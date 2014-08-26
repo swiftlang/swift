@@ -398,6 +398,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     InlineKind kind;
     if (Tok.getText() == "never")
       kind = InlineKind::Never;
+    else if (Tok.getText() == "__always")
+      kind = InlineKind::Always;
     else {
       diagnose(Loc, diag::inline_attribute_unknown_option,
                Tok.getText(), AttrName);

@@ -671,7 +671,7 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 }
 
 static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
-                                 bool &isNoinline, std::string &Semantics,
+                                 Inline_t &inlineStrategy, std::string &Semantics,
                                  EffectsKind &MRK,
                                  Parser &P) {
   while (P.consumeIf(tok::l_square)) {
@@ -683,7 +683,9 @@ static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
     else if (P.Tok.getText() == "global_init")
       isGlobalInit = true;
     else if (P.Tok.getText() == "noinline")
-      isNoinline = true;
+      inlineStrategy = NoInline;
+    else if (P.Tok.getText() == "always_inline")
+      inlineStrategy = AlwaysInline;
     else if (P.Tok.getText() == "readnone")
       MRK = EffectsKind::ReadNone;
     else if (P.Tok.getText() == "readonly")
@@ -3004,11 +3006,12 @@ bool Parser::parseDeclSIL() {
 
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
-  bool isGlobalInit = false, isNoinline = false;
+  bool isGlobalInit = false;
+  Inline_t inlineStrategy = InlineDefault;
   std::string Semantics;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
-      parseDeclSILOptional(isTransparent, isGlobalInit, isNoinline, Semantics,
+      parseDeclSILOptional(isTransparent, isGlobalInit, inlineStrategy, Semantics,
                            MRK, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -3032,7 +3035,7 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setGlobalInit(isGlobalInit);
-    FunctionState.F->setNoinline(isNoinline);
+    FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setEffectsInfo(MRK);
     if (!Semantics.empty())
       FunctionState.F->setSemanticsAttr(Semantics);

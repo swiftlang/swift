@@ -33,6 +33,7 @@ class SILModule;
   
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
+enum Inline_t { InlineDefault, NoInline, AlwaysInline };
   
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
@@ -83,7 +84,7 @@ private:
   unsigned GlobalInitFlag : 1;
 
   /// The function's noinline attribute.
-  unsigned NoinlineFlag : 1;
+  unsigned InlineStrategy : 2;
 
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
@@ -103,7 +104,7 @@ private:
               Optional<SILLocation> loc,
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
-              bool isNoinline, EffectsKind E,
+              Inline_t inlineStrategy, EffectsKind E,
               SILFunction *insertBefore,
               SILDebugScope *debugScope,
               DeclContext *DC);
@@ -115,7 +116,7 @@ public:
                              Optional<SILLocation> loc = Nothing,
                              IsBare_t isBareSILFunction = IsNotBare,
                              IsTransparent_t isTrans = IsNotTransparent,
-                             bool isNoinline = false,
+                             Inline_t inlineStrategy = InlineDefault,
                              EffectsKind EK = EffectsKind::Unspecified,
                              SILFunction *InsertBefore = nullptr,
                              SILDebugScope *DebugScope = nullptr,
@@ -230,8 +231,8 @@ public:
   void setTransparent(IsTransparent_t isT) { Transparent = isT; }
 
   /// Get this function's noinline attribute.
-  bool isNoinline() const { return NoinlineFlag; }
-  void setNoinline(bool isNI) { NoinlineFlag = isNI; }
+  Inline_t getInlineStrategy() const { return Inline_t(InlineStrategy); }
+  void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }
 
   /// \return the function side effects information.
   EffectsKind getEffectsInfo() const { return EK; }

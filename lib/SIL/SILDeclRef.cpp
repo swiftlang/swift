@@ -238,6 +238,16 @@ bool SILDeclRef::isNoinline() const {
    return false;
 }
 
+/// \brief True if the function has noinline attribute.
+bool SILDeclRef::isAlwaysInline() const {
+  if (!hasDecl())
+    return false;
+  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
+    if (InlineA->getKind() == InlineKind::Always)
+      return true;
+  return false;
+}
+
 bool SILDeclRef::hasEffectsAttribute() const {
   if (!hasDecl())
     return false;

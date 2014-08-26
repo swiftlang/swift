@@ -225,7 +225,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                                 toStableSILLinkage(F.getLinkage()),
                                 (unsigned)F.isTransparent(),
                                 (unsigned)F.isGlobalInit(),
-                                (unsigned)F.isNoinline(),
+                                (unsigned)F.getInlineStrategy(),
                                 (unsigned)F.getEffectsInfo(),
                                 FnID, SemanticsID);
 

@@ -190,6 +190,11 @@ var ccFunc : @cc(cdecl) () -> () // expected-error {{attribute is not supported}
 @inline(never) class FooClass { // expected-error {{'inline(never)' attribute cannot be applied to this declaration}}
 }
 
+@inline(__always) func AlwaysInlineFunc() {}
+@inline(__always) var alwaysInlineVar : Int // expected-error {{'inline(__always)' attribute cannot be applied to this declaration}}
+@inline(__always) class FooClass2 { // expected-error {{'inline(__always)' attribute cannot be applied to this declaration}}
+}
+
 class A {
   @inline(never) init(a : Int) {}
   var b : Int {
@@ -197,6 +202,17 @@ class A {
       return 42
     }
     @inline(never) set {
+    }
+  }
+}
+
+class B {
+  @inline(__always) init(a : Int) {}
+  var b : Int {
+    @inline(__always) get {
+      return 42
+    }
+    @inline(__always) set {
     }
   }
 }

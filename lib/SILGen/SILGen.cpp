@@ -269,10 +269,16 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   constant.getEffectsAttribute() : EffectsKind::Unspecified;
 
   SmallVector<char, 128> buffer;
+  Inline_t inlineStrategy = InlineDefault;
+  if (constant.isNoinline())
+    inlineStrategy = NoInline;
+  else if (constant.isAlwaysInline())
+    inlineStrategy = AlwaysInline;
+  
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
                                 Nothing, IsNotBare, IsTrans,
-                                constant.isNoinline(), EK);
+                                inlineStrategy, EK);
 
   F->setGlobalInit(constant.isGlobal());
   if (constant.hasDecl())
@@ -587,7 +593,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *f = 
     SILFunction::create(M, SILLinkage::Private, funcName,
                         initSILType, nullptr,
-                        binding, IsNotBare, IsNotTransparent, false);
+                        binding, IsNotBare, IsNotTransparent, InlineDefault);
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(binding->getInit()), *f));
   f->setLocation(binding);

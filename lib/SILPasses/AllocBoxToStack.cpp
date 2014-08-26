@@ -555,7 +555,7 @@ DeadParamCloner::initCloned(SILFunction *Orig,
   auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
                                 Orig->getContextGenericParams(),
                                 Orig->getLocation(), Orig->isBare(),
-                                IsNotTransparent, Orig->isNoinline(),
+                                IsNotTransparent, Orig->getInlineStrategy(),
                                 Orig->getEffectsInfo(), Orig,
                                 Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());

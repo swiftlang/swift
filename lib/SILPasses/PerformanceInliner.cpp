@@ -177,6 +177,12 @@ bool SILPerformanceInliner::isProfitableToInline(SILFunction *Caller,
   unsigned CalleeCost = getFunctionCost(Callee, Caller,
                                         InlineCostThreshold * BoostFactor);
 
+  // When the cost is UINT_MAX it means that it is illegal to inline.
+  // In this case we have to ignore the AlwaysInline strategy.
+  if (Callee->getInlineStrategy() == AlwaysInline && CalleeCost < UINT_MAX) {
+    return true;
+  }
+
   unsigned Threshold = InlineCostThreshold * BoostFactor;
   if (CalleeCost > Threshold) {
     DEBUG(llvm::dbgs() << "        FAIL! Function too big to inline. "
@@ -241,7 +247,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
       DEBUG(llvm::dbgs() << "        FAIL! Cannot find inlineable callee.\n");
       continue;
     }
-    if (Callee->isNoinline())
+    if (Callee->getInlineStrategy() == NoInline)
       continue;
 
     if (AI->hasSubstitutions()) {

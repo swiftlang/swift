@@ -366,12 +366,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   (void)kind;
 
   TypeID funcTyID;
-  unsigned rawLinkage, isTransparent, isGlobal, isNoinline,
+  unsigned rawLinkage, isTransparent, isGlobal, inlineStrategy,
       effect;
   IdentifierID SemanticsID;
   SILFunctionLayout::readRecord(scratch, rawLinkage,
                                 isTransparent, isGlobal,
-                                isNoinline, effect, funcTyID,
+                                inlineStrategy, effect, funcTyID,
                                 SemanticsID);
 
   if (funcTyID == 0) {
@@ -420,7 +420,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                              nullptr, loc);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setGlobalInit(isGlobal == 1);
-    fn->setNoinline(isNoinline == 1);
+    fn->setInlineStrategy((Inline_t)inlineStrategy);
     fn->setEffectsInfo((EffectsKind)effect);
     if (SemanticsID)
       fn->setSemanticsAttr(MF->getIdentifier(SemanticsID).str());

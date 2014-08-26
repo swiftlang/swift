@@ -1321,8 +1321,11 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isGlobalInit())
     OS << "[global_init] ";
   
-  if (isNoinline())
-    OS << "[noinline] ";
+  switch (getInlineStrategy()) {
+    case NoInline: OS << "[noinline] "; break;
+    case AlwaysInline: OS << "[always_inline] "; break;
+    case InlineDefault: break;
+  }
 
   if (getEffectsInfo() == EffectsKind::ReadOnly)
     OS << "[readonly] ";

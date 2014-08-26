@@ -232,7 +232,7 @@ SILFunction *FunctionSignatureOptCloner::initCloned(
   // Create the new function.
   SILFunction *NewF = SILFunction::create(
       M, OptimizedLinkage, NewName, NewFTy, nullptr, Orig.getLocation(),
-      Orig.isBare(), Orig.isTransparent(), Orig.isNoinline(),
+      Orig.isBare(), Orig.isTransparent(), Orig.getInlineStrategy(),
       Orig.getEffectsInfo(), 0, Orig.getDebugScope(),
       Orig.getDeclContext());
   NewF->setSemanticsAttr(Orig.getSemanticsAttr());

@@ -106,7 +106,7 @@ SILFunction *ClosureSpecCloner::initCloned(SILFunction *Orig,
   auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
                                 Orig->getContextGenericParams(),
                                 Orig->getLocation(), Orig->isBare(),
-                                Orig->isTransparent(), Orig->isNoinline(),
+                                Orig->isTransparent(), Orig->getInlineStrategy(),
                                 Orig->getEffectsInfo(),
                                 Orig, Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());

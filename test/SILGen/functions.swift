@@ -526,6 +526,10 @@ func blockToFunc(x: @objc_block () -> ()) -> () -> () {
 @inline(never)
 func noinline_callee() {}
 
+// CHECK-LABEL: sil [always_inline] @_TF9functions20always_inline_calleeFT_T_ : $@thin () -> ()
+@inline(__always)
+func always_inline_callee() {}
+
 // CHECK-LABEL: sil [semantics "foo"] @_TF9functions9semanticsFT_T_ : $@thin () -> ()
 @semantics("foo")
 func semantics() {}
