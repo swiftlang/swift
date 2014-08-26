@@ -3335,9 +3335,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
-  SILBasicBlock *failureBB = nullptr;
+  SILBasicBlock *failureExitBB = nullptr;
+  SILArgument *failureExitArg = nullptr;
+  auto &resultLowering = getTypeLowering(ctor->getResultType());
+
   if (ctor->getFailability() != OTK_None) {
-    failureBB = createBasicBlock();
+    SILBasicBlock *failureBB = createBasicBlock();
+    failureExitBB = createBasicBlock();
     
     // On failure, we'll clean up everything (including self) and return nil
     // instead.
@@ -3345,8 +3349,21 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     B.setInsertionPoint(failureBB);
     Cleanups.emitCleanupsForReturn(ctor);
     B.emitStrongRelease(ctor, selfBox);
-    // return nil...
-    B.createUnreachable(ctor);
+    // Return nil.
+    if (lowering.isAddressOnly()) {
+      // Inject 'nil' into the indirect return.
+      B.createInjectEnumAddr(ctor, IndirectReturnAddress,
+                   getASTContext().getOptionalNoneDecl(ctor->getFailability()));
+      B.createBranch(ctor, failureExitBB);
+    } else {
+      // Pass 'nil' as the return value to the exit BB.
+      failureExitArg = new (F.getModule())
+        SILArgument(resultLowering.getLoweredType(), failureExitBB);
+      SILValue nilResult = B.createEnum(ctor, {},
+                    getASTContext().getOptionalNoneDecl(ctor->getFailability()),
+                    resultLowering.getLoweredType());
+      B.createBranch(ctor, failureExitBB, nilResult);
+    }
     
     B.setInsertionPoint(curBB);
     FailDest = JumpDest(failureBB, Cleanups.getCleanupsDepth(), ctor);
@@ -3414,6 +3431,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       break;
     }
     
+    if (failureExitBB) {
+      B.createBranch(returnLoc, failureExitBB);
+      B.emitBlock(failureExitBB);
+    }
     B.createReturn(returnLoc, emitEmptyTuple(ctor));
     return;
   }
@@ -3441,6 +3462,11 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     break;
   }
   
+  if (failureExitBB) {
+    B.createBranch(returnLoc, failureExitBB, selfValue);
+    B.emitBlock(failureExitBB);
+    selfValue = failureExitArg;
+  }
   B.createReturn(returnLoc, selfValue);
 }
 
