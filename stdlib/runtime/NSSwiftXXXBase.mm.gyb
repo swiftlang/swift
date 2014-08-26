@@ -51,12 +51,21 @@ using namespace swift;
 
 @implementation _NSSwift${Class}Base
 + (void)load {
+  // Poke this class into the superclass chain for _NSSwift${Class}
+  auto subclassName = "_NSSwift${Class}";
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  char buffer[64];
-  snprintf(buffer, 64, "_TtCSs%d%s", (int)strlen("_NSSwift${Class}"), 
-           "_NSSwift${Class}");
-  class_setSuperclass(objc_getClass(buffer), [_NSSwift${Class}Base class]);
+
+  // Compute the mangled name of the subclass
+  char subclassMangledName[64];
+  snprintf(
+    subclassMangledName, sizeof(subclassMangledName),
+    "_TtCSs%d%s",
+    (int)strlen(subclassName), subclassName);
+
+  auto subclass = objc_getClass(subclassMangledName);
+  auto selfClass = [_NSSwift${Class}Base class];
+  class_setSuperclass(subclass, selfClass);
 #pragma clang diagnostic pop
 }
 
