@@ -40,6 +40,9 @@ template <typename ImplClass>
 class SCCVisitor {
 public:
   SCCVisitor(SILFunction &F) : F(F), CurrentNum(0) {}
+  ~SCCVisitor() {
+    cleanup();
+  }
   ImplClass &asImpl() {  return static_cast<ImplClass &>(*this); }
 
   void visit(llvm::SmallVectorImpl<ValueBase *> &SCC) { }
@@ -53,6 +56,8 @@ public:
         if (!Visited.count(&I))
           DFS(&I);
     }
+
+    cleanup();
   }
 
 private:
@@ -70,24 +75,34 @@ private:
 
   llvm::DenseSet<ValueBase *> Visited;
   llvm::SetVector<ValueBase *> DFSStack;
-  typedef llvm::DenseMap<ValueBase *, DFSInfo> ValueInfoMapType;
+  typedef llvm::DenseMap<ValueBase *, DFSInfo *> ValueInfoMapType;
   ValueInfoMapType ValueInfoMap;
+
+  void cleanup() {
+    Visited.clear();
+    DFSStack.clear();
+    for (auto &Entry : ValueInfoMap)
+      delete Entry.second;
+
+    ValueInfoMap.clear();
+    CurrentNum = 0;
+  }
 
   DFSInfo &addDFSInfo(ValueBase *Value) {
     typename ValueInfoMapType::iterator Iter;
     bool Inserted;
 
-    auto MapEntry = std::make_pair(Value, DFSInfo(Value, CurrentNum++));
+    auto MapEntry = std::make_pair(Value, new DFSInfo(Value, CurrentNum++));
     std::tie(Iter, Inserted) = ValueInfoMap.insert(MapEntry);
     assert(Inserted && "Cannot add DFS info more than once for a value!");
-    return Iter->second;
+    return *Iter->second;
   }
 
   DFSInfo &getDFSInfo(ValueBase *Value) {
     assert(ValueInfoMap.find(Value) != ValueInfoMap.end() &&
            "Expected to find value in DFS info map!");
 
-    return ValueInfoMap.find(Value)->second;
+    return *ValueInfoMap.find(Value)->second;
   }
 
   ValueBase *getArgForTerminator(TermInst *Term, SILBasicBlock *SuccBB,
