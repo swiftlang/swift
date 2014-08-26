@@ -2136,6 +2136,10 @@ extension Dictionary : Reflectable {
   }
 }
 
+/// Initializes a `Dictionary` from unique key-value pairs.
+///
+/// Using a builder can be faster than inserting key-value pairs into an empty
+/// `Dictionary`.
 public struct _DictionaryBuilder<Key : Hashable, Value> {
   var _result: [Key : Value]
   var _nativeStorage: _NativeDictionaryStorage<Key, Value>
