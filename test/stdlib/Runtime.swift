@@ -1082,6 +1082,32 @@ Reflection.test("CGRect") {
   expectEqual(expected, output)
 }
 
+Reflection.test("Unmanaged/nil") {
+  var output = ""
+  var optionalURL: Unmanaged<CFURL>? = nil
+  dump(optionalURL, &output)
+
+  var expected = "- nil\n"
+
+  expectEqual(expected, output)
+}
+
+Reflection.test("Unmanaged/not-nil") {
+  var output = ""
+  var optionalURL: Unmanaged<CFURL>? =
+    Unmanaged.passRetained(CFURLCreateWithString(nil, "http://llvm.org/", nil))
+  dump(optionalURL, &output)
+
+  var expected = ""
+  expected += "▿ Swift.Unmanaged\n"
+  expected += "  ▿ Some: Swift.Unmanaged\n"
+  expected += "    - _value: http://llvm.org/ #0\n"
+
+  expectEqual(expected, output)
+
+  optionalURL!.release()
+}
+
 Reflection.test("TupleMirror/NoLeak") {
   if true {
     nsObjectCanaryCount = 0
