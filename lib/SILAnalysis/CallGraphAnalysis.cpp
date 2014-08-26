@@ -17,12 +17,11 @@ using namespace swift;
 
 #define DEBUG_TYPE "call-graph"
 
-STATISTIC(NumCallGraphNodes,
-          "# of call graph nodes created");
-STATISTIC(NumCallSitesWithEdges,
-          "# of call sites with edges");
+STATISTIC(NumCallGraphNodes, "# of call graph nodes created");
+STATISTIC(NumCallSitesWithEdges, "# of call sites with edges");
 STATISTIC(NumCallSitesWithoutEdges,
-          "# of call sites without edges");
+          "# of non-builtin call sites without call graph edges");
+STATISTIC(NumCallSitesOfBuiltins, "# of call sites calling builtins");
 
 CallGraph::CallGraph(SILModule *M, bool completeModule) {
   // Build the initial call graph by creating a node for each
@@ -120,7 +119,11 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
     break;
   }
 
-  case ValueKind::BuiltinFunctionRefInst:
+  case ValueKind::BuiltinFunctionRefInst: {
+    ++NumCallSitesOfBuiltins;
+    break;
+  }
+
   case ValueKind::PartialApplyInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::ProtocolMethodInst:
