@@ -695,7 +695,7 @@ public:
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
   /// intrinsic. The particular intrinsic functions which correspond to the
-  /// retruned value are defined in llvm/Intrinsics.h.
+  /// returned value are defined in llvm/Intrinsics.h.
   const IntrinsicInfo &getIntrinsicInfo() const;
 
   /// \brief Looks up the lazily cached identification for the builtin function.
