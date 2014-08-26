@@ -1242,7 +1242,7 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
     }
   }
   if (!D && hasDefault() && unswitchedElts.size() == 1 &&
-      !BB->getParent()->getModule().Types.isResilient(decl) &&
+      !enumType.isResilient(BB->getParent()->getModule()) &&
       getDefaultBB() == BB) {
     return *unswitchedElts.begin();
   }

@@ -90,6 +90,15 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
 
+bool SILType::isResilient(SILModule &M) const {
+  NominalTypeDecl *nomType = getNominalOrBoundGenericNominal();
+  if (!nomType) {
+    assert(false && "isResilient on non-nominal types not implemented");
+    return true;
+  }
+  return M.Types.isResilient(nomType);
+}
+
 /// True if the type, or the referenced type of an address type, is
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.
