@@ -2565,7 +2565,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     auto DTI = DebugTypeInfo(Decl,
                              Decl->getType()->getLValueOrInOutObjectType(),
                              type);
-    auto Name = Decl->getName().str();
+    auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
     auto DS = i->getDebugScope();
     if (!DS) DS = CurSILFn->getDebugScope();
     assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
