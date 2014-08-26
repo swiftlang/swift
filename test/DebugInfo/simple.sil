@@ -4,44 +4,21 @@ sil_stage canonical
 
 import Builtin
 import Swift
-import SwiftShims
 
-// top_level_code
-sil private @top_level_code : $@thin () -> () {
-bb0:
-  %0 = tuple ()                                   // user: %1
-  return %0 : $()                                 // id: %1
-}
-
-// simple.square (Swift.Int) -> Swift.Int
-sil @_TF6simple6squareFSiSi : $@thin (Int) -> Int {
-bb0(%0 : $Int):
-  debug_value %0 : $Int  // let x                 // id: %1
-  %2 = builtin_function_ref "smul_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %6
-  %3 = struct_extract %0 : $Int, #Int.value       // user: %6
-  %4 = struct_extract %0 : $Int, #Int.value       // user: %6
+sil @square : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  debug_value %0 : $Int32  // let x                 // id: %1
+  %2 = builtin_function_ref "smul_with_overflow_Int32" : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1) // user: %6
+  %3 = struct_extract %0 : $Int32, #Int32.value       // user: %6
+  %4 = struct_extract %0 : $Int32, #Int32.value       // user: %6
   %5 = integer_literal $Builtin.Int1, -1          // user: %6
-  %6 = apply %2(%3, %4, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %7, %8
-  %7 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 0 // user: %10
-  %8 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 1 // user: %9
+  %6 = apply %2(%3, %4, %5) : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1) // users: %7, %8
+  %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0 // user: %10
+  %8 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 1 // user: %9
   cond_fail %8 : $Builtin.Int1                    // id: %9
-  %10 = struct $Int (%7 : $Builtin.Word)          // user: %11
-  // CHECK: ret i64 %{{.*}}, !dbg ![[LOC:.*]]
+  %10 = struct $Int32 (%7 : $Builtin.Int32)          // user: %11
+  // CHECK: ret i32 %{{.*}}, !dbg ![[LOC:.*]]
   // CHECK: ![[LOC]] = metadata !{i32 [[@LINE+1]],
-  return %10 : $Int                               // id: %11
+  return %10 : $Int32                               // id: %11
 }
 
-// Swift.* infix (Swift.Int, Swift.Int) -> Swift.Int
-sil public_external [transparent] @_TFSsoi1mFTSiSi_Si : $@thin (Int, Int) -> Int {
-bb0(%0 : $Int, %1 : $Int):
-  %2 = builtin_function_ref "smul_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %6
-  %3 = struct_extract %0 : $Int, #Int.value       // user: %6
-  %4 = struct_extract %1 : $Int, #Int.value       // user: %6
-  %5 = integer_literal $Builtin.Int1, -1          // user: %6
-  %6 = apply %2(%3, %4, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %7, %8
-  %7 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 0 // user: %10
-  %8 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 1 // user: %9
-  cond_fail %8 : $Builtin.Int1                    // id: %9
-  %10 = struct $Int (%7 : $Builtin.Word)          // user: %11
-  return %10 : $Int                               // id: %11
-}
