@@ -5501,7 +5501,12 @@ public:
       else
         fnTy = FunctionType::get(argTy, ElemTy);
       EED->setType(fnTy);
-      if (EED->getDeclContext()->isGenericContext())
+      
+      // Test for type parameters, as opposed to a generic decl context, in
+      // case the enclosing enum type was illegally declared inside of a generic
+      // context. (In that case, we'll post a diagnostic while visiting the
+      // parent enum.)
+      if (EED->getParentEnum()->getGenericParams())
         computeEnumElementInterfaceType(EED);
       return;
     }
@@ -5514,7 +5519,7 @@ public:
       fnTy = FunctionType::get(MetatypeType::get(ElemTy), fnTy);
     EED->setType(fnTy);
 
-    if (EED->getDeclContext()->isGenericContext())
+    if (EED->getParentEnum()->getGenericParams())
       computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.

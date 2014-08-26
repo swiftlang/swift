@@ -275,3 +275,17 @@ func testDirection() {
 enum NestedSingleElementTuple {
   case Case(x: (y: Int)) // expected-error{{cannot create a single-element tuple with an element label}}
 }
+
+// <rdar://problem/17186190>
+class OuterNonGenericClass {
+  enum Bar {
+    case Baz
+    case Zab
+  } 
+}
+class OuterGenericClass<T> {
+  enum Bar { // expected-error {{type 'Bar' nested in generic type 'OuterGenericClass' is not allowed}}
+    case Baz
+    case Zab
+  } 
+}
