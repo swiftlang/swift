@@ -86,6 +86,10 @@ namespace swift {
   LLVM_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
+  extern "C" bool _swift_usesNativeSwiftReferenceCounting_nonNull(
+    const void *object);
+
+  extern "C" bool _swift_isUniquelyReferencedNative_nonNull(const void* object);
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

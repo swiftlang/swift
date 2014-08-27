@@ -691,3 +691,30 @@ extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,
            (unsigned long long)clas);
   return fullName;
 }
+
+// Given a non-nil object reference, return true iff the object uses
+// native swift reference counting.
+bool swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
+  const void *object
+) {
+    assert(object != nullptr);
+#if SWIFT_OBJC_INTEROP
+    return !isObjCTaggedPointer(object) &&
+      usesNativeSwiftReferenceCounting_allocated(object);
+#else 
+    return true;
+#endif 
+}
+
+// Given a non-nil object reference, return true iff the object is a
+// native swift object with strong reference count of 1.
+bool swift::_swift_isUniquelyReferencedNative_nonNull(
+  const void* object
+) {
+  assert(object != nullptr);
+  return
+#if SWIFT_OBJC_INTEROP
+    swift::_swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
+#endif 
+    ((const HeapObject*)object)->refCount < 2 * RC_INTERVAL;
+}

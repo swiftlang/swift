@@ -524,9 +524,10 @@ void swift::_swift_abortRetainUnowned(const void *object) {
   swift::crash("attempted to retain deallocated object");
 }
 
-// Given the bits of a Native swift object reference, or of a Swift
-// enum containing a Native swift object reference as a payload,
-// return true iff the object's strong reference count is 1.
+// Given the bits of a Native swift object reference, or of a
+// word-sized Swift enum containing a Native swift object reference as
+// a payload, return true iff the object's strong reference count is
+// 1.
 extern "C" bool _swift_isUniquelyReferenced(std::uintptr_t bits) {
   const auto object = reinterpret_cast<HeapObject*>(
     bits & ~heap_object_abi::SwiftSpareBitsMask);
