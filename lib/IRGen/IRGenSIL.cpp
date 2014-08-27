@@ -2610,7 +2610,10 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
-  //llvm_unreachable("not implemented");
+  const TypeInfo &type = getTypeInfo(i->getElementType());
+  Explosion owner = getLoweredExplosion(i->getOperand());
+  llvm::Value *ownerPtr = owner.claimNext();
+  type.deallocateBox(*this, ownerPtr, i->getElementType().getSwiftRValueType());
 }
 
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {

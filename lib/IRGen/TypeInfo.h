@@ -255,6 +255,11 @@ public:
   virtual OwnedAddress allocateBox(IRGenFunction &IGF, CanType T,
                                    const llvm::Twine &name) const = 0;
 
+  /// Deallocate an uninitialized box of this type on the heap.
+  virtual void deallocateBox(IRGenFunction &IGF,
+                             llvm::Value *boxOwner,
+                             CanType T) const = 0;
+  
   /// Copy a value out of an object and into another, destroying the
   /// old value in the destination.
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,

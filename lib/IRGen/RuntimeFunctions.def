@@ -44,6 +44,11 @@ FUNCTION(AllocBox,       swift_allocBox,      RuntimeCC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(DeallocBox,     swift_deallocBox,    RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION(AllocObject,    swift_allocObject,   RuntimeCC,
          RETURNS(RefCountedPtrTy),

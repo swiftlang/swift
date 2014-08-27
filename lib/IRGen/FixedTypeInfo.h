@@ -76,6 +76,9 @@ public:
   OwnedAddress allocateBox(IRGenFunction &IGF, CanType T,
                            const llvm::Twine &name) const override;
 
+  void deallocateBox(IRGenFunction &IGF, llvm::Value *boxOwner,
+                     CanType T) const override;
+
   // We can give these reasonable default implementations.
 
   void initializeWithTake(IRGenFunction &IGF, Address destAddr,

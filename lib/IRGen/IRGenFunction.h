@@ -144,6 +144,8 @@ public:
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                         llvm::Value *&box,
                         llvm::Value *&valueAddress);
+  
+  void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   llvm::Value *emitTypeMetadataRef(CanType type);
   llvm::Value *emitTypeMetadataRef(SILType type);

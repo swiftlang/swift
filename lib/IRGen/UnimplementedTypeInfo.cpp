@@ -110,6 +110,11 @@ OwnedAddress UnimplementedTypeInfo::allocateBox(IRGenFunction &IGF, CanType T,
                       llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy));
 }
 
+void UnimplementedTypeInfo::deallocateBox(IRGenFunction &IGF,
+                                          llvm::Value *boxOwner, CanType T)
+const {
+}
+
 void UnimplementedTypeInfo::assignWithCopy(IRGenFunction &IGF, Address dest,
                                            Address src, CanType T) const {
   

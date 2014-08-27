@@ -119,3 +119,19 @@ OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF, CanType T,
   return addr;
 }
 
+// Deallocate a fixed-layout box that is uninitialized.
+void FixedTypeInfo::deallocateBox(IRGenFunction &IGF, llvm::Value *boxOwner,
+                                  CanType T) const {
+  // If the type is known to be empty, a box isn't actually allocated.
+  if (isKnownEmpty())
+    return;
+  
+  // Lay out the type as a heap object.
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, T, this);
+  assert(!layout.isKnownEmpty() && "non-empty type had empty layout?");
+
+  auto size = layout.emitSize(IGF.IGM);
+  auto alignMask = layout.emitAlignMask(IGF.IGM);
+  
+  emitDeallocateHeapObject(IGF, boxOwner, size, alignMask);
+}

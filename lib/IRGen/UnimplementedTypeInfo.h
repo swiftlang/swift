@@ -49,6 +49,8 @@ public:
                        CanType T) const override;
   OwnedAddress allocateBox(IRGenFunction &IGF, CanType T,
                            const llvm::Twine &name) const override;
+  void deallocateBox(IRGenFunction &IGF, llvm::Value *boxOwner,
+                     CanType T) const override;
   void assignWithCopy(IRGenFunction &IGF, Address dest,
                       Address src, CanType T) const override;
   void assignWithTake(IRGenFunction &IGF, Address dest,

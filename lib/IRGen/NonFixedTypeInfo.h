@@ -66,6 +66,13 @@ public:
     IGF.emitAllocBoxCall(metadata, box, address);
     return OwnedAddress(getAsBitCastAddress(IGF, address), box);
   }
+  
+  void deallocateBox(IRGenFunction &IGF, llvm::Value *boxOwner,
+                     CanType T) const override {
+    // Deallocate the box using the deallocBox runtime call.
+    llvm::Value *metadata = IGF.emitTypeMetadataRef(T);
+    IGF.emitDeallocBoxCall(boxOwner, metadata);
+  }
 
   ContainedAddress allocateStack(IRGenFunction &IGF,
                                  CanType T,

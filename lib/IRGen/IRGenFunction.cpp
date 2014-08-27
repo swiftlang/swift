@@ -136,6 +136,18 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
   valueAddress = Builder.CreateExtractValue(call, 1);
 }
 
+void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
+                                       llvm::Value *typeMetadata) {
+  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
+                                       llvm::AttributeSet::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+
+  llvm::CallInst *call =
+    Builder.CreateCall2(IGM.getDeallocBoxFn(), box, typeMetadata);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setAttributes(attrs);
+}
+
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
                                  std::initializer_list<llvm::Value *> args) {
   llvm::CallInst *call =

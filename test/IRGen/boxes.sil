@@ -1,0 +1,40 @@
+// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir %s | FileCheck %s
+
+import Builtin
+
+sil_stage canonical
+
+// CHECK-LABEL: define void @generic_box_alloc_dealloc(%swift.type* %T)
+// CHECK:         [[BOX:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* %T)
+// CHECK:         [[OWNER:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 0
+// CHECK:         [[DATA:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1
+// CHECK:         call void @swift_deallocBox(%swift.refcounted* [[OWNER]], %swift.type* %T)
+sil @generic_box_alloc_dealloc : $@thin <T> () -> () {
+entry:
+  %b = alloc_box $T
+  dealloc_box $T, %b#0 : $Builtin.NativeObject
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @fixed_box_alloc_dealloc() 
+// CHECK:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 24, i64 7)
+// CHECK:         call void @swift_deallocObject(%swift.refcounted* [[BOX]], i64 24, i64 7)
+sil @fixed_box_alloc_dealloc : $@thin () -> () {
+entry:
+  %b = alloc_box $Builtin.Word
+  dealloc_box $Builtin.Word, %b#0 : $Builtin.NativeObject
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @empty_box_alloc_dealloc()
+// CHECK-NOT:     swift_allocBox
+// CHECK-NOT:     swift_allocObject
+// CHECK-NOT:     swift_deallocBox
+// CHECK-NOT:     swift_deallocObject
+// CHECK:         ret void
+sil @empty_box_alloc_dealloc : $@thin () -> () {
+entry:
+  %b = alloc_box $()
+  dealloc_box $(), %b#0 : $Builtin.NativeObject
+  return undef : $()
+}
