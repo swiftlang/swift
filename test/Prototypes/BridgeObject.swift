@@ -19,6 +19,9 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift | FileCheck %s
 
+// FIXME: <rdar://problem/18143396> Test Prototypes/BridgeObject.swift fails on some OS versions
+// REQUIRES: write-some-os-version-checks
+
 import Swift
 
 //===--- Code destined for stdlib -----------------------------------------===//
