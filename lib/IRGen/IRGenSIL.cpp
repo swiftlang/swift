@@ -2794,8 +2794,17 @@ void IRGenSILFunction::visitUncheckedRefBitCastInst(
 
 void IRGenSILFunction::visitRefToRawPointerInst(
                                              swift::RefToRawPointerInst *i) {
-  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
-                      IGM.Int8PtrTy);
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *ptrValue = from.claimNext();
+  // The input may have witness tables or other additional data, but the class
+  // reference is always first.
+  from.claimAll();
+  
+  ptrValue = Builder.CreateBitCast(ptrValue, IGM.Int8PtrTy);
+  
+  Explosion to(ResilienceExpansion::Maximal);
+  to.add(ptrValue);
+  setLoweredExplosion(SILValue(i, 0), to);
 }
 
 void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {

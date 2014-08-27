@@ -196,6 +196,12 @@ func class_archetype_to_raw_pointer<T : C>(t: T) -> Builtin.RawPointer {
   return Builtin.bridgeToRawPointer(t)
 }
 
+protocol CP: class {}
+
+func existential_to_raw_pointer(p: CP) -> Builtin.RawPointer {
+  return Builtin.bridgeToRawPointer(p)
+}
+
 // CHECK-LABEL: sil @_TF8builtins18obj_to_raw_pointer
 func obj_to_raw_pointer(c: Builtin.NativeObject) -> Builtin.RawPointer {
   // CHECK: [[RAW:%.*]] = ref_to_raw_pointer [[C:%.*]] to $Builtin.RawPointer

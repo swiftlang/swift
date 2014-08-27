@@ -1708,10 +1708,8 @@ public:
   }
 
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
-    require(AI->getOperand().getType()
-              .getSwiftType()->mayHaveSuperclass() ||
-            AI->getOperand().getType().getSwiftType()->isEqual(
-                            AI->getType().getASTContext().TheNativeObjectType),
+    require(AI->getOperand().getType().getSwiftType()
+              ->isAnyClassReferenceType(),
             "ref-to-raw-pointer operand must be a class reference or"
             " NativeObject");
     require(AI->getType().getSwiftType()->isEqual(

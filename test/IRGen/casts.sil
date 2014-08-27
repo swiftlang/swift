@@ -15,3 +15,14 @@ entry(%a : $*A):
   %x = load %b : $*B
   return %x : $B
 }
+
+protocol CP: class {}
+
+// CHECK-LABEL: define i8* @ref_to_raw_pointer_existential(%objc_object*, i8**) {
+// CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
+// CHECK:         ret i8* [[CAST]]
+sil @ref_to_raw_pointer_existential : $@thin (@owned CP) -> Builtin.RawPointer {
+entry(%p : $CP):
+  %r = ref_to_raw_pointer %p : $CP to $Builtin.RawPointer
+  return %r : $Builtin.RawPointer
+}
