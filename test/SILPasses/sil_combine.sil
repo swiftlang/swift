@@ -1704,3 +1704,25 @@ bb0(%0 : $Builtin.NativeObject):
   return %3 : $Builtin.NativeObject
 }
 
+struct FakeInt16 {
+  var val : Builtin.Int16
+}
+
+struct FakeInt32 {
+  var val : Builtin.Int32
+}
+
+// Don't promote this to an unchecked_trivial_bit_cast.
+
+// CHECK-LABEL: sil @unchecked_addr_cast_of_different_size_structs
+// CHECK-NOT: unchecked_trivial_bit_cast
+// CHECK: return
+
+sil @unchecked_addr_cast_of_different_size_structs : $@thin (@inout FakeInt32) -> Builtin.Int16 {
+bb0(%0 : $*FakeInt32):
+  %1 = unchecked_addr_cast %0 : $*FakeInt32 to $*FakeInt16
+  %2 = load %1 : $*FakeInt16
+  %3 = struct_extract %2 : $FakeInt16, #FakeInt16.val
+  return %3 : $Builtin.Int16
+}
+

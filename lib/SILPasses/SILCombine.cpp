@@ -1506,6 +1506,12 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   return nullptr;
 }
 
+static bool areBothStructs(SILType Ty1, SILType Ty2) {
+  if (Ty1.getStructOrBoundGenericStruct() && Ty2.getStructOrBoundGenericStruct())
+    return true;
+  else return false;
+}
+
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   SILModule &Mod = UADCI->getModule();
@@ -1544,6 +1550,13 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   // anything. This is to ensure that we do not change any types reference
   // semantics from trivial -> reference counted.
   if (InputIsTrivial && !OutputIsTrivial)
+    return nullptr;
+
+  // The structs could have different size. We have code in the stdlib that
+  // casts pointers to differently sized integer types. This code prevents that
+  // we bitcast the values.
+  if (InputTy.getStructOrBoundGenericStruct() &&
+      OutputTy.getStructOrBoundGenericStruct())
     return nullptr;
 
   // For each user U of the unchecked_addr_cast...
