@@ -649,5 +649,28 @@ StringTests.test("growth") {
   expectLE(s.nativeCapacity, 34)
 }
 
+StringTests.test("<rdar://problem/18114265>") {
+  var str = "+y+z*1.0*sum(A1:A3)"
+
+  if let range0 = str.rangeOfString("^\\+|^\\-|^\\*|^\\/", options: NSStringCompareOptions.RegularExpressionSearch){
+
+    let match0 = str[range0]
+    expectEqual("+", match0) //yields "+" - as expexted
+
+    str.removeRange(range0)
+    expectEqual("+", match0) //yields "+" - as expected
+
+    str.removeRange(range0)
+    expectEqual("+", match0) //yields "+" - as expected
+  }
+
+  if let range1 = str.rangeOfString("^\\+|^\\-|^\\*|^\\/", options: NSStringCompareOptions.RegularExpressionSearch){
+    let match1 = str[range1]
+    expectEqual("+", match1) //yields "+" as expected
+    str.removeRange(range1)
+    expectEqual("+", match1) //!@#$ OMG!!!!!!!!!!! a constant variable has changed! This prints "z"
+  }
+}
+
 runAllTests()
 

@@ -610,8 +610,17 @@ extension _StringCore : RangeReplaceableCollectionType {
     let tailCount = count - subRange.endIndex
     let growth = replacementCount - replacedCount
     let newCount = count + growth
-    
-    let (_, existingStorage) = _claimCapacity(newCount, minElementWidth: width)
+
+    // Successfully claiming capacity only ensures that we can modify
+    // the newly-claimed storage without observably mutating other
+    // strings, i.e., when we're appending.  Already-used characters
+    // can only be mutated when we have a unique reference to the
+    // buffer.
+    let appending = subRange.startIndex == endIndex
+
+    let existingStorage = !hasCocoaBuffer && (
+      appending || _isUniquelyReferenced(&_owner)
+    ) ? _claimCapacity(newCount, minElementWidth: width).1 : nil
 
     if _fastPath(existingStorage != nil) {
       let rangeStart = UnsafeMutablePointer<UInt8>(
