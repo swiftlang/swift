@@ -1112,6 +1112,13 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
   for (auto UI : MUI->getUses()) {
     auto *User = UI->getUser();
     
+    // destroy_addr is a release of the entire value.  This can be an early
+    // release for a conditional initializer.
+    if (isa<DestroyAddrInst>(User)) {
+      Releases.push_back(User);
+      continue;
+    }
+    
     // We only track two kinds of uses for delegating initializers:
     // calls to self.init, and "other", which we choose to model as escapes.
     // This intentionally ignores all stores, which (if they got emitted as
@@ -1122,10 +1129,9 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
     // Stores *to* the allocation are writes.  If the value being stored is a
     // call to self.init()... then we have a self.init call.
     if (auto *AI = dyn_cast<AssignInst>(User)) {
-      if (auto *Call = dyn_cast<ApplyInst>(AI->getOperand(0))) {
-        if (isSelfInitUse(Call))
+      if (auto *AssignSource = dyn_cast<SILInstruction>(AI->getOperand(0)))
+        if (isSelfInitUse(AssignSource))
           Kind = DIUseKind::SelfInit;
-      }
     }
     
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
