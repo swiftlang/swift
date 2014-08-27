@@ -104,6 +104,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   bool MainMode = (Invocation.getInputKind() == SourceFileKind::Main);
   bool SILMode = (Invocation.getInputKind() == SourceFileKind::SIL);
 
+  if (SILMode)
+    Invocation.getLangOptions().EnableAccessControl = false;
+
   const Optional<SelectedInput> &PrimaryInput =
     Invocation.getFrontendOptions().PrimaryInput;
 
