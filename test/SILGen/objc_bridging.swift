@@ -178,13 +178,13 @@ extension NSString {
   // CHECK: }
 
   func nsstrResult() -> NSString { return NSS }
-  // CHECK-LABEL: sil  @_TToFCSo8NSString11nsstrResultfS_FT_S_
+  // CHECK-LABEL: sil  @_TToFE13objc_bridgingCSo8NSString11nsstrResultfS0_FT_S0_
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   func nsstrArg(s: NSString) { }
-  // CHECK-LABEL: sil  @_TToFCSo8NSString8nsstrArg
+  // CHECK-LABEL: sil  @_TToFE13objc_bridgingCSo8NSString8nsstrArgfS0_FS0_T_
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }

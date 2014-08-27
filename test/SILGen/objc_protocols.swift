@@ -111,8 +111,8 @@ extension Bas : NSRuncing {
   func foo() {}
 }
 
-// CHECK-LABEL: sil  @_TToFC18objc_protocols_Bas3Bas11copyRuncingfS0_FT_CSo8NSObject
-// CHECK-LABEL: sil  @_TToFC18objc_protocols_Bas3Bas3foofS0_FT_T_
+// CHECK-LABEL: sil  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncingfS1_FT_CSo8NSObject
+// CHECK-LABEL: sil  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foofS1_FT_T_
 
 // -- Inherited objc protocols
 
@@ -132,7 +132,7 @@ extension Zang : Fungible {
   func foo() {}
 }
 
-// CHECK-LABEL: sil  @_TToFC18objc_protocols_Bas4Zang3foofS0_FT_T_
+// CHECK-LABEL: sil  @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofS1_FT_T_
 
 // -- objc protocols with property requirements in extensions
 //    <rdar://problem/16284574>

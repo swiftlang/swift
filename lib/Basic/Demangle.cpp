@@ -949,7 +949,16 @@ private:
   NodePointer demangleContext() {
     // context ::= module
     // context ::= entity
+    // context ::= E module (extension defined in a different module)
     if (!Mangled) return nullptr;
+    if (Mangled.nextIf('E')) {
+      NodePointer ext = NodeFactory::create(Node::Kind::Extension);
+      NodePointer def_module = demangleModule();
+      NodePointer type = demangleContext();
+      ext->addChild(def_module);
+      ext->addChild(type);
+      return ext;
+    }
     if (Mangled.nextIf('S'))
       return demangleSubstitutionIndex();
     if (isStartOfEntity(Mangled.peek()))
@@ -1980,6 +1989,7 @@ private:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
     case Node::Kind::ExplicitClosure:
+    case Node::Kind::Extension:
     case Node::Kind::FieldOffset:
     case Node::Kind::Function:
     case Node::Kind::FunctionType:
@@ -2230,6 +2240,14 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::Directness:
     Printer << pointer->getText() << " ";
+    return;
+  case Node::Kind::Extension:
+    assert(pointer->getNumChildren() == 2 && "Extension expects 2 children.");
+    Printer << "ext.";
+    // Print the module where extension is defined.
+    print(pointer->getChild(0), true); 
+    Printer << ".";
+    print(pointer->getChild(1), asContext);
     return;
   case Node::Kind::Variable:
   case Node::Kind::Function:

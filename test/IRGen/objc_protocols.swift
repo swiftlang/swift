@@ -64,7 +64,7 @@ extension Bas : NSRuncing {
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas3Bas_$_objc_protocols" = private constant { i32, i32, [1 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 1,
 // CHECK;   [1 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC18objc_protocols_Bas3Bas3foofS0_FT_T_ to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foofS1_FT_T_ to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -104,8 +104,8 @@ extension Zang : Frungible {
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas4Zang_$_objc_protocols" = private constant { i32, i32, [2 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC18objc_protocols_Bas4Zang5runcefS0_FT_T_ to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC18objc_protocols_Bas4Zang3foofS0_FT_T_ to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang5runcefS1_FT_T_ to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofS1_FT_T_ to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 

@@ -126,10 +126,10 @@ extension NSString {
     set {}
   }
 
-  // CHECK: define internal [[OPAQUE:.*]]* @_TToFCSo8NSString11nsstrResultfS_FT_S_([[OPAQUE:.*]]*, i8*) unnamed_addr
+  // CHECK: define internal [[OPAQUE:.*]]* @_TToFE20objc_nsstring_bridgeCSo8NSString11nsstrResultfS0_FT_S0_([[OPAQUE:.*]]*, i8*) unnamed_addr
   func nsstrResult() -> NSString { return NSS }
 
-  // CHECK: define internal void @_TToFCSo8NSString8nsstrArgfS_FT1sS__T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
+  // CHECK: define internal void @_TToFE20objc_nsstring_bridgeCSo8NSString8nsstrArgfS0_FT1sS0__T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
   func nsstrArg(#s: NSString) { }
 }
 

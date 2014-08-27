@@ -179,3 +179,4 @@
 ; CHECK: _TF8manglingX30Proprostnemluvesky_uybCEdmaEBaFT_T_ ---> mangling.Pročprostěnemluvíčesky () -> ()
 ; CHECK: _TF8manglingXoi7p_qcaDcFTSiSi_Si ---> mangling.«+» infix (Swift.Int, Swift.Int) -> Swift.Int
 ; CHECK: _TF8manglingoi2qqFTSiSi_T_ ---> mangling.?? infix (Swift.Int, Swift.Int) -> ()
+; CHECK: _TFE11ext_structAV11def_structA1A4testfRS1_FT_T_ ---> ext.ext_structA.def_structA.A.test (inout def_structA.A)() -> ()
