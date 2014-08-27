@@ -373,6 +373,30 @@ extension ${Self} {
     value = dstNotWord
 %       end
   }
+%    end
+
+%    if srcBits > bits:
+  /// Construct a `${Self}` having the same bitwise representation as
+  /// the least significant bits of the provided bit pattern.
+  ///
+  /// No range or overflow checking occurs.
+  @transparent
+  public init(truncatingBitPattern: ${Src}) {
+%
+%       if srcBuiltinName == 'Word':
+    let srcNotWord = Builtin.${CastFromWord}(truncatingBitPattern.value)
+%       else:
+    let srcNotWord = truncatingBitPattern.value
+%       end
+%
+    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(srcNotWord)
+%
+%       if BuiltinName == 'Word':
+    value = Builtin.${CastToWord}(dstNotWord)
+%       else:
+    value = dstNotWord
+%       end
+  }
 
 %    end
 % end

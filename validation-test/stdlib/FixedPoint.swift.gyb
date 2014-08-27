@@ -1,0 +1,181 @@
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/FixedPoint.swift
+// RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/FixedPoint.swift -o %t/a.out
+// RUN: %target-run %t/a.out
+
+import StdlibUnittest
+
+var FixedPoint = TestSuite("FixedPoint")
+
+%{
+
+import gyb
+
+}%
+
+//===----------------------------------------------------------------------===//
+// 'Int(truncatingBitPattern:)' initializer
+//===----------------------------------------------------------------------===//
+
+%{
+
+test_bit_patterns = [
+  0xffffffffffffffff,
+  0x00ffffffffffffff,
+  0x0000ffffffffffff,
+  0x000000ffffffffff,
+  0x00000000ffffffff,
+  0x0000000000ffffff,
+  0x000000000000ffff,
+  0x00000000000000ff,
+  0x0000000000000000,
+
+  0x7f123456789abcde,
+  0x007f123456789abc,
+  0x00007f123456789a,
+  0x0000007f12345678,
+  0x000000007f123456,
+  0x00000000007f1234,
+  0x0000000000007f12,
+  0x000000000000007f,
+]
+
+def prepare_bit_pattern(bit_pattern, dst_bits, dst_signed):
+    mask = ((1 << dst_bits) - 1)
+    dst = bit_pattern & mask
+    if not dst_signed:
+        return dst
+    if dst <= ((1 << (dst_bits - 1)) - 1):
+        return dst
+    return dst - mask - 1
+
+truncating_bit_pattern_test_template = gyb.parseTemplate("truncating_bit_pattern",
+"""
+% from SwiftIntTypes import *
+
+% for (dst_name, dst_bits, dst_signed) in all_integer_types(word_bits):
+%   Dst = int_name(dst_name, dst_signed)
+
+FixedPoint.test("${Dst}(truncatingBitPattern:)") {
+
+%   for (src_name, src_bits, src_signed) in all_integer_types(word_bits):
+%     Src = int_name(src_name, src_signed)
+%     if src_bits > dst_bits:
+%
+%       for bit_pattern in test_bit_patterns:
+
+  if true {
+%       input = prepare_bit_pattern(bit_pattern, src_bits, src_signed)
+    let input = get${Src}(${input})
+%       input = prepare_bit_pattern(input, src_bits, False)
+    let output = get${Dst}(${Dst}(truncatingBitPattern: input))
+    let expected = get${Dst}(${prepare_bit_pattern(input, dst_bits, dst_signed)})
+    expectEqual(output, expected)
+  }
+
+%       end
+
+// This comment prevents gyb from miscompiling this file.
+// <rdar://problem/17548877> gyb miscompiles a certain for loop
+
+%     end
+
+// This comment prevents gyb from miscompiling this file.
+// <rdar://problem/17548877> gyb miscompiles a certain for loop
+
+%   end
+
+}
+
+% end
+""")
+
+}%
+
+#if arch(i386) || arch(arm)
+
+  ${gyb.executeTemplate(
+      truncating_bit_pattern_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=32)}
+
+#elseif arch(x86_64) || arch(arm64)
+
+  ${gyb.executeTemplate(
+      truncating_bit_pattern_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=64)}
+
+#else
+
+_UnimplementedError()
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// 'Int(bitPattern:)' initializer
+//===----------------------------------------------------------------------===//
+
+%{
+
+bit_pattern_test_template = gyb.parseTemplate("bit_pattern",
+"""
+% from SwiftIntTypes import *
+
+% for (dst_name, dst_bits, dst_signed) in all_integer_types(word_bits):
+%   Dst = int_name(dst_name, dst_signed)
+
+%   # Source is the same as destination, but of different signedness.
+%   src_name = dst_name
+%   src_bits = dst_bits
+%   src_signed = not dst_signed
+%   Src = int_name(src_name, src_signed)
+
+FixedPoint.test("${Dst}(bitPattern: ${Src})") {
+
+%   for bit_pattern in test_bit_patterns:
+
+  if true {
+%     input = prepare_bit_pattern(bit_pattern, src_bits, src_signed)
+    let input = get${Src}(${input})
+%     input = prepare_bit_pattern(input, src_bits, False)
+    let output = get${Dst}(${Dst}(bitPattern: input))
+    let expected = get${Dst}(${prepare_bit_pattern(input, dst_bits, dst_signed)})
+    expectEqual(output, expected)
+  }
+
+%   end
+
+}
+
+% end
+
+""")
+
+}%
+
+#if arch(i386) || arch(arm)
+
+  ${gyb.executeTemplate(
+      bit_pattern_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=32)}
+
+#elseif arch(x86_64) || arch(arm64)
+
+  ${gyb.executeTemplate(
+      bit_pattern_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=64)}
+
+#else
+
+_UnimplementedError()
+
+#endif
+
+runAllTests()
+

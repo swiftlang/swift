@@ -6,8 +6,6 @@ func test_Int8() {
   var i8 : Int8
   i8 = -0x1
   println(Int(i8))
-  var ui8 = UInt8(bitPattern: i8)
-  println(ui8)  
 }
 
 func test_UInt8() {
@@ -38,8 +36,6 @@ println(tentwenty)
 
 // CHECK:  -1
 // CHECK:  255
-// CHECK:  255
-// CHECK:  -1
 // CHECK:  4294967295
 // CHECK:  15
 // CHECK:  1020
