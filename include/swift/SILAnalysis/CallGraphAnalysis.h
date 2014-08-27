@@ -23,10 +23,12 @@
 #include <vector>
 
 namespace swift {
+  class CallGraphNode;
 
   class CallGraphEdge {
+
   public:
-    typedef llvm::DenseSet<SILFunction *> CalleeSetType;
+    typedef llvm::DenseSet<CallGraphNode *> CalleeSetType;
 
     /// Create a call graph edge for a call site where we will fill in
     /// the set of potentially called functions later.
@@ -39,11 +41,11 @@ namespace swift {
 
     /// Create a call graph edge for a call site that is known to have
     /// only a single callee.
-    CallGraphEdge(ApplyInst *CallSite, SILFunction *F)
+    CallGraphEdge(ApplyInst *CallSite, CallGraphNode *Node)
       : CallSite(CallSite),
         // FIXME: Do not allocate memory for the singleton callee case.
         CalleeSet(new CalleeSetType, 0) {
-      addCallee(F);
+      addCallee(Node);
       markCalleeSetComplete();
     }
 
@@ -68,10 +70,10 @@ namespace swift {
 
     /// Add the given function to the set of functions that we could
     /// call from this call site.
-    void addCallee(SILFunction *F) {
+    void addCallee(CallGraphNode *Node) {
       assert(!isCalleeSetComplete() &&
              "Attempting to add another callee to a complete call set!");
-      CalleeSet.getPointer()->insert(F);
+      CalleeSet.getPointer()->insert(Node);
     }
 
     /// Return whether the call set is known to be complete.

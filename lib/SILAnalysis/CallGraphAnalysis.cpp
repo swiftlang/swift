@@ -30,8 +30,7 @@ CallGraph::CallGraph(SILModule *M, bool completeModule) {
 
   unsigned NodeOrdinal = 0;
   for (auto &F : *M)
-    if (F.isDefinition())
-      addCallGraphNode(&F, NodeOrdinal++);
+    addCallGraphNode(&F, NodeOrdinal++);
 
   for (auto &F : *M)
     if (F.isDefinition())
@@ -63,12 +62,13 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
     // TODO: Compute this from the call graph itself after stripping
     //       unreachable nodes from graph.
     ++NumCallSitesWithEdges;
-    auto *CallSite = new CallGraphEdge(AI, CalleeFn);
-    CallerNode->addCallSite(CallSite);
-
     auto *CalleeNode = getCallGraphNode(CalleeFn);
-    if (CalleeNode)
-      CalleeNode->addCaller(CallSite);
+    assert(CalleeNode &&
+           "Expected to have a call graph node for all functions!");
+
+    auto *CallSite = new CallGraphEdge(AI, CalleeNode);
+    CallerNode->addCallSite(CallSite);
+    CalleeNode->addCaller(CallSite);
     break;
   }
 
