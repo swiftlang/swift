@@ -17,15 +17,17 @@
 //  similar upon AnyObject and a couple of runtime hacks.
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-stdlib-swift | FileCheck %s
+
+import Swift
 
 //===--- Code destined for stdlib -----------------------------------------===//
 
 @asmname("_swift_usesNativeSwiftReferenceCounting_nonNull")
-func _swift_usesNativeSwiftReferenceCounting_nonNull(_: Word) -> Bool
+func _swift_usesNativeSwiftReferenceCounting_nonNull(_: UnsafePointer<Void>) -> Bool
 
 @asmname("_swift_isUniquelyReferencedNative_nonNull")
-func _swift_isUniquelyReferencedNative_nonNull(_: Word) -> Bool
+func _swift_isUniquelyReferencedNative_nonNull(_: UnsafePointer<Void>) -> Bool
 
 /// A type that can store any object, efficiently discriminate between
 /// native Swift and ObjectiveC classes, and report detect
@@ -37,14 +39,15 @@ struct BridgeObject {
   }
 
   mutating func isUniquelyReferencedNativeObject() -> Bool {
-    return _swift_isUniquelyReferencedNative_nonNull(
-      unsafeBitCast(self, Word.self))
+    return _swift_isUniquelyReferencedNative_nonNull(address)
   }
   
   var isNativeObject : Bool {
-    return _swift_usesNativeSwiftReferenceCounting_nonNull(
-      unsafeBitCast(self, Word.self)
-    )
+    return _swift_usesNativeSwiftReferenceCounting_nonNull(address)
+  }
+
+  var address: UnsafePointer<Void> {
+    return UnsafePointer(Builtin.bridgeToRawPointer(object))
   }
   
   let object: AnyObject
