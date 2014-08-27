@@ -150,15 +150,16 @@
       (beginning-of-line)
       (skip-syntax-forward " ")
       (setq target-column
-            (* 2
-               (- indent-level
-                  (cond ((= (char-syntax (or (char-after) ?\X)) ?\))
-                         1)
-                        ((save-match-data
-                           (looking-at
-                            "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\)\\>"))
-                         1)
-                        (t 0)))))
+            (if (equal (char-after) ?\#) 0
+              (* 2
+                 (- indent-level
+                    (cond ((= (char-syntax (or (char-after) ?\X)) ?\))
+                           1)
+                          ((save-match-data
+                             (looking-at
+                              "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\)\\>"))
+                           1)
+                          (t 0))))))
       (indent-line-to target-column))
     (when (< (current-column) target-column)
       (move-to-column target-column)))
