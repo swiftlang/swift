@@ -50,7 +50,7 @@ void CallGraph::addCallGraphNode(SILFunction *F, unsigned NodeOrdinal) {
 
   // TODO: Only add functions clearly visible from outside our
   //       compilation scope as roots.
-  CallGraphRoots.insert(Node);
+  CallGraphRoots.push_back(Node);
 }
 
 void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {

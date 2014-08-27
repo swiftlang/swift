@@ -192,7 +192,7 @@ namespace swift {
         delete MapEntry.second;
     }
 
-    llvm::DenseSet<CallGraphNode *> &getCallGraphRoots();
+    llvm::SmallVectorImpl<CallGraphNode *> &getCallGraphRoots();
 
     CallGraphNode *getCallGraphNode(SILFunction *F) {
       auto Found = FunctionToNodeMap.find(F);
@@ -208,7 +208,7 @@ namespace swift {
     void addEdges(SILFunction *F);
     void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
 
-    llvm::DenseSet<CallGraphNode *> CallGraphRoots;
+    llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
     llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
   };
 
