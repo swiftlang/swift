@@ -689,3 +689,39 @@ bb0(%0 : $Int, %1 : $@thin MyStruct.Type):
 
 sil @selfinit : $@thin (@thin MyStruct.Type) -> MyStruct // user: %7
 
+struct MyStruct2 {
+  var x: P
+  init(delegate: ())
+  init()
+}
+
+sil @selfinit_delegate : $@thin (@out MyStruct2, @thin MyStruct2.Type) -> ()
+
+// <rdar://problem/18089574> Protocol member in struct + delegating init miscompilation
+// CHECK-LABEL: @self_init_copyaddr
+sil @self_init_copyaddr : $@thin (@out MyStruct2, @thin MyStruct2.Type) -> () {
+bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
+  // CHECK: [[SELF:%[0-9]+]] = alloc_stack $MyStruct2
+  %2 = alloc_stack $MyStruct2  // var self
+  %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct2
+  %6 = metatype $@thin MyStruct2.Type
+  %7 = function_ref @selfinit_delegate : $@thin (@out MyStruct2, @thin MyStruct2.Type) -> ()
+  %8 = alloc_stack $MyStruct2
+
+  // Make sure this copy_addr ends up being an initialization.
+  apply %7(%8#1, %6) : $@thin (@out MyStruct2, @thin MyStruct2.Type) -> ()
+  copy_addr [take] %8#1 to %3 : $*MyStruct2
+  dealloc_stack %8#0 : $*@local_storage MyStruct2
+
+  // CHECK: apply
+  // CHECK-NEXT: copy_addr [take] {{.*}} to [initialization] [[SELF]]#1 : $*MyStruct2
+  // CHECK-NEXT: dealloc_stack
+
+  copy_addr [take] %3 to [initialization] %0 : $*MyStruct2
+  %13 = tuple ()
+  dealloc_stack %2#0 : $*@local_storage MyStruct2
+  return %13 : $()
+}
+
+
+

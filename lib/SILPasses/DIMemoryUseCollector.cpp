@@ -907,11 +907,19 @@ static bool isSelfInitUse(SILInstruction *I) {
   if (!LocExpr) {
     // If we're reading a .sil file, treat a call to "selfinit" as a
     // self.init call as a hack to allow us to write testcases.
-    if (I->getLoc().is<SILFileLocation>())
+    if (I->getLoc().is<SILFileLocation>()) {
       if (auto *AI = dyn_cast<ApplyInst>(I))
         if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-          if (FRI->getReferencedFunction()->getName() == "selfinit")
+          if (FRI->getReferencedFunction()->getName().startswith("selfinit"))
             return true;
+
+      // If this is a copy_addr to a delegating self MUI, then we treat it as a
+      // self init for the purposes of testcases.
+      if (auto *CAI = dyn_cast<CopyAddrInst>(I))
+        if (auto *MUI = dyn_cast<MarkUninitializedInst>(CAI->getDest()))
+          if (MUI->isDelegatingSelf())
+            return true;
+    }
     return false;
   }
 

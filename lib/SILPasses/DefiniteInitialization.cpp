@@ -903,6 +903,10 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
     return;
   }
 
+  // If this is a copy_addr, make sure we remember that it is an initialization.
+  if (auto *CAI = dyn_cast<CopyAddrInst>(InstInfo.Inst))
+    CAI->setIsInitializationOfDest(IsInitialization);
+
   // Lower Assign instructions if needed.
   if (isa<AssignInst>(InstInfo.Inst))
     updateInstructionForInitState(InstInfo);
