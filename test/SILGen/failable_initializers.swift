@@ -6,6 +6,21 @@ class C: P {}
 struct LoadableStruct {
   var x: C
 
+  // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT10alwaysFailCS_1C_GSqS0__
+  // CHECK:       bb0([[C:%.*]] : $C
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
+  // CHECK:         br [[FAIL:bb[0-9]+]]
+  // CHECK:       [[FAIL]]:
+  // CHECK:         strong_release [[C]]
+  // CHECK:         strong_release [[SELF_BOX]]
+  // CHECK:         [[NIL:%.*]] = enum $Optional<LoadableStruct>, #Optional.None!enumelt
+  // CHECK:         br [[EXIT:bb[0-9]+]]([[NIL]] : $Optional<LoadableStruct>)
+  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<LoadableStruct>):
+  // CHECK:         return [[RESULT]]
+  init?(alwaysFail: C) {
+    return nil
+  }
+
   // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT3optSb_GSqS0__
   init?(opt: Bool) {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
@@ -15,6 +30,8 @@ struct LoadableStruct {
   // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $Optional<LoadableStruct>, #Optional.None
   // CHECK:         br [[EXIT:bb.*]]([[NIL]] : $Optional<LoadableStruct>)
+  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<LoadableStruct>):
+  // CHECK:         return [[RESULT]]
     if opt {
       return nil
     }
@@ -24,8 +41,6 @@ struct LoadableStruct {
   // CHECK:         [[SELF_OPT:%.*]] = enum $Optional<LoadableStruct>, #Optional.Some!enumelt.1, [[SELF]]
   // CHECK:         br [[EXIT]]([[SELF_OPT]] : $Optional<LoadableStruct>)
 
-  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<LoadableStruct>):
-  // CHECK:         return [[RESULT]]
   }
 
   // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT3iuoSb_GSQS0__
@@ -37,6 +52,9 @@ struct LoadableStruct {
   // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $ImplicitlyUnwrappedOptional<LoadableStruct>, #ImplicitlyUnwrappedOptional.None
   // CHECK:         br [[EXIT:bb.*]]([[NIL]] : $ImplicitlyUnwrappedOptional<LoadableStruct>)
+  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $ImplicitlyUnwrappedOptional<LoadableStruct>):
+  // CHECK:         return [[RESULT]]
+
   // CHECK:       bb{{.*}}:
   // CHECK:         br [[FAILURE]]
     if iuo {
@@ -48,8 +66,6 @@ struct LoadableStruct {
   // CHECK:         [[SELF_OPT:%.*]] = enum $ImplicitlyUnwrappedOptional<LoadableStruct>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[SELF]]
   // CHECK:         br [[EXIT]]([[SELF_OPT]] : $ImplicitlyUnwrappedOptional<LoadableStruct>)
 
-  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $ImplicitlyUnwrappedOptional<LoadableStruct>):
-  // CHECK:         return [[RESULT]]
   }
 
   // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT15delegatesOptOptSb_GSqS0__
@@ -114,6 +130,8 @@ struct AddressOnlyStruct {
   // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
   // CHECK:         br [[EXIT:bb[0-9]+]]
+  // CHECK:       [[EXIT]]:
+  // CHECK:         return
   // CHECK:       bb{{.*}}:
   // CHECK:         br [[FAILURE]]
     if opt {
@@ -125,8 +143,6 @@ struct AddressOnlyStruct {
   // CHECK:         copy_addr [[SELF_MARKED]] to [initialization] [[DEST_PAYLOAD]]
   // CHECK:         inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.Some
   // CHECK:         br [[EXIT]]
-  // CHECK:       [[EXIT]]:
-  // CHECK:         return
   }
 
   // CHECK-LABEL: sil @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3iuoSb_GSQS0__

@@ -3355,6 +3355,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       B.createInjectEnumAddr(ctor, IndirectReturnAddress,
                    getASTContext().getOptionalNoneDecl(ctor->getFailability()));
       B.createBranch(ctor, failureExitBB);
+
+      B.setInsertionPoint(failureExitBB);
+      B.createReturn(ctor, emitEmptyTuple(ctor));
     } else {
       // Pass 'nil' as the return value to the exit BB.
       failureExitArg = new (F.getModule())
@@ -3363,6 +3366,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                     getASTContext().getOptionalNoneDecl(ctor->getFailability()),
                     resultLowering.getLoweredType());
       B.createBranch(ctor, failureExitBB, nilResult);
+
+      B.setInsertionPoint(failureExitBB);
+      B.createReturn(ctor, failureExitArg);
     }
     
     B.setInsertionPoint(curBB);
@@ -3433,9 +3439,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     
     if (failureExitBB) {
       B.createBranch(returnLoc, failureExitBB);
-      B.emitBlock(failureExitBB);
+    } else {
+      B.createReturn(returnLoc, emitEmptyTuple(ctor));
     }
-    B.createReturn(returnLoc, emitEmptyTuple(ctor));
     return;
   }
 
@@ -3464,10 +3470,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   
   if (failureExitBB) {
     B.createBranch(returnLoc, failureExitBB, selfValue);
-    B.emitBlock(failureExitBB);
-    selfValue = failureExitArg;
+  } else {
+    B.createReturn(returnLoc, selfValue);
   }
-  B.createReturn(returnLoc, selfValue);
 }
 
 static void emitAddressOnlyEnumConstructor(SILGenFunction &gen,
