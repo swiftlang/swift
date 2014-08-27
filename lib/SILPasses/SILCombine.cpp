@@ -1506,12 +1506,6 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   return nullptr;
 }
 
-static bool areBothStructs(SILType Ty1, SILType Ty2) {
-  if (Ty1.getStructOrBoundGenericStruct() && Ty2.getStructOrBoundGenericStruct())
-    return true;
-  else return false;
-}
-
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   SILModule &Mod = UADCI->getModule();
