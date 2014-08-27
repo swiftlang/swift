@@ -31,7 +31,7 @@ class Foo {
   // x86_64-macosx: define double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(double, double, double, double, %C8abitypes3Foo*) {
   // x86_64-macosx: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, %VSC6CGRect* byval align 8) unnamed_addr {
   // armv7-ios: define double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
-  // armv7-ios: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, { [4 x i32] }) unnamed_addr {
+  // armv7-ios: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr { 
   dynamic func getXFromNSRect(r: NSRect) -> Double {
     return Double(r.origin.x)
   }
@@ -39,7 +39,7 @@ class Foo {
   // x86_64-macosx: define float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // x86_64-macosx: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, <2 x float>, <2 x float>) unnamed_addr {
   // armv7-ios: define float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
-  // armv7-ios: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, { [4 x i32] }) unnamed_addr {
+  // armv7-ios: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr {
   dynamic func getXFromRect(r: MyRect) -> Float {
     return r.x
   }
@@ -60,9 +60,10 @@ class Foo {
   // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { [4 x i32] }*
-  // armv7-ios: [[LOADED:%.*]] = load { [4 x i32] }* [[CAST]]
+  // armv7-ios: [[GEP:%.*]] = getelementptr inbounds { [4 x i32] }* [[CAST]], i32 0, i32 0
+  // armv7-ios: [[LOADED:%.*]] = load [4 x i32]* [[GEP]]
   // armv7-ios: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
-  // armv7-ios: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, { [4 x i32] })*)(i8* [[SELFCAST]], i8* [[SEL]], { [4 x i32] } [[LOADED]])
+  // armv7-ios: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x i32])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x i32] [[LOADED]])
   func getXFromRectSwift(r: MyRect) -> Float {
     return getXFromRect(r)
   }
