@@ -2952,7 +2952,6 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
-  // FIXME: Dynamic dispatch for archetype/existential methods.
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
                                              isSuper, substAccessorType,
                                              substitutions);
