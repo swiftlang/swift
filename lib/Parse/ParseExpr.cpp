@@ -981,7 +981,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
             // Dig out the 'self' declaration we're using so we can rebind it.
             // FIXME: Should be in the type checker, not here.
-            if (auto func = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
+            if (auto func = dyn_cast<ConstructorDecl>(CurDeclContext)) {
               if (auto selfDecl = func->getImplicitSelfDecl()) {
                 initRef = new (Context) RebindSelfInConstructorExpr(initRef,
                                                                     selfDecl);

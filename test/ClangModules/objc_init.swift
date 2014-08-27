@@ -129,3 +129,10 @@ class MyDictionary2 : NSDictionary {
 class MyString : NSString {
   override init() { super.init() }
 } // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSString'}}
+
+// <rdar://problem/17281900>
+class View: NSView {
+  override func addSubview(aView: NSView) {
+    var p = MyViewController.init()
+  }
+}
