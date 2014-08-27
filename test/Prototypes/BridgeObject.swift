@@ -19,9 +19,6 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift | FileCheck %s
 
-// FIXME: <rdar://problem/18143396> Test Prototypes/BridgeObject.swift fails on some OS versions
-// REQUIRES: write-some-os-version-checks
-
 import Swift
 
 //===--- Code destined for stdlib -----------------------------------------===//
@@ -74,9 +71,12 @@ func expectTagged(s: NSString, expected: Bool) -> NSString {
   let mask: UWord = 0x8000000000000000
 #else
   let mask: UWord = 0
-#endif
-  if mask != 0 && (unsafeBitCast(s, UWord.self) & mask != 0) != expected {
-    fatalError("Unexpectedly (un-)tagged pointer")
+  #endif
+  // If this API is present, the OS also supports tagged pointers
+  if (NSProcessInfo.processInfo() as AnyObject).operatingSystemVersion? != nil {
+    if mask != 0 && (unsafeBitCast(s, UWord.self) & mask != 0) != expected {
+      fatalError("Unexpectedly (un-)tagged pointer")
+    }
   }
   return s
 }
