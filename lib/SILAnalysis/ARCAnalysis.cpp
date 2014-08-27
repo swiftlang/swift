@@ -143,6 +143,14 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
   return true;
 }
 
+bool swift::arc::canCheckRefCount(SILInstruction *User) {
+  if (auto *AI = dyn_cast<ApplyInst>(User))
+    if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+        return FRI->getReferencedFunction()->getName() ==
+            "_swift_isUniquelyReferenced";
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //                                Use Analysis
 //===----------------------------------------------------------------------===//
@@ -355,10 +363,10 @@ valueHasARCUsesInInstructionRange(SILValue Op,
 /// which may decrement it. We assume that Start and End are both in the same
 /// basic block.
 bool swift::arc::
-valueHasARCDecrementsInInstructionRange(SILValue Op,
-                                        SILBasicBlock::iterator Start,
-                                        SILBasicBlock::iterator End,
-                                        AliasAnalysis *AA) {
+valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
+                                              SILBasicBlock::iterator Start,
+                                              SILBasicBlock::iterator End,
+                                              AliasAnalysis *AA) {
   assert(Start->getParent() == End->getParent() &&
          "Start and End should be in the same basic block");
 
@@ -368,8 +376,9 @@ valueHasARCDecrementsInInstructionRange(SILValue Op,
 
   // Otherwise, until Start != End.
   while (Start != End) {
-    // Check if Start can decrement Op's ref count. If so, return true.
-    if (canDecrementRefCount(&*Start, Op, AA))
+    // Check if Start can decrement or check Op's ref count. If so, return true.
+    // Ref count checks do not have side effects, but are barriers for retains.
+    if (canDecrementRefCount(&*Start, Op, AA) || canCheckRefCount(&*Start))
       return true;
     // Otherwise, increment our iterator.
     ++Start;

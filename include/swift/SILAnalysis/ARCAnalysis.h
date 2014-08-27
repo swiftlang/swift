@@ -35,6 +35,9 @@ namespace arc {
 bool canDecrementRefCount(SILInstruction *User, SILValue Ptr,
                           AliasAnalysis *AA);
 
+/// \returns True if the user \p User checks the ref count of a pointer.
+bool canCheckRefCount(SILInstruction *User);
+
 /// \returns True if the user \p User can use the pointer \p Ptr in a manner
 /// that requires \p Ptr to be alive before Inst.
 bool canUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
@@ -47,12 +50,14 @@ bool valueHasARCUsesInInstructionRange(SILValue Op,
                                        AliasAnalysis *AA);
 
 /// Return true if \p Op has instructions in the instruction range [Start, End)
-/// which may decrement it. We assume that Start and End are both in the same
-/// basic block.
-bool valueHasARCDecrementsInInstructionRange(SILValue Op,
-                                             SILBasicBlock::iterator Start,
-                                             SILBasicBlock::iterator End,
-                                             AliasAnalysis *AA);
+/// which may decrement the ref count or read the ref count for some purpose
+/// other than incrementing it (e.g. uniqueness check). We assume that Start and
+/// End are both in the same basic block.
+bool valueHasARCDecrementOrCheckInInstructionRange(
+    SILValue Op,
+    SILBasicBlock::iterator Start,
+    SILBasicBlock::iterator End,
+    AliasAnalysis *AA);
 
 /// A set of matching reference count increments, decrements, increment
 /// insertion pts, and decrement insertion pts.

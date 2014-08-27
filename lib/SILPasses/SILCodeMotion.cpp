@@ -406,9 +406,9 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *S, SILInstruction *I,
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
   // not move it.
   SILBasicBlock::iterator II = I;
-  if (valueHasARCDecrementsInInstructionRange(Ptr, std::next(II),
-                                              SILBasicBlock::iterator(S),
-                                              AA))
+  if (valueHasARCDecrementOrCheckInInstructionRange(Ptr, std::next(II),
+                                                    SILBasicBlock::iterator(S),
+                                                    AA))
     return false;
 
   SILBuilder Builder(S);
@@ -456,11 +456,10 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
   // not move it.
   SILBasicBlock::iterator II = I;
-  if (valueHasARCDecrementsInInstructionRange(Ptr, std::next(II),
-                                              SILBasicBlock::iterator(CondBr),
-                                              AA))
+  if (valueHasARCDecrementOrCheckInInstructionRange(
+          Ptr, std::next(II), SILBasicBlock::iterator(CondBr), AA)) {
     return false;
-
+  }
   // Work out which enum element is the true branch, and which is false.
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
@@ -520,7 +519,7 @@ static bool tryToSinkRefCountInst(SILInstruction *T, SILInstruction *I,
   SILBasicBlock::iterator II = I;
   ++II;
   for (; &*II != T; ++II) {
-    if (canDecrementRefCount(&*II, Ptr, AA))
+    if (canDecrementRefCount(&*II, Ptr, AA) || canCheckRefCount(&*II))
       return false;
   }
 
@@ -557,7 +556,7 @@ static bool tryToMoveRefCountInstDownInBB(SILBasicBlock::iterator Pos,
   for (; II != Pos; ++II) {
     // If we find a release, then this is the farthest down we can move the
     // instruction.
-    if (canDecrementRefCount(&*II, Ptr, AA))
+    if (canDecrementRefCount(&*II, Ptr, AA) || canCheckRefCount(&*II))
       break;
   }
 

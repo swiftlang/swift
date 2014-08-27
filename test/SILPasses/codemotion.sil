@@ -573,7 +573,9 @@ sil @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
 // The second retain shouldn't move at all
 // The third retain should move below the sadd builtin_function_ref
 // The fourth retain should move below the arc_user builtin_function_ref, but above the apply
-// The fifth retain should move below the apply to _swift_isUniquelyReferenced
+// The fifth retain should *NOT* move below the apply to
+// _swift_isUniquelyReferenced, unless we can prove that the pointers do not
+// alias.
 // And the last retain should remain where it is at the end of the BB.
 //
 // CHECK-LABEL: sil @move_retain_down_bb : $@thin (FakeOptional, FakeOptional, FakeOptional, FakeOptional, FakeOptional) -> (Builtin.Int64, Builtin.Int1) {
@@ -592,8 +594,8 @@ sil @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
 // CHECK-NEXT: function_ref @_swift_isUniquelyReferenced
 // CHECK-NEXT: integer_literal $Builtin.Word, 1
 // CHECK-NEXT: struct $Int
-// CHECK-NEXT: apply
 // CHECK-NEXT: retain_value %3
+// CHECK-NEXT: apply
 // CHECK-NEXT: retain_value %3
 // CHECK-NEXT: switch_enum
 
