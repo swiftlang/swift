@@ -638,39 +638,25 @@ visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
 }
 
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
-  // Promote switch_enum_addr to switch_enum. Detect the pattern:
-  //store %X to %Y#1 : $*Optional<SomeClass>
-  //switch_enum_addr %Y#1 : $*Optional<SomeClass>, case ...
-
-  SILBasicBlock::iterator it = SEAI;
-
-  // Retains are moved as far down the block as possible, so we should skip over
-  // them when we search backwards for a store.
-  do {
-    if (it == SEAI->getParent()->begin())
-      return nullptr;
-    --it;
-  } while (isa<RetainValueInst>(it));
-
-  if (StoreInst *SI = dyn_cast<StoreInst>(it)) {
-    SILValue EnumVal = SI->getSrc();
-
-    // Make sure that the store destination and the switch address is the same
-    // address.
-    if (SI->getDest() != SEAI->getOperand())
-      return nullptr;
-
-    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
-    for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
-      Cases.push_back(SEAI->getCase(i));
-
-    SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
-    Builder->createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
-    eraseInstFromFunction(*SEAI);
+  // Promote switch_enum_addr to switch_enum if the enum is loadable.
+  //   switch_enum_addr %ptr : $*Optional<SomeClass>, case ...
+  //     ->
+  //   %value = load %ptr
+  //   switch_enum %value
+  SILType Ty = SEAI->getOperand().getType();
+  if (!Ty.isLoadable(SEAI->getModule()))
     return nullptr;
-  }
+  
+  SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+  for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
+    Cases.push_back(SEAI->getCase(i));
 
-  return nullptr;
+  
+  SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
+  LoadInst *EnumVal = Builder->createLoad(SEAI->getLoc(),
+                                          SEAI->getOperand());
+  Builder->createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
+  return eraseInstFromFunction(*SEAI);
 }
 
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {

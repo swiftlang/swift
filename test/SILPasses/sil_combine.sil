@@ -1120,7 +1120,8 @@ bb0(%0 : $E):
 
 // CHECK-LABEL: sil @unchecked_take_enum_data_addr_promotion : $@thin (@inout FakeOptional<B>) -> B {
 // CHECK: bb0(%0 : $*FakeOptional<B>):
-// CHECK-NEXT: switch_enum_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: switch_enum
 // CHECK: bb1:
 // CHECK-NEXT: load
 // CHECK-NEXT: unchecked_enum_data
@@ -1726,3 +1727,22 @@ bb0(%0 : $*FakeInt32):
   return %3 : $Builtin.Int16
 }
 
+// CHECK-LABEL: sil @loadable_switch_enum_addr_promotion : $@thin (@in FakeOptional<Builtin.RawPointer>) -> () {
+// CHECK-NOT: switch_enum_addr
+// CHECK: load
+// CHECK-NEXT: switch_enum
+// CHECK-NOT: switch_enum_addr
+sil @loadable_switch_enum_addr_promotion : $@thin (@in FakeOptional<Builtin.RawPointer>) -> () {
+bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
+  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
