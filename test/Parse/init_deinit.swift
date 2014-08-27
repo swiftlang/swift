@@ -22,11 +22,11 @@ struct FooStructDeinitializerB {
 }
 
 struct FooStructDeinitializerC {
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 class FooClassDeinitializerA {
-  deinit(a : Int) {} // expected-error{{deinitializer does not have a parameter clause}}{{9-18=}}
+  deinit(a : Int) {} // expected-error{{no parameter clause allowed on deinitializer}}{{9-18=}}
 }
 
 class FooClassDeinitializerB {
@@ -37,30 +37,30 @@ init {} // expected-error {{initializers may only be declared within a type}} ex
 init() // expected-error {{initializers may only be declared within a type}}
 init() {} // expected-error {{initializers may only be declared within a type}}
 
-deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+deinit {} // expected-error {{deinitializers may only be declared within a class}}
 deinit // expected-error {{expected '{' for deinitializer}}
-deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+deinit {} // expected-error {{deinitializers may only be declared within a class}}
 
 struct BarStruct {
   init() {}
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 extension BarStruct {
   init(x : Int) {}
 
   // When/if we allow 'var' in extensions, then we should also allow dtors
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 enum BarUnion {
   init() {}
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 extension BarUnion {
   init(x : Int) {}
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 class BarClass {
@@ -70,22 +70,22 @@ class BarClass {
 
 extension BarClass {
   convenience init(x : Int) { self.init() }
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 protocol BarProtocol {
   init() {} // expected-error {{protocol initializers may not have bodies}}
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 extension BarProtocol { // expected-error {{protocol 'BarProtocol' cannot be extended}}
   init(x : Int) {}
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 func fooFunc() {
   init() {} // expected-error {{initializers may only be declared within a type}}
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 func barFunc() {
@@ -95,7 +95,7 @@ func barFunc() {
   } ()
 
   var y : () = { () -> () in
-    deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+    deinit {} // expected-error {{deinitializers may only be declared within a class}}
     return
   } ()
 }

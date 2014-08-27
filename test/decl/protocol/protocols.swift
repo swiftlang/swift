@@ -4,7 +4,7 @@ protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
   init() {} // expected-error {{protocol initializers may not have bodies}}
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
 // Protocol decl.

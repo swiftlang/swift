@@ -10,7 +10,7 @@ extension extension_for_invalid_type_3 { // expected-error {{use of undeclared t
   init() {}
 }
 extension extension_for_invalid_type_4 { // expected-error {{use of undeclared type 'extension_for_invalid_type_4'}}
-  deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 extension extension_for_invalid_type_5 { // expected-error {{use of undeclared type 'extension_for_invalid_type_5'}}
   typealias X = Int
