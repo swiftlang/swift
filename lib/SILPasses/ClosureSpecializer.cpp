@@ -25,7 +25,8 @@
 
 using namespace swift;
 
-STATISTIC(NumClosureSpecialized, "Number of functions with closures specialized");
+STATISTIC(NumClosureSpecialized,
+          "Number of functions with closures specialized");
 
 namespace {
 
