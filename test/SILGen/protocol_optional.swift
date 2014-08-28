@@ -16,9 +16,9 @@ func optionalMethodGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int -> ()>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
-  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $AnyObject
-  // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $AnyObject to $@sil_self AnyObject
-  // CHECK-NEXT: [[OBJ_PTR:%[0-9]+]] = unchecked_ref_cast [[EXIST_REF_PROJ]] : $@sil_self AnyObject to $Builtin.UnknownObject
+  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $P1
+  // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $P1 to $@sil_self P1
+  // CHECK-NEXT: [[OBJ_PTR:%[0-9]+]] = unchecked_ref_cast [[EXIST_REF_PROJ]] : $@sil_self P1 to $Builtin.UnknownObject
   // CHECK-NEXT: alloc_stack $Optional<Int -> ()>
   // CHECK-NEXT: dynamic_method_br [[OBJ_PTR]] : $Builtin.UnknownObject, #P1.method!1.foreign
   var methodRef = t.method
@@ -32,9 +32,9 @@ func optionalPropertyGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
-  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $AnyObject
-  // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $AnyObject to $@sil_self AnyObject
-  // CHECK-NEXT: [[OBJ:%[0-9]+]] = unchecked_ref_cast [[EXIST_REF_PROJ]] : $@sil_self AnyObject to $Builtin.UnknownObject
+  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $P1
+  // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $P1 to $@sil_self P1
+  // CHECK-NEXT: [[OBJ:%[0-9]+]] = unchecked_ref_cast [[EXIST_REF_PROJ]] : $@sil_self P1 to $Builtin.UnknownObject
   // CHECK-NEXT: alloc_stack $Optional<Int>
   // CHECK-NEXT: dynamic_method_br [[OBJ]] : $Builtin.UnknownObject, #P1.prop!getter.1.foreign
   var propertyRef = t.prop

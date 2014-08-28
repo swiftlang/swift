@@ -1097,17 +1097,8 @@ struct ASTNodeBase {};
       }
 
       auto baseProtoTy = baseTy->getAs<ProtocolType>();
-      if (!baseProtoTy ||
-          !baseProtoTy->getDecl()->isSpecificProtocol(
-             KnownProtocolKind::AnyObject)) {
-        Out << "Dynamic member reference has non-AnyObject base\n";
-        E->dump(Out);
-        abort();
-      }
-
-      // The member must be [objc].
-      if (!E->getMember().getDecl()->isObjC()) {
-        Out << "Dynamic member reference to non-[objc] member\n";
+      if (!baseProtoTy) {
+        Out << "Dynamic member reference base isn't a protocol\n";
         E->dump(Out);
         abort();
       }

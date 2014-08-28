@@ -655,15 +655,12 @@ namespace {
             = isa<ProtocolDecl>(member->getDeclContext()) &&
               (baseTy->is<ArchetypeType>() || baseTy->isAnyExistentialType());
 
-      // If we are referring to an optional member of a protocol.
+      // If we are referring to an optional member of a protocol, convert
+      // the base type (which may be something that conforms to the protocol) to
+      // the protocol type itself.
       if (isArchetypeOrExistentialRef &&
-          member->getAttrs().hasAttribute<OptionalAttr>()) {
-        auto proto =tc.getProtocol(memberLoc, KnownProtocolKind::AnyObject);
-        if (!proto)
-          return nullptr;
-
-        baseTy = proto->getDeclaredType();
-      }
+          member->getAttrs().hasAttribute<OptionalAttr>())
+        baseTy =cast<ProtocolDecl>(member->getDeclContext())->getDeclaredType();
 
       // References to properties with accessors and storage usually go
       // through the accessors, but sometimes are direct.
