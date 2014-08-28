@@ -249,8 +249,8 @@ struct _DictionaryElement<Key : Hashable, Value> {
 
 /// An instance of this class has all dictionary data tail-allocated.  It is
 /// used as a `HeapBuffer` storage.
-final class _NativeDictionaryStorageImpl<Key : Hashable, Value> :
-    HeapBufferStorageBase {
+@objc
+final class _NativeDictionaryStorageImpl<Key : Hashable, Value> {
 
   typealias Element = _DictionaryElement<Key, Value>
   typealias DictionaryHeapBuffer = HeapBuffer<_DictionaryBody, Element?>

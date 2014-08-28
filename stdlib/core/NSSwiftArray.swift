@@ -22,7 +22,7 @@ import SwiftShims
 // Base class of the heap buffer implementation backing the new Array
 // design.  
 @objc internal
-class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
+class _NSSwiftArray : _CocoaArrayType {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
   
   func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
