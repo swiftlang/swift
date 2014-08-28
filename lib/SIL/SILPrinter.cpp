@@ -1503,8 +1503,9 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     if (f.hasLocation())
       emittedFunctions.insert(f.getLocation().getAsASTNode<Decl>());
 
-  // Print the declarations and types from the origin module.
-  if (M) {
+  // Print the declarations and types from the origin module, unless we're not
+  // in whole-module mode.
+  if (M && AssociatedDeclContext == M) {
     PrintOptions Options = PrintOptions::printSIL();
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;
