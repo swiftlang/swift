@@ -480,6 +480,8 @@ void ClangImporter::importHeader(StringRef header, Module *adapter,
     return importBridgingHeader(header, adapter, diagLoc);
   }
 
+  if (!cachedContents.empty() && cachedContents.back() == '\0')
+    cachedContents = cachedContents.drop_back();
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
     llvm::MemoryBuffer::getMemBuffer(cachedContents, header)
   };

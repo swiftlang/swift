@@ -484,8 +484,10 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
       ImportedHeader.emit(ScratchRecord, publicImportSet.count(import),
                           importedHeaderSize, importedHeaderModTime,
                           importedHeader);
-      if (!contents.empty())
+      if (!contents.empty()) {
+        contents.push_back('\0');
         ImportedHeaderContents.emit(ScratchRecord, contents);
+      }
       continue;
     }
 
