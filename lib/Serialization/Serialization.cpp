@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Serialization/ModuleFormat.h"
 #include "Serialization.h"
 #include "SILFormat.h"
 #include "swift/AST/AST.h"
@@ -27,6 +26,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/BCRecordLayout.h"
+#include "swift/Serialization/SerializationOptions.h"
 
 #include "clang/Basic/Module.h"
 
@@ -2963,10 +2963,8 @@ Serializer::Serializer(const unsigned char (&signature)[N],
 
 
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               const SILModule *SILMod, bool serializeAllSIL,
-                               FilenamesTy inputFiles, StringRef importedHeader,
-                               StringRef moduleLinkName,
-                               bool autolinkForceLoad) {
+                               const SILModule *SILMod,
+                               const SerializationOptions &options) {
   Serializer S{MODULE_SIGNATURE, DC};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
@@ -2975,9 +2973,9 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   {
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
-    S.writeInputFiles(inputFiles, importedHeader, moduleLinkName,
-                      autolinkForceLoad);
-    S.writeSIL(SILMod, serializeAllSIL);
+    S.writeInputFiles(options.InputFilenames, options.ImportedHeader,
+                      options.ModuleLinkName, options.AutolinkForceLoad);
+    S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
   }
 
@@ -3004,33 +3002,31 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
   S.writeToStream(os);
 }
 
-void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
-                      const char *docOutputPath,
-                      const SILModule *M, bool serializeAllSIL,
-                      FilenamesTy inputFiles, StringRef importedHeader,
-                      StringRef moduleLinkName, bool autolinkForceLoad) {
-  assert(outputPath && outputPath[0] != '\0');
+void swift::serialize(ModuleOrSourceFile DC,
+                      const SerializationOptions &options,
+                      const SILModule *M) {
+  assert(options.OutputPath && options.OutputPath[0] != '\0');
 
   std::error_code EC;
-  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(options.OutputPath, EC, llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
     getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                  outputPath, EC.message());
+                                  options.OutputPath, EC.message());
     out.clear_error();
     return;
   }
 
-  Serializer::writeToStream(out, DC, M, serializeAllSIL, inputFiles,
-                            importedHeader, moduleLinkName, autolinkForceLoad);
+  Serializer::writeToStream(out, DC, M, options);
 
-  if (docOutputPath && docOutputPath[0] != '\0') {
+  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
     std::error_code EC;
-    llvm::raw_fd_ostream docOut(docOutputPath, EC, llvm::sys::fs::F_None);
+    llvm::raw_fd_ostream docOut(options.DocOutputPath, EC,
+                                llvm::sys::fs::F_None);
 
     if (docOut.has_error() || EC) {
       getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                    docOutputPath, EC.message());
+                                    options.DocOutputPath, EC.message());
       docOut.clear_error();
       return;
     }

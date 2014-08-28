@@ -29,6 +29,7 @@
 #include "swift/Immediate/Immediate.h"
 #include "swift/Option/Options.h"
 #include "swift/PrintAsObjC/PrintAsObjC.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -217,12 +218,19 @@ static bool performCompile(CompilerInstance &Instance,
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
-    if (!opts.ModuleOutputPath.empty())
-      serialize(DC, opts.ModuleOutputPath.c_str(),
-                opts.ModuleDocOutputPath.c_str(), SM.get(),
-                opts.SILSerializeAll, opts.InputFilenames,
-                opts.SerializeBridgingHeader ? opts.ImplicitObjCHeaderPath : "",
-                opts.ModuleLinkName, !IRGenOpts.ForceLoadSymbolName.empty());
+    if (!opts.ModuleOutputPath.empty()) {
+      SerializationOptions serializationOpts;
+      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
+      serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
+      serializationOpts.SerializeAllSIL = opts.SILSerializeAll;
+      serializationOpts.InputFilenames = opts.InputFilenames;
+      if (opts.SerializeBridgingHeader)
+        serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+      serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+      if (!IRGenOpts.ForceLoadSymbolName.empty())
+        serializationOpts.AutolinkForceLoad = true;
+      serialize(DC, serializationOpts, SM.get());
+    }
 
     if (Action == FrontendOptions::EmitModuleOnly)
       return false;

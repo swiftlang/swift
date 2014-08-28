@@ -285,9 +285,8 @@ private:
 public:
   /// Serialize a module to the given stream.
   static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                            const SILModule *M, bool serializeAllSIL,
-                            FilenamesTy inputFiles, StringRef importedHeader,
-                            StringRef moduleLinkName, bool autolinkForceLoad);
+                            const SILModule *M,
+                            const SerializationOptions &options);
 
   /// Serialize module documentation to the given stream.
   static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC);

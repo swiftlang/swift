@@ -43,6 +43,7 @@ namespace swift {
   class Module;
   class Parser;
   class PersistentParserState;
+  class SerializationOptions;
   class SILModule;
   class SILParserTUState;
   class SourceFile;
@@ -168,14 +169,8 @@ namespace swift {
   using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;
 
   /// Serializes a module or single source file to the given output file.
-  void serialize(ModuleOrSourceFile DC, const char *outputPath,
-                 const char *docOutputPath = nullptr,
-                 const SILModule *M = nullptr,
-                 bool serializeAllSIL = false,
-                 ArrayRef<std::string> inputFilenames = {},
-                 StringRef importedHeader = {},
-                 StringRef moduleLinkName = {},
-                 bool autolinkForceLoad = false);
+  void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
+                 const SILModule *M = nullptr);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
