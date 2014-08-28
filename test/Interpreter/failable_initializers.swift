@@ -18,6 +18,16 @@ struct GuineaPig {
     if failBefore { return nil }
     canary = Canary()
   }
+
+  init?(delegateFailure: Bool, failBefore: Bool, failAfter: Bool) {
+    if failBefore { return nil }
+    self.init(live: !delegateFailure)
+    if failAfter { return nil }
+  }
+
+  init?(alwaysFail: Void) {
+    return nil
+  }
 }
 
 // CHECK: it's alive
@@ -52,6 +62,52 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's dead
 if let b = GuineaPig(failBefore: true) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: it's dead
+if let c = GuineaPig(alwaysFail: ()) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: it's dead
+if let d = GuineaPig(delegateFailure: false, failBefore: true, failAfter: false) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+if let e = GuineaPig(delegateFailure: true, failBefore: false, failAfter: false) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+if let f = GuineaPig(delegateFailure: false, failBefore: false, failAfter: true) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+// CHECK-NEXT: it's alive
+// CHECK-NEXT: died
+if let g = GuineaPig(delegateFailure: false, failBefore: false, failAfter: false) {
   println("it's alive")
 } else {
   println("it's dead")
