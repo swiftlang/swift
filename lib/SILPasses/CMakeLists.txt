@@ -44,4 +44,5 @@ add_swift_library(swiftSILPasses
   COWArrayOpt.cpp
   ArrayBoundsCheckOpts.cpp
   ClosureSpecializer.cpp
+  SILCombinerVisitors.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)
