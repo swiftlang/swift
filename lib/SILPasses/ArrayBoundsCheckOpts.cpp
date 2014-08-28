@@ -316,9 +316,24 @@ static SILInstruction *isArrayBufferStorageRetain(SILInstruction *R,
     return nullptr;
 
   // Find the projection from the array:
-  // %42 = SILValue(Array, ...) : $Array<Int>
-  // %43 = struct_extract %42 : $Array<Int>, #Array._buffer
-  // %44 = struct_extract %43 : $_ArrayBuffer<Int>, #_ArrayBuffer.storage
+  // We can either have:
+  //
+  //  %42 = SILValue(Array, ...) : $Array<Int>
+  //  %43 = struct_extract %42 : $Array<Int>, #Array._buffer
+  //  %44 = struct_extract %43 : $_ArrayBuffer<Int>, #_ArrayBuffer.storage
+  //  retain_value %44
+  //
+  // Or we can have a retain directly on the array:
+  //  %42 = SILValue(Array, ...) : $Array<Int>
+  // retain %42
+  if (R->getOperand(0) == Array) {
+    if (InstSeq) {
+      InstSeq->push_back(Array.getDef());
+      InstSeq->push_back(R);
+    }
+    return R;
+  }
+
   auto ArrayBufferStorageProj =
       dyn_cast<StructExtractInst>(R->getOperand(0).getDef());
   if (!ArrayBufferStorageProj || ArrayBufferStorageProj->getFieldNo() != 0)

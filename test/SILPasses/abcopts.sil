@@ -38,6 +38,13 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %9 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
+  // Redundant same index and array and retain the array directly instead of
+  // through the array buffer storage.
+  retain_value %3 : $ArrayInt
+  %r9 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
+
+
   // Not redundant - different index.
   %10 = integer_literal $Builtin.Word, 1
   %11 = struct $Int(%10 : $Builtin.Word)
