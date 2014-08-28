@@ -59,16 +59,21 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
   if (!AIScope)
     AIScope = AI->getFunction()->getDebugScope();
 
-  CallSiteScope = new (F.getModule())
-        SILDebugScope(AI->getLoc(), F, AIScope);
-  CallSiteScope->InlinedCallSite = AIScope->InlinedCallSite;
+  if (IKind == InlineKind::MandatoryInline) {
+    // Mandatory inlining: every instruction inherits scope/location
+    // from the call site.
+    CallSiteScope = AIScope;
+  } else {
+    // Performance inlining. Construct a proper inline scope pointing
+    // back to the call site.
+    CallSiteScope = new (F.getModule())
+      SILDebugScope(AI->getLoc(), F, AIScope);
+    CallSiteScope->InlinedCallSite = AIScope->InlinedCallSite;
+  }
 
   // Increment the ref count for the inlined function, so it doesn't
   // get deleted before we can emit abstract debug info for it.
   F.getModule().markFunctionAsInlined(CalleeFunction);
-
-  assert(CallSiteScope ||
-         AI->getLoc().getKind() == SILLocation::MandatoryInlinedKind);
 
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
