@@ -1,3 +1,4 @@
+// RUN: %sil-opt -codemotion -verify %s | FileCheck %s
 // RUN: %sil-opt -enum-simplification -verify %s | FileCheck %s
 
 import Builtin
@@ -51,11 +52,8 @@ bb0(%0 : $FakeOptional):
 
 // CHECK-LABEL: sil @test2 : $@thin (FakeOptional) -> () {
 // CHECK: bb0
-// CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: strong_release
+// CHECK: strong_retain
+// CHECK: strong_release
 sil @test2 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   %1 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
@@ -87,10 +85,8 @@ bb0:
 // CHECK-NEXT: function_ref @get_object
 // CHECK-NEXT: apply
 // CHECK-NEXT: enum
-// CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: strong_release
+// CHECK: strong_retain
+// CHECK: strong_release
 sil @test4 : $@thin () -> () {
 bb0:
   %0 = function_ref @get_object : $@thin () -> Builtin.NativeObject
@@ -184,7 +180,7 @@ bb3:
 // CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
 // CHECK-NEXT: strong_retain [[PAYLOAD]]
 // CHECK: bb4:
-// CHECK-NEXT: retain_value [[INPUT]]
+// CHECK: retain_value [[INPUT]]
 sil @test8 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   cond_br undef, bb1, bb2
@@ -215,7 +211,7 @@ bb4:
 // CHECK: bb2:
 // CHECK-NOT: retain
 // CHECK: bb3:
-// CHECK-NEXT: retain_value [[INPUT]]
+// CHECK: retain_value [[INPUT]]
 sil @test9 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
@@ -243,7 +239,7 @@ bb3:
 // CHECK: bb2:
 // CHECK-NOT: retain
 // CHECK: bb3:
-// CHECK-NEXT: retain_value [[INPUT]]
+// CHECK: retain_value [[INPUT]]
 sil @test9_enums : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   %1 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional, #FakeOptional.Some!enumelt

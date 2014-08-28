@@ -41,7 +41,8 @@ using namespace swift;
 
 static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
                                        EnumElementDecl *EnumDecl) {
-  ++NumRefCountOpsSimplified;
+  assert(EnumDecl->hasArgumentType() &&
+         "We assume enumdecl has an argument type");
 
   SILModule &Mod = I->getModule();
   SILType ArgType =
@@ -55,6 +56,8 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
   // operations.
   if (UEDITy.isTrivial(Mod))
     return;
+
+  ++NumRefCountOpsSimplified;
 
   // If we have a retain value...
   if (isa<RetainValueInst>(I)) {
