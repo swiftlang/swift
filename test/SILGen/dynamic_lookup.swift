@@ -57,14 +57,13 @@ func opt_to_class(var obj: AnyObject) {
   // CHECK-NEXT: [[EXISTVAL:%[0-9]+]] = load [[EXISTBOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[EXISTVAL]] : $AnyObject
   // CHECK-NEXT: [[OBJ_SELF:%[0-9]*]] = project_existential_ref [[EXIST:%[0-9]+]]
-  // CHECK-NEXT: [[OBJ:%[0-9]*]] = unchecked_ref_cast [[OBJ_SELF]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<() -> ()>
-  // CHECK-NEXT: dynamic_method_br [[OBJ]] : $Builtin.UnknownObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
+  // CHECK-NEXT: dynamic_method_br [[OBJ_SELF]] : $@sil_self AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
 
   // Has method BB:
-  // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
-  // CHECK-NEXT: strong_retain [[OBJ]]
-  // CHECK-NEXT: [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ]]) : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()
+  // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@cc(objc_method) @thin (@sil_self AnyObject) -> ()):
+  // CHECK-NEXT: strong_retain [[OBJ_SELF]]
+  // CHECK-NEXT: [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
   // CHECK-NEXT: [[THUNKTEMP:%.*]] = alloc_stack $@callee_owned (@out (), @in ()) -> ()
   // CHECK:      [[THUNKFN:%.*]] = function_ref @{{.*}} : $@thin (@out (), @in (), @owned @callee_owned () -> ()) -> ()
   // CHECK-NEXT: [[THUNK:%.*]] = partial_apply [[THUNKFN]]([[PARTIAL]])
@@ -126,12 +125,11 @@ func opt_to_property(var obj: AnyObject) {
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[RAWOBJ_SELF:%[0-9]+]] = project_existential_ref [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[RAWOBJ:%[0-9]+]] = unchecked_ref_cast [[RAWOBJ_SELF]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
-  // CHECK-NEXT: dynamic_method_br [[RAWOBJ]] : $Builtin.UnknownObject, #X.value!getter.1.foreign, bb1, bb2
-  // CHECK: bb1([[METHOD:%[0-9]+]] : $@cc(objc_method) @thin (Builtin.UnknownObject) -> Int):
-  // CHECK-NEXT: strong_retain [[RAWOBJ]]
-  // CHECK-NEXT: [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ]]) : $@cc(objc_method) @thin (Builtin.UnknownObject) -> Int
+  // CHECK-NEXT: dynamic_method_br [[RAWOBJ_SELF]] : $@sil_self AnyObject, #X.value!getter.1.foreign, bb1, bb2
+  // CHECK: bb1([[METHOD:%[0-9]+]] : $@cc(objc_method) @thin (@sil_self AnyObject) -> Int):
+  // CHECK-NEXT: strong_retain [[RAWOBJ_SELF]]
+  // CHECK-NEXT: [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> Int
   // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[BOUND_METHOD]]() : $@callee_owned () -> Int
   // CHECK-NEXT: [[VALUETEMP:%.*]] = alloc_stack $Int
   // CHECK-NEXT: store [[VALUE]] to [[VALUETEMP]]
@@ -154,14 +152,13 @@ func direct_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = project_existential_ref [[OBJ]] : $AnyObject to $@sil_self AnyObject
-  // CHECK-NEXT: [[OBJ_PTR:%[0-9]+]] = unchecked_ref_cast [[OBJ_REF]] : $@sil_self AnyObject to $Builtin.UnknownObject
   // CHECK-NEXT: [[I:%[0-9]+]] = load [[I_BOX]]#1 : $*Int
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_PTR]] : $Builtin.UnknownObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@sil_self AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-  // CHECK: bb1([[GETTER:%[0-9]+]] : $@cc(objc_method) @thin (Int, Builtin.UnknownObject) -> Int):
-  // CHECK-NEXT: strong_retain [[OBJ_PTR]]
-  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_PTR]]) : $@cc(objc_method) @thin (Int, Builtin.UnknownObject) -> Int
+  // CHECK: bb1([[GETTER:%[0-9]+]] : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int):
+  // CHECK-NEXT: strong_retain [[OBJ_REF]]
+  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
   // CHECK-NEXT: [[RESULTTEMP:%.*]] = alloc_stack $Int
   // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]
@@ -182,14 +179,13 @@ func opt_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = project_existential_ref [[OBJ]] : $AnyObject to $@sil_self AnyObject
-  // CHECK-NEXT: [[OBJ_PTR:%[0-9]+]] = unchecked_ref_cast [[OBJ_REF]] : $@sil_self AnyObject to $Builtin.UnknownObject
   // CHECK-NEXT: [[I:%[0-9]+]] = load [[I_BOX]]#1 : $*Int
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_PTR]] : $Builtin.UnknownObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@sil_self AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-  // CHECK: bb1([[GETTER:%[0-9]+]] : $@cc(objc_method) @thin (Int, Builtin.UnknownObject) -> Int):
-  // CHECK-NEXT: strong_retain [[OBJ_PTR]]
-  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_PTR]]) : $@cc(objc_method) @thin (Int, Builtin.UnknownObject) -> Int
+  // CHECK: bb1([[GETTER:%[0-9]+]] : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int):
+  // CHECK-NEXT: strong_retain [[OBJ_REF]]
+  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
   // CHECK-NEXT: [[RESULTTEMP:%.*]] = alloc_stack $Int
   // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]

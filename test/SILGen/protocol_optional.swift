@@ -18,9 +18,8 @@ func optionalMethodGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: strong_retain [[T]] : $T
   // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $P1
   // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $P1 to $@sil_self P1
-  // CHECK-NEXT: [[OBJ_PTR:%[0-9]+]] = unchecked_ref_cast [[EXIST_REF_PROJ]] : $@sil_self P1 to $Builtin.UnknownObject
   // CHECK-NEXT: alloc_stack $Optional<Int -> ()>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_PTR]] : $Builtin.UnknownObject, #P1.method!1.foreign
+  // CHECK-NEXT: dynamic_method_br [[EXIST_REF_PROJ]] : $@sil_self P1, #P1.method!1.foreign
   var methodRef = t.method
 }
 
@@ -34,9 +33,8 @@ func optionalPropertyGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: strong_retain [[T]] : $T
   // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $P1
   // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $P1 to $@sil_self P1
-  // CHECK-NEXT: [[OBJ:%[0-9]+]] = unchecked_ref_cast [[EXIST_REF_PROJ]] : $@sil_self P1 to $Builtin.UnknownObject
   // CHECK-NEXT: alloc_stack $Optional<Int>
-  // CHECK-NEXT: dynamic_method_br [[OBJ]] : $Builtin.UnknownObject, #P1.prop!getter.1.foreign
+  // CHECK-NEXT: dynamic_method_br [[EXIST_REF_PROJ]] : $@sil_self P1, #P1.prop!getter.1.foreign
   var propertyRef = t.prop
 }
 
@@ -50,12 +48,11 @@ func optionalSubscriptGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: strong_retain [[T]] : $T
   // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $AnyObject
   // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $AnyObject to $@sil_self AnyObject
-  // CHECK-NEXT: [[OBJ:%[0-9]+]] = unchecked_ref_cast [[EXIST_REF_PROJ]] : $@sil_self AnyObject to $Builtin.UnknownObject
   // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSi33_convertFromBuiltinIntegerLiteral
   // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK-NEXT: [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
   // CHECK-NEXT: [[FIVE:%[0-9]+]] = apply [transparent] [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   // CHECK-NEXT: alloc_stack $Optional<Int>
-  // CHECK-NEXT: dynamic_method_br [[OBJ]] : $Builtin.UnknownObject, #P1.subscript!getter.1.foreign
+  // CHECK-NEXT: dynamic_method_br [[EXIST_REF_PROJ]] : $@sil_self AnyObject, #P1.subscript!getter.1.foreign
   var subscriptRef = t[5]
 }

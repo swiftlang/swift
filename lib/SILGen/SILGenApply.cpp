@@ -111,23 +111,36 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
                               ctx);
 }
 
+static Type getExistentialArchetype(SILValue existential) {
+  CanType ty = existential.getType().getSwiftRValueType();
+  if (ty->is<ArchetypeType>())
+    return ty;
+  return cast<ProtocolType>(ty)->getDecl()->getSelf()->getArchetype();
+}
+
+/// Get the 'Self' type of an AnyObject operand to use as the result type of
+/// projecting the object instance handle.
+static SILType getSelfTypeForDynamicLookup(SILGenFunction &gen,
+                                           SILValue existential) {
+  return gen.getLoweredType(getExistentialArchetype(existential));
+}
+
 /// Retrieve the type to use for a method found via dynamic lookup.
-static CanSILFunctionType getDynamicMethodLoweredType(SILGenModule &SGM,
+static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
                                                       SILValue proto,
                                                       SILDeclRef methodName) {
-  auto &ctx = SGM.getASTContext();
+  auto &ctx = gen.getASTContext();
   
   // Determine the opaque 'self' parameter type.
   CanType selfTy;
   if (methodName.getDecl()->isInstanceMember()) {
-    selfTy = ctx.TheUnknownObjectType;
+    selfTy = getExistentialArchetype(proto)->getCanonicalType();
   } else {
     selfTy = proto.getType().getSwiftType();
   }
   
   // Replace the 'self' parameter type in the method type with it.
-  auto methodTy = SGM.getConstantType(methodName).castTo<SILFunctionType>();
-  
+  auto methodTy = gen.SGM.getConstantType(methodName).castTo<SILFunctionType>();
   return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
@@ -715,16 +728,6 @@ public:
     llvm_unreachable("bad callee kind");
   }
 };
-
-/// Get the 'Self' type of an AnyObject operand to use as the result type of
-/// projecting the object instance handle.
-SILType getSelfTypeForDynamicLookup(SILGenFunction &gen,
-                                    SILValue existential) {
-  CanType ty = existential.getType().getSwiftRValueType();
-  ProtocolDecl *proto = cast<ProtocolType>(ty)->getDecl();
-  // AnyObject is a class protocol so its projection should be loadable.
-  return gen.getLoweredLoadableType(proto->getSelf()->getArchetype());
-}
   
 /// An ASTVisitor for building SIL function calls.
 /// Nested ApplyExprs applied to an underlying curried function or method
@@ -1366,16 +1369,15 @@ public:
     if (callSites.empty())
       return false;
 
-    // Only methods can be forced.
+    // Only @objc methods can be forced.
     auto *fd = dyn_cast<FuncDecl>(dynamicMemberRef->getMember().getDecl());
-    if (!fd)
+    if (!fd || !fd->isObjC())
       return false;
 
     // We found it. Emit the base.
     ManagedValue existential =
       gen.emitRValueAsSingleValue(dynamicMemberRef->getBase());
 
-    assert(fd->isObjC() && "Dynamic member references require @objc");
     SILValue val;
     if (fd->isInstanceMember()) {
       assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
@@ -3104,7 +3106,15 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.
-  gen.B.emitRetainValueOperation(loc, self);
+#if 0
+  auto CMV = ConsumableManagedValue(ManagedValue::forUnmanaged(self),
+                                    CastConsumptionKind::CopyOnSuccess);
+  self = gen.getManagedValue(loc, CMV).forward(gen);
+#else
+  if (!self.getType().isAddress())
+    gen.B.emitRetainValueOperation(loc, self);
+#endif
+  
   SILValue result = gen.B.createPartialApply(loc, method, method.getType(), {},
                         self, SILType::getPrimitiveObjectType(partialApplyTy));
   // If necessary, thunk to the native ownership conventions and bridged types.
@@ -3125,10 +3135,22 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
   SILValue operand = existential.getValue();
   if (e->getMember().getDecl()->isInstanceMember()) {
-    operand = B.createProjectExistentialRef(e, operand,
-                                  getSelfTypeForDynamicLookup(*this, operand));
-    operand = B.createUncheckedRefCast(e, operand,
-                                 SILType::getUnknownObjectType(getASTContext()));
+    
+    // Attach the existential cleanup to the projection so that it gets
+    // consumed (or not) when the call is applied to it (or isn't).
+    ManagedValue proj;
+    SILType protoSelfTy = getSelfTypeForDynamicLookup(*this, operand);
+    if (operand.getType().isClassExistentialType()) {
+      SILValue val = B.createProjectExistentialRef(e, operand,
+                                                   protoSelfTy);
+      proj = ManagedValue(val, existential.getCleanup());
+    } else {
+      assert(protoSelfTy.isAddress() && "Self should be address-only");
+      SILValue val = B.createProjectExistential(e, operand, protoSelfTy);
+      proj = ManagedValue::forUnmanaged(val);
+    }
+    
+    operand = proj.getValue();
   } else {
     auto metatype = operand.getType().castTo<ExistentialMetatypeType>();
     assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
@@ -3180,7 +3202,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
       methodTy = CanFunctionType::get(TupleType::getEmpty(getASTContext()),
                                       methodTy);
 
-    auto dynamicMethodTy = getDynamicMethodLoweredType(SGM, operand, member);
+    auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);
@@ -3228,8 +3250,6 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   SILValue base = existential.getValue();
   base = B.createProjectExistentialRef(e, base, 
            getSelfTypeForDynamicLookup(*this, base));
-  base = B.createUncheckedRefCast(e, base,
-           SILType::getUnknownObjectType(getASTContext()));
 
   // Emit the index.
   RValue index = emitRValue(e->getIndex());
@@ -3268,7 +3288,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto methodTy =
       subscriptDecl->getGetter()->getType()->castTo<AnyFunctionType>()
                       ->getResult()->getCanonicalType();
-    auto dynamicMethodTy = getDynamicMethodLoweredType(SGM, base, member);
+    auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);

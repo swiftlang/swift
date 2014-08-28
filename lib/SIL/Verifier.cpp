@@ -1202,7 +1202,6 @@ public:
     requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
     SILType operandType = EMI->getOperand().getType();
 
-    require(EMI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
@@ -1946,7 +1945,6 @@ public:
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
     SILType operandType = DMBI->getOperand().getType();
 
-    require(DMBI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!DMBI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
@@ -1963,9 +1961,11 @@ public:
     require(DMBI->getHasMethodBB()->bbarg_size() == 1,
             "true bb for dynamic_method_br must take an argument");
     
-    requireSameType(DMBI->getHasMethodBB()->bbarg_begin()[0]->getType(),
+/*
+ requireSameType(DMBI->getHasMethodBB()->bbarg_begin()[0]->getType(),
                     getDynamicMethodType(operandType, DMBI->getMember()),
               "bb argument for dynamic_method_br must be of the method's type");
+ */
   }
   
   void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {

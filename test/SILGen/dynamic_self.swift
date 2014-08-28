@@ -99,10 +99,10 @@ func testExistentialDispatchClass(cp: CP) {
 
 // CHECK-LABEL: sil @_TF12dynamic_self21testAnyObjectDispatch{{.*}} : $@thin (@owned AnyObject) -> ()
 func testAnyObjectDispatch(o: AnyObject) {
-  // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $Builtin.UnknownObject, #ObjC.method!1.foreign, bb1, bb2
+  // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@sil_self AnyObject, #ObjC.method!1.foreign, bb1, bb2
 
-  // CHECK: bb1([[METHOD:%[0-9]+]] : $@cc(objc_method) @thin (Builtin.UnknownObject) -> @autoreleased AnyObject):
-  // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [[METHOD]]([[O_OBJ]]) : $@cc(objc_method) @thin (Builtin.UnknownObject) -> @autoreleased AnyObject
+  // CHECK: bb1([[METHOD:%[0-9]+]] : $@cc(objc_method) @thin (@sil_self AnyObject) -> @autoreleased AnyObject):
+  // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [[METHOD]]([[O_OBJ]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> @autoreleased AnyObject
   var x = o.method
 }
 
