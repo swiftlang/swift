@@ -53,6 +53,9 @@ public:
   SILFunction &getFunction() const { return F; }
   SILModule &getModule() const { return F.getModule(); }
   ASTContext &getASTContext() const { return F.getASTContext(); }
+  const Lowering::TypeLowering &getTypeLowering(SILType T) const {
+    return F.getModule().getTypeLowering(T);
+  }
 
   //===--------------------------------------------------------------------===//
   // Insertion Point Management
@@ -754,9 +757,8 @@ public:
                                      SILValue Operand) {
     return insert(new (F.getModule()) FixLifetimeInst(Loc, Operand));
   }
-  void emitFixLifetime(SILLocation Loc,
-                       SILValue Operand) {
-    if (F.getModule().getTypeLowering(Operand.getType()).isTrivial())
+  void emitFixLifetime(SILLocation Loc, SILValue Operand) {
+    if (getTypeLowering(Operand.getType()).isTrivial())
       return;
     createFixLifetime(Loc, Operand);
   }
@@ -971,7 +973,7 @@ public:
   /// for the non-address value.
   void emitRetainValueOperation(SILLocation loc, SILValue v) {
     assert(!v.getType().isAddress());
-    auto &lowering = F.getModule().getTypeLowering(v.getType());
+    auto &lowering = getTypeLowering(v.getType());
     return lowering.emitRetainValue(*this, loc, v);
   }
   
@@ -979,7 +981,7 @@ public:
   /// lowering for the non-address value.
   void emitReleaseValueOperation(SILLocation loc, SILValue v) {
     assert(!v.getType().isAddress());
-    auto &lowering = F.getModule().getTypeLowering(v.getType());
+    auto &lowering = getTypeLowering(v.getType());
     lowering.emitReleaseValue(*this, loc, v);
   }
 
