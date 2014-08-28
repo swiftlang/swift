@@ -1259,7 +1259,9 @@ ERROR(ambiguous_operator_ref,tce_sema,none,
       "ambiguous use of operator %0", (Identifier))
 
 ERROR(partial_application_of_method_invalid,tce_sema,none,
-      "partial application of %select{struct method|enum method|enum constructor|generic method|protocol method|Objective-C}0 is not allowed", (unsigned))
+      "partial application of %select{struct method|enum method|enum "
+      "constructor|generic method|protocol method|Objective-C}0 is not allowed",
+      (unsigned))
 
 ERROR(self_assignment_var,tce_sema,none,
       "assigning a variable to itself", ())

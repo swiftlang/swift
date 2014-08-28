@@ -124,13 +124,20 @@ protocol P {
   func bar(x: Int)
 }
 
+@objc
+protocol P2 {
+  func bar(x: Int)
+}
+
+
 func generic<T: P>(t: T) {
   var bar = t.bar // expected-error{{partial application of generic method is not allowed}}
   var barFull : () = t.bar(0)
 }
 
-func existential(p: P) {
+func existential(p: P, p2 : P2) {
   var bar = p.bar // expected-error{{partial application of protocol method is not allowed}}
+  var bar2 = p2.bar // expected-error{{partial application of protocol method is not allowed}}
   var barFull : () = p.bar(0)
 }
 
@@ -144,7 +151,7 @@ func genericClassP<T: ClassP>(t: T) {
 }
 
 func existentialClassP(p: ClassP) {
-  var bas = p.bas
+  var bas = p.bas  // expected-error{{partial application of protocol method is not allowed}}
   var basFull : () = p.bas(0)
 }
 

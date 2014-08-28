@@ -2074,16 +2074,17 @@ namespace {
             goto not_value_type_member;
         } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
           auto baseTy = pmRef->getBase()->getType();
-          if (baseTy->hasReferenceSemantics())
-            goto not_value_type_member;
           if (baseTy->isAnyExistentialType()) {
             kind = MemberPartialApplication::Protocol;
+          } else if (baseTy->hasReferenceSemantics()) {
+            goto not_value_type_member;
           } else if (isa<FuncDecl>(pmRef->getMember().getDecl()))
             kind = MemberPartialApplication::Archetype;
           else
             goto not_value_type_member;
           fn = dyn_cast<FuncDecl>(pmRef->getMember().getDecl());
         }
+        
         if (fn && fn->isInstanceMember())
           InvalidPartialApplications.insert({
             member,
