@@ -823,11 +823,11 @@ Reflection.test("CustomMirror") {
     var output = ""
     dump(Brilliant(123, "four five six"), &output)
 
-    var expected = ""
-    expected += "▿ Brilliant(123, four five six) #0\n"
-    expected += "  - first: 123\n"
-    expected += "  - second: four five six\n"
-    expected += "  ▿ self: Brilliant(123, four five six) #0\n"
+    let expected =
+      "▿ Brilliant(123, four five six) #0\n" +
+      "  - first: 123\n" +
+      "  - second: four five six\n" +
+      "  ▿ self: Brilliant(123, four five six) #0\n"
 
     expectEqual(expected, output)
   }
@@ -842,11 +842,11 @@ Reflection.test("CustomMirror") {
     var output = ""
     dump(Brilliant(123, "four five six"), &output, maxItems: 3)
 
-    var expected = ""
-    expected += "▿ Brilliant(123, four five six) #0\n"
-    expected += "  - first: 123\n"
-    expected += "  - second: four five six\n"
-    expected += "    (1 more child)\n"
+    let expected =
+      "▿ Brilliant(123, four five six) #0\n" +
+      "  - first: 123\n" +
+      "  - second: four five six\n" +
+      "    (1 more child)\n"
 
     expectEqual(expected, output)
   }
@@ -855,10 +855,10 @@ Reflection.test("CustomMirror") {
     var output = ""
     dump(Brilliant(123, "four five six"), &output, maxItems: 2)
 
-    var expected = ""
-    expected += "▿ Brilliant(123, four five six) #0\n"
-    expected += "  - first: 123\n"
-    expected += "    (2 more children)\n"
+    let expected =
+      "▿ Brilliant(123, four five six) #0\n" +
+      "  - first: 123\n" +
+      "    (2 more children)\n"
 
     expectEqual(expected, output)
   }
@@ -867,9 +867,9 @@ Reflection.test("CustomMirror") {
     var output = ""
     dump(Brilliant(123, "four five six"), &output, maxItems: 1)
 
-    var expected = ""
-    expected += "▿ Brilliant(123, four five six) #0\n"
-    expected += "    (3 children)\n"
+    let expected =
+      "▿ Brilliant(123, four five six) #0\n" +
+      "    (3 children)\n"
 
     expectEqual(expected, output)
   }
@@ -891,11 +891,11 @@ Reflection.test("CustomMirrorIsInherited") {
     var output = ""
     dump(Irradiant(), &output)
 
-    var expected = ""
-    expected += "▿ Brilliant(400, ) #0\n"
-    expected += "  - first: 400\n"
-    expected += "  - second: \n"
-    expected += "  ▿ self: Brilliant(400, ) #0\n"
+    let expected =
+      "▿ Brilliant(400, ) #0\n" +
+      "  - first: 400\n" +
+      "  - second: \n" +
+      "  ▿ self: Brilliant(400, ) #0\n"
 
     expectEqual(expected, output)
   }
@@ -907,14 +907,14 @@ Reflection.test("TupleMirror") {
     let tuple = (Brilliant(384, "seven six eight"), Matte("nine"))
     dump(tuple, &output)
 
-    var expected = ""
-    expected += "▿ (2 elements)\n"
-    expected += "  ▿ .0: Brilliant(384, seven six eight) #0\n"
-    expected += "    - first: 384\n"
-    expected += "    - second: seven six eight\n"
-    expected += "    ▿ self: Brilliant(384, seven six eight) #0\n"
-    expected += "  ▿ .1: a.Matte\n"
-    expected += "    - s: nine\n"
+    let expected =
+      "▿ (2 elements)\n" +
+      "  ▿ .0: Brilliant(384, seven six eight) #0\n" +
+      "    - first: 384\n" +
+      "    - second: seven six eight\n" +
+      "    ▿ self: Brilliant(384, seven six eight) #0\n" +
+      "  ▿ .1: a.Matte\n" +
+      "    - s: nine\n"
 
     expectEqual(expected, output)
 
@@ -928,12 +928,12 @@ Reflection.test("TupleMirror") {
     let tuple = (1, 2.5, false, "three")
     dump(tuple, &output)
 
-    var expected = ""
-    expected += "▿ (4 elements)\n"
-    expected += "  - .0: 1\n"
-    expected += "  - .1: 2.5\n"
-    expected += "  - .2: false\n"
-    expected += "  - .3: three\n"
+    let expected =
+      "▿ (4 elements)\n" +
+      "  - .0: 1\n" +
+      "  - .1: 2.5\n" +
+      "  - .2: false\n" +
+      "  - .3: three\n"
 
     expectEqual(expected, output)
   }
@@ -944,12 +944,12 @@ Reflection.test("TupleMirror") {
     let tuple = (1, ("Hello", "World"))
     dump(tuple, &output)
 
-    var expected = ""
-    expected += "▿ (2 elements)\n"
-    expected += "  - .0: 1\n"
-    expected += "  ▿ .1: (2 elements)\n"
-    expected += "    - .0: Hello\n"
-    expected += "    - .1: World\n"
+    let expected =
+      "▿ (2 elements)\n" +
+      "  - .0: 1\n" +
+      "  ▿ .1: (2 elements)\n" +
+      "    - .0: Hello\n" +
+      "    - .1: World\n"
 
     expectEqual(expected, output)
   }
@@ -988,15 +988,15 @@ Reflection.test("String.UTF8View/Mirror") {
   var output = ""
   dump("\u{61}\u{304b}\u{3099}".utf8, &output)
 
-  var expected = ""
-  expected += "▿ \u{61}\u{304b}\u{3099}\n"
-  expected += "  - [0]: 97\n"
-  expected += "  - [1]: 227\n"
-  expected += "  - [2]: 129\n"
-  expected += "  - [3]: 139\n"
-  expected += "  - [4]: 227\n"
-  expected += "  - [5]: 130\n"
-  expected += "  - [6]: 153\n"
+  let expected =
+    "▿ \u{61}\u{304b}\u{3099}\n" +
+    "  - [0]: 97\n" +
+    "  - [1]: 227\n" +
+    "  - [2]: 129\n" +
+    "  - [3]: 139\n" +
+    "  - [4]: 227\n" +
+    "  - [5]: 130\n" +
+    "  - [6]: 153\n"
 
   expectEqual(expected, output)
 }
@@ -1009,13 +1009,13 @@ Reflection.test("String.UTF16View/Mirror") {
   var output = ""
   dump("\u{61}\u{304b}\u{3099}\u{1f425}".utf16, &output)
 
-  var expected = ""
-  expected += "▿ \u{61}\u{304b}\u{3099}\u{1f425}\n"
-  expected += "  - [0]: 97\n"
-  expected += "  - [1]: 12363\n"
-  expected += "  - [2]: 12441\n"
-  expected += "  - [3]: 55357\n"
-  expected += "  - [4]: 56357\n"
+  let expected =
+    "▿ \u{61}\u{304b}\u{3099}\u{1f425}\n" +
+    "  - [0]: 97\n" +
+    "  - [1]: 12363\n" +
+    "  - [2]: 12441\n" +
+    "  - [3]: 55357\n" +
+    "  - [4]: 56357\n"
 
   expectEqual(expected, output)
 }
@@ -1028,12 +1028,12 @@ Reflection.test("String.UnicodeScalarView/Mirror") {
   var output = ""
   dump("\u{61}\u{304b}\u{3099}\u{1f425}".unicodeScalars, &output)
 
-  var expected = ""
-  expected += "▿ \u{61}\u{304b}\u{3099}\u{1f425}\n"
-  expected += "  - [0]: \u{61}\n"
-  expected += "  - [1]: \u{304b}\n"
-  expected += "  - [2]: \u{3099}\n"
-  expected += "  - [3]: \u{1f425}\n"
+  let expected =
+    "▿ \u{61}\u{304b}\u{3099}\u{1f425}\n" +
+    "  - [0]: \u{61}\n" +
+    "  - [1]: \u{304b}\n" +
+    "  - [2]: \u{3099}\n" +
+    "  - [3]: \u{1f425}\n"
 
   expectEqual(expected, output)
 }
@@ -1042,10 +1042,10 @@ Reflection.test("CGPoint") {
   var output = ""
   dump(CGPoint(x: 1.25, y: 2.75), &output)
 
-  var expected = ""
-  expected += "▿ (1.25,2.75)\n"
-  expected += "  - x: 1.25\n"
-  expected += "  - y: 2.75\n"
+  let expected =
+    "▿ (1.25,2.75)\n" +
+    "  - x: 1.25\n" +
+    "  - y: 2.75\n"
 
   expectEqual(expected, output)
 }
@@ -1054,10 +1054,10 @@ Reflection.test("CGSize") {
   var output = ""
   dump(CGSize(width: 1.25, height: 2.75), &output)
 
-  var expected = ""
-  expected += "▿ (1.25,2.75)\n"
-  expected += "  - width: 1.25\n"
-  expected += "  - height: 2.75\n"
+  let expected =
+    "▿ (1.25,2.75)\n" +
+    "  - width: 1.25\n" +
+    "  - height: 2.75\n"
 
   expectEqual(expected, output)
 }
@@ -1070,14 +1070,14 @@ Reflection.test("CGRect") {
       size: CGSize(width: 10.25, height: 11.75)),
     &output)
 
-  var expected = ""
-  expected += "▿ (1.25,2.25,10.25,11.75)\n"
-  expected += "  ▿ origin: (1.25,2.25)\n"
-  expected += "    - x: 1.25\n"
-  expected += "    - y: 2.25\n"
-  expected += "  ▿ size: (10.25,11.75)\n"
-  expected += "    - width: 10.25\n"
-  expected += "    - height: 11.75\n"
+  let expected =
+    "▿ (1.25,2.25,10.25,11.75)\n" +
+    "  ▿ origin: (1.25,2.25)\n" +
+    "    - x: 1.25\n" +
+    "    - y: 2.25\n" +
+    "  ▿ size: (10.25,11.75)\n" +
+    "    - width: 10.25\n" +
+    "    - height: 11.75\n"
 
   expectEqual(expected, output)
 }
@@ -1087,7 +1087,7 @@ Reflection.test("Unmanaged/nil") {
   var optionalURL: Unmanaged<CFURL>? = nil
   dump(optionalURL, &output)
 
-  var expected = "- nil\n"
+  let expected = "- nil\n"
 
   expectEqual(expected, output)
 }
@@ -1098,10 +1098,10 @@ Reflection.test("Unmanaged/not-nil") {
     Unmanaged.passRetained(CFURLCreateWithString(nil, "http://llvm.org/", nil))
   dump(optionalURL, &output)
 
-  var expected = ""
-  expected += "▿ Swift.Unmanaged\n"
-  expected += "  ▿ Some: Swift.Unmanaged\n"
-  expected += "    - _value: http://llvm.org/ #0\n"
+  let expected =
+    "▿ Swift.Unmanaged\n" +
+    "  ▿ Some: Swift.Unmanaged\n" +
+    "    - _value: http://llvm.org/ #0\n"
 
   expectEqual(expected, output)
 
