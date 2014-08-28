@@ -1173,10 +1173,11 @@ public:
     auto params = methodTy->getParameters();
     SmallVector<SILParameterInfo, 4>
       dynParams(params.begin(), params.end() - 1);
-    dynParams.push_back(SILParameterInfo(selfType.getSwiftType(),
-                                             params.back().getConvention()));
+    dynParams.push_back(SILParameterInfo(selfType.getSwiftRValueType(),
+                                         params.back().getConvention()));
     
     auto dynResult = methodTy->getResult();
+
     // If the method returns Self, substitute AnyObject for the result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
       if (fnDecl->hasDynamicSelf()) {
@@ -1188,7 +1189,7 @@ public:
                                   dynResult.getConvention());
       }
     }
-    
+
     auto fnTy = SILFunctionType::get(nullptr,
                                      methodTy->getExtInfo(),
                                      methodTy->getCalleeConvention(),
@@ -1961,11 +1962,9 @@ public:
     require(DMBI->getHasMethodBB()->bbarg_size() == 1,
             "true bb for dynamic_method_br must take an argument");
     
-/*
- requireSameType(DMBI->getHasMethodBB()->bbarg_begin()[0]->getType(),
+    requireSameType(DMBI->getHasMethodBB()->bbarg_begin()[0]->getType(),
                     getDynamicMethodType(operandType, DMBI->getMember()),
               "bb argument for dynamic_method_br must be of the method's type");
- */
   }
   
   void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
