@@ -60,3 +60,28 @@ func f2<T:P4>(a: T) {
 }
 
 f2(Y3())
+
+
+protocol AsExistentialA {
+  var delegate : AsExistentialB? { get }
+}
+protocol AsExistentialB {
+  func aMethod(object : AsExistentialA)
+}
+
+protocol AsExistentialAssocTypeA {
+  var delegate : AsExistentialAssocTypeB? { get } // expected-error {{protocol 'AsExistentialAssocTypeB' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
+protocol AsExistentialAssocTypeB {
+  func aMethod(object : AsExistentialAssocTypeA)
+  typealias Bar
+}
+
+protocol AsExistentialAssocTypeAgainA {
+  var delegate : AsExistentialAssocTypeAgainB? { get }
+  typealias Bar
+}
+protocol AsExistentialAssocTypeAgainB {
+  func aMethod(object : AsExistentialAssocTypeAgainA) // expected-error + {{protocol 'AsExistentialAssocTypeAgainA' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
+

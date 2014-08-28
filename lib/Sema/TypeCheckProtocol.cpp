@@ -2213,6 +2213,9 @@ existentialConformsToItself(TypeChecker &tc,
       return *known;
   }
 
+  // Assume for now that it does. This prevents circularity issues.
+  proto->setExistentialConformsToSelf(true);
+
   // Check that all inherited protocols conform to themselves.
   for (auto inheritedProto : proto->getProtocols()) {
     // If we're already checking this protocol, assume it's fine.
@@ -2225,7 +2228,7 @@ existentialConformsToItself(TypeChecker &tc,
       // Recursive call already diagnosed this problem, but tack on a note
       // to establish the relationship.
       // FIXME: Poor location information.
-      if (complainLoc.isValid()) {
+      if (complainLoc.isValid() && *proto->existentialConformsToSelf()) {
         tc.diagnose(proto,
                     diag::inherited_protocol_does_not_conform, type,
                     inheritedProto->getType());
@@ -2247,14 +2250,13 @@ existentialConformsToItself(TypeChecker &tc,
     // Check for associated types.
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       // A protocol cannot conform to itself if it has an associated type.
+      if (complainLoc.isValid() && *proto->existentialConformsToSelf()) {
+        tc.diagnose(complainLoc, diag::type_does_not_conform, type,
+                    proto->getDeclaredType());
+        tc.diagnose(assocType, diag::protocol_existential_assoc_type,
+                    assocType->getName());
+      }
       proto->setExistentialConformsToSelf(false);
-      if (complainLoc.isInvalid())
-        return false;
-
-      tc.diagnose(complainLoc, diag::type_does_not_conform, type,
-                  proto->getDeclaredType());
-      tc.diagnose(assocType, diag::protocol_existential_assoc_type,
-                  assocType->getName());
       return false;
     }
 
@@ -2292,18 +2294,17 @@ existentialConformsToItself(TypeChecker &tc,
 
     // A protocol cannot conform to itself if any of its value members
     // refers to 'Self'.
-    proto->setExistentialConformsToSelf(false);
-    if (complainLoc.isInvalid())
-      return false;
+    if (complainLoc.isValid() && *proto->existentialConformsToSelf()) {
+      tc.diagnose(complainLoc, diag::type_does_not_conform, type,
+                  proto->getDeclaredType());
+      tc.diagnose(valueMember, diag::protocol_existential_refers_to_this,
+                  valueMember->getName());
+    }
 
-    tc.diagnose(complainLoc, diag::type_does_not_conform, type,
-                proto->getDeclaredType());
-    tc.diagnose(valueMember, diag::protocol_existential_refers_to_this,
-                valueMember->getName());
+    proto->setExistentialConformsToSelf(false);
     return false;
   }
 
-  proto->setExistentialConformsToSelf(true);
   return true;
 }
 
