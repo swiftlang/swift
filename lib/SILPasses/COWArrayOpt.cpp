@@ -74,28 +74,40 @@ static SILValue getAccessPath(SILValue V, SmallVectorImpl<unsigned>& Path) {
 }
 
 namespace {
-/// Collect all uses of the address of an element at the given underlying object
-/// and access path. Uses of the address of an aggregate that contains the
-/// element are also recorded in AggregateAddressUsers. If the use is a Load,
-/// record it separately so that uses of the value can be traversed.
+/// Collect all uses of a struct given an aggregate value that contains the
+/// struct and access path describing the projection of the aggregate
+/// that accesses the struct.
+///
+/// AggregateAddressUsers records uses of the aggregate value's address. These
+/// may indirectly access the struct's elements.
+///
+/// Projections over the aggregate that do not access the struct are ignored.
+///
+/// StructLoads records loads of the struct value.
+/// StructAddressUsers records other uses of the struct address.
+/// StructValueUsers records direct uses of the loaded struct.
+///
+/// Projections of the struct over its elements are all similarly recorded in
+/// ElementAddressUsers, ElementLoads, and ElementValueUsers.
 ///
 /// bb0(%arg : $*S)
-/// apply %f(%arg)        // <--- Aggregate Address User
+/// apply %f(%arg)           // <--- Aggregate Address User
 /// %struct_addr = struct_element_addr %arg : $*S, #S.element
 /// apply %g(%struct_addr)   // <--- Struct Address User
 /// %val = load %struct_addr // <--- Struct Load
-/// apply %h(%sval)          // <--- Value User
+/// apply %h(%val)           // <--- Struct Value User
 /// %elt_addr = struct_element_addr %struct_addr : $*A, #A.element
 /// apply %i(%elt_addr)      // <--- Element Address User
 /// %elt = load %elt_addr    // <--- Element Load
-/// apply %j(%elt)           // <--- Element User
+/// apply %j(%elt)           // <--- Element Value User
 class StructUseCollector {
 public:
   typedef SmallPtrSet<Operand*, 16> VisitedSet;
   typedef SmallVector<SILInstruction*, 16> UserList;
 
   /// Map a user of a value or an element within that value to the operand that
-  /// directly uses the value.
+  /// directly uses the value. Multiple levels of struct_extract may exist
+  /// between the use instruction and the operand.
   typedef llvm::MapVector<SILInstruction*, Operand*> UserMap;
 
   UserList AggregateAddressUsers;
@@ -286,12 +298,13 @@ public:
 protected:
   bool checkUniqueArrayContainer(SILValue ArrayContainer);
   SmallPtrSetImpl<SILBasicBlock*> &getReachingBlocks();
+  bool isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
+                                    SILValue ArrayVal);
   bool checkSafeArrayAddressUses(UserList &AddressUsers);
-  bool checkSafeArrayElementUses(SILValue ArrayVal,
-                                 StructExtractInst *SEI);
   bool checkSafeArrayValueUses(UserList &ArrayValueUsers);
+  bool checkSafeArrayElementUse(SILInstruction *UseInst, SILValue ArrayVal);
   bool checkSafeElementValueUses(UserMap &ElementValueUsers);
-  bool hoistMakeMutable(ApplyInst *MakeMutable, SILValue Array);
+  bool hoistMakeMutable(ApplyInst *MakeMutable, SILValue ArrayAddr);
 };
 } // namespace
 
@@ -348,14 +361,41 @@ SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
   return ReachingBlocks;
 }
 
+/// \return true if the given retain instruction is followed by a release on the
+/// same object prior to any potential mutating operation.
+bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
+                                               SILValue ArrayVal) {
+  // If a retain is found outside the loop ignore it. Otherwise, it must
+  // have a matching @owned call.
+  if (!Loop->contains(RetainInst))
+    return true;
+
+  // Walk forward looking for a release of ArrayLoad or element of
+  // ArrayUserSet. Note that ArrayUserSet does not included uses of elements
+  // within the Array. Consequently, checkSafeArrayElementUse must prove that
+  // no uses of the Array value, or projections of it can lead to mutation
+  // (element uses may only be retained/released).
+  for (auto II = std::next(SILBasicBlock::iterator(RetainInst)),
+         IE = RetainInst->getParent()->end(); II != IE; ++II) {
+    if (isRelease(II, ArrayVal))
+      return true;
+
+    if (ArrayUserSet.count(II)) // May be an array mutation.
+      break;
+  }
+  DEBUG(llvm::dbgs() << "    Skipping Array: retained in loop!\n    "
+        << *RetainInst);
+  return false;
+}
+
 /// \return true if all given users of an array address are safe to hoist
 /// make_mutable across.
 ///
 /// General calls are unsafe because they may copy the array struct which in
 /// turn bumps the reference count of the array storage.
 ///
-/// The same logic currently applies to both uses of the array itself and uses
-/// of an aggregate containing the array.
+/// The same logic currently applies to both uses of the array struct itself and
+/// uses of an aggregate containing the array.
 ///
 /// This does not apply to addresses of elements within the array. e.g. it is
 /// not safe to store to an element in the array because we may be storing an
@@ -401,6 +441,41 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
   return true;
 }
 
+/// Check that the use of an Array value, the value of an aggregate containing
+/// an array, or the value of an element within the array, is safe w.r.t
+/// make_mutable hoisting. Retains are safe as long as they are not inside the
+/// Loop.
+bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
+  for (auto *UseInst : ArrayValueUsers) {
+    if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
+      if (isArraySemanticCall(AI))
+        continue;
+
+    } else if (auto *SEI = dyn_cast<StructExtractInst>(UseInst)) {
+      for (auto UI : SEI->getUses()) {
+        if (!checkSafeArrayElementUse(UI->getUser(), SEI->getOperand()))
+          return false;
+      }
+      continue;
+
+    } else if (auto *RVI = dyn_cast<RetainValueInst>(UseInst)) {
+      if (isRetainReleasedBeforeMutate(UseInst, RVI->getOperand()))
+        continue;
+
+    } else if (isa<ReleaseValueInst>(UseInst)) {
+      // Releases are always safe. This case handles the release of an array
+      // buffer that is loaded from a local array struct.
+      continue;
+
+    }
+    // Found an unsafe or unknown user. The Array may escape here.
+    DEBUG(llvm::dbgs() << "    Skipping Array: unsafe Array value use!\n    "
+          << *UseInst);
+    return false;
+  }
+  return true;
+}
+
 /// Given an array value, recursively check that uses of elements within the
 /// array are safe.
 ///
@@ -411,105 +486,46 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 ///   %s = struct_extract %b : $_ArrayBuffer<Int>, #_ArrayBuffer.storage
 ///  retain_value %s : $Optional<Builtin.NativeObject>
 ///
+///  SILCombine typically simplifies this by bypassing the
+///  struct_extract. However, for completeness this analysis has the ability to
+///  follow struct_extract users.
+///
 /// Since this does not recurse through multi-operand instructions, no visited
 /// set is necessary.
-bool COWArrayOpt::checkSafeArrayElementUses(SILValue ArrayVal,
-                                            StructExtractInst *SEI) {
-  for (auto UI : SEI->getUses()) {
-    SILInstruction *UseInst = UI->getUser();
-    if (isa<RetainValueInst>(UseInst)) {
-      // If a retain is found outside the loop ignore it. Otherwise, it must
-      // have a matching @owned call.
-      if (!Loop->contains(UseInst))
-        continue;
+bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
+                                           SILValue ArrayVal) {
+  if (isa<RetainValueInst>(UseInst) &&
+      isRetainReleasedBeforeMutate(UseInst, ArrayVal))
+    return true;
 
-      // Walk forward looking for a release of ArrayLoad or element of
-      // ArrayUserSet. Note that ArrayUserSet does not included uses of elements
-      // within the Array. Consequently, checkSafeArrayValueUses must prove that
-      // no uses of the Array value, or projections of it can lead to mutation
-      // (they are only for retains/releases).
-      bool FoundRelease = false;
-      for (auto II = std::next(SILBasicBlock::iterator(UseInst)),
-             IE = UseInst->getParent()->end(); II != IE; ++II) {
-        if (isRelease(II, ArrayVal)) {
-          FoundRelease = true;
-          break;
-        }
-        if (ArrayUserSet.count(II)) // May be an array mutation.
-          break;
-      }
-      if (FoundRelease)
-        continue;
-      DEBUG(llvm::dbgs() << "    Skipping Array: retained in loop!\n    "
-            << *UseInst);
+  if (isa<ReleaseValueInst>(UseInst))
+    // Releases are always safe. This case handles the release of an array
+    // buffer that is loaded from a local array struct.
+    return true;
 
-    } else if (isa<ReleaseValueInst>(UseInst)) {
-      // Releases are always safe.
-      continue;
-    }
-    else if (StructExtractInst *NestedSEI =
-             dyn_cast<StructExtractInst>(UseInst)) {
+  if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(UseInst)) {
+    for (auto UI : SEI->getUses()) {
       // Recurse.
-      if (checkSafeArrayElementUses(ArrayVal, NestedSEI))
-        continue;
+      if (!checkSafeArrayElementUse(UI->getUser(), ArrayVal))
+        return false;
     }
-    // Found an unsafe or unknown user. The Array may escape here.
-    return false;
+    return true;
   }
-  return true;
-}
-
-/// Check that the use of an Array value, the value of an aggregate containing
-/// an array, or the value of an element within the array, is safe w.r.t
-/// make_mutable hoisting. Retains are safe as long as they are not inside the
-/// Loop.
-bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
-  for (auto *UseInst : ArrayValueUsers) {
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
-      if (isArraySemanticCall(AI))
-        continue;
-      DEBUG(llvm::dbgs() << "    Skipping Array: Array value escapes!\n    "
-            << *UseInst);
-
-    } else if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(UseInst)) {
-      if (checkSafeArrayElementUses(SEI->getOperand(), SEI))
-        continue;
-
-    } else if (isa<ReleaseValueInst>(UseInst)) {
-      // Releases are always safe. This case handles the release of an array
-      // buffer that is loaded from a local array struct.
-      continue;
-
-    } else {
-      DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n"
-            << *UseInst);
-    }
-    // Found an unsafe or unknown user. The Array may escape here.
-    return false;
-  }
-  return true;
+  // Found an unsafe or unknown user. The Array may escape here.
+  DEBUG(llvm::dbgs() << "    Skipping Array: unknown Element use!\n"
+        << *UseInst);
+  return false;
 }
 
 /// Check that the use of an Array element is safe w.r.t. make_mutable hoisting.
+///
+/// This logic should be similar to checkSafeArrayElementUse
 bool COWArrayOpt::checkSafeElementValueUses(UserMap &ElementValueUsers) {
   for (auto &Pair : ElementValueUsers) {
     SILInstruction *UseInst = Pair.first;
     Operand *ArrayValOper = Pair.second;
-    if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(UseInst)) {
-      if (checkSafeArrayElementUses(ArrayValOper->get(), SEI))
-        continue;
-
-    } else if (isa<ReleaseValueInst>(UseInst)) {
-      // Releases are always safe. This case handles the release of an array
-      // buffer that is loaded from a local array struct.
-      continue;
-
-    } else {
-      DEBUG(llvm::dbgs() << "    Skipping Array: unknown Element use!\n"
-            << *UseInst);
-    }
-    // Found an unsafe or unknown user. The Array element may escape here.
-    return false;
+    if (!checkSafeArrayElementUse(UseInst, ArrayValOper->get()))
+      return false;
   }
   return true;
 }
@@ -525,16 +541,16 @@ static SILBasicBlock *getValBB(SILValue Val) {
 
 /// Check if this call to "make_mutable" is hoistable, and move it, or delete it
 /// if it's already hoisted.
-bool COWArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue Array) {
-  DEBUG(llvm::dbgs() << "    Checking mutable array: " << Array);
+bool COWArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue ArrayAddr) {
+  DEBUG(llvm::dbgs() << "    Checking mutable array: " << ArrayAddr);
 
-  SILBasicBlock *ArrayBB = getValBB(Array);
+  SILBasicBlock *ArrayBB = getValBB(ArrayAddr);
   if (ArrayBB && !DomTree->dominates(ArrayBB, Preheader)) {
     DEBUG(llvm::dbgs() << "    Skipping Array: does not dominate loop!\n");
     return false;
   }
   SmallVector<unsigned, 4> AccessPath;
-  SILValue ArrayContainer = getAccessPath(Array, AccessPath);
+  SILValue ArrayContainer = getAccessPath(ArrayAddr, AccessPath);
 
   // Check that the array is a member of an inout argument or return value.
   if (!checkUniqueArrayContainer(ArrayContainer))
@@ -547,9 +563,9 @@ bool COWArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue Array) {
 
   if (!checkSafeArrayAddressUses(StructUses.AggregateAddressUsers) ||
       !checkSafeArrayAddressUses(StructUses.StructAddressUsers) ||
-      !StructUses.ElementAddressUsers.empty() ||
       !checkSafeArrayValueUses(StructUses.StructValueUsers) ||
-      !checkSafeElementValueUses(StructUses.ElementValueUsers))
+      !checkSafeElementValueUses(StructUses.ElementValueUsers) ||
+      !StructUses.ElementAddressUsers.empty())
     return false;
 
   // Hoist this call to make_mutable.
@@ -577,14 +593,14 @@ bool COWArrayOpt::run() {
         if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee())) {
           if (FRI->getReferencedFunction()
               ->hasSemanticsString("array.make_mutable")) {
-            SILValue Array = AI->getSelfArgument();
-            auto HoistedCallEntry = ArrayMakeMutableMap.find(Array);
+            SILValue ArrayAddr = AI->getSelfArgument();
+            auto HoistedCallEntry = ArrayMakeMutableMap.find(ArrayAddr);
             if (HoistedCallEntry == ArrayMakeMutableMap.end()) {
-              if (hoistMakeMutable(AI, Array)) {
-                ArrayMakeMutableMap[Array] = AI;
+              if (hoistMakeMutable(AI, ArrayAddr)) {
+                ArrayMakeMutableMap[ArrayAddr] = AI;
                 HasChanged = true;
               } else
-                ArrayMakeMutableMap[Array] = nullptr;
+                ArrayMakeMutableMap[ArrayAddr] = nullptr;
             }
             else if (HoistedCallEntry->second) {
               DEBUG(llvm::dbgs() << "    Removing make_mutable call: " << *AI);
