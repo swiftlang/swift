@@ -25,7 +25,6 @@ namespace llvm {
 namespace swift {
   class CanType;
   class FuncDecl;
-  enum class ResilienceExpansion : unsigned;
   struct SILDeclRef;
   class SILType;
   class Substitution;
@@ -51,7 +50,6 @@ namespace irgen {
                                          CanSILFunctionType origFnType,
                                          CanSILFunctionType substFnType,
                                          ArrayRef<Substitution> subs,
-                                         ResilienceExpansion maxExplosion,
                                          ObjCMessageKind kind);
 
   void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,

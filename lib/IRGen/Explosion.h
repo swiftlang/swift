@@ -35,16 +35,15 @@ namespace irgen {
 /// as arguments in exactly this way.
 class Explosion {
   unsigned NextValue;
-  ResilienceExpansion Kind;
   SmallVector<llvm::Value*, 8> Values;
 
 public:
-  Explosion(ResilienceExpansion kind) : NextValue(0), Kind(kind) {}
+  Explosion() : NextValue(0) {}
 
   // We want to be a move-only type.
   Explosion(const Explosion &) = delete;
   Explosion &operator=(const Explosion &) = delete;
-  Explosion(Explosion &&other) : NextValue(0), Kind(other.Kind) {
+  Explosion(Explosion &&other) : NextValue(0) {
     // Do an uninitialized copy of the non-consumed elements.
     Values.reserve(other.size());
     Values.set_size(other.size());
@@ -57,7 +56,6 @@ public:
   Explosion &operator=(Explosion &&o) {
     assert(empty() && "explosion had values remaining when reassigned!");
     NextValue = o.NextValue;
-    Kind = o.Kind;
     Values.swap(o.Values);
     o.reset();
     return *this;
@@ -66,9 +64,6 @@ public:
   ~Explosion() {
     assert(empty() && "explosion had values remaining when destroyed!");
   }
-
-  /// Return the type of explosion this represents.
-  ResilienceExpansion getKind() const { return Kind; }
 
   bool empty() const {
     return NextValue == Values.size();
@@ -172,11 +167,6 @@ public:
     Values.clear();
   }
 
-  void reset(ResilienceExpansion level) {
-    Kind = level;
-    reset();
-  }
-  
   void print(llvm::raw_ostream &OS);
   void dump();
 };
@@ -222,14 +212,10 @@ public:
   
 private:
   SmallVector<Element, 8> Elements;
-  ResilienceExpansion Kind;
   bool ContainsAggregate;
 
 public:
-  ExplosionSchema(ResilienceExpansion kind)
-    : Kind(kind), ContainsAggregate(false) {}
-
-  ResilienceExpansion getKind() const { return Kind; }
+  ExplosionSchema() : ContainsAggregate(false) {}
 
   /// Return the number of elements in this schema.
   unsigned size() const { return Elements.size(); }

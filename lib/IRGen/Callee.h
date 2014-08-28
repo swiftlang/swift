@@ -87,21 +87,9 @@ namespace irgen {
 
     /// The minimum uncurrying level at which the function can be called.
     unsigned getMinUncurryLevel() const { return MinUncurryLevel; }
-
-    /// Produce the known limits on the abstract callee for the given
-    /// known-global function.
-    static AbstractCallee forDirectGlobalFunction(IRGenModule &IGM,
-                                                  ValueDecl *func);
   };
 
   class Callee {
-    /// The explosion level to use for this function.
-    ResilienceExpansion ExplosionLevel;
-
-    /// The number of function applications at which this function is
-    /// being called.
-    unsigned UncurryLevel;
-
     /// The unsubstituted function type being called.
     CanSILFunctionType OrigFnType;
 
@@ -127,11 +115,9 @@ namespace irgen {
     static Callee forFreestandingFunction(CanSILFunctionType origFnType,
                                           CanSILFunctionType substFnType,
                                           ArrayRef<Substitution> subs,
-                                          llvm::Constant *fn,
-                                          ResilienceExpansion explosionLevel,
-                                          unsigned uncurryLevel) {
+                                          llvm::Constant *fn) {
       return forKnownFunction(origFnType, substFnType, subs,
-                              fn, nullptr, explosionLevel, uncurryLevel);
+                              fn, nullptr);
     }
 
     /// Prepare a callee for a known instance method.  Methods never
@@ -140,38 +126,21 @@ namespace irgen {
     static Callee forMethod(CanSILFunctionType origFnType,
                             CanSILFunctionType substFnType,
                             ArrayRef<Substitution> subs,
-                            llvm::Constant *fn,
-                            ResilienceExpansion explosionLevel,
-                            unsigned uncurryLevel) {
+                            llvm::Constant *fn) {
       return forKnownFunction(origFnType, substFnType, subs,
-                              fn, nullptr, explosionLevel, uncurryLevel);
+                              fn, nullptr);
     }
 
     /// Prepare a callee for a known function with a known data pointer.
     static Callee forKnownFunction(CanSILFunctionType origFnType,
                                    CanSILFunctionType substFnType,
                                    ArrayRef<Substitution> subs,
-                                   llvm::Value *fn, llvm::Value *data,
-                                   ResilienceExpansion explosionLevel) {
-      return forKnownFunction(origFnType, substFnType, subs,
-                              fn, data, explosionLevel,
-                              0);
-    }
-
-    /// Prepare a callee for a known function with a known data pointer.
-    static Callee forKnownFunction(CanSILFunctionType origFnType,
-                                   CanSILFunctionType substFnType,
-                                   ArrayRef<Substitution> subs,
-                                   llvm::Value *fn, llvm::Value *data,
-                                   ResilienceExpansion explosionLevel,
-                                   unsigned uncurryLevel) {
+                                   llvm::Value *fn, llvm::Value *data) {
       // Invariant on the function pointer.
       assert(cast<llvm::PointerType>(fn->getType())
                ->getElementType()->isFunctionTy());
 
       Callee result;
-      result.ExplosionLevel = explosionLevel;
-      result.UncurryLevel = uncurryLevel;
       result.OrigFnType = origFnType;
       result.SubstFnType = substFnType;
       result.FnPtr = fn;
@@ -188,8 +157,6 @@ namespace irgen {
     bool hasSubstitutions() const { return !Substitutions.empty(); }
     ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
 
-    ResilienceExpansion getExplosionLevel() const { return ExplosionLevel; }
-    //unsigned getUncurryLevel() const { return UncurryLevel; }
     llvm::Value *getFunction() const { return FnPtr; }
 
     llvm::FunctionType *getLLVMFunctionType() {

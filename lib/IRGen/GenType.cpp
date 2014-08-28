@@ -303,8 +303,8 @@ const {
                                  &TypeInfo::initializeWithTake);
 }
 
-ExplosionSchema TypeInfo::getSchema(ResilienceExpansion kind) const {
-  ExplosionSchema schema(kind);
+ExplosionSchema TypeInfo::getSchema() const {
+  ExplosionSchema schema;
   getSchema(schema);
   return schema;
 }
@@ -338,10 +338,10 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
   
   // Prefer loads and stores if we won't make a million of them.
   // Maybe this should also require the scalars to have a fixed offset.
-  ExplosionSchema schema = getSchema(ResilienceExpansion::Maximal);
+  ExplosionSchema schema = getSchema();
   if (!schema.containsAggregate() && schema.size() <= 2) {
     auto &loadableTI = cast<LoadableTypeInfo>(*this);
-    Explosion copy(ResilienceExpansion::Maximal);
+    Explosion copy;
     loadableTI.loadAsTake(IGF, srcAddr, copy);
     loadableTI.initialize(IGF, copy, destAddr);
     return;
@@ -363,7 +363,7 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
   }
 
   // Otherwise explode and re-implode.
-  Explosion copy(ResilienceExpansion::Maximal);
+  Explosion copy;
   loadAsCopy(IGF, srcAddr, copy);
   initialize(IGF, copy, destAddr);
 }
@@ -708,7 +708,7 @@ namespace {
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
       : ScalarTypeInfo(ty, Size(0), llvm::BitVector{}, Alignment(1), IsPOD) {}
-    unsigned getExplosionSize(ResilienceExpansion kind) const { return 0; }
+    unsigned getExplosionSize() const { return 0; }
     void getSchema(ExplosionSchema &schema) const {}
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
@@ -1639,8 +1639,8 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
 }
 
 /// Compute the explosion schema for the given type.
-ExplosionSchema IRGenModule::getSchema(SILType type, ResilienceExpansion kind) {
-  ExplosionSchema schema(kind);
+ExplosionSchema IRGenModule::getSchema(SILType type) {
+  ExplosionSchema schema;
   getSchema(type, schema);
   return schema;
 }
@@ -1661,14 +1661,14 @@ void IRGenModule::getSchema(SILType type, ExplosionSchema &schema) {
 }
 
 /// Compute the explosion schema for the given type.
-unsigned IRGenModule::getExplosionSize(SILType type, ResilienceExpansion kind) {
+unsigned IRGenModule::getExplosionSize(SILType type) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemas.
   if (auto tuple = type.getAs<TupleType>()) {
     unsigned count = 0;
     for (auto index : indices(tuple.getElementTypes()))
-      count += getExplosionSize(type.getTupleElementType(index), kind);
+      count += getExplosionSize(type.getTupleElementType(index));
     return count;
   }
 
@@ -1677,19 +1677,18 @@ unsigned IRGenModule::getExplosionSize(SILType type, ResilienceExpansion kind) {
   if (!loadableTI) return 1;
 
   // Okay, that didn't work;  just do the general thing.
-  return loadableTI->getExplosionSize(kind);
+  return loadableTI->getExplosionSize();
 }
 
 /// Determine whether this type is a single value that is passed
 /// indirectly at the given level.
-llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type,
-                                                      ResilienceExpansion kind) {
+llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type) {
   if (auto archetype = type.getAs<ArchetypeType>()) {
     if (!archetype->requiresClass())
       return OpaquePtrTy;
   }
 
-  ExplosionSchema schema(kind);
+  ExplosionSchema schema;
   getSchema(type, schema);
   if (schema.size() == 1 && schema.begin()->isAggregate())
     return schema.begin()->getAggregateType()->getPointerTo(0);
@@ -1697,10 +1696,9 @@ llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type,
 }
 
 /// Determine whether this type requires an indirect result.
-llvm::PointerType *IRGenModule::requiresIndirectResult(SILType type,
-                                                       ResilienceExpansion kind) {
+llvm::PointerType *IRGenModule::requiresIndirectResult(SILType type) {
   auto &ti = getTypeInfo(type);
-  ExplosionSchema schema = ti.getSchema(kind);
+  ExplosionSchema schema = ti.getSchema();
   if (schema.requiresIndirectResult(*this))
     return ti.getStorageType()->getPointerTo();
   return nullptr;

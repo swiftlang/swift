@@ -86,8 +86,6 @@ namespace {
                                      Explosion &tuple,
                                      unsigned fieldNo,
                                      Explosion &out) const {
-      assert(tuple.getKind() == out.getKind());
-
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
 
       // If the field requires no storage, there's nothing to do.
@@ -95,7 +93,7 @@ namespace {
         return IGF.emitFakeExplosion(field.getTypeInfo(), out);
   
       // Otherwise, project from the base.
-      auto fieldRange = field.getProjectionRange(out.getKind());
+      auto fieldRange = field.getProjectionRange();
       ArrayRef<llvm::Value *> element = tuple.getRange(fieldRange.first,
                                                        fieldRange.second);
       out.add(element);
@@ -115,7 +113,7 @@ namespace {
       return field.projectAddress(IGF, tuple, offsets);
     }
 
-    bool isIndirectArgument(ResilienceExpansion kind) const override {
+    bool isIndirectArgument() const override {
       llvm_unreachable("unexploded tuple as argument?");
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -200,11 +198,11 @@ namespace {
   public:
     // FIXME: Spare bits between tuple elements.
     LoadableTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
-                          unsigned maxExplosionSize, unsigned minExplosionSize,
+                          unsigned explosionSize,
                           llvm::Type *ty,
                           Size size, llvm::BitVector &&spareBits,
                           Alignment align, IsPOD_t isPOD)
-      : TupleTypeInfoBase(fields, maxExplosionSize, minExplosionSize,
+      : TupleTypeInfoBase(fields, explosionSize,
                           ty, size, std::move(spareBits), align, isPOD)
       {}
 
@@ -309,10 +307,8 @@ namespace {
 
     LoadableTupleTypeInfo *createLoadable(ArrayRef<TupleFieldInfo> fields,
                                           StructLayout &&layout,
-                                          unsigned maxExplosionSize,
-                                          unsigned minExplosionSize) {
-      return LoadableTupleTypeInfo::create(fields, maxExplosionSize,
-                                           minExplosionSize,
+                                          unsigned explosionSize) {
+      return LoadableTupleTypeInfo::create(fields, explosionSize,
                                            layout.getType(), layout.getSize(),
                                            std::move(layout.getSpareBits()),
                                            layout.getAlignment(),

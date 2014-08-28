@@ -199,12 +199,10 @@ namespace {
   class DiffersByAbstraction
       : public SubstTypeVisitor<DiffersByAbstraction, bool> {
     IRGenModule &IGM;
-    ResilienceExpansion ExplosionLevel;
     AbstractionDifference DiffKind;
   public:
-    DiffersByAbstraction(IRGenModule &IGM, ResilienceExpansion explosionLevel,
-                         AbstractionDifference kind)
-      : IGM(IGM), ExplosionLevel(explosionLevel), DiffKind(kind) {}
+    DiffersByAbstraction(IRGenModule &IGM, AbstractionDifference kind)
+      : IGM(IGM), DiffKind(kind) {}
 
     bool visit(CanType origTy, CanType substTy) {
       if (origTy == substTy) return false;
@@ -257,7 +255,7 @@ namespace {
       // For function arguments, consider whether the substituted type
       // is passed indirectly under the abstract-call convention.
       // We only ever care about the abstract-call convention.
-      return !IGM.isSingleIndirectValue(substType, ExplosionLevel);
+      return !IGM.isSingleIndirectValue(substType);
     }
 
     bool visitBoundGenericType(CanBoundGenericType origTy,
@@ -332,16 +330,13 @@ namespace {
 
 bool irgen::differsByAbstractionInMemory(IRGenModule &IGM,
                                          CanType origTy, CanType substTy) {
-  return DiffersByAbstraction(IGM, ResilienceExpansion::Minimal,
-                              AbstractionDifference::Memory)
+  return DiffersByAbstraction(IGM, AbstractionDifference::Memory)
            .visit(origTy, substTy);
 }
 
 bool irgen::differsByAbstractionInExplosion(IRGenModule &IGM,
-                                            CanType origTy, CanType substTy,
-                                            ResilienceExpansion explosionLevel) {
-  return DiffersByAbstraction(IGM, explosionLevel,
-                              AbstractionDifference::Explosion)
+                                            CanType origTy, CanType substTy) {
+  return DiffersByAbstraction(IGM, AbstractionDifference::Explosion)
            .visit(origTy, substTy);
 }
 
@@ -456,10 +451,9 @@ void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   Explosion &in, Explosion &out) {
   expectedTy = applyContextArchetypes(IGF, expectedTy);
 
-  ExplosionSchema expectedSchema = IGF.IGM.getSchema(expectedTy, in.getKind());
+  ExplosionSchema expectedSchema = IGF.IGM.getSchema(expectedTy);
   assert(expectedSchema.size() ==
-         IGF.IGM.getExplosionSize(applyContextArchetypes(IGF, substTy),
-                                  in.getKind()));
+         IGF.IGM.getExplosionSize(applyContextArchetypes(IGF, substTy)));
   for (ExplosionSchema::Element &elt : expectedSchema) {
     llvm::Value *value = in.claimNext();
     assert(elt.isScalar());

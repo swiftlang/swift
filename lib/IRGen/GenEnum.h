@@ -374,7 +374,7 @@ public:
   virtual void getSchema(ExplosionSchema &schema) const = 0;
   virtual void destroy(IRGenFunction &IGF, Address addr, CanType T) const = 0;
   
-  virtual bool isIndirectArgument(ResilienceExpansion kind) const {
+  virtual bool isIndirectArgument() const {
     return TIK < Loadable;
   }
   
@@ -416,7 +416,7 @@ public:
   
   /// \group Delegated LoadableTypeInfo operations
   
-  virtual unsigned getExplosionSize(ResilienceExpansion kind) const = 0;
+  virtual unsigned getExplosionSize() const = 0;
   virtual void loadAsCopy(IRGenFunction &IGF, Address addr,
                           Explosion &e) const = 0;
   virtual void loadAsTake(IRGenFunction &IGF, Address addr,

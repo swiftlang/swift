@@ -59,7 +59,7 @@ public:
   static bool isLoadable() { return true; }
 
   /// Return the number of elements in an explosion of this type.
-  virtual unsigned getExplosionSize(ResilienceExpansion kind) const = 0;
+  virtual unsigned getExplosionSize() const = 0;
 
   /// Load an explosion of values from an address as if copy-initializing
   /// a set of registers.

@@ -174,7 +174,7 @@ namespace {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     
-    bool isIndirectArgument(ResilienceExpansion kind) const {
+    bool isIndirectArgument() const override {
       return TIK < Loadable;
     }
     
@@ -231,7 +231,7 @@ namespace {
                                  unsigned index) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
-    unsigned getExplosionSize(ResilienceExpansion kind) const override {
+    unsigned getExplosionSize() const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     void loadAsCopy(IRGenFunction &IGF, Address addr,
@@ -338,7 +338,7 @@ namespace {
                          ArrayRef<std::pair<EnumElementDecl*,
                                             llvm::BasicBlock*>> dests,
                          llvm::BasicBlock *defaultDest) const override {
-      value.claim(getExplosionSize(value.getKind()));
+      value.claim(getExplosionSize());
       emitSingletonSwitch(IGF, dests, defaultDest);
     }
     
@@ -413,9 +413,9 @@ namespace {
                                       getSingleton()->getBestKnownAlignment()));
     }
     
-    unsigned getExplosionSize(ResilienceExpansion kind) const {
+    unsigned getExplosionSize() const {
       if (!getLoadableSingleton()) return 0;
-      return getLoadableSingleton()->getExplosionSize(kind);
+      return getLoadableSingleton()->getExplosionSize();
     }
     
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -712,7 +712,7 @@ namespace {
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
                             llvm::BasicBlock *defaultDest) const override {
-      Explosion value(ResilienceExpansion::Minimal);
+      Explosion value;
       loadAsTake(IGF, addr, value);
       emitValueSwitch(IGF, value, dests, defaultDest);
     }
@@ -722,7 +722,7 @@ namespace {
                           EnumElementDecl *elt,
                           Explosion &out) const override {
       // All of the cases project an empty explosion.
-      in.claim(getExplosionSize(in.getKind()));
+      in.claim(getExplosionSize());
     }
     
     void emitValueInjection(IRGenFunction &IGF,
@@ -1080,7 +1080,7 @@ namespace {
         schema.add(ExplosionSchema::Element::forScalar(extraTagTy));
     }
     
-    unsigned getExplosionSize(ResilienceExpansion kind) const override {
+    unsigned getExplosionSize() const override {
       return unsigned(ExtraTagBitCount > 0) + unsigned(payloadTy != nullptr);
     }
     
@@ -1120,14 +1120,14 @@ namespace {
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e)
     const override {
       assert(TIK >= Loadable);
-      Explosion tmp(e.getKind());
+      Explosion tmp;
       loadAsTake(IGF, addr, tmp);
       copy(IGF, tmp, e);
     }
     
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
       assert(TIK >= Loadable);
-      Explosion old(e.getKind());
+      Explosion old;
       if (!isPOD(ResilienceScope::Local))
         loadAsTake(IGF, addr, old);
       initialize(IGF, e, addr);
@@ -1147,7 +1147,7 @@ namespace {
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
       assert(TIK >= Loadable);
-      dest.add(src.claim(getExplosionSize(ResilienceExpansion::Minimal)));
+      dest.add(src.claim(getExplosionSize()));
     }
     
   protected:
@@ -1596,7 +1596,7 @@ namespace {
                             llvm::BasicBlock *defaultDest) const override {
       if (TIK >= Fixed) {
         // Load the fixed-size representation and switch directly.
-        Explosion value(ResilienceExpansion::Minimal);
+        Explosion value;
         loadForSwitch(IGF, addr, value);
         return emitValueSwitch(IGF, value, dests, defaultDest);
       }
@@ -1612,7 +1612,7 @@ namespace {
       // Only the payload case has anything to project. The other cases are
       // empty.
       if (theCase != getPayloadElement()) {
-        inEnum.claim(getExplosionSize(inEnum.getKind()));
+        inEnum.claim(getExplosionSize());
         return;
       }
       
@@ -1620,9 +1620,7 @@ namespace {
         llvm::Value *payload = inEnum.claimNext();
         getLoadablePayloadTypeInfo().unpackEnumPayload(IGF, payload, out, 0);
       } else {
-        assert(getLoadablePayloadTypeInfo()
-                 .getSchema(ResilienceExpansion::Minimal)
-                 .empty()
+        assert(getLoadablePayloadTypeInfo().getSchema().empty()
                && "empty payload with non-empty explosion schema?!");
       }
       if (ExtraTagBitCount > 0)
@@ -1895,8 +1893,8 @@ namespace {
         llvm::BasicBlock *endBB = testFixedEnumContainsPayload(IGF, payload, extraTag);
         
         if (payload) {
-          Explosion payloadValue(ResilienceExpansion::Minimal);
-          Explosion payloadCopy(ResilienceExpansion::Minimal);
+          Explosion payloadValue;
+          Explosion payloadCopy;
           auto &loadableTI = getLoadablePayloadTypeInfo();
           loadableTI.unpackEnumPayload(IGF, payload, payloadValue, 0);
           loadableTI.copy(IGF, payloadValue, payloadCopy);
@@ -1931,7 +1929,7 @@ namespace {
 
       switch (CopyDestroyKind) {
       case POD:
-        src.claim(getExplosionSize(src.getKind()));
+        src.claim(getExplosionSize());
         return;
 
       case Normal: {
@@ -1944,7 +1942,7 @@ namespace {
         
         // If we did, consume it.
         if (payload) {
-          Explosion payloadValue(ResilienceExpansion::Minimal);
+          Explosion payloadValue;
           auto &loadableTI = getLoadablePayloadTypeInfo();
           loadableTI.unpackEnumPayload(IGF, payload, payloadValue, 0);
           loadableTI.consume(IGF, payloadValue);
@@ -2680,7 +2678,7 @@ namespace {
                             llvm::BasicBlock *defaultDest) const override {
       if (TIK >= Fixed) {
         // Load the fixed-size representation and switch directly.
-        Explosion value(ResilienceExpansion::Minimal);
+        Explosion value;
         loadForSwitch(IGF, addr, value);
         return emitValueSwitch(IGF, value, dests, defaultDest);
       }
@@ -2724,7 +2722,7 @@ namespace {
       
       // Non-payload cases project to an empty explosion.
       if (foundPayload == ElementsWithPayload.end()) {
-        inValue.claim(getExplosionSize(inValue.getKind()));
+        inValue.claim(getExplosionSize());
         return;
       }
       
@@ -2925,10 +2923,10 @@ namespace {
         forNontrivialPayloads(IGF, payload, extraTagBits,
           [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
             auto &lti = cast<LoadableTypeInfo>(*elt.ti);
-            Explosion value(ResilienceExpansion::Minimal);
+            Explosion value;
             projectPayloadValue(IGF, payload, tagIndex, lti, value);
 
-            Explosion tmp(value.getKind());
+            Explosion tmp;
             lti.copy(IGF, value, tmp);
             tmp.claimAll(); // FIXME: repack if not bit-identical
           });
@@ -2968,7 +2966,7 @@ namespace {
       
       switch (CopyDestroyKind) {
       case POD:
-        src.claim(getExplosionSize(src.getKind()));
+        src.claim(getExplosionSize());
         return;
           
       case Normal: {
@@ -2979,7 +2977,7 @@ namespace {
         forNontrivialPayloads(IGF, payload, extraTagBits,
           [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
             auto &lti = cast<LoadableTypeInfo>(*elt.ti);
-            Explosion value(ResilienceExpansion::Minimal);
+            Explosion value;
             projectPayloadValue(IGF, payload, tagIndex, lti, value);
 
             lti.consume(IGF, value);
@@ -3023,8 +3021,7 @@ namespace {
         // If the enum is loadable, it's better to do this directly using values,
         // so we don't need to RMW tag bits in place.
         if (TI->isLoadable()) {
-          Explosion tmpSrc(ResilienceExpansion::Minimal),
-                    tmpOld(ResilienceExpansion::Minimal);
+          Explosion tmpSrc, tmpOld;
           if (isTake)
             loadAsTake(IGF, src, tmpSrc);
           else
@@ -3074,7 +3071,7 @@ namespace {
         // If the enum is loadable, it's better to do this directly using values,
         // so we don't need to RMW tag bits in place.
         if (TI->isLoadable()) {
-          Explosion tmpSrc(ResilienceExpansion::Minimal);
+          Explosion tmpSrc;
           if (isTake)
             loadAsTake(IGF, src, tmpSrc);
           else
@@ -3211,7 +3208,7 @@ namespace {
         // If loadable, it's better to do this directly to the value than
         // in place, so we don't need to RMW out the tag bits in memory.
         if (TI->isLoadable()) {
-          Explosion tmp(ResilienceExpansion::Minimal);
+          Explosion tmp;
           loadAsTake(IGF, addr, tmp);
           consume(IGF, tmp);
           return;
@@ -3469,8 +3466,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     }
 
     auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
-    if (loadableArgTI
-        && loadableArgTI->getExplosionSize(ResilienceExpansion::Minimal) == 0) {
+    if (loadableArgTI && loadableArgTI->getExplosionSize() == 0) {
       elementsWithNoPayload.push_back({elt, nullptr});
     } else {
       // *Now* apply the substitutions and get the type info for the instance's
@@ -3558,8 +3554,8 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
       return Strategy.destroy(IGF, addr, T);
     }
-    bool isIndirectArgument(ResilienceExpansion kind) const override {
-      return Strategy.isIndirectArgument(kind);
+    bool isIndirectArgument() const override {
+      return Strategy.isIndirectArgument();
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address dest, CanType T) const override {
@@ -3634,8 +3630,8 @@ namespace {
                           Alignment A, IsPOD_t isPOD)
       : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD) {}
 
-    unsigned getExplosionSize(ResilienceExpansion kind) const override {
-      return Strategy.getExplosionSize(kind);
+    unsigned getExplosionSize() const override {
+      return Strategy.getExplosionSize();
     }
     void loadAsCopy(IRGenFunction &IGF, Address addr,
                     Explosion &e) const override {
@@ -3840,7 +3836,7 @@ namespace {
     auto &rawFixedTI = cast<FixedTypeInfo>(rawTI);
     assert(rawFixedTI.isPOD(ResilienceScope::Component)
            && "c-compatible raw type isn't POD?!");
-    ExplosionSchema rawSchema = rawTI.getSchema(ResilienceExpansion::Minimal);
+    ExplosionSchema rawSchema = rawTI.getSchema();
     assert(rawSchema.size() == 1
            && "c-compatible raw type has non-single-scalar representation?!");
     assert(rawSchema.begin()[0].isScalar()

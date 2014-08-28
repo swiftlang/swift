@@ -84,7 +84,7 @@ const {
   return nullptr;
 }
 
-bool UnimplementedTypeInfo::isIndirectArgument(ResilienceExpansion level) const{
+bool UnimplementedTypeInfo::isIndirectArgument() const {
   return true;
 }
 void UnimplementedTypeInfo::getSchema(ExplosionSchema &schema) const {

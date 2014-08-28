@@ -251,10 +251,10 @@ public:
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   void getSchema(SILType T, ExplosionSchema &schema);
-  ExplosionSchema getSchema(SILType T, ResilienceExpansion kind);
-  unsigned getExplosionSize(SILType T, ResilienceExpansion kind);
-  llvm::PointerType *isSingleIndirectValue(SILType T, ResilienceExpansion kind);
-  llvm::PointerType *requiresIndirectResult(SILType T, ResilienceExpansion kind);
+  ExplosionSchema getSchema(SILType T);
+  unsigned getExplosionSize(SILType T);
+  llvm::PointerType *isSingleIndirectValue(SILType T);
+  llvm::PointerType *requiresIndirectResult(SILType T);
   bool isTrivialMetatype(CanMetatypeType type);
   bool isPOD(SILType type, ResilienceScope scope);
   ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
@@ -430,7 +430,6 @@ public:
   void emitLocalDecls(clang::Decl *decl);
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
-                                      ResilienceExpansion expansion,
                                       ExtraData extraData,
                                       llvm::AttributeSet &attrs);
 

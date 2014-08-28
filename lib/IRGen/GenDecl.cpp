@@ -1112,7 +1112,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
-         /*FIXME: shouldn't be required here*/ ResilienceExpansion::Minimal,
                                                ExtraData::None,
                                                attrs);
   

@@ -173,8 +173,7 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
     return;
   }
 
-  ExplosionSchema schema =
-    cast<LoadableTypeInfo>(type).getSchema(explosion.getKind());
+  ExplosionSchema schema = cast<LoadableTypeInfo>(type).getSchema();
   for (auto &element : schema) {
     llvm::Type *elementType;
     if (element.isAggregate()) {

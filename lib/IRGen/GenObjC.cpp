@@ -542,7 +542,6 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               CanSILFunctionType origFnType,
                                               CanSILFunctionType substFnType,
                                               ArrayRef<Substitution> subs,
-                                              ResilienceExpansion maxExplosion,
                                               ObjCMessageKind kind) {
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Allocator
@@ -551,11 +550,8 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
           || method.kind == SILDeclRef::Kind::Deallocator) &&
          "objc method call must be to a func/initializer/getter/setter/dtor");
 
-  ResilienceExpansion explosionLevel = ResilienceExpansion::Minimal;
-
   llvm::AttributeSet attrs;
   auto fnTy = IGF.IGM.getFunctionType(origFnType,
-                                      explosionLevel,
                                       ExtraData::None,
                                       attrs);
   bool indirectResult = requiresExternalIndirectResult(IGF.IGM, origFnType);
@@ -602,8 +598,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                         Callee::forKnownFunction(origFnType,
                                                  substFnType,
                                                  subs,
-                                                 messenger, nullptr,
-                                                 explosionLevel));
+                                                 messenger, nullptr));
   return emission;
 }
 
@@ -661,13 +656,10 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             CanType classType) {
   // Compute the formal type that we expect +allocWithZone: to have.
   auto formalType = getAllocObjectFormalType(IGF.IGM.Context, classType);
-  auto explosionLevel = ResilienceExpansion::Minimal;
-  unsigned uncurryLevel = 0;
 
   // Compute the appropriate LLVM type for the function.
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(formalType, explosionLevel,
-                                      ExtraData::None, attrs);
+  auto fnTy = IGF.IGM.getFunctionType(formalType, ExtraData::None, attrs);
 
   // Get the messenger function.
   llvm::Constant *messenger = IGF.IGM.getObjCMsgSendFn();
@@ -676,13 +668,11 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
   // Prepare the call.
   CallEmission emission(IGF, Callee::forKnownFunction(formalType,
                                                       formalType, {},
-                                                      messenger, nullptr,
-                                                      explosionLevel,
-                                                      uncurryLevel));
+                                                      messenger, nullptr));
 
   // Emit the arguments.
   {
-    Explosion args(emission.getCurExplosionLevel());
+    Explosion args;
     args.add(self);
     args.add(IGF.emitObjCSelectorRefLoad("allocWithZone:"));
     args.add(llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy));
@@ -690,7 +680,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
   }
 
   // Emit the call.
-  Explosion out(explosionLevel);
+  Explosion out;
   emission.emitToExplosion(out);
   return out.claimNext();
 }
@@ -705,7 +695,6 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   llvm::AttributeSet attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType,
-                                                  ResilienceExpansion::Minimal,
                                                   ExtraData::Retainable,
                                                   attrs);
   // FIXME: Give the thunk a real name.
@@ -748,12 +737,12 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   }
   
   // Recover 'self' from the context.
-  Explosion params = subIGF.collectParameters(ResilienceExpansion::Minimal);
+  Explosion params = subIGF.collectParameters();
   llvm::Value *context = params.takeLast();
   Address dataAddr = layout.emitCastTo(subIGF, context);
   auto &fieldLayout = layout.getElements()[0];
   Address selfAddr = fieldLayout.project(subIGF, dataAddr, Nothing);
-  Explosion selfParams(ResilienceExpansion::Minimal);
+  Explosion selfParams;
   if (retainsSelf)
     cast<LoadableTypeInfo>(selfTI).loadAsCopy(subIGF, selfAddr, selfParams);
   else
@@ -764,18 +753,17 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Value *indirectReturn = nullptr;
   SILType appliedResultTy = origMethodType->getSemanticResultSILType();
   auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
-  if (appliedResultTI.getSchema(ResilienceExpansion::Minimal)
-        .requiresIndirectResult(IGM)) {
+  if (appliedResultTI.getSchema().requiresIndirectResult(IGM)) {
     indirectReturn = params.claimNext();
   }
 
   // Prepare the call to the underlying method.
   CallEmission emission
     = prepareObjCMethodRootCall(subIGF, method, origMethodType, origMethodType,
-                                ArrayRef<Substitution>{}, ResilienceExpansion::Minimal,
+                                ArrayRef<Substitution>{},
                                 ObjCMessageKind::Normal);
   
-  Explosion args(params.getKind());
+  Explosion args;
   addObjCMethodCallImplicitArguments(subIGF, args, method, self, SILType());
   args.add(params.claimAll());
   emission.addArg(args);
@@ -798,7 +786,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     cleanup();
     subIGF.Builder.CreateRetVoid();
   } else {
-    Explosion result(ResilienceExpansion::Minimal);
+    Explosion result;
     emission.emitToExplosion(result);
     cleanup();
     auto &callee = emission.getCallee();
@@ -829,7 +817,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   auto &fieldLayout = layout.getElements()[0];
   auto &fieldType = layout.getElementTypes()[0];
   Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
-  Explosion selfParams(ResilienceExpansion::Minimal);
+  Explosion selfParams;
   selfParams.add(self);
   fieldLayout.getType().initializeFromParams(IGF, selfParams,
                                              fieldAddr, fieldType);

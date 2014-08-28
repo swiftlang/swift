@@ -70,10 +70,6 @@ public:
   Callee &getMutableCallee() { return CurCallee; }
   const Callee &getCallee() const { return CurCallee; }
 
-  ResilienceExpansion getCurExplosionLevel() const {
-    return getCallee().getExplosionLevel();
-  }
-
   ArrayRef<Substitution> getSubstitutions() const {
     return CurCallee.getSubstitutions();
   }

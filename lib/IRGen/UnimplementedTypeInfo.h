@@ -40,7 +40,7 @@ public:
   llvm::Constant *getStaticSize(IRGenModule &IGM) const override;
   llvm::Constant *getStaticAlignmentMask(IRGenModule &IGM) const override;
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override;
-  bool isIndirectArgument(ResilienceExpansion level) const override;
+  bool isIndirectArgument() const override;
   void getSchema(ExplosionSchema &schema) const override;
   ContainedAddress allocateStack(IRGenFunction &IGF,
                                  CanType T,

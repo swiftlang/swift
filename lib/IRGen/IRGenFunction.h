@@ -94,7 +94,7 @@ public:
 
 //--- Function prologue and epilogue -------------------------------------------
 public:
-  Explosion collectParameters(ResilienceExpansion explosionLevel);
+  Explosion collectParameters();
   void emitScalarReturn(SILType resultTy, Explosion &scalars);
   
   void emitBBForReturn();

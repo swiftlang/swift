@@ -231,16 +231,15 @@ public:
   /// it is not known.
   virtual llvm::Constant *getStaticStride(IRGenModule &IGM) const = 0;
 
-  /// Is this type passed indirectly as an argument at the given
-  /// explosion level?
-  virtual bool isIndirectArgument(ResilienceExpansion level) const = 0;
+  /// Is this type passed indirectly as an argument?
+  virtual bool isIndirectArgument() const = 0;
   
   /// Add the information for exploding values of this type to the
   /// given schema.
   virtual void getSchema(ExplosionSchema &schema) const = 0;
 
   /// A convenience for getting the schema of a single type.
-  ExplosionSchema getSchema(ResilienceExpansion kind) const;
+  ExplosionSchema getSchema() const;
 
   /// Allocate a variable of this type on the stack.
   virtual ContainedAddress allocateStack(IRGenFunction &IGF,

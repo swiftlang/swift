@@ -88,7 +88,7 @@ enum class ExtraData : unsigned char {
   /// The function takes its block object as extra data.
   Block,
   
-  Last_ExtraData = Metatype
+  Last_ExtraData = Block
 };
 
 /// ResilienceScope - The compiler is often able to pursue

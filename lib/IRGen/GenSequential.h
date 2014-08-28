@@ -37,15 +37,9 @@ template <class FieldImpl> class SequentialField {
 
   template <class, class, class> friend class SequentialTypeBuilder;
 
-  /// MaximalBegin/MaximalEnd - the range of explosion indexes for
-  /// this element, under a maximal explosion
-  unsigned MaximalBegin : 16;
-  unsigned MaximalEnd : 16;
-
-  /// MinimalBegin/MinimalEnd - the range of explosion indexes for
-  /// this element, under a minimal explosion
-  unsigned MinimalBegin : 16;
-  unsigned MinimalEnd : 16;
+  /// Begin/End - the range of explosion indexes for this element
+  unsigned Begin : 16;
+  unsigned End : 16;
 
 protected:
   explicit SequentialField(const TypeInfo &elementTI)
@@ -53,8 +47,7 @@ protected:
 
   explicit SequentialField(const ElementLayout &layout,
                            unsigned begin, unsigned end)
-    : Layout(layout), MaximalBegin(begin), MaximalEnd(end),
-      MinimalBegin(begin), MinimalEnd(end) {}
+    : Layout(layout), Begin(begin), End(end) {}
 
   const FieldImpl *asImpl() const {
     return static_cast<const FieldImpl*>(this);
@@ -87,14 +80,8 @@ public:
     return Layout.getByteOffset();
   }
 
-  std::pair<unsigned, unsigned> getProjectionRange(ResilienceExpansion kind) const {
-    switch (kind) {
-    case ResilienceExpansion::Maximal:
-      return std::make_pair(MaximalBegin, MaximalEnd);
-    case ResilienceExpansion::Minimal:
-      return std::make_pair(MinimalBegin, MinimalEnd);
-    }
-    llvm_unreachable("bad explosion kind!");
+  std::pair<unsigned, unsigned> getProjectionRange() const {
+    return {Begin, End};
   }
 };
 
@@ -244,18 +231,16 @@ class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
     : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
   typedef SequentialTypeInfoImpl<Impl, Base, FieldImpl> super;
 
-  unsigned MaximalExplosionSize : 16;
-  unsigned MinimalExplosionSize : 16;
+  unsigned ExplosionSize : 16;
 
 protected:
   using super::asImpl;
 
   template <class... As> 
-  SequentialTypeInfo(ArrayRef<FieldImpl> fields, unsigned maxExplosionSize,
-                     unsigned minExplosionSize, As&&...args)
+  SequentialTypeInfo(ArrayRef<FieldImpl> fields, unsigned explosionSize,
+                     As &&...args)
     : super(fields, std::forward<As>(args)...),
-      MaximalExplosionSize(maxExplosionSize),
-      MinimalExplosionSize(minExplosionSize) {}
+      ExplosionSize(explosionSize) {}
 
 private:
   template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF,
@@ -303,12 +288,8 @@ public:
     forAllFields<&LoadableTypeInfo::initialize>(IGF, e, addr);
   }
 
-  unsigned getExplosionSize(ResilienceExpansion level) const {
-    switch (level) {
-    case ResilienceExpansion::Minimal: return MinimalExplosionSize;
-    case ResilienceExpansion::Maximal: return MaximalExplosionSize;
-    }
-    llvm_unreachable("bad explosion level");
+  unsigned getExplosionSize() const {
+    return ExplosionSize;
   }
 
   void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -376,7 +357,7 @@ public:
 
     bool loadable = true;
 
-    unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
+    unsigned explosionSize = 0;
     for (unsigned i : indices(astFields)) {
       auto &astField = astFields[i];
       // Compute the field's type info.
@@ -393,15 +374,9 @@ public:
       }
 
       auto &fieldInfo = fields.back();
-      fieldInfo.MaximalBegin = maximalExplosionSize;
-      maximalExplosionSize +=
-        loadableFieldTI->getExplosionSize(ResilienceExpansion::Maximal);
-      fieldInfo.MaximalEnd = maximalExplosionSize;
-
-      fieldInfo.MinimalBegin = minimalExplosionSize;
-      minimalExplosionSize +=
-        loadableFieldTI->getExplosionSize(ResilienceExpansion::Minimal);
-      fieldInfo.MinimalEnd = minimalExplosionSize;
+      fieldInfo.Begin = explosionSize;
+      explosionSize += loadableFieldTI->getExplosionSize();
+      fieldInfo.End = explosionSize;
     }
 
     // Perform layout and fill in the fields.
@@ -413,9 +388,7 @@ public:
     // Create the type info.
     if (loadable) {
       assert(layout.isFixedLayout());
-      return asImpl()->createLoadable(fields, std::move(layout),
-                                      maximalExplosionSize,
-                                      minimalExplosionSize);
+      return asImpl()->createLoadable(fields, std::move(layout), explosionSize);
     } else if (layout.isFixedLayout()) {
       return asImpl()->createFixed(fields, std::move(layout));
     } else {

@@ -1399,8 +1399,7 @@ namespace {
                                      IGM.getModule());
     IRGenFunction IGF(IGM, fn);
     
-    llvm::Value *metadata = IGF.collectParameters(ResilienceExpansion::Minimal)
-      .claimNext();
+    llvm::Value *metadata = IGF.collectParameters().claimNext();
     
     // Get the address at which the field type vector reference should be
     // cached.
@@ -1823,7 +1822,7 @@ namespace {
       if (IGM.DebugInfo)
         IGM.DebugInfo->emitArtificialFunction(IGF, f);
 
-      Explosion params = IGF.collectParameters(ResilienceExpansion::Minimal);
+      Explosion params = IGF.collectParameters();
       llvm::Value *metadataPattern = params.claimNext();
       llvm::Value *args = params.claimNext();
 
@@ -3357,8 +3356,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            llvm::Value *base,
                                            SILType baseType,
                                            SILDeclRef method,
-                                           CanSILFunctionType methodType,
-                                           ResilienceExpansion maxExplosion) {
+                                           CanSILFunctionType methodType) {
   // FIXME: Support property accessors.
   AbstractFunctionDecl *methodDecl
     = cast<AbstractFunctionDecl>(method.getDecl());
@@ -3382,7 +3380,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   // Use the type of the method we were type-checked against, not the
   // type of the overridden method.
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(methodType, method.getResilienceExpansion(),
+  auto fnTy = IGF.IGM.getFunctionType(methodType,
                                       ExtraData::None, attrs)->getPointerTo();
 
   SILDeclRef fnRef(overridden, method.kind, method.getResilienceExpansion(),

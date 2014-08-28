@@ -187,8 +187,7 @@ namespace irgen {
                                       llvm::Value *base,
                                       SILType baseType,
                                       SILDeclRef method,
-                                      CanSILFunctionType methodType,
-                                      ResilienceExpansion maxExplosion);
+                                      CanSILFunctionType methodType);
 
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///

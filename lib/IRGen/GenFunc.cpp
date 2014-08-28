@@ -204,22 +204,22 @@ namespace {
 
     /// Configure this result to carry a number of direct values at
     /// the given explosion level.
-    Explosion &initForDirectValues(ResilienceExpansion level) {
+    Explosion &initForDirectValues() {
       assert(CurState == State::Invalid);
       CurState = State::Direct;
-      return *new (&CurValue.Direct) Explosion(level);
+      return *new (&CurValue.Direct) Explosion();
     }
 
     /// As a potential efficiency, set that this is a direct result
     /// with no values.
     void setAsEmptyDirect() {
-      initForDirectValues(ResilienceExpansion::Maximal);
+      initForDirectValues();
     }
 
     /// Set this result so that it carries a single directly-returned
     /// maximally-fragile value without management.
     void setAsSingleDirectUnmanagedFragileValue(llvm::Value *value) {
-      initForDirectValues(ResilienceExpansion::Maximal).add(value);
+      initForDirectValues().add(value);
     }
 
     void setAsIndirectAddress(Address address) {
@@ -327,11 +327,10 @@ namespace {
     ///   - the explosion kind desired
     ///   - whether a data pointer argument is required
     struct Currying {
-      Signature Signatures[unsigned(ResilienceExpansion::Last_ResilienceExpansion) + 1]
-                          [unsigned(ExtraData::Last_ExtraData) + 1];
+      Signature Signatures[unsigned(ExtraData::Last_ExtraData) + 1];
 
-      Signature &select(ResilienceExpansion kind, ExtraData extraData) {
-        return Signatures[unsigned(kind)][unsigned(extraData)];
+      Signature &select(ExtraData extraData) {
+        return Signatures[unsigned(extraData)];
       }
     };
 
@@ -352,9 +351,7 @@ namespace {
       return ExtraDataKind;
     }
     
-    Signature getSignature(IRGenModule &IGM,
-                           ResilienceExpansion explosionKind,
-                           ExtraData extraData) const;
+    Signature getSignature(IRGenModule &IGM, ExtraData extraData) const;
 
   };
   
@@ -404,7 +401,7 @@ namespace {
       llvm_unreachable("@unowned(unsafe) function type");
     }
 
-    unsigned getExplosionSize(ResilienceExpansion kind) const {
+    unsigned getExplosionSize() const override {
       return hasExtraData() ? 2 : 1;
     }
 
@@ -871,15 +868,13 @@ namespace {
   class SignatureExpansion {
     IRGenModule &IGM;
     CanSILFunctionType FnType;
-    ResilienceExpansion ExplosionLevel;
   public:
     SmallVector<llvm::Type*, 8> ParamIRTypes;
     llvm::AttributeSet Attrs;
     bool HasIndirectResult = false;
 
-    SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
-                       ResilienceExpansion explosionLevel)
-      : IGM(IGM), FnType(fnType), ExplosionLevel(explosionLevel) {}
+    SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType)
+      : IGM(IGM), FnType(fnType) {}
 
     llvm::Type *expandSignatureTypes();
 
@@ -920,7 +915,7 @@ llvm::Type *SignatureExpansion::expandResult() {
     if (tuple->getNumElements() == 0)
       return IGM.VoidTy;
 
-  ExplosionSchema schema = IGM.getSchema(resultType, ExplosionLevel);
+  ExplosionSchema schema = IGM.getSchema(resultType);
   switch (FnType->getAbstractCC()) {
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
@@ -1040,7 +1035,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
     case clang::CodeGen::ABIArgInfo::Expand: {
       assert(i >= paramOffset && "Unexpected index for expanded argument");
       auto &param = params[i - paramOffset];
-      auto schema = IGM.getSchema(param.getSILType(), ExplosionLevel);
+      auto schema = IGM.getSchema(param.getSILType());
       schema.addToArgTypes(IGM, ParamIRTypes);
       break;
     }
@@ -1093,7 +1088,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
     case AbstractCC::Freestanding:
     case AbstractCC::Method:
     case AbstractCC::WitnessMethod: {
-      auto schema = IGM.getSchema(param.getSILType(), ExplosionLevel);
+      auto schema = IGM.getSchema(param.getSILType());
       schema.addToArgTypes(IGM, ParamIRTypes);
       return;
     }
@@ -1149,17 +1144,16 @@ llvm::Type *SignatureExpansion::expandSignatureTypes() {
 }
 
 Signature FuncSignatureInfo::getSignature(IRGenModule &IGM,
-                                          ResilienceExpansion explosionLevel,
                                           ExtraData extraData) const {
   // Compute a reference to the appropriate signature cache.
-  Signature &signature = TheSignatures.select(explosionLevel, extraData);
+  Signature &signature = TheSignatures.select(extraData);
 
   // If it's already been filled in, we're done.
   if (signature.isValid())
     return signature;
 
   GenericContextScope scope(IGM, FormalType->getGenericSignature());
-  SignatureExpansion expansion(IGM, FormalType, explosionLevel);
+  SignatureExpansion expansion(IGM, FormalType);
   
   // Blocks are passed into themselves as their first argument.
   if (FormalType->getRepresentation() == FunctionType::Representation::Block)
@@ -1205,11 +1199,10 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
 
 llvm::FunctionType *
 IRGenModule::getFunctionType(CanSILFunctionType type,
-                             ResilienceExpansion explosionKind,
                              ExtraData extraData,
                              llvm::AttributeSet &attrs) {
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
-  Signature sig = sigInfo.getSignature(*this, explosionKind, extraData);
+  Signature sig = sigInfo.getSignature(*this, extraData);
   attrs = sig.getAttributes();
   return sig.getType();
 }
@@ -1232,31 +1225,6 @@ AbstractCC irgen::getAbstractCC(ValueDecl *fn) {
     return AbstractCC::C;
   }
   return AbstractCC::Freestanding;
-}
-
-static AbstractCallee getAbstractDirectCallee(ValueDecl *val,
-                                              ResilienceExpansion level,
-                                              ExtraData extraData) {
-  unsigned minUncurry = 0;
-  if (val->getDeclContext()->isTypeContext())
-    minUncurry = 1;
-  unsigned maxUncurry = getDeclNaturalUncurryLevel(val);
-  
-  AbstractCC convention = getAbstractCC(val);
-
-  return AbstractCallee(convention, level, minUncurry, maxUncurry, extraData);
-}
-
-/// Construct the best known limits on how we can call the given
-/// global function.
-AbstractCallee AbstractCallee::forDirectGlobalFunction(IRGenModule &IGM,
-                                                       ValueDecl *val) {
-  assert(!val->getDeclContext()->isLocalContext());
-
-  // FIXME: be more aggressive about this.
-  ResilienceExpansion level = ResilienceExpansion::Minimal;
-
-  return getAbstractDirectCallee(val, level, ExtraData::None);
 }
 
 /// Return this function pointer, bitcasted to an i8*.
@@ -1883,7 +1851,6 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 /// The unsubstituted result must be naturally returned directly.
 void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   assert(LastArgWritten == 0 && "emitting unnaturally to explosion");
-  assert(out.getKind() == getCallee().getExplosionLevel());
 
   auto call = emitCallSite(false);
 
@@ -1896,7 +1863,7 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   // call itself due to ABI type coercion.
   auto resultType = getCallee().getOrigFunctionType()->getSILResult();
   auto &resultTI = IGF.IGM.getTypeInfo(resultType);
-  auto schema = resultTI.getSchema(out.getKind());
+  auto schema = resultTI.getSchema();
   auto *bodyType = schema.getScalarResultType(IGF.IGM);
 
   // Extract out the scalar results.
@@ -1999,7 +1966,7 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
   // If the call is naturally to an explosion, emit it that way and
   // then initialize the temporary.
   if (LastArgWritten == 0) {
-    Explosion result(getCallee().getExplosionLevel());
+    Explosion result;
     emitToExplosion(result);
     cast<LoadableTypeInfo>(substResultTI).initialize(IGF, result, addr);
     return;
@@ -2088,22 +2055,13 @@ void CallEmission::emitToExplosion(Explosion &out) {
   switch (resultDiff) {
   // If they don't differ at all, we're good. 
   case ResultDifference::Identical:
-    // We can emit directly if the explosion levels match.
-    if (out.getKind() == getCallee().getExplosionLevel()) {
-      emitToUnmappedExplosion(out);
-    // Otherwise we have to re-explode.
-    } else {
-      Explosion temp(getCallee().getExplosionLevel());
-      emitToUnmappedExplosion(temp);
-
-      substResultTI.reexplode(IGF, temp, out);
-    }
+    emitToUnmappedExplosion(out);
     return;
 
   case ResultDifference::Aliasable: {
-    Explosion temp(getCallee().getExplosionLevel());
+    Explosion temp;
     emitToUnmappedExplosion(temp);
-    ExplosionSchema resultSchema = substResultTI.getSchema(out.getKind());
+    ExplosionSchema resultSchema = substResultTI.getSchema();
     assert(temp.size() == resultSchema.size());
     for (unsigned i = 0, e = temp.size(); i != e; ++i) {
       llvm::Type *expectedType = resultSchema.begin()[i].getScalarType();
@@ -2127,7 +2085,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
                == MetatypeRepresentation::Thin
              && "remapping to non-thin metatype?!");
       
-      Explosion temp(getCallee().getExplosionLevel());
+      Explosion temp;
       emitToUnmappedExplosion(temp);
       temp.claimAll();
       return;
@@ -2138,10 +2096,10 @@ void CallEmission::emitToExplosion(Explosion &out) {
         // Remap a class archetype to an instance.
         assert(substResultType.hasReferenceSemantics() &&
                "remapping class archetype to non-class?!");
-        auto schema = substResultTI.getSchema(getCallee().getExplosionLevel());
+        auto schema = substResultTI.getSchema();
         assert(schema.size() == 1 && schema.begin()->isScalar()
                && "remapping class archetype to non-single-scalar");
-        Explosion temp(getCallee().getExplosionLevel());
+        Explosion temp;
         emitToUnmappedExplosion(temp);
         llvm::Value *pointer = temp.claimNext();
         pointer = IGF.Builder.CreateBitCast(pointer,
@@ -2271,7 +2229,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF,
   }
 
   auto &argTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(argType));
-  auto inputSchema = argTI.getSchema(in.getKind());
+  auto inputSchema = argTI.getSchema();
 
   // Check to see if we can pairwise coerce Swift's exploded scalars
   // to Clang's expanded elements.
@@ -2422,7 +2380,7 @@ void CallEmission::addArg(Explosion &arg) {
   switch (getCallee().getAbstractCC()) {
   case AbstractCC::C:
   case AbstractCC::ObjCMethod: {
-    Explosion externalized(arg.getKind());
+    Explosion externalized;
     externalizeArguments(IGF, getCallee(), arg, externalized, newByvals,
                          origParams);
     arg = std::move(externalized);
@@ -2437,7 +2395,6 @@ void CallEmission::addArg(Explosion &arg) {
   }
 
   // Add the given number of arguments.
-  assert(getCallee().getExplosionLevel() == arg.getKind());
   assert(LastArgWritten >= arg.size());
 
   size_t targetIndex = LastArgWritten - arg.size();
@@ -2469,8 +2426,8 @@ void CallEmission::addArg(Explosion &arg) {
 /// Initialize an Explosion with the parameters of the current
 /// function.  All of the objects will be added unmanaged.  This is
 /// really only useful when writing prologue code.
-Explosion IRGenFunction::collectParameters(ResilienceExpansion explosionLevel) {
-  Explosion params(explosionLevel);
+Explosion IRGenFunction::collectParameters() {
+  Explosion params;
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i)
     params.add(i);
   return params;
@@ -2590,7 +2547,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   }
 
   auto &resultTI = IGM.getTypeInfo(resultType);
-  auto schema = resultTI.getSchema(result.getKind());
+  auto schema = resultTI.getSchema();
   auto *bodyType = schema.getScalarResultType(IGM);
 
   // Multiple return values are returned as a struct.
@@ -2651,7 +2608,6 @@ static void emitApplyArgument(IRGenFunction &IGF,
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        llvm::Function *staticFnPtr,
                                        llvm::Type *fnTy,
-                                       ResilienceExpansion explosionLevel,
                                        CanSILFunctionType origType,
                                        CanSILFunctionType substType,
                                        CanSILFunctionType outType,
@@ -2661,7 +2617,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   ExtraData extraData
     = layout.isKnownEmpty() ? ExtraData::None : ExtraData::Retainable;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(outType,
-                                                  explosionLevel,
                                                   extraData,
                                                   attrs);
   // Build a name for the thunk. If we're thunking a static function reference,
@@ -2683,10 +2638,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
   
-  Explosion origParams = subIGF.collectParameters(explosionLevel);
+  Explosion origParams = subIGF.collectParameters();
 
   // Create a new explosion for potentially reabstracted parameters.
-  Explosion params(explosionLevel);
+  Explosion params;
 
   {
     // Lower the forwarded arguments in the original function's generic context.
@@ -2694,7 +2649,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     
     // Forward the indirect return value, if we have one.
     auto &resultTI = IGM.getTypeInfo(outType->getResult().getSILType());
-    if (resultTI.getSchema(explosionLevel).requiresIndirectResult(IGM))
+    if (resultTI.getSchema().requiresIndirectResult(IGM))
       params.add(origParams.claimNext());
     
     // Reemit the parameters as unsubstituted.
@@ -2733,11 +2688,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
       
-      Explosion param(explosionLevel);
+      Explosion param;
       // If the argument is passed indirectly, copy into a temporary.
       // (If it were instead passed "const +0", we could pass a reference
       // to the memory in the data pointer.  But it isn't.)
-      if (fieldTI.isIndirectArgument(explosionLevel)) {
+      if (fieldTI.isIndirectArgument()) {
         auto caddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
         fieldTI.initializeWithCopy(subIGF, caddr.getAddress(), fieldAddr,
                                    fieldTy);
@@ -2837,7 +2792,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       continue;
     
     // Empty values don't matter.
-    auto schema = ti.getSchema(out.getKind());
+    auto schema = ti.getSchema();
     if (schema.size() == 0)
       continue;
     
@@ -2869,7 +2824,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // Collect the polymorphic arguments.
   if (hasPolymorphicParameters(origType)) {
     assert(!subs.empty() && "no substitutions for polymorphic argument?!");
-    Explosion polymorphicArgs(args.getKind());
+    Explosion polymorphicArgs;
     emitPolymorphicArguments(IGF, origType, substType, subs, polymorphicArgs);
 
     const TypeInfo &metatypeTI = IGF.IGM.getTypeMetadataPtrTypeInfo(),
@@ -2941,7 +2896,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   
   // Create the forwarding stub.
   llvm::AttributeSet attrs;
-  auto fnPtrTy = IGF.IGM.getFunctionType(origType, args.getKind(),
+  auto fnPtrTy = IGF.IGM.getFunctionType(origType,
                                          fnContext ? ExtraData::Retainable
                                                    : ExtraData::None, attrs)
     ->getPointerTo();
@@ -2949,7 +2904,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   llvm::Function *forwarder = emitPartialApplicationForwarder(IGF.IGM,
                                                               staticFn,
                                                               fnPtrTy,
-                                                              args.getKind(),
                                                               origType,
                                                               substType,
                                                               outType,
@@ -2981,7 +2935,7 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
   IRGenFunction IGF(IGM, func);
   
   // Copy the captures from the source to the destination.
-  Explosion params = IGF.collectParameters(ResilienceExpansion::Minimal);
+  Explosion params = IGF.collectParameters();
   auto dest = Address(params.claimNext(), blockTL.getFixedAlignment());
   auto src = Address(params.claimNext(), blockTL.getFixedAlignment());
   
@@ -3015,7 +2969,7 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
   IRGenFunction IGF(IGM, func);
   
   // Destroy the captures.
-  Explosion params = IGF.collectParameters(ResilienceExpansion::Minimal);
+  Explosion params = IGF.collectParameters();
   auto storage = Address(params.claimNext(), blockTL.getFixedAlignment());
   auto capture = blockTL.projectCapture(IGF, storage);
   auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());

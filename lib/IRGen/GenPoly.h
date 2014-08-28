@@ -25,7 +25,6 @@ namespace llvm {
 
 namespace swift {
   class CanType;
-  enum class ResilienceExpansion : unsigned;
   class Substitution;
 
 namespace irgen {
@@ -39,8 +38,7 @@ namespace irgen {
 
   /// Do the given types differ by abstraction when passed in an explosion?
   bool differsByAbstractionInExplosion(IRGenModule &IGM,
-                                       CanType origTy, CanType substTy,
-                                       ResilienceExpansion explosionLevel);
+                                       CanType origTy, CanType substTy);
 
   /// Given a substituted explosion, re-emit it as an unsubstituted one.
   ///

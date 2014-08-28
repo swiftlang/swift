@@ -612,7 +612,7 @@ namespace {
     void emitCopyOfTables(IRGenFunction &IGF, Address dest, Address src) const {
       if (NumProtocols == 0) return;
 
-      Explosion temp(ResilienceExpansion::Minimal);
+      Explosion temp;
       emitLoadOfTables(IGF, src, temp);
       emitStoreOfTables(IGF, temp, dest);
     }
@@ -742,7 +742,7 @@ namespace {
 
     void weakLoadStrong(IRGenFunction &IGF, Address existential,
                         Explosion &out) const override {
-      Explosion temp(ResilienceExpansion::Minimal);
+      Explosion temp;
       Address valueAddr = projectValue(IGF, existential);
       temp.add(IGF.emitUnknownWeakLoadStrong(valueAddr,
                                             IGF.IGM.UnknownRefCountedPtrTy));
@@ -752,7 +752,7 @@ namespace {
 
     void weakTakeStrong(IRGenFunction &IGF, Address existential,
                         Explosion &out) const override {
-      Explosion temp(ResilienceExpansion::Minimal);
+      Explosion temp;
       Address valueAddr = projectValue(IGF, existential);
       temp.add(IGF.emitUnknownWeakTakeStrong(valueAddr,
                                             IGF.IGM.UnknownRefCountedPtrTy));
@@ -762,7 +762,7 @@ namespace {
 
     void weakInit(IRGenFunction &IGF, Explosion &in,
                   Address existential) const override {
-      Explosion temp(ResilienceExpansion::Minimal);
+      Explosion temp;
       decomposeExplosion(in, temp, IGF);
 
       llvm::Value *value = temp.claimNext();
@@ -774,7 +774,7 @@ namespace {
 
     void weakAssign(IRGenFunction &IGF, Explosion &in,
                     Address existential) const override {
-      Explosion temp(ResilienceExpansion::Minimal);
+      Explosion temp;
       decomposeExplosion(in, temp, IGF);
 
       llvm::Value *value = temp.claimNext();
@@ -814,7 +814,7 @@ namespace {
 
     unsigned getNumProtocols() const { return NumProtocols; }
 
-    unsigned getExplosionSize(ResilienceExpansion kind) const override {
+    unsigned getExplosionSize() const override {
       return 1 + NumProtocols;
     }
     
@@ -3915,7 +3915,7 @@ EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
   MetadataForDepths.push_back(selfMeta);
 
   // All our archetypes should be satisfiable from the source.
-  Explosion empty(ResilienceExpansion::Minimal);
+  Explosion empty;
   emitWithSourceBound(empty);
 }
 

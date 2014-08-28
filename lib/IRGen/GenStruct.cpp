@@ -130,7 +130,6 @@ namespace {
                                    Explosion &in,
                                    VarDecl *field,
                                    Explosion &out) const {
-      assert(in.getKind() == out.getKind());
       auto &fieldInfo = getFieldInfo(field);
 
       // If the field requires no storage, there's nothing to do.
@@ -138,7 +137,7 @@ namespace {
         return;
   
       // Otherwise, project from the base.
-      auto fieldRange = fieldInfo.getProjectionRange(out.getKind());
+      auto fieldRange = fieldInfo.getProjectionRange();
       auto elements = in.getRange(fieldRange.first, fieldRange.second);
       out.add(elements);
     }
@@ -246,16 +245,16 @@ namespace {
                               ClangFieldInfo> {
   public:
     ClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
-                        unsigned maxExplosionSize, unsigned minExplosionSize,
+                        unsigned explosionSize,
                         llvm::Type *storageType, Size size,
                         llvm::BitVector &&spareBits, Alignment align)
       : StructTypeInfoBase(StructTypeInfoKind::ClangRecordTypeInfo,
-                           fields, maxExplosionSize, minExplosionSize,
+                           fields, explosionSize,
                            storageType, size, std::move(spareBits),
                            align, IsPOD) {
     }
 
-    bool isIndirectArgument(ResilienceExpansion kind) const override {
+    bool isIndirectArgument() const override {
       return false;
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -277,17 +276,17 @@ namespace {
   public:
     // FIXME: Spare bits between struct members.
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
-                           unsigned maxExplosionSize, unsigned minExplosionSize,
+                           unsigned explosionSize,
                            llvm::Type *storageType, Size size,
                            llvm::BitVector &&spareBits,
                            Alignment align, IsPOD_t isPOD)
       : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo,
-                           fields, maxExplosionSize, minExplosionSize,
+                           fields, explosionSize,
                            storageType, size, std::move(spareBits),
                            align, isPOD)
     {}
 
-    bool isIndirectArgument(ResilienceExpansion kind) const override { return false; }
+    bool isIndirectArgument() const override { return false; }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, CanType T) const override {
       LoadableStructTypeInfo::initialize(IGF, params, addr);
@@ -458,11 +457,9 @@ namespace {
 
     LoadableStructTypeInfo *createLoadable(ArrayRef<StructFieldInfo> fields,
                                            StructLayout &&layout,
-                                           unsigned maxExplosionSize,
-                                           unsigned minExplosionSize) {
+                                           unsigned explosionSize) {
       return LoadableStructTypeInfo::create(fields,
-                                            maxExplosionSize,
-                                            minExplosionSize,
+                                            explosionSize,
                                             layout.getType(),
                                             layout.getSize(),
                                             std::move(layout.getSpareBits()),
@@ -551,7 +548,7 @@ public:
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
     return ClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
-                                       NextExplosionIndex, llvmType, TotalSize,
+                                       llvmType, TotalSize,
                                        std::move(SpareBits), TotalAlignment);
   }
 
@@ -680,8 +677,7 @@ private:
 
   /// Add information to track a value field at the current offset.
   void addFieldInfo(VarDecl *swiftField, const LoadableTypeInfo &fieldType) {
-    unsigned explosionSize =
-      fieldType.getExplosionSize(ResilienceExpansion::Maximal);
+    unsigned explosionSize = fieldType.getExplosionSize();
     unsigned explosionBegin = NextExplosionIndex;
     NextExplosionIndex += explosionSize;
     unsigned explosionEnd = NextExplosionIndex;
