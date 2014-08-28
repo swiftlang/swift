@@ -2973,6 +2973,14 @@ namespace {
 
     void addMethodFromSILWitnessTable(AbstractFunctionDecl *iface) {
       auto &entry = SILEntries.front();
+      SILEntries = SILEntries.slice(1);
+
+      // Handle missing optional requirements.
+      if (entry.getKind() == SILWitnessTable::MissingOptional) {
+        Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+        return;
+      }
+      
       assert(entry.getKind() == SILWitnessTable::Method
              && "sil witness table does not match protocol");
       assert(entry.getMethodWitness().Requirement.getDecl() == iface
@@ -2983,8 +2991,6 @@ namespace {
                                    NotForDefinition);
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
       Table.push_back(witness);
-      
-      SILEntries = SILEntries.slice(1);
       return;
     }
     

@@ -38,7 +38,8 @@ class NormalProtocolConformance;
 /// A mapping from each requirement of a protocol to the SIL-level entity
 /// satisfying the requirement for a concrete type.
 class SILWitnessTable : public llvm::ilist_node<SILWitnessTable>,
-                        public SILAllocated<SILWitnessTable> {
+                        public SILAllocated<SILWitnessTable>
+{
 public:
   /// A witness table entry describing the witness for a method.
   struct MethodWitness {
@@ -76,6 +77,12 @@ public:
     /// The ProtocolConformance for the base protocol.
     ProtocolConformance *Witness;
   };
+                          
+  /// A witness table entry for an optional requirement that is not present.
+  struct MissingOptionalWitness {
+    /// The witness for the optional requirement that wasn't present.
+    ValueDecl *Witness;
+  };
   
   /// A witness table entry kind.
   enum WitnessKind {
@@ -84,6 +91,7 @@ public:
     AssociatedType,
     AssociatedTypeProtocol,
     BaseProtocol,
+    MissingOptional
   };
   
   /// A witness table entry.
@@ -94,6 +102,7 @@ public:
       AssociatedTypeWitness AssociatedType;
       AssociatedTypeProtocolWitness AssociatedTypeProtocol;
       BaseProtocolWitness BaseProtocol;
+      MissingOptionalWitness MissingOptional;
     };
     
   public:
@@ -117,6 +126,10 @@ public:
         BaseProtocol(BaseProtocol)
     {}
     
+    Entry(const MissingOptionalWitness &MissingOptional)
+      : Kind(WitnessKind::MissingOptional), MissingOptional(MissingOptional) {
+    }
+    
     WitnessKind getKind() const { return Kind; }
     
     const MethodWitness &getMethodWitness() const {
@@ -132,10 +145,14 @@ public:
       assert(Kind == WitnessKind::AssociatedTypeProtocol);
       return AssociatedTypeProtocol;
     }
-    const BaseProtocolWitness &
-    getBaseProtocolWitness() const {
+    const BaseProtocolWitness &getBaseProtocolWitness() const {
       assert(Kind == WitnessKind::BaseProtocol);
       return BaseProtocol;
+    }
+    
+    const MissingOptionalWitness &getMissingOptionalWitness() const {
+      assert(Kind == WitnessKind::MissingOptional);
+      return MissingOptional;
     }
   };
   

@@ -1180,8 +1180,8 @@ static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
                                          NominalTypeDecl *theType,
                                          VarDecl *var) {
   assert(!generics && "generic static properties not implemented");
-  assert((isa<StructDecl>(theType) || isa<EnumDecl>(theType))
-         && "only value type static properties are implemented");
+  assert((isa<StructDecl>(theType) || isa<EnumDecl>(theType)) &&
+         "only value type static properties are implemented");
 
   SGM.addGlobalVariable(var);
 }
@@ -2068,8 +2068,17 @@ public:
   
   void emitFuncEntry(FuncDecl *fd, ValueDecl *witnessDecl,
                      ArrayRef<Substitution> WitnessSubstitutions) {
-
     // Emit the witness thunk and add it to the table.
+    
+    // If this is a non-present optional requirement, emit a MissingOptional.
+    if (!witnessDecl) {
+      assert(fd->getAttrs().hasAttribute<OptionalAttr>() &&
+             "Non-optional protocol requirement lacks a witness?");
+      Entries.push_back(SILWitnessTable::MissingOptionalWitness{ fd });
+      return;
+    }
+    
+    
     // TODO: multiple resilience expansions?
     // TODO: multiple uncurry levels?
     SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func,

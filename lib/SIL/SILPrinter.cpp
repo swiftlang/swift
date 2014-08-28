@@ -1612,6 +1612,14 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "base_protocol "
          << baseProtoWitness.Requirement->getName() << ": ";
       baseProtoWitness.Witness->printName(OS);
+      break;
+    }
+    case MissingOptional: {
+      // optional requirement 'declref': <<not present>>
+      OS << "optional requirement '"
+         << witness.getMissingOptionalWitness().Witness->getName()
+         << "': <<not present>>";
+      break;
     }
     }
     OS << '\n';

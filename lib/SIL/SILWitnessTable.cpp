@@ -122,6 +122,7 @@ SILWitnessTable::~SILWitnessTable() {
     case AssociatedType:
     case AssociatedTypeProtocol:
     case BaseProtocol:
+    case MissingOptional:
     case Invalid:
       break;
     }
@@ -145,6 +146,7 @@ void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries) {
     case AssociatedType:
     case AssociatedTypeProtocol:
     case BaseProtocol:
+    case MissingOptional:
     case Invalid:
       break;
     }
