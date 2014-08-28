@@ -300,7 +300,7 @@ public func += (inout lhs: String, rhs: String) {
     lhs = rhs
   }
   else {
-    lhs._core.extend(rhs._core)
+    lhs._core.append(rhs._core)
   }
 }
 

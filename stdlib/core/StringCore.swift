@@ -44,6 +44,10 @@ public struct _StringCore {
   }
 
   func _invariantCheck() {
+    // Note: this code is intentionally #if'ed out.  It unconditionally
+    // accesses lazily initialized globals, and thus it is a performance burden
+    // in non-checked builds.
+#if INTERNAL_CHECKS_ENABLED
     _sanityCheck(count >= 0)
     
     if _baseAddress == .null() {
@@ -63,6 +67,7 @@ public struct _StringCore {
       _sanityCheck(UnsafeMutablePointer(_baseAddress) <= buffer.usedEnd)
       _sanityCheck(UnsafeMutablePointer(_pointerToNth(count)) <= buffer.usedEnd)
     }
+#endif
   }
 
   /// Bitmask for the count part of _countAndFlags
