@@ -274,6 +274,15 @@ public:
     return insert(StringLiteralInst::create(loc, text, encoding, F));
   }
 
+  StringLiteralInst *createStringLiteral(SILLocation loc, const Twine& text,
+                                         StringLiteralInst::Encoding encoding) {
+    SmallVector<char, 256> Out;
+    return insert(StringLiteralInst::create(loc,
+                                            text.toStringRef(Out),
+                                            encoding,
+                                            F));
+  }
+
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {
     return insert(new (F.getModule()) LoadInst(Loc, LV));
   }

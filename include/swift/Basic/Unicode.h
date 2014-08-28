@@ -79,6 +79,10 @@ bool isSingleUnicodeScalar(StringRef S);
 
 unsigned extractFirstUnicodeScalar(StringRef S);
 
+/// Get the length of the UTF8 string transcoded into UTF16.
+/// Returns the number of code units in UTF16 representation
+uint64_t getUTF16Length(StringRef Str);
+
 } // namespace unicode
 } // namespace swift
 

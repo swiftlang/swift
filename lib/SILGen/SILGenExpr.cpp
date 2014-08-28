@@ -813,16 +813,7 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
 
   case StringLiteralExpr::UTF16: {
     instEncoding = StringLiteralInst::Encoding::UTF16;
-
-    // Transcode the string to UTF16 to get its length.
-    SmallVector<UTF16, 128> buffer(Str.size() + 1); // +1 for ending nulls.
-    const UTF8 *fromPtr = (const UTF8 *) Str.data();
-    UTF16 *toPtr = &buffer[0];
-    (void)ConvertUTF8toUTF16(&fromPtr, fromPtr + Str.size(),
-                             &toPtr, toPtr + Str.size(), strictConversion);
-
-    // The length of the transcoded string in UTF-16 code points.
-    Length = toPtr - &buffer[0];
+    Length = unicode::getUTF16Length(Str);
     break;
   }
   case StringLiteralExpr::OneUnicodeScalar: {

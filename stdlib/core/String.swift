@@ -78,6 +78,7 @@ extension String : UnicodeScalarLiteralConvertible {
 
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   @effects(readonly)
+  @semantics("string.makeUTF8")
   public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
@@ -102,6 +103,7 @@ extension String : ExtendedGraphemeClusterLiteralConvertible {
 
 extension String : _BuiltinUTF16StringLiteralConvertible {
   @effects(readonly)
+  @semantics("string.makeUTF16")
   public
   static func _convertFromBuiltinUTF16StringLiteral(
     start: Builtin.RawPointer, numberOfCodeUnits: Builtin.Word
@@ -119,6 +121,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
 
 extension String : _BuiltinStringLiteralConvertible {
   @effects(readonly)
+  @semantics("string.makeUTF8")
   public
   static func _convertFromBuiltinStringLiteral(
     start: Builtin.RawPointer,
@@ -282,6 +285,7 @@ extension String : StringInterpolationConvertible {
 }
 
 @effects(readonly)
+@semantics("string.concat")
 public func +(var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs

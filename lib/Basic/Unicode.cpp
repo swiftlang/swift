@@ -94,3 +94,19 @@ unsigned swift::unicode::extractFirstUnicodeScalar(StringRef S) {
   return Scalar;
 }
 
+uint64_t swift::unicode::getUTF16Length(StringRef Str) {
+  uint64_t Length;
+  // Transcode the string to UTF-16 to get its length.
+  SmallVector<UTF16, 128> buffer(Str.size() + 1); // +1 for ending nulls.
+  const UTF8 *fromPtr = (const UTF8 *) Str.data();
+  UTF16 *toPtr = &buffer[0];
+  ConversionResult Result = ConvertUTF8toUTF16(&fromPtr, fromPtr + Str.size(),
+                                               &toPtr, toPtr + Str.size(),
+                                               strictConversion);
+  assert(Result == conversionOK &&
+         "UTF-8 encoded string cannot be converted into UTF-16 encoding");
+
+  // The length of the transcoded string in UTF-16 code points.
+  Length = toPtr - &buffer[0];
+  return Length;
+}

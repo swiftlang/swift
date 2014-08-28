@@ -841,6 +841,10 @@ public:
   /// getEncoding - Return the desired encoding of the text.
   Encoding getEncoding() const { return TheEncoding; }
 
+  /// getCodeUnitCount - Return encoding-based length of the string
+  /// literal in code units.
+  uint64_t getCodeUnitCount();
+
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 

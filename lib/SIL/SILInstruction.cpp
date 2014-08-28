@@ -16,6 +16,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILVisitor.h"
@@ -898,6 +899,12 @@ StringLiteralInst::create(SILLocation loc, StringRef text, Encoding encoding,
 
   auto Ty = SILType::getRawPointerType(F.getModule().getASTContext());
   return ::new (buf) StringLiteralInst(loc, text, encoding, Ty);
+}
+
+uint64_t StringLiteralInst::getCodeUnitCount() {
+  if (TheEncoding == Encoding::UTF16)
+    return unicode::getUTF16Length(getValue());
+  return Length;
 }
 
 StoreInst::StoreInst(SILLocation Loc, SILValue Src, SILValue Dest)
