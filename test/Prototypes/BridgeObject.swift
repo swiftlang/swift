@@ -64,6 +64,15 @@ class C {
 }
 import Foundation
 
+func isOSNewerThan(major: Int, minor: Int, patch: Int = 0) -> Bool {
+  let vers = (majorVersion: major, minorVersion: minor, patchVersion: patch)
+  // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
+  let procInfo = NSProcessInfo.processInfo() as AnyObject
+  return procInfo.isOperatingSystemAtLeastVersion?(
+                    NSOperatingSystemVersion(vers)
+                  ) == true
+}
+
 func expectTagged(s: NSString, expected: Bool) -> NSString {
 #if arch(x86_64)
   let mask: UWord = 0x8000000000000001
@@ -72,26 +81,27 @@ func expectTagged(s: NSString, expected: Bool) -> NSString {
 #else
   let mask: UWord = 0
 #endif
-  
-  let procInfo = NSProcessInfo.processInfo() as AnyObject
 
+  var taggedStringsSupported: Bool
 #if os(iOS)
-  let taggedPointerOS = (majorVersion: 8, minorVersion: 0, patchVersion: 0)
+  // NSTaggedPointerString is not yet enabled as of iOS 8.0.
+  taggedStringsSupported = false
 #elseif os(OSX)
-  let taggedPointerOS = (majorVersion: 10, minorVersion: 10, patchVersion: 0)
-#else
-  let taggedPointerOS = () // Unknown OS
+  // NSTaggedPointerString is enabled starting in OS X 10.10.
+  taggedStringsSupported = isOSNewerThan(10,10)  &&  mask != 0
 #endif
-  
-  // This API may be missing, so check for it first.  Then make sure
-  // it's at least OS X 10.10 before checking for tagged pointers
-  if mask != 0 && procInfo.isOperatingSystemAtLeastVersion?(
-    NSOperatingSystemVersion(taggedPointerOS)
-  ) == true {
-    if (unsafeBitCast(s, UWord.self) & mask != 0) != expected {
-      fatalError("Unexpectedly (un-)tagged pointer")
-    }
+
+  let tagged = unsafeBitCast(s, UWord.self) & mask != 0
+
+  if taggedStringsSupported  &&  expected == tagged {
+    // okay
+  } else if !taggedStringsSupported  &&  !tagged {
+    // okay
+  } else {
+    let un = !tagged ? "un" : ""
+    fatalError("Unexpectedly \(un)tagged pointer for string \"\(s)\"")
   }
+
   return s
 }
 
