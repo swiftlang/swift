@@ -296,7 +296,7 @@ public func +(var lhs: String, rhs: String) -> String {
 
 // String append
 public func += (inout lhs: String, rhs: String) {
-  if (lhs.isEmpty) {
+  if lhs.isEmpty {
     lhs = rhs
   }
   else {
