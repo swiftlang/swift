@@ -420,18 +420,31 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
 /// release_value on the payload of the switch_enum in the destination BBs. We
 /// only do this if the destination BBs have only the switch enum as its
 /// predecessor.
-static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *S, SILInstruction *I,
-                                  AliasAnalysis *AA) {
+static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
+                                          SILBasicBlock::iterator RV,
+                                          AliasAnalysis *AA) {
   // If this instruction is not a retain_value, there is nothing left for us to
   // do... bail...
-  if (!isa<RetainValueInst>(I))
+  if (!isa<RetainValueInst>(RV))
     return false;
 
-  SILValue Ptr = I->getOperand(0);
+  SILValue Ptr = RV->getOperand(0);
+
+  // Next go over all instructions after I in the basic block. If none of them
+  // can decrement our ptr value, we can move the retain over the ref count
+  // inst. If any of them do potentially decrement the ref count of Ptr, we can
+  // not move it.
+  SILBasicBlock::iterator SwitchIter = Switch;
+  if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, RV,
+                                                             SwitchIter,
+                                                             AA)) {
+    RV->moveBefore(*B);
+    return true;
+  }
 
   // If the retain value's argument is not the switch's argument, we can't do
   // anything with our simplistic analysis... bail...
-  if (Ptr != S->getOperand())
+  if (Ptr != Switch->getOperand())
     return false;
 
   // If S has a default case bail since the default case could represent
@@ -441,32 +454,21 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *S, SILInstruction *I,
   // for Seed 5. After Seed 5, we should be able to recognize if a switch_enum
   // handles all cases except for 1 and has a default case. We might be able to
   // stick code into SILBuilder that has this behavior.
-  if (S->hasDefault())
+  if (Switch->hasDefault())
     return false;
-
-  // Next go over all instructions after I in the basic block. If none of them
-  // can decrement our ptr value, we can move the retain over the ref count
-  // inst. If any of them do potentially decrement the ref count of Ptr, we can
-  // not move it.
-  SILBasicBlock::iterator II = I;
-  if (valueHasARCDecrementOrCheckInInstructionRange(Ptr, std::next(II),
-                                                    SILBasicBlock::iterator(S),
-                                                    AA))
-    return false;
-
-  SILBuilder Builder(S);
 
   // Ok, we have a ref count instruction, sink it!
-  for (unsigned i = 0, e = S->getNumCases(); i != e; ++i) {
-    auto Case = S->getCase(i);
+  SILBuilder Builder(Switch);
+  for (unsigned i = 0, e = Switch->getNumCases(); i != e; ++i) {
+    auto Case = Switch->getCase(i);
     EnumElementDecl *Enum = Case.first;
     SILBasicBlock *Succ = Case.second;
     Builder.setInsertionPoint(&*Succ->begin());
     if (Enum->hasArgumentType())
-      createRefCountOpForPayload(Builder, I, Enum);
+      createRefCountOpForPayload(Builder, RV, Enum);
   }
 
-  I->eraseFromParent();
+  RV->eraseFromParent();
   NumSunk++;
   return true;
 }
@@ -476,34 +478,35 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *S, SILInstruction *I,
 /// only do this if the destination BBs have only the switch enum as its
 /// predecessor.
 static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
-                                             SILInstruction *I,
+                                             SILBasicBlock::iterator I,
                                              AliasAnalysis *AA) {
   // If this instruction is not a retain_value, there is nothing left for us to
   // do... bail...
   if (!isa<RetainValueInst>(I))
     return false;
 
-  SILValue Ptr = I->getOperand(0);
-
   // Make sure the condition comes from an enum_is_tag
   auto *EITI = dyn_cast<EnumIsTagInst>(CondBr->getCondition());
   if (!EITI)
-    return false;
-
-  // If the retain value's argument is not the cond_br's argument, we can't do
-  // anything with our simplistic analysis... bail...
-  if (Ptr != EITI->getOperand())
     return false;
 
   // Next go over all instructions after I in the basic block. If none of them
   // can decrement our ptr value, we can move the retain over the ref count
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
   // not move it.
-  SILBasicBlock::iterator II = I;
-  if (valueHasARCDecrementOrCheckInInstructionRange(
-          Ptr, std::next(II), SILBasicBlock::iterator(CondBr), AA)) {
+  SILValue Ptr = I->getOperand(0);
+  SILBasicBlock::iterator CondBrIter = CondBr;
+  if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, std::next(I),
+                                                             CondBrIter, AA)) {
+    I->moveBefore(*B);
     return false;
   }
+
+  // If the retain value's argument is not the cond_br's argument, we can't do
+  // anything with our simplistic analysis... bail...
+  if (Ptr != EITI->getOperand())
+    return false;
+
   // Work out which enum element is the true branch, and which is false.
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
@@ -527,6 +530,7 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
   // handle it in SILCombine.
   if (!OtherElt)
     return false;
+
   Elts[1] = OtherElt;
 
   SILBuilder Builder(EITI);
@@ -545,81 +549,74 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
   return true;
 }
 
-static bool tryToSinkRefCountInst(SILInstruction *T, SILInstruction *I,
+static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
+                                  SILBasicBlock::iterator I,
+                                  bool CanSinkToSuccessors,
                                   AliasAnalysis *AA) {
-  if (auto *S = dyn_cast<SwitchEnumInst>(T))
-    return tryToSinkRefCountAcrossSwitch(S, I, AA);
-  if (auto *CondBr = dyn_cast<CondBranchInst>(T))
-    if (tryToSinkRefCountAcrossEnumIsTag(CondBr, I, AA))
-      return true;
+  // The following methods should only be attempted if we can sink to our
+  // successor.
+  if (CanSinkToSuccessors) {
+    // If we have a switch, try to sink ref counts across it and then return
+    // that result. We do not keep processing since the code below can not
+    // properly sink ref counts over switch_enums so we might as well exit
+    // early.
+    if (auto *S = dyn_cast<SwitchEnumInst>(T))
+      return tryToSinkRefCountAcrossSwitch(S, I, AA);
 
-  // We currently handle checked_cast_br and cond_br.
-  if (!isa<CheckedCastBranchInst>(T) && !isa<CondBranchInst>(T))
-    return false;
+    // In contrast, even if we do not sink ref counts across a cond_br from an
+    // enum_is_tag, we may be able to sink anyways. So we do not return on a
+    // failure case.
+    if (auto *CondBr = dyn_cast<CondBranchInst>(T))
+      if (tryToSinkRefCountAcrossEnumIsTag(CondBr, I, AA))
+        return true;
+  }
 
   if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
     return false;
 
   SILValue Ptr = I->getOperand(0);
-  SILBasicBlock::iterator II = I;
-  ++II;
-  for (; &*II != T; ++II) {
-    if (canDecrementRefCount(&*II, Ptr, AA) || canCheckRefCount(&*II))
-      return false;
+  if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, std::next(I),
+                                                             T, AA)) {
+    DEBUG(llvm::dbgs() << "    Moving " << *I);
+    I->moveBefore(*B);
+    return true;
   }
 
-  SILBuilder Builder(T);
+  // Ok, we have a ref count instruction that *could* be sunk. If we have a
+  // terminator that we can not sink through or the cfg will not let us sink
+  // into our predecessors, just move the increment before the terminator.
+  if (!CanSinkToSuccessors ||
+      (!isa<CheckedCastBranchInst>(T) && !isa<CondBranchInst>(T))) {
+    DEBUG(llvm::dbgs() << "    Moving " << *I);
+    I->moveBefore(T);
+    return true;
+  }
 
-  // Ok, we have a ref count instruction, sink it!
+  // Ok, it is legal for us to sink this increment to our successors. Create a
+  // copy of this instruction in each one of our successors.
+
+  DEBUG(llvm::dbgs() << "    Sinking " << *I);
+  SILBuilder Builder(T);
   for (auto &Succ : T->getParent()->getSuccs()) {
     SILBasicBlock *SuccBB = Succ.getBB();
     Builder.setInsertionPoint(&*SuccBB->begin());
-    if (isa<StrongRetainInst>(I))
+    if (isa<StrongRetainInst>(I)) {
       Builder.createStrongRetain(I->getLoc(), Ptr);
-    else
-      // I should be RetainValueInst.
+    } else {
+      assert(isa<RetainValueInst>(I) && "This can only be retain_value");
       Builder.createRetainValue(I->getLoc(), Ptr);
+    }
   }
 
+  // Then erase this instruction.
   I->eraseFromParent();
-  NumSunk++;
-  return true;
-}
-
-/// \brief - Tries to move the given retain instruction down as far as possible
-/// in the current BB.  It will move it as far as 'Pos' if possible, or to the
-/// first release it sees.
-static bool tryToMoveRefCountInstDownInBB(SILBasicBlock::iterator Pos,
-                                          SILInstruction *I,
-                                          AliasAnalysis *AA) {
-  if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
-    return false;
-
-  SILValue Ptr = I->getOperand(0);
-  SILBasicBlock::iterator II = I;
-  ++II;
-  for (; II != Pos; ++II) {
-    // If we find a release, then this is the farthest down we can move the
-    // instruction.
-    if (canDecrementRefCount(&*II, Ptr, AA) || canCheckRefCount(&*II))
-      break;
-  }
-
-  // If we didn't find anywhere to move it then give up.
-  Pos = II;
-  --II;
-  if (I == II)
-    return false;
-
-  // Ok, we have a ref count instruction, move it further down the BB.
-  I->moveBefore(Pos);
   NumSunk++;
   return true;
 }
 
 /// Try sink a retain as far as possible.  This is either to sucessor BBs,
 /// or as far down the current BB as possible
-static bool sinkRetain(SILBasicBlock *BB, AliasAnalysis *AA) {
+static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA) {
 
   // Make sure that each one of our successors only has one predecessor,
   // us.
@@ -641,28 +638,22 @@ static bool sinkRetain(SILBasicBlock *BB, AliasAnalysis *AA) {
   // Walk from the terminator up the BB.  Try move retains either to the next
   // BB, or the end of this BB.  Note that ordering is maintained of retains
   // within this BB.
-  SILBasicBlock::iterator InsertPos = SI;
   SI = std::prev(SI);
   while (SI != SE) {
     SILInstruction *Inst = &*SI;
     SI = std::prev(SI);
-    // Try sink to successor
-    if (CanSinkToSuccessor && tryToSinkRefCountInst(S, Inst, AA)) {
-      Changed = true;
-      continue;
-    }
-    // Try move further down the current BB.
-    if (tryToMoveRefCountInstDownInBB(InsertPos, Inst, AA)) {
-      InsertPos = std::prev(InsertPos);
-      Changed = true;
-      continue;
-    }
+
+    // Try to:
+    //
+    //   1. If there are no decrements between our ref count inst and
+    //      terminator, sink the ref count inst into either our successors.
+    //   2. If there are such decrements, move the retain right before that
+    //      decrement.
+    Changed |= tryToSinkRefCountInst(S, Inst, CanSinkToSuccessor, AA);
   }
 
-  if (CanSinkToSuccessor && tryToSinkRefCountInst(S, &*SI, AA))
-    return true;
-  if (tryToMoveRefCountInstDownInBB(InsertPos, &*SI, AA))
-    return true;
+  // Handle the first instruction in the BB.
+  Changed |= tryToSinkRefCountInst(S, &*SI, CanSinkToSuccessor, AA);
   return Changed;
 }
 
@@ -1155,7 +1146,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= State.process();
 
     // Finally we try to sink retain instructions from this BB to the next BB.
-    Changed |= sinkRetain(State.getBB(), AA);
+    Changed |= sinkRefCountIncrement(State.getBB(), AA);
   }
 
   return Changed;
