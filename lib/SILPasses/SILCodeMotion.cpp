@@ -625,14 +625,11 @@ static bool sinkRetain(SILBasicBlock *BB, AliasAnalysis *AA) {
   // us.
   // If that condition is not true, we can still sink to the end of this BB,
   // but not to successors.
-  bool CanSinkToSuccessor = true;
-  for (auto &Succ : BB->getSuccs()) {
-    SILBasicBlock *SuccBB = Succ.getBB();
-    if (!SuccBB || !SuccBB->getSinglePredecessor()) {
-      CanSinkToSuccessor = false;
-      break;
-    }
-  }
+  bool CanSinkToSuccessor = std::none_of(BB->succ_begin(), BB->succ_end(),
+    [](const SILSuccessor &S) -> bool {
+      SILBasicBlock *SuccBB = S.getBB();
+      return !SuccBB || !SuccBB->getSinglePredecessor();
+  });
 
   SILInstruction *S = BB->getTerminator();
   SILBasicBlock::iterator SI = S, SE = BB->begin();
