@@ -39,7 +39,7 @@ func _malloc_size(heapMemory: UnsafeMutablePointer<Void>) -> Int
 /// construct and---if necessary---destroy Elements there yourself,
 /// either in a derived class, or it can be in some manager object
 /// that owns the HeapBuffer.
-@objc public class HeapBufferStorage<Value,Element> {
+public class HeapBufferStorage<Value,Element> {
   public typealias Buffer = HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()
