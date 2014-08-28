@@ -349,7 +349,7 @@ ClangImporter::create(ASTContext &ctx,
   auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
     "extern int __swift __attribute__((unavailable));");
   invocation->getPreprocessorOpts().addRemappedFile("<swift-imported-modules>",
-                                                    sourceBuffer);
+                                                    sourceBuffer.release());
 
   // Create a compiler instance.
   importer->Impl.Instance.reset(new CompilerInstance);

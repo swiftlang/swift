@@ -179,9 +179,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
 }
 
 SourceCompleteResult ide::isSourceInputComplete(StringRef Text) {
-  std::unique_ptr<llvm::MemoryBuffer> InputBuf;
-  InputBuf.reset(llvm::MemoryBuffer::getMemBufferCopy(Text));
-  return ide::isSourceInputComplete(std::move(InputBuf));
+  return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text));
 }
 
 const clang::Module *ide::findUnderlyingClangModule(const Module *M) {
