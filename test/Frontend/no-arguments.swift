@@ -1,4 +1,3 @@
-// RUN: not %swift_driver_plain -frontend 2>&1 | FileCheck %s
-// CHECK: error: no arguments provided to '-frontend'
+// RUN: not %swift 2>&1 | FileCheck %s
 
-
+// CHECK: <unknown>:0: error: this mode requires at least one input file

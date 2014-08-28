@@ -198,10 +198,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   } else {
     // We don't have a mode, so determine a default.
-    if (Opts.InputFilenames.empty()) {
-      // We don't have any input files, so default to the REPL.
-      Action = FrontendOptions::REPL;
-    } else if (Args.hasArg(OPT_emit_module, OPT_emit_module_path)) {
+    if (Args.hasArg(OPT_emit_module, OPT_emit_module_path)) {
       // We've been told to emit a module, but have no other mode indicators.
       // As a result, put the frontend into EmitModuleOnly mode.
       // (Setting up module output will be handled below.)
