@@ -269,12 +269,80 @@ struct UnaryOp_match {
   }
 };
 
-
-template <typename Ty>
-UnaryOp_match<Ty, ValueKind::PointerToAddressInst>
-m_PointerToAddressInst(const Ty &T) {
-  return T;
-}
+// XMacro for generating a matcher for unary op instructions that can apply
+// further matchers to the operands of the unary operation.
+#define UNARY_OP_MATCH_WITH_ARG_MATCHER(Class)        \
+  template <typename Ty>                              \
+  UnaryOp_match<Ty, ValueKind::Class>                 \
+  m_##Class(const Ty &T) {                            \
+    return T;                                         \
+  }
+UNARY_OP_MATCH_WITH_ARG_MATCHER(AllocRefDynamicInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(LoadWeakInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ConvertFunctionInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UpcastInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(PointerToAddressInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(AddressToPointerInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedRefCastInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedAddrCastInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedTrivialBitCastInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedRefBitCastInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(RawPointerToRefInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(RefToUnownedInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedToRefInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(RefToUnmanagedInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UnmanagedToRefInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ThinToThickFunctionInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ThickToObjCMetatypeInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCToThickMetatypeInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCMetatypeToObjectInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCExistentialMetatypeToObjectInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(IsNonnullInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(RetainValueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ReleaseValueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(AutoreleaseValueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(EnumIsTagInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedEnumDataInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(InitEnumDataAddrInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(InjectEnumAddrInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedTakeEnumDataAddrInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ValueMetatypeInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ExistentialMetatypeInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(TupleExtractInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(TupleElementAddrInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(StructExtractInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(StructElementAddrInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(LoadInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(RefElementAddrInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ClassMethodInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(SuperMethodInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ProtocolMethodInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(DynamicMethodInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectExistentialInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectExistentialRefInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialRefInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialRefInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UpcastExistentialRefInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectBlockStorageInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongReleaseInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainAutoreleasedInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainUnownedInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedRetainInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedReleaseInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(FixLifetimeInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(CopyBlockInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocStackInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocRefInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocBoxInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(DestroyAddrInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(CondFailInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ReturnInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(AutoreleaseReturnInst)
+#undef UNARY_OP_MATCH_WITH_ARG_MATCHER
 
 //===----------------------------------------------------------------------===//
 //                            Binary Instructions
