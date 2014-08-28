@@ -1441,6 +1441,15 @@ getActualOptionalTypeKind(uint8_t raw) {
   return Nothing;
 }
 
+template <typename T, typename ...Args>
+T *ModuleFile::createDecl(Args &&... args) {
+  // Note that this method is not used for all decl kinds.
+  static_assert(std::is_base_of<Decl, T>::value, "not a Decl");
+  T *result = new (getContext()) T(std::forward<Args>(args)...);
+  result->setEarlyAttrValidation(true);
+  return result;
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
@@ -1637,8 +1646,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
-                                         SourceLoc(), underlyingType, DC);
+    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
+                                           SourceLoc(), underlyingType, DC);
     declOrOffset = alias;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -1682,11 +1691,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto genericParam = new (ctx) GenericTypeParamDecl(DC,
-                                                       getIdentifier(nameID),
-                                                       SourceLoc(),
-                                                       depth,
-                                                       index);
+    auto genericParam = createDecl<GenericTypeParamDecl>(DC,
+                                                         getIdentifier(nameID),
+                                                         SourceLoc(),
+                                                         depth,
+                                                         index);
     declOrOffset = genericParam;
 
     if (isImplicit)
@@ -1726,10 +1735,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto assocType = new (ctx) AssociatedTypeDecl(DC, SourceLoc(),
-                                                  getIdentifier(nameID),
-                                                  SourceLoc(), this,
-                                                  defaultDefinitionID);
+    auto assocType = createDecl<AssociatedTypeDecl>(DC, SourceLoc(),
+                                                    getIdentifier(nameID),
+                                                    SourceLoc(), this,
+                                                    defaultDefinitionID);
     declOrOffset = assocType;
 
     assocType->setAccessibility(cast<ProtocolDecl>(DC)->getAccessibility());
@@ -1767,8 +1776,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
-                                          SourceLoc(), { }, genericParams, DC);
+    auto theStruct = createDecl<StructDecl>(SourceLoc(), getIdentifier(nameID),
+                                            SourceLoc(), None, genericParams,
+                                            DC);
     declOrOffset = theStruct;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -1846,9 +1856,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       failability = *actualFailability;
 
     DeclName name(ctx, ctx.Id_init, argNames);
-    auto ctor = new (ctx) ConstructorDecl(name, SourceLoc(), failability, 
-                                          SourceLoc(), /*bodyParams=*/nullptr, 
-                                          nullptr, genericParams, parent);
+    auto ctor = createDecl<ConstructorDecl>(name, SourceLoc(), failability,
+                                            SourceLoc(), /*bodyParams=*/nullptr,
+                                            nullptr, genericParams, parent);
     declOrOffset = ctor;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -1934,8 +1944,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto var = new (ctx) VarDecl(isStatic, isLet, SourceLoc(),
-                                 getIdentifier(nameID), type, DC);
+    auto var = createDecl<VarDecl>(isStatic, isLet, SourceLoc(),
+                                   getIdentifier(nameID), type, DC);
 
     declOrOffset = var;
 
@@ -2013,9 +2023,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto param = new (ctx) ParamDecl(isLet, SourceLoc(), 
-                                     getIdentifier(argNameID), SourceLoc(),
-                                     getIdentifier(paramNameID), type, DC);
+    auto param = createDecl<ParamDecl>(isLet, SourceLoc(),
+                                       getIdentifier(argNameID), SourceLoc(),
+                                       getIdentifier(paramNameID), type, DC);
 
     declOrOffset = param;
 
@@ -2083,6 +2093,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto fn = FuncDecl::createDeserialized(
         ctx, SourceLoc(), staticSpelling.getValue(), SourceLoc(), name,
         SourceLoc(), genericParams, /*type=*/nullptr, numParamPatterns, DC);
+    fn->setEarlyAttrValidation();
     declOrOffset = fn;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -2162,7 +2173,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    auto binding = new (ctx) PatternBindingDecl(
+    auto binding = createDecl<PatternBindingDecl>(
         SourceLoc(), StaticSpelling.getValue(), SourceLoc(), pattern,
         /*init=*/nullptr,
         /*conditional=*/false, getDeclContext(contextID));
@@ -2191,8 +2202,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto proto = new (ctx) ProtocolDecl(DC, SourceLoc(), SourceLoc(),
-                                        getIdentifier(nameID), { });
+    auto proto = createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(),
+                                          getIdentifier(nameID), None);
     declOrOffset = proto;
 
     if (isClassBounded)
@@ -2243,11 +2254,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
 
     decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID);
-    declOrOffset = new (ctx) PrefixOperatorDecl(getDeclContext(contextID),
-                                                SourceLoc(),
-                                                getIdentifier(nameID),
-                                                SourceLoc(), SourceLoc(),
-                                                SourceLoc());
+    declOrOffset = createDecl<PrefixOperatorDecl>(getDeclContext(contextID),
+                                                  SourceLoc(),
+                                                  getIdentifier(nameID),
+                                                  SourceLoc(), SourceLoc(),
+                                                  SourceLoc());
     break;
   }
 
@@ -2256,11 +2267,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
 
     decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID);
-    declOrOffset = new (ctx) PostfixOperatorDecl(getDeclContext(contextID),
-                                                 SourceLoc(),
-                                                 getIdentifier(nameID),
-                                                 SourceLoc(), SourceLoc(),
-                                                 SourceLoc());
+    declOrOffset = createDecl<PostfixOperatorDecl>(getDeclContext(contextID),
+                                                   SourceLoc(),
+                                                   getIdentifier(nameID),
+                                                   SourceLoc(), SourceLoc(),
+                                                   SourceLoc());
     break;
   }
 
@@ -2290,17 +2301,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     InfixData infixData(precedence, associativity.getValue(),
                         isAssignment);
 
-    declOrOffset = new (ctx) InfixOperatorDecl(getDeclContext(contextID),
-                                               SourceLoc(), 
-                                               getIdentifier(nameID),
-                                               SourceLoc(), SourceLoc(),
-                                               isAssocImplicit,
-                                               SourceLoc(), SourceLoc(),
-                                               isPrecedenceImplicit,
-                                               SourceLoc(), SourceLoc(),
-                                               isAssignmentImplicit,
-                                               SourceLoc(),
-                                               SourceLoc(), infixData);
+    declOrOffset = createDecl<InfixOperatorDecl>(getDeclContext(contextID),
+                                                 SourceLoc(),
+                                                 getIdentifier(nameID),
+                                                 SourceLoc(), SourceLoc(),
+                                                 isAssocImplicit,
+                                                 SourceLoc(), SourceLoc(),
+                                                 isPrecedenceImplicit,
+                                                 SourceLoc(), SourceLoc(),
+                                                 isAssignmentImplicit,
+                                                 SourceLoc(),
+                                                 SourceLoc(), infixData);
     break;
   }
 
@@ -2325,8 +2336,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theClass = new (ctx) ClassDecl(SourceLoc(), getIdentifier(nameID),
-                                        SourceLoc(), { }, genericParams, DC);
+    auto theClass = createDecl<ClassDecl>(SourceLoc(), getIdentifier(nameID),
+                                          SourceLoc(), None, genericParams, DC);
     declOrOffset = theClass;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -2398,8 +2409,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theEnum = new (ctx) EnumDecl(SourceLoc(), getIdentifier(nameID),
-                                      SourceLoc(), { }, genericParams, DC);
+    auto theEnum = createDecl<EnumDecl>(SourceLoc(), getIdentifier(nameID),
+                                        SourceLoc(), None, genericParams, DC);
 
     declOrOffset = theEnum;
 
@@ -2464,12 +2475,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return declOrOffset;
 
     // FIXME: Deserialize the literal raw value, if any.
-    auto elem = new (ctx) EnumElementDecl(SourceLoc(),
-                                          getIdentifier(nameID),
-                                          TypeLoc::withoutLoc(argTy),
-                                          SourceLoc(),
-                                          nullptr,
-                                          DC);
+    auto elem = createDecl<EnumElementDecl>(SourceLoc(),
+                                            getIdentifier(nameID),
+                                            TypeLoc::withoutLoc(argTy),
+                                            SourceLoc(),
+                                            nullptr,
+                                            DC);
     declOrOffset = elem;
 
     elem->setType(getType(ctorTypeID));
@@ -2516,8 +2527,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       argNames.push_back(getIdentifier(argNameID));
 
     DeclName name(ctx, ctx.Id_subscript, argNames);
-    auto subscript = new (ctx) SubscriptDecl(name, SourceLoc(), indices,
-                                             SourceLoc(), elemTy, DC);
+    auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), indices,
+                                               SourceLoc(), elemTy, DC);
     declOrOffset = subscript;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -2565,7 +2576,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                           nominal->getGenericParams()};
     auto extension = ExtensionDecl::create(ctx, SourceLoc(), component, { },
                                            DC);
-
+    extension->setEarlyAttrValidation();
     declOrOffset = extension;
 
     if (isImplicit)
@@ -2605,8 +2616,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto dtor = new (ctx) DestructorDecl(ctx.Id_deinit, SourceLoc(),
-                                         /*selfpat*/nullptr, DC);
+    auto dtor = createDecl<DestructorDecl>(ctx.Id_deinit, SourceLoc(),
+                                           /*selfpat*/nullptr, DC);
     declOrOffset = dtor;
 
     dtor->setAccessibility(cast<ClassDecl>(DC)->getAccessibility());

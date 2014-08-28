@@ -282,6 +282,10 @@ private:
     assert(status == getStatus() && "not enough bits for status");
   }
 
+  /// Creates a new AST node to represent a deserialized decl.
+  template <typename T, typename ...Args>
+  T *createDecl(Args &&... args);
+
   /// Constructs an new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
              std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
