@@ -382,6 +382,214 @@ StringTests.test("appendToSubstringBug") {
   }
 }
 
+StringTests.test("COW/removeRange/start") {
+  var str = "12345678"
+  let literalIdentity = str.bufferID
+
+  // Check literal-to-heap reallocation.
+  if true {
+    let slice = str
+    expectEqual(literalIdentity, str.bufferID)
+    expectEqual(literalIdentity, slice.bufferID)
+    expectEqual("12345678", str)
+    expectEqual("12345678", slice)
+
+    // This mutation should reallocate the string.
+    str.removeRange(str.startIndex..<advance(str.startIndex, 1))
+    expectNotEqual(literalIdentity, str.bufferID)
+    expectEqual(literalIdentity, slice.bufferID)
+    let heapStrIdentity = str.bufferID
+    expectEqual("2345678", str)
+    expectEqual("12345678", slice)
+
+    // No more reallocations are expected.
+    str.removeRange(str.startIndex..<advance(str.startIndex, 1))
+    // FIXME: extra reallocation, should be expectEqual()
+    expectNotEqual(heapStrIdentity, str.bufferID)
+    // end FIXME
+    expectEqual(literalIdentity, slice.bufferID)
+    expectEqual("345678", str)
+    expectEqual("12345678", slice)
+  }
+
+  // Check heap-to-heap reallocation.
+  expectEqual("345678", str)
+  if true {
+    let heapStrIdentity1 = str.bufferID
+
+    let slice = str
+    expectEqual(heapStrIdentity1, str.bufferID)
+    expectEqual(heapStrIdentity1, slice.bufferID)
+    expectEqual("345678", str)
+    expectEqual("345678", slice)
+
+    // This mutation should reallocate the string.
+    str.removeRange(str.startIndex..<advance(str.startIndex, 1))
+    expectNotEqual(heapStrIdentity1, str.bufferID)
+    expectEqual(heapStrIdentity1, slice.bufferID)
+    let heapStrIdentity2 = str.bufferID
+    expectEqual("45678", str)
+    expectEqual("345678", slice)
+
+    // No more reallocations are expected.
+    str.removeRange(str.startIndex..<advance(str.startIndex, 1))
+    // FIXME: extra reallocation, should be expectEqual()
+    expectNotEqual(heapStrIdentity2, str.bufferID)
+    // end FIXME
+    expectEqual(heapStrIdentity1, slice.bufferID)
+    expectEqual("5678", str)
+    expectEqual("345678", slice)
+  }
+}
+
+StringTests.test("COW/removeRange/end") {
+  var str = "12345678"
+  let literalIdentity = str.bufferID
+
+  // Check literal-to-heap reallocation.
+  expectEqual("12345678", str)
+  if true {
+    let slice = str
+    expectEqual(literalIdentity, str.bufferID)
+    expectEqual(literalIdentity, slice.bufferID)
+    expectEqual("12345678", str)
+    expectEqual("12345678", slice)
+
+    // This mutation should reallocate the string.
+    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    expectNotEqual(literalIdentity, str.bufferID)
+    expectEqual(literalIdentity, slice.bufferID)
+    let heapStrIdentity = str.bufferID
+    expectEqual("1234567", str)
+    expectEqual("12345678", slice)
+
+    // No more reallocations are expected.
+    str.append(UnicodeScalar("x"))
+    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    // FIXME: extra reallocation, should be expectEqual()
+    expectNotEqual(heapStrIdentity, str.bufferID)
+    // end FIXME
+    expectEqual(literalIdentity, slice.bufferID)
+    expectEqual("1234567", str)
+    expectEqual("12345678", slice)
+
+    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.append(UnicodeScalar("x"))
+    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    // FIXME: extra reallocation, should be expectEqual()
+    expectNotEqual(heapStrIdentity, str.bufferID)
+    // end FIXME
+    expectEqual(literalIdentity, slice.bufferID)
+    expectEqual("123456", str)
+    expectEqual("12345678", slice)
+  }
+
+  // Check heap-to-heap reallocation.
+  expectEqual("123456", str)
+  if true {
+    let heapStrIdentity1 = str.bufferID
+
+    let slice = str
+    expectEqual(heapStrIdentity1, str.bufferID)
+    expectEqual(heapStrIdentity1, slice.bufferID)
+    expectEqual("123456", str)
+    expectEqual("123456", slice)
+
+    // This mutation should reallocate the string.
+    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    expectNotEqual(heapStrIdentity1, str.bufferID)
+    expectEqual(heapStrIdentity1, slice.bufferID)
+    let heapStrIdentity = str.bufferID
+    expectEqual("12345", str)
+    expectEqual("123456", slice)
+
+    // No more reallocations are expected.
+    str.append(UnicodeScalar("x"))
+    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    // FIXME: extra reallocation, should be expectEqual()
+    expectNotEqual(heapStrIdentity, str.bufferID)
+    // end FIXME
+    expectEqual(heapStrIdentity1, slice.bufferID)
+    expectEqual("12345", str)
+    expectEqual("123456", slice)
+
+    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.append(UnicodeScalar("x"))
+    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    // FIXME: extra reallocation, should be expectEqual()
+    expectNotEqual(heapStrIdentity, str.bufferID)
+    // end FIXME
+    expectEqual(heapStrIdentity1, slice.bufferID)
+    expectEqual("1234", str)
+    expectEqual("123456", slice)
+  }
+}
+
+StringTests.test("COW/replaceRange/end") {
+  // Check literal-to-heap reallocation.
+  if true {
+    var str = "12345678"
+    let literalIdentity = str.bufferID
+
+    var slice = str[str.startIndex..<advance(str.startIndex, 7)]
+    expectEqual(literalIdentity, str.bufferID)
+    expectEqual(literalIdentity, slice.bufferID)
+    expectEqual("12345678", str)
+    expectEqual("1234567", slice)
+
+    // This mutation should reallocate the string.
+    slice.replaceRange(slice.endIndex..<slice.endIndex, with: "a")
+    expectNotEqual(literalIdentity, slice.bufferID)
+    expectEqual(literalIdentity, str.bufferID)
+    let heapStrIdentity = str.bufferID
+    expectEqual("1234567a", slice)
+    expectEqual("12345678", str)
+
+    // No more reallocations are expected.
+    slice.replaceRange(advance(slice.endIndex, -1)..<slice.endIndex, with: "b")
+    // FIXME: extra reallocation, should be expectEqual()
+    expectNotEqual(heapStrIdentity, slice.bufferID)
+    // end FIXME
+    expectEqual(literalIdentity, str.bufferID)
+
+    expectEqual("1234567b", slice)
+    expectEqual("12345678", str)
+  }
+
+  // Check literal-to-heap reallocation.
+  if true {
+    var str = "12345678"
+    let literalIdentity = str.bufferID
+
+    // Move the string to the heap.
+    str.reserveCapacity(32)
+    expectNotEqual(literalIdentity, str.bufferID)
+    let heapStrIdentity1 = str.bufferID
+
+    var slice = str[str.startIndex..<advance(str.startIndex, 7)]
+    expectEqual(heapStrIdentity1, str.bufferID)
+    expectEqual(heapStrIdentity1, slice.bufferID)
+
+    // This mutation should reallocate the string.
+    slice.replaceRange(slice.endIndex..<slice.endIndex, with: "a")
+    expectNotEqual(heapStrIdentity1, slice.bufferID)
+    expectEqual(heapStrIdentity1, str.bufferID)
+    let heapStrIdentity2 = slice.bufferID
+    expectEqual("1234567a", slice)
+    expectEqual("12345678", str)
+
+    // No more reallocations are expected.
+    slice.replaceRange(advance(slice.endIndex, -1)..<slice.endIndex, with: "b")
+    // FIXME: extra reallocation, should be expectEqual()
+    expectNotEqual(heapStrIdentity2, slice.bufferID)
+    // end FIXME
+    expectEqual(heapStrIdentity1, str.bufferID)
+
+    expectEqual("1234567b", slice)
+    expectEqual("12345678", str)
+  }
+}
+
 func asciiString<
   S: SequenceType where S.Generator.Element == Character
 >(content: S) -> String {
@@ -647,29 +855,6 @@ StringTests.test("growth") {
     s2 = s
   }
   expectLE(s.nativeCapacity, 34)
-}
-
-StringTests.test("<rdar://problem/18114265>") {
-  var str = "+y+z*1.0*sum(A1:A3)"
-
-  if let range0 = str.rangeOfString("^\\+|^\\-|^\\*|^\\/", options: NSStringCompareOptions.RegularExpressionSearch){
-
-    let match0 = str[range0]
-    expectEqual("+", match0) //yields "+" - as expexted
-
-    str.removeRange(range0)
-    expectEqual("+", match0) //yields "+" - as expected
-
-    str.removeRange(range0)
-    expectEqual("+", match0) //yields "+" - as expected
-  }
-
-  if let range1 = str.rangeOfString("^\\+|^\\-|^\\*|^\\/", options: NSStringCompareOptions.RegularExpressionSearch){
-    let match1 = str[range1]
-    expectEqual("+", match1) //yields "+" as expected
-    str.removeRange(range1)
-    expectEqual("+", match1) //!@#$ OMG!!!!!!!!!!! a constant variable has changed! This prints "z"
-  }
 }
 
 runAllTests()
