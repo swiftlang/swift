@@ -1362,7 +1362,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Generate the body.
   bool InCleanupBlock = false;
   bool KeepCurrentLocation = false;
-  SILDebugScope * PrevScope = CurSILFn->getDebugScope();
 
   for (auto InsnIter = BB->begin(); InsnIter != BB->end(); ++InsnIter) {
     auto &I = *InsnIter;
@@ -1401,23 +1400,16 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       auto DS = I.getDebugScope();
       assert((!DS || (DS->SILFn == CurSILFn || DS->InlinedCallSite)) &&
              "insn was not inlined, but belongs to a different function");
-      if (DS && DS->SILFn != CurSILFn && !DS->InlinedCallSite) {
+
+      // Until SILDebugScopes are properly serialized, bare functions
+      // are allowed to not have a scope.
+      if (!DS && CurSILFn->isBare())
         DS = CurSILFn->getDebugScope();
-        assert(DS->SILFn == CurSILFn);
-      }
 
-      // Reuse the last scope for orphaned instructions.
-      if (!DS)
-        DS = PrevScope;
-
-      if (!DS)
-        // Until DebugScopes are properly serialized, bare functions
-        // are allowed to not have a scope.
-        assert(CurSILFn->isBare() && "function without a debug scope");
-      else if (!KeepCurrentLocation) {
+      // Ignore scope-less instructions and have IRBuilder reuse the
+      // previous location and scope.
+      if (DS && !KeepCurrentLocation)
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
-        PrevScope = DS;
-      }
 
       // Function argument handling.
       if (InEntryBlock && !ArgsEmitted) {
@@ -1429,6 +1421,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
             // arguments is initialized.  We need to emit the debug info
             // for the function arguments after the function prologue,
             // after the initialization.
+            if (!DS)
+              DS = CurSILFn->getDebugScope();
             IGM.DebugInfo->clearLoc(Builder);
             emitFunctionArgDebugInfo(BB);
             IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
