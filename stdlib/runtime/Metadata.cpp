@@ -25,6 +25,7 @@
 #include <mutex>
 #include <cctype>
 #include <dispatch/dispatch.h>
+#include <pthread.h>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "ExistentialMetadataImpl.h"
@@ -36,6 +37,10 @@
 
 using namespace swift;
 using namespace metadataimpl;
+
+static void *permanentAlloc(size_t size) {
+  return malloc(size);
+}
 
 namespace {
   template <class Entry> class MetadataCache;
@@ -62,9 +67,9 @@ namespace {
   public:
     static Impl *allocate(const void * const *arguments,
                           size_t numArguments, size_t payloadSize) {
-      void *buffer = operator new(sizeof(Impl)  +
-                                  numArguments * sizeof(void*) +
-                                  payloadSize);
+      void *buffer = permanentAlloc(sizeof(Impl)  +
+                                    numArguments * sizeof(void*) +
+                                    payloadSize);
       void *resultPtr = (char*)buffer + numArguments * sizeof(void*);
       auto result = new (resultPtr) Impl(numArguments);
 
@@ -1072,6 +1077,10 @@ struct BasicLayout {
             sizeof(HeapObject)};
   }
 };
+
+static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
+  return (size + alignMask) & ~alignMask;
+}
   
 /// Perform basic sequential layout given a vector of metadata pointers,
 /// calling a functor with the offset of each field, and returning the
@@ -1084,7 +1093,7 @@ void performBasicLayout(BasicLayout &layout,
                         size_t numElements,
                         FUNCTOR &&f) {
   size_t size = layout.size;
-  size_t alignment = layout.flags.getAlignment();
+  size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   for (unsigned i = 0; i != numElements; ++i) {
@@ -1092,25 +1101,25 @@ void performBasicLayout(BasicLayout &layout,
     
     // Lay out this element.
     auto eltVWT = elt->getValueWitnesses();
-    size = llvm::RoundUpToAlignment(size, eltVWT->getAlignment());
+    size = roundUpToAlignMask(size, eltVWT->getAlignmentMask());
 
     // Report this record to the functor.
     f(i, elt, size);
     
     // Update the size and alignment of the aggregate..
     size += eltVWT->size;
-    alignment = std::max(alignment, eltVWT->getAlignment());
+    alignMask = std::max(alignMask, eltVWT->getAlignmentMask());
     if (!eltVWT->isPOD()) isPOD = false;
     if (!eltVWT->isBitwiseTakable()) isBitwiseTakable = false;
   }
-  bool isInline = ValueWitnessTable::isValueInline(size, alignment);
+  bool isInline = ValueWitnessTable::isValueInline(size, alignMask + 1);
   
   layout.size = size;
-  layout.flags = ValueWitnessFlags().withAlignment(alignment)
+  layout.flags = ValueWitnessFlags().withAlignmentMask(alignMask)
                                     .withPOD(isPOD)
                                     .withBitwiseTakable(isBitwiseTakable)
                                     .withInlineStorage(isInline);
-  layout.stride = llvm::RoundUpToAlignment(size, alignment);
+  layout.stride = roundUpToAlignMask(size, alignMask);
 }
 } // end anonymous namespace
 
@@ -1272,33 +1281,133 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
 
 /*** Classes ***************************************************************/
 
+namespace {
+  /// The structure of ObjC class ivars as emitted by compilers.
+  struct ClassIvarEntry {
+    size_t *Offset;
+    const char *Name;
+    const char *Type;
+    uint32_t Log2Alignment;
+    uint32_t Size;
+  };
+
+  /// The structure of ObjC class ivar lists as emitted by compilers.
+  struct ClassIvarList {
+    uint32_t EntrySize;
+    uint32_t Count;
+
+    ClassIvarEntry *getIvars() {
+      return reinterpret_cast<ClassIvarEntry*>(this+1);
+    }
+    const ClassIvarEntry *getIvars() const {
+      return reinterpret_cast<const ClassIvarEntry*>(this+1);
+    }
+  };
+
+  /// The structure of ObjC class rodata as emitted by compilers.
+  struct ClassROData {
+    uint32_t Flags;
+    uint32_t InstanceStart;
+    uint32_t InstanceSize;
+#ifdef __LP64__
+    uint32_t Reserved;
+#endif
+    const uint8_t *IvarLayout;
+    const char *Name;
+    const void *MethodList;
+    const void *ProtocolList;
+    ClassIvarList *IvarList;
+    const uint8_t *WeakIvarLayout;
+    const void *PropertyList;
+  };
+}
+
+static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
+  assert(((alignMask + 1) & alignMask) == 0 &&
+         "not an alignment mask!");
+
+  uint32_t log2 = 0;
+  while ((1 << log2) != (alignMask + 1))
+    log2++;
+  return log2;
+}
+
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
                                             const ClassMetadata *super,
                                             size_t numFields,
-                                            const Metadata * const *fieldTypes,
+                                      const ClassFieldLayout *fieldLayouts,
                                             size_t *fieldOffsets) {
   // Start layout by appending to a standard heap object header.
-  auto layout = BasicLayout::initialForHeapObject();
+  size_t size, alignMask;
+
   // If we have a superclass, start from its size and alignment instead.
   if (super) {
-    uintptr_t superSize = super->getInstanceSize();
-    uintptr_t superAlignMask = super->getInstanceAlignMask();
-    layout.size = superSize;
-    layout.flags = layout.flags.withAlignmentMask(superAlignMask);
-    layout.stride = llvm::RoundUpToAlignment(superSize, superAlignMask+1);
+    // This is straightforward if the superclass is Swift.
+    if (super->isTypeMetadata()) {
+      size = super->getInstanceSize();
+      alignMask = super->getInstanceAlignMask();
+
+    // If it's Objective-C, we need to clone the ivar descriptors.
+    // The data pointer will still be the value we set up according
+    // to the compiler ABI.
+    } else {
+      ClassROData *rodata = (ClassROData*) (self->Data & ~uintptr_t(1));
+
+      // Do layout starting from our notion of where the superclass starts.
+      size = rodata->InstanceStart;
+      alignMask = 0xF; // malloc alignment guarantee
+
+      if (numFields) {
+        // Clone the ivar list.
+        const ClassIvarList *dependentIvars = rodata->IvarList;
+        assert(dependentIvars->Count == numFields);
+        assert(dependentIvars->EntrySize == sizeof(ClassIvarEntry));
+
+        auto ivarListSize = sizeof(ClassIvarList) +
+                            numFields * sizeof(ClassIvarEntry);
+        auto ivars = (ClassIvarList*) permanentAlloc(ivarListSize);
+        memcpy(ivars, dependentIvars, ivarListSize);
+        rodata->IvarList = ivars;
+
+        for (unsigned i = 0; i != numFields; ++i) {
+          ClassIvarEntry &ivar = ivars->getIvars()[i];
+
+          // The offset variable for the ivar is the respective entry in
+          // the field-offset vector.
+          ivar.Offset = &fieldOffsets[i];
+
+          // If the ivar's size doesn't match the field layout we
+          // computed, overwrite it and give it better type information.
+          if (ivar.Size != fieldLayouts[i].Size) {
+            ivar.Size = fieldLayouts[i].Size;
+            ivar.Type = nullptr;
+            ivar.Log2Alignment =
+              getLog2AlignmentFromMask(fieldLayouts[i].AlignMask);
+          }
+        }
+      }
+    }
+
+  // If we don't have a formal superclass, start with the basic heap header.
+  } else {
+    auto heapLayout = BasicLayout::initialForHeapObject();
+    size = heapLayout.size;
+    alignMask = heapLayout.flags.getAlignmentMask();
+  }
+
+  for (unsigned i = 0; i != numFields; ++i) {
+    auto offset = roundUpToAlignMask(size, fieldLayouts[i].AlignMask);
+    fieldOffsets[i] = offset;
+    size = offset + fieldLayouts[i].Size;
+    alignMask = std::max(alignMask, fieldLayouts[i].AlignMask);
   }
   
-  performBasicLayout(layout, fieldTypes, numFields,
-    [&](size_t i, const Metadata *fieldType, size_t offset) {
-      fieldOffsets[i] = offset;
-    });
-
   // Save the final size and alignment into the metadata record.
   assert(self->isTypeMetadata());
-  self->setInstanceSize(layout.size);
-  self->setInstanceAlignMask(layout.flags.getAlignmentMask());
+  self->setInstanceSize(size);
+  self->setInstanceAlignMask(alignMask);
 }
 
 /*** Metatypes *************************************************************/

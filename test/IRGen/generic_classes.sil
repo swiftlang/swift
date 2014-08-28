@@ -152,6 +152,20 @@ class GenericInheritsNonGeneric<C> : RootNonGeneric {
 }
 sil @_TFC15generic_classes25GenericInheritsNonGenericD : $@cc(method) @thin <T> (GenericInheritsNonGeneric<T>) -> ()
 
+// rdar://18067671
+class RecursiveGenericInheritsGeneric<A, B> : RootGeneric<A> {
+  var w : B
+  var r : RecursiveGenericInheritsGeneric<A, B>?
+
+  func zippity()
+  func doo()
+  func dah()
+
+  override init()
+}
+sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@cc(method) @thin <T,U> (RecursiveGenericInheritsGeneric<T,U>) -> ()
+
+
 // CHECK: define [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
@@ -261,7 +275,7 @@ entry(%c : $RootGeneric<Int32>):
 
 // CHECK: define internal %swift.type* [[CREATE_ROOTGENERIC]](%swift.type_pattern*, i8**) {
 // -- initialize the dependent field offsets
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, %swift.type** {{%.*}}, i64* {{%.*}})
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, i64* {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
 // CHECK: define internal %swift.type* [[CREATE_GENERICINHERITSGENERIC]](%swift.type_pattern*, i8**) {
@@ -337,10 +351,22 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[SELF_BASE_VEC_I8]], i8* [[SUPER_BASE_VEC_I8]], i64 24, i32 8, i1 false)
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i64* [[METADATA_ARRAY]], i32 22
-// CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type** [[TYPES:%.*]], i32 0
-// CHECK:   store %swift.type* %B, %swift.type** [[T1]], align 8
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], %swift.type* [[SUPER]], i64 1, %swift.type** [[TYPES]], i64* [[T0]])
+// CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64* [[METADATA_ARRAY]], i32 22
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* %B to i8***
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
+// CHECK:   [[VWT:%.*]] = load i8*** [[T1]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8** [[VWT]], i32 17
+// CHECK:   [[T1:%.*]] = load i8** [[T0]], align 8
+// CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8** [[VWT]], i32 18
+// CHECK:   [[T1:%.*]] = load i8** [[T0]], align 8
+// CHECK:   [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
+// CHECK:   [[ALIGN:%.*]] = and i64 [[T2]], 65535
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds [2 x i64]* [[TYPES:%.*]], i32 0, i32 0
+// CHECK:   store i64 [[SIZE]], i64* [[SIZE_ADDR]], align 8
+// CHECK:   [[ALIGN_ADDR:%.*]] = getelementptr inbounds [2 x i64]* [[TYPES]], i32 0, i32 1
+// CHECK:   store i64 [[ALIGN]], i64* [[ALIGN_ADDR]], align 8
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], %swift.type* [[SUPER]], i64 1, i64* [[SIZE_ADDR]], i64* [[OFFSETS]])
 //   Initialize the ObjC class.
 // CHECK:   call void @swift_instantiateObjCClass(%swift.type* [[METADATA]])
 // CHECK:   ret %swift.type* [[METADATA]]

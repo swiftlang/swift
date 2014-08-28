@@ -1839,12 +1839,17 @@ extern "C" void swift_initStructMetadata_UniversalStrategy(size_t numFields,
                                          size_t *fieldOffsets,
                                          ValueWitnessTable *vwtable);
 
+struct ClassFieldLayout {
+  size_t Size;
+  size_t AlignMask;
+};
+
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
                                             const ClassMetadata *super,
                                             size_t numFields,
-                                            const Metadata * const *fieldTypes,
+                                      const ClassFieldLayout *fieldLayouts,
                                             size_t *fieldOffsets);
   
 /// \brief Fetch a uniqued metadata for a metatype type.

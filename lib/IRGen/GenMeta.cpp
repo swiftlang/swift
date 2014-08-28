@@ -2643,34 +2643,43 @@ namespace {
         for (auto prop : Target->getStoredProperties()) {
           storedProperties.push_back(prop);
         }
+
         // Fill out an array with the field type metadata records.
         Address fields = IGF.createAlloca(
-                         llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
-                                              storedProperties.size()),
+                         llvm::ArrayType::get(IGF.IGM.SizeTy,
+                                              storedProperties.size() * 2),
                          IGF.IGM.getPointerAlignment(), "classFields");
-        fields = IGF.Builder.CreateBitCast(fields,
-                                     IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+        Address firstField;
         unsigned index = 0;
         for (auto prop : storedProperties) {
-          auto propTy = prop->getType()->getCanonicalType();
-          // Strip reference storage qualifiers like unowned and weak.
-          // FIXME: Some clients probably care about them.
-          if (auto refStorTy = dyn_cast<ReferenceStorageType>(propTy))
-            propTy = refStorTy.getReferentType();
-          
-          llvm::Value *metadata = IGF.emitTypeMetadataRef(propTy);
-          Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
-                                                      IGF.IGM.getPointerSize());
-          IGF.Builder.CreateStore(metadata, field);
-          ++index;
+          auto propType = prop->getType()->getCanonicalType();
+          auto &propTI = IGF.getTypeInfoForUnlowered(propType);
+          auto sizeAndAlignMask = propTI.getSizeAndAlignmentMask(IGF, propType);
+
+          llvm::Value *size = sizeAndAlignMask.first;
+          Address sizeAddr =
+            IGF.Builder.CreateStructGEP(fields, index, IGF.IGM.getPointerSize());
+          IGF.Builder.CreateStore(size, sizeAddr);
+          if (index == 0) firstField = sizeAddr;
+
+          llvm::Value *alignMask = sizeAndAlignMask.second;
+          Address alignMaskAddr =
+            IGF.Builder.CreateStructGEP(fields, index + 1,
+                                        IGF.IGM.getPointerSize());
+          IGF.Builder.CreateStore(alignMask, alignMaskAddr);
+
+          index += 2;
         }
-        
+
+        if (storedProperties.empty()) {
+          firstField = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
+        }
+
         // Ask the runtime to lay out the class.
-        auto numFields = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                                storedProperties.size());
+        auto numFields = IGF.IGM.getSize(Size(storedProperties.size()));
         IGF.Builder.CreateCall5(IGF.IGM.getInitClassMetadataUniversalFn(),
                                 metadata, superMetadata, numFields,
-                                fields.getAddress(), fieldVector);
+                                firstField.getAddress(), fieldVector);
       }
 
       // Register the class with the ObjC runtime.
