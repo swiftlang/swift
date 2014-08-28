@@ -1,6 +1,6 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
-// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-sil -verify
+// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | FileCheck %s
+// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
 
 import Foundation
 import gizmo
@@ -336,6 +336,85 @@ func foreignExtensionDispatch(g: Gizmo) {
   g.foreignDynamicExtension()
 }
 
+
+// CHECK-LABEL: sil @_TF7dynamic33nativeMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+func nativeMethodDispatchFromOtherFile() {
+  // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT6nativeSi_S0_
+  let c = FromOtherFile(native: 0)
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.nativeMethod!1 :
+  c.nativeMethod()
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.nativeProp!getter.1 :
+  let x = c.nativeProp
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.nativeProp!setter.1 :
+  c.nativeProp = x
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!getter.1 :
+  let y = c[native: 0]
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!setter.1 :
+  c[native: 0] = y
+}
+
+// CHECK-LABEL: sil @_TF7dynamic31objcMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+func objcMethodDispatchFromOtherFile() {
+  // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT4objcSi_S0_
+  let c = FromOtherFile(objc: 0)
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.objcMethod!1 :
+  c.objcMethod()
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.objcProp!getter.1 :
+  let x = c.objcProp
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.objcProp!setter.1 :
+  c.objcProp = x
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!getter.1 :
+  let y = c[objc: 0]
+  // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!setter.1 :
+  c[objc: 0] = y
+}
+
+// CHECK-LABEL: sil @_TF7dynamic34dynamicMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+func dynamicMethodDispatchFromOtherFile() {
+  // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT7dynamicSi_S0_
+  let c = FromOtherFile(dynamic: 0)
+  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicMethod!1.foreign
+  c.dynamicMethod()
+  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicProp!getter.1.foreign
+  let x = c.dynamicProp
+  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.dynamicProp!setter.1.foreign
+  c.dynamicProp = x
+  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!getter.1.foreign
+  let y = c[dynamic: 0]
+  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!setter.1.foreign
+  c[dynamic: 0] = y
+}
+
+// CHECK-LABEL: sil @_TF7dynamic28managedDispatchFromOtherFileFCS_13FromOtherFileT_
+func managedDispatchFromOtherFile(c: FromOtherFile) {
+  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!getter.1.foreign
+  let x = c.managedProp
+  // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!setter.1.foreign
+  c.managedProp = x
+}
+
+// CHECK-LABEL: sil @_TF7dynamic23dynamicExtensionMethodsFCS_13ObjCOtherFileT_
+func dynamicExtensionMethods(obj: ObjCOtherFile) {
+  // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionMethod!1.foreign
+  obj.extensionMethod()
+  // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionProp!getter.1.foreign
+  _ = obj.extensionProp
+
+  // CHECK: class_method [volatile] {{%.*}} : $@thick ObjCOtherFile.Type, #ObjCOtherFile.extensionClassProp!getter.1.foreign
+  // CHECK-NEXT: thick_to_objc_metatype {{%.*}} : $@thick ObjCOtherFile.Type to $@objc_metatype ObjCOtherFile.Type
+  _ = obj.dynamicType.extensionClassProp
+
+  // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.dynExtensionMethod!1.foreign
+  obj.dynExtensionMethod()
+  // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.dynExtensionProp!getter.1.foreign
+  _ = obj.dynExtensionProp
+
+  // CHECK: class_method [volatile] {{%.*}} : $@thick ObjCOtherFile.Type, #ObjCOtherFile.dynExtensionClassProp!getter.1.foreign
+  // CHECK-NEXT: thick_to_objc_metatype {{%.*}} : $@thick ObjCOtherFile.Type to $@objc_metatype ObjCOtherFile.Type
+  _ = obj.dynamicType.dynExtensionClassProp
+}
+
+
 // Vtable contains entries for native and @objc methods, but not dynamic ones
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK-LABEL:   #Foo.init!initializer.1:   _TFC7dynamic3FoocfMS0_FT6nativeSi_S0_        // dynamic.Foo.init (dynamic.Foo.Type)(native : Swift.Int) -> dynamic.Foo
@@ -361,3 +440,5 @@ func foreignExtensionDispatch(g: Gizmo) {
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
 // CHECK-LABEL:   #Foo.overriddenByDynamic!1: _TTDFC7dynamic8Subclass19overriddenByDynamicfS0_FT_T_
+
+

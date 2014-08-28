@@ -265,14 +265,6 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
     TC.diagnose(symbolLoc, diag::note_make_implicitly_unwrapped_optional,
                 ImplicitlyUnwrappedOptionalType::get(type))
       .fixItInsert(symbolLoc, "!");
-
-    // Recover by setting the implicitly-unwrapped optional type.
-    type = ImplicitlyUnwrappedOptionalType::get(type);
-    if (auto refStorageType = VD->getType()->getAs<ReferenceStorageType>())
-      type = ReferenceStorageType::get(type, refStorageType->getOwnership(),
-                                       TC.Context);
-
-    VD->overwriteType(type);
   }
 }
 

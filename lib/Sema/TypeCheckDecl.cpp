@@ -2803,6 +2803,33 @@ static bool isImplicitlyObjC(const ValueDecl *VD, bool allowImplicit = false) {
   return classContext->isObjC();
 }
 
+/// If we need to infer 'dynamic', do so now.
+///
+/// FIXME: This is a workaround for the fact that we cannot dynamically
+/// dispatch to methods introduced in extensions, because they aren't
+/// available in the class vtable.
+static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
+  // If we can't infer dynamic here, don't.
+  if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
+    return;
+
+  // Only 'objc' declarations use 'dynamic'.
+  if (!D->isObjC() || D->hasClangNode())
+    return;
+
+  // Only introduce 'dynamic' on declarations in extensions that don't
+  // override other declarations.
+  if (!isa<ExtensionDecl>(D->getDeclContext()) || D->getOverriddenDecl())
+    return;
+
+  // The presence of 'dynamic' or 'final' blocks the inference of 'dynamic'.
+  if (D->isDynamic() || D->isFinal())
+    return;
+
+  // Add the 'dynamic' attribute.
+  D->getAttrs().add(new (ctx) DynamicAttr(/*isImplicit=*/true));
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2906,33 +2933,6 @@ public:
     }
   }
 
-  /// If we need to infer 'dynamic', do so now.
-  ///
-  /// FIXME: This is a workaround for the fact that we cannot dynamically
-  /// dispatch to methods introduced in extensions, because they aren't
-  /// available in the class vtable.
-  void inferDynamic(ValueDecl *D) {
-    // If we can't infer dynamic here, don't.
-    if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
-      return;
-
-    // Only 'objc' declarations use 'dynamic'.
-    if (!D->isObjC())
-      return;
-
-    // Only introduce 'dynamic' on declarations in extensions that don't
-    // override other declarations.
-    if (!isa<ExtensionDecl>(D->getDeclContext()) || D->getOverriddenDecl())
-      return;
-
-    // The presence of 'dynamic' or 'final' blocks the inference of 'final'.
-    if (D->isDynamic() || D->isFinal())
-      return;
-
-    // Add the 'dynamic' attribute.
-    D->getAttrs().add(new (TC.Context) DynamicAttr(/*isImplicit=*/true));
-  }
-
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
@@ -2956,32 +2956,9 @@ public:
     }
 
     TC.validateDecl(VD);
-    validateAttributes(TC, VD);
-    TC.checkDeclAttributesEarly(VD);
 
-    // The instance var requires ObjC interop if it has an @objc or @IBOutlet
-    // attribute or if it's a member of an ObjC class or protocol.
-    if (VD->getDeclContext()->getDeclaredTypeInContext()) {
-      auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());
-      ObjCReason reason = ObjCReason::DontDiagnose;
-      if (VD->getAttrs().hasAttribute<ObjCAttr>())
-        reason = ObjCReason::ExplicitlyObjC;
-      else if (VD->getAttrs().hasAttribute<IBOutletAttr>())
-        reason = ObjCReason::ExplicitlyIBOutlet;
-      else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
-        reason = ObjCReason::ExplicitlyNSManaged;
-      else if (VD->getAttrs().hasAttribute<DynamicAttr>())
-        reason = ObjCReason::ExplicitlyDynamic;
-      else if (protocolContext && protocolContext->isObjC())
-        reason = ObjCReason::MemberOfObjCProtocol;
-
-      bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    isImplicitlyObjC(VD);
-      if (isObjC && !TC.isRepresentableInObjC(VD, reason))
-        isObjC = false;
-      
-      markAsObjC(VD, isObjC);
-    }
+    if (VD->isObjC())
+      checkBridgedFunctions();
 
     if (IsFirstPass && !checkOverrides(VD)) {
       // If a property has an override attribute but does not override
@@ -2994,8 +2971,6 @@ public:
         }
       }
     }
-
-    inferDynamic(VD);
 
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
@@ -3308,7 +3283,7 @@ public:
       }
     }
 
-    inferDynamic(SD);
+    inferDynamic(TC.Context, SD);
 
     TC.checkDeclAttributes(SD);
   }
@@ -4603,7 +4578,7 @@ public:
       }
     }
 
-    inferDynamic(FD);
+    inferDynamic(TC.Context, FD);
 
     TC.checkDeclAttributes(FD);
   }
@@ -5798,7 +5773,7 @@ public:
       }
     }
 
-    inferDynamic(CD);
+    inferDynamic(TC.Context, CD);
 
     TC.checkDeclAttributes(CD);
   }
@@ -6135,6 +6110,40 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       addMemberToContextIfNeeded(getter, VD->getDeclContext());
       addMemberToContextIfNeeded(setter, VD->getDeclContext());
     }
+
+    validateAttributes(*this, VD);
+    if (!VD->didEarlyAttrValidation()) {
+      checkDeclAttributesEarly(VD);
+
+      // If this is a property, check if it needs to be exposed to Objective-C.
+      // FIXME: Guarding this together with early attribute validation is a
+      // hack. It's necessary because properties can get types before
+      // validateDecl is called.
+      if (VD->getDeclContext()->getDeclaredTypeInContext()) {
+        auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());
+        ObjCReason reason = ObjCReason::DontDiagnose;
+        if (VD->getAttrs().hasAttribute<ObjCAttr>())
+          reason = ObjCReason::ExplicitlyObjC;
+        else if (VD->getAttrs().hasAttribute<IBOutletAttr>())
+          reason = ObjCReason::ExplicitlyIBOutlet;
+        else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+          reason = ObjCReason::ExplicitlyNSManaged;
+        else if (VD->getAttrs().hasAttribute<DynamicAttr>())
+          reason = ObjCReason::ExplicitlyDynamic;
+        else if (protocolContext && protocolContext->isObjC())
+          reason = ObjCReason::MemberOfObjCProtocol;
+
+        bool isObjC = (reason != ObjCReason::DontDiagnose) ||
+                      isImplicitlyObjC(VD);
+        if (isObjC)
+          isObjC = isRepresentableInObjC(VD, reason);
+
+        VD->setIsObjC(isObjC);
+      }
+
+      inferDynamic(Context, VD);
+    }
+
     break;
   }
       
