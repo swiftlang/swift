@@ -268,6 +268,10 @@ private:
     /// Whether this module file comes from a framework.
     unsigned IsFramework : 1;
 
+    /// Whether this module has a shadowed module that's part of its public
+    /// interface.
+    unsigned HasUnderlyingModule : 1;
+
     /// Whether or not ImportDecls is valid.
     unsigned ComputedImportDecls : 1;
 

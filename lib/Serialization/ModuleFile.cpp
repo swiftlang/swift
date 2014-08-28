@@ -580,6 +580,7 @@ ModuleFile::ModuleFile(
       }
 
       cursor.EnterSubBlock(INPUT_BLOCK_ID);
+      bool seenFlags = false;
 
       auto next = cursor.advance();
       while (next.Kind == llvm::BitstreamEntry::Record) {
@@ -622,6 +623,14 @@ ModuleFile::ModuleFile(
           assert(importedHeaderInfo.contents.empty() &&
                  "contents seen already");
           importedHeaderInfo.contents = blobData;
+          break;
+        }
+        case input_block::MODULE_FLAGS: {
+          assert(!seenFlags && "only one flags record allowed");
+          bool hasUnderlyingModule;
+          input_block::ModuleFlagsLayout::readRecord(scratch,
+                                                     hasUnderlyingModule);
+          Bits.HasUnderlyingModule = hasUnderlyingModule;
           break;
         }
         default:
@@ -865,7 +874,7 @@ bool ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
     return false;
   }
 
-  if (Bits.IsFramework)
+  if (Bits.HasUnderlyingModule)
     (void)getModule(FileContext->getParentModule()->Name);
 
   return getStatus() == ModuleStatus::Valid;
@@ -936,7 +945,7 @@ void ModuleFile::getImportedModules(
     Module::ImportFilter filter) {
   PrettyModuleFileDeserialization stackEntry(*this);
   bool includeShadowedModule = (filter != Module::ImportFilter::Private &&
-                                ShadowedModule && Bits.IsFramework);
+                                ShadowedModule && Bits.HasUnderlyingModule);
 
   for (auto &dep : Dependencies) {
     if (filter != Module::ImportFilter::All &&

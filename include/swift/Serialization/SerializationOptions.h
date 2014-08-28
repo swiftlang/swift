@@ -35,6 +35,7 @@ namespace swift {
     StringRef ModuleLinkName;
 
     bool AutolinkForceLoad = false;
+    bool HasUnderlyingModule = false;
     bool SerializeAllSIL = false;
   };
 

@@ -253,6 +253,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, LINK_LIBRARY);
   BLOCK_RECORD(input_block, IMPORTED_HEADER);
   BLOCK_RECORD(input_block, IMPORTED_HEADER_CONTENTS);
+  BLOCK_RECORD(input_block, MODULE_FLAGS);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -430,18 +431,16 @@ static void flattenImportPath(const Module::ImportedModule &import,
   out.append(accessPathElem.first.str());
 }
 
-void Serializer::writeInputFiles(FilenamesTy inputFiles,
-                                 StringRef importedHeader,
-                                 StringRef moduleLinkName,
-                                 bool autolinkForceLoad) {
+void Serializer::writeInputBlock(const SerializationOptions &options) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::SourceFileLayout SourceFile(Out);
   input_block::ImportedModuleLayout ImportedModule(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
+  input_block::ModuleFlagsLayout ModuleFlags(Out);
 
-  for (auto filename : inputFiles) {
+  for (auto filename : options.InputFilenames) {
     llvm::SmallString<128> path(filename);
 
     std::error_code err;
@@ -478,12 +477,12 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
       off_t importedHeaderSize = 0;
       time_t importedHeaderModTime = 0;
       std::string contents;
-      if (!importedHeader.empty())
+      if (!options.ImportedHeader.empty())
         contents = clangImporter->getBridgingHeaderContents(
-            importedHeader, importedHeaderSize, importedHeaderModTime);
+            options.ImportedHeader, importedHeaderSize, importedHeaderModTime);
       ImportedHeader.emit(ScratchRecord, publicImportSet.count(import),
                           importedHeaderSize, importedHeaderModTime,
-                          importedHeader);
+                          options.ImportedHeader);
       if (!contents.empty()) {
         contents.push_back('\0');
         ImportedHeaderContents.emit(ScratchRecord, contents);
@@ -497,10 +496,12 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
                         !import.first.empty(), importPath);
   }
 
-  if (!moduleLinkName.empty()) {
+  if (!options.ModuleLinkName.empty()) {
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
-                     autolinkForceLoad, moduleLinkName);
+                     options.AutolinkForceLoad, options.ModuleLinkName);
   }
+
+  ModuleFlags.emit(ScratchRecord, options.HasUnderlyingModule);
 }
 
 /// Translate AST default argument kind to the Serialization enum values, which
@@ -2975,8 +2976,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   {
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
-    S.writeInputFiles(options.InputFilenames, options.ImportedHeader,
-                      options.ModuleLinkName, options.AutolinkForceLoad);
+    S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
   }

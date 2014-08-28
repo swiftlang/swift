@@ -176,8 +176,7 @@ private:
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
-  void writeInputFiles(FilenamesTy inputFiles, StringRef importedHeader,
-                       StringRef moduleLinkName, bool autolinkForceLoad);
+  void writeInputBlock(const SerializationOptions &options);
 
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern);

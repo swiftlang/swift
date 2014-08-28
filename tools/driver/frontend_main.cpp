@@ -229,6 +229,7 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.ModuleLinkName = opts.ModuleLinkName;
       if (!IRGenOpts.ForceLoadSymbolName.empty())
         serializationOpts.AutolinkForceLoad = true;
+      serializationOpts.HasUnderlyingModule = opts.ImportUnderlyingModule;
       serialize(DC, serializationOpts, SM.get());
     }
 
