@@ -3731,9 +3731,10 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     = buildForwardingSubstitutions(ctor->getGenericParamsOfContext());
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
+  SILType resultTy = getLoweredLoadableType(ctor->getResultType());
 
   SILValue initedSelfValue
-    = B.createApply(Loc, initVal.forward(*this), initTy, selfTy, subs, args,
+    = B.createApply(Loc, initVal.forward(*this), initTy, resultTy, subs, args,
                     initConstant.isTransparent());
 
   // Return the initialized 'self'.
@@ -3755,7 +3756,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   }
 
   // FIXME: The (potentially partially initialized) value here would need to be
-  // cleaned up on a constructor failure unwinding.
+  // cleaned up on a constructor failure unwinding, if we were to support
+  // failing before total initialization.
 
   // Set up the 'self' argument.  If this class has a superclass, we set up
   // self as a box.  This allows "self reassignment" to happen in super init
@@ -3826,6 +3828,37 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
   prepareEpilog(Type(), CleanupLocation::getCleanupLocation(endOfInitLoc));
+  
+  // If the constructor can fail, set up an alternative epilog for constructor
+  // failure.
+  SILBasicBlock *failureExitBB = nullptr;
+  SILArgument *failureExitArg = nullptr;
+  auto &resultLowering = getTypeLowering(ctor->getResultType());
+
+  if (ctor->getFailability() != OTK_None) {
+    SILBasicBlock *failureBB = createBasicBlock();
+    failureExitBB = createBasicBlock();
+    failureExitArg = new (F.getModule())
+      SILArgument(resultLowering.getLoweredType(), failureExitBB);
+
+    // On failure, we'll clean up everything (except self, which should already
+    // have been released) and return nil instead.
+    auto curBB = B.getInsertionBB();
+    B.setInsertionPoint(failureBB);
+    Cleanups.emitCleanupsForReturn(ctor);
+    SILValue nilResult = B.createEnum(ctor, {},
+                    getASTContext().getOptionalNoneDecl(ctor->getFailability()),
+                    resultLowering.getLoweredType());
+    B.createBranch(ctor, failureExitBB, nilResult);
+    
+    B.setInsertionPoint(failureExitBB);
+    B.createReturn(ctor, failureExitArg)
+      ->setDebugScope(F.getDebugScope());
+    
+    B.setInsertionPoint(curBB);
+    FailDest = JumpDest(failureBB, Cleanups.getCleanupsDepth(), ctor);
+    FailSelfDecl = selfDecl;
+  }
 
   // Handle member initializers.
   if (isDelegating) {
@@ -3874,10 +3907,28 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     B.emitRetainValueOperation(cleanupLoc, selfArg);
     B.emitStrongRelease(cleanupLoc, selfBox);
   }
-
+  
+  // Inject the self value into an optional if the constructor is failable.
+  switch (ctor->getFailability()) {
+  case OTK_None:
+    // Not optional.
+    break;
+      
+  case OTK_Optional:
+  case OTK_ImplicitlyUnwrappedOptional:
+    selfArg = B.createEnum(ctor, selfArg,
+                   getASTContext().getOptionalSomeDecl(ctor->getFailability()),
+                   getLoweredLoadableType(ctor->getResultType()));
+    break;
+  }
+  
   // Return the final 'self'.
-  B.createReturn(returnLoc, selfArg)
-    ->setDebugScope(F.getDebugScope());
+  if (failureExitBB) {
+    B.createBranch(returnLoc, failureExitBB, selfArg);
+  } else {
+    B.createReturn(returnLoc, selfArg)
+      ->setDebugScope(F.getDebugScope());
+  }
 }
 
 /// In class initializers, we cannot retain or release 'self' prior to
@@ -4479,8 +4530,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
       auto matMV = ManagedValue(mat.address, mat.valueCleanup);
       // If the current constructor is not failable, force out the value.
       newSelf = SGF.emitGetOptionalValueFrom(E, matMV,
-                                             SGF.getTypeLowering(newSelf.getType()),
-                                             SGFContext());
+                                         SGF.getTypeLowering(newSelf.getType()),
+                                         SGFContext());
       break;
     }
     }

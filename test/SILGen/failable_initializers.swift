@@ -214,3 +214,144 @@ struct AddressOnlyStruct {
     self.init(iuo: true)
   }
 }
+
+class RootClass {
+  var x: C
+
+  init(norm: Bool) {
+    x = C()
+  }
+
+  init?(alwaysFail: Void) {
+    return nil
+  }
+
+  // CHECK-LABEL: sil @_TFC21failable_initializers9RootClasscfMS0_FT3optSb_GSqS0__
+  // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself]
+  init?(opt: Bool) {
+    x = C()
+  // CHECK:         cond_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+
+  // CHECK:       [[FAILURE:bb[0-9]+]]:
+  // CHECK:         [[NIL:%.*]] = enum $Optional<RootClass>, #Optional.None!enumelt
+  // CHECK:         br [[EXIT:bb[0-9]+]]([[NIL]] : $Optional<RootClass>)
+  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):
+  // CHECK:         return [[RESULT]]
+
+    if opt {
+  // CHECK:       [[YES:bb[0-9]+]]:
+  // CHECK:         strong_release [[SELF_MARKED]]
+  // CHECK:         br [[FAILURE]]
+      return nil
+    }
+
+  // CHECK:       [[NO:bb[0-9]+]]:
+  // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[SELF_MARKED]]
+  // CHECK:         br [[EXIT]]([[SOME]] : $Optional<RootClass>)
+  }
+
+  init!(iuo: Bool) {
+    x = C()
+    if iuo {
+      return nil
+    }
+  }
+
+  // CHECK-LABEL: sil @_TFC21failable_initializers9RootClasscfMS0_FT16delegatesOptNormSb_GSqS0__
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $RootClass
+  // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself]
+  // CHECK:         store [[SELF_MARKED]] to [[SELF_BOX]]
+  // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_BOX]]
+  // CHECK:         [[INIT:%.*]] = class_method [[SELF_TAKEN]] : $RootClass, #RootClass.init
+  // CHECK:         [[NEW_SELF:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
+  // CHECK:         store [[NEW_SELF]] to [[SELF_BOX]]
+
+  // CHECK:         [[RESULT_SELF:%.*]] = load [[SELF_BOX]]
+  // CHECK:         strong_retain [[RESULT_SELF]]
+  // CHECK:         strong_release [[SELF_BOX]]
+  // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[RESULT_SELF]]
+  // CHECK:         br [[EXIT:bb[0-9]+]]([[SOME]] : $Optional<RootClass>)
+  
+  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):
+  // CHECK:         return [[RESULT]]
+  convenience init?(delegatesOptNorm: Bool) {
+    self.init(norm: true)
+  }
+
+  // CHECK-LABEL: sil @_TFC21failable_initializers9RootClasscfMS0_FT15delegatesOptOptSb_GSqS0__
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $RootClass
+  // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself]
+  // CHECK:         store [[SELF_MARKED]] to [[SELF_BOX]]
+  // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_BOX]]
+  // CHECK:         [[INIT:%.*]] = class_method [[SELF_TAKEN]] : $RootClass, #RootClass.init
+  // CHECK:         [[NEW_SELF_OPT:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
+  // CHECK:         [[NEW_SELF_OPT_MAT:%.*]] = alloc_stack $Optional<RootClass>
+  // CHECK:         store [[NEW_SELF_OPT]] to [[NEW_SELF_OPT_MAT]]
+  // CHECK:         [[DOES_OPT_HAVE_VALUE:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
+  // CHECK:         [[HAS_VALUE:%.*]] = apply [transparent] [[DOES_OPT_HAVE_VALUE]]<RootClass>([[NEW_SELF_OPT_MAT]]#1)
+  // CHECK:         cond_br [[HAS_VALUE]], [[HAS_VALUE:bb[0-9]+]], [[NO_VALUE:bb[0-9]+]]
+
+  // CHECK:       [[FAILURE:bb[0-9]+]]:
+  // CHECK:         [[NIL:%.*]] = enum $Optional<RootClass>, #Optional.None!enumelt
+  // CHECK:         br [[EXIT:bb[0-9]+]]([[NIL]] : $Optional<RootClass>)
+  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):
+  // CHECK:         return [[RESULT]]
+
+  // CHECK:       [[NO_VALUE]]:
+  // CHECK:          dealloc_box $RootClass, [[SELF_BOX]]
+  // CHECK:          destroy_addr [[NEW_SELF_OPT_MAT]]
+  // CHECK:          dealloc_stack [[NEW_SELF_OPT_MAT]]
+  // CHECK:          br [[FAILURE]]
+
+  // CHECK:       [[HAS_VALUE]]:
+  // CHECK:         [[GET_OPTIONAL_VALUE:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+  // CHECK:         [[TMP:%.*]] = alloc_stack $RootClass
+  // CHECK:         apply [transparent] [[GET_OPTIONAL_VALUE]]<RootClass>([[TMP]]#1, [[NEW_SELF_OPT_MAT]]#1)
+  // CHECK:         [[NEW_SELF:%.*]] = load [[TMP]]
+  // CHECK:         store [[NEW_SELF]] to [[SELF_BOX]]
+  // CHECK:         dealloc_stack [[TMP]]
+  // CHECK:         dealloc_stack [[NEW_SELF_OPT_MAT]]
+
+  // CHECK:         [[SELF_RESULT:%.*]] = load [[SELF_BOX]]
+  // CHECK:         strong_retain [[SELF_RESULT]]
+  // CHECK:         strong_release [[SELF_BOX]]
+  // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[SELF_RESULT]]
+  // CHECK:         br [[EXIT]]([[SOME]] : $Optional<RootClass>)
+  convenience init?(delegatesOptOpt: Bool) {
+    self.init(opt: true)
+  }
+
+  convenience init(delegatesNormIUO: Bool) {
+    self.init(iuo: true)
+  }
+}
+
+class SubClass: RootClass {
+  var y: C
+
+  init(normInheritNorm: Bool) {
+    y = C()
+    super.init(norm: true)
+  }
+
+  init(normInheritIUO: Bool) {
+    y = C()
+    super.init(iuo: true)
+  }
+
+  init?(optInheritNorm: Bool) {
+    y = C()
+    super.init(norm: true)
+    if optInheritNorm {
+      return nil
+    }
+  }
+
+  init?(optInheritOpt: Bool) {
+    y = C()
+    super.init(opt: true)
+    if optInheritOpt {
+      return nil
+    }
+  }
+}
