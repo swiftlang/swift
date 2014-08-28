@@ -818,7 +818,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 }
 
 SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
-  SILValue Operand = RVI->getOperand().stripRCIdentityPreservingOps();
+  SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand.getType();
 
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
@@ -843,19 +843,12 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   if (OperandTy.isTrivial(RVI->getModule()))
     return eraseInstFromFunction(*RVI);
 
-  // If we have a non-trivial stripped argument that is not equal to
-  // RVI->getOperand(), change RVI to use the stripped argument.
-  if (Operand != RVI->getOperand()) {
-    RVI->setOperand(Operand);
-    return RVI;
-  }
-
   // Do nothing for non-trivial non-reference types.
   return nullptr;
 }
 
 SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
-  SILValue Operand = RVI->getOperand().stripRCIdentityPreservingOps();
+  SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand.getType();
 
   // retain_value of an enum with a trivial payload or no-payload is a no-op +
@@ -911,13 +904,6 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
         eraseInstFromFunction(*Release);
         return eraseInstFromFunction(*RVI);
       }
-  }
-
-  // If we have a non-trivial stripped argument that is not equal to
-  // RVI->getOperand(), change RVI to use the stripped argument.
-  if (Operand != RVI->getOperand()) {
-    RVI->setOperand(Operand);
-    return RVI;
   }
 
   return nullptr;
