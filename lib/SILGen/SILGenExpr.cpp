@@ -3343,12 +3343,11 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     SILBasicBlock *failureBB = createBasicBlock();
     failureExitBB = createBasicBlock();
     
-    // On failure, we'll clean up everything (including self) and return nil
-    // instead.
+    // On failure, we'll clean up everything (except self, which should have
+    // been cleaned up before jumping here) and return nil instead.
     auto curBB = B.getInsertionBB();
     B.setInsertionPoint(failureBB);
     Cleanups.emitCleanupsForReturn(ctor);
-    B.emitStrongRelease(ctor, selfBox);
     // Return nil.
     if (lowering.isAddressOnly()) {
       // Inject 'nil' into the indirect return.
@@ -3373,6 +3372,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     
     B.setInsertionPoint(curBB);
     FailDest = JumpDest(failureBB, Cleanups.getCleanupsDepth(), ctor);
+    FailSelfDecl = selfDecl;
   }
 
   // If this is not a delegating constructor, emit member initializers.
@@ -4455,7 +4455,28 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
       // If the delegate result is nil, clean up and propagate 'nil' from our
       // constructor.
       SGF.B.emitBlock(noneBB);
-      assert(SGF.FailDest.isValid() && "too big to fail");
+      assert(SGF.FailDest.isValid() && SGF.FailSelfDecl && "too big to fail");
+      // If the delegation consumed self, then our box for 'self' is
+      // uninitialized, so we have to deallocate it without triggering a
+      // destructor using dealloc_box.
+      auto selfBox = SGF.VarLocs[SGF.FailSelfDecl].box;
+      assert(selfBox.isValid() && "self not boxed in constructor delegation?!");
+      switch (SGF.SelfInitDelegationState) {
+      case SILGenFunction::NormalSelf:
+        llvm_unreachable("self isn't normal in a constructor delegation");
+        
+      case SILGenFunction::WillConsumeSelf:
+        // We didn't consume, so release the box normally.
+        SGF.B.createStrongRelease(E, selfBox);
+        break;
+      
+      case SILGenFunction::DidConsumeSelf:
+        // We did consume. Deallocate the box. This is safe because any capture
+        // of 'self' prior to full initialization would be a DI violation, so
+        // we can count on the box having a retain count of exactly 1 here.
+        SGF.B.createDeallocBox(E, SGF.getLoweredType(SGF.FailSelfDecl->getType()),
+                               selfBox);
+      }
       SGF.Cleanups.emitBranchAndCleanups(SGF.FailDest, E);
       
       // Otherwise, project out the value and carry on.

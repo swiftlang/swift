@@ -147,6 +147,8 @@ public:
   JumpDest ReturnDest;
   /// The cleanup depth and epilog BB for "fail" statements.
   JumpDest FailDest;
+  /// The 'self' variable that needs to be cleaned up on failure.
+  VarDecl *FailSelfDecl = nullptr;
 
   /// \brief True if a non-void return is required in this function.
   bool NeedsReturn : 1;

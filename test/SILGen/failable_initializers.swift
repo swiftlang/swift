@@ -9,10 +9,10 @@ struct LoadableStruct {
   // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT10alwaysFailCS_1C_GSqS0__
   // CHECK:       bb0([[C:%.*]] : $C
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAIL:bb[0-9]+]]
   // CHECK:       [[FAIL]]:
   // CHECK:         strong_release [[C]]
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $Optional<LoadableStruct>, #Optional.None!enumelt
   // CHECK:         br [[EXIT:bb[0-9]+]]([[NIL]] : $Optional<LoadableStruct>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<LoadableStruct>):
@@ -26,12 +26,15 @@ struct LoadableStruct {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
     x = C()
-  // CHECK:       bb{{.*}}:
-  // CHECK:         strong_release [[SELF_BOX]]
+  // CHECK:       [[FAILURE:bb[0-9]+]]:
   // CHECK:         [[NIL:%.*]] = enum $Optional<LoadableStruct>, #Optional.None
   // CHECK:         br [[EXIT:bb.*]]([[NIL]] : $Optional<LoadableStruct>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<LoadableStruct>):
   // CHECK:         return [[RESULT]]
+
+  // CHECK:       bb{{.*}}:
+  // CHECK:         strong_release [[SELF_BOX]]
+  // CHECK:         br [[FAILURE]]
     if opt {
       return nil
     }
@@ -49,13 +52,13 @@ struct LoadableStruct {
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
     x = C()
   // CHECK:       [[FAILURE:bb[0-9]+]]:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $ImplicitlyUnwrappedOptional<LoadableStruct>, #ImplicitlyUnwrappedOptional.None
   // CHECK:         br [[EXIT:bb.*]]([[NIL]] : $ImplicitlyUnwrappedOptional<LoadableStruct>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $ImplicitlyUnwrappedOptional<LoadableStruct>):
   // CHECK:         return [[RESULT]]
 
   // CHECK:       bb{{.*}}:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAILURE]]
     if iuo {
       return nil
@@ -81,10 +84,10 @@ struct LoadableStruct {
   // CHECK:         cond_br [[HAS_VALUE]], [[DOES_HAVE_VALUE:bb[0-9]+]], [[DOESNT_HAVE_VALUE:bb[0-9]+]]
   // -- TODO: failure
   // CHECK:       [[FAILURE:bb[0-9]+]]:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $Optional<LoadableStruct>, #Optional.None
   // CHECK:         br [[EXIT:bb.*]]([[NIL]] : $Optional<LoadableStruct>)
   // CHECK:       [[DOESNT_HAVE_VALUE]]:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         destroy_addr [[DELEGATEE_SELF_MAT]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF_MAT]]
   // CHECK:         br [[FAILURE]]
@@ -127,12 +130,12 @@ struct AddressOnlyStruct {
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
     x = C()
   // CHECK:       [[FAILURE:bb[0-9]+]]:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
   // CHECK:         br [[EXIT:bb[0-9]+]]
   // CHECK:       [[EXIT]]:
   // CHECK:         return
   // CHECK:       bb{{.*}}:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAILURE]]
     if opt {
       return nil
@@ -151,10 +154,10 @@ struct AddressOnlyStruct {
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
     x = C()
   // CHECK:       [[FAILURE:bb[0-9]+]]:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         inject_enum_addr %0 : $*ImplicitlyUnwrappedOptional<AddressOnlyStruct>, #ImplicitlyUnwrappedOptional.None!enumelt
   // CHECK:         br [[EXIT:bb[0-9]+]]
   // CHECK:       bb{{.*}}:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAILURE]]
     if iuo {
       return nil
@@ -178,10 +181,10 @@ struct AddressOnlyStruct {
   // CHECK:         cond_br [[HAS_VALUE]], [[DOES_HAVE_VALUE:bb[0-9]+]], [[DOESNT_HAVE_VALUE:bb[0-9]+]]
   // -- TODO: failure
   // CHECK:       [[FAILURE:bb[0-9]+]]:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
   // CHECK:         br [[EXIT:bb[0-9]+]]
   // CHECK:       [[DOESNT_HAVE_VALUE]]:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         destroy_addr [[DELEGATEE_SELF]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF]]
   // CHECK:         br [[FAILURE]]

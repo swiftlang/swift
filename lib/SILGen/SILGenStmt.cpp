@@ -627,7 +627,20 @@ void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
 }
 
 void SILGenFunction::visitFailStmt(FailStmt *S) {
-  assert(FailDest.isValid() && "too big to fail");
+  assert(FailDest.isValid() && FailSelfDecl && "too big to fail");
+  // Clean up 'self', which may be constant or variable depending on whether
+  // the initializer delegates.
+  auto &selfLoc = VarLocs[FailSelfDecl];
+  if (selfLoc.isConstant()) {
+    // Release the 'self' value.
+    B.createStrongRelease(S, selfLoc.getConstant());
+  } else {
+    // Release the box containing 'self'.
+    assert(selfLoc.box.isValid() && "no box for non-constant self?!");
+    B.createStrongRelease(S, selfLoc.box);
+  }
+  
+  // Jump to the failure block.
   Cleanups.emitBranchAndCleanups(FailDest, S);
 }
 
