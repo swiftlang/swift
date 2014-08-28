@@ -320,3 +320,82 @@ bool swift::isNonEscapingLocalObject(SILValue V) {
   // conservative and return false.
   return false;
 }
+
+/// Check if the value \p Value is known to be zero, non-zero or unknown.
+IsZeroKind swift::isZeroValue(SILValue Value) {
+  // Inspect integer literals.
+  if (auto *L = dyn_cast<IntegerLiteralInst>(Value.getDef())) {
+    if (L->getValue().getZExtValue() == 0)
+      return IsZeroKind::Zero;
+    return IsZeroKind::NotZero;
+  }
+
+  // Inspect Structs.
+  switch (Value.getDef()->getKind()) {
+    // Bitcast of zero is zero.
+    case ValueKind::UncheckedTrivialBitCastInst:
+    // Extracting from a zero class returns a zero.
+    case ValueKind::StructExtractInst:
+      return isZeroValue(cast<SILInstruction>(Value.getDef())->getOperand(0));
+    default:
+      break;
+  }
+
+  // Inspect casts.
+  if (auto *AI = dyn_cast<ApplyInst>(Value.getDef())) {
+    auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
+    if (!FR)
+      return IsZeroKind::Unknown;
+    switch (FR->getBuiltinInfo().ID) {
+      case BuiltinValueKind::IntToPtr:
+      case BuiltinValueKind::PtrToInt:
+      case BuiltinValueKind::ZExt:
+        return isZeroValue(AI->getArgument(0));
+      case BuiltinValueKind::UDiv:
+      case BuiltinValueKind::SDiv: {
+        if (IsZeroKind::Zero == isZeroValue(AI->getArgument(0)))
+          return IsZeroKind::Zero;
+        return IsZeroKind::Unknown;
+      }
+      case BuiltinValueKind::Mul:
+      case BuiltinValueKind::SMulOver:
+      case BuiltinValueKind::UMulOver: {
+        IsZeroKind LHS = isZeroValue(AI->getArgument(0));
+        IsZeroKind RHS = isZeroValue(AI->getArgument(1));
+        if (LHS == IsZeroKind::Zero || RHS == IsZeroKind::Zero)
+          return IsZeroKind::Zero;
+
+        return IsZeroKind::Unknown;
+      }
+      default:
+        return IsZeroKind::Unknown;
+    }
+  }
+
+  // Handle results of XXX_with_overflow arithmetic.
+  if (auto *T = dyn_cast<TupleExtractInst>(Value.getDef())) {
+    // Make sure we are extracting the number value and not
+    // the overflow flag.
+    if (T->getFieldNo() != 0)
+      return IsZeroKind::Unknown;
+
+    ApplyInst *CAI = dyn_cast<ApplyInst>(T->getOperand());
+    if (!CAI)
+      return IsZeroKind::Unknown;
+
+    // Check that this is a builtin function.
+    if (!isa<BuiltinFunctionRefInst>(CAI->getCallee()))
+      return IsZeroKind::Unknown;
+
+    return isZeroValue(T->getOperand());
+  }
+
+  //Inspect allocations and pointer literals.
+  if (isa<StringLiteralInst>(Value.getDef()) ||
+      isa<AllocationInst>(Value.getDef()) ||
+      isa<SILGlobalAddrInst>(Value.getDef()))
+    return IsZeroKind::NotZero;
+
+  return IsZeroKind::Unknown;
+}
+

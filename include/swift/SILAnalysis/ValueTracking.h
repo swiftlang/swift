@@ -25,6 +25,15 @@ SILValue getUnderlyingObject(SILValue V);
 /// from the function.
 bool isNonEscapingLocalObject(SILValue V);
 
+enum class IsZeroKind {
+  Zero,
+  NotZero,
+  Unknown
+};
+
+/// Check if the value \p Value is known to be zero, non-zero or unknown.
+IsZeroKind isZeroValue(SILValue Value);
+
 } // end namespace swift
 
 #endif // SWIFT_SILANALYSIS_VALUETRACKING_H
