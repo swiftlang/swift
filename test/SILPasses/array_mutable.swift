@@ -24,13 +24,12 @@ struct S {
 }
 
 // CHECK-LABEL: sil @_TF13array_mutable6arreltFRVS_1ST_
-// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced 
+// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
 // CHECK-NOT: {{^bb}}
 // CHECK: apply %[[FR]]
 // CHECK: {{^bb}}
 // CHECK-NOT: _swift_isUniquelyReferenced
-// CHECK: [[VOID:%[^ ]+]] = tuple ()
-// CHECK: return [[VOID]]
+// CHECK: {{^[}]}}
 func arrelt(inout s: S) {
   for i in 0..<s.a.count {
     s.a[i] = 0
