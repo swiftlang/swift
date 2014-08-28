@@ -15,13 +15,19 @@
 #endif
 
 NON_CF(AuthorizationRef)
+
 NON_CF(CCCryptorRef)
-NON_CF(ExtAudioFileRef)
+
 NON_CF(CGPDFArrayRef)
 NON_CF(CGPDFDictionaryRef)
 NON_CF(CGPDFObjectRef)
 NON_CF(CGPDFStreamRef)
 NON_CF(CGPDFStringRef)
+
+NON_CF(ExtAudioFileRef)
+
+NON_CF(FSEventStreamRef)
+NON_CF(ConstFSEventStreamRef)
 
 #undef NON_CF
 
