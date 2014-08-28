@@ -384,7 +384,7 @@ public:
             "operand of alloc_ref_dynamic must have a metatype representation");
     if (ARDI->isObjC()) {
       require(metaTy->getRepresentation() == MetatypeRepresentation::ObjC,
-              "alloc_ref_dynamic [objc] requires operand of ObjC metatype");
+              "alloc_ref_dynamic @objc requires operand of ObjC metatype");
     } else {
       require(metaTy->getRepresentation() == MetatypeRepresentation::Thick,
               "alloc_ref_dynamic requires operand of thick metatype");
@@ -1202,11 +1202,8 @@ public:
     requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
     SILType operandType = EMI->getOperand().getType();
 
-    require(EMI->getMember().getDecl()->isObjC(), "method must be [objc]");
-    if (EMI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.getSwiftType()->is<BuiltinUnknownObjectType>(),
-              "operand must have Builtin.UnknownObject type");
-    } else {
+    require(EMI->getMember().getDecl()->isObjC(), "method must be @objc");
+    if (!EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
       require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
@@ -1949,11 +1946,8 @@ public:
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
     SILType operandType = DMBI->getOperand().getType();
 
-    require(DMBI->getMember().getDecl()->isObjC(), "method must be [objc]");
-    if (DMBI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.getSwiftType()->is<BuiltinUnknownObjectType>(),
-              "operand must have Builtin.UnknownObject type");
-    } else {
+    require(DMBI->getMember().getDecl()->isObjC(), "method must be @objc");
+    if (!DMBI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
       require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()

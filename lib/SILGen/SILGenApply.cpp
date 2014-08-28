@@ -1385,8 +1385,6 @@ public:
       val = gen.B.createProjectExistentialRef(dynamicMemberRef,
                       existential.getValue(),
                       getSelfTypeForDynamicLookup(gen, existential.getValue()));
-      val = gen.B.createUncheckedRefCast(dynamicMemberRef, val,
-                             SILType::getUnknownObjectType(gen.getASTContext()));
       ManagedValue proj(val, existential.getCleanup());
       setSelfParam(RValue(gen, dynamicMemberRef,
                           proj.getType().getSwiftRValueType(), proj),

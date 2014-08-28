@@ -3590,8 +3590,7 @@ dynamic_method_br
                        ',' sil-identifier ',' sil-identifier
 
   dynamic_method_br %0 : $P, #X.method!1, bb1, bb2
-  // %0 must be of type Builtin.ObjCPointer 
-  // where $P contains the Swift.DynamicLookup protocol
+  // %0 must be of protocol type
   // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
 

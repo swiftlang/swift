@@ -21,19 +21,17 @@ class X {
 
 // CHECK-LABEL: sil  @_TF14dynamic_lookup15direct_to_class
 func direct_to_class(obj: AnyObject) {
-  // CHECK: [[OBJ_SELF:%[0-9]+]] = project_existential_ref [[EX:%[0-9]+]] : $AnyObject
-  // CHECK: [[OBJ:%[0-9]+]] = unchecked_ref_cast [[OBJ_SELF]]
-  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ]] : $Builtin.UnknownObject, #X.f!1.foreign : X -> () -> (), $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()
-  // CHECK: apply [[METHOD]]([[OBJ]]) : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()
+  // CHECK: [[OBJ_SELF:%[0-9]+]] = project_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@sil_self AnyObject
+  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@sil_self AnyObject, #X.f!1.foreign : X -> () -> (), $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
+  // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
   obj.f!()
 }
 
 // CHECK-LABEL: sil  @_TF14dynamic_lookup18direct_to_protocol
 func direct_to_protocol(obj: AnyObject) {
-  // CHECK: [[OBJ_SELF:%[0-9]+]] = project_existential_ref [[EX:%[0-9]+]] : $AnyObject
-  // CHECK: [[OBJ:%[0-9]+]] = unchecked_ref_cast [[OBJ_SELF]]
-  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ]] : $Builtin.UnknownObject, #P.g!1.foreign : <`Self` : P> Self -> () -> (), $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()
-  // CHECK: apply [[METHOD]]([[OBJ]]) : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()
+  // CHECK: [[OBJ_SELF:%[0-9]+]] = project_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@sil_self AnyObject
+  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@sil_self AnyObject, #P.g!1.foreign : <`Self` : P> Self -> () -> (), $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
+  // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
   obj.g!()
 }
 
