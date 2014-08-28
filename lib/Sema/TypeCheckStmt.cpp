@@ -682,7 +682,7 @@ public:
 /// Check an expression whose result is not being used at all.
 static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
   // Complain about l-values that are neither loaded nor stored.
-  if (E->getType()->is<LValueType>()) {
+  if (E->getType()->isLValueType()) {
     TC.diagnose(E->getLoc(), diag::expression_unused_lvalue)
       .highlight(E->getSourceRange());
     return;
@@ -710,17 +710,17 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         break;
 
       // Type check the expression.
-      bool isDiscarded = !(IsREPL && isa<TopLevelCodeDecl>(DC));
+      bool isDiscarded = !(IsREPL && isa<TopLevelCodeDecl>(DC))
+        && !TC.Context.LangOpts.Playground
+        && !TC.Context.LangOpts.DebuggerSupport;
       if (TC.typeCheckExpression(SubExpr, DC, Type(), Type(), isDiscarded)) {
         elem = SubExpr;
         continue;
       }
       
-      if (isDiscarded &&
-          !TC.Context.LangOpts.Playground &&
-          !TC.Context.LangOpts.DebuggerSupport) {
+      if (isDiscarded)
         diagnoseIgnoredExpr(TC, SubExpr);
-      }
+      
       elem = SubExpr;
       continue;
     }

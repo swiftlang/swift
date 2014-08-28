@@ -980,10 +980,10 @@ bool TypeChecker::typeCheckExpression(
 
     // Strip the address-of expression.
     result = addressOf->getSubExpr();
-  } else if (auto lvalueType = result->getType()->getAs<LValueType>()) {
+  } else if (result->getType()->isLValueType() && !discardedExpr) {
     // We referenced an lvalue. Load it.
-    if (!discardedExpr)
-      result = new (Context) LoadExpr(result, lvalueType->getObjectType());
+    result = solution.coerceToType(result, result->getType()->getRValueType(),
+                                   cs.getConstraintLocator(expr));
   }
 
   if (getLangOpts().DebugConstraintSolver) {

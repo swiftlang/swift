@@ -22,6 +22,8 @@ func1()
 var bind_test1 : () -> () = func1
 var bind_test2 : Int = 4; func1 // expected-error {{expression resolves to an unused l-value}}
 
+(func1, func2) // expected-error {{expression resolves to an unused l-value}}
+
 func basictest() {
   // Simple integer variables.
   var x : Int
