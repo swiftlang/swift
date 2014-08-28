@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILANALYSIS_ARCANALYSIS_H
 #define SWIFT_SILANALYSIS_ARCANALYSIS_H
 
+#include "swift/Basic/Optional.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -42,22 +43,24 @@ bool canCheckRefCount(SILInstruction *User);
 /// that requires \p Ptr to be alive before Inst.
 bool canUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
 
-/// Return true if \p Op has arc uses in the instruction range [Start, End). We
-/// assume that Start and End are both in the same basic block.
-bool valueHasARCUsesInInstructionRange(SILValue Op,
-                                       SILBasicBlock::iterator Start,
-                                       SILBasicBlock::iterator End,
-                                       AliasAnalysis *AA);
+/// If \p Op has arc uses in the instruction range [Start, End), return the
+/// first such instruction. Otherwise return Nothing_t::Nothing. We assume that
+/// Start and End are both in the same basic block.
+Optional<SILBasicBlock::iterator>
+valueHasARCUsesInInstructionRange(SILValue Op,
+                                  SILBasicBlock::iterator Start,
+                                  SILBasicBlock::iterator End,
+                                  AliasAnalysis *AA);
 
-/// Return true if \p Op has instructions in the instruction range [Start, End)
-/// which may decrement the ref count or read the ref count for some purpose
-/// other than incrementing it (e.g. uniqueness check). We assume that Start and
-/// End are both in the same basic block.
-bool valueHasARCDecrementOrCheckInInstructionRange(
-    SILValue Op,
-    SILBasicBlock::iterator Start,
-    SILBasicBlock::iterator End,
-    AliasAnalysis *AA);
+/// If \p Op has instructions in the instruction range (Start, End] which may
+/// decrement it, return the first such instruction. Returns Nothing_t::Nothing
+/// if no such instruction exists. We assume that Start and End are both in the
+/// same basic block.
+Optional<SILBasicBlock::iterator>
+valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
+                                              SILBasicBlock::iterator Start,
+                                              SILBasicBlock::iterator End,
+                                              AliasAnalysis *AA);
 
 /// A set of matching reference count increments, decrements, increment
 /// insertion pts, and decrement insertion pts.

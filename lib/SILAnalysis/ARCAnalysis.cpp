@@ -331,9 +331,11 @@ bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
 // instruction range in one BB.
 //===----------------------------------------------------------------------===//
 
-/// Return true if \p Op has arc uses in the instruction range [Start, End). We
-/// assume that Start and End are both in the same basic block.
-bool swift::arc::
+/// If \p Op has arc uses in the instruction range [Start, End), return the
+/// first such instruction. Otherwise return Nothing_t::Nothing. We assume that
+/// Start and End are both in the same basic block.
+Optional<SILBasicBlock::iterator>
+swift::arc::
 valueHasARCUsesInInstructionRange(SILValue Op,
                                   SILBasicBlock::iterator Start,
                                   SILBasicBlock::iterator End,
@@ -343,26 +345,28 @@ valueHasARCUsesInInstructionRange(SILValue Op,
 
   // If Start == End, then we have an empty range, return false.
   if (Start == End)
-    return false;
+    return Nothing_t::Nothing;
 
   // Otherwise, until Start != End.
   while (Start != End) {
     // Check if Start can use Op in an ARC relevant way. If so, return true.
     if (canUseValue(&*Start, Op, AA))
-      return true;
+      return Start;
 
     // Otherwise, increment our iterator.
     ++Start;
   }
 
   // If all such instructions can not use Op, return false.
-  return false;
+  return Nothing_t::Nothing;
 }
 
-/// Return true if \p Op has instructions in the instruction range (Start, End]
-/// which may decrement it. We assume that Start and End are both in the same
-/// basic block.
-bool swift::arc::
+/// If \p Op has instructions in the instruction range (Start, End] which may
+/// decrement it, return the first such instruction. Returns Nothing_t::Nothing
+/// if no such instruction exists. We assume that Start and End are both in the
+/// same basic block.
+Optional<SILBasicBlock::iterator>
+swift::arc::
 valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
                                               SILBasicBlock::iterator Start,
                                               SILBasicBlock::iterator End,
@@ -370,20 +374,21 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
   assert(Start->getParent() == End->getParent() &&
          "Start and End should be in the same basic block");
 
-  // If Start == End, then we have an empty range, return false.
+  // If Start == End, then we have an empty range, return nothing.
   if (Start == End)
-    return false;
+    return Nothing_t::Nothing;
 
   // Otherwise, until Start != End.
   while (Start != End) {
-    // Check if Start can decrement or check Op's ref count. If so, return true.
-    // Ref count checks do not have side effects, but are barriers for retains.
+    // Check if Start can decrement or check Op's ref count. If so, return
+    // Start. Ref count checks do not have side effects, but are barriers for
+    // retains.
     if (canDecrementRefCount(&*Start, Op, AA) || canCheckRefCount(&*Start))
-      return true;
+      return Start;
     // Otherwise, increment our iterator.
     ++Start;
   }
 
-  // If all such instructions can not decrement Op, return false.
-  return false;
+  // If all such instructions can not decrement Op, return nothing.
+  return Nothing_t::Nothing;
 }
