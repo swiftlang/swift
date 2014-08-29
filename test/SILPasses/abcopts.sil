@@ -339,9 +339,7 @@ bb3:
 // Check start.
 // HOIST: [[S1:%[0-9]+]] = struct $Int ([[ZERO]] : $Builtin.Word)
 // HOIST: [[L1:%[0-9]+]] = load %1 : $*ArrayInt
-// HOIST: [[SE1:%[0-9]+]] = struct_extract [[L1]]
-// HOIST: [[SE2:%[0-9]+]] = struct_extract [[SE1]]
-// HOIST: retain_value [[SE2]]
+// HOIST: retain_value [[L1]]
 // HOIST: [[CB1:%[0-9]+]] = function_ref @checkbounds
 // HOIST: apply [[CB1]]([[S1]], [[L1]])
 
@@ -352,9 +350,7 @@ bb3:
 // HOIST: [[SUB2:%[0-9]+]] = tuple_extract [[SUB1]]
 // HOIST: [[SUB3:%[0-9]+]] = struct $Int ([[SUB2]]
 // HOIST: [[L2:%[0-9]+]] = load %1
-// HOIST: [[SEL2:%[0-9]+]] = struct_extract [[L2]]
-// HOIST: [[SEL21:%[0-9]+]] = struct_extract [[SEL2]]
-// HOIST: retain_value [[SEL21]]
+// HOIST: retain_value [[L2]]
 // HOIST: [[CB2:%[0-9]+]] = function_ref @checkbounds
 // HOIST: apply [[CB2]]([[SUB3]], [[L2]])
 // HOIST: br bb2
@@ -410,9 +406,7 @@ bb3:
 // HOIST: [[SGE1:%[0-9]+]] = apply [[SGE]]
 // HOIST: cond_fail [[SGE1]]
 // HOIST:  [[CB:%[0-9]+]] = function_ref @checkbounds
-// HOIST:  load %1 : $*ArrayInt                      // users: %13, %16
-// HOIST:  struct_extract
-// HOIST:  struct_extract
+// HOIST:  load %1 : $*ArrayInt
 // HOIST:  retain_value
 // HOIST:  apply [[CB]]
 // HOIST:  br bb2

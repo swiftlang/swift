@@ -62,7 +62,6 @@ using ArraySet = llvm::SmallPtrSet<SILValue, 16>;
 using ArrayAccessDesc = llvm::PointerIntPair<ValueBase *, 1, bool>;
 using IndexedArraySet = llvm::DenseSet<std::pair<ValueBase *, ArrayAccessDesc>>;
 using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 16>;
-using ValueBaseList = llvm::SmallVector<ValueBase *, 4>;
 
 /// The kind of array operation identified by looking at the semantics attribute
 /// of the called function.
@@ -306,17 +305,17 @@ private:
 
 /// Check whether this a retain on the storage of the array.
 static SILInstruction *isArrayBufferStorageRetain(SILInstruction *R,
-                                                  SILValue Array,
-                                                  ValueBaseList *InstSeq) {
+                                                  SILValue Array) {
   // Is this a retain.
   if (!isa<RetainValueInst>(R))
     return nullptr;
 
-  if (!R->getOperand(0))
+  SILValue RetainedVal = R->getOperand(0);
+  if (!RetainedVal)
     return nullptr;
 
   // Find the projection from the array:
-  // We can either have:
+  // We can either have something like
   //
   //  %42 = SILValue(Array, ...) : $Array<Int>
   //  %43 = struct_extract %42 : $Array<Int>, #Array._buffer
@@ -326,47 +325,15 @@ static SILInstruction *isArrayBufferStorageRetain(SILInstruction *R,
   // Or we can have a retain directly on the array:
   //  %42 = SILValue(Array, ...) : $Array<Int>
   // retain %42
-  if (R->getOperand(0) == Array) {
-    if (InstSeq) {
-      InstSeq->push_back(Array.getDef());
-      InstSeq->push_back(R);
-    }
-    return R;
-  }
-
-  auto ArrayBufferStorageProj =
-      dyn_cast<StructExtractInst>(R->getOperand(0).getDef());
-  if (!ArrayBufferStorageProj || ArrayBufferStorageProj->getFieldNo() != 0)
+  RetainedVal = RetainedVal.stripRCIdentityPreservingOps();
+  if (RetainedVal != Array)
     return nullptr;
-
-  // Valid operand?
-  if (!ArrayBufferStorageProj->getOperand())
-    return nullptr;
-
-  auto ArrayBufferProj = dyn_cast<StructExtractInst>(
-      ArrayBufferStorageProj->getOperand().getDef());
-  if (!ArrayBufferProj || ArrayBufferProj->getFieldNo() != 0)
-    return nullptr;
-
-  auto Arr = ArrayBufferProj->getOperand();
-  if (Arr != Array)
-    return nullptr;
-
-  // Store the sequence.
-  if (InstSeq) {
-    InstSeq->push_back(Arr.getDef());
-    InstSeq->push_back(ArrayBufferProj);
-    InstSeq->push_back(ArrayBufferStorageProj);
-    InstSeq->push_back(R);
-  }
-
   return R;
 }
 
 /// Find a matching preceeding retain on the same array.
 static SILInstruction *
-findMatchingRetain(SILInstruction *BoundsCheck,
-                   ValueBaseList *InstSeq = nullptr) {
+findMatchingRetain(SILInstruction *BoundsCheck) {
   auto ApplyBoundsCheck = dyn_cast<ApplyInst>(BoundsCheck);
   assert(ApplyBoundsCheck);
   auto Array = ApplyBoundsCheck->getSelfArgument();
@@ -374,7 +341,7 @@ findMatchingRetain(SILInstruction *BoundsCheck,
   for (auto E = BoundsCheck->getParent()->rend(),
             Iter = SILBasicBlock::reverse_iterator(BoundsCheck);
        Iter != E; ++Iter) {
-    if (auto R = isArrayBufferStorageRetain(&*Iter, Array, InstSeq))
+    if (auto R = isArrayBufferStorageRetain(&*Iter, Array))
       return R;
     if (!BoundSearch--)
       return nullptr;
@@ -928,27 +895,27 @@ private:
 /// The set of instructions to retain the array starting at the load is to be
 /// specified in \p RetainSequence.
 static void hoistBoundsCheckCallWithIndex(SILInstruction *CheckToHoist,
+                                          SILInstruction *Retain,
                                           SILValue Index,
-                                          ValueBaseList &RetainSequence,
                                           SILBasicBlock *Preheader) {
-  assert(isa<LoadInst>(RetainSequence[0]) ||
-         isa<SILArgument>(RetainSequence[0]) &&
+  auto Arr = Retain->getOperand(0);
+  assert(Arr && Arr.getDef() && "Should have a valid retain instruction");
+
+  Arr = Arr.stripRCIdentityPreservingOps();
+  assert(isa<LoadInst>(Arr.getDef()) ||
+         isa<SILArgument>(Arr.getDef()) &&
              "Expect a LoadInst or an Array parameter");
   auto *InsertPt = Preheader->getTerminator();
 
   // Clone and fixup the load, retain sequenence to the header.
   auto *LI =
-    dyn_cast<LoadInst>(RetainSequence[0]);
+    dyn_cast<LoadInst>(Arr.getDef());
   // We might also have an array argument.
-  ValueBase *PrevI =
-      LI ? LI->clone(InsertPt) : RetainSequence[0];
+  ValueBase *PrevI = LI ? LI->clone(InsertPt) : Arr.getDef();
   ValueBase *Array = PrevI;
 
-  for (unsigned i = 1, e = RetainSequence.size(); i != e; ++i) {
-    auto *NewI = cast<SILInstruction>(RetainSequence[i])->clone(InsertPt);
-    NewI->setOperand(0, PrevI);
-    PrevI = NewI;
-  }
+  SILBuilder(InsertPt).createRetainValue(Retain->getLoc(), SILValue(Array, 0));
+
   // Clone the check and update index and array.
   auto NewCheck = cast<ApplyInst>(CheckToHoist->clone(InsertPt));
   // Set index.
@@ -1001,8 +968,8 @@ public:
   /// Hoists the necessary check for beginning and end of the induction
   /// encapsulated by this acess function to the header.
   void hoistCheckToPreheader(SILInstruction *CheckToHoist,
-                             SILBasicBlock *Preheader,
-                             ValueBaseList &RetainSequence) {
+                             SILInstruction *Retain,
+                             SILBasicBlock *Preheader) {
     SILBuilder Builder(Preheader->getTerminator());
     SILLocation Loc = CheckToHoist->getLoc();
 
@@ -1014,8 +981,7 @@ public:
     // Set the new start index to the first value of the induction.
     Start->setOperand(0, FirstVal);
 
-    hoistBoundsCheckCallWithIndex(CheckToHoist, Start, RetainSequence,
-                                  Preheader);
+    hoistBoundsCheckCallWithIndex(CheckToHoist, Retain, Start, Preheader);
 
     // Get the last induction value.
     auto LastVal = Ind->getLastValue(Loc, Builder);
@@ -1025,29 +991,33 @@ public:
     // Set the new end index to the last value of the induction.
     End->setOperand(0, LastVal);
 
-    hoistBoundsCheckCallWithIndex(CheckToHoist, End, RetainSequence, Preheader);
+    hoistBoundsCheckCallWithIndex(CheckToHoist, Retain, End, Preheader);
   }
 };
 
 /// Eliminate a check by hoisting it to the loop's preheader.
 static bool hoistCheck(SILBasicBlock *Preheader, SILInstruction *CheckToHoist,
                        AccessFunction &Access) {
-  ValueBaseList RetainSequence;
-  auto R = findMatchingRetain(CheckToHoist, &RetainSequence);
+  auto Retain = findMatchingRetain(CheckToHoist);
+  if (!Retain)
+    return false;
+  auto Arr = Retain->getOperand(0);
+  if (!Arr)
+    return false;
 
+  Arr = Arr.stripRCIdentityPreservingOps();
   // The start of the retain sequence needs to be a load or the array struct
   // passed as an argument.
-  if (!R || (!isa<LoadInst>(RetainSequence[0]) &&
-             !isa<SILArgument>(RetainSequence[0])))
+  if (!isa<LoadInst>(Arr.getDef()) && !isa<SILArgument>(Arr.getDef()))
     return false;
 
   // Hoist the access function and the check to the preheader for start and end
   // of the induction.
-  Access.hoistCheckToPreheader(CheckToHoist, Preheader, RetainSequence);
+  Access.hoistCheckToPreheader(CheckToHoist, Retain, Preheader);
 
   // Remove the old check in the loop and the matching retain.
   CheckToHoist->eraseFromParent();
-  R->eraseFromParent();
+  Retain->eraseFromParent();
 
   DEBUG(llvm::dbgs() << "  Bounds check hoisted\n");
   return true;
@@ -1055,28 +1025,34 @@ static bool hoistCheck(SILBasicBlock *Preheader, SILInstruction *CheckToHoist,
 
 /// Hoists an loop invariant bounds check.
 static bool hoistInvariantCheck(SILBasicBlock *Preheader,
-                                SILInstruction *Inst) {
-  ValueBaseList RetainSequence;
-  auto R = findMatchingRetain(Inst, &RetainSequence);
-  if (!R || (!isa<LoadInst>(RetainSequence[0]) &&
-             !isa<SILArgument>(RetainSequence[1])))
+                                SILInstruction *Check) {
+  auto Retain = findMatchingRetain(Check);
+  if (!Retain)
     return false;
 
-  auto FR = dyn_cast<FunctionRefInst>(Inst->getOperand(0));
+  SILValue Arr = Retain->getOperand(0).stripRCIdentityPreservingOps();
+  if (!isa<LoadInst>(Arr.getDef()) && !isa<SILArgument>(Arr.getDef()))
+    return false;
+
+  auto FR = dyn_cast<FunctionRefInst>(Check->getOperand(0));
   if (!FR)
     return false;
-  auto NewFR = FR->clone(Preheader->getTerminator());
 
-  for (auto *V : RetainSequence) {
-    // Don't need to move the argument.
-    if (isa<SILArgument>(V))
-      continue;
-    auto Inst = cast<SILInstruction>(V);
-    Inst->moveBefore(Preheader->getTerminator());
-  }
+  auto PreheaderTerm = Preheader->getTerminator();
+  assert(PreheaderTerm && "We better have a terminator");
+  auto NewFR = FR->clone(PreheaderTerm);
+  assert(NewFR && "Cloning failed?!");
 
-  Inst->moveBefore(Preheader->getTerminator());
-  Inst->setOperand(0, NewFR);
+  // Hoist the retain by moving the load and then creating a retain of the
+  // loaded value.
+  if (!isa<SILArgument>(Arr.getDef()))
+    cast<SILInstruction>(Arr.getDef())->moveBefore(PreheaderTerm);
+  SILBuilder(PreheaderTerm).createRetainValue(Retain->getLoc(), Arr);
+  Retain->eraseFromParent();
+
+  // Move the check.
+  Check->moveBefore(Preheader->getTerminator());
+  Check->setOperand(0, NewFR);
 
   return true;
 }
