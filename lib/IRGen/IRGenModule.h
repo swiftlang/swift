@@ -385,6 +385,7 @@ private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
+  llvm::Constant *ObjCISAMaskPtr = nullptr;
   Optional<llvm::Value*> ObjCRetainAutoreleasedReturnValueMarker;
   ClassDecl *SwiftRootClass = nullptr;
 
@@ -479,6 +480,7 @@ public:
                                      ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                         llvm::Type *definitionTy = nullptr);
+  Address getAddrOfObjCISAMask();
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
   

@@ -380,6 +380,16 @@ llvm::Constant *IRGenModule::getObjCEmptyVTablePtr() {
   return ObjCEmptyVTablePtr;
 }
 
+Address IRGenModule::getAddrOfObjCISAMask() {
+  // This symbol is only exported by the runtime if the platform uses
+  // isa masking.
+  assert(TargetInfo.hasISAMasking());
+  if (!ObjCISAMaskPtr) {
+    ObjCISAMaskPtr =  Module.getOrInsertGlobal("swift_isaMask", IntPtrTy);
+  }
+  return Address(ObjCISAMaskPtr, getPointerAlignment());
+}
+
 llvm::Module *IRGenModule::getModule() const {
   return ClangCodeGen->GetModule();
 }

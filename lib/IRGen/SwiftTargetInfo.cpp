@@ -59,6 +59,9 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   // arm64 requires marker assembly for objc_retainAutoreleasedReturnValue.
   target.ObjCRetainAutoreleasedReturnValueMarker =
     "mov\tfp, fp\t\t; marker for objc_retainAutoreleaseReturnValue";
+
+  // arm64 requires ISA-masking.
+  target.ObjCUseISAMask = true;
 }
 
 /// Configures target-specific information for x86-64 platforms.
@@ -81,6 +84,9 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
   // x86-64 has every objc_msgSend variant known to humankind.
   target.ObjCUseFPRet = true;
   target.ObjCUseFP2Ret = true;
+
+  // x86-64 requires ISA-masking.
+  target.ObjCUseISAMask = true;
 }
 
 /// Configures target-specific information for 32-bit x86 platforms.

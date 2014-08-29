@@ -30,5 +30,21 @@
 #endif
 #endif
 
+/// Does the current Swift platform allow information other than the
+/// class pointer to be stored in the isa field?  If so, when deriving
+/// the class pointer of an object, we must apply a
+/// dynamically-determined mask to the value loaded from the first
+/// field of the object.
+///
+/// According to the Objective-C ABI, this is true only for 64-bit
+/// platforms.
+#ifndef SWIFT_HAS_ISA_MASKING
+#if SWIFT_OBJC_INTEROP && defined(__LP64__)
+#define SWIFT_HAS_ISA_MASKING 1
+#else
+#define SWIFT_HAS_ISA_MASKING 0
+#endif
+#endif
+
 #endif // SWIFT_RUNTIME_CONFIG_H
 

@@ -79,6 +79,34 @@ necessary control over the binary layout. Some examples:
 Class Layout
 ~~~~~~~~~~~~
 
+Swift relies on the following assumptions about the Objective-C runtime,
+which are therefore now part of the Objective-C ABI:
+
+- 32-bit platforms never have tagged pointers.  ObjC pointer types are
+  either nil or an object pointer.
+
+- On x86-64, a tagged pointer either sets the lowest bit of the pointer
+  or the highest bit of the pointer.  Therefore, both of these bits are
+  zero if and only if the value is not a tagged pointer.
+
+- On ARM64, a tagged pointer always sets the highest bit of the pointer.
+
+- 32-bit platforms never perform any isa masking.  ``object_getClass``
+  is always equivalent to ``*(Class*)object``.
+
+- 64-bit platforms perform isa masking only if the runtime exports a
+  symbol ``uintptr_t objc_debug_isa_class_mask;``.  If this symbol
+  is exported, ``object_getClass`` on a non-tagged pointer is always
+  equivalent to ``(Class)(objc_debug_isa_class_mask & *(uintptr_t*)object)``.
+
+- The superclass field of a class object is always stored immediately
+  after the isa field.  Its value is either nil or a pointer to the
+  class object for the superclass; it never has other bits set.
+
+The following assumptions are part of the Swift ABI:
+
+- Swift class pointers are never tagged pointers.
+
 TODO
 
 Fragile Enum Layout

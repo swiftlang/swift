@@ -35,6 +35,11 @@ public:
 
   /// True if the ObjC runtime for the chosen platform supports tagged pointers.
   bool hasObjCTaggedPointers() const;
+
+  /// True if the ObjC runtime for the chosen platform requires ISA masking.
+  bool hasISAMasking() const {
+    return ObjCUseISAMask;
+  }
   
   /// The spare bit mask for pointers. Bits set in this mask are unused by
   /// pointers of any alignment.
@@ -71,6 +76,7 @@ public:
   bool ObjCUseFPRet = false;
   bool ObjCUseFP2Ret = false;
   bool ObjCUseNullForEmptyVTable = false;
+  bool ObjCUseISAMask = false;
 };
 
 }

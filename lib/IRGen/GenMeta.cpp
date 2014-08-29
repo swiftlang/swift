@@ -2582,7 +2582,7 @@ namespace {
       if (HasDependentSuperclass) {
         // The superclass of the metaclass is the metaclass of the superclass.
 
-        // Call object_getClass() to read the superclass's metaclass.
+        // Read the superclass's metaclass.
         llvm::Value *superMetaClass = 
             emitLoadOfObjCHeapMetadataRef(IGF, superMetadata);
         superMetaClass = IGF.Builder.CreateBitCast(superMetaClass, 
@@ -3119,18 +3119,25 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   return {size, alignMask};
 }
 
-/// Given a pointer to a heap object, load its heap metadata pointer using the
-/// ObjC runtime.
+/// Given a non-tagged object pointer, load a pointer to its class object.
 static llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *object) {
-  object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
-  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectClassFn(),
-                                         object,
-                                         object->getName() + ".class");
-  metadata->setCallingConv(IGF.IGM.RuntimeCC);
-  metadata->setDoesNotThrow();
-  metadata->setDoesNotAccessMemory();
-  return metadata;
+  if (IGF.IGM.TargetInfo.hasISAMasking()) {
+    object = IGF.Builder.CreateBitCast(object,
+                                       IGF.IGM.IntPtrTy->getPointerTo());
+    llvm::Value *metadata =
+      IGF.Builder.CreateLoad(Address(object, IGF.IGM.getPointerAlignment()));
+    llvm::Value *mask = IGF.Builder.CreateLoad(IGF.IGM.getAddrOfObjCISAMask());
+    metadata = IGF.Builder.CreateAnd(metadata, mask);
+    metadata = IGF.Builder.CreateIntToPtr(metadata, IGF.IGM.TypeMetadataPtrTy);
+    return metadata;
+  } else {
+    object = IGF.Builder.CreateBitCast(object,
+                                  IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+    llvm::Value *metadata =
+      IGF.Builder.CreateLoad(Address(object, IGF.IGM.getPointerAlignment()));
+    return metadata;
+  }
 }
 
 /// Given a pointer to a heap object (i.e. definitely not a tagged

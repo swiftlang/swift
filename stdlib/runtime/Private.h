@@ -25,8 +25,9 @@
 namespace swift {
   struct ProtocolDescriptor;
 
-  LLVM_LIBRARY_VISIBILITY
-  extern uintptr_t ISAMask;
+#if SWIFT_HAS_ISA_MASKING
+  extern "C" uintptr_t swift_isaMask;
+#endif
 
   extern "C" LLVM_LIBRARY_VISIBILITY
   bool _swift_classConformsToObjCProtocol(const void *theClass,
@@ -53,8 +54,12 @@ namespace swift {
   static inline const ClassMetadata *_swift_getClassOfAllocated(const void *object) {
     // Load the isa field.
     uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
+
+#if SWIFT_HAS_ISA_MASKING
     // Apply the mask.
-    bits &= ISAMask;
+    bits &= swift_isaMask;
+#endif
+
     // The result is a class pointer.
     return reinterpret_cast<const ClassMetadata *>(bits);
   }
@@ -79,7 +84,6 @@ namespace swift {
 
   static inline
   const ClassMetadata *_swift_getSuperclass(const ClassMetadata *theClass) {
-    // This is kosher under the ABI.
     return theClass->SuperClass;
   }
 
