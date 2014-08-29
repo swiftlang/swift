@@ -362,17 +362,9 @@ public:
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
 
-    // Initialize the worklist with a bottom-up call-graph order list of
-    // functions.
-    const std::vector<SILFunction *> &Order = CGA->bottomUpCallGraphOrder();
-    std::vector<SILFunction *> Worklist(Order);
-    std::reverse(Worklist.begin(), Worklist.end());
-
     bool Changed = false;
-    while (!Worklist.empty()) {
-      SILFunction *F = Worklist.back();
-      Worklist.pop_back();
-
+    // Specialize going bottom-up in the call graph.
+    for (auto *F : CGA->bottomUpCallGraphOrder()) {
       // If F is empty, attempt to link it. Skip it if we fail to do so.
       if (F->empty() &&
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
