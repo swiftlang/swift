@@ -447,7 +447,7 @@ void ClangImporter::Implementation::importHeader(
 
   clang::SourceLocation includeLoc =
     sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
-  clang::FileID bufferID = sourceMgr.createFileID(sourceBuffer.release(),
+  clang::FileID bufferID = sourceMgr.createFileID(std::move(sourceBuffer),
                                                   clang::SrcMgr::C_User,
                                                   /*LoadedID=*/0,
                                                   /*LoadedOffset=*/0,
