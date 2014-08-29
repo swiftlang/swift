@@ -165,7 +165,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
   // Determine what the user has asked the frontend to do.
-  FrontendOptions::ActionType Action;
+  FrontendOptions::ActionType &Action = Opts.RequestedAction;
   if (const Arg *A = Args.getLastArg(OPT_modes_Group)) {
     Option Opt = A->getOption();
     if (Opt.matches(OPT_emit_object)) {
@@ -203,12 +203,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       // As a result, put the frontend into EmitModuleOnly mode.
       // (Setting up module output will be handled below.)
       Action = FrontendOptions::EmitModuleOnly;
-    } else {
-      // In the absence of any other mode indicators, emit an object file.
-      Action = FrontendOptions::EmitObject;
     }
   }
-  Opts.RequestedAction = Action;
 
   if (Opts.RequestedAction == FrontendOptions::Immediate &&
       Opts.PrimaryInput.hasValue()) {
@@ -234,7 +230,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
       return true;
     }
-  } else {
+  } else if (Opts.RequestedAction != FrontendOptions::NoneAction) {
     if (Opts.InputFilenames.empty()) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
@@ -281,7 +277,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       if (Opts.RequestedAction == FrontendOptions::REPL) {
         // Default to a module named "REPL" if we're in REPL mode.
         ModuleName = "REPL";
-      } else {
+      } else if (!Opts.InputFilenames.empty()) {
         StringRef OutputFilename(Opts.OutputFilename);
         if (OutputFilename.empty() || OutputFilename == "-" ||
             llvm::sys::fs::is_directory(OutputFilename)) {
@@ -322,6 +318,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     StringRef Suffix;
     switch (Opts.RequestedAction) {
+    case FrontendOptions::NoneAction:
+      break;
+
     case FrontendOptions::Parse:
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:
@@ -407,7 +406,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     if (Opts.OutputFilename.empty()) {
       if (Opts.RequestedAction != FrontendOptions::REPL &&
-          Opts.RequestedAction != FrontendOptions::Immediate) {
+          Opts.RequestedAction != FrontendOptions::Immediate &&
+          Opts.RequestedAction != FrontendOptions::NoneAction) {
         Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
         return true;
       }
@@ -489,6 +489,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (!Opts.DependenciesFilePath.empty()) {
     switch (Opts.RequestedAction) {
+    case FrontendOptions::NoneAction:
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
@@ -510,6 +511,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (!Opts.ObjCHeaderOutputPath.empty()) {
     switch (Opts.RequestedAction) {
+    case FrontendOptions::NoneAction:
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
@@ -532,6 +534,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   if (!Opts.ModuleOutputPath.empty() ||
       !Opts.ModuleDocOutputPath.empty()) {
     switch (Opts.RequestedAction) {
+    case FrontendOptions::NoneAction:
     case FrontendOptions::Parse:
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:

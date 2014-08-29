@@ -106,6 +106,7 @@ public:
   std::vector<std::string> LLVMArgs;
 
   enum ActionType {
+    NoneAction, ///< No specific action
     Parse, ///< Parse and type-check only
     DumpParse, ///< Parse only and dump AST
     DumpAST, ///< Parse, type-check, and dump AST
@@ -126,7 +127,7 @@ public:
   };
 
   /// Indicates the action the user requested that the frontend perform.
-  ActionType RequestedAction = Parse;
+  ActionType RequestedAction = NoneAction;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
