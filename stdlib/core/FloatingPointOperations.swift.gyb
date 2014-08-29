@@ -59,7 +59,7 @@ public protocol FloatingPointType : Strideable {
   class func _fromBitPattern(bits: _BitsType) -> Self
   func _toBitPattern() -> _BitsType
 
-% for src_ty in all_integer_types_new(word_bits):
+% for src_ty in all_integer_types(word_bits):
 
   init(_ value: ${src_ty.stdlib_name})
 

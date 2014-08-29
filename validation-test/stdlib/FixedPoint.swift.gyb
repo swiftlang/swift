@@ -71,12 +71,12 @@ truncating_bit_pattern_test_template = gyb.parseTemplate("truncating_bit_pattern
 """
 % from SwiftIntTypes import *
 
-% for dst_ty in all_integer_types_new(word_bits):
+% for dst_ty in all_integer_types(word_bits):
 %   Dst = dst_ty.stdlib_name
 
 FixedPoint.test("${Dst}(truncatingBitPattern:)") {
 
-%   for src_ty in all_integer_types_new(word_bits):
+%   for src_ty in all_integer_types(word_bits):
 %     Src = src_ty.stdlib_name
 %     if should_define_truncating_bit_pattern_init(src_ty=src_ty, dst_ty=dst_ty):
 %
@@ -142,7 +142,7 @@ bit_pattern_test_template = gyb.parseTemplate("bit_pattern",
 """
 % from SwiftIntTypes import *
 
-% for dst_ty in all_integer_types_new(word_bits):
+% for dst_ty in all_integer_types(word_bits):
 %   Dst = dst_ty.stdlib_name
 
 %   # Source is the same as destination, but of different signedness.
@@ -218,7 +218,7 @@ hash_value_test_template = gyb.parseTemplate("hash_value",
 """
 % from SwiftIntTypes import *
 
-% for self_ty in all_integer_types_new(word_bits):
+% for self_ty in all_integer_types(word_bits):
 %   Self = self_ty.stdlib_name
 
 FixedPoint.test("${Self}.hashValue") {

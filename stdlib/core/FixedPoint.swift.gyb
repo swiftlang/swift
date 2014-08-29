@@ -101,7 +101,7 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
   return .from(IntMax(x.toUIntMax()))
 }
 
-% for self_ty in all_integer_types_new(word_bits):
+% for self_ty in all_integer_types(word_bits):
 %   bits = self_ty.bits
 %   signed = self_ty.is_signed
 %   (sign, ext) = ('s', 'sext') if signed else ('u', 'zext')
@@ -334,7 +334,7 @@ extension ${Self} : SignedNumberType {}
 // construction from other integer types
 @transparent
 extension ${Self} {
-% for src_ty in all_integer_types_new(word_bits):
+% for src_ty in all_integer_types(word_bits):
 %    srcBits = src_ty.bits
 %    srcSigned = src_ty.is_signed
 %    Src = src_ty.stdlib_name

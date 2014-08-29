@@ -11,10 +11,10 @@
 ##===----------------------------------------------------------------------===##
 
 # Bit counts for all int types
-_all_integer_type_bitwidths_new = [8, 16, 32, 64]
+_all_integer_type_bitwidths = [8, 16, 32, 64]
 
 # Number of bits in the biggest int type
-int_max_bits = max(_all_integer_type_bitwidths_new)
+int_max_bits = max(_all_integer_type_bitwidths)
 
 class SwiftIntegerType(object):
     def __init__(self, is_word, bits, is_signed):
@@ -46,8 +46,8 @@ class SwiftIntegerType(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-def all_integer_types_new(word_bits):
-    for bitwidth in _all_integer_type_bitwidths_new:
+def all_integer_types(word_bits):
+    for bitwidth in _all_integer_type_bitwidths:
         for is_signed in [ False, True ]:
             yield SwiftIntegerType(is_word=False, bits=bitwidth,
                 is_signed=is_signed)

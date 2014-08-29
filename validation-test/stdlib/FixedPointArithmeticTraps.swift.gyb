@@ -46,7 +46,7 @@ word_bits = 4
 
 var FixedPointArithmeticTraps = TestSuite("FixedPointArithmeticTraps")
 
-% for self_ty in all_integer_types_new(word_bits):
+% for self_ty in all_integer_types(word_bits):
 %   IntTy = self_ty.stdlib_name
 
 //
@@ -219,7 +219,7 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
 // Test ${description} for ${IntTy}
 //
 
-%     if signedness == 'signed':
+%     if self_ty.is_signed:
 
 FixedPointArithmeticTraps.test("${description}/${IntTy}/Negative") {
   var a = get${IntTy}(${IntTy}.max / 3)

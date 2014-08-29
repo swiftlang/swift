@@ -13,6 +13,9 @@ import StdlibUnittest
 
 from SwiftIntTypes import *
 
+# Test cases are written in a way that they don't depend on the word size.
+word_bits = 4
+
 }%
 
 #if arch(i386) || arch(x86_64)
@@ -54,7 +57,8 @@ func getTooLargeMessage() -> String {
 var FloatingPointConversion = TestSuite("FloatingPointConversion")
 
 % for FloatSelf in ['Float32', 'Float64', 'Float80']:
-%   for IntSelf in all_integer_type_names():
+%   for int_ty in all_integer_types(word_bits):
+%     IntSelf = int_ty.stdlib_name
 
 %     if FloatSelf == 'Float80':
 #if arch(i386) || arch(x86_64)
@@ -75,7 +79,7 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf")
   get${IntSelf}(${IntSelf}(get${FloatSelf}(+${FloatSelf}.infinity)))
 }
 
-%     if is_signed_int(IntSelf):
+%     if int_ty.is_signed:
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
