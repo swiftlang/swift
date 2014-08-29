@@ -144,6 +144,14 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   return _swift_isClassOrObjCExistential(x)
 }
 
+/// Return an UnsafePointer to the storage used for `object`.  There's
+/// not much you can do with this other than use it to identify the
+/// object
+@transparent
+public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
+  return UnsafePointer(Builtin.bridgeToRawPointer(object))
+}
+
 //===----------------------------------------------------------------------===//
 // Branch hints
 //===----------------------------------------------------------------------===//

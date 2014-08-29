@@ -30,8 +30,8 @@ func _swift_usesNativeSwiftReferenceCounting_nonNull(_: UnsafePointer<Void>) -> 
 func _swift_isUniquelyReferencedNative_nonNull(_: UnsafePointer<Void>) -> Bool
 
 /// A type that can store any object, efficiently discriminate between
-/// native Swift and ObjectiveC classes, and report detect
-/// uniquely-referenced native Swift classes, for copy-on-write
+/// native Swift and ObjectiveC classes, and detect
+/// uniquely-referenced native Swift classes for copy-on-write
 /// optimization.
 struct BridgeObject {
   init(_ object: AnyObject) {
@@ -47,13 +47,18 @@ struct BridgeObject {
   }
 
   var address: UnsafePointer<Void> {
-    return UnsafePointer(Builtin.bridgeToRawPointer(object))
+    return unsafeAddressOf(object)
   }
   
   let object: AnyObject
 }
 
+
+
+//===----------------------------------------------------------------------===//
 //===--- Testing code -----------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
 // CHECK: testing...
 println("testing...")
 
