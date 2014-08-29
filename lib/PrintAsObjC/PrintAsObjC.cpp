@@ -23,6 +23,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Path.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -802,6 +803,22 @@ public:
   }
 };
 
+/// A generalization of llvm::SmallSetVector that allows a custom comparator.
+template <typename T, unsigned N, typename C = std::less<T>>
+using SmallSetVector =
+  llvm::SetVector<T, SmallVector<T, N>, llvm::SmallSet<T, N, C>>;
+
+/// A comparator for types with PointerLikeTypeTraits that sorts by opaque
+/// void pointer representation.
+template <typename T>
+struct PointerLikeComparator {
+  using Traits = llvm::PointerLikeTypeTraits<T>;
+  bool operator()(T lhs, T rhs) {
+    return std::less<void*>()(Traits::getAsVoidPointer(lhs),
+                              Traits::getAsVoidPointer(rhs));
+  }
+};
+
 class ModuleWriter {
   enum class EmissionState {
     DefinitionRequested = 0,
@@ -811,7 +828,10 @@ class ModuleWriter {
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
   std::vector<const Decl *> declsToWrite;
-  llvm::SmallSetVector<Module *, 8> imports;
+
+  using ImportModuleTy = PointerUnion<Module*, const clang::Module*>;
+  SmallSetVector<ImportModuleTy, 8,
+                 PointerLikeComparator<ImportModuleTy>> imports;
 
   std::string bodyBuffer;
   llvm::raw_string_ostream os{bodyBuffer};
@@ -830,10 +850,27 @@ public:
   /// will be handled explicitly rather than needing an explicit @import.
   bool addImport(const Decl *D) {
     Module *otherModule = D->getModuleContext();
+
     if (otherModule == &M)
       return false;
     if (otherModule->isStdlibModule())
       return true;
+
+    // If there's a Clang node, see if it comes from an explicit submodule.
+    // Import that instead, looking through any implicit submodules.
+    if (auto clangNode = D->getClangNode()) {
+      auto importer =
+        static_cast<ClangImporter *>(M.Ctx.getClangModuleLoader());
+      if (const auto *clangModule = importer->getClangOwningModule(clangNode)) {
+        while (clangModule && !clangModule->IsExplicit)
+          clangModule = clangModule->Parent;
+        if (clangModule) {
+          imports.insert(clangModule);
+          return true;
+        }
+      }
+    }
+
     imports.insert(otherModule);
     return true;
   }
@@ -1062,16 +1099,32 @@ public:
   void writeImports(raw_ostream &out) {
     out << "#if defined(__has_feature) && __has_feature(modules)\n";
 
-    llvm::DenseSet<Identifier> seenImports;
+    // Track printed names to handle overlay modules.
+    llvm::SmallPtrSet<Identifier, 8> seenImports;
     bool includeUnderlying = false;
     for (auto import : imports) {
-      auto Name = import->Name;
-      if (isUnderlyingModule(import)) {
-        includeUnderlying = true;
-        continue;
+      if (auto *swiftModule = import.dyn_cast<Module *>()) {
+        auto Name = swiftModule->Name;
+        if (isUnderlyingModule(swiftModule)) {
+          includeUnderlying = true;
+          continue;
+        }
+        if (seenImports.insert(Name))
+          out << "@import " << Name.str() << ";\n";
+      } else {
+        const auto *clangModule = import.get<const clang::Module *>();
+        out << "@import ";
+        // FIXME: This should be an API on clang::Module.
+        SmallVector<StringRef, 4> submoduleNames;
+        do {
+          submoduleNames.push_back(clangModule->Name);
+          clangModule = clangModule->Parent;
+        } while (clangModule);
+        interleave(submoduleNames.rbegin(), submoduleNames.rend(),
+                   [&out](StringRef next) { out << next; },
+                   [&out] { out << "."; });
+        out << ";\n";
       }
-      if (seenImports.insert(Name).second)
-        out << "@import " << Name.str() << ";\n";
     }
 
     out << "#endif\n\n";

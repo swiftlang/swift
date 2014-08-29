@@ -414,8 +414,7 @@ static void flattenImportPath(const Module::ImportedModule &import,
       submoduleNames.push_back(submodule->Name);
       submodule = submodule->Parent;
     } while (submodule);
-    std::reverse(submoduleNames.begin(), submoduleNames.end());
-    interleave(submoduleNames,
+    interleave(submoduleNames.rbegin(), submoduleNames.rend(),
                [&out](StringRef next) { out.append(next); },
                [&out] { out.push_back('\0'); });
   } else {
