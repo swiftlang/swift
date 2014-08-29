@@ -143,6 +143,10 @@ def enable_union_import :
   Flag<["-"], "enable-union-import">,
   HelpText<"Import C unions">;
 
+def emit_NSApplicationMain :
+  Flag<["-"], "emit-NSApplicationMain">,
+  HelpText<"Emit a 'main' entry point that calls NSApplicationMain">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

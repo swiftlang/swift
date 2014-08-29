@@ -791,9 +791,14 @@ public:
       sgm.TopLevelSGF = nullptr;
     }
     
-    // If the source file contains the main class, emit the implicit toplevel
-    // code.
-    if (sf->hasMainClass()) {
+    // If the source file contains an artificial main, emit the implicit
+    // toplevel code.
+    switch (auto artificialMain = sf->getArtificialMainKind()) {
+    case ArtificialMainKind::None:
+      break;
+    
+    case ArtificialMainKind::UIApplicationMain:
+    case ArtificialMainKind::NSApplicationMain:
       ClassDecl *mainClass = sf->getParentModule()->getMainClass();
       assert(!sgm.M.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)
              && "already emitted toplevel before main class?!");
@@ -805,7 +810,8 @@ public:
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
       
       SILGenFunction(sgm, *toplevel)
-        .emitArtificialTopLevel(mainClass);
+        .emitArtificialTopLevel(artificialMain, mainClass);
+      break;
     }
   }
 };

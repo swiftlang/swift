@@ -646,6 +646,13 @@ public:
   }
 };
   
+/// The kind of artificial main a source file carries.
+enum class ArtificialMainKind {
+  None,
+  NSApplicationMain,
+  UIApplicationMain,
+};
+  
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -817,12 +824,16 @@ public:
   /// True if this source file contains the main class for the module.
   bool hasMainClass() const;
   
+  /// True if this source file includes an artificial main entry point.
+  ArtificialMainKind getArtificialMainKind() const;
+  
   /// True if this source file has an application entry point.
   ///
   /// This is true if the source file either is in script mode or contains
   /// a designated main class.
   bool hasEntryPoint() const {
-    return isScriptMode() || hasMainClass();
+    return isScriptMode()
+      || getArtificialMainKind() != ArtificialMainKind::None;
   }
 };
 

@@ -22,3 +22,7 @@ module UIKit {
   header "UIKit.h" 
   export *
 }
+module AppKit {
+  header "AppKit.h" 
+  export *
+}

@@ -1365,6 +1365,15 @@ bool SourceFile::hasMainClass() const {
   return mainClass->getParentSourceFile() == this;
 }
 
+ArtificialMainKind SourceFile::getArtificialMainKind() const {
+  if (getASTContext().LangOpts.EmitNSApplicationMain)
+    return ArtificialMainKind::NSApplicationMain;
+  if (hasMainClass() && getParentModule()->getMainClass()->getAttrs()
+        .hasAttribute<UIApplicationMainAttr>())
+    return ArtificialMainKind::UIApplicationMain;
+  return ArtificialMainKind::None;
+}
+
 //===----------------------------------------------------------------------===//
 // Miscellaneous
 //===----------------------------------------------------------------------===//

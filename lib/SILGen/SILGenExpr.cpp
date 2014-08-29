@@ -2806,7 +2806,8 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitEpilog(ace);
 }
 
-void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
+void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
+                                            ClassDecl *mainClass) {
   auto findStdlibDecl = [&](StringRef name) -> ValueDecl* {
     SmallVector<ValueDecl*, 1> lookupBuffer;
     getASTContext().getStdlibModule()->lookupValue({},
@@ -2840,7 +2841,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
      SILType::getPrimitiveAddressType(argvDecl->getType()->getCanonicalType()));
   argv = B.createLoad(mainClass, argv);
   
-  if (mainClass->getAttrs().hasAttribute<UIApplicationMainAttr>()) {
+  switch (kind) {
+  case ArtificialMainKind::UIApplicationMain: {
     // Emit a UIKit main.
     // return UIApplicationMain(C_ARGC, C_ARGV, nil, ClassName);
     
@@ -2932,7 +2934,48 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     return;
   }
   
-  llvm_unreachable("no *ApplicationMain attribute on main class?!");
+  case ArtificialMainKind::NSApplicationMain: {
+    // Emit an AppKit main.
+    // return NSApplicationMain(C_ARGC, C_ARGV);
+
+    SILParameterInfo argTypes[] = {
+      SILParameterInfo(argc.getType().getSwiftRValueType(),
+                       ParameterConvention::Direct_Unowned),
+      SILParameterInfo(argv.getType().getSwiftRValueType(),
+                       ParameterConvention::Direct_Unowned),
+    };
+    auto NSApplicationMainType = SILFunctionType::get(nullptr,
+                  AnyFunctionType::ExtInfo()
+                    .withRepresentation(AnyFunctionType::Representation::Thin)
+                    // Should be C calling convention, but NSApplicationMain
+                    // has an overlay to fix the type of argv.
+                    .withCallingConv(AbstractCC::Freestanding),
+                  ParameterConvention::Direct_Unowned,
+                  argTypes,
+                  SILResultInfo(argc.getType().getSwiftRValueType(),
+                                ResultConvention::Unowned),
+                  getASTContext());
+    
+    auto NSApplicationMainFn
+      = SGM.M.getOrCreateFunction(mainClass, "NSApplicationMain",
+                                  SILLinkage::PublicExternal,
+                                  NSApplicationMainType,
+                                  IsBare, IsTransparent);
+    
+    auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
+    SILValue args[] = { argc, argv };
+    
+    B.createApply(mainClass, NSApplicationMain,
+                  NSApplicationMain->getType(),
+                  argc.getType(), {}, args);
+    auto r = B.createTuple(mainClass, SGM.Types.getEmptyTupleType(), {});
+    B.createReturn(mainClass, r);
+    return;
+  }
+  
+  case ArtificialMainKind::None:
+    llvm_unreachable("no artificial main?!");
+  }
 }
 
 std::pair<Optional<SILValue>, SILLocation>

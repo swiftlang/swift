@@ -83,6 +83,9 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
+    /// Triggers emission of an artificial 'main' for an AppKit project.
+    bool EmitNSApplicationMain = false;
+
     /// The minimum platform version to which code will be deployed.
     clang::VersionTuple MinPlatformVersion;
 
