@@ -1,4 +1,3 @@
-// RUN: %sil-opt -codemotion -verify %s | FileCheck %s
 // RUN: %sil-opt -enum-simplification -verify %s | FileCheck %s
 
 import Builtin

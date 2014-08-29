@@ -25,6 +25,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
@@ -33,8 +34,7 @@
 
 STATISTIC(NumSunk,   "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "number of enum ref count ops simplified.");
-STATISTIC(NumReleasesMovedIntoSwitches, "number of release moved into switch "
-          "regions");
+STATISTIC(NumHoisted, "Number of instructions hoisted");
 
 using namespace swift;
 using namespace swift::arc;
@@ -665,6 +665,9 @@ namespace {
 
 class BBToDataflowStateMap;
 
+using EnumBBCaseList = llvm::SmallVector<std::pair<SILBasicBlock *,
+                                                   EnumElementDecl *>, 2>;
+
 /// Class that performs enum tag state dataflow on the given BB.
 class BBEnumTagDataflowState
     : public SILInstructionVisitor<BBEnumTagDataflowState, bool> {
@@ -677,9 +680,7 @@ class BBEnumTagDataflowState
                                               EnumElementDecl *>, 4>>;
   ValueToCaseSmallBlotMapVectorTy ValueToCaseMap;
 
-  using EnumBBCaseList = llvm::SmallVector<std::pair<SILBasicBlock *,
-                                                     EnumElementDecl *>, 2>;
-  llvm::DenseMap<SILValue, EnumBBCaseList> EnumToEnumBBCaseListMap;
+  llvm::MapVector<SILValue, EnumBBCaseList> EnumToEnumBBCaseListMap;
 
 public:
   BBEnumTagDataflowState() = default;
@@ -723,7 +724,8 @@ public:
   bool process();
   void
   mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
-  bool moveReleasesUpCFGIfCasesCovered(AliasAnalysis *AA);
+  bool hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA);
+  bool sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA);
   void handlePredSwitchEnum(SwitchEnumInst *S);
   void handlePredCondEnumIsTag(CondBranchInst *CondBr);
 };
@@ -1015,7 +1017,7 @@ bool BBEnumTagDataflowState::process() {
 }
 
 bool
-BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered(AliasAnalysis *AA) {
+BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
   bool Changed = false;
   unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
 
@@ -1090,7 +1092,127 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered(AliasAnalysis *AA) {
     }
 
     RVI->eraseFromParent();
-    ++NumReleasesMovedIntoSwitches;
+    ++NumHoisted;
+    Changed = true;
+  }
+
+  return Changed;
+}
+
+static SILInstruction *
+findLastSinkableMatchingEnumValueRCIncrementInPred(AliasAnalysis *AA,
+                                                   SILValue EnumValue,
+                                                   SILBasicBlock *BB) {
+    // Otherwise, see if we can find a retain_value or strong_retain associated
+    // with that enum in the relevant predecessor.
+    auto FirstInc = std::find_if(BB->rbegin(), BB->rend(),
+      [&EnumValue](const SILInstruction &I) -> bool {
+      // If I is not an increment, ignore it.
+      if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
+        return false;
+
+      // Otherwise, if the increments operand stripped of RC identity preserving
+      // ops matches EnumValue, it is the first increment we are interested in.
+      return EnumValue == I.getOperand(0).stripRCIdentityPreservingOps();
+    });
+
+    // If we do not find a ref count increment in the relevant BB, skip this
+    // enum since there is nothing we can do.
+    if (FirstInc == BB->rend())
+      return nullptr;
+
+    // Otherwise, see if there are any instructions in between FirstPredInc and
+    // the end of the given basic block that could decrement first pred. If such
+    // an instruction exists, we can not perform this optimization so continue.
+    if (valueHasARCDecrementOrCheckInInstructionRange(EnumValue, &*FirstInc,
+                                                      BB->getTerminator(),
+                                                      AA))
+      return nullptr;
+
+    return &*FirstInc;
+}
+
+static bool
+findRetainsSinkableFromSwitchRegionForEnum(
+  AliasAnalysis *AA, SILValue EnumValue,
+  EnumBBCaseList &Map, SmallVectorImpl<SILInstruction *> &DeleteList) {
+
+  // For each predecessor with argument type...
+  for (auto &P : Map) {
+    SILBasicBlock *PredBB = P.first;
+    EnumElementDecl *Decl = P.second;
+
+    // If the case does not have an argument type, skip the predecessor since
+    // there will not be a retain to sink.
+    if (!Decl->hasArgumentType())
+      continue;
+
+    // Ok, we found a payloaded predecessor. Look backwards through the
+    // predecessor for the first ref count increment on EnumValue. If there
+    // are no ref count decrements in between the increment and the terminator
+    // of the BB, then we can sink the retain out of the switch enum.
+    auto *Inc = findLastSinkableMatchingEnumValueRCIncrementInPred(AA,
+                                                                   EnumValue,
+                                                                   PredBB);
+    // If we do not find such an increment, there is nothing we can do, bail.
+    if (!Inc)
+      return false;
+
+    // Otherwise add the increment to the delete list.
+    DeleteList.push_back(Inc);
+  }
+
+  // If we were able to process each predecessor successfully, return true.
+  return true;
+}
+
+bool
+BBEnumTagDataflowState::sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA) {
+  bool Changed = false;
+  unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
+  llvm::SmallVector<SILInstruction *, 4> DeleteList;
+
+  // For each (EnumValue, [(BB, EnumTag)]) that we are tracking...
+  for (auto &P : EnumToEnumBBCaseListMap) {
+    // Clear our delete list.
+    DeleteList.clear();
+
+    // If EnumValue is null, we deleted this entry. There is nothing to do for
+    // this value... Skip it.
+    if (!P.first)
+      continue;
+    SILValue EnumValue = P.first.stripRCIdentityPreservingOps();
+    EnumBBCaseList &Map = P.second;
+
+    // If we do not have a tag associated with this enum value for each
+    // predecessor, we are not a switch region exit for this enum value. Skip
+    // this value.
+    if (Map.size() != NumPreds)
+      continue;
+
+    // Look through our predecessors for a set of ref count increments on our
+    // enum value for every payloaded case that *could* be sunk. If we miss an
+    // increment from any of the payloaded case there is nothing we can do here,
+    // so skip this enum value.
+    if (!findRetainsSinkableFromSwitchRegionForEnum(AA, EnumValue, Map,
+                                                    DeleteList))
+      continue;
+
+    // If we do not have any payload arguments, then we should have an empty
+    // delete list and there is nothing to do here.
+    if (DeleteList.empty())
+      continue;
+
+    // Ok, we can perform this transformation! Insert the new retain_value and
+    // delete all of the ref count increments from the predecessor BBs.
+    //
+    // TODO: Which debug loc should we use here? Using one of the locs from the
+    // delete list seems reasonable for now...
+    SILBuilder(getBB()->begin()).createRetainValue(DeleteList[0]->getLoc(),
+                                                   EnumValue);
+    for (auto *I : DeleteList)
+      I->eraseFromParent();
+    ++NumSunk;
     Changed = true;
   }
 
@@ -1126,12 +1248,14 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     DEBUG(llvm::dbgs() << "    Merging predecessors!\n");
     State.mergePredecessorStates(BBToStateMap);
 
-    // If our predecessors cover any of our enum values, attempt to move
-    // releases up the CFG onto the enum payloads (if they exist) or eliminate
-    // them entirely.
+    // If our predecessors cover any of our enum values, attempt to hoist
+    // releases up the CFG onto enum payloads or sink retains out of switch
+    // regions.
     DEBUG(llvm::dbgs() << "    Attempting to move releases into "
           "predecessors!\n");
-    Changed |= State.moveReleasesUpCFGIfCasesCovered(AA);
+    Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
+    Changed |= State.sinkIncrementsOutOfSwitchRegions(AA);
+
 
     // Then attempt to sink code from predecessors. This can include retains
     // which is why we always attempt to move releases up the CFG before sinking
