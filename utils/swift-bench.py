@@ -40,12 +40,230 @@ import time
 import re
 import os
 import sys
+import argparse
 
-# TODO: Wrap into a class
-sources = []
-verboseLevel = 10
-compiler = ""
-tests = {}
+
+class SwiftBenchHarness:
+  sources = []
+  verboseLevel = 0
+  compiler = ""
+  tests = {}
+  timeLimit = 1000
+  minSampleTime = 100
+  minIterTime = 1
+
+
+  def log(self, str, level):
+    if self.verboseLevel >= level:
+      for i in range(1,level):
+        sys.stdout.write('  ')
+      print(str)
+
+
+  def parseArguments(self):
+    self.log("Parsing arguments.", 2)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbosity", help="increase output verbosity", type=int)
+    parser.add_argument("files", help="input files", nargs='+')
+    parser.add_argument('-c', '--compiler', help="compiler to use")
+    parser.add_argument('-t', '--timelimit', help="Time limit for every test", type=int)
+    parser.add_argument('-s', '--sampletime', help="Minimum time for every sample", type=int)
+    args = parser.parse_args()
+    if args.verbosity:
+      self.verboseLevel = args.verbosity
+    self.sources = args.files
+    if args.compiler:
+      self.compiler = args.compiler
+    else:
+      self.compiler = 'swiftc'
+    if args.timelimit and args.timelimit > 0:
+      self.timeLimit = args.timelimit
+    if args.sampletime and args.sampletime > 0:
+      self.minSampleTime = args.sampletime
+    self.log("Sources: %s." % self.sources, 3)
+    self.log("Compiler: %s." % self.compiler, 3)
+    self.log("Verbosity: %s." % self.verboseLevel, 3)
+    self.log("Time limit: %s." % self.timeLimit, 3)
+    self.log("Min sample time: %s." % self.minSampleTime, 3)
+
+
+  def processSource(self, name):
+    self.log("Processing source file: %s." % name, 2)
+
+    header = """
+@asmname("mach_absolute_time") func __mach_absolute_time__() -> UInt64
+@inline(never)
+func False() -> Bool { return false }
+@inline(never)
+func Consume(x: Int) { if False() { println(x) } }
+"""
+    beforeBench = """
+@inline(never)
+"""
+    intoBench = """
+  if False() { return 0 }
+"""
+    mainBegin = """
+func main() {
+  var N = 1
+  var name = ""
+  if Process.arguments.count > 1 {
+    N = Process.arguments[1].toInt()!
+  }
+"""
+    mainBody = """
+  name = "%s"
+  if Process.arguments.count <= 2 || Process.arguments[2] == name {
+    let start = __mach_absolute_time__()
+    for _ in 1...N {
+      bench_%s()
+    }
+    let end = __mach_absolute_time__()
+    println("\(name),\(N),\(end - start)")
+  }
+"""
+    mainEnd = """
+}
+main()
+"""
+
+    benchRE = re.compile("^\s*func\s\s*bench_([a-zA-Z0-9_]+)\s*\(\s*\)\s*->\s*Int\s*({)?\s*$")
+    f = open(name)
+    lines = f.readlines()
+    f.close()
+    output = header
+    lookingForCurlyBrace = False
+    testNames = []
+    for l in lines:
+      if lookingForCurlyBrace:
+        output += l
+        if "{" not in l:
+          continue
+        lookingForCurlyBrace = False
+        output += intoBench
+        continue
+
+      m = benchRE.match(l)
+      if m:
+        output += beforeBench
+        output += l
+        benchName = m.group(1)
+        # TODO: Keep track of the line number as well
+        self.log("Benchmark found: %s" % benchName, 3)
+        self.tests[name+":"+benchName] = Test(benchName, name, "", "")
+        testNames.append(benchName)
+        if m.group(2):
+          output += intoBench
+        else:
+          lookingForCurlyBrace = True
+      else:
+        output += l
+
+    output += mainBegin
+    for n in testNames:
+      output += mainBody % (n, n)
+    processedName = 'processed_'+name
+    output += mainEnd
+    f = open(processedName, 'w')
+    f.write(output)
+    f.close()
+    for n in testNames:
+      self.tests[name+":"+n].processedSource = processedName
+
+
+  def processSources(self):
+    self.log("Processing sources: %s." % self.sources, 2)
+    for s in self.sources:
+      self.processSource(s)
+
+
+  def compileSources(self):
+    self.log("Compiling processed sources.", 2)
+    for t in self.tests:
+      self.tests[t].binary = "./"+self.tests[t].processedSource.split(os.extsep)[0]
+      try:
+        self.log("Executing '%s %s -o %s'" % (self.compiler, self.tests[t].processedSource, self.tests[t].binary), 3)
+        r = subprocess.check_output([self.compiler, self.tests[t].processedSource, "-o", self.tests[t].binary], stderr=subprocess.STDOUT)
+      except subprocess.CalledProcessError as e:
+        self.tests[t].output = e.output
+        self.tests[t].status = "COMPFAIL"
+
+
+  def runBenchmarks(self):
+    self.log("Running benchmarks.", 2)
+    for t in self.tests:
+      self.runBench(t)
+
+
+  def parseBenchmarkOutput(self, res):
+    # Parse lines like
+    # TestName,NNN,MMM
+    # where NNN - performed iterations number, MMM - execution time (in ns)
+    RESULTS_RE = re.compile(r"(\w+),[ \t]*(\d+),[ \t]*(\d+)")
+    m = RESULTS_RE.match(res)
+    if not m:
+      return ("", 0, 0)
+    return (m.group(1), m.group(2), m.group(3))
+
+
+  def computeItersNumber(self, name):
+    scale = 1
+    spent = 0
+    # Mesaure time for one iteration
+    # If it's too small, increase number of iteration until it's measurable
+    while (spent <= self.minIterTime):
+      try:
+        r = subprocess.check_output([self.tests[name].binary, str(scale),
+                                     self.tests[name].name], stderr=subprocess.STDOUT)
+        (testName, itersComputed, execTime) = self.parseBenchmarkOutput(r)
+        spent = int(execTime) / 1000000 # Convert ns to ms
+        if spent <= self.minIterTime:
+          scale *= 2
+      except subprocess.CalledProcessError as e:
+        r = e.output
+        break
+    if spent == 0:
+      spent = 1
+    # Now compute number of samples we can take in the given time limit
+    mult = int(self.minSampleTime / spent)
+    if mult == 0:
+      mult = 1
+    scale *= mult
+    spent *= mult
+    samples = int(self.timeLimit / spent)
+    if samples == 0:
+      samples = 1
+    return (samples, scale)
+
+
+  def runBench(self, name):
+    if not self.tests[name].status == "":
+      return
+    (numSamples, iterScale) = self.computeItersNumber(name)
+    samples = []
+    self.log("Running bench: %s, numsamples: %d" % (name, numSamples), 2)
+    output = ""
+    for i in range(0,numSamples):
+      try:
+        r = subprocess.check_output([self.tests[name].binary, str(iterScale),
+                                     self.tests[name].name], stderr=subprocess.STDOUT)
+        (testName, itersComputed, execTime) = self.parseBenchmarkOutput(r)
+        # TODO: Verify testName and itersComputed
+        samples.append(int(execTime) / iterScale)
+        self.tests[name].output = r
+      except subprocess.CalledProcessError as e:
+        self.tests[name].status = "RUNFAIL"
+        self.tests[name].output = e.output
+        break
+    res = TestResults(name, samples)
+    self.tests[name].results = res
+
+
+  def reportResults(self):
+    self.log("\nReporting results.", 2)
+    print("==================================================")
+    for t in self.tests:
+      self.tests[t].Print()
 
 
 class Test:
@@ -93,218 +311,13 @@ class TestResults:
     print("")
 
 
-
-def log(str, level = 1):
-  if verboseLevel >= level:
-    for i in range(1,level):
-      sys.stdout.write('  ')
-    print(str)
-
-
-def parseArguments():
-  global compiler
-  global sources
-  log("Parsing arguments.", 2)
-  # This routien is not implemented yet.
-  # Hardcode some values for testing purposes.
-  sources.append("bench.swift")
-  sources.append("bench2.swift")
-  sources.append("benchCompFail.swift")
-  sources.append("benchAbort.swift")
-  sources.append("benchMulti.swift")
-  compiler = "/Users/michaelzolotukhin/devel/swift/build/Ninja-RelWithDebInfo/swift/bin/swiftc"
-  log("Sources: %s." % sources, 3)
-
-
-def processSource(name):
-  global tests
-  log("Processing source file: %s." % name, 2)
-
-  header = """
-@asmname("mach_absolute_time") func __mach_absolute_time__() -> UInt64
-@inline(never)
-func False() -> Bool { return false }
-@inline(never)
-func Consume(x: Int) { if False() { println(x) } }
-"""
-  beforeBench = """
-@inline(never)
-"""
-  intoBench = """
-  if False() { return 0 }
-"""
-  mainBegin = """
-func main() {
-  var N = 1
-  var name = ""
-  if Process.arguments.count > 1 {
-    N = Process.arguments[1].toInt()!
-  }
-"""
-  mainBody = """
-  name = "%s"
-  if Process.arguments.count <= 2 || Process.arguments[2] == name {
-    let start = __mach_absolute_time__()
-    for _ in 1...N {
-      bench_%s()
-    }
-    let end = __mach_absolute_time__()
-    println("\(name),\(N),\(end - start)")
-  }
-"""
-  mainEnd = """
-}
-main()
-"""
-
-  benchRE = re.compile("^\s*func\s\s*bench_([a-zA-Z0-9_]+)\s*\(\s*\)\s*->\s*Int\s*({)?\s*$")
-  f = open(name)
-  lines = f.readlines()
-  f.close()
-  output = header
-  lookingForCurlyBrace = False
-  testNames = []
-  for l in lines:
-    if lookingForCurlyBrace:
-      output += l
-      if "{" not in l:
-        continue
-      lookingForCurlyBrace = False
-      output += intoBench
-      continue
-
-    m = benchRE.match(l)
-    if m:
-      output += beforeBench
-      output += l
-      benchName = m.group(1)
-      # TODO: Keep track of the line number as well
-      log("Benchmark found: %s" % benchName, 3)
-      tests[name+":"+benchName] = Test(benchName, name, "", "")
-      testNames.append(benchName)
-      if m.group(2):
-        output += intoBench
-      else:
-        lookingForCurlyBrace = True
-    else:
-      output += l
-
-  output += mainBegin
-  for n in testNames:
-    output += mainBody % (n, n)
-  processedName = 'processed_'+name
-  output += mainEnd
-  f = open(processedName, 'w')
-  f.write(output)
-  f.close()
-  for n in testNames:
-    tests[name+":"+n].processedSource = processedName
-
-
-def processSources():
-  log("Processing sources: %s." % sources, 2)
-  for s in sources:
-    processSource(s)
-
-
-def compileSources():
-  log("Compiling processed sources.", 2)
-  for t in tests:
-    tests[t].binary = "./"+tests[t].processedSource.split(os.extsep)[0]
-    try:
-      log("Executing '%s %s -o %s'" % (compiler, tests[t].processedSource, tests[t].binary), 3)
-      r = subprocess.check_output([compiler, tests[t].processedSource, "-o", tests[t].binary], stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-      tests[t].output = e.output
-      tests[t].status = "COMPFAIL"
-
-
-def runBenchmarks():
-  log("Running benchmarks.", 2)
-  for t in tests:
-    runBench(t)
-
-
-def parseBenchmarkOutput(res):
-  # Parse lines like
-  # TestName,NNN,MMM
-  # where NNN - performed iterations number, MMM - execution time (in ns)
-  RESULTS_RE = re.compile(r"(\w+),[ \t]*(\d+),[ \t]*(\d+)")
-  m = RESULTS_RE.match(res)
-  if not m:
-    return ("", 0, 0)
-  return (m.group(1), m.group(2), m.group(3))
-
-
-def computeItersNumber(name):
-  timeLimit = 1000
-  itertime = 100
-  mintime = 1
-  scale = 1
-  spent = 0
-  # Mesaure time for one iteration
-  # If it's too small, increase number of iteration until it's measurable
-  while (spent <= mintime):
-    try:
-      r = subprocess.check_output([tests[name].binary, str(scale),
-                                   tests[name].name], stderr=subprocess.STDOUT)
-      (testName, itersComputed, execTime) = parseBenchmarkOutput(r)
-      spent = int(execTime) / 1000000 # Convert ns to ms
-      if spent <= mintime:
-        scale *= 2
-    except subprocess.CalledProcessError as e:
-      r = e.output
-      break
-  if spent == 0:
-    spent = 1
-  # Now compute number of samples we can take in the given time limit
-  mult = int(itertime / spent)
-  if mult == 0:
-    mult = 1
-  scale *= mult
-  spent *= mult
-  samples = int(timeLimit / spent)
-  if samples == 0:
-    samples = 1
-  return (samples, scale)
-
-
-def runBench(name):
-  if not tests[name].status == "":
-    return
-  (numSamples, iterScale) = computeItersNumber(name)
-  samples = []
-  log("Running bench: %s, numsamples: %d" % (name, numSamples), 2)
-  output = ""
-  for i in range(0,numSamples):
-    try:
-      r = subprocess.check_output([tests[name].binary, str(iterScale),
-                                   tests[name].name], stderr=subprocess.STDOUT)
-      (testName, itersComputed, execTime) = parseBenchmarkOutput(r)
-      # TODO: Verify testName and itersComputed
-      samples.append(int(execTime) / iterScale)
-      tests[name].output = r
-    except subprocess.CalledProcessError as e:
-      tests[name].status = "RUNFAIL"
-      tests[name].output = e.output
-      break
-  res = TestResults(name, samples)
-  tests[name].results = res
-
-
-def reportResults():
-  log("\nReporting results.", 2)
-  print("==================================================")
-  for t in tests:
-    tests[t].Print()
-
-
 def main():
-  parseArguments()
-  processSources()
-  compileSources()
-  runBenchmarks()
-  reportResults()
+  harness = SwiftBenchHarness()
+  harness.parseArguments()
+  harness.processSources()
+  harness.compileSources()
+  harness.runBenchmarks()
+  harness.reportResults()
 
 
 main()
