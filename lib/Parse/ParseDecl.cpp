@@ -723,7 +723,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           continue;
         }
 
-        unsigned major = 0, minor = 0, micro = 0;
+        unsigned major = 0, minor = 0;
         StringRef majorPart, minorPart;
         std::tie(majorPart, minorPart) = Tok.getText().split('.');
         if (majorPart.getAsInteger(10, major) ||
@@ -737,6 +737,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
         consumeToken();
         if (consumeIf(tok::period)) {
+          unsigned micro = 0;
           if (!Tok.is(tok::integer_literal) ||
               Tok.getText().getAsInteger(10, micro)) {
             // Reject things like 0.1e5 and hex literals.
@@ -748,9 +749,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
             continue;
           }
           consumeToken();
+          VersionArg = clang::VersionTuple(major, minor, micro);
+        } else {
+          VersionArg = clang::VersionTuple(major, minor);
         }
 
-        VersionArg = clang::VersionTuple(major, minor, micro);
         break;
       }
 
