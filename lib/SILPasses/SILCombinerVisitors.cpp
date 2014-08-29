@@ -280,12 +280,6 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand.getType();
 
-  SILValue OpStripped = Operand.stripRCIdentityPreservingOps();
-  if (Operand != OpStripped) {
-    RVI->setOperand(OpStripped);
-    return RVI;
-  }
-
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
@@ -316,12 +310,6 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand.getType();
 
-  SILValue OpStripped = Operand.stripRCIdentityPreservingOps();
-  if (Operand != OpStripped) {
-    RVI->setOperand(OpStripped);
-    return RVI;
-  }
-
   // retain_value of an enum with a trivial payload or no-payload is a no-op +
   // RAUW.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
@@ -339,8 +327,9 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   }
 
   // RetainValueInst of a reference type is a strong_release.
-  if (OperandTy.hasReferenceSemantics())
+  if (OperandTy.hasReferenceSemantics()) {
     return new (RVI->getModule()) StrongRetainInst(RVI->getLoc(), Operand);
+  }
 
   // RetainValueInst of a trivial type is a no-op + use propogation.
   if (OperandTy.isTrivial(RVI->getModule())) {
