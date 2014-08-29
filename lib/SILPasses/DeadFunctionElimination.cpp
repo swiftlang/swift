@@ -97,8 +97,8 @@ class SILDeadFuncElimination : public SILModuleTransform {
 
     // Scan the call graph top-down (caller first) because eliminating functions
     // can generate more opportunities.
-    for (int i = Order.size() - 1; i >= 0; i--)
-      Changed |= tryToRemoveFunction(Order[i]);
+    for (auto I = Order.rbegin(), E = Order.rend(); I != E; ++I)
+      Changed |= tryToRemoveFunction(*I);
 
     // Invalidate the call graph.
     if (Changed)
