@@ -51,6 +51,7 @@ class SwiftBenchHarness:
   timeLimit = 1000
   minSampleTime = 100
   minIterTime = 1
+  optFlags = []
 
 
   def log(self, str, level):
@@ -73,10 +74,13 @@ class SwiftBenchHarness:
     parser.add_argument('-c', '--compiler', help="compiler to use")
     parser.add_argument('-t', '--timelimit', help="Time limit for every test", type=int)
     parser.add_argument('-s', '--sampletime', help="Minimum time for every sample", type=int)
+    parser.add_argument('-f', '--flags', help="Compilation flags", nargs='+')
     args = parser.parse_args()
     if args.verbosity:
       self.verboseLevel = args.verbosity
     self.sources = args.files
+    if args.flags:
+      self.optFlags = args.flags
     if args.compiler:
       self.compiler = args.compiler
     else:
@@ -85,8 +89,9 @@ class SwiftBenchHarness:
       self.timeLimit = args.timelimit
     if args.sampletime and args.sampletime > 0:
       self.minSampleTime = args.sampletime
-    self.log("Sources: %s." % self.sources, 3)
+    self.log("Sources: %s." % ', '.join(self.sources), 3)
     self.log("Compiler: %s." % self.compiler, 3)
+    self.log("Opt flags: %s." % ', '.join(self.optFlags), 3)
     self.log("Verbosity: %s." % self.verboseLevel, 3)
     self.log("Time limit: %s." % self.timeLimit, 3)
     self.log("Min sample time: %s." % self.minSampleTime, 3)
@@ -187,7 +192,7 @@ main()
     for t in self.tests:
       self.tests[t].binary = "./"+self.tests[t].processedSource.split(os.extsep)[0]
       try:
-        self.runCommand([self.compiler, self.tests[t].processedSource, "-o", self.tests[t].binary])
+        self.runCommand([self.compiler, self.tests[t].processedSource, "-o", self.tests[t].binary] + self.optFlags)
       except subprocess.CalledProcessError as e:
         self.tests[t].output = e.output
         self.tests[t].status = "COMPFAIL"
