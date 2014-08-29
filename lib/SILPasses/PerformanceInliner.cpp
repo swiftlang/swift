@@ -306,20 +306,12 @@ public:
       return;
     }
 
-    // Initialize the worklist with a bottom-up call-graph order list of
-    // functions.
-    const std::vector<SILFunction *> &Order = CGA->bottomUpCallGraphOrder();
-    std::vector<SILFunction *> Worklist(Order);
-    std::reverse(Worklist.begin(), Worklist.end());
-
     SILPerformanceInliner inliner(getOptions().InlineThreshold,
                                   SILModule::LinkingMode::LinkAll, InlineSem);
 
     bool Changed = false;
-    while (!Worklist.empty()) {
-      SILFunction *F = Worklist.back();
-      Worklist.pop_back();
-
+    // Inline functions bottom up from the leafs.
+    for (auto *F : CGA->bottomUpCallGraphOrder()) {
       // If F is empty, attempt to link it. Skip it if we fail to do so.
       if (F->empty() &&
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
