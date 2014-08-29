@@ -10,15 +10,10 @@ var FixedPoint = TestSuite("FixedPoint")
 
 import gyb
 
-}%
-
-//===----------------------------------------------------------------------===//
-// 'Int(truncatingBitPattern:)' initializer
-//===----------------------------------------------------------------------===//
-
-%{
-
 test_bit_patterns = [
+  0x0000000000000000,
+  0x0000000000000001,
+
   0xffffffffffffffff,
   0x00ffffffffffffff,
   0x0000ffffffffffff,
@@ -27,7 +22,15 @@ test_bit_patterns = [
   0x0000000000ffffff,
   0x000000000000ffff,
   0x00000000000000ff,
-  0x0000000000000000,
+
+  0xfe123456789abcde,
+  0x00fe123456789abc,
+  0x0000fe123456789a,
+  0x000000fe12345678,
+  0x00000000fe123456,
+  0x0000000000fe1234,
+  0x000000000000fe12,
+  0x00000000000000fe,
 
   0x7f123456789abcde,
   0x007f123456789abc,
@@ -47,6 +50,22 @@ def prepare_bit_pattern(bit_pattern, dst_bits, dst_signed):
     if dst <= ((1 << (dst_bits - 1)) - 1):
         return dst
     return dst - mask - 1
+
+def get_fixed_point_hash(bit_pattern, src_bits, word_bits):
+    if src_bits <= word_bits:
+        bit_pattern = prepare_bit_pattern(bit_pattern, src_bits, True)
+        return prepare_bit_pattern(bit_pattern, word_bits, True)
+    if src_bits == word_bits * 2:
+        return prepare_bit_pattern(
+            bit_pattern ^ (bit_pattern >> 32), word_bits, True)
+
+}%
+
+//===----------------------------------------------------------------------===//
+// 'Int(truncatingBitPattern:)' initializer
+//===----------------------------------------------------------------------===//
+
+%{
 
 truncating_bit_pattern_test_template = gyb.parseTemplate("truncating_bit_pattern",
 """
@@ -182,6 +201,65 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
   ${gyb.executeTemplate(
       bit_pattern_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=64)}
+
+#else
+
+_UnimplementedError()
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// 'Int.hashValue' property
+//===----------------------------------------------------------------------===//
+
+%{
+
+hash_value_test_template = gyb.parseTemplate("hash_value",
+"""
+% from SwiftIntTypes import *
+
+% for self_ty in all_integer_types_new(word_bits):
+%   Self = self_ty.stdlib_name
+
+FixedPoint.test("${Self}.hashValue") {
+
+%   for bit_pattern in test_bit_patterns:
+
+  if true {
+%     input = prepare_bit_pattern(bit_pattern, self_ty.bits, self_ty.is_signed)
+    let input = get${Self}(${input})
+    let output = getInt(input.hashValue)
+    let expected = getInt(${get_fixed_point_hash(input, self_ty.bits, word_bits)})
+    expectEqual(expected, output)
+  }
+
+%   end
+
+}
+
+% end
+
+""")
+
+}%
+
+#if arch(i386) || arch(arm)
+
+  ${gyb.executeTemplate(
+      hash_value_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      get_fixed_point_hash=get_fixed_point_hash,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=32)}
+
+#elseif arch(x86_64) || arch(arm64)
+
+  ${gyb.executeTemplate(
+      hash_value_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      get_fixed_point_hash=get_fixed_point_hash,
       test_bit_patterns=test_bit_patterns,
       word_bits=64)}
 

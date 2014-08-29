@@ -220,16 +220,16 @@ extension ${Self} : Hashable {
   public var hashValue: Int {
 % if bits < word_bits:
     return Int(Builtin.sextOrBitCast_${BuiltinName}_Word(self.value))
-% elif bits > word_bits:
-    var result: Int = 0
-    for var i = 0; i < ${bits}; i += Int._sizeInBits {
-      result ^= Int(self >> ${Self}(i)) & ~0
-    }
-    return result
-% elif BuiltinName == 'Word':
+% elif self_ty.is_word:
     return Int(self.value)
-% else:
+% elif bits == word_bits:
     return Int(Builtin.${CastToWord}(self.value))
+% elif bits == word_bits * 2:
+    return
+      Int(truncatingBitPattern: self) ^
+      Int(truncatingBitPattern: self >> 32)
+% else:
+    _Unimplemented()
 % end
   }
 }
