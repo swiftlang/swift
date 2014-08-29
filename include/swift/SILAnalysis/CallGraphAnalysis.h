@@ -183,6 +183,11 @@ namespace swift {
     bool CallerSetComplete;
   };
 
+  struct CallGraphSCC {
+  public:
+    llvm::SmallVector<CallGraphNode *, 1> SCCNodes;
+  };
+
   class CallGraph {
   public:
     CallGraph(SILModule *M, bool completeModule);
@@ -190,9 +195,14 @@ namespace swift {
     ~CallGraph() {
       for (auto &MapEntry : FunctionToNodeMap)
         delete MapEntry.second;
+
+      for (auto *SCC : BottomUpSCCOrder)
+        delete SCC;
     }
 
-    llvm::SmallVectorImpl<CallGraphNode *> &getCallGraphRoots();
+    llvm::SmallVectorImpl<CallGraphNode *> &getCallGraphRoots() {
+      return CallGraphRoots;
+    }
 
     CallGraphNode *getCallGraphNode(SILFunction *F) {
       auto Found = FunctionToNodeMap.find(F);
@@ -203,13 +213,22 @@ namespace swift {
       return Found->second;
     }
 
+    llvm::SmallVectorImpl<CallGraphSCC *> &getBottomUpSCCOrder() {
+      if (BottomUpSCCOrder.empty())
+        computeBottomUpSCCOrder();
+
+      return BottomUpSCCOrder;
+    }
+
   private:
     void addCallGraphNode(SILFunction *F, unsigned Ordinal);
     void addEdges(SILFunction *F);
     void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
+    void computeBottomUpSCCOrder();
 
     llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
     llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
+    llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
   };
 
   /// \brief a utility class that is used to traverse the call-graph

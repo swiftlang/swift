@@ -11,7 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include <algorithm>
+#include <utility>
 
 using namespace swift;
 
@@ -152,4 +157,88 @@ void CallGraph::addEdges(SILFunction *F) {
     for (auto &I : BB)
       if (auto *AI = dyn_cast<ApplyInst>(&I))
         addEdgesForApply(AI, CallerNode);
+}
+
+static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,
+                         llvm::SmallVectorImpl<CallGraphNode *> &OrderedNodes) {
+  for (auto *Node : Callees)
+    OrderedNodes.push_back(Node);
+
+  std::sort(OrderedNodes.begin(), OrderedNodes.end(),
+            [](CallGraphNode *left, CallGraphNode *right) {
+              return left->getOrdinal() < right->getOrdinal();
+            });
+}
+
+/// Finds SCCs in the call graph. Our call graph has an unconventional
+/// form where each edge of the graph is really a multi-edge that can
+/// point to multiple call graph nodes in the case where we can call
+/// one of several different functions.
+class CallGraphSCCFinder {
+public:
+  CallGraphSCCFinder(llvm::SmallVectorImpl<CallGraphSCC *> &TheSCCs)
+    : NextDFSNum(0), TheSCCs(TheSCCs) {}
+
+  void DFS(CallGraphNode *Node) {
+    // Set the DFSNum for this node if we haven't already, and if we
+    // have, which indicates it's already been visited, return.
+    if (!DFSNum.insert(std::make_pair(Node, NextDFSNum)).second)
+      return;
+
+    assert(MinDFSNum.find(Node) == MinDFSNum.end() &&
+           "Node should not already have a minimum DFS number!");
+
+    MinDFSNum[Node] = NextDFSNum;
+    ++NextDFSNum;
+
+    DFSStack.insert(Node);
+
+    for (auto *CallSite : Node->getCallSites()) {
+      llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
+      orderCallees(CallSite->getCalleeSet(), OrderedNodes);
+
+      for (auto *CalleeNode : OrderedNodes) {
+        if (DFSNum.find(CalleeNode) == DFSNum.end()) {
+          DFS(CalleeNode);
+          MinDFSNum[Node] = std::min(MinDFSNum[Node], MinDFSNum[CalleeNode]);
+        } else if (DFSStack.count(CalleeNode)) {
+          MinDFSNum[Node] = std::min(MinDFSNum[Node], DFSNum[CalleeNode]);
+        }
+      }
+    }
+
+    // If this node is the root of an SCC (including SCCs with a
+    // single node), pop the SCC and push it on our SCC stack.
+    if (DFSNum[Node] == MinDFSNum[Node]) {
+      auto *SCC = new CallGraphSCC();
+
+      CallGraphNode *Popped;
+      do {
+        Popped = DFSStack.pop_back_val();
+        SCC->SCCNodes.push_back(Popped);
+      } while (Popped != Node);
+
+      TheSCCs.push_back(SCC);
+    }
+  }
+
+private:
+  unsigned NextDFSNum;
+  llvm::SmallVectorImpl<CallGraphSCC *> &TheSCCs;
+
+  llvm::DenseMap<CallGraphNode *, unsigned> DFSNum;
+  llvm::DenseMap<CallGraphNode *, unsigned> MinDFSNum;
+  llvm::SetVector<CallGraphNode *> DFSStack;
+};
+
+void CallGraph::computeBottomUpSCCOrder() {
+  if (!BottomUpSCCOrder.empty()) {
+    for (auto *SCC : BottomUpSCCOrder)
+      delete SCC;
+
+    BottomUpSCCOrder.clear();
+  }
+
+  for (auto *Node : getCallGraphRoots())
+    CallGraphSCCFinder(BottomUpSCCOrder).DFS(Node);
 }
