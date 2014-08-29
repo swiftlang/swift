@@ -2042,11 +2042,23 @@ public:
       = Conformance->getInheritedConformances().find(baseProtocol);
     assert(foundBaseConformance != Conformance->getInheritedConformances().end()
            && "no inherited conformance for base protocol");
+    
+    auto conformance = foundBaseConformance->second;
+    
     Entries.push_back(SILWitnessTable::BaseProtocolWitness{
       baseProtocol,
-      foundBaseConformance->second
+      conformance,
     });
-    SGM.getWitnessTable(foundBaseConformance->second);
+    
+    // Emit the witness table for the base conformance if it belongs to this
+    // module or is shared.
+    if (conformance->getDeclContext()->getParentModule()
+          == SGM.SwiftModule
+        || SGM.Types.getLinkageForProtocolConformance(
+                                        conformance->getRootNormalConformance(),
+                                        NotForDefinition)
+          == SILLinkage::Shared)
+      SGM.getWitnessTable(conformance);
   }
   
   /// Fallback for unexpected protocol requirements.
