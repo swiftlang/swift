@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 @IBAction // expected-error {{'IBAction' may only be used on 'func' declarations}}
 var iboutlet_global: Int

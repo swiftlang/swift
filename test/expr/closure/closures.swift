@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 var func4 : (fn : @autoclosure () -> ()) -> ()
 var func6 : (fn : (Int,Int) -> Int) -> ()

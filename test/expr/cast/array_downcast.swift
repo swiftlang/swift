@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 class V {}
 class U : V {}

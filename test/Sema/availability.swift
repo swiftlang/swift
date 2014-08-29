@@ -1,4 +1,4 @@
-// RUN: %swift %s -target x86_64-apple-macosx10.9 -verify
+// RUN: %swift -parse %s -target x86_64-apple-macosx10.9 -verify
 
 @availability(*, unavailable)
 func unavailable_foo() {} // expected-note {{'unavailable_foo()' has been explicitly marked unavailable here}}

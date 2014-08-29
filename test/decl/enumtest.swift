@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 //===----------------------------------------------------------------------===//
 // Tests for various simple enum constructs

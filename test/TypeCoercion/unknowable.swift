@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 //===----------------------------------------------------------------------===//
 // Refer to members of literals

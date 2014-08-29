@@ -1,4 +1,4 @@
-// RUN: %swift %s -o /dev/null -verify
+// RUN: %swift -emit-sil %s -o /dev/null -verify
 
 func testUnreachableAfterReturn() -> Int {
   var x: Int = 3;

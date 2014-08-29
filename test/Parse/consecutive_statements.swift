@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 func statement_starts() {
   var f = { (x : Int) -> () in }

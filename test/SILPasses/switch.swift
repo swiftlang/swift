@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -emit-sil %s -verify
 
 func non_fully_covered_switch(var x: Int) -> Int {
   switch x {

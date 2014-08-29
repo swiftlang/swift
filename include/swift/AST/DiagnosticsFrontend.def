@@ -68,6 +68,8 @@ ERROR(error_immediate_mode_missing_library,frontend,none,
   (unsigned, StringRef))
 ERROR(error_immediate_mode_primary_file,frontend,none,
   "immediate mode is incompatible with -primary-file", ())
+ERROR(error_missing_frontend_action,frontend,none,
+  "no frontend action was selected", ())
 
 ERROR(error_mode_cannot_emit_dependencies,frontend,none,
   "this mode does not support emitting dependency files", ())

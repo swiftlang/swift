@@ -1,4 +1,4 @@
-// RUN: %swift %s -I=%S/Inputs -enable-source-import -parse-as-library -verify
+// RUN: %swift -parse %s -I=%S/Inputs -enable-source-import -parse-as-library -verify
 
 // Name lookup is global in a library.
 var x : x_ty = 4

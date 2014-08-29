@@ -1,4 +1,4 @@
-// RUN: %swift -verify %s
+// RUN: %swift -parse -verify %s
 
 @objc class HasStaticProperties {
   class var staticVar1: Int { return 4 }

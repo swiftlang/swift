@@ -328,9 +328,13 @@ int frontend_main(ArrayRef<const char *>Args,
   Invocation.setMainExecutablePath(MainExecutablePath);
 
   // Parse arguments.
-  // In the absence of any other mode indicators, emit an object file.
-  Invocation.getFrontendOptions().RequestedAction = FrontendOptions::EmitObject;
   if (Invocation.parseArgs(Args, Instance.getDiags())) {
+    return 1;
+  }
+  if (Invocation.getFrontendOptions().RequestedAction ==
+        FrontendOptions::NoneAction) {
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::error_missing_frontend_action);
     return 1;
   }
 

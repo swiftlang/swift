@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 class Super {
   final var i: Int { get { return 5 } } // expected-note{{overridden declaration is here}}

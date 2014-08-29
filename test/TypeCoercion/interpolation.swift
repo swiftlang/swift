@@ -1,4 +1,4 @@
-// RUN: %swift -verify %s
+// RUN: %swift -parse -verify %s
 
 func simple_ret(s: String, i: Int) -> String {
   return "A string \"\(s)\" and an int \(i)"

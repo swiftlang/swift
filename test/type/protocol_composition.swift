@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 func canonical_empty_protocol() -> protocol<> {
   return 1

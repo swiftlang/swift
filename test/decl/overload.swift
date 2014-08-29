@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 var var_redecl1: Int // expected-note {{previously declared here}}
 var_redecl1 = 0

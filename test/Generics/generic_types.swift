@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 protocol MyFormattedPrintable {
   func myFormat() -> String

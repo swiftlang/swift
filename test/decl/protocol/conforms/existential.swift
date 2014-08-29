@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 // Check for protocol conformance to itself within an existential.
 protocol ConformsToSelf1 {

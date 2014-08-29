@@ -1,4 +1,4 @@
-// RUN: %swift %s %clang-importer-sdk -verify
+// RUN: %swift -parse %s %clang-importer-sdk -verify
 
 import ObjectiveC
 

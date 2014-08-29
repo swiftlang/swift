@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -verify
+// RUN: %target-swift-frontend -parse %s -verify
 
 import Darwin
 import ObjectiveC

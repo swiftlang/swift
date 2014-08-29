@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify -solver-memory-threshold 100000
+// RUN: %swift -parse %s -verify -solver-memory-threshold 100000
 
 var x = [1, 2, 3, [4, 5], 6] // expected-error{{cannot convert the expression's type 'Array' to type 'ArrayLiteralConvertible'}} expected-note{{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
 

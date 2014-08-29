@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift -parse %s -verify
 
 var sa1_global: Int
 sa1_global = sa1_global // expected-error {{assigning a variable to itself}}
