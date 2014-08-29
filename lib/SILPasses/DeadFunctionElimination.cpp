@@ -92,8 +92,9 @@ class SILDeadFuncElimination : public SILModuleTransform {
     if (getOptions().DebugSerialization)
       return;
 
+    auto &CG = CGA->getCallGraph();
     // A bottom-up list of functions, leafs first.
-    const std::vector<SILFunction *> &Order = CGA->bottomUpCallGraphOrder();
+    const std::vector<SILFunction *> &Order = CG.getBottomUpFunctionOrder();
 
     // Scan the call graph top-down (caller first) because eliminating functions
     // can generate more opportunities.

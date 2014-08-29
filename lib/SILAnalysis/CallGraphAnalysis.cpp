@@ -243,3 +243,13 @@ void CallGraph::computeBottomUpSCCOrder() {
   for (auto *Node : getCallGraphRoots())
     CallGraphSCCFinder(BottomUpSCCOrder).DFS(Node);
 }
+
+void CallGraph::computeBottomUpFunctionOrder() {
+  BottomUpFunctionOrder.clear();
+
+  computeBottomUpSCCOrder();
+
+  for (auto *SCC : BottomUpSCCOrder)
+    for (auto *Node : SCC->SCCNodes)
+      BottomUpFunctionOrder.push_back(Node->getFunction());
+}

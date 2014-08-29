@@ -220,15 +220,24 @@ namespace swift {
       return BottomUpSCCOrder;
     }
 
+    std::vector<SILFunction *> &getBottomUpFunctionOrder() {
+      if (BottomUpFunctionOrder.empty())
+        computeBottomUpFunctionOrder();
+
+      return BottomUpFunctionOrder;
+    }
+
   private:
     void addCallGraphNode(SILFunction *F, unsigned Ordinal);
     void addEdges(SILFunction *F);
     void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
     void computeBottomUpSCCOrder();
+    void computeBottomUpFunctionOrder();
 
     llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
     llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
     llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
+    std::vector<SILFunction *> BottomUpFunctionOrder;
   };
 
   /// \brief a utility class that is used to traverse the call-graph
@@ -304,14 +313,24 @@ namespace swift {
   class CallGraphAnalysis : public SILAnalysis {
     SILModule *M;
     std::vector<SILFunction *> BottomUpFunctionOrder;
+    CallGraph *CG;
 
   public:
-    virtual ~CallGraphAnalysis() {}
+    virtual ~CallGraphAnalysis() {
+      delete CG;
+    }
     CallGraphAnalysis(SILModule *MM) : SILAnalysis(AnalysisKind::CallGraph),
-                                       M(MM) {}
+                                       M(MM), CG(nullptr) {}
 
     static bool classof(const SILAnalysis *S) {
       return S->getKind() == AnalysisKind::CallGraph;
+    }
+
+    CallGraph &getCallGraph() {
+      if (!CG)
+        CG = new CallGraph(M, false);
+
+      return *CG;
     }
 
     /// Return the bottom up call-graph order for module M. Notice that we don't
@@ -331,8 +350,11 @@ namespace swift {
 
 
     virtual void invalidate(InvalidationKind K) {
-      if (K >= InvalidationKind::CallGraph)
+      if (K >= InvalidationKind::CallGraph) {
         BottomUpFunctionOrder.clear();
+        delete CG;
+        CG = nullptr;
+      }
     }
 
     virtual void invalidate(SILFunction*, InvalidationKind K) { invalidate(K); }
