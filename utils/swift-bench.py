@@ -187,7 +187,7 @@ main()
     output += mainBegin
     for n in testNames:
       output += mainBody % (n, n)
-    processedName = 'processed_'+name
+    processedName = 'processed_' + os.path.basename(name)
     output += mainEnd
     f = open(processedName, 'w')
     f.write(output)
@@ -220,7 +220,7 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     self.tests[name].binary = "./"+self.tests[name].processedSource.split(os.extsep)[0]
     if not self.tests[name].processedSource in self.compiledFiles:
       try:
-        self.runCommand([self.compiler, self.tests[name].processedSource, "-o", self.tests[name].binary, '-c'] + self.optFlags)
+        self.runCommand([self.compiler, self.tests[name].processedSource, "-o", self.tests[name].binary + '.o', '-c'] + self.optFlags)
         self.runCommand([self.compiler, '-o', self.tests[name].binary, self.tests[name].binary + '.o', 'opaque.o'])
         self.compiledFiles[self.tests[name].processedSource] = ('', '')
       except subprocess.CalledProcessError as e:
