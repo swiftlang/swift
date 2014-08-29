@@ -113,8 +113,8 @@ namespace swift {
         delete CallSite;
     }
 
-    SILFunction &getFunction() {
-      return *Function;
+    SILFunction *getFunction() {
+      return Function;
     }
 
     /// Get the complete set of call sites that can call into this
