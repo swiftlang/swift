@@ -1,4 +1,6 @@
-// RUN: %swift -parse -verify %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: cp %s %t/main.swift
+// RUN: %swift -parse -verify -primary-file %t/main.swift %S/Inputs/enum_equatable_hashable_other.swift
 
 enum Foo {
   case A, B
@@ -54,6 +56,29 @@ if InvalidCustomHashable.A == .B { }
 var s: String = InvalidCustomHashable.A == .B
 s = InvalidCustomHashable.A.hashValue
 var i: Int = InvalidCustomHashable.A.hashValue // expected-error{{'String' is not convertible to 'Int'}}
+
+
+// Check use of an enum's synthesized members before the enum is actually declared.
+struct UseEnumBeforeDeclaration {
+  let eqValue = EnumToUseBeforeDeclaration.A == .A
+  let hashValue = EnumToUseBeforeDeclaration.A.hashValue
+}
+enum EnumToUseBeforeDeclaration {
+  case A
+}
+
+// Check enums from another file in the same module.
+if FromOtherFile.A == .A {}
+let _: Int = FromOtherFile.A.hashValue
+
+func getFromOtherFile() -> AlsoFromOtherFile { return .A }
+if .A == getFromOtherFile() {}
+
+// FIXME: This should work.
+func overloadFromOtherFile() -> YetAnotherFromOtherFile { return .A }
+func overloadFromOtherFile() -> Bool { return false }
+if .A == overloadFromOtherFile() {} // expected-error {{could not find member 'A'}}
+
 
 // Complex enums are not implicitly Equatable or Hashable.
 enum Complex {

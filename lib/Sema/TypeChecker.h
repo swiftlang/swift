@@ -270,10 +270,6 @@ public:
   // standard library until we encounter a declaration that requires one. This
   // flag is set to 'true' once the bridge functions have been checked.
   bool HasCheckedBridgeFunctions = false;
-  
-  // Track whether an external declaration's delayed members have been forced
-  // during the current typecheck cycle.
-  bool HasForcedExternalDecl = false;
 
   /// Describes an attempt to capture a local function.
   struct LocalFunctionCapture {

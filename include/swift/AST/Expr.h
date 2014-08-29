@@ -2797,11 +2797,6 @@ protected:
   }
 
 public:
-  
-  /// Signifies whether or not this is an application of a potentially delayed,
-  /// globally scoped operator.
-  bool IsGlobalDelayedOperatorApply = false;
-  
   Expr *getFn() const { return Fn; }
   void setFn(Expr *e) { Fn = e; }
 

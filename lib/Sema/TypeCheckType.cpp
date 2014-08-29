@@ -140,7 +140,6 @@ void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
   if (nominalDecl->hasDelayedMembers()) {
     this->handleExternalDecl(nominalDecl);
     nominalDecl->setHasDelayedMembers(false);
-    this->HasForcedExternalDecl = true;
   }
 }
 

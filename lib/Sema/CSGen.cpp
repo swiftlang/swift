@@ -895,6 +895,57 @@ namespace {
       return false;
     }
 
+    /// Extracts == from a type's Equatable conformance.
+    ///
+    /// This only applies to types whose Equatable conformance can be derived.
+    /// Performing the conformance check forces the function to be synthesized.
+    void addNewEqualsOperatorOverloads(
+        SmallVectorImpl<Constraint *> &newConstraints,
+        Type paramTy,
+        Type tyvarType,
+        ConstraintLocator *csLoc) {
+      ProtocolDecl *equatableProto =
+        CS.TC.Context.getProtocol(KnownProtocolKind::Equatable);
+      if (!equatableProto)
+        return;
+
+      paramTy = paramTy->getLValueOrInOutObjectType();
+      paramTy = paramTy->getReferenceStorageReferent();
+
+      auto nominal = paramTy->getAnyNominal();
+      if (!nominal)
+        return;
+      if (!nominal->derivesProtocolConformance(equatableProto))
+        return;
+
+      ProtocolConformance *conformance = nullptr;
+      if (!CS.TC.conformsToProtocol(paramTy, equatableProto,
+                                    CS.DC, &conformance))
+        return;
+      if (!conformance)
+        return;
+
+      auto requirement =
+        equatableProto->lookupDirect(CS.TC.Context.Id_EqualsOperator);
+      assert(requirement.size() == 1 && "broken Equatable protocol");
+      ConcreteDeclRef witness =
+        conformance->getWitness(requirement.front(), &CS.TC);
+      if (!witness)
+        return;
+
+      // FIXME: If we ever have derived == for generic types, we may need to
+      // revisit this.
+      if (witness.getDecl()->getType()->hasArchetype())
+        return;
+
+      OverloadChoice choice{
+        Type(), witness.getDecl(), /*specialized=*/false
+      };
+      auto overload =
+        Constraint::createBindOverload(CS, tyvarType, choice, csLoc);
+      newConstraints.push_back(overload);
+    }
+
     Type visitApplyExpr(ApplyExpr *expr) {
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
@@ -985,38 +1036,24 @@ namespace {
                   
                   newConstraints.push_back(oldConstraint);
                 }
-                
-                // Now add the new bindings as overloads.
-                // This will only occur if the new bindings were added while
-                // solving the system, so disable the flag to prevent further
-                // unnecessary checks.
-                if (expr->IsGlobalDelayedOperatorApply) {
-                  if(CS.TC.HasForcedExternalDecl &&
-                     CS.TC.implicitlyDefinedFunctions.size()) {
-                    
-                    CS.TC.HasForcedExternalDecl = false;
-                    
-                    auto declName = declRef->getDecls()[0]->getName();
-                    SmallVector<OverloadChoice, 4> choices;
-                    
-                    for (auto implicitFn : CS.TC.implicitlyDefinedFunctions) {
-                      if (implicitFn->getName() == declName) {
-                        CS.TC.validateDecl(implicitFn, true);
-                        choices.push_back(OverloadChoice(Type(),
-                                                         implicitFn,
-                                                         declRef->isSpecialized()));
+
+                // Add a hack for lazily-generated global operators.
+                // For now, that's just ==.
+                if (declRef->isPotentiallyDelayedGlobalOperator()) {
+                  Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
+                  if (declRef->getDecls()[0]->getName() == eqOperator) {
+                    if (!declRef->isSpecialized()) {
+                      addNewEqualsOperatorOverloads(newConstraints, firstArgTy,
+                                                    tyvarType, csLoc);
+                      if (!firstArgTy->isEqual(secondArgTy)) {
+                        addNewEqualsOperatorOverloads(newConstraints,
+                                                      secondArgTy,
+                                                      tyvarType, csLoc);
                       }
                     }
-                  
-                    if (!choices.empty()) {
-                      for (auto choice : choices) {
-                        auto overload = Constraint::createBindOverload(CS,
-                                                                       tyvarType,
-                                                                       choice,
-                                                                       csLoc);
-                        newConstraints.push_back(overload);
-                      }
-                    }
+
+                  } else {
+                    assert("unknown delayed global operator");
                   }
                 }
 
