@@ -1323,16 +1323,19 @@ SILInstruction *SILCombiner::visitUnconditionalCheckedCastInst(
                                UnconditionalCheckedCastInst *UCCI) {
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
   if (RemoveCondFails) {
-    if (UCCI->getOperand().getType().isAddress()) {
+    SILModule &Mod = UCCI->getModule();
+    SILValue Op = UCCI->getOperand();
+    SILLocation Loc = UCCI->getLoc();
+
+    if (Op.getType().isAddress()) {
       // unconditional_checked_cast -> unchecked_addr_cast
-      return new (UCCI->getModule()) UncheckedAddrCastInst(
-        UCCI->getLoc(), UCCI->getOperand(), UCCI->getType());
-    } else if (UCCI->getOperand().getType().isHeapObjectReferenceType()) {
+      return new (Mod) UncheckedAddrCastInst(Loc, Op, UCCI->getType());
+    } else if (Op.getType().isHeapObjectReferenceType()) {
       // unconditional_checked_cast -> unchecked_ref_cast
-      return new (UCCI->getModule()) UncheckedRefCastInst(
-        UCCI->getLoc(), UCCI->getOperand(), UCCI->getType());
+      return new (Mod) UncheckedRefCastInst(Loc, Op, UCCI->getType());
     }
   }
+
   return nullptr;
 }
 
