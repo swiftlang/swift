@@ -101,11 +101,13 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
   return .from(IntMax(x.toUIntMax()))
 }
 
-% for (name, bits, signed) in all_integer_types(word_bits):
+% for self_ty in all_integer_types_new(word_bits):
+%   bits = self_ty.bits
+%   signed = self_ty.is_signed
 %   (sign, ext) = ('s', 'sext') if signed else ('u', 'zext')
-%   BuiltinName = builtin_int_name(name)
-%   Self = int_name(name, signed)
-%   OtherSelf = other_int_name(name, signed)
+%   Self = self_ty.stdlib_name
+%   BuiltinName = self_ty.builtin_name
+%   OtherSelf = self_ty.get_opposite_signedness().stdlib_name
 
 public struct ${Self}
    : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'} {
@@ -332,9 +334,11 @@ extension ${Self} : SignedNumberType {}
 // construction from other integer types
 @transparent
 extension ${Self} {
-% for (srcName, srcBits, srcSigned) in all_integer_types(word_bits):
-%    Src = int_name(srcName, srcSigned)
-%    srcBuiltinName = builtin_int_name(srcName)
+% for src_ty in all_integer_types_new(word_bits):
+%    srcBits = src_ty.bits
+%    srcSigned = src_ty.is_signed
+%    Src = src_ty.stdlib_name
+%    srcBuiltinName = src_ty.builtin_name
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    if Self != Src:
   public init(_ v: ${Src}) {
@@ -375,7 +379,7 @@ extension ${Self} {
   }
 %    end
 
-%    if srcBits > bits:
+%    if should_define_truncating_bit_pattern_init(src_ty=src_ty, dst_ty=self_ty):
   /// Construct a `${Self}` having the same bitwise representation as
   /// the least significant bits of the provided bit pattern.
   ///
@@ -389,7 +393,11 @@ extension ${Self} {
     let srcNotWord = truncatingBitPattern.value
 %       end
 %
+%       if self_ty.bits == src_ty.bits:
+    let dstNotWord = srcNotWord
+%       else:
     let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(srcNotWord)
+%       end
 %
 %       if BuiltinName == 'Word':
     value = Builtin.${CastToWord}(dstNotWord)

@@ -52,23 +52,23 @@ truncating_bit_pattern_test_template = gyb.parseTemplate("truncating_bit_pattern
 """
 % from SwiftIntTypes import *
 
-% for (dst_name, dst_bits, dst_signed) in all_integer_types(word_bits):
-%   Dst = int_name(dst_name, dst_signed)
+% for dst_ty in all_integer_types_new(word_bits):
+%   Dst = dst_ty.stdlib_name
 
 FixedPoint.test("${Dst}(truncatingBitPattern:)") {
 
-%   for (src_name, src_bits, src_signed) in all_integer_types(word_bits):
-%     Src = int_name(src_name, src_signed)
-%     if src_bits > dst_bits:
+%   for src_ty in all_integer_types_new(word_bits):
+%     Src = src_ty.stdlib_name
+%     if should_define_truncating_bit_pattern_init(src_ty=src_ty, dst_ty=dst_ty):
 %
 %       for bit_pattern in test_bit_patterns:
 
   if true {
-%       input = prepare_bit_pattern(bit_pattern, src_bits, src_signed)
+%       input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
     let input = get${Src}(${input})
-%       input = prepare_bit_pattern(input, src_bits, False)
+%       input = prepare_bit_pattern(input, src_ty.bits, False)
     let output = get${Dst}(${Dst}(truncatingBitPattern: input))
-    let expected = get${Dst}(${prepare_bit_pattern(input, dst_bits, dst_signed)})
+    let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
     expectEqual(output, expected)
   }
 
