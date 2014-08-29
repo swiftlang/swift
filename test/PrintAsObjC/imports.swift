@@ -8,7 +8,6 @@
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t/imports.h
 // RUN: %check-in-clang %t/imports.h -I %S/Inputs/custom-modules/
 
-// CHECK-DAG: @import ctypes;
 // CHECK-DAG: @import ctypes.bits;
 // CHECK-DAG: @import Foundation;
 // CHECK-DAG: @import Base;
@@ -16,10 +15,10 @@
 // CHECK-DAG: @import Base.ExplicitSub;
 // CHECK-DAG: @import Base.ExplicitSub.ExSub;
 
+// NEGATIVE-NOT: ctypes;
 // NEGATIVE-NOT: ImSub;
 // NEGATIVE-NOT: ImplicitSub;
 
-import ctypes
 import ctypes.bits
 import Foundation
 
@@ -34,7 +33,6 @@ import Base.ExplicitSub.ExSub;
 @objc class Test {
   let word: DWORD = 0
   let number: NSTimeInterval = 0.0
-  let point: Point = Point(x: 0, y: 0)
 
   let baseI: BaseI = 0
   let baseII: BaseII = 0
