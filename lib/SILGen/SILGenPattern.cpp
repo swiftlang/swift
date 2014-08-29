@@ -1501,37 +1501,37 @@ void SwitchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
     emitSerialCastOperand(SGF, rows[0].Pattern, src, sourceType, rows,
                           borrowedValues);
 
-  /// Emit all of the 'is' checks.
-  for (unsigned i = 0, e = rows.size(); i != e; ++i) {
-    CanType targetType = getTargetType(rows[i]);
+  // Emit all of the 'is' checks.
+  for (unsigned specBegin = 0, numRows = rows.size(); specBegin != numRows; ) {
+    CanType targetType = getTargetType(rows[specBegin]);
 
     // Find all the immediately following rows that are checking for
     // exactly the same type.
-    unsigned nextRow;
-    for (nextRow = i + 1; nextRow != e; ++nextRow) {
-      if (getTargetType(rows[nextRow]) != targetType)
+    unsigned specEnd = specBegin + 1;
+    for (; specEnd != numRows; ++specEnd) {
+      if (getTargetType(rows[specEnd]) != targetType)
         break;
     }
 
     // Build the specialized-rows array.
     bool isIrrefutable = false;
     SmallVector<SpecializedRow, 4> specializedRows;
-    specializedRows.resize(nextRow - i);
-    for (unsigned j = i; j != nextRow; ++j) {
-      auto &specRow = specializedRows[j - i];
-      auto isa = cast<IsaPattern>(rows[j].Pattern);
-      specRow.RowIndex = rows[j].RowIndex;
+    specializedRows.resize(specEnd - specBegin);
+    for (unsigned i = specBegin; i != specEnd; ++i) {
+      auto &specRow = specializedRows[i - specBegin];
+      auto isa = cast<IsaPattern>(rows[i].Pattern);
+      specRow.RowIndex = rows[i].RowIndex;
       specRow.Patterns.push_back(isa->getSubPattern());
-      isIrrefutable = (isIrrefutable || rows[j].Irrefutable);
+      isIrrefutable = (isIrrefutable || rows[i].Irrefutable);
     }
 
-    SILLocation loc = rows[i].Pattern;
+    SILLocation loc = rows[specBegin].Pattern;
     CleanupLocation cleanupLoc = CleanupLocation::getCleanupLocation(loc);
 
     // emitCheckedCastBranch's idea of what "success" means is local
     // to the cast.  A cast that leads to a refutable row is not a
     // global success, and we e.g. can't emit a take from the operand.
-    bool isFinal = (nextRow == e);
+    bool isFinal = (specEnd == numRows);
     CleanupStateRestorationScope forwardingScope(SGF.Cleanups);
     ConsumableManagedValue castOperand;
     if (isIrrefutable || (isFinal && operand.isOwned())) {
@@ -1563,6 +1563,9 @@ void SwitchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
 
     // Dispatch continues on the "false" block.
     scope.exit();
+
+    // Continue where we left off.
+    specBegin = specEnd;
   }
 
   ArgUnforwarder unforwarder(SGF);
