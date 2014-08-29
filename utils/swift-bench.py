@@ -215,18 +215,27 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     # TODO: Handle subprocess.CalledProcessError for this call:
     self.runCommand(['clang++', 'opaque.cpp', '-o', 'opaque.o', '-c', '-O2'])
 
+  compiledFiles = {}
+  def compileSource(self, name):
+    self.tests[name].binary = "./"+self.tests[name].processedSource.split(os.extsep)[0]
+    if not self.tests[name].processedSource in self.compiledFiles:
+      try:
+        self.runCommand([self.compiler, self.tests[name].processedSource, "-o", self.tests[name].binary, '-c'] + self.optFlags)
+        self.runCommand([self.compiler, '-o', self.tests[name].binary, self.tests[name].binary + '.o', 'opaque.o'])
+        self.compiledFiles[self.tests[name].processedSource] = ('', '')
+      except subprocess.CalledProcessError as e:
+        self.compiledFiles[self.tests[name].processedSource] = ('COMPFAIL', e.output)
+
+    (status, output) = self.compiledFiles[self.tests[name].processedSource]
+    self.tests[name].status = status
+    self.tests[name].output = output
+
 
   def compileSources(self):
     self.log("Compiling processed sources.", 2)
     self.compileOpaqueCFile()
     for t in self.tests:
-      self.tests[t].binary = "./"+self.tests[t].processedSource.split(os.extsep)[0]
-      try:
-        self.runCommand([self.compiler, self.tests[t].processedSource, "-o", self.tests[t].binary, '-c'] + self.optFlags)
-        self.runCommand([self.compiler, '-o', self.tests[t].binary, self.tests[t].binary + '.o', 'opaque.o'])
-      except subprocess.CalledProcessError as e:
-        self.tests[t].output = e.output
-        self.tests[t].status = "COMPFAIL"
+      self.compileSource(t)
 
 
   def runBenchmarks(self):
