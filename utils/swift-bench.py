@@ -60,6 +60,11 @@ class SwiftBenchHarness:
       print(str)
 
 
+  def runCommand(self, cmd):
+    self.log('    Executing: ' + ' '.join(cmd), 1)
+    return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+
   def parseArguments(self):
     self.log("Parsing arguments.", 2)
     parser = argparse.ArgumentParser()
@@ -182,8 +187,7 @@ main()
     for t in self.tests:
       self.tests[t].binary = "./"+self.tests[t].processedSource.split(os.extsep)[0]
       try:
-        self.log("Executing '%s %s -o %s'" % (self.compiler, self.tests[t].processedSource, self.tests[t].binary), 3)
-        r = subprocess.check_output([self.compiler, self.tests[t].processedSource, "-o", self.tests[t].binary], stderr=subprocess.STDOUT)
+        self.runCommand([self.compiler, self.tests[t].processedSource, "-o", self.tests[t].binary])
       except subprocess.CalledProcessError as e:
         self.tests[t].output = e.output
         self.tests[t].status = "COMPFAIL"
@@ -213,8 +217,8 @@ main()
     # If it's too small, increase number of iteration until it's measurable
     while (spent <= self.minIterTime):
       try:
-        r = subprocess.check_output([self.tests[name].binary, str(scale),
-                                     self.tests[name].name], stderr=subprocess.STDOUT)
+        r = self.runCommand([self.tests[name].binary, str(scale),
+                             self.tests[name].name])
         (testName, itersComputed, execTime) = self.parseBenchmarkOutput(r)
         spent = int(execTime) / 1000000 # Convert ns to ms
         if spent <= self.minIterTime:
@@ -245,8 +249,8 @@ main()
     output = ""
     for i in range(0,numSamples):
       try:
-        r = subprocess.check_output([self.tests[name].binary, str(iterScale),
-                                     self.tests[name].name], stderr=subprocess.STDOUT)
+        r = self.runCommand([self.tests[name].binary, str(iterScale),
+                             self.tests[name].name])
         (testName, itersComputed, execTime) = self.parseBenchmarkOutput(r)
         # TODO: Verify testName and itersComputed
         samples.append(int(execTime) / iterScale)
