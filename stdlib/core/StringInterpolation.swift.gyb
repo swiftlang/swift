@@ -29,8 +29,8 @@ PrintableTypes = [
     'Float64'
   ]
 
-for (name, bits, signed) in all_integer_types(word_bits):
-    PrintableTypes.append(int_name(name, signed))
+for int_ty in all_integer_types_new(word_bits):
+    PrintableTypes.append(int_ty.stdlib_name)
 
 }%
 

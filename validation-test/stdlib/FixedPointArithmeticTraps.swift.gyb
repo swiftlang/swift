@@ -37,24 +37,17 @@ func expectNoOverflow<T>(
 
 %{
 
-allIntTypes = [
-    ('signed', 'Int'),
-    ('signed', 'Int8'),
-    ('signed', 'Int16'),
-    ('signed', 'Int32'),
-    ('signed', 'Int64'),
-    ('unsigned', 'UInt'),
-    ('unsigned', 'UInt8'),
-    ('unsigned', 'UInt16'),
-    ('unsigned', 'UInt32'),
-    ('unsigned', 'UInt64'),
-]
+from SwiftIntTypes import *
+
+# Test cases are written in a way that they don't depend on the word size.
+word_bits = 4
 
 }%
 
 var FixedPointArithmeticTraps = TestSuite("FixedPointArithmeticTraps")
 
-% for (signedness, IntTy) in allIntTypes:
+% for self_ty in all_integer_types_new(word_bits):
+%   IntTy = self_ty.stdlib_name
 
 //
 // Test pre- and post-increment/decrement for ${IntTy}
@@ -168,7 +161,7 @@ FixedPointArithmeticTraps.test("Division/${IntTy}") {
   a = a / get${IntTy}(0)
 }
 
-%   if signedness == 'signed':
+%   if self_ty.is_signed:
 
 FixedPointArithmeticTraps.test("Division/${IntTy}.min-over-minus-one") {
   var a = get${IntTy}(${IntTy}.min)
@@ -202,7 +195,7 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}") {
   a = a % get${IntTy}(0)
 }
 
-%   if signedness == 'signed':
+%   if self_ty.is_signed:
 
 FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
   var a = get${IntTy}(${IntTy}.min)

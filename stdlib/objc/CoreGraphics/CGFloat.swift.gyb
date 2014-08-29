@@ -60,10 +60,9 @@ public struct CGFloat {
     return UInt(native._toBitPattern())
   }
 
-% for (name, bits, signed) in all_integer_types(word_bits):
-%   int_type_name = int_name(name, signed)
+% for src_ty in all_integer_types_new(word_bits):
 
-  @transparent public init(_ value: ${int_type_name}) {
+  @transparent public init(_ value: ${src_ty.stdlib_name}) {
     self.native = NativeType(value)
   }
 
@@ -181,12 +180,11 @@ extension CGFloat : Reflectable {
   }
 }
 
-% for (name, bits, signed) in all_integer_types(word_bits):
-%   int_type_name = int_name(name, signed)
+% for dst_ty in all_integer_types_new(word_bits):
 
-@transparent extension ${int_type_name} {
+@transparent extension ${dst_ty.stdlib_name} {
   public init(_ value: CGFloat) {
-    self = ${int_type_name}(value.native)
+    self = ${dst_ty.stdlib_name}(value.native)
   }
 }
 
