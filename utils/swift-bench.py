@@ -228,6 +228,8 @@ main()
         spent = int(execTime) / 1000000 # Convert ns to ms
         if spent <= self.minIterTime:
           scale *= 2
+        if scale > sys.maxint:
+          return (0, 0)
       except subprocess.CalledProcessError as e:
         r = e.output
         break
@@ -249,6 +251,10 @@ main()
     if not self.tests[name].status == "":
       return
     (numSamples, iterScale) = self.computeItersNumber(name)
+    if (numSamples, iterScale) == (0, 0):
+      self.tests[name].status = "CAN'T MEASURE"
+      self.tests[name].output = "Can't find number of iterations for the test to last longer than %d ms." % self.minIterTime
+      return
     samples = []
     self.log("Running bench: %s, numsamples: %d" % (name, numSamples), 2)
     output = ""
