@@ -213,6 +213,67 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
 
 %   end
 
+%   for (description, operation) in [("RightShift", ">>"), ("LeftShift", "<<")]:
+
+//
+// Test ${description} for ${IntTy}
+//
+
+%     if signedness == 'signed':
+
+FixedPointArithmeticTraps.test("${description}/${IntTy}/Negative") {
+  var a = get${IntTy}(${IntTy}.max / 3)
+
+  a = get${IntTy}(a ${operation} get${IntTy}(1))
+
+  let shiftAmount: ${IntTy} = -1
+
+  // Overflow in ${description}.
+  expectCrashLater()
+  a = a ${operation} get${IntTy}(shiftAmount)
+}
+
+%     end
+
+FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSize") {
+  var a = get${IntTy}(${IntTy}.max / 3)
+
+  a = get${IntTy}(a ${operation} get${IntTy}(0))
+  a = get${IntTy}(a ${operation} get${IntTy}(1))
+
+  let shiftAmount = ${IntTy}(sizeof(${IntTy}.self) * 8)
+
+  // Overflow in ${description}.
+  expectCrashLater()
+  a = a ${operation} get${IntTy}(shiftAmount)
+}
+
+FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSizePlusOne") {
+  var a = get${IntTy}(${IntTy}.max / 3)
+
+  a = get${IntTy}(a ${operation} get${IntTy}(0))
+
+  let shiftAmount = ${IntTy}(sizeof(${IntTy}.self) * 8 + 1)
+
+  // Overflow in ${description}.
+  expectCrashLater()
+  a = a ${operation} get${IntTy}(shiftAmount)
+}
+
+FixedPointArithmeticTraps.test("${description}/${IntTy}/Max") {
+  var a = get${IntTy}(${IntTy}.max / 3)
+
+  a = get${IntTy}(a ${operation} get${IntTy}(0))
+
+  let shiftAmount: ${IntTy} = ${IntTy}.max
+
+  // Overflow in ${description}.
+  expectCrashLater()
+  a = a ${operation} get${IntTy}(shiftAmount)
+}
+
+%   end
+
 // This comment prevents gyb from miscompiling this file.
 // <rdar://problem/17548877> gyb miscompiles a certain for loop
 
