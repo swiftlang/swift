@@ -240,8 +240,9 @@ void CallGraph::computeBottomUpSCCOrder() {
     BottomUpSCCOrder.clear();
   }
 
+  CallGraphSCCFinder SCCFinder(BottomUpSCCOrder);
   for (auto *Node : getCallGraphRoots())
-    CallGraphSCCFinder(BottomUpSCCOrder).DFS(Node);
+    SCCFinder.DFS(Node);
 }
 
 void CallGraph::computeBottomUpFunctionOrder() {
