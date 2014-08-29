@@ -10,6 +10,7 @@ typedef __typeof__(__objc_yes) BOOL;
 - (NSObject*) init;
 + (NSObject*) new;
 + (void) load;
++ (void) initialize;
 
 @property (readonly, copy) NSString *description;
 

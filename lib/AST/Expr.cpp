@@ -164,6 +164,10 @@ bool Expr::isSuperExpr() const {
       expr = derivedToBase->getSubExpr();
       continue;
     }
+    if (auto metatypeConversion = dyn_cast<MetatypeConversionExpr>(expr)) {
+      expr = metatypeConversion->getSubExpr();
+      continue;
+    }
 
     return false;
   } while (true);
