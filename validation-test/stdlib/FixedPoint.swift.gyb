@@ -69,7 +69,7 @@ FixedPoint.test("${Dst}(truncatingBitPattern:)") {
 %       input = prepare_bit_pattern(input, src_ty.bits, False)
     let output = get${Dst}(${Dst}(truncatingBitPattern: input))
     let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
-    expectEqual(output, expected)
+    expectEqual(expected, output)
   }
 
 %       end
@@ -142,7 +142,7 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
 %     input = prepare_bit_pattern(input, src_bits, False)
     let output = get${Dst}(${Dst}(bitPattern: input))
     let expected = get${Dst}(${prepare_bit_pattern(input, dst_bits, dst_signed)})
-    expectEqual(output, expected)
+    expectEqual(expected, output)
   }
 
   if true {
@@ -155,8 +155,8 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
 
 %     input = prepare_bit_pattern(input, src_bits, False)
     let expected = get${Dst}(${prepare_bit_pattern(input, dst_bits, dst_signed)})
-    expectEqual(literalOutput, expected)
-    expectEqual(output, expected)
+    expectEqual(expected, literalOutput)
+    expectEqual(expected, output)
   }
 
 %   end
