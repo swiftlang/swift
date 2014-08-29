@@ -11,36 +11,10 @@
 ##===----------------------------------------------------------------------===##
 
 # Bit counts for all int types
-_all_integer_type_bitwidths = [8, 16, 32, 64, 'Int']
 _all_integer_type_bitwidths_new = [8, 16, 32, 64]
 
 # Number of bits in the biggest int type
 int_max_bits = max(_all_integer_type_bitwidths_new)
-
-def all_integer_types(word_bits):
-    for name in _all_integer_type_bitwidths:
-        for signed in False, True:
-            yield str(name), int(word_bits if name=='Int' else name), signed
-
-def all_integer_type_names():
-    for name in _all_integer_type_bitwidths:
-        for signed in False, True:
-            yield int_name(str(name), signed)
-
-def _base_int_name(name):
-    return 'Int' if name == 'Int' else 'Int' + str(name)
-
-def builtin_int_name(name):
-    return 'Word' if name == 'Int' else 'Int' + str(name)
-
-def int_name(name, signed):
-    return ('' if signed else 'U') + _base_int_name(name)
-
-def other_int_name(name, signed):
-    return ('U' if signed else '') + _base_int_name(name)
-
-def is_signed_int(name):
-    return name[0] != 'U'
 
 class SwiftIntegerType(object):
     def __init__(self, is_word, bits, is_signed):
