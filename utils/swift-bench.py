@@ -102,8 +102,23 @@ class SwiftBenchHarness:
 
     header = """
 @asmname("mach_absolute_time") func __mach_absolute_time__() -> UInt64
+@asmname("opaqueGetInt32")
+func _opaqueGetInt32(x: Int) -> Int
+@asmname("opaqueGetInt64")
+func _opaqueGetInt64(x: Int) -> Int
+
 @inline(never)
-func False() -> Bool { return false }
+public func getInt(x: Int) -> Int {
+#if arch(i386) || arch(arm)
+  return _opaqueGetInt32(x)
+#elseif arch(x86_64) || arch(arm64)
+  return _opaqueGetInt64(x)
+#else
+  return x
+#endif
+}
+@inline(never)
+func False() -> Bool { return getInt(1) == 0 }
 @inline(never)
 func Consume(x: Int) { if False() { println(x) } }
 """
@@ -187,12 +202,28 @@ main()
       self.processSource(s)
 
 
+  def compileOpaqueCFile(self):
+    self.log("Generating and compiling C file with opaque functions.", 3)
+    fileBody = """
+#include <stdint.h>
+extern "C" int32_t opaqueGetInt32(int32_t x) { return x; }
+extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
+"""
+    f = open('opaque.cpp', 'w')
+    f.write(fileBody)
+    f.close()
+    # TODO: Handle subprocess.CalledProcessError for this call:
+    self.runCommand(['clang++', 'opaque.cpp', '-o', 'opaque.o', '-c', '-O2'])
+
+
   def compileSources(self):
     self.log("Compiling processed sources.", 2)
+    self.compileOpaqueCFile()
     for t in self.tests:
       self.tests[t].binary = "./"+self.tests[t].processedSource.split(os.extsep)[0]
       try:
-        self.runCommand([self.compiler, self.tests[t].processedSource, "-o", self.tests[t].binary] + self.optFlags)
+        self.runCommand([self.compiler, self.tests[t].processedSource, "-o", self.tests[t].binary, '-c'] + self.optFlags)
+        self.runCommand([self.compiler, '-o', self.tests[t].binary, self.tests[t].binary + '.o', 'opaque.o'])
       except subprocess.CalledProcessError as e:
         self.tests[t].output = e.output
         self.tests[t].status = "COMPFAIL"
