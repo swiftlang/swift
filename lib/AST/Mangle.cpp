@@ -436,9 +436,16 @@ void Mangler::mangleDeclName(ValueDecl *decl) {
     // Don't bother to use the private discriminator if the enclosing context
     // is also private.
     auto isWithinPrivateNominal = [](const Decl *D) -> bool {
-      auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext());
-      if (!nominal)
+      const DeclContext *DC = D->getDeclContext();
+      if (!DC->isTypeContext()) {
+        assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
+               "do we need a private discriminator for this context?");
         return false;
+      }
+
+      auto nominal = dyn_cast<NominalTypeDecl>(DC);
+      if (!nominal)
+        nominal = cast<ExtensionDecl>(DC)->getExtendedType()->getAnyNominal();
       return nominal->getAccessibility() == Accessibility::Private;
     };
 

@@ -45,7 +45,7 @@ extension PublicStruct {
   private func extPrivateMethod() {}
 }
 extension PrivateStruct {
-  // CHECK-LABEL: sil @_TFV16mangling_privateP33_713AFCDB29B710C2AB6F4DF7C1C8FEC913PrivateStructP33_713AFCDB29B710C2AB6F4DF7C1C8FEC916extPrivateMethodfS0_FT_T_
+  // CHECK-LABEL: sil @_TFV16mangling_privateP33_713AFCDB29B710C2AB6F4DF7C1C8FEC913PrivateStruct16extPrivateMethodfS0_FT_T_
   private func extPrivateMethod() {}
 }
 
