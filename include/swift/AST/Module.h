@@ -522,8 +522,8 @@ public:
   /// which distinguishes \p D from other declarations in the same module with
   /// the same name.
   ///
-  /// Since this value is used in name mangling, it should contain only
-  /// ASCII identifier characters.
+  /// Since this value is used in name mangling, it should be a valid ASCII-only
+  /// identifier.
   virtual void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
                                                const ValueDecl *D) const = 0;
 

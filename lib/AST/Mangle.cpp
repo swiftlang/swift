@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Punycode.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
@@ -447,13 +448,16 @@ void Mangler::mangleDeclName(ValueDecl *decl) {
       auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
       auto fileUnit = cast<FileUnit>(topLevelContext);
 
-      SmallString<32> discriminator;
+      SmallString<64> discriminator;
       fileUnit->getDiscriminatorForPrivateValue(discriminator, decl);
+      assert(!discriminator.empty());
       assert(!isNonAscii(discriminator) &&
              "discriminator contains non-ASCII characters");
+      assert(!clang::isDigit(discriminator.front()) &&
+             "not a valid identifier");
 
       // Manually construct an <identifier> mangling here.
-      Buffer << 'P' << (discriminator.size()+1) << '_' << discriminator.str();
+      Buffer << 'P' << discriminator.size() << discriminator.str();
     }
     // Fall through to mangle the name.
   }

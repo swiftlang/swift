@@ -31,7 +31,10 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -1378,9 +1381,42 @@ void
 SourceFile::getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
                                             const ValueDecl *D) const {
   assert(D->getDeclContext()->getModuleScopeContext() == this);
-  // FIXME: Actually come up with a discriminator.
-  StringRef discriminator = getParentModule()->Name.str();
-  buffer.append(discriminator.begin(), discriminator.end());
+
+  StringRef name = getFilename();
+  if (name.empty()) {
+    assert(1 == std::count_if(getParentModule()->getFiles().begin(),
+                              getParentModule()->getFiles().end(),
+                              [](const FileUnit *FU) -> bool {
+      return isa<SourceFile>(FU) && cast<SourceFile>(FU)->getFilename().empty();
+    }) && "can't promise uniqueness if multiple source files are nameless");
+
+    // We still need a discriminator.
+    buffer.push_back('_');
+    return;
+  }
+
+  // Use a hash of the basename of the source file as our discriminator.
+  // This keeps us from leaking information about the original filename
+  // while still providing uniqueness. Using the basename makes the
+  // discriminator invariant across source checkout locations.
+  // FIXME: Use a faster hash here? We don't need security, just uniqueness.
+  llvm::MD5 hash;
+  hash.update(llvm::sys::path::filename(name));
+  llvm::MD5::MD5Result result;
+  hash.final(result);
+
+  // Make sure the whole thing is a valid identifier.
+  buffer.push_back('_');
+
+  // Write the hash as a hex string.
+  // FIXME: This should go into llvm/ADT/StringExtras.h.
+  // FIXME: And there are more compact ways to encode a 16-byte value.
+  buffer.reserve(buffer.size() + 2*llvm::array_lengthof(result));
+  for (uint8_t byte : result) {
+    buffer.push_back(llvm::hexdigit(byte >> 4, /*lowercase=*/false));
+    buffer.push_back(llvm::hexdigit(byte & 0xF, /*lowercase=*/false));
+  }
+  // FIXME: Cache the result?
 }
 
 //===----------------------------------------------------------------------===//
