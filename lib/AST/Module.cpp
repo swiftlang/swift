@@ -1377,10 +1377,12 @@ ArtificialMainKind SourceFile::getArtificialMainKind() const {
   return ArtificialMainKind::None;
 }
 
-void
-SourceFile::getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
-                                            const ValueDecl *D) const {
+Identifier
+SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   assert(D->getDeclContext()->getModuleScopeContext() == this);
+
+  if (!PrivateDiscriminator.empty())
+    return PrivateDiscriminator;
 
   StringRef name = getFilename();
   if (name.empty()) {
@@ -1391,8 +1393,8 @@ SourceFile::getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
     }) && "can't promise uniqueness if multiple source files are nameless");
 
     // We still need a discriminator.
-    buffer.push_back('_');
-    return;
+    PrivateDiscriminator = getASTContext().Id_Underscore;
+    return PrivateDiscriminator;
   }
 
   // Use a hash of the basename of the source file as our discriminator.
@@ -1406,7 +1408,7 @@ SourceFile::getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
   hash.final(result);
 
   // Make sure the whole thing is a valid identifier.
-  buffer.push_back('_');
+  SmallString<33> buffer{"_"};
 
   // Write the hash as a hex string.
   // FIXME: This should go into llvm/ADT/StringExtras.h.
@@ -1416,7 +1418,9 @@ SourceFile::getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
     buffer.push_back(llvm::hexdigit(byte >> 4, /*lowercase=*/false));
     buffer.push_back(llvm::hexdigit(byte & 0xF, /*lowercase=*/false));
   }
-  // FIXME: Cache the result?
+
+  PrivateDiscriminator = getASTContext().getIdentifier(buffer);
+  return PrivateDiscriminator;
 }
 
 //===----------------------------------------------------------------------===//

@@ -457,16 +457,16 @@ void Mangler::mangleDeclName(ValueDecl *decl) {
       auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
       auto fileUnit = cast<FileUnit>(topLevelContext);
 
-      SmallString<64> discriminator;
-      fileUnit->getDiscriminatorForPrivateValue(discriminator, decl);
+      Identifier discriminator =
+        fileUnit->getDiscriminatorForPrivateValue(decl);
       assert(!discriminator.empty());
-      assert(!isNonAscii(discriminator) &&
+      assert(!isNonAscii(discriminator.str()) &&
              "discriminator contains non-ASCII characters");
-      assert(!clang::isDigit(discriminator.front()) &&
+      assert(!clang::isDigit(discriminator.str().front()) &&
              "not a valid identifier");
 
-      // Manually construct an <identifier> mangling here.
-      Buffer << 'P' << discriminator.size() << discriminator.str();
+      Buffer << 'P';
+      mangleIdentifier(discriminator);
     }
     // Fall through to mangle the name.
   }

@@ -556,7 +556,7 @@ public:
   Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
   Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
 
-  StringRef getDiscriminatorForPrivateValue(const ValueDecl *D);
+  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 };
 
 } // end namespace swift

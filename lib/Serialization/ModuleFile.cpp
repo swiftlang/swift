@@ -1239,7 +1239,7 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
   return *I;
 }
 
-StringRef ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
+Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
   // FIXME: Actually implement this.
-  return FileContext->getParentModule()->Name.str();
+  return FileContext->getParentModule()->Name;
 }

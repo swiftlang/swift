@@ -55,6 +55,7 @@ IDENTIFIER(toRaw)
 IDENTIFIER(Type)
 IDENTIFIER(value)
 
+IDENTIFIER_WITH_NAME(Underscore, "_")
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")
 IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")

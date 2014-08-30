@@ -518,14 +518,14 @@ public:
     return Nothing;
   }
 
-  /// Fills \p buffer with an implementation-defined "discriminator" for \p D,
-  /// which distinguishes \p D from other declarations in the same module with
-  /// the same name.
+  /// Returns an implementation-defined "discriminator" for \p D, which
+  /// distinguishes \p D from other declarations in the same module with the
+  /// same name.
   ///
   /// Since this value is used in name mangling, it should be a valid ASCII-only
   /// identifier.
-  virtual void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
-                                               const ValueDecl *D) const = 0;
+  virtual Identifier
+  getDiscriminatorForPrivateValue(const ValueDecl *D) const = 0;
 
   /// Finds all top-level decls in this file.
   ///
@@ -647,8 +647,8 @@ public:
   
   void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
-  void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
-                                       const ValueDecl *D) const override {
+  Identifier
+  getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
     llvm_unreachable("no private decls in the derived file unit");
   }
 
@@ -693,6 +693,11 @@ private:
   ///
   /// This is filled in by the Name Binding phase.
   ArrayRef<std::pair<Module::ImportedModule, bool>> Imports;
+
+  /// A unique identifier representing this file; used to mark private decls
+  /// within the file to keep them from conflicting with other files in the
+  /// same module.
+  mutable Identifier PrivateDiscriminator;
 
   /// \brief The ID for the memory buffer containing this file's source.
   ///
@@ -777,8 +782,7 @@ public:
   virtual void
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
-  void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
-                                       const ValueDecl *D) const override;
+  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
 
@@ -875,8 +879,8 @@ public:
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
-  void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
-                                       const ValueDecl *D) const override {
+  Identifier
+  getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
     llvm_unreachable("no private values in the Builtin module");
   }
 
