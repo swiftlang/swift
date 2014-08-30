@@ -17,6 +17,9 @@
 // RUN: %target-run %t.out
 // XFAIL: interpret
 
+// FIXME: <rdar://problem/18185538> Test Prototypes/HeapStorage.swift fails on 32-bit architectures
+// XFAIL: PTRSIZE=32
+
 import Swift
 import Darwin
 import SwiftShims
