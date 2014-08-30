@@ -105,18 +105,18 @@ public:
   typedef SmallPtrSet<Operand*, 16> VisitedSet;
   typedef SmallVector<SILInstruction*, 16> UserList;
 
-  /// Map a user of a value or an element within that value to the operand that
-  /// directly uses the value. Multiple levels of struct_extract may exist
-  /// between the use instruction and the operand.
-  typedef llvm::MapVector<SILInstruction*, Operand*> UserMap;
+  /// Record the users of a value or an element within that value along with the
+  /// operand that directly uses the value. Multiple levels of struct_extract
+  /// may exist between the operand and the user instruction.
+  typedef SmallVector<std::pair<SILInstruction*, Operand*>, 16> UserOperList;
 
   UserList AggregateAddressUsers;
   UserList StructAddressUsers;
   UserList StructLoads;
   UserList StructValueUsers;
-  UserMap ElementAddressUsers;
-  UserMap ElementLoads;
-  UserMap ElementValueUsers;
+  UserOperList ElementAddressUsers;
+  UserOperList ElementLoads;
+  UserOperList ElementValueUsers;
   VisitedSet Visited;
 
   /// Collect all uses of the value at the given address.
@@ -137,7 +137,8 @@ public:
       for (auto DefUI : Pair.first->getUses()) {
         if (!Visited.insert(&*DefUI))
           continue;
-        ElementValueUsers[DefUI->getUser()] = Pair.second;
+        ElementValueUsers.push_back(
+          std::make_pair(DefUI->getUser(), Pair.second));
       }
     }
   }
@@ -161,11 +162,11 @@ protected:
         // Found a use of an element.
         assert(AccessPathSuffix.empty() && "should have accessed struct");
         if (LoadInst *LoadI = dyn_cast<LoadInst>(UseInst))
-          ElementLoads[LoadI] = StructVal;
+          ElementLoads.push_back(std::make_pair(LoadI, StructVal));
         else if (isa<StructElementAddrInst>(UseInst))
           collectAddressUses(UseInst, AccessPathSuffix, StructVal);
         else
-          ElementAddressUsers[UseInst] = StructVal;
+          ElementAddressUsers.push_back(std::make_pair(UseInst,StructVal));
         continue;
 
       } else if (AccessPathSuffix.empty()) {
@@ -259,7 +260,7 @@ namespace {
 /// guard are already guarded by either "init" or "mutate_unknown".
 class COWArrayOpt {
   typedef StructUseCollector::UserList UserList;
-  typedef StructUseCollector::UserMap UserMap;
+  typedef StructUseCollector::UserOperList UserOperList;
 
   SILFunction *Function;
   SILLoop *Loop;
@@ -280,10 +281,12 @@ class COWArrayOpt {
 
   // \brief Transient per-Array user set.
   //
-  // Track all known array users. During analysis of retains/releases within the
-  // loop body, the users in this set are assumed to cover all possible mutating
-  // operations on the array. If the array escaped through an unknown use, the
-  // analysis must abort earlier.
+  // Track all known array users with the exception of struct_extract users
+  // (checkSafeArrayElementUse prohibits struct_extract users from mutating the
+  // array). During analysis of retains/releases within the loop body, the
+  // users in this set are assumed to cover all possible mutating operations on
+  // the array. If the array escaped through an unknown use, the analysis must
+  // abort earlier.
   SmallPtrSet<SILInstruction*, 8> ArrayUserSet;
 
 public:
@@ -303,7 +306,7 @@ protected:
   bool checkSafeArrayAddressUses(UserList &AddressUsers);
   bool checkSafeArrayValueUses(UserList &ArrayValueUsers);
   bool checkSafeArrayElementUse(SILInstruction *UseInst, SILValue ArrayVal);
-  bool checkSafeElementValueUses(UserMap &ElementValueUsers);
+  bool checkSafeElementValueUses(UserOperList &ElementValueUsers);
   bool hoistMakeMutable(ApplyInst *MakeMutable, SILValue ArrayAddr);
 };
 } // namespace
@@ -479,6 +482,12 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
 /// Given an array value, recursively check that uses of elements within the
 /// array are safe.
 ///
+/// Consider any potentially mutating operation unsafe. Mutation would not
+/// prevent make_mutable hoisting, but it would interfere with
+/// isRetainReleasedBeforeMutate. Since struct_extract users are not visited by
+/// StructUseCollector, they are never added to ArrayUserSet. Thus we check here
+/// that no mutating struct_extract users exist.
+///
 /// After the lower aggregates pass, SIL contains chains of struct_extract and
 /// retain_value instructions. e.g.
 ///   %a = load %0 : $*Array<Int>
@@ -520,7 +529,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
 /// Check that the use of an Array element is safe w.r.t. make_mutable hoisting.
 ///
 /// This logic should be similar to checkSafeArrayElementUse
-bool COWArrayOpt::checkSafeElementValueUses(UserMap &ElementValueUsers) {
+bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
   for (auto &Pair : ElementValueUsers) {
     SILInstruction *UseInst = Pair.first;
     Operand *ArrayValOper = Pair.second;
@@ -560,6 +569,8 @@ bool COWArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue ArrayAddr) {
   // not escape within this function.
   StructUseCollector StructUses;
   StructUses.collectUses(ArrayContainer.getDef(), AccessPath);
+  for (auto *Oper : StructUses.Visited)
+    ArrayUserSet.insert(Oper->getUser());
 
   if (!checkSafeArrayAddressUses(StructUses.AggregateAddressUsers) ||
       !checkSafeArrayAddressUses(StructUses.StructAddressUsers) ||
