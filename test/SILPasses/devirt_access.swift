@@ -88,7 +88,7 @@ private class LocalPrivateSubclass : PrivateClass {
 //PRIMARY-FILE-LABEL: sil @_TF13devirt_access11testPrivateFT_T_
 //PRIMARY-FILE: class_method
 //WHOLE-MODULE-LABEL: sil @_TF13devirt_access11testPrivateFT_T_
-//WHOLE-MODULE: function_ref @_TF13devirt_access15getPrivateClassFT_CS_12PrivateClass
+//WHOLE-MODULE: function_ref @_TF13devirt_accessP[[DISCRIMINATOR:[0-9]+_.+]]15getPrivateClassFT_CS_P[[DISCRIMINATOR]]12PrivateClass
 //WHOLE-MODULE: return
 func testPrivate() {
   let obj = getPrivateClass()
@@ -96,9 +96,9 @@ func testPrivate() {
 }
 
 //PRIMARY-FILE-LABEL: sil @_TF13devirt_access21testPrivateOverriddenFT_T_
-//PRIMARY-FILE: function_ref @_TF13devirt_access15getPrivateClassFT_CS_12PrivateClass
+//PRIMARY-FILE: function_ref @_TF13devirt_accessP[[DISCRIMINATOR:[0-9]+_.+]]15getPrivateClassFT_CS_P[[DISCRIMINATOR]]12PrivateClass
 //WHOLE-MODULE-LABEL: sil @_TF13devirt_access21testPrivateOverriddenFT_T_
-//WHOLE-MODULE: function_ref @_TF13devirt_access15getPrivateClassFT_CS_12PrivateClass
+//WHOLE-MODULE: function_ref @_TF13devirt_accessP[[DISCRIMINATOR]]15getPrivateClassFT_CS_P[[DISCRIMINATOR]]12PrivateClass
 //WHOLE-MODULE: return
 func testPrivateOverridden() {
   let obj = getPrivateClass()

@@ -414,3 +414,11 @@ void SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
 StringRef SerializedASTFile::getFilename() const {
   return File.getModuleFilename();
 }
+
+void SerializedASTFile::getDiscriminatorForPrivateValue(
+    SmallVectorImpl<char> &buffer,
+    const ValueDecl *D) const {
+  StringRef discriminator = File.getDiscriminatorForPrivateValue(D);
+  assert(!discriminator.empty() && "no discriminator found for value");
+  buffer.append(discriminator.begin(), discriminator.end());
+}

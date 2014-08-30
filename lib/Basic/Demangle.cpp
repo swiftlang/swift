@@ -713,6 +713,17 @@ private:
       localName->addChild(std::move(discriminator));
       localName->addChild(std::move(name));
       return localName;
+
+    } else if (Mangled.nextIf('P')) {
+      NodePointer discriminator = demangleIdentifier();
+      if (!discriminator) return nullptr;
+
+      NodePointer name = demangleIdentifier();
+      if (!name) return nullptr;
+
+      auto privateName = NodeFactory::create(Node::Kind::PrivateDeclName);
+      privateName->addChildren(std::move(discriminator), std::move(name));
+      return privateName;
     }
 
     // decl-name ::= identifier
@@ -2013,6 +2024,7 @@ private:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::LazyProtocolWitnessTableTemplate:
     case Node::Kind::LocalDeclName:
+    case Node::Kind::PrivateDeclName:
     case Node::Kind::Metaclass:
     case Node::Kind::NominalTypeDescriptor:
     case Node::Kind::NonObjCAttribute:
@@ -2298,6 +2310,11 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << '(';
     print(pointer->getChild(1));
     Printer << " #" << (pointer->getChild(0)->getIndex() + 1) << ')';
+    return;
+  case Node::Kind::PrivateDeclName:
+    Printer << '(';
+    print(pointer->getChild(1));
+    Printer << " in " << pointer->getChild(0)->getText() << ')';
     return;
   case Node::Kind::Module:
   case Node::Kind::Identifier:

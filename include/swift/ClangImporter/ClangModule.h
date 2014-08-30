@@ -83,6 +83,11 @@ public:
   virtual void
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
+  void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
+                                       const ValueDecl *D) const override {
+    llvm_unreachable("no private decls in Clang modules");
+  }
+
   virtual StringRef getFilename() const override;
 
   clang::ASTContext &getClangASTContext() const;

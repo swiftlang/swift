@@ -553,8 +553,10 @@ public:
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) override;
 
-   Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
-   Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
+  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
+  Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
+
+  StringRef getDiscriminatorForPrivateValue(const ValueDecl *D);
 };
 
 } // end namespace swift

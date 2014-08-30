@@ -518,6 +518,15 @@ public:
     return Nothing;
   }
 
+  /// Fills \p buffer with an implementation-defined "discriminator" for \p D,
+  /// which distinguishes \p D from other declarations in the same module with
+  /// the same name.
+  ///
+  /// Since this value is used in name mangling, it should contain only
+  /// ASCII identifier characters.
+  virtual void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
+                                               const ValueDecl *D) const = 0;
+
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -637,7 +646,12 @@ public:
                           NLKind lookupKind) const override;
   
   void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
-  
+
+  void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
+                                       const ValueDecl *D) const override {
+    llvm_unreachable("no private decls in the derived file unit");
+  }
+
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::Derived;
   }
@@ -763,6 +777,9 @@ public:
   virtual void
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
+  void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
+                                       const ValueDecl *D) const override;
+
   virtual bool walk(ASTWalker &walker) override;
 
   /// @{
@@ -857,6 +874,11 @@ public:
   virtual void lookupValue(Module::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
+
+  void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
+                                       const ValueDecl *D) const override {
+    llvm_unreachable("no private values in the Builtin module");
+  }
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::Builtin;

@@ -185,6 +185,9 @@ public:
   virtual void
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
+  void getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
+                                       const ValueDecl *D) const override;
+
   virtual StringRef getFilename() const override;
 
   static bool classof(const FileUnit *file) {

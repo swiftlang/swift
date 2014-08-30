@@ -180,3 +180,5 @@
 ; CHECK: _TF8manglingXoi7p_qcaDcFTSiSi_Si ---> mangling.«+» infix (Swift.Int, Swift.Int) -> Swift.Int
 ; CHECK: _TF8manglingoi2qqFTSiSi_T_ ---> mangling.?? infix (Swift.Int, Swift.Int) -> ()
 ; CHECK: _TFE11ext_structAV11def_structA1A4testfRS1_FT_T_ ---> ext.ext_structA.def_structA.A.test (inout def_structA.A)() -> ()
+; CHECK: _TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> devirt_access.(getPrivateClass in _DISC) () -> devirt_access.(PrivateClass in _DISC)
+; CHECK: _TF4mainP5_mainX3wxaFT_T_ ---> main.(λ in _main) () -> ()

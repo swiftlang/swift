@@ -420,10 +420,42 @@ static OperatorFixity getDeclFixity(ValueDecl *decl) {
 }
 
 void Mangler::mangleDeclName(ValueDecl *decl) {
-  // decl-name ::= 'L' index identifier
   if (decl->getDeclContext()->isLocalContext()) {
+    // Mangle local declarations with a numeric discriminator.
+    // decl-name ::= 'L' index identifier
     Buffer << 'L' << Index(decl->getLocalDiscriminator());
-    // Fall through to mangle the <identiifier>.
+    // Fall through to mangle the <identifier>.
+
+  } else if (decl->hasAccessibility() &&
+             decl->getAccessibility() == Accessibility::Private) {
+    // Mangle non-local private declarations with a textual discriminator
+    // based on their enclosing file.
+    // decl-name ::= 'P' identifier identifier
+
+    // Don't bother to use the private discriminator if the enclosing context
+    // is also private.
+    auto isWithinPrivateNominal = [](const Decl *D) -> bool {
+      auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext());
+      if (!nominal)
+        return false;
+      return nominal->getAccessibility() == Accessibility::Private;
+    };
+
+    if (!isWithinPrivateNominal(decl)) {
+      // The first <identifier> is a discriminator string unique to the decl's
+      // original source file.
+      auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
+      auto fileUnit = cast<FileUnit>(topLevelContext);
+
+      SmallString<32> discriminator;
+      fileUnit->getDiscriminatorForPrivateValue(discriminator, decl);
+      assert(!isNonAscii(discriminator) &&
+             "discriminator contains non-ASCII characters");
+
+      // Manually construct an <identifier> mangling here.
+      Buffer << 'P' << (discriminator.size()+1) << '_' << discriminator.str();
+    }
+    // Fall through to mangle the name.
   }
 
   // decl-name ::= identifier

@@ -1560,8 +1560,8 @@ namespace {
                                                    SourceLoc(), varName,
                                                    underlyingType,
                                                    structDecl);
-        var->setAccessibility(Accessibility::Private);
-        var->setSetterAccessibility(Accessibility::Private);
+        var->setAccessibility(Accessibility::Internal);
+        var->setSetterAccessibility(Accessibility::Internal);
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);

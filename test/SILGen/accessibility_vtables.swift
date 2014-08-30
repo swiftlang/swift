@@ -33,7 +33,7 @@ class InternalSub : InternalBase {
 }
 
 // CHECK-LABEL: sil_vtable InternalSub {
-// CHECK-NEXT:  #InternalBase.method!1: _TFC21accessibility_vtables12InternalBase6methodfS0_FT_T_     // accessibility_vtables.InternalBase.method (accessibility_vtables.InternalBase)() -> ()
+// CHECK-NEXT:  #InternalBase.method!1: _TFC21accessibility_vtables12InternalBaseP{{[0-9]+}}[[DISCRIMINATOR:_.+]]6methodfS0_FT_T_     // accessibility_vtables.InternalBase.(method in [[DISCRIMINATOR]]) (accessibility_vtables.InternalBase)() -> ()
 // CHECK-NEXT:  #InternalBase.init!initializer.1: _TFC21accessibility_vtables11InternalSubcfMS0_FT_S0_        // accessibility_vtables.InternalSub.init (accessibility_vtables.InternalSub.Type)() -> accessibility_vtables.InternalSub
 // CHECK-NEXT:  #InternalBase.prop!getter.1: _TFC21accessibility_vtables11InternalSubg4propSi // accessibility_vtables.InternalSub.prop.getter : Swift.Int
 // CHECK-NEXT:  #InternalBase.prop!setter.1: _TFC21accessibility_vtables12InternalBases4propSi        // accessibility_vtables.InternalBase.prop.setter : Swift.Int

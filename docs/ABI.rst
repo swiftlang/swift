@@ -751,7 +751,9 @@ Globals
   entity-name ::= 'W' decl-name type     // didSet
   decl-name ::= identifier
   decl-name ::= local-decl-name
+  decl-name ::= private-decl-name
   local-decl-name ::= 'L' index identifier  // locally-discriminated declaration
+  private-decl-name ::= 'P' identifier identifier  // file-discriminated declaration
   reabstract-signature ::= ('G' generic-signature)? type type
 
 An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
@@ -759,7 +761,7 @@ substitution (``[S]``) of a nominal type, or an ``entity-kind``
 (``[FIsv]``).
 
 An ``entity-name`` starts with ``[AaCcDggis]`` or a ``decl-name``.
-A ``decl-name`` starts with a ``[L]`` or an ``identifier`` (``[0-9oX]``).
+A ``decl-name`` starts with ``[LP]`` or an ``identifier`` (``[0-9oX]``).
 
 A ``context`` starts with either an ``entity`` or a ``module``, which
 might be an ``identifier`` (``[0-9oX]``) or a substitution of a module
@@ -774,6 +776,14 @@ forwarder's destination.
 A generic specialization mangling consists of a header, specifying the types
 and conformances used to specialize the generic function, followed by the
 full mangled name of the original unspecialized generic symbol.
+
+The first identifier in a ``<private-decl-name>`` is a string that represents
+the file the original declaration came from. It should be considered unique
+within the enclosing module. The second identifier is the name of the entity.
+
+Not all declarations marked ``private`` declarations will use the 
+``<private-decl-name>`` mangling; if the entity's context is enough to uniquely
+identify the entity, the simple ``identifier`` form may be used.
 
 The types in a ``<reabstract-signature>`` are always non-polymorphic
 ``<impl-function-type>`` types.

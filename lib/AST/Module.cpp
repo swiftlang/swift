@@ -1374,6 +1374,15 @@ ArtificialMainKind SourceFile::getArtificialMainKind() const {
   return ArtificialMainKind::None;
 }
 
+void
+SourceFile::getDiscriminatorForPrivateValue(SmallVectorImpl<char> &buffer,
+                                            const ValueDecl *D) const {
+  assert(D->getDeclContext()->getModuleScopeContext() == this);
+  // FIXME: Actually come up with a discriminator.
+  StringRef discriminator = getParentModule()->Name.str();
+  buffer.append(discriminator.begin(), discriminator.end());
+}
+
 //===----------------------------------------------------------------------===//
 // Miscellaneous
 //===----------------------------------------------------------------------===//
