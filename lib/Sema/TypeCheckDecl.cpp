@@ -1154,6 +1154,15 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (other->isInvalid())
       continue;
 
+    // Skip declarations in other files.
+    // In practice, this means we will warn on a private declaration that
+    // shadows a non-private one, but only in the file where the shadowing
+    // happens. We will warn on conflicting non-private declarations in both
+    // files.
+    if (tc.Context.LangOpts.UsePrivateDiscriminators)
+      if (!other->isAccessibleFrom(currentDC))
+        continue;
+
     // If there is a conflict, complain.
     if (conflicting(currentSig, other->getOverloadSignature())) {
       // If the two declarations occur in the same source file, make sure

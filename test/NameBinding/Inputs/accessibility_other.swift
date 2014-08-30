@@ -23,3 +23,7 @@ extension OriginallyEmpty {
   func method() {}
   typealias TheType = Float
 }
+
+private func privateInBothFiles() {}
+func privateInPrimaryFile() {} // expected-note {{previously declared here}}
+private func privateInOtherFile() {} // expected-error {{invalid redeclaration}}

@@ -1,12 +1,12 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
 
-// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-source-import -I=%S/Inputs -sdk "" -enable-access-control -verify
-// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-source-import -I=%S/Inputs -sdk "" -disable-access-control -D DEFINE_VAR_FOR_SCOPED_IMPORT -D ACCESS_DISABLED
+// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-private-discriminators -enable-source-import -I=%S/Inputs -sdk "" -enable-access-control -verify
+// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-private-discriminators -enable-source-import -I=%S/Inputs -sdk "" -disable-access-control -D DEFINE_VAR_FOR_SCOPED_IMPORT -D ACCESS_DISABLED
 
 // RUN: %swift -emit-module -o %t %S/Inputs/has_accessibility.swift -D DEFINE_VAR_FOR_SCOPED_IMPORT
-// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I=%t -sdk "" -enable-access-control -verify
-// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I=%t -sdk "" -disable-access-control -D ACCESS_DISABLED
+// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-private-discriminators -I=%t -sdk "" -enable-access-control -verify
+// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-private-discriminators -I=%t -sdk "" -disable-access-control -D ACCESS_DISABLED
 
 import has_accessibility
 
@@ -86,5 +86,12 @@ extension OriginallyEmpty : MethodProto {}
 extension HiddenType : TypeProto {} // expected-error {{type 'HiddenType' does not conform to protocol 'TypeProto'}}
 #if !ACCESS_DISABLED
 extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to protocol 'TypeProto'}}
+#endif
+
+
+#if !ACCESS_DISABLED
+private func privateInBothFiles() {} // no-warning
+private func privateInPrimaryFile() {} // expected-error {{invalid redeclaration}}
+func privateInOtherFile() {} // expected-note {{previously declared here}}
 #endif
 
