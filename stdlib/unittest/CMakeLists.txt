@@ -14,6 +14,7 @@ set(SWIFTUNITTEST_SOURCES
   Statistics.swift
   StdlibCoreExtras.swift
   SwiftBlockToCFunctionThunks.cpp
+  LifetimeTracked.swift
 )
 
 add_swift_library(swiftStdlibUnittest INSTALL TARGET_LIBRARY

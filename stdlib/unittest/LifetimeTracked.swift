@@ -1,0 +1,47 @@
+//===--- LifetimeTracked.swift --------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+var trackedCount = 0
+var nextTrackedSerialNumber = 0
+
+public final class LifetimeTracked : ForwardIndexType, Printable {
+  public init(_ value: Int) {
+    ++trackedCount
+    serialNumber = ++nextTrackedSerialNumber
+    self.value = value
+  }
+  
+  deinit {
+    assert(serialNumber > 0, "double destruction!")
+    --trackedCount
+    serialNumber = -serialNumber
+  }
+
+  public var description: String {
+    assert(serialNumber > 0, "dead Tracked!")
+    return value.description
+  }
+
+  public func successor() -> LifetimeTracked {
+    return LifetimeTracked(self.value.successor())
+  }
+
+  public class var instances: Int {
+    return trackedCount
+  }
+  
+  public let value: Int = 0
+  public var serialNumber: Int = 0
+}
+
+public func == (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
+  return x.value == y.value
+}
