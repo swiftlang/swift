@@ -112,7 +112,7 @@
                     "unchecked_ref_bit_cast" "unchecked_trivial_bit_cast")
                   'words) . font-lock-keyword-face)
    ;; Checked Conversions
-   `(,(regexp-opt '("unconditional_checked_cast")
+   `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr")
 		  'words) . font-lock-keyword-face)
    ;; Runtime Failures
    `(,(regexp-opt '("cond_fail")
