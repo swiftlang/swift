@@ -128,7 +128,7 @@ ArrayRef<Substitution> SILType::gatherAllSubstitutions(SILModule &M) {
 
 bool SILType::isHeapObjectReferenceType() const {
   auto &C = getASTContext();
-  if (getSwiftRValueType()->mayHaveSuperclass())
+  if (getSwiftRValueType()->isBridgeableObjectType())
     return true;
   if (getSwiftRValueType()->isEqual(C.TheNativeObjectType))
     return true;

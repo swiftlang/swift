@@ -229,6 +229,22 @@ func obj_from_raw_pointer(p: Builtin.RawPointer) -> Builtin.NativeObject {
   return Builtin.bridgeFromRawPointer(p)
 }
 
+// CHECK-LABEL: sil @_TF8builtins28unknown_obj_from_raw_pointer
+func unknown_obj_from_raw_pointer(p: Builtin.RawPointer) -> Builtin.UnknownObject {
+  // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $Builtin.UnknownObject
+  // CHECK: retain [[C]]
+  // CHECK: return [[C]]
+  return Builtin.bridgeFromRawPointer(p)
+}
+
+// CHECK-LABEL: sil @_TF8builtins28existential_from_raw_pointer
+func existential_from_raw_pointer(p: Builtin.RawPointer) -> AnyObject {
+  // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $AnyObject
+  // CHECK: retain [[C]]
+  // CHECK: return [[C]]
+  return Builtin.bridgeFromRawPointer(p)
+}
+
 // CHECK-LABEL: sil @_TF8builtins5gep64
 func gep64(p: Builtin.RawPointer, i: Builtin.Int64) -> Builtin.RawPointer {
   // CHECK: [[GEP:%.*]] = index_raw_pointer

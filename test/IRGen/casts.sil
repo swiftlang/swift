@@ -3,6 +3,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 class A {}
 class B: A {}
@@ -25,4 +26,13 @@ sil @ref_to_raw_pointer_existential : $@thin (@owned CP) -> Builtin.RawPointer {
 entry(%p : $CP):
   %r = ref_to_raw_pointer %p : $CP to $Builtin.RawPointer
   return %r : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: define %objc_object* @raw_pointer_to_ref_existential(i8*) {
+// CHECK:         [[CAST:%.*]] = bitcast i8* %0 to %objc_object*
+// CHECK:         ret %objc_object* [[CAST]]
+sil @raw_pointer_to_ref_existential : $@thin (@owned Builtin.RawPointer) -> AnyObject {
+entry(%p : $Builtin.RawPointer):
+  %r = raw_pointer_to_ref %p : $Builtin.RawPointer to $AnyObject
+  return %r : $AnyObject
 }

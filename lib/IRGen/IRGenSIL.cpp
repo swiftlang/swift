@@ -2753,7 +2753,10 @@ void IRGenSILFunction::visitRefToRawPointerInst(
 
 void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {
   auto &ti = getTypeInfo(i->getType());
-  llvm::Type *destType = ti.getStorageType();
+  auto schema = ti.getSchema();
+  assert(schema.size() == 1 && schema[0].isScalar()
+         && "dest type is not a single scalar");
+  llvm::Type *destType = schema[0].getScalarType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
                       destType);
 }
