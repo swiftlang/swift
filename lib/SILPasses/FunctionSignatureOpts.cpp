@@ -191,7 +191,7 @@ private:
     for (auto &Arg : ArgDescriptors)
       if (Arg.Arg == A)
         return Arg;
-    return Nothing_t::Nothing;
+    return Nothing;
   }
 
   static SILFunction *initCloned(SILFunction &Orig,

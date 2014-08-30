@@ -44,7 +44,7 @@ bool canCheckRefCount(SILInstruction *User);
 bool canUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
 
 /// If \p Op has arc uses in the instruction range [Start, End), return the
-/// first such instruction. Otherwise return Nothing_t::Nothing. We assume that
+/// first such instruction. Otherwise return Nothing. We assume that
 /// Start and End are both in the same basic block.
 Optional<SILBasicBlock::iterator>
 valueHasARCUsesInInstructionRange(SILValue Op,
@@ -53,7 +53,7 @@ valueHasARCUsesInInstructionRange(SILValue Op,
                                   AliasAnalysis *AA);
 
 /// If \p Op has instructions in the instruction range (Start, End] which may
-/// decrement it, return the first such instruction. Returns Nothing_t::Nothing
+/// decrement it, return the first such instruction. Returns Nothing
 /// if no such instruction exists. We assume that Start and End are both in the
 /// same basic block.
 Optional<SILBasicBlock::iterator>
