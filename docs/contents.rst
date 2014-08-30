@@ -11,6 +11,7 @@ Contents
 
    DesignDecisions
    LangRefNew
+   IndexInvalidation
    AccessControl
    DriverInternals
    DriverParseableOutput
