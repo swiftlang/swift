@@ -1484,6 +1484,25 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   };
   unsigned recordID;
 
+  class DiscriminatorRAII {
+    ModuleFile &moduleFile;
+    Serialized<Decl *> &declOrOffset;
+
+  public:
+    Identifier discriminator;
+
+    DiscriminatorRAII(ModuleFile &moduleFile,
+                      Serialized<Decl *> &declOrOffset)
+      : moduleFile(moduleFile), declOrOffset(declOrOffset) {}
+
+    ~DiscriminatorRAII() {
+      if (!discriminator.empty() && declOrOffset.isComplete())
+        if (auto value = dyn_cast_or_null<ValueDecl>(declOrOffset.get()))
+          moduleFile.PrivateDiscriminatorsByValue[value] = discriminator;
+    }
+  };
+  DiscriminatorRAII discriminatorRAII{*this, declOrOffset};
+
   while (true) {
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       // We don't know how to serialize decls represented by sub-blocks.
@@ -1614,15 +1633,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       AddAttribute(Attr);
 
-      // Advance bitstream cursor to the next record.
-      entry = DeclTypeCursor.advance();
+    } else if (recordID == decls_block::DISCRIMINATOR) {
+      IdentifierID discriminatorID;
+      decls_block::DiscriminatorLayout::readRecord(scratch, discriminatorID);
+      discriminatorRAII.discriminator = getIdentifier(discriminatorID);
 
-      // Prepare to read the next record.
-      scratch.clear();
-      continue;
+    } else {
+      break;
     }
 
-    break;
+    // Advance bitstream cursor to the next record.
+    entry = DeclTypeCursor.advance();
+
+    // Prepare to read the next record.
+    scratch.clear();
   }
 
   PrettyDeclDeserialization stackTraceEntry(

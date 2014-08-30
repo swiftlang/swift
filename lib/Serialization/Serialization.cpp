@@ -1448,6 +1448,26 @@ void Serializer::writeDecl(const Decl *D) {
       writeDeclAttribute(Attr);
   }
 
+  if (M->Ctx.LangOpts.UsePrivateDiscriminators) {
+    if (auto *value = dyn_cast<ValueDecl>(D)) {
+      if (value->hasAccessibility() &&
+          value->getAccessibility() == Accessibility::Private &&
+          !value->getDeclContext()->isLocalContext()) {
+        // FIXME: We shouldn't need to encode this for /all/ private decls.
+        // In theory we can follow the same rules as mangling and only include
+        // the outermost private context.
+        auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
+        if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
+          Identifier discriminator =
+            enclosingFile->getDiscriminatorForPrivateValue(value);
+          unsigned abbrCode = DeclTypeAbbrCodes[DiscriminatorLayout::Code];
+          DiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          addIdentifierRef(discriminator));
+        }
+      }
+    }
+  }
+
   switch (D->getKind()) {
   case DeclKind::Import:
     llvm_unreachable("import decls should not be serialized");
@@ -2622,6 +2642,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
     registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
     registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
+
+    registerDeclTypeAbbr<DiscriminatorLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
     registerDeclTypeAbbr<XRefLayout>();
 

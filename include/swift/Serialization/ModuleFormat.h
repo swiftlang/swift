@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 131;
+const uint16_t VERSION_MINOR = 132;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -945,6 +945,13 @@ namespace decls_block {
   using LastGenericRequirementLayout = BCRecordLayout<
     LAST_GENERIC_REQUIREMENT,
     BCFixed<1>                 // dummy
+  >;
+
+  /// Specifies the discriminator string for a private declaration. This
+  /// identifies the declaration's original source file in some opaque way.
+  using DiscriminatorLayout = BCRecordLayout<
+    DISCRIMINATOR,
+    IdentifierIDField  // discriminator string, as an identifier
   >;
 
   /// A placeholder for lack of conformance information. Conformances are

@@ -1240,6 +1240,7 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
 }
 
 Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
-  // FIXME: Actually implement this.
-  return FileContext->getParentModule()->Name;
+  Identifier discriminator = PrivateDiscriminatorsByValue.lookup(D);
+  assert(!discriminator.empty() && "no discriminator found for decl");
+  return discriminator;
 }

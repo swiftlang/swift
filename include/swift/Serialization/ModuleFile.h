@@ -250,6 +250,8 @@ private:
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
 
+  llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
+
   TinyPtrVector<Decl *> ImportDecls;
 
   using DeclIDVector = SmallVector<serialization::DeclID, 4>;
