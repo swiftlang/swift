@@ -588,6 +588,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPatterns |= Args.hasArg(OPT_enable_experimental_patterns);
 
   Opts.EnableCharacterLiterals |= Args.hasArg(OPT_enable_character_literals);
+  Opts.UsePrivateDiscriminators |=
+    Args.hasArg(OPT_enable_private_discriminators);
 
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {

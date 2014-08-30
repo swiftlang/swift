@@ -86,6 +86,13 @@ namespace swift {
     /// Triggers emission of an artificial 'main' for an AppKit project.
     bool EmitNSApplicationMain = false;
 
+    /// If set, symbol mangling will include private discriminators.
+    ///
+    /// This option is for staging purposes only; it will soon go away.
+    /// In particular, setting this will not actually change the mangler's
+    /// behavior; it just affects what the compiler \em thinks will happen.
+    bool UsePrivateDiscriminators = false;
+    
     /// The minimum platform version to which code will be deployed.
     clang::VersionTuple MinPlatformVersion;
 

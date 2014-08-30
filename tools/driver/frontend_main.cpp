@@ -20,6 +20,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/Mangle.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/DependencyFileGenerator.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
@@ -337,6 +338,9 @@ int frontend_main(ArrayRef<const char *>Args,
                                  diag::error_missing_frontend_action);
     return 1;
   }
+
+  if (Invocation.getLangOptions().UsePrivateDiscriminators)
+    Mangle::Mangler::UsePrivateDiscriminators = true;
 
   // TODO: reorder, if possible, so that diagnostics emitted during
   // CompilerInvocation::parseArgs are included in the serialized file.

@@ -1,11 +1,11 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %swift %s -emit-silgen | FileCheck %s
+// RUN: %swift %s -emit-silgen -enable-private-discriminators | FileCheck %s
 
 // RUN: cp %s %t
-// RUN: %swift %t/mangling_private.swift -emit-silgen | FileCheck %s
+// RUN: %swift %t/mangling_private.swift -emit-silgen -enable-private-discriminators | FileCheck %s
 
 // RUN: cp %s %t/other_name.swift
-// RUN: %swift %t/other_name.swift -emit-silgen -module-name mangling_private | FileCheck %s -check-prefix=OTHER-NAME
+// RUN: %swift %t/other_name.swift -emit-silgen -enable-private-discriminators -module-name mangling_private | FileCheck %s -check-prefix=OTHER-NAME
 
 // CHECK-LABEL: sil @_TF16mangling_privateP33_713AFCDB29B710C2AB6F4DF7C1C8FEC911privateFuncFT_Si
 // OTHER-NAME-LABEL: sil @_TF16mangling_privateP33_AD9C6D430861F1E1D66B54DBCA7CC94B11privateFuncFT_Si

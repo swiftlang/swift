@@ -50,6 +50,9 @@ class Mangler {
   bool UsePunycode;
 
 public:
+  /// If set, private declarations will be mangled with a discriminator.
+  static bool UsePrivateDiscriminators;
+
   enum BindGenerics : unsigned {
     /// We don't intend to mangle any sort of type within this context
     /// and so do not require its generic parameters to be bound.

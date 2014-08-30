@@ -35,6 +35,8 @@
 using namespace swift;
 using namespace Mangle;
 
+bool Mangler::UsePrivateDiscriminators = false;
+
 /// Translate the given operator character into its mangled form.
 ///
 /// Current operator characters:   @/=-+*%<>!&|^~ and the special operator '..'
@@ -427,7 +429,7 @@ void Mangler::mangleDeclName(ValueDecl *decl) {
     Buffer << 'L' << Index(decl->getLocalDiscriminator());
     // Fall through to mangle the <identifier>.
 
-  } else if (decl->hasAccessibility() &&
+  } else if (UsePrivateDiscriminators && decl->hasAccessibility() &&
              decl->getAccessibility() == Accessibility::Private) {
     // Mangle non-local private declarations with a textual discriminator
     // based on their enclosing file.
