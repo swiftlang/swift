@@ -1793,7 +1793,7 @@ public:
 
   unsigned getFieldNo() const {
     unsigned i = 0;
-    for (auto *D : getStructDecl()->getStoredProperties()) {
+    for (VarDecl *D : getStructDecl()->getStoredProperties()) {
       if (Field == D)
         return i;
       ++i;
@@ -1806,6 +1806,37 @@ public:
     auto s = getOperand().getType().getStructOrBoundGenericStruct();
     assert(s);
     return s;
+  }
+
+  /// Return true if we are extracting the only non-trivial field of out parent
+  /// struct. This implies that a ref count operation on the aggregate is
+  /// equivalent to a ref count operation on this field.
+  bool isFieldOnlyNonTrivialField() const {
+    SILModule &Mod = getModule();
+
+    // If the field we are extracting is trivial, we can not be a non-trivial
+    // field... return false.
+    if (getType().isTrivial(Mod))
+      return false;
+
+    SILType StructTy = getOperand().getType();
+
+    // Ok, we are visiting a non-trivial field. Then for every stored field...
+    for (VarDecl *D : getStructDecl()->getStoredProperties()) {
+      // If we are visiting our own field continue.
+      if (Field == D)
+        continue;
+
+      // Ok, we have a field that is not equal to the field we are
+      // extracting. If that field is not trivial we have found a non trivial
+      // member that is not the member we are extracting, return false.
+      if (!StructTy.getFieldType(D, Mod).isTrivial(Mod))
+        return false;
+    }
+
+    // We checked every other field of the struct and did not find any
+    // non-trivial fields except for ourselves. Return true.
+    return true;
   }
 };
 

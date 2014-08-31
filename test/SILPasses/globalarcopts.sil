@@ -14,6 +14,19 @@ struct S {
 }
 sil @S_user : $@thin (S) -> ()
 
+struct S2 {
+  var x : Builtin.Int32
+  var y : Builtin.NativeObject
+  var z : Builtin.Int32
+}
+
+struct S3 {
+  var x : Builtin.Int32
+  var y : Builtin.NativeObject
+  var y1 : Builtin.NativeObject
+  var z : Builtin.Int32
+}
+
 class Cls {
   var random : Builtin.Int32
 
@@ -1397,4 +1410,25 @@ bb0(%0 : $Either<C, S>):
   release_value %1 : $S
   %2 = tuple()
   return %2 : $()
+}
+
+// CHECK-LABEL: sil @strip_off_structs_only_non_trivial_field : $@thin (S2, S3) -> () {
+// CHECK: bb0([[ARG0:%[0-9]+]] : $S2, [[ARG1:%[0-9]+]] : $S3):
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+// CHECK: retain_value [[ARG1]]
+// CHECK-NEXT: [[EXT:%[0-9]+]] = struct_extract [[ARG1]]
+// CHECK-NEXT: release_value [[EXT]]
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @strip_off_structs_only_non_trivial_field : $@thin (S2, S3) -> () {
+bb0(%0 : $S2, %1 : $S3):
+  retain_value %0 : $S2
+  %2 = struct_extract %0 : $S2, #S2.y
+  release_value %2 : $Builtin.NativeObject
+  retain_value %1 : $S3
+  %3 = struct_extract %1 : $S3, #S3.y
+  release_value %3 : $Builtin.NativeObject
+  %4 = tuple()
+  return %4 : $()
 }

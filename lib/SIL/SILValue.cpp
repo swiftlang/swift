@@ -102,18 +102,6 @@ SILValue SILValue::stripIndexingInsts() {
   }
 }
 
-/// Returns true if S is a decl of a struct with only one stored field.
-static bool isSingleFieldStruct(StructDecl *S) {
-  auto R = S->getStoredProperties();
-  auto B = R.begin();
-  if (B == R.end())
-    return false;
-  ++B;
-  if (B != R.end())
-    return false;
-  return true;
-}
-
 SILValue SILValue::stripRCIdentityPreservingOps() {
   SILValue V = *this;
   while (true) {
@@ -125,10 +113,12 @@ SILValue SILValue::stripRCIdentityPreservingOps() {
       continue;
     }
 
-    // Then if we have a struct_extract from a struct with one member is is ref
-    // count equivalent with the member. Strip off extract.
+    // Then if we have a struct_extract that is extracting a non-trivial member
+    // from a struct with no other non-trivial members, a ref count operation on
+    // the struct is equivalent to a ref count operation on the extracted
+    // member. Strip off the extract.
     if (auto *SEI = dyn_cast<StructExtractInst>(V)) {
-      if (isSingleFieldStruct(SEI->getStructDecl())) {
+      if (SEI->isFieldOnlyNonTrivialField()) {
         V = SEI->getOperand();
         continue;
       }
