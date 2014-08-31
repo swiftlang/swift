@@ -1828,10 +1828,14 @@ public:
         continue;
 
       // Ok, we have a field that is not equal to the field we are
-      // extracting. If that field is not trivial we have found a non trivial
-      // member that is not the member we are extracting, return false.
-      if (!StructTy.getFieldType(D, Mod).isTrivial(Mod))
-        return false;
+      // extracting. If that field is trivial, we do not care about
+      // it... continue.
+      if (StructTy.getFieldType(D, Mod).isTrivial(Mod))
+        continue;
+
+      // We have found a non trivial member that is not the member we are
+      // extracting, fail.
+      return false;
     }
 
     // We checked every other field of the struct and did not find any
