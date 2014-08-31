@@ -2463,13 +2463,13 @@ namespace {
                && "pod *and* refcounted?!");
         CopyDestroyKind = POD;
       } else if (allSingleSwiftRefcount
-                 && WithNoPayload.size() <= 1) {
+                 && ElementsWithNoPayload.size() <= 1) {
         CopyDestroyKind = TaggedSwiftRefcounted;
       }
       // FIXME: Memory corruption issues arise when enabling this for mixed
       // Swift/ObjC enums.
       else if (allSingleUnknownRefcount
-                 && WithNoPayload.size() <= 1) {
+                 && ElementsWithNoPayload.size() <= 1) {
         CopyDestroyKind = TaggedUnknownRefcounted;
       }
     }
