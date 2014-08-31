@@ -26,10 +26,20 @@ namespace swift {
   class CallGraphNode;
 
   class CallGraphEdge {
-
   public:
     typedef llvm::DenseSet<CallGraphNode *> CalleeSetType;
 
+  private:
+    // The call site represented by this call graph edge.
+    ApplyInst *CallSite;
+
+    // The set of functions potentially called from this call site. This
+    // might include functions that are not actually callable based on
+    // dynamic types. If the int bit is non-zero, the set is complete in
+    // the sense that no function outside the set could be called.
+    llvm::PointerIntPair<CalleeSetType *, 1> CalleeSet;
+
+  public:
     /// Create a call graph edge for a call site where we will fill in
     /// the set of potentially called functions later.
     CallGraphEdge(ApplyInst *CallSite) : CallSite(CallSite),
@@ -86,18 +96,25 @@ namespace swift {
     void markCalleeSetComplete() {
       CalleeSet.setInt(1);
     }
-
-    // The call site represented by this call graph edge.
-    ApplyInst *CallSite;
-
-    // The set of functions potentially called from this call site. This
-    // might include functions that are not actually callable based on
-    // dynamic types. If the int bit is non-zero, the set is complete in
-    // the sense that no function outside the set could be called.
-    llvm::PointerIntPair<CalleeSetType *, 1> CalleeSet;
   };
 
   class CallGraphNode {
+    /// The function represented by this call graph node.
+    SILFunction *Function;
+
+    /// The call graph node ordinal within the SILModule.
+    const unsigned Ordinal;
+
+    /// The known call sites that call into this function. The
+    /// caller's call graph node owns these.
+    llvm::SmallVector<CallGraphEdge *, 4> Callers;
+
+    /// The call sites within this function. This CallGraph node owns these.
+    llvm::SmallVector<CallGraphEdge *, 4> CallSites;
+
+    /// Do we know all the potential callers of this function?
+    bool CallerSetComplete;
+
   public:
     friend class CallGraph;
 
@@ -165,30 +182,18 @@ namespace swift {
     void addCaller(CallGraphEdge *CallerCallSite) {
       Callers.push_back(CallerCallSite);
     }
-
-    /// The function represented by this call graph node.
-    SILFunction *Function;
-
-    /// The call graph node ordinal within the SILModule.
-    const unsigned Ordinal;
-
-    /// The known call sites that call into this function. The
-    /// caller's call graph node owns these.
-    llvm::SmallVector<CallGraphEdge *, 4> Callers;
-
-    /// The call sites within this function. This CallGraph node owns these.
-    llvm::SmallVector<CallGraphEdge *, 4> CallSites;
-
-    /// Do we know all the potential callers of this function?
-    bool CallerSetComplete;
   };
 
   struct CallGraphSCC {
-  public:
     llvm::SmallVector<CallGraphNode *, 1> SCCNodes;
   };
 
   class CallGraph {
+    llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
+    llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
+    llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
+    std::vector<SILFunction *> BottomUpFunctionOrder;
+
   public:
     CallGraph(SILModule *M, bool completeModule);
 
@@ -233,21 +238,27 @@ namespace swift {
     void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
     void computeBottomUpSCCOrder();
     void computeBottomUpFunctionOrder();
-
-    llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
-    llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
-    llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
-    std::vector<SILFunction *> BottomUpFunctionOrder;
   };
 
   /// \brief a utility class that is used to traverse the call-graph
   /// and return a top-down or bottom up list of functions to process.
-  template <typename Node> struct CallGraphSorter {
+  template <typename Node>
+  class CallGraphSorter {
+  public:
     typedef std::pair<Node, Node> Edge;
     typedef std::vector<Node> NodeList;
     typedef llvm::DenseSet<Edge> EdgeList;
     typedef llvm::DenseMap<Node, NodeList> Graph;
 
+  private:
+    /// Adjacency list.
+    Graph graph;
+    /// A global list of edges with no repetitions.
+    EdgeList edges;
+    /// A stable order for the nodes in the graph.
+    NodeList StableNodeList;
+
+  public:
     CallGraphSorter() {}
 
     /// \brief Add an edge in the call graph.
@@ -299,14 +310,6 @@ namespace swift {
         }
       }
     }
-
-    private:
-    /// Adjacency list.
-    Graph graph;
-    /// A global list of edges with no repetitions.
-    EdgeList edges;
-    /// A stable order for the nodes in the graph.
-    NodeList StableNodeList;
   };
 
   /// The Call Graph Analysis provides information about the call graph.
