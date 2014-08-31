@@ -155,7 +155,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.add(createGlobalLoadStoreOpts());
   PM.add(createCodeMotion());
-  PM.add(createEnumSimplification());
   PM.add(createGlobalARCOpts());
 
   // Devirtualize.
