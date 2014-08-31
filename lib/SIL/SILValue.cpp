@@ -114,15 +114,6 @@ static bool isSingleFieldStruct(StructDecl *S) {
   return true;
 }
 
-/// Returns true if \p Elt is the EnumElementDecl of the first payloaded case of
-/// \p E.
-static bool isFirstPayloadedCaseOfEnum(EnumDecl *E, EnumElementDecl *Elt) {
-  for (EnumElementDecl *Iter : E->getAllElements())
-    if (Iter->hasArgumentType())
-      return Iter == Elt;
-  return false;
-}
-
 SILValue SILValue::stripRCIdentityPreservingOps() {
   SILValue V = *this;
   while (true) {
@@ -146,11 +137,8 @@ SILValue SILValue::stripRCIdentityPreservingOps() {
     // If we have an unchecked_enum_data from the first payloaded argument of an
     // enum, strip off the unchecked_enum_data.
     if (auto *UEDI = dyn_cast<UncheckedEnumDataInst>(V)) {
-      EnumDecl *E = UEDI->getOperand().getType().getEnumOrBoundGenericEnum();
-      if (isFirstPayloadedCaseOfEnum(E, UEDI->getElement())) {
-        V = UEDI->getOperand();
-        continue;
-      }
+      V = UEDI->getOperand();
+      continue;
     }
 
     return V;
@@ -225,13 +213,8 @@ SILValue SILValue::stripSinglePredecessorRCIdentityPreservingArgs() {
     }
 
     if (auto *SWEI = dyn_cast<SwitchEnumInst>(PredTI)) {
-      EnumDecl *Enum = SWEI->getOperand().getType().getEnumOrBoundGenericEnum();
-      if (EnumElementDecl *EltDecl = SWEI->getUniqueCaseForDestination(BB)) {
-        if (isFirstPayloadedCaseOfEnum(Enum, EltDecl)) {
-          V = SWEI->getOperand();
-          continue;
-        }
-      }
+      V = SWEI->getOperand();
+      continue;
     }
 
     return V;

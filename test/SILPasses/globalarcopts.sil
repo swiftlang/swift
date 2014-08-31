@@ -33,6 +33,11 @@ enum FakeOptional<T> {
   case Some(T)
 }
 
+enum Either<LTy, RTy> {
+  case Left(LTy)
+  case Right(RTy)
+}
+
 /////////////////
 // Basic Tests //
 /////////////////
@@ -1378,4 +1383,18 @@ bb2:
   %4 = integer_literal $Builtin.Int1, -1
   cond_fail %4 : $Builtin.Int1
   unreachable
+}
+
+// CHECK-LABEL: sil @strip_off_multi_payload_unchecked_enum_data : $@thin (Either<C, S>) -> () {
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @strip_off_multi_payload_unchecked_enum_data : $@thin (Either<C, S>) -> () {
+bb0(%0 : $Either<C, S>):
+  retain_value %0 : $Either<C, S>
+  %1 = unchecked_enum_data %0 : $Either<C, S>, #Either.Right!enumelt.1
+  release_value %1 : $S
+  %2 = tuple()
+  return %2 : $()
 }
