@@ -37,11 +37,8 @@ struct Struct {
   }
 }
 
-// For classes, we only support failure after the object has been fully
-// initialized. Although we could support failure with partial initialization
-// for fully native Swift classes, it would be difficult to support for ObjC
-// and mixed-heritage classes because of Cocoa's monolithic dealloc interface.
-
+// For classes, we can also support failure at any point in a native swift
+// class.
 class RootClass {
   let x, y: Int
 
