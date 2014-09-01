@@ -737,7 +737,25 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
+// CHECK-LABEL: sil @test_root_partial_release
+// CHECK-NEXT: bb0(%0 :
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: dealloc_ref %0
+sil @test_root_partial_release : $@cc(method) @thin (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : $RootClassWithNontrivialStoredProperties):
+  %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
 
+  %1 = alloc_ref $SomeClass
+  %2 = ref_element_addr %4 : $RootClassWithNontrivialStoredProperties, #RootClassWithNontrivialStoredProperties.x
+  assign %1 to %2 : $*SomeClass
 
+  strong_release %4 : $RootClassWithNontrivialStoredProperties
 
+  %13 = tuple ()
+  return %13 : $()
+}
 

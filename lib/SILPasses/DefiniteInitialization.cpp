@@ -1249,6 +1249,10 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   return AllocAddr;
 }
 
+/// Process any destroy_addr and strong_release instructions that are invoked on
+/// a partially initialized value.  This generates code to destroy the elements
+/// that are known to be alive, ignore the ones that are known to be dead, and
+/// to emit branching logic when an element may or may not be initialized.
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilder B(TheMemory.MemoryInst);
@@ -1261,14 +1265,13 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   // lifetime ends.  In this case, we have to make sure not to destroy an
   // element that wasn't initialized yet.
   for (auto &CDElt : ConditionalDestroys) {
-    auto *DAI = cast<DestroyAddrInst>(Releases[CDElt.first]);
+    auto *Release = Releases[CDElt.first];
+    auto Loc = Release->getLoc();
     auto &Availability = CDElt.second;
     
-    // The only instruction that can be in a partially live region is a
-    // destroy_addr.  A strong_release must only occur in code that was
-    // mandatory inlined, and the argument would have required it to be live at
-    // that site.
-    SILValue Addr = DAI->getOperand();
+    // The instruction in a partially live region is a destroy_addr or
+    // strong_release.
+    SILValue Addr = Release->getOperand(0);
   
     // If the memory is not-fully initialized at the destroy_addr, then there
     // can be multiple issues: we could have some tuple elements initialized and
@@ -1295,10 +1298,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       case DIKind::Yes:
         // If an element is known to be initialized, then we can strictly
-        // destroy its value at DAI's position.
-        B.setInsertionPoint(DAI);
-        SILValue EltPtr = TheMemory.emitElementAddress(Elt, DAI->getLoc(), B);
-        if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
+        // destroy its value at releases position.
+        B.setInsertionPoint(Release);
+        SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
+        if (auto *DA = B.emitDestroyAddr(Release->getLoc(), EltPtr))
           Releases.push_back(DA);
         continue;
       }
@@ -1309,9 +1312,9 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       
       // Insert a load of the liveness bitmask and split the CFG into a diamond
       // right before the destroy_addr, if we haven't already loaded it.
-      B.setInsertionPoint(DAI);
+      B.setInsertionPoint(Release);
       if (!LoadedMask)
-        LoadedMask = B.createLoad(DAI->getLoc(), ControlVariableAddr);
+        LoadedMask = B.createLoad(Loc, ControlVariableAddr);
       SILValue CondVal = LoadedMask;
       
       // If this memory object has multiple tuple elements, we need to make sure
@@ -1322,36 +1325,40 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
           if (!ShiftRightFn) {
             SILBuilder FB(TheMemory.getFunctionEntryPoint());
             ShiftRightFn = getBinaryFunction("lshr", CondVal.getType(),
-                                             DAI->getLoc(), FB);
+                                             Loc, FB);
           }
-          SILValue Amt = B.createIntegerLiteral(DAI->getLoc(),
-                                                CondVal.getType(), Elt);
+          SILValue Amt = B.createIntegerLiteral(Loc, CondVal.getType(), Elt);
           SILValue Args[] = { CondVal, Amt };
-          CondVal = B.createApply(DAI->getLoc(), ShiftRightFn, Args);
+          CondVal = B.createApply(Loc, ShiftRightFn, Args);
         }
         
         if (!TruncateFn) {
           SILBuilder FB(TheMemory.getFunctionEntryPoint());
-          TruncateFn = getTruncateToI1Function(CondVal.getType(),
-                                               DAI->getLoc(), FB);
+          TruncateFn = getTruncateToI1Function(CondVal.getType(), Loc, FB);
         }
-        CondVal = B.createApply(DAI->getLoc(), TruncateFn, CondVal);
+        CondVal = B.createApply(Loc, TruncateFn, CondVal);
       }
       
       SILBasicBlock *CondDestroyBlock, *ContBlock;
-      InsertCFGDiamond(CondVal, DAI->getLoc(),
-                       B, CondDestroyBlock, nullptr, ContBlock);
+      InsertCFGDiamond(CondVal, Loc, B, CondDestroyBlock, nullptr, ContBlock);
       
       // Set up the conditional destroy block.
       B.setInsertionPoint(CondDestroyBlock->begin());
-      SILValue EltPtr = TheMemory.emitElementAddress(Elt, DAI->getLoc(), B);
-      if (auto *DA = B.emitDestroyAddr(DAI->getLoc(), EltPtr))
+      SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
+      if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
         Releases.push_back(DA);
     }
     
-    // Finally, now that the destroy_addr is handled, remove the original
-    // destroy.
-    DAI->eraseFromParent();
+    // If the instruction was a strong_release, emit a dealloc_ref to free the
+    // now fully-uninitialized memory.
+    if (isa<StrongReleaseInst>(Release)) {
+      B.setInsertionPoint(Release);
+      B.createDeallocRef(Release->getLoc(), Release->getOperand(0));
+    }
+    
+    // Finally, now that the original instruction is handled, remove the
+    // original destroy.
+    Release->eraseFromParent();
     if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
       recursivelyDeleteTriviallyDeadInstructions(AddrI);
   }
