@@ -5279,7 +5279,7 @@ public:
     // Check property and subscript overriding.
     if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {
       auto *overrideASD = cast<AbstractStorageDecl>(override);
-
+      
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage() &&
           overrideASD->getStorageKind() != VarDecl::Observing) {
@@ -5314,6 +5314,17 @@ public:
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
+      
+      
+      // Make sure a 'let' property is only overridden by 'let' properties.  A
+      // let property provides more guarantees than the getter of a 'var'
+      // property.
+      if (isa<VarDecl>(baseASD) && cast<VarDecl>(baseASD)->isLet()) {
+        TC.diagnose(overrideASD, diag::override_let_property,
+                    overrideASD->getName());
+        TC.diagnose(baseASD, diag::property_override_here);
+        return true;
+      }
     }
     
     // Non-Objective-C declarations in extensions cannot override or
@@ -5327,8 +5338,8 @@ public:
       return true;
     }
     
-    // If the overriding declaration does not have the @override
-    // attribute on it, complain.
+    // If the overriding declaration does not have the 'override' modifier on
+    // it, complain.
     if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
         overrideRequiresKeyword(base)) {
       // FIXME: rdar://16320042 - For properties, we don't have a useful

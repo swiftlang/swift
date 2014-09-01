@@ -241,3 +241,14 @@ class D5 : C {
 class D6 : C {
   init(double: Double) { } // expected-error{{'required' modifier must be present on all overrides of a required initializer}}
 }
+
+
+
+class C_with_let {
+  let x = 42  // expected-note {{attempt to override property here}}
+}
+
+class D_with_let : C_with_let {
+  override var x : Int { get { return 4 } set {} }  // expected-error {{cannot override immutable 'let' property 'x' with the getter of a 'var'}}
+}
+

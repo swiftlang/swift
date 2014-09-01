@@ -759,6 +759,12 @@ ERROR(missing_override,sema_tcd,none,
       "overriding declaration requires an 'override' keyword", ())
 ERROR(override_unavailable,sema_tcd,none,
       "cannot override %0 which has been marked unavailable", (Identifier))
+
+ERROR(override_let_property,sema_tcd,none,
+      "cannot override immutable 'let' property %0 with the getter of a 'var'",
+      (Identifier))
+
+
 ERROR(override_not_accessible,sema_tcd,none,
       "%select{|setter of }0overriding %1 must be as accessible as "
       "%select{its enclosing type|the declaration it overrides}2",
