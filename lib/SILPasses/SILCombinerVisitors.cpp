@@ -1028,6 +1028,10 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
     return eraseInstFromFunction(*SRI);
 
+  if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
+      isa<ObjCMetatypeToObjectInst>(SRI->getOperand()))
+    return eraseInstFromFunction(*SRI);
+
   // Sometimes in the stdlib due to hand offs, we will see code like:
   //
   // strong_release %0
@@ -1407,6 +1411,10 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
 SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
   // Release of ThinToThickFunction is a no-op.
   if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
+    return eraseInstFromFunction(*SRI);
+
+  if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
+      isa<ObjCMetatypeToObjectInst>(SRI->getOperand()))
     return eraseInstFromFunction(*SRI);
 
   return nullptr;
