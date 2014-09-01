@@ -347,7 +347,7 @@ namespace {
     
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
-    std::vector<SILLocation> EmittedErrorLocs;
+    std::vector<SourceLoc> EmittedErrorLocs;
     SmallPtrSet<SILBasicBlock*, 16> BlocksReachableFromEntry;
     
   public:
@@ -483,10 +483,10 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
   // Check to see if we've already emitted an error at this location.  If so,
   // swallow the error.
   for (auto L : EmittedErrorLocs)
-    if (L == Inst->getLoc())
+    if (L == Inst->getLoc().getSourceLoc())
       return false;
-  
-  EmittedErrorLocs.push_back(Inst->getLoc());
+
+  EmittedErrorLocs.push_back(Inst->getLoc().getSourceLoc());
   return true;
 }
 
@@ -997,6 +997,8 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   // required (or desired).
   if (isa<DeallocStackInst>(Release) || isa<DeallocBoxInst>(Release))
     return;
+  
+  assert(isa<StrongReleaseInst>(Release) || isa<DestroyAddrInst>(Release));
 
   // If the memory object is completely initialized, then nothing needs to be
   // done at this release point.

@@ -410,7 +410,7 @@ class SomeDerivedClass : SomeClass {
 
   init(a : Int, b : Bool) {
     y = 42
-    someMethod() // expected-error 2 {{'self' used before super.init call}}
+    someMethod() // expected-error {{'self' used before super.init call}}
     super.init()
   }
 
@@ -545,7 +545,7 @@ class RequiresInitsDerived : Gizmo {
   } // expected-error{{super.init isn't called before returning from initializer}}
 
   init(d: Double) {
-    f() // expected-error 2{{'self' used before super.init call}}
+    f() // expected-error {{'self' used before super.init call}}
     super.init()
   }
 
