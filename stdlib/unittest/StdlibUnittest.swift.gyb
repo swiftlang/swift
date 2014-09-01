@@ -678,9 +678,6 @@ public func runAllTests() {
   }
 }
 
-// FIXME: remove this.
-public typealias TestCase = TestSuite
-
 public class TestSuite {
   public init(_ name: String) {
     self.name = name
