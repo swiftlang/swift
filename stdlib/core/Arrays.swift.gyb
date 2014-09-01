@@ -136,10 +136,17 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
 }
 
 extension ${Self} : ArrayLiteralConvertible {
+%if Self == 'Array':
+  // Optimized implementation for Array
+  public static func convertFromArrayLiteral(elements: Element...) -> ${Self} {
+    return elements
+  }
+%else:
   @effects(readonly)
   public static func convertFromArrayLiteral(elements: Element...) -> ${Self} {
     return ${Self}(_extractOrCopyToNativeArrayBuffer(elements._buffer))
   }
+%end
 }
 
 extension ${Self} {
