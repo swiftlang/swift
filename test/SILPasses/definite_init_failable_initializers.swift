@@ -2,7 +2,6 @@
 // initializers properly.
 
 // RUN: %swift -emit-sil -verify %s
-// XFAIL: *
 
 // For value types, we can handle failure at any point, using DI's established
 // analysis for partial struct and tuple values.
@@ -49,12 +48,12 @@ class RootClass {
   init() { x = 0; y = 0 }
 
   init?(failBeforeInitialization: ()) {
-    return nil // expected-error{{}}
+    return nil
   }
 
   init?(failAfterPartialInitialization: ()) {
     x = 0
-    return nil // expected-error{{}}
+    return nil
   }
 
   init?(failAfterFullInitialization: ()) {
@@ -64,7 +63,7 @@ class RootClass {
   }
 
   convenience init?(failBeforeDelegation: Bool) {
-    if failBeforeDelegation { return nil } // expected-error{{}}
+    if failBeforeDelegation { return nil }
     self.init()
   }
 
@@ -74,7 +73,7 @@ class RootClass {
   }
 
   convenience init?(failBeforeFailableDelegation: Bool) {
-    if failBeforeFailableDelegation { return nil } // expected-error{{}}
+    if failBeforeFailableDelegation { return nil }
     self.init(failBeforeInitialization: ())
   }
 
@@ -93,12 +92,12 @@ class SubClass: RootClass {
   }
 
   override init?(failBeforeInitialization: ()) {
-    return nil // expected-error{{}}
+    return nil
   }
 
   init?(failBeforeSuperInitialization: ()) {
     z = 0
-    return nil // expected-error{{}}
+    return nil
   }
 
   override init?(failAfterFullInitialization: ()) {
@@ -109,7 +108,7 @@ class SubClass: RootClass {
 
   init?(failBeforeFailableSuperInit: Bool) {
     z = 0
-    if failBeforeFailableSuperInit { return nil } // expected-error{{}}
+    if failBeforeFailableSuperInit { return nil }
     super.init(failBeforeInitialization: ())
   }
 
@@ -120,7 +119,7 @@ class SubClass: RootClass {
   }
 
   convenience init?(failBeforeDelegation: Bool) {
-    if failBeforeDelegation { return nil } // expected-error{{}}
+    if failBeforeDelegation { return nil }
     self.init()
   }
 
@@ -130,7 +129,7 @@ class SubClass: RootClass {
   }
 
   convenience init?(failBeforeFailableDelegation: Bool) {
-    if failBeforeFailableDelegation { return nil } // expected-error{{}}
+    if failBeforeFailableDelegation { return nil }
     self.init(failBeforeInitialization: ())
   }
 
