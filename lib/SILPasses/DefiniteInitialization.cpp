@@ -1349,9 +1349,24 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         Releases.push_back(DA);
     }
     
-    // If the instruction was a strong_release, emit a dealloc_ref to free the
-    // now fully-uninitialized memory.
-    if (isa<StrongReleaseInst>(Release)) {
+    // If this is an early release in a derive class, we need to emit a load of
+    // 'self' box to get the class reference, and then do a dealloc_ref.
+    if (TheMemory.isDerivedClassSelf()) {
+      B.setInsertionPoint(Release);
+      SILValue Pointer;
+      if (isa<DestroyAddrInst>(Release))
+        Pointer = Release->getOperand(0);
+      else {
+        assert(isa<StrongReleaseInst>(Release));
+        // Get the address result of the alloc_box.
+        Pointer = SILValue(Release->getOperand(0).getDef(), 1);
+      }
+      auto Ref = B.createLoad(Release->getLoc(), Pointer);
+      B.createDeallocRef(Release->getLoc(), Ref);
+    } else if (isa<StrongReleaseInst>(Release)) {
+      // If the instruction was a strong_release, emit a dealloc_ref to free the
+      // now fully-uninitialized memory.
+      assert(cast<MarkUninitializedInst>(TheMemory.MemoryInst)->isRootSelf());
       B.setInsertionPoint(Release);
       B.createDeallocRef(Release->getLoc(), Release->getOperand(0));
     }

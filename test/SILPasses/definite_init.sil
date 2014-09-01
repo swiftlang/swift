@@ -725,6 +725,11 @@ class RootClassWithNontrivialStoredProperties {
   init()
 }
 
+class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStoredProperties {
+  var a, b: SomeClass
+  override init()
+}
+
 // CHECK-LABEL: sil @test_root_release
 // CHECK-NEXT: bb0(%0 :
 // CHECK-NEXT: dealloc_ref %0
@@ -759,3 +764,35 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
+// CHECK-LABEL: sil @test_derived_partial_release
+// CHECK-NEXT: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack
+// CHECK-NEXT: store
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: ref_element_addr [[SELF]]
+// CHECK-NEXT: store
+// CHECK-NEXT: ref_element_addr %0
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: dealloc_ref [[SELF]]
+// CHECK-NEXT: dealloc_stack [[SELFBOX]]
+
+sil @test_derived_partial_release : $@cc(method) @thin (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+  %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %0 : $DerivedClassWithNontrivialStoredProperties
+  store %4 to %1#1 : $*DerivedClassWithNontrivialStoredProperties
+
+  %8 = alloc_ref $SomeClass
+  %9 = load %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  %10 = ref_element_addr %9 : $DerivedClassWithNontrivialStoredProperties, #DerivedClassWithNontrivialStoredProperties.a
+  assign %8 to %10 : $*SomeClass
+  destroy_addr %1#1 : $*DerivedClassWithNontrivialStoredProperties
+
+
+  dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}
