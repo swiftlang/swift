@@ -1203,6 +1203,7 @@ public:
     requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
     SILType operandType = EMI->getOperand().getType();
 
+    require(EMI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
@@ -1948,6 +1949,7 @@ public:
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
     SILType operandType = DMBI->getOperand().getType();
 
+    require(DMBI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!DMBI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
