@@ -995,9 +995,13 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   
   // If the instruction is a deallocation of uninitialized memory, no action is
   // required (or desired).
-  if (isa<DeallocStackInst>(Release) || isa<DeallocBoxInst>(Release))
+  if (isa<DeallocStackInst>(Release) || isa<DeallocBoxInst>(Release) ||
+      isa<DeallocRefInst>(Release))
     return;
   
+  // We only handle strong_release and destroy_addr here.  The former is a
+  // release of a class in an initializer, the later is used for local variable
+  // destruction.
   assert(isa<StrongReleaseInst>(Release) || isa<DestroyAddrInst>(Release));
 
   // If the memory object is completely initialized, then nothing needs to be
@@ -1006,8 +1010,21 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
     getLivenessAtInst(Release, 0, TheMemory.NumElements);
   if (Availability.isAllYes()) return;
   
-  // If it is all no, then we can just remove it.
+  // If it is all 'no' then we can handle is specially without conditional code.
   if (Availability.isAllNo()) {
+    // If this is a strong release, then none of the fields of the class are
+    // initialized.  We still have to free to box though, so turn this into a
+    // dealloc_ref.
+    if (auto *SRI = dyn_cast<StrongReleaseInst>(Release)) {
+        SILBuilder B(Release);
+      auto Dealloc = B.createDeallocRef(SRI->getLoc(), SRI->getOperand());
+      Releases[ReleaseID] = Dealloc;
+      Release->eraseFromParent();
+      return;
+    }
+    
+    // destroy_addr can just be zapped.
+    assert(isa<DestroyAddrInst>(Release));
     SILValue Addr = Release->getOperand(0);
     Release->eraseFromParent();
     if (auto *AddrI = dyn_cast<SILInstruction>(Addr))

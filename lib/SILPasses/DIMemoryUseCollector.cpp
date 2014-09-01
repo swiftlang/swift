@@ -988,10 +988,15 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
       continue;
     }
     
-    // We ignore retains and releases of self.
-    if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User))
+    // releases of self are tracked as a release (but retains are just treated
+    // like a normal 'load' use).  In the case of a failing initializer, the
+    // release on the exit path needs to cleanup the partially initialized
+    // elements.
+    if (isa<StrongReleaseInst>(User)) {
+      Releases.push_back(User);
       continue;
-
+    }
+    
     // If this is an upcast instruction, it is a conversion of self to the base.
     // This is either part of a super.init sequence, or a general superclass
     // access.

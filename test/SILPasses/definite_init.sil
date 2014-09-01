@@ -599,10 +599,8 @@ sil @rootclass_test3 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @o
 bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  
 
-  strong_retain %3 : $RootClassWithIVars             // id: %11
   %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
   assign %1 to %11 : $*Int
-  strong_release %3 : $RootClassWithIVars            // id: %14
 
   return %3 : $RootClassWithIVars    // expected-error {{property '<unknown>.x' not initialized}}
 }
@@ -632,7 +630,6 @@ bb0(%0 : $DerivedClassWithIVars):
   
 
   %11 = load %1#1 : $*DerivedClassWithIVars
-  strong_retain %11 : $DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
@@ -652,7 +649,6 @@ bb0(%0 : $DerivedClassWithIVars):
   store %3 to %1#1 : $*DerivedClassWithIVars
 
   %11 = load %1#1 : $*DerivedClassWithIVars
-  strong_retain %11 : $DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars   // expected-error {{property '<unknown>.a' not initialized at super.init call}}
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
@@ -722,6 +718,26 @@ bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
   dealloc_stack %2#0 : $*@local_storage MyStruct2
   return %13 : $()
 }
+
+class RootClassWithNontrivialStoredProperties {
+  var x, y: SomeClass
+
+  init()
+}
+
+// CHECK-LABEL: sil @test_root_release
+// CHECK-NEXT: bb0(%0 :
+// CHECK-NEXT: dealloc_ref %0
+sil @test_root_release : $@cc(method) @thin (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : $RootClassWithNontrivialStoredProperties):
+  %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
+  strong_release %4 : $RootClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}
+
+
 
 
 
