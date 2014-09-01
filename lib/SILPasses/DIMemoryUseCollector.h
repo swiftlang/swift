@@ -95,13 +95,21 @@ public:
     return false;
   }
   
-  bool isEnumSelf() const {
+  // True if the memory object is the 'self' argument of a enum initializer.
+  bool isEnumInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       if (MUI->isRootSelf() && isa<EnumDecl>(getType()->getAnyNominal()))
         return true;
     return false;
   }
-  
+
+  // True if the memory object is the 'self' argument of a class initializer.
+  bool isClassInitSelf() const {
+    if (isAnyInitSelf() && isa<ClassDecl>(getType()->getAnyNominal()))
+      return true;
+    return false;
+  }
+
   /// isDerivedClassSelf - Return true if this memory object is the 'self' of
   /// a derived class init method.
   bool isDerivedClassSelf() const {

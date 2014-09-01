@@ -749,7 +749,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   // return in the enum init case, and we haven't stored to self.   Emit a
   // specific diagnostic.
   if (auto *LI = dyn_cast<LoadInst>(Inst))
-    if (TheMemory.isEnumSelf() && LI->hasOneUse() &&
+    if (TheMemory.isEnumInitSelf() && LI->hasOneUse() &&
         isa<ReturnInst>((*LI->use_begin())->getUser())) {
       if (shouldEmitError(Inst))
         diagnose(Module, Inst->getLoc(),
@@ -1012,18 +1012,37 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   
   // If it is all 'no' then we can handle is specially without conditional code.
   if (Availability.isAllNo()) {
-    // If this is a strong release, then none of the fields of the class are
-    // initialized.  We still have to free to box though, so turn this into a
-    // dealloc_ref.
-    if (auto *SRI = dyn_cast<StrongReleaseInst>(Release)) {
-        SILBuilder B(Release);
-      auto Dealloc = B.createDeallocRef(SRI->getLoc(), SRI->getOperand());
+    // If this is an early release in a class, we need to emit a dealloc_ref to
+    // free the memory.  If this is a derived class, we may have to do a load of
+    // the 'self' box to get the class reference.
+    if (TheMemory.isClassInitSelf()) {
+      SILBuilder B(Release);
+      SILValue Pointer = Release->getOperand(0);
+
+      // If we see an alloc_box as the pointer, then we're deallocating a 'box'
+      // for self.  Make sure we're using its address result, not its refcount
+      // result, and make sure that the box gets deallocated (not released)
+      // since the pointer it contains will be manually cleaned up.
+      if (isa<AllocBoxInst>(Pointer))
+        Pointer = SILValue(Pointer.getDef(), 1);
+        
+      if (!isa<MarkUninitializedInst>(Pointer))
+      Pointer = B.createLoad(Release->getLoc(), Pointer);
+      auto Dealloc = B.createDeallocRef(Release->getLoc(), Pointer);
+      
+      // dealloc_box the self box is necessary.
+      if (isa<AllocBoxInst>(Release->getOperand(0))) {
+        auto DB = B.createDeallocBox(Release->getLoc(), Pointer.getType(),
+                                     Release->getOperand(0));
+        Releases.push_back(DB);
+      }
+      
       Releases[ReleaseID] = Dealloc;
       Release->eraseFromParent();
       return;
     }
     
-    // destroy_addr can just be zapped.
+    // Otherwise, in the normal case, the destroy_addr can just be zapped.
     assert(isa<DestroyAddrInst>(Release));
     SILValue Addr = Release->getOperand(0);
     Release->eraseFromParent();
@@ -1349,28 +1368,32 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         Releases.push_back(DA);
     }
     
-    // If this is an early release in a derive class, we need to emit a load of
-    // 'self' box to get the class reference, and then do a dealloc_ref.
-    if (TheMemory.isDerivedClassSelf()) {
+    // If this is an early release in a class, we need to emit a dealloc_ref to
+    // free the memory.  If this is a derived class, we may have to do a load of
+    // the 'self' box to get the class reference.
+    if (TheMemory.isClassInitSelf()) {
       B.setInsertionPoint(Release);
-      SILValue Pointer;
-      if (isa<DestroyAddrInst>(Release))
-        Pointer = Release->getOperand(0);
-      else {
-        assert(isa<StrongReleaseInst>(Release));
-        // Get the address result of the alloc_box.
-        Pointer = SILValue(Release->getOperand(0).getDef(), 1);
+      SILValue Pointer = Release->getOperand(0);
+      
+      // If we see an alloc_box as the pointer, then we're deallocating a 'box'
+      // for self.  Make sure we're using its address result, not its refcount
+      // result, and make sure that the box gets deallocated (not released)
+      // since the pointer it contains will be manually cleaned up.
+      if (isa<AllocBoxInst>(Pointer))
+        Pointer = SILValue(Pointer.getDef(), 1);
+      
+      if (!isa<MarkUninitializedInst>(Pointer))
+        Pointer = B.createLoad(Release->getLoc(), Pointer);
+      B.createDeallocRef(Release->getLoc(), Pointer);
+      
+      // dealloc_box the self box is necessary.
+      if (isa<AllocBoxInst>(Release->getOperand(0))) {
+        auto DB = B.createDeallocBox(Release->getLoc(), Pointer.getType(),
+                                     Release->getOperand(0));
+        Releases.push_back(DB);
       }
-      auto Ref = B.createLoad(Release->getLoc(), Pointer);
-      B.createDeallocRef(Release->getLoc(), Ref);
-    } else if (isa<StrongReleaseInst>(Release)) {
-      // If the instruction was a strong_release, emit a dealloc_ref to free the
-      // now fully-uninitialized memory.
-      assert(cast<MarkUninitializedInst>(TheMemory.MemoryInst)->isRootSelf());
-      B.setInsertionPoint(Release);
-      B.createDeallocRef(Release->getLoc(), Release->getOperand(0));
     }
-    
+  
     // Finally, now that the original instruction is handled, remove the
     // original destroy.
     Release->eraseFromParent();

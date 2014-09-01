@@ -65,7 +65,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
 
     // If this is a 'self' decl in an init method for a non-enum value, then we
     // want to process the stored members of the struct/class elementwise.
-    if (isAnyInitSelf() && !isEnumSelf() && !isDelegatingInit())
+    if (isAnyInitSelf() && !isEnumInitSelf() && !isDelegatingInit())
       IsSelfOfNonDelegatingInitializer = true;
   }
   
@@ -1056,7 +1056,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  for (auto UI : SelfBox.getUses()) {
+  for (auto UI : SelfBox.getDef()->getUses()) {
     SILInstruction *User = UI->getUser();
     
     // Ignore the initialization store.
@@ -1111,9 +1111,17 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
       }
       continue;
     }
+   
+    // destroyaddr on the box is load+release, which is treated as a release.
+    if (isa<DestroyAddrInst>(User) || isa<StrongReleaseInst>(User)) {
+      Releases.push_back(User);
+      continue;
+    }
     
-    // destroyaddr on the box is load+release, which is ignored.
-    if (isa<DestroyAddrInst>(User)) continue;
+    // Ignore the deallocation of the stack box.  Its contents will be
+    // uninitialized by the point it executes.
+    if (isa<DeallocStackInst>(User))
+      continue;
 
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.
