@@ -234,7 +234,7 @@ public func <(lhs: String, rhs: String) -> Bool {
 extension String {
 
   public mutating func extend(rhs: String) {
-    _core.extend(rhs._core)
+    _core.append(rhs._core)
   }
 
   public mutating func append(x: UnicodeScalar) {
@@ -290,7 +290,7 @@ public func +(var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs
   }
-  lhs._core.extend(rhs._core)
+  lhs._core.append(rhs._core)
   return lhs
 }
 
@@ -531,7 +531,7 @@ extension String : ExtensibleCollectionType {
       let bytes = Character._smallValue(_63bits)
       _core.extend(Character.SmallUTF16(bytes))
     case .LargeRepresentation(let str):
-      _core.extend(str._value._core)
+      _core.append(str._value._core)
     }
   }
   
