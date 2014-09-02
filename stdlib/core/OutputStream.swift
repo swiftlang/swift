@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims // for putchar
+
 //===----------------------------------------------------------------------===//
 // Input/Output interfaces
 //===----------------------------------------------------------------------===//
@@ -268,7 +270,7 @@ internal struct _Stdout : OutputStreamType {
     // It is important that we use stdio routines in order to correctly
     // interoperate with stdio buffering.
     for c in string.utf8 {
-      _putchar(Int32(c))
+      putchar(Int32(c))
     }
   }
 }

@@ -17,9 +17,6 @@ typealias _HeapObject = SwiftShims.HeapObject
 func _swift_bufferAllocate(
   bufferType: AnyClass, size: Int, alignMask: Int) -> AnyObject
 
-@asmname("malloc_size")
-func _malloc_size(heapMemory: UnsafeMutablePointer<Void>) -> Int
-
 /// A class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is
 /// determined at create time.
@@ -116,7 +113,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   func _allocatedSize() -> Int {
-    return _malloc_size(UnsafeMutablePointer(_address))
+    return Int(bitPattern: malloc_size(UnsafeMutablePointer(_address)))
   }
 
   func _allocatedAlignMask() -> Int {

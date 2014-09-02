@@ -12,7 +12,13 @@
 #ifndef SWIFT_STDLIB_SHIMS_SHIMS_H_
 #define SWIFT_STDLIB_SHIMS_SHIMS_H_
 
-#include <stdint.h>
+#include <stdint.h>        // for intptr_t
+
+#include <malloc/malloc.h> // for malloc_size
+
+#include <string.h>        // for strlen, strcpy, strcmp
+
+#include <stdio.h>         // for putchar
 
 // This struct is layout-compatible with NSRange.  Using the name
 // "NSRange" here could eliminate some horrible unsafeBitCast

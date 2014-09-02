@@ -14,9 +14,6 @@
 
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
-@asmname("putchar")
-func _putchar(value: Int32) -> Int32
-
 @asmname("swift_stdlib_atomicCompareExchangeStrongPtr")
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
   #object: UnsafeMutablePointer<COpaquePointer>,
