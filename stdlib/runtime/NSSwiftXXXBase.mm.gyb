@@ -35,7 +35,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mutex>
-#include "../shims/shims.h"
 
 // Redeclare these just we check them.
 extern "C" id _objc_rootAutorelease(id);

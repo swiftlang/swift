@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <mutex>
 #include <unordered_map>
-#include "../shims/shims.h"
 #import <CoreFoundation/CFBase.h> // for CFTypeID
 
 // Redeclare these just we check them.
