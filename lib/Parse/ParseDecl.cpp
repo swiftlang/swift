@@ -2391,6 +2391,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
                              TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                              FuncDecl *&WillSet, FuncDecl *&DidSet,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
+                             SourceLoc VarLBLoc,
                              SmallVectorImpl<Decl *> &Decls) {
   Get = Set = WillSet = DidSet = nullptr;
 
@@ -2529,7 +2530,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     IsFirstAccessor = false;
 
     // Consume the contextual keyword, if present.
-    SourceLoc Loc = isImplicitGet ? Tok.getLoc() : consumeToken();
+    SourceLoc Loc = isImplicitGet ? VarLBLoc : consumeToken();
 
     FuncDecl *&TheDecl = *TheDeclPtr;
 
@@ -2548,7 +2549,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     auto *ValueNamePattern =
       parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
 
-    SourceLoc LBLoc = Tok.getLoc();
+    SourceLoc LBLoc = isImplicitGet ? VarLBLoc : Tok.getLoc();
     // FIXME: Use outer '{' loc if isImplicitGet.
     bool ExternalAsmName = false;
     if (!isImplicitGet && !consumeIf(tok::l_brace)) {
@@ -2582,10 +2583,13 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       else
         consumeGetSetBody(TheDecl, LBLoc);
 
-      SourceLoc RBLoc = Tok.getLoc();
-      if (!isImplicitGet)
+      SourceLoc RBLoc;
+      if (!isImplicitGet) {
         parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
                            LBLoc);
+      } else {
+        RBLoc = Tok.is(tok::r_brace) ? Tok.getLoc() : PreviousLoc;
+      }
 
       if (!isDelayedParsingEnabled()) {
         BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
@@ -2609,7 +2613,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
   LBLoc = consumeToken(tok::l_brace);
   SourceLoc LastValidLoc = LBLoc;
   bool Invalid = parseGetSetImpl(Flags, Indices, ElementTy, Get, Set, WillSet,
-                                 DidSet, LastValidLoc, StaticLoc, Decls);
+                                 DidSet, LastValidLoc, StaticLoc, LBLoc, Decls);
 
   // Parse the final '}'.
   if (Invalid)

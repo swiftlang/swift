@@ -262,7 +262,7 @@ extension decl_extension_1 {
 // CHECK-NEXT: comment_attach.swift:138:3: Constructor/decl_struct_1.init RawComment=[/// init().  Aaa.\n] BriefComment=[init().  Aaa.]
 // CHECK-NEXT: comment_attach.swift:141:3: Subscript/decl_struct_1.subscript RawComment=[/// subscript Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:141:13: Param/decl_struct_1.i RawComment=none
-// CHECK-NEXT: comment_attach.swift:141:33: Func/decl_struct_1.<getter for decl_struct_1.subscript> RawComment=none
+// CHECK-NEXT: comment_attach.swift:141:31: Func/decl_struct_1.<getter for decl_struct_1.subscript> RawComment=none
 // CHECK-NEXT: comment_attach.swift:144:10: Struct/decl_struct_1.NestedStruct RawComment=[/// NestedStruct Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:147:9: Class/decl_struct_1.NestedClass RawComment=[/// NestedClass Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:150:8: Enum/decl_struct_1.NestedEnum RawComment=[/// NestedEnum Aaa.\n]

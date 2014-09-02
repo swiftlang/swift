@@ -697,7 +697,8 @@ public:
                        Pattern *Indices, TypeLoc ElementTy,
                        FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
                        FuncDecl *&DidSet, SourceLoc &LastValidLoc,
-                       SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
+                       SourceLoc StaticLoc, SourceLoc VarLBLoc,
+                       SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
                    Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
