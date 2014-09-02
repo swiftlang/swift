@@ -1,5 +1,7 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
 
+import Builtin
+
 sil_stage canonical
 
 // CHECK-LABEL: define i8* @thin_func_value(i8*) {
@@ -67,3 +69,17 @@ entry(%x : $*X):
   %z = apply %f(%x) : $@thin (@out X) -> ()
   return %z : $()
 }
+
+// CHECK-LABEL: define i1 @test_is_nonnull_function(i8*, %swift.refcounted*) {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:  %2 = icmp ne i8* %0, null
+// CHECK-NEXT:  ret i1 %2
+// CHECK-NEXT:  }
+
+sil @test_is_nonnull_function : $@thin (() -> ()) -> Builtin.Int1 {
+bb0(%0 : $() -> ()):
+  %3 = is_nonnull %0 : $() -> ()
+  return %3 : $Builtin.Int1                                 // id: %5
+}
+
+

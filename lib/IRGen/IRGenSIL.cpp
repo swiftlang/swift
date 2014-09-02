@@ -3069,11 +3069,16 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 }
 
 void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
-  // Get the value we're testing, which may be an address or an instance
-  // pointer.
+  // Get the value we're testing, which may be a function, an address or an
+  // instance pointer.
   llvm::Value *val;
   const LoweredValue &lv = getLoweredValue(i->getOperand());
-  if (lv.isAddress()) {
+  
+  if (i->getOperand().getType().getSwiftType()->is<SILFunctionType>()) {
+    Explosion values = lv.getExplosion(*this);
+    val = values.claimNext();   // Function pointer.
+    values.claimNext();         // Ignore the data pointer.
+  } else if (lv.isAddress()) {
     val = lv.getAddress().getAddress();
   } else {
     Explosion values = lv.getExplosion(*this);
