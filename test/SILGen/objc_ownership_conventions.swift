@@ -178,6 +178,13 @@ func applyBlock(f: @objc_block Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
   return f(x)
 }
 
+// CHECK-LABEL: sil @_TF26objc_ownership_conventions15maybeApplyBlock
+func maybeApplyBlock(f: (@objc_block Gizmo -> Gizmo)?, x: Gizmo) -> Gizmo? {
+  // CHECK:     bb0([[BLOCK:%.*]] : $Optional<@objc_block Gizmo -> Gizmo>, [[ARG:%.*]] : $Gizmo):
+  // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
+  return f?(x)
+}
+
 func useInnerPointer(p: UnsafeMutablePointer<Void>) {}
 
 // Handle inner-pointer methods by autoreleasing self after the call.

@@ -407,13 +407,16 @@ public:
       ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);
     
-    // If the value is an ObjC block passed into the entry point of the
-    // function, copy it, so we can treat the value reliably
+    // If the value is a (possibly optional) ObjC block passed into the entry
+    // point of the function, then copy it so we can treat the value reliably
     // as a heap object. Escape analysis can eliminate this copy if it's
     // unneeded during optimization.
+    CanType objectType = t;
+    if (auto theObjTy = t.getAnyOptionalObjectType())
+      objectType = theObjTy;
     if (functionArgs
-        && isa<FunctionType>(t)
-        && cast<FunctionType>(t)->getRepresentation()
+        && isa<FunctionType>(objectType)
+        && cast<FunctionType>(objectType)->getRepresentation()
               == FunctionType::Representation::Block) {
       SILValue blockCopy = gen.B.createCopyBlock(loc, mv.getValue());
       mv = gen.emitManagedRValueWithCleanup(blockCopy);
