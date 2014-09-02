@@ -118,7 +118,7 @@ public enum Character :
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 
-  struct SmallUTF16 : CollectionType {
+  struct _SmallUTF16 : CollectionType {
     init(var _ u8: UInt64) {
       let input = UnsafeBufferPointer(
         start: UnsafePointer<UTF8.CodeUnit>(Builtin.addressof(&u8)), 
@@ -144,7 +144,7 @@ public enum Character :
       var d = data
       return UnsafePointer<UTF16.CodeUnit>(Builtin.addressof(&d))[i]
     }
-    func generate() -> IndexingGenerator<SmallUTF16> {
+    func generate() -> IndexingGenerator<_SmallUTF16> {
       return IndexingGenerator(self)
     }
     

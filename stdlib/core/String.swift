@@ -529,7 +529,7 @@ extension String : ExtensibleCollectionType {
     switch c {
     case .SmallRepresentation(let _63bits):
       let bytes = Character._smallValue(_63bits)
-      _core.extend(Character.SmallUTF16(bytes))
+      _core.extend(Character._SmallUTF16(bytes))
     case .LargeRepresentation(let str):
       _core.append(str._value._core)
     }
