@@ -43,26 +43,23 @@ func _roundUpToAlignment(offset: Int, alignment: Int) -> Int {
 func _swift_bufferAllocate(
   bufferType: AnyClass, size: Int, alignMask: Int) -> AnyObject
 
-/// A class containing an ivar "value" of type Value, and
-/// containing storage for an array of Element whose size is
+/// A class containing a property of type `Value` and
+/// raw storage for an array of `Element` whose size is
 /// determined at create time.
 ///
-/// The analogous C++-ish class template would be::
-///
-///   template <class Value, class Element>
-///   struct HeapBuffer2 {
-///     Value value;
-///     Element baseAddress[];        // length determined at creation time
-///
-///     HeapBuffer2() = delete
-///     static shared_ptr<HeapBuffer2> create(Value init, int capacity);
-///   }
-///
-/// Note that the Element array is RAW MEMORY.  You are expected to
-/// construct and---if necessary---destroy Elements there yourself,
-/// either in a derived class, or it can be in some manager object
-/// that owns the HeapBuffer2.
+/// Note that the `Element` array is suitably-aligned **raw memory**.
+/// You are expected to construct and---if necessary---destroy objects
+/// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
+/// Typical usage stores a count and capacity in `Value` and destroys
+/// any live elements in the `deinit` of a subclass.  Note: subclasses
+/// must not have any stored properties; any storage needed should be
+/// included in `Value`.
 public class HeapStorage<Value, Element> {
+  
+  /// Create a new instance of the most-derived class, calling
+  /// `initialize` on the partially-constructed object to generate an
+  /// initial `Value`.  Note, in particular, accessing `value` inside
+  /// the `initialize` function is undefined.
   public final class func create(
     minimumCapacity: Int, initialize: (HeapStorage)->Value
   ) -> HeapStorage {
@@ -83,6 +80,7 @@ public class HeapStorage<Value, Element> {
     return result
   }
 
+  // helper function for create, above
   internal final class func _allocate(
     totalSize: Int, alignMask: Int
   ) -> HeapStorage {
@@ -90,7 +88,8 @@ public class HeapStorage<Value, Element> {
         _swift_bufferAllocate(self, totalSize, alignMask)
       )
   }
-  
+
+  /// Make ordinary initialization unavaible
   internal init() {
     fatalError("Only initialize these by calling create")
   }
@@ -130,6 +129,7 @@ public class HeapStorage<Value, Element> {
     ) &/ sizeof(Element)
   }
 
+  /// The stored `Value` instance.
   public final var value: Value {
     get {
       return withUnsafeMutablePointerToValue {
@@ -143,20 +143,22 @@ public class HeapStorage<Value, Element> {
     }
   }
   
-  // Call body with an UnsafeMutablePointer to the stored value
+  /// Call `body` with an `UnsafeMutablePointer` to the stored `Value`
   public final func withUnsafeMutablePointerToValue<R>(
     body: (UnsafeMutablePointer<Value>)->R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
   
-  // Call body with an UnsafeMutablePointer to the stored value
+  /// Call body with an `UnsafeMutablePointer` to the `Element` storage
   public final func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>)->R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
 
+  /// Call body with `UnsafeMutablePointer`\ s to the stored `Value`
+  /// and raw `Element` storage
   public final func withUnsafeMutablePointers<R>(
     body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
   ) -> R {
@@ -173,10 +175,12 @@ public class HeapStorage<Value, Element> {
     return UnsafePointer(unsafeAddressOf(self))
   }
 
+  /// Offset from the allocated storage for `self` to the stored `Value`
   internal final class var _valueOffset : Int {
     return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
   }
 
+  /// Offset from the allocated storage for `self` to the `Element` storage
   internal final class var _elementOffset : Int {
     return _roundUpToAlignment(
       _valueOffset + sizeof(Value.self), alignof(Element.self))
@@ -199,6 +203,9 @@ struct CountAndCapacity {
   let capacity: Int = 0
 }
 
+// An example of HeapStorage, very similar to what Array will use.
+// However, only half of the element storage is actually used to store
+// elements, as a simple way of catching potential bugs.
 final class TestHeapStorage<T> : HeapStorage<CountAndCapacity,T> {
   class func create(capacity: Int) -> TestHeapStorage {
     let r = self.create(capacity) {
@@ -224,14 +231,15 @@ final class TestHeapStorage<T> : HeapStorage<CountAndCapacity,T> {
   deinit {
     teardown()
   }
-  
+
+  // This doesn't seem to compile properly when embedded directly in
+  // deinit.
   func teardown() {
     let count = self.count
     
     withUnsafeMutablePointerToElements {
       (x: UnsafeMutablePointer<T>)->() in
       for i in stride(from: 0, to: count, by: 2) {
-        println("destroying element \(i)")
         (x + i).destroy()
       }
     }
