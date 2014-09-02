@@ -1286,6 +1286,8 @@ void Mangler::mangleClosureEntity(AbstractClosureExpr *closure,
   Type Ty = closure->getType();
   if (!Ty)
     Ty = ErrorType::get(closure->getASTContext());
+
+  if (!DeclCtx) DeclCtx = closure->getLocalContext();
   mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal, /*uncurry*/ 0);
 }
 
