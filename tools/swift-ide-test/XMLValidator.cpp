@@ -1,4 +1,4 @@
-//===-- XMLValidator.cpp - XML validation ---------------------------------===//
+//===--- XMLValidator.cpp - XML validation --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
