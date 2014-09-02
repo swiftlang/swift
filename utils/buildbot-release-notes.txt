@@ -1,6 +1,10 @@
 Latest
 ------
 
+
+2014-09-02
+----------
+
 * Characters can no longer be concatenated using "+".  Use String(c1) +
   String(c2) instead.
 
