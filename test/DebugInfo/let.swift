@@ -4,7 +4,7 @@ class DeepThought {
 }
 
 func foo() -> Int {
-  // CHECK: call void @llvm.dbg.value(metadata !{%C3let11DeepThought* {{.*}}}, i64 0, metadata ![[A:.*]])
+  // CHECK: call void @llvm.dbg.declare(metadata !{%C3let11DeepThought** {{.*}}}, metadata ![[A:.*]])
   // CHECK ![[A]] = {{.*}}i32 0} ; [ DW_TAG_auto_variable ] [machine] [line [[@LINE+1]]]
   let machine = DeepThought()
 // CHECK: [ DW_TAG_auto_variable ] [a] [line [[@LINE+1]]]

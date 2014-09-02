@@ -594,7 +594,10 @@ public:
     auto SILVal = i->getOperand();
     Explosion e = getLoweredExplosion(SILVal);
     DebugTypeInfo DbgTy(Decl, getTypeInfo(SILVal.getType()));
-    emitDebugVariableDeclaration(Builder, e.claimAll(), DbgTy,
+    // Emit an -O0 shadow copy for the explosion.
+    llvm::SmallVector<llvm::Value *, 8> Copy;
+    emitShadowCopy(e.claimAll(), Name, Copy);
+    emitDebugVariableDeclaration(Builder, Copy, DbgTy,
                                  i->getDebugScope(), Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
