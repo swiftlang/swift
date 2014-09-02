@@ -152,6 +152,16 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
 }
 
+/// Equivalent to `x as T`, except that no check that `x` actually has
+/// dynamic type `T` is performed in -O builds.  Better than an
+/// `unsafeBitCast` because it's more restrictive, and checking is
+/// still performed in debug builds.
+@transparent
+public func unsafeDowncast<T: AnyObject>(x: AnyObject) -> T {
+  _debugPrecondition(x is T, "invalid unsafeDowncast")
+  return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(x))
+}
+
 //===----------------------------------------------------------------------===//
 // Branch hints
 //===----------------------------------------------------------------------===//

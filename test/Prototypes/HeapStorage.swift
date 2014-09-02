@@ -86,10 +86,9 @@ public class HeapStorage<Value, Element> {
   internal final class func _allocate(
     totalSize: Int, alignMask: Int
   ) -> HeapStorage {
-    return Builtin.bridgeFromRawPointer(
-      Builtin.bridgeToRawPointer(
+    return unsafeDowncast(
         _swift_bufferAllocate(self, totalSize, alignMask)
-      ))
+      )
   }
   
   internal init() {
