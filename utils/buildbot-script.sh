@@ -40,6 +40,7 @@ KNOWN_SETTINGS=(
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     skip-test-swift-performance ""               "set to skip testing Swift performance"
     skip-test-validation        ""               "set to skip validation test suite"
+    stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
     run-with-asan-compiler      ""               "the AddressSanitizer compiler to use (non-asan build if empty string is passed)"
 )
@@ -514,6 +515,9 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
 
         if [[ "${product}" == SourceKit ]] ; then
             test_target=check-${product}
+            if [[ "$STRESS_TEST_SOURCEKIT" ]]; then
+              test_target="${test_target} stress-SourceKit"
+            fi
         else
             test_target=check-${product}-all
             if [[ "$SKIP_TEST_VALIDATION" ]]; then
