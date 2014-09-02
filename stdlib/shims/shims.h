@@ -12,13 +12,19 @@
 #ifndef SWIFT_STDLIB_SHIMS_SHIMS_H_
 #define SWIFT_STDLIB_SHIMS_SHIMS_H_
 
+//===--- Standard "C" headers ---------------------------------------------===//
+#include <stddef.h>        // for size_t
 #include <stdint.h>        // for intptr_t
 
-#include <malloc/malloc.h> // for malloc_size
+//===--- Forward-declare bits of Darwin that we need in the stdlib --------===//
+// Actually #including the headers will pull in our overlay, resulting in a   //
+// circular module dependency.
 
-#include <string.h>        // for strlen, strcpy, strcmp
-
-#include <stdio.h>         // for putchar
+size_t malloc_size(const void *ptr);
+size_t strlen(const char *s);
+char *strcpy(char *restrict dst, const char *restrict src);
+int strcmp(const char *s1, const char *s2);
+int putchar(int c);
 
 // This struct is layout-compatible with NSRange.  Using the name
 // "NSRange" here could eliminate some horrible unsafeBitCast
