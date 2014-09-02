@@ -28,7 +28,7 @@ add_swift_library(swiftIRGen
   StructLayout.cpp
   UnimplementedTypeInfo.cpp
   DEPENDS LLVMMC LLVMProfileData LLVMSupport LLVMCore LLVMObjCARCOpts
-  swiftAST swiftOptimizeARC)
+  swiftAST swiftLLVMPasses)
 
 # Clang dependencies.
 # FIXME: Clang should really export these in some reasonable manner.

@@ -22,7 +22,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/OptimizeARC/PassesFwd.h"
+#include "swift/LLVMPasses/PassesFwd.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/IR/DataLayout.h"

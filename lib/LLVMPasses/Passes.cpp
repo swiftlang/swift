@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "swift-optimize"
-#include "swift/OptimizeARC/Passes.h"
+#include "swift/LLVMPasses/Passes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"

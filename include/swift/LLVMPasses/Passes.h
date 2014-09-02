@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_OPTIMIZEARC_PASSES_H
-#define SWIFT_OPTIMIZEARC_PASSES_H
+#ifndef SWIFT_LLVMPASSES_PASSES_H
+#define SWIFT_LLVMPASSES_PASSES_H
 
-#include "swift/OptimizeARC/PassesFwd.h"
+#include "swift/LLVMPasses/PassesFwd.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Pass.h"
 

@@ -1,4 +1,4 @@
-//===- SwiftARCPasses.cpp - hooks to test the Swift passes with opt -------===//
+//===--- PassesFwd.h - Creation functions for LLVM  passes ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,13 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/OptimizeARC/Passes.h"
+#ifndef SWIFT_LLVMPASSES_PASSESFWD_H
+#define SWIFT_LLVMPASSES_PASSESFWD_H
 
-using namespace llvm;
+namespace llvm {
+  class FunctionPass;
+  class ImmutablePass;
+}
 
-static RegisterPass<swift::SwiftAliasAnalysis>
-  AA("swift-aa", "Swift Alias Analysis", false, true);
-static RegisterPass<swift::SwiftARCOpt>
-  AO("swift-arc-optimize", "Swift ARC optimization");
-static RegisterPass<swift::SwiftARCExpandPass>
-  AE("swift-arc-expand", "Swift ARC expansion");
+namespace swift {
+  llvm::FunctionPass *createSwiftARCOptPass();
+  llvm::FunctionPass *createSwiftARCExpandPass();
+  llvm::ImmutablePass *createSwiftAliasAnalysisPass();
+} // end namespace swift
+
+#endif
