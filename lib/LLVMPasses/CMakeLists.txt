@@ -1,5 +1,6 @@
 add_swift_library(swiftLLVMPasses
-  Passes.cpp
+  LLVMSwiftAA.cpp
+  LLVMARCOpts.cpp
   NO_LLVM_COMMON_LIBS
   )
 
