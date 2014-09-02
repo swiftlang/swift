@@ -797,15 +797,13 @@ bb0:
   return %9999 : $()
 }
 
-// Because enum is local, we can sink the strong_retain past blocker.
-//
 // CHECK-LABEL: sil @enum_simplification_test5 : $@thin () -> () {
 // CHECK: bb1:
-// CHECK-NOT: strong_retain
-// CHECK: bb2:
-// CHECK-NOT: strong_retain
-// CHECK: bb3:
 // CHECK: strong_retain
+// CHECK: bb2:
+// CHECK: strong_retain
+// CHECK: bb3:
+// CHECK-NOT: strong_retain
 sil @enum_simplification_test5 : $@thin () -> () {
 bb0:
   %0 = function_ref @get_object : $@thin () -> Builtin.NativeObject

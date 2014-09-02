@@ -124,11 +124,19 @@ SILValue SILValue::stripRCIdentityPreservingOps() {
       }
     }
 
-    // If we have an unchecked_enum_data from the first payloaded argument of an
-    // enum, strip off the unchecked_enum_data.
+    // If we have an unchecked_enum_data, strip off the unchecked_enum_data.
     if (auto *UEDI = dyn_cast<UncheckedEnumDataInst>(V)) {
       V = UEDI->getOperand();
       continue;
+    }
+
+    // If we have an enum instruction with a payload, strip off the enum to
+    // expose the enum's payload.
+    if (auto *EI = dyn_cast<EnumInst>(V)) {
+      if (EI->hasOperand()) {
+        V = EI->getOperand();
+        continue;
+      }
     }
 
     return V;
