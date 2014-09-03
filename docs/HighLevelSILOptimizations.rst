@@ -1,5 +1,7 @@
 :orphan:
 
+.. _HighLevelSILOptimizations:
+
 High-Level Optimizations in SIL
 ===============================
 

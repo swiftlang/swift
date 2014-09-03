@@ -116,6 +116,7 @@ IR.
   high-level optimizations on basic Swift containers such as Array or String.
   Domain specific optimizations require a defined interface between
   the standard library and the optimizer. More details can be found here:
+  :ref:`HighLevelSILOptimizations`
 
 Syntax
 ------
