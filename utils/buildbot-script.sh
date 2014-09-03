@@ -43,7 +43,7 @@ KNOWN_SETTINGS=(
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
     run-with-asan-compiler      ""               "the AddressSanitizer compiler to use (non-asan build if empty string is passed)"
-    disable_assertions          ""               "set to disable assertions"
+    disable-assertions          ""               "set to disable assertions"
 )
 
 function toupper() {
