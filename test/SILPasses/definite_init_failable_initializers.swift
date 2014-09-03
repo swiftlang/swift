@@ -37,30 +37,17 @@ struct Struct {
   }
 }
 
-// For classes, we can also support failure at any point in a native swift
-// class.
+// For classes, we cannot yet support failure with a partially initialized
+// object.
+// TODO: We ought to be able to for native Swift classes.
+
 class RootClass {
   let x, y: Int
 
   init() { x = 0; y = 0 }
 
-  init?(failBeforeInitialization: ()) {
-    return nil
-  }
-
-  init?(failAfterPartialInitialization: ()) {
-    x = 0
-    return nil
-  }
-
-  init?(failAfterFullInitialization: ()) {
-    x = 0
-    y = 0
-    return nil // OK
-  }
-
   convenience init?(failBeforeDelegation: Bool) {
-    if failBeforeDelegation { return nil }
+    if failBeforeDelegation { return nil } // TODO: e/xpected-error
     self.init()
   }
 
@@ -69,8 +56,23 @@ class RootClass {
     return nil // OK
   }
 
+  init?(failBeforeInitialization: ()) {
+    return nil // expected-error{{properties of a class instance must be initialized before returning nil}}
+  }
+
+  init?(failAfterPartialInitialization: ()) {
+    x = 0
+    return nil // expected-error{{properties of a class instance must be initialized before returning nil}}
+  }
+
+  init?(failAfterFullInitialization: ()) {
+    x = 0
+    y = 0
+    return nil // OK
+  }
+
   convenience init?(failBeforeFailableDelegation: Bool) {
-    if failBeforeFailableDelegation { return nil }
+    if failBeforeFailableDelegation { return nil } // TODO: e/xpected-error
     self.init(failBeforeInitialization: ())
   }
 
@@ -89,12 +91,12 @@ class SubClass: RootClass {
   }
 
   override init?(failBeforeInitialization: ()) {
-    return nil
+    return nil // TODO: e/xpected-error
   }
 
   init?(failBeforeSuperInitialization: ()) {
     z = 0
-    return nil
+    return nil // TODO: e/xpected-error
   }
 
   override init?(failAfterFullInitialization: ()) {
@@ -105,7 +107,7 @@ class SubClass: RootClass {
 
   init?(failBeforeFailableSuperInit: Bool) {
     z = 0
-    if failBeforeFailableSuperInit { return nil }
+    if failBeforeFailableSuperInit { return nil } // TODO: e/xpected-error
     super.init(failBeforeInitialization: ())
   }
 
@@ -116,7 +118,7 @@ class SubClass: RootClass {
   }
 
   convenience init?(failBeforeDelegation: Bool) {
-    if failBeforeDelegation { return nil }
+    if failBeforeDelegation { return nil } // TODO: e/xpected-error
     self.init()
   }
 
@@ -126,7 +128,7 @@ class SubClass: RootClass {
   }
 
   convenience init?(failBeforeFailableDelegation: Bool) {
-    if failBeforeFailableDelegation { return nil }
+    if failBeforeFailableDelegation { return nil } // TODO: e/xpected-error
     self.init(failBeforeInitialization: ())
   }
 

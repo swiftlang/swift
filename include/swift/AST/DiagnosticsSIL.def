@@ -134,6 +134,10 @@ ERROR(struct_not_fully_initialized,sil_analysis,none,
       (StringRef))
 
 
+ERROR(object_not_fully_initialized_before_failure,sil_analysis,none,
+      "all stored properties of a class instance must be initialized before "
+      "returning nil from an initializer", ())
+
 // Control flow diagnostics.
 ERROR(missing_return,sil_analysis,none,
       "missing return in a %select{function|closure}1 expected to return %0",

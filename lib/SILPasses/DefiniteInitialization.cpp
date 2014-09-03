@@ -1009,7 +1009,11 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   AvailabilitySet Availability =
     getLivenessAtInst(Release, 0, TheMemory.NumElements);
   if (Availability.isAllYes()) return;
-  
+
+  if (isa<StrongReleaseInst>(Release))
+    diagnose(Module, Release->getLoc(),
+             diag::object_not_fully_initialized_before_failure);
+
   // If it is all 'no' then we can handle is specially without conditional code.
   if (Availability.isAllNo()) {
     // If this is an early release in a class, we need to emit a dealloc_ref to
