@@ -43,6 +43,7 @@ KNOWN_SETTINGS=(
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
     run-with-asan-compiler      ""               "the AddressSanitizer compiler to use (non-asan build if empty string is passed)"
+    disable_assertions          ""               "set to disable assertions"
 )
 
 function toupper() {
@@ -315,11 +316,16 @@ if [[ "${RUN_WITH_ASAN_COMPILER}" ]]; then
     CMAKE_SHARED_LINKER_FLAGS="-fsanitize=address"
 fi
 
+ENABLE_ASSERTIONS="ON"
+if [[ "$DISABLE_ASSERTIONS" ]]; then
+    ENABLE_ASSERTIONS="OFF"
+fi
+
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
     "${CMAKE_COMPILER_OPTIONS[@]}"
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-    -DLLVM_ENABLE_ASSERTIONS="ON" 
+    -DLLVM_ENABLE_ASSERTIONS="${ENABLE_ASSERTIONS}"
 )
 
 case "${CMAKE_GENERATOR}" in
