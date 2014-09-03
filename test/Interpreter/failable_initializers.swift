@@ -9,9 +9,9 @@ struct GuineaPig {
 
   init() { canary = Canary() }
 
-  init?(live: Bool) {
+  init?(fail: Bool) {
     canary = Canary()
-    if !live { return nil }
+    if fail { return nil }
   }
 
   init?(failBefore: Bool) {
@@ -21,7 +21,7 @@ struct GuineaPig {
 
   init?(delegateFailure: Bool, failBefore: Bool, failAfter: Bool) {
     if failBefore { return nil }
-    self.init(live: !delegateFailure)
+    self.init(fail: delegateFailure)
     if failAfter { return nil }
   }
 
@@ -31,7 +31,7 @@ struct GuineaPig {
 }
 
 // CHECK: it's alive
-if let x = GuineaPig(live: true) {
+if let x = GuineaPig(fail: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -42,7 +42,7 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let y = GuineaPig(live: false) {
+if let y = GuineaPig(fail: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -215,8 +215,13 @@ class Bear {
   }
 }
 
-class PolarBear: Bear {
+final class PolarBear: Bear {
   let y: Canary
+
+  override init?(fail: Bool) {
+    y = Canary()
+    super.init(fail: fail)
+  }
 
   init?(chainFailure: Bool, failAfter: Bool) {
     y = Canary()
@@ -307,6 +312,45 @@ if let bf = PolarBear(chainFailure: true, failAfter: true) {
 }
 
 println("--") // CHECK-NEXT: --
+
+protocol FailableOnDemand {
+  init?(fail: Bool)
+}
+
+extension GuineaPig: FailableOnDemand {}
+extension PolarBear: FailableOnDemand {}
+
+func tryInitFail<T: FailableOnDemand>(_: T.Type, #fail: Bool) {
+  if let x = T(fail: fail) {
+    println("it's alive")
+  } else {
+    println("it's dead")
+  }
+}
+
+// CHECK-NEXT: it's alive
+// CHECK-NEXT: died
+tryInitFail(GuineaPig.self, fail: false)
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+tryInitFail(GuineaPig.self, fail: true)
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: it's alive
+// CHECK-NEXT: died
+// CHECK-NEXT: died
+tryInitFail(PolarBear.self, fail: false)
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+tryInitFail(PolarBear.self, fail: true)
 
 // CHECK-NEXT: done
 println("done")
