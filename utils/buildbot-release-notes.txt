@@ -1,6 +1,39 @@
 Latest
 ------
 
+* Initializers can now fail by returning 'nil'. A failable initializer is
+  declared with 'init?' (to return an explicit optional) or 'init!' (to return
+  an implicitly-unwrapped optional). For example, you could implement
+  String.toInt as a failable initializer of Int like this:
+
+    extension Int {
+      init?(fromString: String) {
+        if let i = fromString.toInt() {
+          // Initialize
+          self = i
+        } else {
+          // Discard self and return 'nil'.
+          return nil
+        }
+      }
+    }
+
+  The result of constructing a value using a failable initializer then becomes
+  optional:
+
+    if let twentytwo = Int(fromString: "22") {
+      println("the number is \(twentytwo)")
+    } else {
+      println("not a number")
+    }
+
+  In the current implementation, struct and enum initializers can return nil
+  at any point inside the initializer, but class initializers can only return
+  nil after all of the stored properties of the object have been initialized
+  and 'self.init' or 'super.init' has been called. If 'self.init' or
+  'super.init' is used to delegate to a failable initializer, then the 'nil'
+  return is implicitly propagated through the current initializer if the
+  called initializer fails.
 
 2014-09-02
 ----------
