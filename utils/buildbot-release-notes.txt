@@ -35,6 +35,12 @@ Latest
   return is implicitly propagated through the current initializer if the
   called initializer fails.
 
+* Nested classes explicitly marked @objc will now properly be included in a
+  target's generated header as long as the containing context is also
+  (implicitly or explicitly) @objc. Nested classes not explicitly marked @objc
+  will never be printed in the generated header, even if they extend an
+  Objective-C class.
+
 2014-09-02
 ----------
 

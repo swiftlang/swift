@@ -1609,6 +1609,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
           Attr = ObjCAttr::create(ctx, Nothing);
         else
           Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces));
+        Attr->setImplicit(isImplicit);
         break;
       }
 

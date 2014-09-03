@@ -228,13 +228,16 @@ class MyObject : NSObject {}
     @objc class DeeperIn {}
   }
 
-  // CHECK-LABEL: @interface AnotherInner
+  // CHECK-LABEL: @interface AnotherInner : A1
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
-  @objc class AnotherInner {}
+  @objc class AnotherInner : A1 {}
 
   // NEGATIVE-NOT: NonObjCInner
   class NonObjCInner {}
+
+  // NEGATIVE-NOT: ImplicitObjCInner
+  class ImplicitObjCInner : A1 {}
 }
 
 // CHECK-LABEL: @class Inner2;

@@ -924,7 +924,15 @@ public:
 
       // Catch nested types and emit their definitions /after/ this class.
       if (isa<TypeDecl>(VD)) {
-        nestedTypes.push_back(VD);
+        // Don't emit nested types that are just implicitly @objc.
+        // You should have to opt into this, since they are even less
+        // namespaced than usual.
+        if (std::any_of(VD->getAttrs().begin(), VD->getAttrs().end(),
+                        [](const DeclAttribute *attr) {
+                          return isa<ObjCAttr>(attr) && !attr->isImplicit();
+                        })) {
+          nestedTypes.push_back(VD);
+        }
         continue;
       }
 
