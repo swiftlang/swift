@@ -17,9 +17,11 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Mangle.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
@@ -242,6 +244,10 @@ ExplodePatternBindingDecls(
     "explode-pattern-binding-decls",
     llvm::cl::desc("Separate pattern binding decls into individual var decls"),
     llvm::cl::init(false));
+
+static llvm::cl::opt<std::string>
+MangledNameToFind("find-mangled",
+    llvm::cl::desc("Print the entity with the given mangled name"));
 
 // Module printing options.
 
@@ -1000,6 +1006,22 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 // AST printing
 //============================================================================//
 
+static Module *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
+  SmallVector<std::pair<Identifier, SourceLoc>, 4>
+      AccessPath;
+  while (!ModuleName.empty()) {
+    StringRef SubModuleName;
+    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
+    AccessPath.push_back(
+        { Context.getIdentifier(SubModuleName), SourceLoc() });
+  }
+  return Context.getModule(AccessPath);
+}
+
+static Module *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
+  return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
+}
+
 static int doPrintAST(const CompilerInvocation &InitInvok,
                       StringRef SourceFilename,
                       bool RunTypeChecker,
@@ -1034,26 +1056,91 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   Options.AccessibilityFilter = AccessibilityFilter;
   Options.SkipUnavailable = !PrintUnavailableDecls;
 
-  Module *M = CI.getMainModule();
-  M->getMainSourceFile(Invocation.getInputKind()).print(llvm::outs(), Options);
-
-  return 0;
-}
-
-static Module *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
-  SmallVector<std::pair<Identifier, SourceLoc>, 4>
-      AccessPath;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back(
-        { Context.getIdentifier(SubModuleName), SourceLoc() });
+  if (options::MangledNameToFind.empty()) {
+    Module *M = CI.getMainModule();
+    M->getMainSourceFile(Invocation.getInputKind()).print(llvm::outs(),
+                                                          Options);
+    return EXIT_SUCCESS;
   }
-  return Context.getModule(AccessPath);
-}
 
-static Module *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
+  // If we were given a mangled name, do a very simple form of LLDB's logic to
+  // look up a type based on that name.
+  Demangle::NodePointer node =
+    demangle_wrappers::demangleSymbolAsNode(options::MangledNameToFind);
+  using NodeKind = Demangle::Node::Kind;
+
+  if (node->getKind() != NodeKind::Global) {
+    llvm::errs() << "Unable to demangle name.\n";
+    return EXIT_FAILURE;
+  }
+  node = node->getFirstChild();
+
+  // FIXME: Look up things other than types.
+  if (node->getKind() != NodeKind::Type) {
+    llvm::errs() << "Name does not refer to a type.\n";
+    return EXIT_FAILURE;
+  }
+  node = node->getFirstChild();
+
+  switch (node->getKind()) {
+  case NodeKind::Class:
+  case NodeKind::Enum:
+  case NodeKind::Protocol:
+  case NodeKind::Structure:
+    break;
+  default:
+    llvm::errs() << "Name does not refer to a nominal type.\n";
+    return EXIT_FAILURE;
+  }
+
+  ASTContext &ctx = CI.getASTContext();
+
+  LookupName lookupName;
+  auto nameNode = node->getChild(1);
+  switch (nameNode->getKind()) {
+  case NodeKind::Identifier:
+    lookupName.Name = ctx.getIdentifier(nameNode->getText());
+    break;
+  case NodeKind::PrivateDeclName:
+    lookupName.PrivateDiscriminator =
+      ctx.getIdentifier(nameNode->getChild(0)->getText());
+    lookupName.Name = ctx.getIdentifier(nameNode->getChild(1)->getText());
+    break;
+  default:
+    llvm::errs() << "Unsupported name kind.\n";
+    return EXIT_FAILURE;
+  }
+
+  auto contextNode = node->getFirstChild();
+  // FIXME: Handle nested contexts.
+  if (contextNode->getKind() != NodeKind::Module) {
+    llvm::errs() << "Name does not refer to a top-level declaration.\n";
+    return EXIT_FAILURE;
+  }
+
+  const Module *M = getModuleByFullName(ctx, contextNode->getText());
+  SmallVector<ValueDecl *, 4> results;
+  M->lookupValue({}, lookupName.Name, NLKind::QualifiedLookup, results);
+
+  if (!lookupName.PrivateDiscriminator.empty()) {
+    auto newEnd = std::remove_if(results.begin(), results.end(),
+                                 [=](ValueDecl *VD) {
+      auto enclosingFile =
+        cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
+      auto discriminator = enclosingFile->getDiscriminatorForPrivateValue(VD);
+      return discriminator != lookupName.PrivateDiscriminator;
+    });
+    results.erase(newEnd, results.end());
+  }
+
+  if (results.empty()) {
+    llvm::errs() << "No matching declarations found.\n";
+    return EXIT_FAILURE;
+  }
+  for (auto *VD : results)
+    VD->print(llvm::outs(), Options);
+
+  return EXIT_SUCCESS;
 }
 
 namespace {
@@ -2137,6 +2224,10 @@ int main(int argc, char *argv[]) {
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
+
+  // Force these options, which are factored out for staging purposes.
+  InitInvok.getLangOptions().UsePrivateDiscriminators = true;
+  Mangle::Mangler::UsePrivateDiscriminators = true;
 
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addBuildConfigOption(ConfigName);

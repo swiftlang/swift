@@ -1021,6 +1021,8 @@ bool DeclContext::lookupQualified(Type type,
   if (auto moduleTy = type->getAs<ModuleType>()) {
     assert(!(options & NL_IgnoreAccessibility) &&
            "accessibility always enforced for module-level lookup");
+    assert(member.PrivateDiscriminator.empty() &&
+           "use Module::lookupValue to look up a top-level private value");
 
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();

@@ -82,11 +82,13 @@ enum class DeclContextKind : uint8_t {
 class LookupName {
 public:
   /// The name of the member.
-  const DeclName Name;
+  DeclName Name;
 
   /// If non-empty, the discriminator associated with the member's original
   /// declaration context.
-  const Identifier PrivateDiscriminator;
+  Identifier PrivateDiscriminator;
+
+  LookupName() = default;
 
   /*implicit*/ LookupName(DeclName name,
                           Identifier discriminator = Identifier())
