@@ -658,6 +658,10 @@ public:
 
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                              DeclAttrKind DK);
+  
+  /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
+  /// an error parsing.
+  bool parseVersionTuple(clang::VersionTuple &Version, const Diagnostic &D);
 
   bool parseTypeAttributeList(TypeAttributes &Attributes) {
     if (Tok.is(tok::at_sign))

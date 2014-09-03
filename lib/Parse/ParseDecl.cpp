@@ -698,60 +698,17 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           continue;
         }
 
-        // A version number is either an integer (8), a float (8.1), or a
-        // float followed by a dot and an integer (8.1.0).
-        if (!Tok.isAny(tok::integer_literal, tok::floating_literal)) {
-          diagnose(Tok, diag::attr_availability_expected_version, AttrName);
-          DiscardAttribute = true;
-          if (peekToken().isAny(tok::r_paren, tok::comma))
-            consumeToken();
-          continue;
-        }
-
         auto &VersionArg = (ArgumentKind == IsIntroduced) ? Introduced :
                            (ArgumentKind == IsDeprecated) ? Deprecated :
                                                             Obsoleted;
-        if (Tok.is(tok::integer_literal)) {
-          unsigned major = 0;
-          if (Tok.getText().getAsInteger(10, major)) {
-            // Maybe the literal was in hex. Reject that.
-            diagnose(Tok, diag::attr_availability_expected_version, AttrName);
-            DiscardAttribute = true;
-          }
-          VersionArg = clang::VersionTuple(major);
-          consumeToken();
-          continue;
-        }
 
-        unsigned major = 0, minor = 0;
-        StringRef majorPart, minorPart;
-        std::tie(majorPart, minorPart) = Tok.getText().split('.');
-        if (majorPart.getAsInteger(10, major) ||
-            minorPart.getAsInteger(10, minor)) {
-          // Reject things like 0.1e5 and hex literals.
-          diagnose(Tok, diag::attr_availability_expected_version, AttrName);
+        if (parseVersionTuple(
+                VersionArg,
+                Diagnostic(diag::attr_availability_expected_version,
+                           AttrName))) {
           DiscardAttribute = true;
-          consumeToken();
-          continue;
-        }
-
-        consumeToken();
-        if (consumeIf(tok::period)) {
-          unsigned micro = 0;
-          if (!Tok.is(tok::integer_literal) ||
-              Tok.getText().getAsInteger(10, micro)) {
-            // Reject things like 0.1e5 and hex literals.
-            diagnose(Tok, diag::attr_availability_expected_version, AttrName);
-            DiscardAttribute = true;
-            if (Tok.is(tok::integer_literal) ||
-                peekToken().isAny(tok::r_paren, tok::comma))
-              consumeToken();
-            continue;
-          }
-          consumeToken();
-          VersionArg = clang::VersionTuple(major, minor, micro);
-        } else {
-          VersionArg = clang::VersionTuple(major, minor);
+          if (peekToken().isAny(tok::r_paren, tok::comma))
+            consumeToken();
         }
 
         break;
@@ -916,6 +873,59 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   if (AtLoc.isValid() && DeclAttribute::isDeclModifier(DK))
     diagnose(AtLoc, diag::cskeyword_not_attribute, AttrName).fixItRemove(AtLoc);
   
+  return false;
+}
+
+bool Parser::parseVersionTuple(clang::VersionTuple &Version,
+                               const Diagnostic &D) {
+  // A version number is either an integer (8), a float (8.1), or a
+  // float followed by a dot and an integer (8.1.0).
+  if (!Tok.isAny(tok::integer_literal, tok::floating_literal)) {
+    diagnose(Tok, D);
+    return true;
+  }
+
+  if (Tok.is(tok::integer_literal)) {
+    unsigned major = 0;
+    if (Tok.getText().getAsInteger(10, major)) {
+      // Maybe the literal was in hex. Reject that.
+      diagnose(Tok, D);
+      consumeToken();
+      return true;
+    }
+    Version = clang::VersionTuple(major);
+    consumeToken();
+    return false;
+  }
+
+  unsigned major = 0, minor = 0;
+  StringRef majorPart, minorPart;
+  std::tie(majorPart, minorPart) = Tok.getText().split('.');
+  if (majorPart.getAsInteger(10, major) || minorPart.getAsInteger(10, minor)) {
+    // Reject things like 0.1e5 and hex literals.
+    diagnose(Tok, D);
+    consumeToken();
+    return true;
+  }
+
+  consumeToken();
+  if (consumeIf(tok::period)) {
+    unsigned micro = 0;
+    if (!Tok.is(tok::integer_literal) ||
+        Tok.getText().getAsInteger(10, micro)) {
+      // Reject things like 0.1e5 and hex literals.
+      diagnose(Tok, D);
+      if (Tok.is(tok::integer_literal) ||
+          peekToken().isAny(tok::r_paren, tok::comma))
+        consumeToken();
+      return true;
+    }
+    consumeToken();
+    Version = clang::VersionTuple(major, minor, micro);
+  } else {
+    Version = clang::VersionTuple(major, minor);
+  }
+
   return false;
 }
 
