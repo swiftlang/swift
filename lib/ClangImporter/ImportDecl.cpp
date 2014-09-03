@@ -2760,7 +2760,7 @@ namespace {
 
       // Add the 'self' parameter to the function types.
       Type allocType = FunctionType::get(selfMetaVar->getType(), type);
-      Type initType = FunctionType::get(resultTy, type);
+      Type initType = FunctionType::get(selfTy, type);
 
       // Look for other constructors that occur in this context with
       // the same name.
