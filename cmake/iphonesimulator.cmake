@@ -11,8 +11,18 @@ execute_process(COMMAND xcrun -sdk iphonesimulator -toolchain XcodeDefault -find
                 OUTPUT_VARIABLE cxx_path
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-CMAKE_FORCE_C_COMPILER("${cc_path}" Clang)
-CMAKE_FORCE_CXX_COMPILER("${cxx_path}" Clang)
+if (SWIFT_DISTCC)
+  set(CMAKE_C_COMPILER_ARG1 "${cc_path}")
+  set(CMAKE_CXX_COMPILER_ARG1 "${cxx_path}")
+  # These two calls don't have any effect other than to bypass the
+  # check for a working compiler (since we're cross-compiling)
+  CMAKE_FORCE_C_COMPILER("${SWIFT_DISTCC}" Clang)
+  CMAKE_FORCE_CXX_COMPILER("${SWIFT_DISTCC}" Clang)
+else()
+  CMAKE_FORCE_C_COMPILER("${cc_path}" Clang)
+  CMAKE_FORCE_CXX_COMPILER("${cxx_path}" Clang)
+endif()
+
 set(CXX_SUPPORTS_CXX11 ON FORCE)
 
 # Compiler forcing leaves the compiler version unset, which the llvm 

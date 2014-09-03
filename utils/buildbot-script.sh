@@ -286,6 +286,7 @@ CLANG="$TOOLCHAIN/usr/bin/clang"
 if [[ "$DISTCC" ]] ; then
     DISTCC_PUMP="$(which pump)"
     CMAKE_COMPILER_OPTIONS=(
+        -DSWIFT_DISTCC="$(which distcc)"
         -DCMAKE_C_COMPILER="$(which distcc)"
         -DCMAKE_C_COMPILER_ARG1="${CLANG}"
         -DCMAKE_CXX_COMPILER="$(which distcc)"

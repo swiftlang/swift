@@ -212,6 +212,9 @@ set(SWIFT_ASAN_BUILD OFF CACHE BOOL "This is an AddressSanitizer build")
 set(SWIFT_EXTRA_FLAGS "" CACHE STRING
   "Extra flags to pass when compiling swift files")
 
+set(SWIFT_DISTCC "" CACHE PATH
+  "Path to distcc executable for distributed builds")
+
 # FIXME: Remove this when OS X builds as an SDK.
 set(SWIFTLIB_EXTRA_DEFAULT_COMPILE_FLAGS "" CACHE STRING
   "Extra compile flags to pass when building the default (OS X) target library")
