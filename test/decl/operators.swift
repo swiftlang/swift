@@ -60,7 +60,7 @@ prefix func +// this should be a comment, not an operator
 prefix func -/* this also should be a comment, not an operator */
 (arg: Int) -> Int { return arg }
 
-func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{braced block of statements is an unused closure}}
+func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}}
 func errors() {
   */    // expected-error {{unexpected end of block comment}}
   
@@ -161,7 +161,7 @@ func operator_in_func_bad () {
                                                                     // expected-error {{braced block of statements is an unused closure}}
 }
 
-infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}}
+infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}}
 
 infix operator ??= {}
 

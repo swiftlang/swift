@@ -194,3 +194,7 @@ var closureWithObservedProperty: () -> () = {
   }
 }
 
+;
+
+{}() // expected-error{{statement cannot begin with a closure}} expected-note{{explicitly discard the result of the closure}}
+

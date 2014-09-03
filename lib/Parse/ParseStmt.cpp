@@ -324,6 +324,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ContextChange CC(*this, TLCD, &State->getTopLevelContext());
       SourceLoc StartLoc = Tok.getLoc();
 
+      // Expressions can't begin with a closure literal at statement position.
+      // This prevents potential ambiguities with trailing closure syntax.
+      if (Tok.is(tok::l_brace)) {
+        diagnose(Tok, diag::statement_begins_with_closure);
+        diagnose(Tok, diag::discard_result_of_closure)
+          .fixItInsert(Tok.getLoc(), "_ = ");
+      }
+
       ParserStatus Status = parseExprOrStmt(Result);
       if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeTopLevelDecl(BeginParserPosition, TLCD);
@@ -434,6 +442,15 @@ void Parser::parseTopLevelCodeDeclDelayed() {
 
   SourceLoc StartLoc = Tok.getLoc();
   ASTNode Result;
+
+  // Expressions can't begin with a closure literal at statement position. This
+  // prevents potential ambiguities with trailing closure syntax.
+  if (Tok.is(tok::l_brace)) {
+    diagnose(Tok, diag::statement_begins_with_closure);
+    diagnose(Tok, diag::discard_result_of_closure)
+      .fixItInsert(Tok.getLoc(), "_ = ");
+  }
+
   parseExprOrStmt(Result);
   if (!Result.isNull()) {
     auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());

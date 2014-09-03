@@ -71,6 +71,8 @@ protocol P2 {}
 
 extension () {} // expected-error {{expected identifier in extension declaration}}
 // expected-error @-1{{braced block of statements is an unused closure}}
+// expected-error @-2{{cannot begin with a closure expression}}
+// expected-note @-3{{explicitly discard the result}}
 
 typealias TupleAlias = (x: Int, y: Int)
 extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' cannot be extended}}

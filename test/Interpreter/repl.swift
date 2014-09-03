@@ -202,7 +202,7 @@ chained
 [chained]
 // CHECK: : [(f: Int -> ()) -> Int]
 
-{97210}()
+({97210}())
 // CHECK: = 97210
 true && true
 // CHECK: = true
