@@ -105,7 +105,7 @@ private:
   void printMembers(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !shouldInclude(VD))
+      if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
         continue;
       if (auto FD = dyn_cast<FuncDecl>(VD))
         if (FD->isAccessor())
@@ -916,10 +916,18 @@ public:
   }
 
   void forwardDeclareMemberTypes(DeclRange members) {
+    SmallVector<ValueDecl *, 4> nestedTypes;
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !printer.shouldInclude(VD))
         continue;
+
+      // Catch nested types and emit their definitions /after/ this class.
+      if (isa<TypeDecl>(VD)) {
+        nestedTypes.push_back(VD);
+        continue;
+      }
+
       ReferencedTypeFinder::walk(VD->getType(),
                                  [this](ReferencedTypeFinder &finder,
                                         const TypeDecl *TD) {
@@ -937,6 +945,11 @@ public:
           assert(false && "unknown local type decl");
       });
     }
+
+    declsToWrite.insert(declsToWrite.end()-1, nestedTypes.rbegin(),
+                        nestedTypes.rend());
+
+    // Separate forward declarations from the class itself.
     os << '\n';
   }
 

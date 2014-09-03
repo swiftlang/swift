@@ -48,6 +48,20 @@ extension A3 {
   var more: Int { return 10 }
 }
 
+// CHECK-LABEL: @interface A4{{$}}
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class A4 {}
+
+// CHECK-LABEL: @interface A4 (SWIFT_EXTENSION(extensions))
+// CHECK-NEXT: @end
+extension A4 {
+  // CHECK-LABEL: @interface Inner
+  // CHECK-NEXT: init
+  // CHECK-NEXT: @end
+  @objc class Inner {}
+}
+
 // NEGATIVE-NOT: CGColor
 extension CGColor {
   func anyOldMethod() {}

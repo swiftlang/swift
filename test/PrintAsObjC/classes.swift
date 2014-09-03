@@ -214,6 +214,67 @@ class MyObject : NSObject {}
 // CHECK-NEXT: @end
 @objc protocol MyProtocol : NSObjectProtocol {}
 
+// CHECK-LABEL: @interface Nested
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class Nested {
+  // CHECK-LABEL: @interface Inner
+  // CHECK-NEXT: init
+  // CHECK-NEXT: @end
+  @objc class Inner {
+    // CHECK-LABEL: @interface DeeperIn
+    // CHECK-NEXT: init
+    // CHECK-NEXT: @end
+    @objc class DeeperIn {}
+  }
+
+  // CHECK-LABEL: @interface AnotherInner
+  // CHECK-NEXT: init
+  // CHECK-NEXT: @end
+  @objc class AnotherInner {}
+
+  // NEGATIVE-NOT: NonObjCInner
+  class NonObjCInner {}
+}
+
+// CHECK-LABEL: @class Inner2;
+// CHECK-LABEL: @interface NestedMembers
+// CHECK-NEXT: @property (nonatomic) Inner2 * ref2;
+// CHECK-NEXT: @property (nonatomic) Inner3 * ref3;
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class NestedMembers {
+  // NEGATIVE-NOT: @class NestedMembers;
+  // CHECK-LABEL: @interface Inner2
+  // CHECK-NEXT: @property (nonatomic) NestedMembers * ref;
+  // CHECK-NEXT: init
+  // CHECK-NEXT: @end
+  @objc class Inner2 {
+    var ref: NestedMembers? = nil
+  }
+
+  var ref2: Inner2? = nil
+  var ref3: Inner3? = nil
+
+  // CHECK-LABEL: @interface Inner3
+  // CHECK-NEXT: @property (nonatomic) NestedMembers * ref;
+  // CHECK-NEXT: init
+  // CHECK-NEXT: @end
+  @objc class Inner3 {
+    var ref: NestedMembers? = nil
+  }
+}
+
+// CHECK-LABEL: @interface NestedSuperclass
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class NestedSuperclass {
+  // CHECK-LABEL: @interface Subclass : NestedSuperclass
+  // CHECK-NEXT: init
+  // CHECK-NEXT: @end
+  @objc class Subclass : NestedSuperclass {}
+}
+
 // NEGATIVE-NOT: @interface Private :
 private class Private : A1 {}
 
