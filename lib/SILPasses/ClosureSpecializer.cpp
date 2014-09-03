@@ -240,6 +240,9 @@ static unsigned getInstCount(SILFunction *F) {
 bool ClosureSpecializer::isProfitable(ArgSpecDescriptor &AD) {
   // Check the relative size of the callee and the closure.
   auto *ClosureFRI = cast<FunctionRefInst>(AD.PAI->getCallee());
+  // We only handle the case where callee is FunctionRefInst.
+  if (!isa<FunctionRefInst>(AD.AI->getCallee()))
+    return false;
   auto *CalleeFRI = cast<FunctionRefInst>(AD.AI->getCallee());
   auto *Callee = CalleeFRI->getReferencedFunction();
 

@@ -1,0 +1,28 @@
+// RUN: %sil-opt -closure-specialize %s | FileCheck %s
+// rdar://18156518
+
+import Builtin
+import Swift
+
+protocol P {
+  func foo(f: Int->Int, _ j: Int) -> Int
+}
+
+sil @_TF4test3bazfSiFT1mSi_Si : $@thin (Int, Int) -> Int
+
+// CHECK-LABEL: @_TF4test3barFTPS_1P_Si_Si : $@thin (@in P, Int) -> Int {
+// CHECK: partial_apply
+// CHECK: apply
+sil [noinline] @_TF4test3barFTPS_1P_Si_Si : $@thin (@in P, Int) -> Int {
+bb0(%0 : $*P, %1 : $Int):
+  %2 = project_existential %0 : $*P to $*@sil_self P
+  %3 = protocol_method %0 : $*P, #P.foo!1 : <`Self` : P> inout Self -> (Int -> Int, Int) -> Int, $@cc(witness_method) @callee_owned (@owned @callee_owned (Int) -> Int, Int, @inout @sil_self P) -> Int
+  %4 = integer_literal $Builtin.Word, 2
+  %5 = struct $Int (%4 : $Builtin.Word)
+  // function_ref test.baz (Swift.Int)(m : Swift.Int) -> Swift.Int
+  %6 = function_ref @_TF4test3bazfSiFT1mSi_Si : $@thin (Int, Int) -> Int
+  %7 = partial_apply %6(%5) : $@thin (Int, Int) -> Int
+  %8 = apply %3(%7, %1, %2) : $@cc(witness_method) @callee_owned (@owned @callee_owned (Int) -> Int, Int, @inout @sil_self P) -> Int
+  destroy_addr %0 : $*P
+  return %8 : $Int
+}
