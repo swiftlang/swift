@@ -1010,7 +1010,11 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
     getLivenessAtInst(Release, 0, TheMemory.NumElements);
   if (Availability.isAllYes()) return;
 
-  if (isa<StrongReleaseInst>(Release))
+
+  // Right now we don't fully support cleaning up a partially initialized object
+  // after a failure.  Handle this by only allowing an early 'return nil' in an
+  // initializer after all properties are initialized.
+  if (TheMemory.isClassInitSelf())
     diagnose(Module, Release->getLoc(),
              diag::object_not_fully_initialized_before_failure);
 
@@ -1031,7 +1035,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
         Pointer = SILValue(Pointer.getDef(), 1);
         
       if (!isa<MarkUninitializedInst>(Pointer))
-      Pointer = B.createLoad(Release->getLoc(), Pointer);
+        Pointer = B.createLoad(Release->getLoc(), Pointer);
       auto Dealloc = B.createDeallocRef(Release->getLoc(), Pointer);
       
       // dealloc_box the self box is necessary.

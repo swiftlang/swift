@@ -46,8 +46,8 @@ class RootClass {
 
   init() { x = 0; y = 0 }
 
-  convenience init?(failBeforeDelegation: Bool) {
-    if failBeforeDelegation { return nil } // TODO: e/xpected-error
+  convenience init?(failBeforeDelegation: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+    if failBeforeDelegation { return nil }
     self.init()
   }
 
@@ -71,8 +71,8 @@ class RootClass {
     return nil // OK
   }
 
-  convenience init?(failBeforeFailableDelegation: Bool) {
-    if failBeforeFailableDelegation { return nil } // TODO: e/xpected-error
+  convenience init?(failBeforeFailableDelegation: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+    if failBeforeFailableDelegation { return nil }
     self.init(failBeforeInitialization: ())
   }
 
@@ -90,13 +90,13 @@ class SubClass: RootClass {
     super.init()
   }
 
-  override init?(failBeforeInitialization: ()) {
-    return nil // TODO: e/xpected-error
+  override init?(failBeforeInitialization: ()) {   // expected-error{{properties of a class instance must be initialized before returning nil}}
+    return nil
   }
 
-  init?(failBeforeSuperInitialization: ()) {
+  init?(failBeforeSuperInitialization: ()) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
     z = 0
-    return nil // TODO: e/xpected-error
+    return nil
   }
 
   override init?(failAfterFullInitialization: ()) {
@@ -105,9 +105,9 @@ class SubClass: RootClass {
     return nil // OK
   }
 
-  init?(failBeforeFailableSuperInit: Bool) {
+  init?(failBeforeFailableSuperInit: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
     z = 0
-    if failBeforeFailableSuperInit { return nil } // TODO: e/xpected-error
+    if failBeforeFailableSuperInit { return nil }
     super.init(failBeforeInitialization: ())
   }
 
@@ -117,8 +117,8 @@ class SubClass: RootClass {
     return nil // OK
   }
 
-  convenience init?(failBeforeDelegation: Bool) {
-    if failBeforeDelegation { return nil } // TODO: e/xpected-error
+  convenience init?(failBeforeDelegation: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+    if failBeforeDelegation { return nil }
     self.init()
   }
 
@@ -127,8 +127,8 @@ class SubClass: RootClass {
     return nil // OK
   }
 
-  convenience init?(failBeforeFailableDelegation: Bool) {
-    if failBeforeFailableDelegation { return nil } // TODO: e/xpected-error
+  convenience init?(failBeforeFailableDelegation: Bool) {  // expected-error{{properties of a class instance must be initialized before returning nil}}
+    if failBeforeFailableDelegation { return nil }
     self.init(failBeforeInitialization: ())
   }
 
