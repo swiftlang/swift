@@ -64,9 +64,6 @@ namespace llvm {
 
 namespace swift {
 
-// The indentation of the members of this enum describe the inheritance
-// hierarchy.  Commented out members are abstract classes.  This formation
-// allows for range checks in classof.
 enum class DeclContextKind : uint8_t {
   AbstractClosureExpr,
   Initializer,
@@ -79,6 +76,23 @@ enum class DeclContextKind : uint8_t {
   NominalTypeDecl,
   ExtensionDecl,
   Last_DeclContextKind = ExtensionDecl
+};
+
+/// Describes a member to find using qualified lookup.
+class LookupName {
+public:
+  /// The name of the member.
+  const DeclName Name;
+
+  /// If non-empty, the discriminator associated with the member's original
+  /// declaration context.
+  const Identifier PrivateDiscriminator;
+
+  /*implicit*/ LookupName(DeclName name,
+                          Identifier discriminator = Identifier())
+    : Name(name), PrivateDiscriminator(discriminator) {}
+
+  /*implicit*/ LookupName(Identifier name) : LookupName(DeclName(name)) {}
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -260,7 +274,7 @@ public:
   ///
   /// \param type The type to look into.
   ///
-  /// \param name The name to search for.
+  /// \param member The member to search for.
   ///
   /// \param options Options that control name lookup, based on the
   /// \c NL_* constants in \c NameLookupOptions.
@@ -272,7 +286,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(Type type, DeclName name, unsigned options,
+  bool lookupQualified(Type type, LookupName member, unsigned options,
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
