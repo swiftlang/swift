@@ -1955,34 +1955,6 @@ strong_retain_unowned
 Asserts that the strong reference count of the heap object referenced by ``%0``
 is still positive, then increases it by one.
 
-ref_to_unowned
-``````````````
-
-::
-
-  sil-instruction ::= 'ref_to_unowned' sil-operand
-
-  %1 = unowned_to_ref %0 : T
-  // $T must be a reference type
-  // %1 will have type $@unowned T
-
-Adds the ``@unowned`` qualifier to the type of a reference to a heap
-object.  No runtime effect.
-
-unowned_to_ref
-``````````````
-
-::
-
-  sil-instruction ::= 'unowned_to_ref' sil-operand
-
-  %1 = unowned_to_ref %0 : $@unowned T
-  // $T must be a reference type
-  // %1 will have type $T
-
-Strips the ``@unowned`` qualifier off the type of a reference to a
-heap object.  No runtime effect.
-
 unowned_retain
 ``````````````
 ::
@@ -2555,6 +2527,16 @@ existential_metatype
 Obtains the metatype of the concrete value
 referenced by the existential container referenced by ``%0``.
 
+objc_protocol
+`````````````
+::
+
+  sil-instruction ::= 'objc_protocol' protocol-decl : sil-type
+
+  %0 = objc_protocol #ObjCProto : $Protocol
+
+*TODO* Fill this in.
+
 Aggregate Types
 ~~~~~~~~~~~~~~~
 
@@ -2602,6 +2584,17 @@ are the preferred forms.
 For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate destroys than it is to
 reason about destroys of the subobjects.
+
+autorelease_value
+`````````````````
+
+::
+
+  sil-instruction ::= 'autorelease_value' sil-operand
+
+  autorelease_value %0 : $A
+
+*TODO* Complete this section.
 
 tuple
 `````
@@ -3122,6 +3115,21 @@ pointer can be used with any operation on archetypes, such as
 ``witness_method``. When the operand is of metatype type, the result
 will be the metatype of the opened archetype.
 
+Blocks
+~~~~~~
+
+project_block_storage
+`````````````````````
+::
+
+   sil-instruction ::= 'project_block_storage' sil-operand ':' sil-type
+
+init_block_storage_header
+`````````````````````````
+
+*TODO* Fill this in. The printing of this instruction looks incomplete on trunk currently.
+
+
 Unchecked Conversions
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -3204,6 +3212,39 @@ unchecked_addr_cast
 Converts an address to a different address type. Using the resulting address 
 is undefined unless ``B`` is layout compatible with ``A``.
 
+unchecked_trivial_bit_cast
+``````````````````````````
+
+::
+
+  sil-instruction ::= 'unchecked_trivial_bit_cast' sil-operand 'to' sil-type
+
+  %1 = unchecked_trivial_bit_cast %0 : $Builtin.NativeObject to $Builtin.Word
+  // %0 must be an object.
+  // %1 must be an object with trivial type.
+
+Bitcasts an object of type ``A`` to be of same sized type ``B`` with
+the constraint that ``B`` must be trivial. This can be used for
+bitcasting among trivial types, but more importantly is a one way
+bitcast from non-trivial types to trivial types.
+
+unchecked_ref_bit_cast
+``````````````````````
+::
+
+  sil-instruction ::= 'unchecked_ref_bit_cast' sil-operand 'to' sil-type
+
+  %1 = unchecked_trivial_bit_cast %0 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
+  // %0 must be an object.
+  // %1 must be an object that is trivial iff %0 is trivial and is non-trivial iff %0 is non-trivial.
+
+Bitcasts an object of type ``A`` to be of same sized type ``B`` with
+the constraint that ``A`` and ``B`` must both either be trivial or
+non-trivial. This enables the optimizer to know that the bitcast does
+not perform an unsafe operation that would require the optimizer to
+consider the operand and the output of the bitcast as objects with
+different ARC identities.
+
 ref_to_raw_pointer
 ``````````````````
 ::
@@ -3236,6 +3277,34 @@ semantics for the object on its own). It is undefined behavior to cast a
 ``RawPointer`` to a type unrelated to the dynamic type of the heap object.
 It is also undefined behavior to cast a ``RawPointer`` from an address to any
 heap object type.
+
+ref_to_unowned
+``````````````
+
+::
+
+  sil-instruction ::= 'ref_to_unowned' sil-operand
+
+  %1 = unowned_to_ref %0 : T
+  // $T must be a reference type
+  // %1 will have type $@unowned T
+
+Adds the ``@unowned`` qualifier to the type of a reference to a heap
+object.  No runtime effect.
+
+unowned_to_ref
+``````````````
+
+::
+
+  sil-instruction ::= 'unowned_to_ref' sil-operand
+
+  %1 = unowned_to_ref %0 : $@unowned T
+  // $T must be a reference type
+  // %1 will have type $T
+
+Strips the ``@unowned`` qualifier off the type of a reference to a
+heap object.  No runtime effect.
 
 convert_function
 ````````````````
