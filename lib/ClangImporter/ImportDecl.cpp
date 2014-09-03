@@ -2764,6 +2764,8 @@ namespace {
 
       // Look for other constructors that occur in this context with
       // the same name.
+      Type allocParamType = allocType->castTo<AnyFunctionType>()->getResult()
+                              ->castTo<AnyFunctionType>()->getInput();
       for (auto other : nominalOwner->lookupDirect(name)) {
         auto ctor = dyn_cast<ConstructorDecl>(other);
         if (!ctor || ctor->isInvalid() ||
@@ -2773,7 +2775,10 @@ namespace {
         // If the types don't match, this is a different constructor with
         // the same selector. This can happen when an overlay overloads an
         // existing selector with a Swift-only signature.
-        if (!ctor->getType()->isEqual(allocType)) {
+        Type ctorParamType = ctor->getType()->castTo<AnyFunctionType>()
+                               ->getResult()->castTo<AnyFunctionType>()
+                               ->getInput();
+        if (!ctorParamType->isEqual(allocParamType)) {
           continue;
         }
 
