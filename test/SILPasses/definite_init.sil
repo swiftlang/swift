@@ -778,7 +778,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [derivedself] %0 : $DerivedClassWithNontrivialStoredProperties
   store %4 to %1#1 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  destroy_addr %1#1 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
   dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
@@ -811,7 +811,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %10 = ref_element_addr %9 : $DerivedClassWithNontrivialStoredProperties, #DerivedClassWithNontrivialStoredProperties.a
   assign %8 to %10 : $*SomeClass
 
-  destroy_addr %1#1 : $*DerivedClassWithNontrivialStoredProperties
+  destroy_addr %1#1 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
   dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
@@ -849,7 +849,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [delegatingself] %0 : $DerivedClassWithNontrivialStoredProperties
   store %4 to %2#1 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %2#1 : $*DerivedClassWithNontrivialStoredProperties
+  destroy_addr %2#1 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
   dealloc_stack %2#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
