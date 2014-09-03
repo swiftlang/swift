@@ -1,5 +1,5 @@
 set(OPT ${PATH_TO_LLVM_BUILD}/bin/opt)
-set(SWIFT_LLVM_DYLIB ${SWIFT_BINARY_DIR}/lib/SwiftLLVMPasses.dylib)
+get_property(SWIFT_LLVM_DYLIB TARGET SwiftLLVMPasses PROPERTY LOCATION)
 
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/llvm-opt.in
