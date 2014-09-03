@@ -199,6 +199,116 @@ if let v = Chimera(failAfter: false) {
   println("it's dead")
 }
 
+println("--") // CHECK-NEXT: --
+
+class Bear {
+  let x: Canary
+
+  init?(fail: Bool) {
+    x = Canary()
+    if fail { return nil }
+  }
+
+  convenience init?(delegateFailure: Bool, failAfter: Bool) {
+    self.init(fail: delegateFailure)
+    if failAfter { return nil }
+  }
+}
+
+class PolarBear: Bear {
+  let y: Canary
+
+  init?(chainFailure: Bool, failAfter: Bool) {
+    y = Canary()
+    super.init(fail: chainFailure)
+    if failAfter { return nil }
+  }
+}
+
+// CHECK-NEXT: it's alive
+// CHECK-NEXT: died
+if let ba = Bear(fail: false) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+if let bb = Bear(fail: true) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: it's alive
+// CHECK-NEXT: died
+if let bc = Bear(delegateFailure: false, failAfter: false) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+if let bd = Bear(delegateFailure: false, failAfter: true) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+if let bd = Bear(delegateFailure: true, failAfter: true) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: it's alive
+// CHECK-NEXT: died
+// CHECK-NEXT: died
+if let be = PolarBear(chainFailure: false, failAfter: false) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+if let bf = PolarBear(chainFailure: false, failAfter: true) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+if let bf = PolarBear(chainFailure: true, failAfter: true) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
 // CHECK-NEXT: done
 println("done")
+
 
