@@ -98,6 +98,12 @@ namespace swift {
     }
   };
 
+  /// A helper method for use with ArrayRefView. Just returns the CallSite
+  /// ApplyInst of E.
+  inline ApplyInst *getEdgeApplyInst(CallGraphEdge * const &E) {
+    return const_cast<ApplyInst *>(E->getCallSite());
+  }
+
   class CallGraphNode {
     /// The function represented by this call graph node.
     SILFunction *Function;
@@ -134,21 +140,36 @@ namespace swift {
       return Function;
     }
 
-    /// Get the complete set of call sites that can call into this
-    /// function.
+    /// Get the complete set of edges associated with call sites that can call
+    /// into this function.
     const llvm::SmallVectorImpl<CallGraphEdge *> &getCallers() const {
       assert(isCallerSetComplete() &&
              "Attempt to get an incomplete caller set!");
       return Callers;
     }
 
-    /// Get the known set of call sites that can call into this
+    // An adaptor that is used to show all of the apply insts which call the
+    // SILFunction of this node.
+    using CallerCallSiteList = ArrayRefView<CallGraphEdge *, ApplyInst *,
+                                            getEdgeApplyInst>;
+
+    /// Return the set of apply insts that can call into this function.
+    CallerCallSiteList getCallerCallSites() const {
+      return CallerCallSiteList(getCallers());
+    }
+
+    /// Get the known set of call graph edges that represent calls into this
     /// function.
     llvm::SmallVectorImpl<CallGraphEdge *> &getKnownCallers() {
       return Callers;
     }
 
-    /// Get the call sites within this function.
+    /// Return the known set of apply insts that can call into this function.
+    CallerCallSiteList getKnownCallerCallSites() {
+      return CallerCallSiteList(getKnownCallers());
+    }
+
+    /// Get the known set of call sites in this function.
     llvm::SmallVectorImpl<CallGraphEdge *> &getCallSites() {
       return CallSites;
     }
