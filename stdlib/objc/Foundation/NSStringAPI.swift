@@ -192,14 +192,18 @@ extension String {
   //     encoding:(NSStringEncoding)enc
   //     error:(NSError **)error
 
-  /// Returns a string created by reading data from the file at a
+  /// Produces a string created by reading data from the file at a
   /// given path interpreted using a given encoding.
-  public static func stringWithContentsOfFile(
-    path: String,
+  public init?(
+    contentsOfFile path: String,
     encoding enc: NSStringEncoding,
     error: NSErrorPointer = nil
-  ) -> String? {
-    return NSString(contentsOfFile: path, encoding: enc, error: error)
+  ) {
+    if let ns = NSString(contentsOfFile: path, encoding: enc, error: error) {
+      self = ns as String
+    } else {
+      return nil
+    }
   }
 
   // + (instancetype)
@@ -207,16 +211,20 @@ extension String {
   //     usedEncoding:(NSStringEncoding *)
   //     enc error:(NSError **)error
 
-  /// Returns a string created by reading data from the file at
+  /// Produces a string created by reading data from the file at
   /// a given path and returns by reference the encoding used to
   /// interpret the file.
-  public static func stringWithContentsOfFile(
-    path: String,
+  public init?(
+    contentsOfFile path: String,
     usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
-  ) -> String? {
-    return NSString(contentsOfFile: path, usedEncoding: usedEncoding,
-                                             error: error)
+  ) {
+    if let ns = NSString(contentsOfFile: path, usedEncoding: usedEncoding,
+                          error: error) {
+      self = ns as String
+    } else {
+      return nil
+    }
   }
 
   // + (instancetype)
@@ -224,13 +232,19 @@ extension String {
   //     encoding:(NSStringEncoding)enc
   //     error:(NSError **)error
 
-  /// Returns a string created by reading data from a given URL
+  /// Produces a string created by reading data from a given URL
   /// interpreted using a given encoding.  Errors are written into the
   /// inout `error` argument.
-  public static func stringWithContentsOfURL(
-    url: NSURL, encoding enc: NSStringEncoding, error: NSErrorPointer = nil
-  ) -> String? {
-    return NSString(contentsOfURL: url, encoding: enc, error: error)
+  public init?(
+    contentsOfURL url: NSURL, 
+    encoding enc: NSStringEncoding, 
+    error: NSErrorPointer = nil
+  ) {
+    if let ns = NSString(contentsOfURL: url, encoding: enc, error: error) {
+      self = ns as String
+    } else {
+      return nil
+    }
   }
 
   // + (instancetype)
@@ -238,29 +252,36 @@ extension String {
   //     usedEncoding:(NSStringEncoding *)enc
   //     error:(NSError **)error
 
-  /// Returns a string created by reading data from a given URL
+  /// Produces a string created by reading data from a given URL
   /// and returns by reference the encoding used to interpret the
   /// data.  Errors are written into the inout `error` argument.
-  public static func stringWithContentsOfURL(
-    url: NSURL,
+  public init?(
+    contentsOfURL url: NSURL,
     usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
-  ) -> String? {
-    return NSString(contentsOfURL: url, usedEncoding: enc,
-                                            error: error)
+  ) {
+    if let ns = NSString(contentsOfURL: url, usedEncoding: enc, error: error) {
+      self = ns as String
+    } else {
+      return nil
+    }
   }
 
   // + (instancetype)
   //     stringWithCString:(const char *)cString
   //     encoding:(NSStringEncoding)enc
 
-  /// Returns a string containing the bytes in a given C array,
+  /// Produces a string containing the bytes in a given C array,
   /// interpreted according to a given encoding.
-  public static func stringWithCString(
-    cString: UnsafePointer<CChar>,
+  public init?(
+    CString: UnsafePointer<CChar>,
     encoding enc: NSStringEncoding
-  ) -> String? {
-    return NSString(CString: cString, encoding: enc)
+  ) {
+    if let ns = NSString(CString: CString, encoding: enc) {
+      self = ns as String
+    } else {
+      return nil 
+    }
   }
 
 
@@ -270,12 +291,14 @@ extension String {
   
   // + (instancetype)stringWithUTF8String:(const char *)bytes
 
-  /// Returns a string created by copying the data from a given
+  /// Produces a string created by copying the data from a given
   /// C array of UTF8-encoded bytes.
-  public static func stringWithUTF8String(
-    bytes: UnsafePointer<CChar>
-  ) -> String? {
-    return NSString(UTF8String: bytes)
+  public init?(UTF8String bytes: UnsafePointer<CChar>) {
+    if let ns = NSString(UTF8String: bytes) {
+      self = ns as String
+    } else {
+      return nil
+    }
   }
 
   //===--- Instance Methods/Properties-------------------------------------===//
@@ -729,17 +752,21 @@ extension String {
   //     length:(NSUInteger)length
   //     encoding:(NSStringEncoding)encoding
 
-  /// Returns an initialized `NSString` object equivalent to the given
+  /// Produces an initialized `NSString` object equivalent to the given
   /// `bytes` interpreted in the given `encoding`.
-  public static func stringWithBytes<
+  public init? <
     S: SequenceType where S.Generator.Element == UInt8
   >(
     bytes: S, encoding: NSStringEncoding
-  ) -> String? {
+  ) {
     let byteArray = Array(bytes)
-    return NSString(
-      bytes: byteArray, length: byteArray.count, encoding: encoding
-    ) as NSString? // HACK: FIXME: coerce to optional NSString to handle nil
+    if let ns = NSString(
+                  bytes: byteArray, length: byteArray.count, encoding: encoding
+                ) {
+      self = ns as String
+    } else {
+      return nil
+    }
   }
 
   // - (instancetype)
@@ -748,18 +775,22 @@ extension String {
   //     encoding:(NSStringEncoding)encoding
   //     freeWhenDone:(BOOL)flag
 
-  /// Returns an initialized `String` object that contains a
+  /// Produces an initialized `String` object that contains a
   /// given number of bytes from a given buffer of bytes interpreted
   /// in a given encoding, and optionally frees the buffer.  WARNING:
-  /// this method is not memory-safe!
-  public static func stringWithBytesNoCopy(
-    bytes: UnsafeMutablePointer<Void>, length: Int,
+  /// this initializer is not memory-safe!
+  public init?(
+    bytesNoCopy bytes: UnsafeMutablePointer<Void>, length: Int,
     encoding: NSStringEncoding, freeWhenDone flag: Bool
-  ) -> String? {
-    return NSString(
-      bytesNoCopy: bytes, length: length,
-      encoding: encoding, freeWhenDone: flag
-    ) as NSString? // Important: coerce to optional NSString to handle nil
+  ) {
+    if let ns = NSString(
+                  bytesNoCopy: bytes, length: length,
+                  encoding: encoding, freeWhenDone: flag
+                ) {
+      self = ns as String
+    } else {
+      return nil
+    }
   }
 
 

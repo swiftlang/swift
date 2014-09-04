@@ -89,7 +89,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   if true {
     var err: NSError?
-    let content = String.stringWithContentsOfFile(existingPath,
+    let content = String(contentsOfFile: existingPath,
         encoding: NSASCIIStringEncoding, error: &err)
 
     expectEmpty(err)
@@ -99,7 +99,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
   }
   if true {
     var err: NSError?
-    let content = String.stringWithContentsOfFile(nonExistentPath,
+    let content = String(contentsOfFile: nonExistentPath,
         encoding: NSASCIIStringEncoding, error: &err)
 
     expectNotEmpty(err)
@@ -112,7 +112,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
   if true {
     var usedEncoding: NSStringEncoding = 0
     var err: NSError?
-    var content = String.stringWithContentsOfFile(existingPath,
+    var content = String(contentsOfFile: existingPath,
         usedEncoding: &usedEncoding, error: &err)
 
     expectNotEqual(0, usedEncoding)
@@ -124,7 +124,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
   if true {
     var usedEncoding: NSStringEncoding = 0
     var err: NSError?
-    var content = String.stringWithContentsOfFile(nonExistentPath, error: &err)
+    var content = String(contentsOfFile: nonExistentPath, error: &err)
 
     expectEqual(0, usedEncoding)
     expectNotEmpty(err)
@@ -139,7 +139,7 @@ NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
   let nonExistentURL = NSURL(string: "file://" + nonExistentPath)!
   if true {
     var err: NSError?
-    var content = String.stringWithContentsOfURL(existingURL,
+    var content = String(contentsOfURL: existingURL,
         encoding: NSASCIIStringEncoding, error: &err)
 
     expectEmpty(err)
@@ -149,7 +149,7 @@ NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
   }
   if true {
     var err: NSError?
-    var content = String.stringWithContentsOfURL(nonExistentURL,
+    var content = String(contentsOfURL: nonExistentURL,
         encoding: NSASCIIStringEncoding, error: &err)
 
     expectNotEmpty(err)
@@ -164,7 +164,7 @@ NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
   if true {
     var usedEncoding: NSStringEncoding = 0
     var err: NSError?
-    var content = String.stringWithContentsOfURL(existingURL,
+    var content = String(contentsOfURL: existingURL,
         usedEncoding: &usedEncoding, error: &err)
 
     expectNotEqual(0, usedEncoding)
@@ -176,7 +176,7 @@ NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
   if true {
     var usedEncoding: NSStringEncoding = 0
     var err: NSError?
-    var content = String.stringWithContentsOfURL(nonExistentURL,
+    var content = String(contentsOfURL: nonExistentURL,
         usedEncoding: &usedEncoding, error: &err)
 
     expectEqual(0, usedEncoding)
@@ -187,11 +187,11 @@ NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
 
 NSStringAPIs.test("stringWithCString(_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
-      String.stringWithCString(
+      String(CString: 
           "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
 }
 
-NSStringAPIs.test("stringWithUTF8String(_:)") {
+NSStringAPIs.test("init(UTF8String:)") {
   var s = "foo あいう"
   var up = UnsafeMutablePointer<UInt8>.alloc(100)
   var i = 0
@@ -200,7 +200,7 @@ NSStringAPIs.test("stringWithUTF8String(_:)") {
     i++
   }
   up[i] = 0
-  expectOptionalEqual(s, String.stringWithUTF8String(UnsafePointer(up)))
+  expectOptionalEqual(s, String(UTF8String: UnsafePointer(up)))
   up.dealloc(100)
 }
 
@@ -708,10 +708,10 @@ NSStringAPIs.test("hash") {
   expectEqual(nsstr.hash, s.hash)
 }
 
-NSStringAPIs.test("stringWithBytes(_:encoding:)") {
+NSStringAPIs.test("init(bytes:encoding:)") {
   var s: String = "abc あかさた"
   expectOptionalEqual(
-    s, String.stringWithBytes(s.utf8, encoding: NSUTF8StringEncoding))
+    s, String(bytes: s.utf8, encoding: NSUTF8StringEncoding))
 
   /*
   FIXME: Test disabled because the NSString documentation is unclear about
@@ -724,10 +724,10 @@ NSStringAPIs.test("stringWithBytes(_:encoding:)") {
   // FIXME: add a test where this function actually returns nil.
 }
 
-NSStringAPIs.test("stringWithBytesNoCopy(_:length:encoding:freeWhenDone:)") {
+NSStringAPIs.test("init(bytesNoCopy:length:encoding:freeWhenDone:)") {
   var s: String = "abc あかさた"
   var bytes: [UInt8] = Array(s.utf8)
-  expectOptionalEqual(s, String.stringWithBytesNoCopy(&bytes,
+  expectOptionalEqual(s, String(bytesNoCopy: &bytes,
       length: bytes.count, encoding: NSUTF8StringEncoding,
       freeWhenDone: false))
 
@@ -1532,7 +1532,7 @@ NSStringAPIs.test("writeToFile(_:atomically:encoding:error:)") {
     expectTrue(result)
 
     expectOptionalEqual(
-      s, String.stringWithContentsOfFile(
+      s, String(contentsOfFile: 
         nonExistentPath, encoding: NSASCIIStringEncoding))
   }
 }
@@ -1550,7 +1550,7 @@ NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
     expectTrue(result)
 
     expectOptionalEqual(
-      s, String.stringWithContentsOfFile(
+      s, String(contentsOfFile: 
         nonExistentPath, encoding: NSASCIIStringEncoding))
   }
 }

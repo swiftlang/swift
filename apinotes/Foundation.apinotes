@@ -8377,7 +8377,7 @@ Classes:
     Nullability:
     - S
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithData:encoding:'
     MethodKind: Instance
     Nullability:
@@ -8406,7 +8406,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'isEqualToString:'
     MethodKind: Instance
     Nullability:
