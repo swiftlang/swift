@@ -30,10 +30,6 @@
 #define TYPE_ATTR(X)
 #endif
 
-#ifndef AVAILABILITY_PLATFORM
-#define AVAILABILITY_PLATFORM(X, PrettyName)
-#endif
-
 // Type attributes
 TYPE_ATTR(autoclosure)
 TYPE_ATTR(cc)
@@ -198,13 +194,6 @@ DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized,
 SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
                  OnClass, 52)
 
-// Reordering these platforms will break serialization.
-AVAILABILITY_PLATFORM(iOS, "iOS")
-AVAILABILITY_PLATFORM(OSX, "OS X")
-AVAILABILITY_PLATFORM(iOSApplicationExtension, "iOS application extension")
-AVAILABILITY_PLATFORM(OSXApplicationExtension, "OS X application extension")
-
-#undef AVAILABILITY_PLATFORM
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

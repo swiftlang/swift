@@ -4702,12 +4702,12 @@ void ClangImporter::Implementation::importAttributes(
 
       // Translate from Clang platform strings to known Swift platforms.
       auto platformK =
-        llvm::StringSwitch<Optional<AvailabilityAttr::PlatformKind>>(Platform)
-          .Case("ios", AvailabilityAttr::iOS)
-          .Case("macosx", AvailabilityAttr::OSX)
-          .Case("ios_app_extension", AvailabilityAttr::iOSApplicationExtension)
+        llvm::StringSwitch<Optional<PlatformKind>>(Platform)
+          .Case("ios", PlatformKind::iOS)
+          .Case("macosx", PlatformKind::OSX)
+          .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
           .Case("macosx_app_extension",
-                AvailabilityAttr::OSXApplicationExtension)
+                PlatformKind::OSXApplicationExtension)
           .Default(Nothing);
       if (!platformK)
         continue;

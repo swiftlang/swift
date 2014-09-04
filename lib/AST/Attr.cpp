@@ -398,52 +398,53 @@ AvailabilityAttr *AvailabilityAttr::createUnavailableAttr(ASTContext &C,
 }
 
 StringRef
-AvailabilityAttr::platformString(AvailabilityAttr::PlatformKind platform) {
+AvailabilityAttr::platformString(PlatformKind platform) {
   switch (platform) {
-    case none: return "*";
-#define AVAILABILITY_PLATFORM(X, PrettyName) case X: return #X;
-#include "swift/AST/Attr.def"
+    case PlatformKind::none: return "*";
+#define AVAILABILITY_PLATFORM(X, PrettyName) case PlatformKind::X: return #X;
+#include "swift/AST/PlatformKinds.def"
   }
 }
 
 StringRef AvailabilityAttr::prettyPlatformString(
-            AvailabilityAttr::PlatformKind platform) {
+            PlatformKind platform) {
   switch (platform) {
-    case none: return "*";
-#define AVAILABILITY_PLATFORM(X, PrettyName) case X: return PrettyName;
-#include "swift/AST/Attr.def"
+    case PlatformKind::none: return "*";
+#define AVAILABILITY_PLATFORM(X, PrettyName) case PlatformKind::X: \
+            return PrettyName;
+#include "swift/AST/PlatformKinds.def"
   }
 }
 
-Optional<AvailabilityAttr::PlatformKind>
+Optional<PlatformKind>
 AvailabilityAttr::platformFromString(StringRef Name) {
   if (Name == "*")
     return PlatformKind::none;
   return
-    llvm::StringSwitch<Optional<AvailabilityAttr::PlatformKind>>(Name)
-#define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, X)
-#include "swift/AST/Attr.def"
-    .Default(Optional<AvailabilityAttr::PlatformKind>());
+    llvm::StringSwitch<Optional<PlatformKind>>(Name)
+#define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
+#include "swift/AST/PlatformKinds.def"
+    .Default(Optional<PlatformKind>());
 }
 
 bool AvailabilityAttr::isActivePlatform(const ASTContext &ctx) const {
   if (!hasPlatform())
     return true;
 
-  if (Platform == OSXApplicationExtension ||
-      Platform == iOSApplicationExtension)
+  if (Platform == PlatformKind::OSXApplicationExtension ||
+      Platform == PlatformKind::iOSApplicationExtension)
     if (!ctx.LangOpts.EnableAppExtensionRestrictions)
       return false;
 
   // FIXME: This is an awful way to get the current OS.
   switch (Platform) {
-  case OSX:
-  case OSXApplicationExtension:
+  case PlatformKind::OSX:
+  case PlatformKind::OSXApplicationExtension:
     return ctx.LangOpts.getTargetConfigOption("os") == "OSX";
-  case iOS:
-  case iOSApplicationExtension:
+  case PlatformKind::iOS:
+  case PlatformKind::iOSApplicationExtension:
     return ctx.LangOpts.getTargetConfigOption("os") == "iOS";
-  case none:
+  case PlatformKind::none:
     llvm_unreachable("handled above");
   }
 }

@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Ownership.h"
+#include "swift/AST/PlatformKind.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -586,12 +587,6 @@ enum class MinVersionComparison {
 /// Defines the @availability attribute.
 class AvailabilityAttr : public DeclAttribute {
 public:
-  /// Available platforms for the availability attribute.
-  enum PlatformKind {
-    none,
-#define AVAILABILITY_PLATFORM(X, PrettyName) X,
-#include "swift/AST/Attr.def"
-  };
 
 #define INIT_VER_TUPLE(X)\
   X(X.empty() ? Optional<clang::VersionTuple>() : X)
