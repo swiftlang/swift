@@ -199,7 +199,7 @@ extension String {
     encoding enc: NSStringEncoding,
     error: NSErrorPointer = nil
   ) -> String? {
-    return NSString.stringWithContentsOfFile(path, encoding: enc, error: error)
+    return NSString(contentsOfFile: path, encoding: enc, error: error)
   }
 
   // + (instancetype)
@@ -215,7 +215,7 @@ extension String {
     usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) -> String? {
-    return NSString.stringWithContentsOfFile(path, usedEncoding: usedEncoding,
+    return NSString(contentsOfFile: path, usedEncoding: usedEncoding,
                                              error: error)
   }
 
@@ -230,7 +230,7 @@ extension String {
   public static func stringWithContentsOfURL(
     url: NSURL, encoding enc: NSStringEncoding, error: NSErrorPointer = nil
   ) -> String? {
-    return NSString.stringWithContentsOfURL(url, encoding: enc, error: error)
+    return NSString(contentsOfURL: url, encoding: enc, error: error)
   }
 
   // + (instancetype)
@@ -246,7 +246,7 @@ extension String {
     usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) -> String? {
-    return NSString.stringWithContentsOfURL(url, usedEncoding: enc,
+    return NSString(contentsOfURL: url, usedEncoding: enc,
                                             error: error)
   }
 

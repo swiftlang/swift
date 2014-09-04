@@ -657,10 +657,31 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       // Determine whether one declaration is more specialized than the other.
-      if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2))
+      bool firstAsSpecializedAs = false;
+      bool secondAsSpecializedAs = false;
+      if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2)) {
         ++score1;
-      if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1))
+        firstAsSpecializedAs = true;
+      }
+      if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1)) {
         ++score2;
+        secondAsSpecializedAs = true;
+      }
+
+      // If each is as specialized as the other, and both are constructors,
+      // check the constructor kind.
+      if (firstAsSpecializedAs && secondAsSpecializedAs) {
+        if (auto ctor1 = dyn_cast<ConstructorDecl>(decl1)) {
+          if (auto ctor2 = dyn_cast<ConstructorDecl>(decl2)) {
+            if (ctor1->getInitKind() != ctor2->getInitKind()) {
+              if (ctor1->getInitKind() < ctor2->getInitKind())
+                ++score1;
+              else
+                ++score2;
+            }
+          }
+        }
+      }
 
       // If one declaration is available and the other is not,
       bool unavail1 = decl1->getAttrs().isUnavailable(cs.getASTContext());

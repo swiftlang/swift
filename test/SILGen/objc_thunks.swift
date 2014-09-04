@@ -188,15 +188,15 @@ class Hoozit : Gizmo {
   // CHECK-LABEL: sil @_TFC11objc_thunks6HoozitcfMS0_FT7bellsOnSi_S0_ : $@cc(method) @thin (Int, @owned Hoozit) -> @owned Hoozit {
   // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
-  // CHECK-NEXT: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo , $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned Gizmo
-  // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned Gizmo
+  // CHECK-NEXT: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
   // CHECK: unchecked_ref_cast
   // CHECK-NEXT: store [[SELF:%[0-9]+]] to [[SELF_BOX]]#1 : $*Hoozit
   // CHECK-NEXT: [[NONNULL:%[0-9]+]] = is_nonnull [[SELF]] : $Hoozit
   // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
   // CHECK: [[NULL_BB]]:
-  // CHECK-NEXT:   br [[EPILOG_BB:bb[0-9]+]]
+  // CHECK:   br [[EPILOG_BB:bb[0-9]+]]
 
   // CHECK: [[NONNULL_BB]]:
   // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_TF11objc_thunks5otherFT_T_ : $@thin () -> ()
@@ -341,7 +341,7 @@ class DesignatedStubs : Gizmo {
 
   override init() { i = 5 }
 
-  // CHECK-LABEL: sil @_TFC11objc_thunks15DesignatedStubscfMS0_FT7bellsOnSi_S0_ : $@cc(method) @thin (Int, @owned DesignatedStubs) -> @owned DesignatedStubs
+  // CHECK-LABEL: sil @_TFC11objc_thunks15DesignatedStubscfMS0_FT7bellsOnSi_GSQS0__
   // CHECK: function_ref @_TFSs26_unimplemented_initializer
   // CHECK: string_literal utf8 "objc_thunks.DesignatedStubs"
   // CHECK: string_literal utf8 "init(bellsOn:)"
@@ -354,14 +354,14 @@ class DesignatedStubs : Gizmo {
 class DesignatedOverrides : Gizmo {
   var i: Int = 5
 
-  // CHECK-LABEL: sil @_TFC11objc_thunks19DesignatedOverridescfMS0_FT_S0_ : $@cc(method) @thin (@owned DesignatedOverrides) -> @owned DesignatedOverrides
+  // CHECK-LABEL: sil @_TFC11objc_thunks19DesignatedOverridescfMS0_FT_GSQS0__
   // CHECK-NOT: return
   // CHECK: function_ref @_TFSi33_convertFromBuiltinIntegerLiteralf
-  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> () -> Gizmo , $@cc(objc_method) @thin (@owned Gizmo) -> @owned Gizmo
+  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> () -> Gizmo! , $@cc(objc_method) @thin (@owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return
 
-  // CHECK-LABEL: sil @_TFC11objc_thunks19DesignatedOverridescfMS0_FT7bellsOnSi_S0_ : $@cc(method) @thin (Int, @owned DesignatedOverrides) -> @owned DesignatedOverrides
+  // CHECK-LABEL: sil @_TFC11objc_thunks19DesignatedOverridescfMS0_FT7bellsOnSi_GSQS0__
   // CHECK: function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si
-  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo , $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned Gizmo
+  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return
 }

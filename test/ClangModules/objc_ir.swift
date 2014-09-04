@@ -36,12 +36,12 @@ func extensionMethods(#b: B) {
 
 // CHECK: define void @_TF7objc_ir19initCallToAllocInitFT1iVSs5Int32_T_
 func initCallToAllocInit(#i: CInt) {
-  // CHECK: call [[B]]* @_TFCSo1BCfMS_FT3intVSs5Int32_S_
+  // CHECK: call {{.*}} @_TFCSo1BCfMS_FT3intVSs5Int32_GSQS__
  
   B(int: i)
 }
 
-// CHECK: linkonce_odr hidden [[B]]* @_TFCSo1BCfMS_FT3intVSs5Int32_S_
+// CHECK: linkonce_odr hidden {{.*}} @_TFCSo1BCfMS_FT3intVSs5Int32_GSQS__
 // CHECK: load i8** @"\01L_selector(allocWithZone:)"
 // CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
 
@@ -109,7 +109,7 @@ func pointerProperties(obj: PointerWrapper) {
   obj.idPtr = AutoreleasingUnsafeMutablePointer()
 }
 
-// CHECK: linkonce_odr hidden [[B]]* @_TTOFCSo1BcfMS_FT3intVSs5Int32_S_
+// CHECK: linkonce_odr hidden {{.*}} @_TTOFCSo1BcfMS_FT3intVSs5Int32_GSQS__
 // CHECK: load i8** @"\01L_selector(initWithInt:)"
 // CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
 

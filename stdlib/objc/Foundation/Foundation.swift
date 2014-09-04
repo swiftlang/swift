@@ -119,7 +119,7 @@ extension NSString : StringLiteralConvertible {
       immutableResult = NSString(
         bytes: &uintValue,
         length: 4,
-        encoding: NSUTF32StringEncoding)
+        encoding: NSUTF32StringEncoding)!
     }
     return self(string: immutableResult)
   }
@@ -1118,7 +1118,7 @@ public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
-  convenience init(format predicateFormat: String, _ args: CVarArgType...) {
+  convenience init?(format predicateFormat: String, _ args: CVarArgType...) {
     let va_args = getVaList(args)
     self.init(format: predicateFormat, arguments: va_args)
   }

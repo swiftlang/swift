@@ -20,7 +20,7 @@ if unsafeNil == (nil as UnsafeMutablePointer<Int>) {
   // CHECK: ok unsafeNil == (nil as UnsafeMutablePointer<Int>)
 }
 
-let removed = NSFileManager.defaultManager().removeItemAtURL(NSURL(string:"/this/file/does/not/exist"), error:nil)
+let removed = NSFileManager.defaultManager().removeItemAtURL(NSURL(string:"/this/file/does/not/exist")!, error:nil)
 if !removed {
   println("ok !removed")
   // CHECK: ok !removed

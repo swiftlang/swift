@@ -136,7 +136,7 @@ FoundationTestSuite.test("NSRange") {
 //===----------------------------------------------------------------------===//
 
 FoundationTestSuite.test("NSURL") {
-  let nsURL = NSURL(string: "http://llvm.org")
+  let nsURL = NSURL(string: "http://llvm.org")!
   expectEqual("http://llvm.org", nsURL.description)
 }
 

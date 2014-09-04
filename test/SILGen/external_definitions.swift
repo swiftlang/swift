@@ -12,13 +12,12 @@ hasNoPrototype()
 // CHECK-LABEL: sil  private @top_level_code
 // -- Foreign function is referenced with C calling conv and ownership semantics
 // CHECK:   [[NSANSE:%.*]] = function_ref @NSAnse : $@cc(cdecl) @thin (ImplicitlyUnwrappedOptional<Ansible>) -> @autoreleased ImplicitlyUnwrappedOptional<Ansible>
-// CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPSs9AnyObject___S_ : $@thin (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned Ansible
+// CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPSs9AnyObject___GSQS__
 // CHECK:   [[NSOBJECT_CTOR:%.*]] = function_ref @_TFCSo8NSObjectCfMS_FT_S_ : $@thin (@thick NSObject.Type) -> @owned NSObject
 // CHECK:   [[ANSIBLE:%.*]] = apply [[ANSIBLE_CTOR]]
-// CHECK:   [[OANSIBLE:%.*]] = unchecked_ref_bit_cast [[ANSIBLE]]
-// CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[OANSIBLE]])
+// CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[ANSIBLE]])
 // CHECK:   retain_autoreleased [[NSANSE_RESULT]]
-// CHECK:   strong_release [[ANSIBLE]]
+// CHECK:   release_value [[ANSIBLE]] : $ImplicitlyUnwrappedOptional<Ansible>
 // -- Referencing unapplied C function goes through a thunk
 // CHECK:   [[NSANSE:%.*]] = function_ref @_TTOFSC6NSAnseFGSQCSo7Ansible_GSQS__ : $@thin (@owned ImplicitlyUnwrappedOptional<Ansible>) -> @owned ImplicitlyUnwrappedOptional<Ansible>
 // -- Referencing unprototyped C function passes no parameters
@@ -26,7 +25,7 @@ hasNoPrototype()
 // CHECK:   apply [[NOPROTO]]()
 
 // -- Constructors for imported Ansible
-// CHECK-LABEL: sil  shared @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPSs9AnyObject___S_ : $@thin (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned Ansible
+// CHECK-LABEL: sil  shared @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPSs9AnyObject___GSQS__ : $@thin (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned ImplicitlyUnwrappedOptional<Ansible>
 
 
 // -- Constructors for imported NSObject

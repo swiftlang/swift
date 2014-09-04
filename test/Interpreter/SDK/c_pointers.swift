@@ -76,9 +76,9 @@ println("NSError out:")
 autoreleasepool {
   var err: NSError? = NSError()
   hangCanary(err!)
-  if let s = NSString.stringWithContentsOfFile("/hopefully/does/not/exist\u{1B}",
-                                               encoding: NSUTF8StringEncoding,
-                                               error: &err) {
+  if let s = NSString(contentsOfFile: "/hopefully/does/not/exist\u{1B}",
+                      encoding: NSUTF8StringEncoding,
+                      error: &err) {
     _preconditionFailure("file should not actually exist")
   } else if let err_ = err {
     // The original value should have died
@@ -96,10 +96,9 @@ class DumbString: NSString {
   override func characterAtIndex(x: Int) -> unichar { _preconditionFailure("nope") }
   override var length: Int { return 0 }
 
-  override class func stringWithContentsOfFile(s: String,
-                                  encoding: NSStringEncoding,
-                                  error: AutoreleasingUnsafeMutablePointer<NSError?>)
-  -> DumbString? {
+  convenience init?(contentsOfFile s: String, encoding: NSStringEncoding,
+                    error: AutoreleasingUnsafeMutablePointer<NSError?>) {
+    self.init()
     error.memory = NSError(domain: "Malicious Mischief", code: 594, userInfo: nil)
     return nil
   }
@@ -109,8 +108,7 @@ class DumbString: NSString {
 println("NSError in:")
 autoreleasepool {
   var err: NSError? = nil
-  DumbString.stringWithContentsOfFile("foo", encoding: NSUTF8StringEncoding,
-                                      error: &err)
+  DumbString(contentsOfFile: "foo", encoding: NSUTF8StringEncoding, error: &err)
   let err_ = err!
   println(err_.domain) // CHECK-NEXT: Malicious Mischief
   println(err_.code) // CHECK-NEXT: 594

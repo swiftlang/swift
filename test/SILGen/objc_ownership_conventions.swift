@@ -7,22 +7,22 @@ import gizmo
 func test3() -> NSObject {
   // initializer returns at +1
   return Gizmo()
-  // CHECK: [[CTOR:%[0-9]+]] = function_ref @_TFCSo5GizmoCfMS_FT_S_ : $@thin (@thick Gizmo.Type) -> @owned Gizmo
+  // CHECK: [[CTOR:%[0-9]+]] = function_ref @_TFCSo5GizmoCfMS_FT_GSQS__ : $@thin (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: [[GIZMO_META:%[0-9]+]] = metatype $@thick Gizmo.Type
-  // CHECK-NEXT: [[GIZMO:%[0-9]+]] = apply [[CTOR]]([[GIZMO_META]]) : $@thin (@thick Gizmo.Type) -> @owned Gizmo
-  // CHECK-NEXT: [[GIZMO_NS:%[0-9]+]] = upcast [[GIZMO]] : $Gizmo to $NSObject
-  // CHECK-NEXT: return [[GIZMO_NS]] : $NSObject
+  // CHECK-NEXT: [[GIZMO:%[0-9]+]] = apply [[CTOR]]([[GIZMO_META]]) : $@thin (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK: [[GIZMO_NS:%[0-9]+]] = upcast [[GIZMO:%[0-9]+]] : $Gizmo to $NSObject
+  // CHECK: return [[GIZMO_NS]] : $NSObject
 
-  // CHECK-LABEL: sil shared @_TFCSo5GizmoCfMS_FT_S_ : $@thin (@thick Gizmo.Type) -> @owned Gizmo
+  // CHECK-LABEL: sil shared @_TFCSo5GizmoCfMS_FT_GSQS__ : $@thin (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // alloc is implicitly ns_returns_retained
   // init is implicitly ns_consumes_self and ns_returns_retained
   // CHECK-NEXT: bb0([[GIZMO_META:%[0-9]+]] : $@thick Gizmo.Type):
   // CHECK-NEXT: [[GIZMO_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[GIZMO_META]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
   // CHECK-NEXT: [[GIZMO:%[0-9]+]] = alloc_ref_dynamic [objc] [[GIZMO_META_OBJC]] : $@objc_metatype Gizmo.Type, $Gizmo
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[INIT_CTOR:%[0-9]+]] = function_ref @_TTOFCSo5GizmocfMS_FT_S_
-  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[INIT_CTOR]]([[GIZMO]]) : $@cc(method) @thin (@owned Gizmo) -> @owned Gizmo
-  // CHECK-NEXT: return [[RESULT]] : $Gizmo
+  // CHECK-NEXT: [[INIT_CTOR:%[0-9]+]] = function_ref @_TTOFCSo5GizmocfMS_FT_GSQS__
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[INIT_CTOR]]([[GIZMO]]) : $@cc(method) @thin (@owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK-NEXT: return [[RESULT]] : $ImplicitlyUnwrappedOptional<Gizmo>
 }
 
 

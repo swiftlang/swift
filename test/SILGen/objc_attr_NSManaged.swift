@@ -33,6 +33,6 @@ class SwiftGizmo : Gizmo {
 // The vtable should not contain any entry points for getters and setters.
 // CHECK-LABEL: sil_vtable SwiftGizmo {
 // CHECK-NEXT: #SwiftGizmo.modifyX!1: _TFC19objc_attr_NSManaged10SwiftGizmo7modifyXfS0_FT_T_ // objc_attr_NSManaged.SwiftGizmo.modifyX (objc_attr_NSManaged.SwiftGizmo)() -> ()
-// CHECK-NEXT:  #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_     // objc_attr_NSManaged.SwiftGizmo.init (objc_attr_NSManaged.SwiftGizmo.Type)() -> objc_attr_NSManaged.SwiftGizmo
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_S0_      // objc_attr_NSManaged.SwiftGizmo.init (objc_attr_NSManaged.SwiftGizmo.Type)(bellsOn : Swift.Int) -> objc_attr_NSManaged.SwiftGizmo
+// CHECK-NEXT:  #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_GSQS0__
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__
 // CHECK-NEXT: }
