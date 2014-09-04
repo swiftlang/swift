@@ -195,6 +195,9 @@ DECL_ATTR_ALIAS(unowned, Ownership)
 DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized,
           /* Not serialized */51)
 
+SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
+                 OnClass, 52)
+
 // Reordering these platforms will break serialization.
 AVAILABILITY_PLATFORM(iOS, "iOS")
 AVAILABILITY_PLATFORM(OSX, "OS X")

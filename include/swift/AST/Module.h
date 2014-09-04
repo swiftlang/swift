@@ -191,7 +191,7 @@ private:
 
   SmallVector<FileUnit *, 2> Files;
   
-  /// The class in this module marked @UIApplicationMain.
+  /// The class in this module marked @NS/UIApplicationMain.
   ClassDecl *MainClass = nullptr;
   
   /// The source location of the main class.

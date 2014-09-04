@@ -1112,6 +1112,20 @@ bool Module::isBuiltinModule() const {
 }
 
 bool Module::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
+  // %select indices for UI/NSApplication-related diagnostics.
+  enum : unsigned {
+    UIApplicationMainClass = 0,
+    NSApplicationMainClass = 1,
+  };
+  
+  unsigned mainClassDiagKind;
+  if (mainClass->getAttrs().hasAttribute<UIApplicationMainAttr>())
+    mainClassDiagKind = UIApplicationMainClass;
+  else if (mainClass->getAttrs().hasAttribute<NSApplicationMainAttr>())
+    mainClassDiagKind = NSApplicationMainClass;
+  else
+    llvm_unreachable("main class has no @ApplicationMain attribute?!");
+  
   if (mainClass == MainClass)
     return false;
   
@@ -1119,11 +1133,13 @@ bool Module::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
     // If we already have a main class, and we haven't diagnosed it, do so now.
     if (!DiagnosedMultipleMainClasses) {
       getASTContext().Diags.diagnose(MainClassDiagLoc,
-                                     diag::attr_UIApplicationMain_multiple);
+                                     diag::attr_ApplicationMain_multiple,
+                                     mainClassDiagKind);
       DiagnosedMultipleMainClasses = true;
     }
     getASTContext().Diags.diagnose(diagLoc,
-                                   diag::attr_UIApplicationMain_multiple);
+                                   diag::attr_ApplicationMain_multiple,
+                                   mainClassDiagKind);
     return true;
   }
   
@@ -1136,12 +1152,14 @@ bool Module::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
         continue;
       if (sf->isScriptMode()) {
         getASTContext().Diags.diagnose(diagLoc,
-                                     diag::attr_UIApplicationMain_with_script);
+                                     diag::attr_ApplicationMain_with_script,
+                                     mainClassDiagKind);
         // Note the source file we're reading top-level code from.
         if (auto bufID = sf->getBufferID()) {
           auto fileLoc = getASTContext().SourceMgr.getLocForBufferStart(*bufID);
           getASTContext().Diags.diagnose(fileLoc,
-                                     diag::attr_UIApplicationMain_script_here);
+                                     diag::attr_ApplicationMain_script_here,
+                                     mainClassDiagKind);
         }
         break;
       }
@@ -1371,9 +1389,14 @@ bool SourceFile::hasMainClass() const {
 ArtificialMainKind SourceFile::getArtificialMainKind() const {
   if (getASTContext().LangOpts.EmitNSApplicationMain)
     return ArtificialMainKind::NSApplicationMain;
-  if (hasMainClass() && getParentModule()->getMainClass()->getAttrs()
-        .hasAttribute<UIApplicationMainAttr>())
-    return ArtificialMainKind::UIApplicationMain;
+  if (hasMainClass()) {
+    auto &attrs = getParentModule()->getMainClass()->getAttrs();
+    if (attrs.hasAttribute<UIApplicationMainAttr>())
+      return ArtificialMainKind::UIApplicationMain;
+    if (attrs.hasAttribute<NSApplicationMainAttr>())
+      return ArtificialMainKind::NSApplicationMain;
+    llvm_unreachable("main class has no @ApplicationMain attr?!");
+  }
   return ArtificialMainKind::None;
 }
 

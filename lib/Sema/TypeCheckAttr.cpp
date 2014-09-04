@@ -51,6 +51,7 @@ public:
   IGNORED_ATTR(ClassProtocol)
   IGNORED_ATTR(Final)
   IGNORED_ATTR(IBDesignable)
+  IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(NoReturn)
   IGNORED_ATTR(ObjC)
@@ -536,7 +537,14 @@ public:
   void visitAccessibilityAttr(AccessibilityAttr *attr);
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
 
+  void checkApplicationMainAttribute(DeclAttribute *attr,
+                                     Identifier Id_ApplicationDelegate,
+                                     Identifier Id_Kit,
+                                     Identifier Id_ApplicationMain);
+  
+  void visitNSApplicationMainAttr(NSApplicationMainAttr *attr);
   void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
+
   void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
 
   void checkOperatorAttribute(DeclAttribute *attr);
@@ -808,9 +816,23 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   
 }
 
-void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
-  //if (attr->isInvalid())
-  //  return;
+void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
+                                             Identifier Id_ApplicationDelegate,
+                                             Identifier Id_Kit,
+                                             Identifier Id_ApplicationMain) {
+  // %select indexes for ApplicationMain diagnostics.
+  enum : unsigned {
+    UIApplicationMainClass,
+    NSApplicationMainClass,
+  };
+  
+  unsigned applicationMainKind;
+  if (isa<UIApplicationMainAttr>(attr))
+    applicationMainKind = UIApplicationMainClass;
+  else if (isa<NSApplicationMainAttr>(attr))
+    applicationMainKind = NSApplicationMainClass;
+  else
+    llvm_unreachable("not an ApplicationMain attr");
   
   auto *CD = dyn_cast<ClassDecl>(D);
   
@@ -821,33 +843,31 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
   // The class cannot be generic.
   if (CD->isGenericContext()) {
     TC.diagnose(attr->getLocation(),
-                diag::attr_generic_UIApplicationMain_not_supported);
+                diag::attr_generic_ApplicationMain_not_supported,
+                applicationMainKind);
     attr->setInvalid();
     return;
   }
   
-  // @UIApplicationMain classes must conform to UIKit's UIApplicationDelegate
+  // @XXApplicationMain classes must conform to the XXApplicationDelegate
   // protocol.
   auto &C = D->getASTContext();
-  Identifier Id_UIApplicationDelegate
-    = C.getIdentifier("UIApplicationDelegate");
-  Identifier Id_UIKit
-    = C.getIdentifier("UIKit");
 
-  auto UIKitModule = C.getLoadedModule(Id_UIKit);
-  ProtocolDecl *uiApplicationDelegateProto = nullptr;
-  if (UIKitModule) {
-    UnqualifiedLookup lookup(Id_UIApplicationDelegate, UIKitModule, nullptr,
+  auto KitModule = C.getLoadedModule(Id_Kit);
+  ProtocolDecl *ApplicationDelegateProto = nullptr;
+  if (KitModule) {
+    UnqualifiedLookup lookup(Id_ApplicationDelegate, KitModule, nullptr,
                              SourceLoc(), /*IsType=*/true);
-    uiApplicationDelegateProto = dyn_cast_or_null<ProtocolDecl>(
+    ApplicationDelegateProto = dyn_cast_or_null<ProtocolDecl>(
                                    lookup.getSingleTypeResult());
   }
 
-  if (!uiApplicationDelegateProto ||
-      !TC.conformsToProtocol(CD->getDeclaredType(), uiApplicationDelegateProto,
+  if (!ApplicationDelegateProto ||
+      !TC.conformsToProtocol(CD->getDeclaredType(), ApplicationDelegateProto,
                              CD)) {
     TC.diagnose(attr->getLocation(),
-                diag::attr_UIApplicationMain_not_UIApplicationDelegate);
+                diag::attr_ApplicationMain_not_ApplicationDelegate,
+                applicationMainKind);
     attr->setInvalid();
   }
 
@@ -860,8 +880,8 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
     attr->setInvalid();
   
   // Check that we have the needed symbols in the frameworks.
-  UnqualifiedLookup lookupMain(C.getIdentifier("UIApplicationMain"),
-                               UIKitModule, nullptr, SourceLoc(),
+  UnqualifiedLookup lookupMain(Id_ApplicationMain,
+                               KitModule, nullptr, SourceLoc(),
                                /*IsType=*/false);
   for (const auto &result : lookupMain.Results) {
     if (result.hasValueDecl())
@@ -877,6 +897,21 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
         TC.validateDecl(result.getValueDecl());
     }
   }
+}
+
+void AttributeChecker::visitNSApplicationMainAttr(NSApplicationMainAttr *attr) {
+  auto &C = D->getASTContext();
+  checkApplicationMainAttribute(attr,
+                                C.getIdentifier("NSApplicationDelegate"),
+                                C.getIdentifier("AppKit"),
+                                C.getIdentifier("NSApplicationMain"));
+}
+void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
+  auto &C = D->getASTContext();
+  checkApplicationMainAttribute(attr,
+                                C.getIdentifier("UIApplicationDelegate"),
+                                C.getIdentifier("UIKit"),
+                                C.getIdentifier("UIApplicationMain"));
 }
 
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {

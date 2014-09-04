@@ -993,25 +993,32 @@ ERROR(nscopying_doesnt_conform,sema_tcd,none,
       "'NSCopying' attribute is only valid with types that conform to"
       " the NSCopying protocol", ())
 
-// UIApplicationMain attribute
-ERROR(attr_UIApplicationMain_not_class,sema_tcd,none,
-      "'UIApplicationMain' attribute may only be used on classes", ())
-ERROR(attr_UIApplicationMain_not_UIApplicationDelegate,sema_tcd,none,
-      "'UIApplicationMain' class must conform to the 'UIApplicationDelegate' protocol",
-      ())
-ERROR(attr_generic_UIApplicationMain_not_supported,sema_tcd,none,
-      "generic 'UIApplicationMain' classes are not supported",
-      ())
-ERROR(attr_UIApplicationMain_multiple,sema_tcd,none,
-      "'UIApplicationMain' attribute can only apply to one class in a module",
-      ())
-ERROR(attr_UIApplicationMain_with_script,sema_tcd,none,
-      "'UIApplicationMain' attribute cannot be used in a module that contains "
+// UIApplicationMain/NSApplicationMain attribute
+#define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'}"
+#define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
+
+ERROR(attr_ApplicationMain_not_class,sema_tcd,none,
+      "%" SELECT_APPLICATION_MAIN "0 attribute may only be used on classes",
+      (unsigned))
+ERROR(attr_ApplicationMain_not_ApplicationDelegate,sema_tcd,none,
+      "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
+      (unsigned))
+ERROR(attr_generic_ApplicationMain_not_supported,sema_tcd,none,
+      "generic %" SELECT_APPLICATION_MAIN "0 classes are not supported",
+      (unsigned))
+ERROR(attr_ApplicationMain_multiple,sema_tcd,none,
+      "%" SELECT_APPLICATION_MAIN "0 attribute can only apply to one class in a module",
+      (unsigned))
+ERROR(attr_ApplicationMain_with_script,sema_tcd,none,
+      "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
       "top-level code",
-      ())
-NOTE(attr_UIApplicationMain_script_here,sema_tcd,none,
+      (unsigned))
+NOTE(attr_ApplicationMain_script_here,sema_tcd,none,
      "top-level code defined in this source file",
-     ())
+     (unsigned))
+
+#undef SELECT_APPLICATION_MAIN
+#undef SELECT_APPLICATION_DELEGATE
 
 // lazy 
 ERROR(lazy_not_on_let,sema_tcd,none,

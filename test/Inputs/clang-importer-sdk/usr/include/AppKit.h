@@ -120,3 +120,8 @@
 
 extern NSString *NSViewFrameDidChangeNotification;
 extern NSString *NSViewFocusDidChangeNotification;
+
+@protocol NSApplicationDelegate
+@end
+
+
