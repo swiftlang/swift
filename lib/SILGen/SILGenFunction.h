@@ -684,8 +684,8 @@ public:
   /// with the given type and in response to the specified epxression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
   ManagedValue emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty,
-                                 SGFContext C = SGFContext(),
-                                 bool isDirectPropertyAccess = false);
+                                 bool isDirectPropertyAccess,
+                                 SGFContext C = SGFContext());
 
   /// Produce a singular RValue for a load from the specified property.
   ManagedValue emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,

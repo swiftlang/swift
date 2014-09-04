@@ -462,7 +462,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
 
 ManagedValue SILGenFunction::
 emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
-                  SGFContext C, bool isDirectPropertyAccess) {
+                  bool isDirectPropertyAccess, SGFContext C) {
   assert(!ncRefType->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   
@@ -558,7 +558,6 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     if (var->isStatic()) {
       auto baseTy = cast<NominalTypeDecl>(var->getDeclContext())
         ->getDeclaredInterfaceType();
-          (void)baseTy;
       assert(!baseTy->is<BoundGenericType>() &&
              "generic static stored properties not implemented");
       assert((baseTy->getStructOrBoundGenericStruct() ||
@@ -683,7 +682,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
             baseMeta->getEnumOrBoundGenericEnum()) &&
            "static stored properties for classes/protocols not implemented");
 
-    return emitRValueForDecl(loc, FieldDecl, propTy, C, isDirectPropertyAccess);
+    return emitRValueForDecl(loc, FieldDecl, propTy, isDirectPropertyAccess, C);
   }
 
   // If the base is a reference type, just handle this as loading the lvalue.
@@ -754,7 +753,8 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
-  auto Val = SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(), C);
+  auto Val = SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(),
+                                   E->isDirectPropertyAccess(), C);
   return RValue(SGF, E, Val);
 }
 
@@ -769,7 +769,9 @@ RValue RValueEmitter::visitTypeExpr(TypeExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  auto Self = SGF.emitRValueForDecl(E, E->getSelf(), E->getSelf()->getType());
+  auto Self = SGF.emitRValueForDecl(E, E->getSelf(),
+                                    E->getSelf()->getType(),
+                                    /*direct*/ false);
 
   // Perform an upcast to convert self to the indicated super type.
   auto Result = SGF.B.createUpcast(E, Self.getValue(),
@@ -2681,7 +2683,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     }
     case CaptureKind::LocalFunction: {
       // SILValue is a constant such as a local func. Pass on the reference.
-      ManagedValue v = emitRValueForDecl(loc, vd, vd->getType());
+      ManagedValue v = emitRValueForDecl(loc, vd, vd->getType(),
+                                         /*direct*/ false);
       capturedArgs.push_back(v.forward(*this));
       break;
     }
@@ -4505,7 +4508,9 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 
   case MagicIdentifierLiteralExpr::DSOHandle: {
     auto Val = SGF.emitRValueForDecl(E, SGF.SGM.SwiftModule->getDSOHandle(), 
-                                     E->getType(), C);
+                                     E->getType(),
+                                     /*direct*/ false,
+                                     C);
     return RValue(SGF, E, Val);
   }
   }
