@@ -1385,6 +1385,13 @@ public:
   }
 };
 
+/// Test that an address or reference type is not null.
+class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
+public:
+  IsNonnullInst(SILLocation Loc, SILValue Operand, SILType BoolTy)
+    : UnaryInstructionBase(Loc, Operand, BoolTy) {}
+};
+
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst
   : public UnaryInstructionBase<ValueKind::UnconditionalCheckedCastInst,

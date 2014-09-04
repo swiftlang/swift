@@ -427,6 +427,13 @@ public:
     return insert(new (F.getModule()) RefToUnmanagedInst(loc, op, ty));
   }
 
+  IsNonnullInst *createIsNonnull(SILLocation loc,
+                                 SILValue operand) {
+    return insert(new (F.getModule())
+                    IsNonnullInst(loc, operand,
+                      SILType::getBuiltinIntegerType(1, getASTContext())));
+  }
+
   UnconditionalCheckedCastInst *createUnconditionalCheckedCast(SILLocation loc,
                                                                SILValue op,
                                                                SILType destTy) {

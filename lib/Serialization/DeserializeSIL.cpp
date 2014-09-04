@@ -1030,6 +1030,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(AutoreleaseValue)
   UNARY_INSTRUCTION(DeinitExistential)
   UNARY_INSTRUCTION(DestroyAddr)
+  UNARY_INSTRUCTION(IsNonnull)
   UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(FixLifetime)

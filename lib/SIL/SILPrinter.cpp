@@ -860,6 +860,10 @@ public:
        << " : " << CI->getType();
   }
 
+  void visitIsNonnullInst(IsNonnullInst *I) {
+    OS << "is_nonnull " << getIDAndType(I->getOperand());
+  }
+  
   void visitRetainValueInst(RetainValueInst *I) {
     OS << "retain_value " << getIDAndType(I->getOperand());
   }

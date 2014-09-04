@@ -365,6 +365,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::InitExistentialInst:
     case ValueKind::InitExistentialRefInst:
     case ValueKind::InjectEnumAddrInst:
+    case ValueKind::IsNonnullInst:
     case ValueKind::LoadInst:
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialInst:
