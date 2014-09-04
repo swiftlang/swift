@@ -332,3 +332,52 @@ struct ImmutableModel: ReadOnlyRequirement {
   // CHECK-LABEL: sil @_TTWV9witnesses14ImmutableModelS_19ReadOnlyRequirementFS1_g4propSS : $@cc(witness_method) @thin (@thick ImmutableModel.Type) -> @owned String
   static let prop: String = ""
 }
+
+protocol FailableRequirement {
+  init?(foo: Int)
+}
+
+protocol IUOFailableRequirement {
+  init!(foo: Int)
+}
+
+struct NonFailableModel: FailableRequirement, IUOFailableRequirement {
+  // CHECK-LABEL: sil @_TTWV9witnesses16NonFailableModelS_19FailableRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__ : $@cc(witness_method) @thin (@out Optional<NonFailableModel>, Int, @thick NonFailableModel.Type) -> ()
+  // CHECK-LABEL: sil @_TTWV9witnesses16NonFailableModelS_22IUOFailableRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__ : $@cc(witness_method) @thin (@out ImplicitlyUnwrappedOptional<NonFailableModel>, Int, @thick NonFailableModel.Type) -> ()
+  init(foo: Int) {}
+}
+
+/* TODO
+struct FailableModel: FailableRequirement, IUOFailableRequirement {
+  init?(foo: Int) {}
+}
+
+struct IUOFailableModel: FailableRequirement, IUOFailableRequirement {
+  init!(foo: Int) {}
+}
+ */
+
+protocol FailableClassRequirement: class {
+  init?(foo: Int)
+}
+
+protocol IUOFailableClassRequirement: class {
+  init!(foo: Int)
+}
+
+final class NonFailableClassModel: FailableClassRequirement, IUOFailableClassRequirement {
+  // CHECK-LABEL: sil @_TTWC9witnesses21NonFailableClassModelS_24FailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
+  // CHECK-LABEL: sil @_TTWC9witnesses21NonFailableClassModelS_27IUOFailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned ImplicitlyUnwrappedOptional<NonFailableClassModel>
+  init(foo: Int) {}
+}
+
+/* TODO
+final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequirement {
+  init?(foo: Int) {}
+}
+
+final class IUOFailableClassModel: FailableClassRequirement, IUOFailableClassRequirement {
+  init!(foo: Int) {}
+}
+ */
+

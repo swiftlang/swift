@@ -388,9 +388,10 @@ public:
   /// meaning it cannot be fully destructured in SIL.
   bool aggregateHasUnreferenceableStorage() const;
 
-  /// Returns the lowered type for T if this type is Optional<T>; otherwise,
-  /// return the null type.
-  SILType getOptionalObjectType(SILModule &SILMod) const;
+  /// Returns the lowered type for T if this type is Optional<T> or
+  /// ImplicitlyUnwrappedOptional<T>; otherwise, return the null type.
+  SILType getAnyOptionalObjectType(SILModule &SILMod,
+                                   OptionalTypeKind &OTK) const;
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }

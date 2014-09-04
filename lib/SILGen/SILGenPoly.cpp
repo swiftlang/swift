@@ -696,6 +696,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
                                CanSILFunctionType fTy,
                                AbstractionPattern origResultType,
                                CanType substResultType,
+                               SILType substResultSILType,
                                SILValue innerResultValue,
                                SILValue innerResultAddr,
                                SILValue outerResultAddr) {
@@ -742,11 +743,35 @@ static SILValue getThunkResult(SILGenFunction &gen,
       innerResult = {};
     // Otherwise we'll have to copy over.
     } else {
-      TemporaryInitialization init(outerResultAddr, CleanupHandle::invalid());
+      SILValue outerPayloadAddr = outerResultAddr;
+      OptionalTypeKind OTK;
+      // If the inner result is the object type of an optional outer result,
+      // then emit into the payload.
+      if (auto objTy = outerResultAddr.getType().getAnyOptionalObjectType(gen.SGM.M,
+                                                                          OTK)){
+        // Optional itself can model protocols, so make sure unwrapping gets us
+        // to the right inner type.
+        if (objTy.getSwiftRValueType()
+              == innerResult.getType().getSwiftRValueType()) {
+          outerPayloadAddr = gen.B.createInitEnumDataAddr(loc, outerResultAddr,
+                          gen.getASTContext().getOptionalSomeDecl(OTK),
+                          objTy.getAddressType());
+        } else {
+          OTK = OTK_None;
+        }
+      }
+      
+      TemporaryInitialization init(outerPayloadAddr, CleanupHandle::invalid());
       auto translated = emitTranslatePrimitive(gen, loc, kind, origResultType,
                                                substResultType, innerResult,
                                                /*emitInto*/ SGFContext(&init));
       emitForceInto(gen, loc, translated, init);
+      
+      // Inject the optional tag if necessary.
+      if (OTK != OTK_None) {
+        gen.B.createInjectEnumAddr(loc, outerResultAddr,
+                                 gen.getASTContext().getOptionalSomeDecl(OTK));
+      }
     }
     
     // Use the () from the call as the result of the outer function if
@@ -758,6 +783,21 @@ static SILValue getThunkResult(SILGenFunction &gen,
       return gen.B.createTuple(loc, voidTy, {});
     }
   } else {
+    // Inject the value into an optional if necessary.
+    OptionalTypeKind OTK;
+    if (auto objTy
+          = substResultSILType.getAnyOptionalObjectType(gen.SGM.M, OTK)){
+      // Optional itself can model protocols, so make sure unwrapping gets us
+      // to the right inner type.
+      if (objTy.getSwiftRValueType()
+            == innerResult.getType().getSwiftRValueType()) {
+        auto innerOptional = gen.B.createEnum(loc, innerResult.getValue(),
+                                  gen.getASTContext().getOptionalSomeDecl(OTK),
+                                  substResultSILType);
+        innerResult = ManagedValue(innerOptional, innerResult.getCleanup());
+      }
+    }
+    
     auto translated = emitTranslatePrimitive(gen, loc, kind, origResultType,
                                              substResultType, innerResult);
     return translated.forward(gen);
@@ -827,10 +867,11 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   auto origResultType = origFormalType.getFunctionResultType();
   auto substResultType = substFormalType.getResult();
   SILValue outerResultValue = getThunkResult(gen, loc, kind, fnType,
-                                             origResultType, substResultType,
-                                             innerResultValue,
-                                             innerResultAddr,
-                                             outerResultAddr);
+               origResultType, substResultType,
+               gen.F.mapTypeIntoContext(thunkType->getSemanticResultSILType()),
+               innerResultValue,
+               innerResultAddr,
+               outerResultAddr);
   scope.pop();
   gen.B.createReturn(loc, outerResultValue);
 }
@@ -1596,7 +1637,10 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
       witnessFTy->getResult().getSILType(), witnessSubs, args,
       isTransparent(witnessFnRef));
 
+  auto thunkResultTy = F.mapTypeIntoContext(thunkTy->getSemanticResultSILType());
+  
   // Reabstract the result value:
+  
   // If the witness is generic, reabstract to the concrete witness signature.
   if (!witnessSubs.empty()) {
     witnessResultValue = getThunkResult(*this, loc,
@@ -1604,6 +1648,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                         witnessFTy,
                                         witnessOrigTy.getFunctionResultType(),
                                         witnessSubstTy.getResult(),
+                                        thunkResultTy,
                                         witnessResultValue,
                                         witnessResultAddr,
                                         witnessSubstResultAddr);
@@ -1614,6 +1659,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                             witnessSubstFTy,
                                             reqtOrigTy.getFunctionResultType(),
                                             witnessSubstTy.getResult(),
+                                            thunkResultTy,
                                             witnessResultValue,
                                             witnessSubstResultAddr,
                                             reqtResultAddr);
