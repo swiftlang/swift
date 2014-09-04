@@ -71,10 +71,10 @@ func nsEncode<CodeUnit>(
 ) {
   _precondition(buffer.count >= 4, "buffer is not large enough")
 
-  var s = NSString(
+  let s = NSString(
     bytes: &c,
     length: 4,
-    encoding: NSUTF32LittleEndianStringEncoding)
+    encoding: NSUTF32LittleEndianStringEncoding)!
 
   s.getBytes(
     &buffer,
