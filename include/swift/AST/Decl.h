@@ -257,9 +257,7 @@ struct OverloadSignature {
 bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 
 /// Decl - Base class for all declarations in Swift.
-class alignas(8) Decl {
-  // alignas(8) because we use three tag bits on Decl*.
-  
+class alignas(1 << DeclAlignInBits) Decl {
   class DeclBitfields {
     friend class Decl;
     unsigned Kind : 8;

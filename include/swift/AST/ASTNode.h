@@ -18,6 +18,7 @@
 #define SWIFT_AST_AST_NODE_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/AST/TypeAlignments.h"
 
 namespace swift {
   class Expr;

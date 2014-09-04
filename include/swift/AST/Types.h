@@ -176,8 +176,7 @@ enum class TypeTraitResult {
 };
 
 /// TypeBase - Base class for all types in Swift.
-class alignas(8) TypeBase {
-  // alignas(8) because we need three tag bits on Type.
+class alignas(1 << TypeAlignInBits) TypeBase {
   
   friend class ASTContext;
   TypeBase(const TypeBase&) = delete;

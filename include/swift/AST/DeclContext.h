@@ -20,10 +20,15 @@
 #define SWIFT_DECLCONTEXT_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+
+namespace llvm {
+  class raw_ostream;
+}
 
 namespace swift {
   class AbstractFunctionDecl;
@@ -45,24 +50,6 @@ namespace swift {
   class ValueDecl;
   class Initializer;
   class ClassDecl;
-}
-
-namespace llvm {
-  class raw_ostream;
-  template<>
-  class PointerLikeTypeTraits<swift::DeclContext*> {
-  public:
-    static void *getAsVoidPointer(swift::DeclContext* P) {
-      return (void*)P;
-    }
-    static swift::DeclContext *getFromVoidPointer(void *P) {
-      return (swift::DeclContext*)P;
-    }
-    enum { NumLowBitsAvailable = 3 };
-  };
-}
-
-namespace swift {
 
 enum class DeclContextKind : uint8_t {
   AbstractClosureExpr,
@@ -107,12 +94,10 @@ public:
 /// in general, so if an AST node class multiply inherits from DeclContext
 /// and another base class, it must 'using DeclContext::operator new;' in order
 /// to use an allocator with the correct alignment.
-class alignas(8) DeclContext {
-  // alignas(8) because we use three tag bits on DeclContext.
+class alignas(1 << DeclContextAlignInBits) DeclContext {
   
   enum {
-    KindBits =
-        llvm::PointerLikeTypeTraits<swift::DeclContext*>::NumLowBitsAvailable
+    KindBits = DeclContextAlignInBits
   };
   static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U<<KindBits,
                 "Not enough KindBits for DeclContextKind");
