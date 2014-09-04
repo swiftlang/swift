@@ -2071,7 +2071,7 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithBase64EncodedString:options:'
     MethodKind: Instance
     Nullability:
