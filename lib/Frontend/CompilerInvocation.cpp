@@ -599,8 +599,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.ImportUnions |= Args.hasArg(OPT_enable_union_import);
   
-  Opts.EmitNSApplicationMain |= Args.hasArg(OPT_emit_NSApplicationMain);
-  
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);

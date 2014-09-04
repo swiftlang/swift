@@ -1387,8 +1387,6 @@ bool SourceFile::hasMainClass() const {
 }
 
 ArtificialMainKind SourceFile::getArtificialMainKind() const {
-  if (getASTContext().LangOpts.EmitNSApplicationMain)
-    return ArtificialMainKind::NSApplicationMain;
   if (hasMainClass()) {
     auto &attrs = getParentModule()->getMainClass()->getAttrs();
     if (attrs.hasAttribute<UIApplicationMainAttr>())

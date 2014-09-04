@@ -83,9 +83,6 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
-    /// Triggers emission of an artificial 'main' for an AppKit project.
-    bool EmitNSApplicationMain = false;
-
     /// If set, symbol mangling will include private discriminators.
     ///
     /// This option is for staging purposes only; it will soon go away.
