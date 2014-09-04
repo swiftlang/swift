@@ -44,14 +44,10 @@ extension String {
   }
 }
 
-// This function should be opaque to the optimizer.
-// BLOCKED: <rdar://problem/16464507> This function will be unnecessary when
-// fix_lifetime is honored by the ARC optimizer.
-@asmname("swift_keepAlive") internal
-func _swift_keepAlive<T>(inout _: T)
-
+// Fix the lifetime of the given instruction so that the ARC optimizer does not
+// shorten the lifetime of x to be before this point.
 @transparent public
 func _fixLifetime<T>(var x: T) {
-  _swift_keepAlive(&x)
+  Builtin.fixLifetime(x)
 }
 

@@ -92,10 +92,7 @@ FUNCTION(Release,        swift_release,       RuntimeCC,
          ATTRS(NoUnwind))
 
 // void swift_fixLifetime(void *ptr);
-//
-// TODO: We use fixLifetime2 for now until we get rid of all usages of the
-// original swift_fixLifetime call.
-FUNCTION(FixLifetime,        swift_fixLifetime2,       RuntimeCC,
+FUNCTION(FixLifetime,        swift_fixLifetime,       RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
