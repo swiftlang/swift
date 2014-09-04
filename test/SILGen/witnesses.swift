@@ -337,12 +337,17 @@ protocol FailableRequirement {
   init?(foo: Int)
 }
 
+protocol NonFailableRefinement: FailableRequirement {
+  init(foo: Int)
+}
+
 protocol IUOFailableRequirement {
   init!(foo: Int)
 }
 
-struct NonFailableModel: FailableRequirement, IUOFailableRequirement {
+struct NonFailableModel: FailableRequirement, NonFailableRefinement, IUOFailableRequirement {
   // CHECK-LABEL: sil @_TTWV9witnesses16NonFailableModelS_19FailableRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__ : $@cc(witness_method) @thin (@out Optional<NonFailableModel>, Int, @thick NonFailableModel.Type) -> ()
+  // CHECK-LABEL: sil @_TTWV9witnesses16NonFailableModelS_21NonFailableRefinementFS1_CUS1___fMQPS1_FT3fooSi_S2_ : $@cc(witness_method) @thin (@out NonFailableModel, Int, @thick NonFailableModel.Type) -> ()
   // CHECK-LABEL: sil @_TTWV9witnesses16NonFailableModelS_22IUOFailableRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__ : $@cc(witness_method) @thin (@out ImplicitlyUnwrappedOptional<NonFailableModel>, Int, @thick NonFailableModel.Type) -> ()
   init(foo: Int) {}
 }
@@ -361,12 +366,17 @@ protocol FailableClassRequirement: class {
   init?(foo: Int)
 }
 
+protocol NonFailableClassRefinement: FailableClassRequirement {
+  init(foo: Int)
+}
+
 protocol IUOFailableClassRequirement: class {
   init!(foo: Int)
 }
 
-final class NonFailableClassModel: FailableClassRequirement, IUOFailableClassRequirement {
+final class NonFailableClassModel: FailableClassRequirement, NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil @_TTWC9witnesses21NonFailableClassModelS_24FailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
+  // CHECK-LABEL: sil @_TTWC9witnesses21NonFailableClassModelS_26NonFailableClassRefinementFS1_CUS1___fMQPS1_FT3fooSi_S2_ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned NonFailableClassModel
   // CHECK-LABEL: sil @_TTWC9witnesses21NonFailableClassModelS_27IUOFailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned ImplicitlyUnwrappedOptional<NonFailableClassModel>
   init(foo: Int) {}
 }
