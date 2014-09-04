@@ -650,7 +650,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::DeallocRefInst:
   case ValueKind::DeinitExistentialInst:
   case ValueKind::DestroyAddrInst:
-  case ValueKind::IsNonnullInst:
   case ValueKind::LoadInst:
   case ValueKind::LoadWeakInst:
   case ValueKind::MarkUninitializedInst:

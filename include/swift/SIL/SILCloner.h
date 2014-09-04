@@ -681,14 +681,6 @@ visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitIsNonnullInst(IsNonnullInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createIsNonnull(getOpLocation(Inst->getLoc()),
-                                 getOpValue(Inst->getOperand())));
-}
-  
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
                                           UnconditionalCheckedCastInst *Inst) {
   SILLocation OpLoc = getOpLocation(Inst->getLoc());

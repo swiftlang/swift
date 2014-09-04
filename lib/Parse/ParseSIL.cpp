@@ -1169,7 +1169,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
     .Case("inject_enum_addr", ValueKind::InjectEnumAddrInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
-    .Case("is_nonnull", ValueKind::IsNonnullInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
     .Case("load_weak", ValueKind::LoadWeakInst)
@@ -2503,13 +2502,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     VarDecl *Field = cast<VarDecl>(FieldV);
     auto ResultTy = Val.getType().getFieldType(Field, SILMod);
     ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
-    break;
-  }
-  case ValueKind::IsNonnullInst: {
-    SourceLoc Loc;
-    if (parseTypedValueRef(Val, Loc))
-      return true;
-    ResultVal = B.createIsNonnull(InstLoc, Val);
     break;
   }
   case ValueKind::IndexAddrInst: {

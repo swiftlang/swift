@@ -3381,20 +3381,6 @@ Applying the resulting thick function value is equivalent to applying the
 original thin value. The ``thin_to_thick_function`` conversion may be
 eliminated if the context is proven not to be needed.
 
-is_nonnull
-``````````
-::
-
-  sil-instruction ::= 'is_nonnull' sil-operand
-
-  %1 = is_nonnull %0 : $C
-  // %0 must be of reference or function type $C
-  // %1 will be of type Builtin.Int1
-
-Checks whether a reference type value is null, returning 1 if
-the value is not null, or 0 if it is null.  If the value is a function
-type, it checks the function pointer (not the data pointer) for null.
-
 Checked Conversions
 ~~~~~~~~~~~~~~~~~~~
 

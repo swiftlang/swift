@@ -1649,13 +1649,6 @@ public:
     }
   }
 
-  void checkIsNonnullInst(IsNonnullInst *II) {
-    // The operand must be a function type or a class type.
-    auto OpTy = II->getOperand().getType().getSwiftType();
-    require(OpTy->mayHaveSuperclass() || OpTy->is<SILFunctionType>(),
-            "is_nonnull operand must be a class or function type");
-  }
-
   void checkAddressToPointerInst(AddressToPointerInst *AI) {
     require(AI->getOperand().getType().isAddress(),
             "address-to-pointer operand must be an address");

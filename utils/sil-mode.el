@@ -108,7 +108,7 @@
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
                     "convert_function"
                     "thick_to_objc_metatype" "objc_to_thick_metatype"
-                    "thin_to_thick_function" "is_nonnull"
+                    "thin_to_thick_function"
                     "unchecked_ref_bit_cast" "unchecked_trivial_bit_cast")
                   'words) . font-lock-keyword-face)
    ;; Checked Conversions

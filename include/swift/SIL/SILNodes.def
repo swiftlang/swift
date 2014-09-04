@@ -196,7 +196,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(ObjCExistentialMetatypeToObjectInst, ConversionInst, None)
     INST(UnconditionalCheckedCastInst, ConversionInst, None)
     VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
-  INST(IsNonnullInst, SILInstruction, None)
   INST(UnconditionalCheckedCastAddrInst, SILInstruction, MayReadWrite)
 
   // Runtime failure

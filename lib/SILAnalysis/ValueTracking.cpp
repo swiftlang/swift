@@ -87,7 +87,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::InjectEnumAddrInst:
   case ValueKind::DeinitExistentialInst:
   case ValueKind::UnreachableInst:
-  case ValueKind::IsNonnullInst:
   case ValueKind::CondFailInst:
   case ValueKind::DynamicMethodBranchInst:
   case ValueKind::ReturnInst:

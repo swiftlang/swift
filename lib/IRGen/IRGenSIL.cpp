@@ -694,8 +694,6 @@ public:
   void visitObjCExistentialMetatypeToObjectInst(
                                         ObjCExistentialMetatypeToObjectInst *i);
 
-  void visitIsNonnullInst(IsNonnullInst *i);
-
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitIndexRawPointerInst(IndexRawPointerInst *i);
   
@@ -3069,33 +3067,6 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
-}
-
-void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
-  // Get the value we're testing, which may be a function, an address or an
-  // instance pointer.
-  llvm::Value *val;
-  const LoweredValue &lv = getLoweredValue(i->getOperand());
-  
-  if (i->getOperand().getType().getSwiftType()->is<SILFunctionType>()) {
-    Explosion values = lv.getExplosion(*this);
-    val = values.claimNext();   // Function pointer.
-    values.claimNext();         // Ignore the data pointer.
-  } else if (lv.isAddress()) {
-    val = lv.getAddress().getAddress();
-  } else {
-    Explosion values = lv.getExplosion(*this);
-    val = values.claimNext();
-  }
-  
-  // Check that the result isn't null.
-  auto *valTy = cast<llvm::PointerType>(val->getType());
-  llvm::Value *result = Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
-                                    val, llvm::ConstantPointerNull::get(valTy));
-  
-  Explosion out;
-  out.add(result);
-  setLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
