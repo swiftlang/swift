@@ -296,6 +296,9 @@ public func sort<T : Comparable>(inout array: [T]) {
 }
 
 /// Return an `Array` containing the sorted elements of `source`${according}.
+///
+/// The sorting algorithm is not stable (can change the relative order of
+/// elements that compare equal).
 ${orderingRequirement}
 public func sorted<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
@@ -310,6 +313,9 @@ public func sorted<
 }
 
 /// Return an `Array` containing the sorted elements of `source`${according}.
+///
+/// The sorting algorithm is not stable (can change the relative order of
+/// elements that compare equal).
 ${orderingRequirement}
 public func sorted<
   C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
