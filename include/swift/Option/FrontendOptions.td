@@ -135,10 +135,6 @@ def enable_objc_implicit_properties :
   Flag<["-"], "enable-objc-implicit-properties">,
   HelpText<"Import Objective-C \"implicit properties\" as properties">;
 
-def enable_objc_failable_initializers :
-  Flag<["-"], "enable-objc-failable-initializers">,
-  HelpText<"Import Objective-C initializers using failable initializers">;
-
 def enable_private_discriminators :
   Flag<["-"], "enable-private-discriminators">,
   HelpText<"Mangle discriminators into the symbol names for private entities">;

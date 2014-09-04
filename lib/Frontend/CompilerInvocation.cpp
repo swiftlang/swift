@@ -661,8 +661,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   Opts.InferImplicitProperties |=
     Args.hasArg(OPT_enable_objc_implicit_properties);
-  Opts.UseFailableInitializers |=
-    Args.hasArg(OPT_enable_objc_failable_initializers);
 
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 

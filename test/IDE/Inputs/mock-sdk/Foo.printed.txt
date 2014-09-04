@@ -162,8 +162,8 @@ class FooClassBase {
   func fooBaseInstanceFunc0()
   class func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase!
   func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase!
-  init()
-  convenience init(float f: Float)
+  init!()
+  convenience init!(float f: Float)
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
   
@@ -188,8 +188,8 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   func fooBaseInstanceFuncOverridden()
   
   class func fooClassFunc0()
-  init()
-  convenience init(float f: Float)
+  init!()
+  convenience init!(float f: Float)
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
   func fooProtoFunc()
@@ -255,12 +255,12 @@ class FooClassPropertyOwnership : FooClassBase {
   @NSCopying var copyable: AnyObject!
   weak var weakRef: @sil_weak AnyObject!
   var scalar: Int32
-  init()
-  convenience init(float f: Float)
+  init!()
+  convenience init!(float f: Float)
 }
 
 class FooUnavailableMembers : FooClassBase {
-  convenience init(int i: Int32)
+  convenience init!(int i: Int32)
   @availability(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
   class func unavailableMembersWithInt(i: Int32) -> Self!
   
@@ -291,8 +291,8 @@ class FooUnavailableMembers : FooClassBase {
   
   @availability(*, unavailable, message="'performSelector' methods are unavailable")
   func performSelectorWithMagic(cmd: COpaquePointer)
-  init()
-  convenience init(float f: Float)
+  init!()
+  convenience init!(float f: Float)
 }
 
 typealias FooCFTypeRef = FooCFType

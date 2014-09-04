@@ -4,7 +4,7 @@
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSArray -function-definitions=false -module-cache-path=%t/mcp > %t/Foundation.NSArray.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSArray.printed.txt -check-prefix=CHECK1 %s
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSArray -function-definitions=false -enable-objc-failable-initializers -module-cache-path=%t/mcp > %t/Foundation.NSArray-failable-inits.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSArray -function-definitions=false -module-cache-path=%t/mcp > %t/Foundation.NSArray-failable-inits.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSArray-failable-inits.printed.txt -check-prefix=CHECK1-FAILABLE-INITS %s
 
 // CHECK1: class NSMutableArray : NSArray
@@ -25,6 +25,6 @@
 // RUN: FileCheck -input-file %t/Foundation.NSString.printed.txt -check-prefix=CHECK_DICTIONARY %s
 
 // Make sure that we don't qualify 'NSErrorPointer'.
-// CHECK_NSSTRING: init(contentsOfFile path: String, encoding enc: UInt, error: NSErrorPointer)
+// CHECK_NSSTRING: init?(contentsOfFile path: String, encoding enc: UInt, error: NSErrorPointer)
 
 // CHECK_DICTIONARY: func propertyListFromStringsFileFormat() -> [NSObject : AnyObject]

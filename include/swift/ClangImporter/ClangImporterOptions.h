@@ -34,9 +34,6 @@ public:
   /// properties.
   bool InferImplicitProperties = false;
 
-  /// If true, use failable initializers.
-  bool UseFailableInitializers = true;
-
   /// If true, Clang diagnostics will be dumped to stderr using Clang's
   /// diagnostic printer as well as being passed to Swift's diagnostic engine.
   bool DumpClangDiagnostics = false;

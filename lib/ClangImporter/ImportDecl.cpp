@@ -43,8 +43,6 @@
 #define DEBUG_TYPE "Clang module importer"
 
 STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
-STATISTIC(NumFactoryMethodsNSError,
-          "# of factory methods not mapped due to NSError");
 STATISTIC(NumFactoryMethodsWrongResult,
           "# of factory methods not mapped due to an incorrect result type");
 STATISTIC(NumFactoryMethodsAsInitializers,
@@ -2250,24 +2248,6 @@ namespace {
         return Nothing;
       }
 
-      if (!Impl.UseFailableInitializers) {
-        // If we aren't using failable initializers, check whether there is an
-        // NSError parameter, which implies failability.
-        for (auto param : decl->parameters()) {
-          if (auto ptr = param->getType()->getAs<clang::PointerType>()) {
-            if (auto classPtr = ptr->getPointeeType()
-                                  ->getAs<clang::ObjCObjectPointerType>()) {
-              if (auto classDecl = classPtr->getInterfaceDecl()) {
-                if (classDecl->getName() == "NSError") {
-                  ++NumFactoryMethodsNSError;
-                  return Nothing;
-                }
-              }
-            }
-          }
-        }
-      }
-
       bool redundant = false;
       auto result = importConstructor(decl, dc, false, initKind,
                                       /*required=*/false, selector, initName,
@@ -2731,21 +2711,14 @@ namespace {
         return nullptr;
 
       // Determine the failability of this initializer.
-      OptionalTypeKind failability;
-      if (Impl.UseFailableInitializers) {
-        // Default to implicit failability.
-        failability = OTK_ImplicitlyUnwrappedOptional;
+      OptionalTypeKind failability = OTK_ImplicitlyUnwrappedOptional;
         
-        // If the method is known to have nullability information for
-        // its return type, use that.
-        if (auto known = Impl.getKnownObjCMethod(objcMethod)) {
-          if (known->NullabilityAudited) {
-            failability = Impl.translateNullability(known->getReturnTypeInfo());
-          }
+      // If the method is known to have nullability information for
+      // its return type, use that.
+      if (auto known = Impl.getKnownObjCMethod(objcMethod)) {
+        if (known->NullabilityAudited) {
+          failability = Impl.translateNullability(known->getReturnTypeInfo());
         }
-      } else {
-        // No failable initializers.
-        failability = OTK_None;
       }
 
       // Determine the type of the result.

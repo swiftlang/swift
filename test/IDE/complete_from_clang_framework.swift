@@ -248,8 +248,8 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc0({#self: FooClassBase#})[#() -> Void#]{{$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFunc1({#(anObject): AnyObject!#})[#FooClassBase!#]{{$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc1({#self: FooClassBase#})[#(AnyObject!) -> FooClassBase!#]{{$}}
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ()[#FooClassBase#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#FooClassBase#]{{$}}
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ()[#FooClassBase!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#FooClassBase!#]{{$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFuncOverridden()[#Void#]{{$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFuncOverridden({#self: FooClassBase#})[#() -> Void#]{{$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseClassFunc0()[#Void#]{{$}}
@@ -273,8 +273,8 @@ func testCompleteClassMembers2() {
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooInstanceFunc2({#self: FooClassDerived#})[#(Int32, withB: Int32) -> Void#]{{$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFuncOverridden({#self: FooClassDerived#})[#() -> Void#]{{$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/CurrNominal:     .fooClassFunc0()[#Void#]{{$}}
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[Constructor]/CurrNominal:      ()[#FooClassDerived#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#FooClassDerived#]{{$}}
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[Constructor]/CurrNominal:      ()[#FooClassDerived!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#FooClassDerived!#]{{$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooProtoFunc({#self: FooClassDerived#})[#() -> Void#]{{$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooProtoFuncWithExtraIndentation1({#self: FooClassDerived#})[#() -> Void#]{{$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooProtoFuncWithExtraIndentation2({#self: FooClassDerived#})[#() -> Void#]{{$}}
