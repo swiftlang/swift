@@ -306,6 +306,11 @@ public:
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo()).consume(IGF, src);
   }
+
+  void fixLifetime(IRGenFunction &IGF, Explosion &src) const {
+    for (auto &field : getFields())
+      cast<LoadableTypeInfo>(field.getTypeInfo()).fixLifetime(IGF, src);
+  }
   
   llvm::Value *packEnumPayload(IRGenFunction &IGF, Explosion &src,
                                 unsigned bitWidth,

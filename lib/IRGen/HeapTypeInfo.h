@@ -163,6 +163,10 @@ public:
     }
   }
 
+  void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
+    return IGF.emitFixLifetime(value);
+  }
+
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
     switch (asDerived().getReferenceCounting()) {
     case ReferenceCounting::Native:

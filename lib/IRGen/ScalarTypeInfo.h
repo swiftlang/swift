@@ -165,6 +165,11 @@ public:
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarRelease(IGF, value);
   }
+
+  void fixLifetime(IRGenFunction &IGF, Explosion &in) const {
+    llvm::Value *value = in.claimNext();
+    asDerived().emitScalarFixLifetime(IGF, value);
+  }
   
   void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
     if (!Derived::IsScalarPOD) {
@@ -213,6 +218,9 @@ private:
   }
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
+  }
+
+  void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
   }
 };
 

@@ -552,6 +552,22 @@ namespace {
       }
     }
 
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      src.claimNext();      
+      switch (getExtraDataKind()) {
+      case ExtraData::None:
+        break;
+      case ExtraData::Retainable:
+        IGF.emitFixLifetime(src.claimNext());
+        break;
+      case ExtraData::Metatype:
+        src.claimNext();
+        break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
+      }
+    }
+
     void retain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
       

@@ -716,6 +716,7 @@ namespace {
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void consume(IRGenFunction &IGF, Explosion &src) const {}
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const {}
     void destroy(IRGenFunction &IGF, Address addr, CanType T) const {}
     llvm::Value *packEnumPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,

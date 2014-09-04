@@ -261,6 +261,9 @@ namespace {
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
     llvm::Value *packEnumPayload(IRGenFunction &IGF,
                                  Explosion &in,
                                  unsigned bitWidth,
@@ -493,6 +496,10 @@ namespace {
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       if (getLoadableSingleton()) getLoadableSingleton()->consume(IGF, src);
+    }
+
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      if (getLoadableSingleton()) getLoadableSingleton()->fixLifetime(IGF, src);
     }
     
     void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
@@ -788,6 +795,7 @@ namespace {
 
     void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {}
     void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {}
+    void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {}
     
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             CanType T)
@@ -1857,6 +1865,20 @@ namespace {
         llvm_unreachable("not a refcounted payload");
       }
     }
+
+    void fixLifetimeOfRefcountedPayload(IRGenFunction &IGF,
+                                        llvm::Value *ptr) const {
+      switch (CopyDestroyKind) {
+      case NullableSwiftRefcounted:
+      case NullableUnknownRefcounted: {
+        IGF.emitFixLifetime(ptr);
+        return;
+      }
+      case POD:
+      case Normal:
+        llvm_unreachable("not a refcounted payload");
+      }
+    }
     
     void releaseRefcountedPayload(IRGenFunction &IGF,
                                   llvm::Value *ptr) const {
@@ -1960,6 +1982,48 @@ namespace {
         llvm::Value *ptr = IGF.Builder.CreateIntToPtr(val,
                                                 getRefcountedPtrType(IGF.IGM));
         releaseRefcountedPayload(IGF, ptr);
+        return;
+      }
+      }
+      
+    }
+
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      assert(TIK >= Loadable);
+
+      switch (CopyDestroyKind) {
+      case POD:
+        src.claim(getExplosionSize());
+        return;
+
+      case Normal: {
+        // Check that we have a payload.
+        llvm::Value *payload, *extraTag;
+        std::tie(payload, extraTag) = getPayloadAndExtraTagFromExplosion(src);
+        
+        llvm::BasicBlock *endBB
+          = testFixedEnumContainsPayload(IGF, payload, extraTag);
+        
+        // If we did, consume it.
+        if (payload) {
+          Explosion payloadValue;
+          auto &loadableTI = getLoadablePayloadTypeInfo();
+          loadableTI.unpackEnumPayload(IGF, payload, payloadValue, 0);
+          loadableTI.fixLifetime(IGF, payloadValue);
+        }
+        
+        IGF.Builder.CreateBr(endBB);
+        IGF.Builder.emitBlock(endBB);
+        return;
+      }
+
+      case NullableSwiftRefcounted:
+      case NullableUnknownRefcounted: {
+        // Bitcast to swift.refcounted*, and hand to swift_release.
+        llvm::Value *val = src.claimNext();
+        llvm::Value *ptr = IGF.Builder.CreateIntToPtr(val,
+                                                getRefcountedPtrType(IGF.IGM));
+        fixLifetimeOfRefcountedPayload(IGF, ptr);
         return;
       }
       }
@@ -2550,6 +2614,20 @@ namespace {
         llvm_unreachable("not a refcounted payload");
       }
     }
+
+    void fixLifetimeOfRefcountedPayload(IRGenFunction &IGF,
+                                        llvm::Value *ptr) const {
+      switch (CopyDestroyKind) {
+      case TaggedSwiftRefcounted:
+      case TaggedUnknownRefcounted: {
+        IGF.emitFixLifetime(ptr);
+        return;
+      }
+      case POD:
+      case Normal:
+        llvm_unreachable("not a refcounted payload");
+      }
+    }
     
     void releaseRefcountedPayload(IRGenFunction &IGF,
                                   llvm::Value *ptr) const {
@@ -2999,6 +3077,49 @@ namespace {
         auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
                                               getRefcountedPtrType(IGF.IGM));
         releaseRefcountedPayload(IGF, ptr);
+        return;
+      }
+      }
+    }
+
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      assert(TIK >= Loadable);
+      
+      switch (CopyDestroyKind) {
+      case POD:
+        src.claim(getExplosionSize());
+        return;
+          
+      case Normal: {
+        llvm::Value *payload = src.claimNext();
+        llvm::Value *extraTagBits = ExtraTagBitCount > 0
+          ? src.claimNext() : nullptr;
+        
+        forNontrivialPayloads(IGF, payload, extraTagBits,
+          [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+            auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+            Explosion value;
+            projectPayloadValue(IGF, payload, tagIndex, lti, value);
+
+            lti.fixLifetime(IGF, value);
+          });
+        return;
+      }
+          
+      case TaggedSwiftRefcounted:
+      case TaggedUnknownRefcounted: {
+        llvm::Value *payload = src.claimNext();
+        if (ExtraTagBitCount > 0)
+          src.claimNext();
+
+        // Mask the tag bits out of the payload, if any.
+        llvm::Value *ptrVal
+          = maskTagBitsFromPayload(IGF, payload);
+
+        // Release the pointer.
+        auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
+                                              getRefcountedPtrType(IGF.IGM));
+        fixLifetimeOfRefcountedPayload(IGF, ptr);
         return;
       }
       }
@@ -3659,6 +3780,9 @@ namespace {
     }
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       return Strategy.consume(IGF, src);
+    }
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      return Strategy.fixLifetime(IGF, src);
     }
     llvm::Value *packEnumPayload(IRGenFunction &IGF,
                                   Explosion &in,

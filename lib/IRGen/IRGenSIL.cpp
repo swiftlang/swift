@@ -2412,7 +2412,9 @@ void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
-  // TODO: Emit an intrinsic call as a signal to the LLVM ARC optimizer.
+  Explosion in = getLoweredExplosion(i->getOperand());
+  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType()))
+    .fixLifetime(*this, in);
 }
 
 void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {

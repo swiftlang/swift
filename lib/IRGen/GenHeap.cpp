@@ -631,6 +631,10 @@ namespace {
     void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitUnownedRelease(value);
     }
+
+    void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
+      IGF.emitFixLifetime(value);
+    }
   };
 
   /// A type implementation for a [weak] reference to an object
@@ -744,6 +748,10 @@ namespace {
 
     void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitUnknownUnownedRelease(value);
+    }
+
+    void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
+      IGF.emitFixLifetime(value);
     }
   };
 
@@ -1004,6 +1012,13 @@ void IRGenFunction::emitInitializeRetained(llvm::Value *newValue,
 void IRGenFunction::emitRelease(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getReleaseFn(), value);
+}
+
+/// Fix the lifetime of a live value. This communicates to the LLVM level ARC
+/// optimizer not to touch this value.
+void IRGenFunction::emitFixLifetime(llvm::Value *value) {
+  if (doesNotRequireRefCounting(value)) return;
+  emitUnaryRefCountCall(*this, IGM.getFixLifetimeFn(), value);
 }
 
 void IRGenFunction::emitUnknownRetain(llvm::Value *value, Explosion &e) {

@@ -430,6 +430,7 @@ public:
   virtual void copy(IRGenFunction &IGF, Explosion &src,
                     Explosion &dest) const = 0;
   virtual void consume(IRGenFunction &IGF, Explosion &src) const = 0;
+  virtual void fixLifetime(IRGenFunction &IGF, Explosion &src) const = 0;
   virtual llvm::Value *packEnumPayload(IRGenFunction &IGF,
                                         Explosion &in,
                                         unsigned bitWidth,

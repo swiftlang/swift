@@ -942,6 +942,15 @@ namespace {
       // Throw out the witness table pointers.
       src.claim(NumProtocols);
     }
+
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      // Copy the instance pointer.
+      llvm::Value *value = src.claimNext();
+      asDerived().emitPayloadFixLifetime(IGF, value);
+
+      // Throw out the witness table pointers.
+      src.claim(NumProtocols);
+    }
     
     void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
       llvm::Value *value = IGF.Builder.CreateLoad(projectValue(IGF, addr));
@@ -990,6 +999,10 @@ namespace {
     void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitUnknownUnownedRelease(value);
     }
+
+    void emitPayloadFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
+      IGF.emitFixLifetime(value);
+    }
   };
 
   /// A type implementation for @unowned(unsafe) class existential types.
@@ -1009,6 +1022,10 @@ namespace {
     }
 
     void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
+      // do nothing
+    }
+
+    void emitPayloadFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
       // do nothing
     }
   };
@@ -1133,6 +1150,10 @@ namespace {
 
     void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitUnknownRelease(value);
+    }
+
+    void emitPayloadFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
+      IGF.emitFixLifetime(value);
     }
 
     const UnownedTypeInfo *

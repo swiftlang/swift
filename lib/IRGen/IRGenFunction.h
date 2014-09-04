@@ -176,6 +176,7 @@ public:
   void emitRetainUnowned(llvm::Value *value);
   void emitUnownedRetain(llvm::Value *value);
   void emitUnownedRelease(llvm::Value *value);
+  void emitFixLifetime(llvm::Value *value);
   void emitWeakInit(llvm::Value *value, Address dest);
   void emitWeakAssign(llvm::Value *value, Address dest);
   llvm::Value *emitWeakLoadStrong(Address src, llvm::Type *type);

@@ -100,6 +100,10 @@ public:
   
   /// Release reference counts or other resources owned by the explosion.
   virtual void consume(IRGenFunction &IGF, Explosion &explosion) const = 0;
+
+  /// Fix the lifetime of the source explosion by creating opaque calls to
+  /// swift_keepAlive for all reference types in the explosion.
+  virtual void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const = 0;
   
   /// Pack the source explosion into an enum payload.
   virtual llvm::Value *packEnumPayload(IRGenFunction &IGF,

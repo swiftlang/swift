@@ -96,6 +96,17 @@ define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
 ; CHECK-NEXT: store i32 42
 ; CHECK-NEXT: ret void
 
+declare void @swift_fixLifetime(%swift.refcounted* %A)
 
+; CHECK: @swift_fixLifetimeTest
+; CHECK: swift_retain_noresult
+; CHECK: swift_fixLifetime
+; CHECK: swift_release
+define void @swift_fixLifetimeTest(%swift.refcounted* %A) {
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  call void @swift_fixLifetime(%swift.refcounted* %A)
+  tail call void @swift_release(%swift.refcounted* %A) nounwind
+  ret void
+}
 
 

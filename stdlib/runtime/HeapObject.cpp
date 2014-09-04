@@ -447,6 +447,12 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
 extern "C" void swift_keepAlive(OpaqueValue* value, const Metadata* t) {
 }
 
+/// This is a function that is opaque to the optimizer.  It is called to ensure
+/// that an object is alive at least until that time.
+extern "C" void swift_keepAlive2(OpaqueValue* value) {
+}
+
+
 void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
   ref->Value = value;
   swift_weakRetain(value);
