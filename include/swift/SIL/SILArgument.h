@@ -51,12 +51,17 @@ public:
     return V->getKind() == ValueKind::SILArgument;
   }
 
-  unsigned getIndex() {
+  unsigned getIndex() const {
     ArrayRef<SILArgument *> Args = getParent()->getBBArgs();
     for (unsigned i = 0, e = Args.size(); i != e; ++i)
       if (Args[i] == this)
         return i;
     llvm_unreachable("SILArgument not argument of its parent BB");
+  }
+
+  /// Returns the SILParameterInfo for this SILArgument.
+  SILParameterInfo getParameterInfo() const {
+    return getFunction()->getLoweredFunctionType()->getParameters()[getIndex()];
   }
 
 private:
