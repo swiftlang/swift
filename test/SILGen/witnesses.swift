@@ -323,3 +323,12 @@ struct LabeledSelfWitness : UnlabeledSelfRequirement {
   // CHECK-LABEL: sil @_TTWV9witnesses18LabeledSelfWitnessS_24UnlabeledSelfRequirementFS1_6methodUS1___fRQPS1_FS2_T_ : $@cc(witness_method) @thin (@in LabeledSelfWitness, @inout LabeledSelfWitness) -> ()
   func method(x: LabeledSelfWitness) {}
 }
+
+protocol ReadOnlyRequirement {
+  class var prop: String { get }
+}
+
+struct ImmutableModel: ReadOnlyRequirement {
+  // CHECK-LABEL: sil @_TTWV9witnesses14ImmutableModelS_19ReadOnlyRequirementFS1_g4propSS : $@cc(witness_method) @thin (@thick ImmutableModel.Type) -> @owned String
+  static let prop: String = ""
+}

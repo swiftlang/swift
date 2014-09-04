@@ -462,7 +462,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
 
 ManagedValue SILGenFunction::
 emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
-                  SGFContext C) {
+                  SGFContext C, bool isDirectPropertyAccess) {
   assert(!ncRefType->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   
@@ -490,7 +490,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     // If this VarDecl is represented as an address, emit it as an lvalue, then
     // perform a load to get the rvalue.
-    if (auto Result = emitLValueForDecl(loc, var)) {
+    if (auto Result = emitLValueForDecl(loc, var, isDirectPropertyAccess)) {
       IsTake_t takes;
       // 'self' may need to be taken during an 'init' delegation.
       if (var->getName() == getASTContext().Id_self) {
@@ -549,9 +549,31 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     assert(var->hasAccessorFunctions() && "Unknown rvalue case");
 
-    // Global properties have no base or subscript.
+    RValueSource selfSource;
+    
+    // Global properties have no base or subscript. Static properties
+    // use the metatype as their base.
+    // FIXME: This has to be dynamically looked up for classes, and
+    // dynamically instantiated for generics.
+    if (var->isStatic()) {
+      auto baseTy = cast<NominalTypeDecl>(var->getDeclContext())
+        ->getDeclaredInterfaceType();
+          (void)baseTy;
+      assert(!baseTy->is<BoundGenericType>() &&
+             "generic static stored properties not implemented");
+      assert((baseTy->getStructOrBoundGenericStruct() ||
+              baseTy->getEnumOrBoundGenericEnum()) &&
+             "static stored properties for classes/protocols not implemented");
+      auto baseMeta = MetatypeType::get(baseTy)->getCanonicalType();
+
+      auto metatype = B.createMetatype(loc,
+                                       getLoweredLoadableType(baseMeta));
+      auto metatypeMV = ManagedValue::forUnmanaged(metatype);
+      auto metatypeRV = RValue(*this, loc, baseMeta, metatypeMV);
+      selfSource = RValueSource(loc, std::move(metatypeRV));
+    }
     return emitGetAccessor(loc, var,
-                           ArrayRef<Substitution>(), RValueSource(),
+                           ArrayRef<Substitution>(), std::move(selfSource),
                            /*isSuper=*/false, RValue(), C);
   }
   
@@ -661,7 +683,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
             baseMeta->getEnumOrBoundGenericEnum()) &&
            "static stored properties for classes/protocols not implemented");
 
-    return emitRValueForDecl(loc, FieldDecl, propTy, C);
+    return emitRValueForDecl(loc, FieldDecl, propTy, C, isDirectPropertyAccess);
   }
 
   // If the base is a reference type, just handle this as loading the lvalue.
