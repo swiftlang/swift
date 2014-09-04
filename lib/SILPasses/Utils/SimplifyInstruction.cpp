@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify"
+#include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
@@ -127,7 +128,8 @@ SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
     return TheTuple->getElements()[TEI->getFieldNo()];
 
-  // tuple_extract(apply([add|sub|...]overflow(x, 0)) -> x
+  // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
+  // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x
   if (TEI->getFieldNo() == 0)
     if (ApplyInst *AI = dyn_cast<ApplyInst>(TEI->getOperand()))
       if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
@@ -322,19 +324,19 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
   const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
 
   switch (Intrinsic.ID) {
-    default:
-      // TODO: Handle some of the llvm intrinsics here.
-      return SILValue();
-    case llvm::Intrinsic::not_intrinsic:
-      break;
-    case llvm::Intrinsic::expect:
-      // If we have an expect optimizer hint with a constant value input,
-      // there is nothing left to expect so propagate the input, i.e.,
-      //
-      // apply(expect, constant, _) -> constant.
-      if (auto *Literal = dyn_cast<IntegerLiteralInst>(AI->getArgument(0)))
-        return Literal;
-      return SILValue();
+  default:
+    // TODO: Handle some of the llvm intrinsics here.
+    return SILValue();
+  case llvm::Intrinsic::not_intrinsic:
+    break;
+  case llvm::Intrinsic::expect:
+    // If we have an expect optimizer hint with a constant value input,
+    // there is nothing left to expect so propagate the input, i.e.,
+    //
+    // apply(expect, constant, _) -> constant.
+    if (auto *Literal = dyn_cast<IntegerLiteralInst>(AI->getArgument(0)))
+      return Literal;
+    return SILValue();
   }
 
   // Otherwise, it should be one of the builtin functions.
@@ -342,22 +344,32 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
   const BuiltinInfo &Builtin = FR->getBuiltinInfo();
 
   switch (Builtin.ID) {
-    default: break;
+  default: break;
 
-    case BuiltinValueKind::TruncOrBitCast: {
-      const SILValue &Op = Args[0];
-      SILValue Result;
-      // trunc(ext(x)) -> x
-      if (match(Op, m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                m_SILValue(Result))) ||
-          match(Op, m_ApplyInst(BuiltinValueKind::SExtOrBitCast,
-                                m_SILValue(Result)))) {
-        // Truncated back to the same bits we started with.
-        if (Result->getType(0) == AI->getType())
-          return Result;
-      }
-      return SILValue();
+  case BuiltinValueKind::TruncOrBitCast: {
+    const SILValue &Op = Args[0];
+    SILValue Result;
+    // trunc(extOrBitCast(x)) -> x
+    if (match(Op, m_ExtOrBitCast(m_SILValue(Result)))) {
+      // Truncated back to the same bits we started with.
+      if (Result->getType(0) == AI->getType())
+        return Result;
     }
+
+    // trunc(tuple_extract(conversion(extOrBitCast(x))))) -> x
+    if (match(Op, m_TupleExtractInst(
+                   m_CheckedConversion(
+                     m_ExtOrBitCast(m_SILValue(Result))), 0))) {
+      // If the top bit of Result is known to be 0, then
+      // it is safe to replace the whole patterb by original bits of x
+      if (Result->getType(0) == AI->getType()) {
+        if (auto signBit = computeSignBit(Result))
+          if (!signBit.getValue())
+            return Result;
+      }
+    }
+    return SILValue();
+  }
   }
   return SILValue();
 }
@@ -395,65 +407,102 @@ static SILValue simplifyBinaryWithOverflow(ApplyInst *AI,
   // Calculate the result.
 
   switch (ID) {
-    default: llvm_unreachable("Invalid case");
-    case llvm::Intrinsic::sadd_with_overflow:
-    case llvm::Intrinsic::uadd_with_overflow:
-      // 0 + X -> X
-      if (match(Op1, m_Zero()))
-        return Op2;
-      // X + 0 -> X
-      if (match(Op2, m_Zero()))
-        return Op1;
-      return SILValue();
-    case llvm::Intrinsic::ssub_with_overflow:
-    case llvm::Intrinsic::usub_with_overflow:
-      // X - 0 -> X
-      if (match(Op2, m_Zero()))
-        return Op1;
-      return SILValue();
-    case llvm::Intrinsic::smul_with_overflow:
-    case llvm::Intrinsic::umul_with_overflow:
-      // 0 * X -> 0
-      if (match(Op1, m_Zero()))
-        return Op1;
-      // X * 0 -> 0
-      if (match(Op2, m_Zero()))
-        return Op2;
-      // 1 * X -> X
-      if (match(Op1, m_One()))
-        return Op2;
-      // X * 1 -> X
-      if (match(Op2, m_One()))
-        return Op1;
-      return SILValue();
+  default: llvm_unreachable("Invalid case");
+  case llvm::Intrinsic::sadd_with_overflow:
+  case llvm::Intrinsic::uadd_with_overflow:
+    // 0 + X -> X
+    if (match(Op1, m_Zero()))
+      return Op2;
+    // X + 0 -> X
+    if (match(Op2, m_Zero()))
+      return Op1;
+    return SILValue();
+  case llvm::Intrinsic::ssub_with_overflow:
+  case llvm::Intrinsic::usub_with_overflow:
+    // X - 0 -> X
+    if (match(Op2, m_Zero()))
+      return Op1;
+    return SILValue();
+  case llvm::Intrinsic::smul_with_overflow:
+  case llvm::Intrinsic::umul_with_overflow:
+    // 0 * X -> 0
+    if (match(Op1, m_Zero()))
+      return Op1;
+    // X * 0 -> 0
+    if (match(Op2, m_Zero()))
+      return Op2;
+    // 1 * X -> X
+    if (match(Op1, m_One()))
+      return Op2;
+    // X * 1 -> X
+    if (match(Op2, m_One()))
+      return Op1;
+    return SILValue();
   }
   return SILValue();
 }
 
+/// Simplify operations that may overflow. All such operations return a tuple.
+/// This function simplifies such operations, but returns only the first
+/// element of a tuple. It looks strange at the first glance, but this
+/// is OK, because this function is invoked only internally when processing
+/// tuple_extract instructions. Therefore the result of this function
+/// is used for simplifications like tuple_extract(x, 0) -> simplified(x)
 SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
                                                  BuiltinFunctionRefInst *FR) {
   const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
 
   // If it's an llvm intrinsic, fold the intrinsic.
   switch (Intrinsic.ID) {
-    default:
-      return SILValue();
-    case llvm::Intrinsic::not_intrinsic:
-      break;
-    case llvm::Intrinsic::sadd_with_overflow:
-    case llvm::Intrinsic::uadd_with_overflow:
-    case llvm::Intrinsic::ssub_with_overflow:
-    case llvm::Intrinsic::usub_with_overflow:
-    case llvm::Intrinsic::smul_with_overflow:
-    case llvm::Intrinsic::umul_with_overflow:
-      return simplifyBinaryWithOverflow(AI, Intrinsic.ID);
+  default:
+    return SILValue();
+  case llvm::Intrinsic::not_intrinsic:
+    break;
+  case llvm::Intrinsic::sadd_with_overflow:
+  case llvm::Intrinsic::uadd_with_overflow:
+  case llvm::Intrinsic::ssub_with_overflow:
+  case llvm::Intrinsic::usub_with_overflow:
+  case llvm::Intrinsic::smul_with_overflow:
+  case llvm::Intrinsic::umul_with_overflow:
+    return simplifyBinaryWithOverflow(AI, Intrinsic.ID);
   }
 
   // Otherwise, it should be one of the builtin functions.
   const BuiltinInfo &Builtin = FR->getBuiltinInfo();
 
   switch (Builtin.ID) {
-    default: break;
+  default: break;
+
+  case BuiltinValueKind::SUCheckedConversion:
+  case BuiltinValueKind::USCheckedConversion: {
+    OperandValueArrayRef Args = AI->getArguments();
+    const SILValue &Op = Args[0];
+    if (auto signBit = computeSignBit(Op))
+      if (!signBit.getValue())
+        return Op;
+    SILValue Result;
+    // CheckedConversion(ExtOrBitCast(x)) -> x
+    if (match(AI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
+      if (Result->getType(0) == AI->getType().getTupleElementType(0))
+        if (auto signBit = computeSignBit(Result))
+          if (!signBit.getValue())
+            return Result;
+    }
+    break;
+
+  case BuiltinValueKind::UToSCheckedTrunc:
+  case BuiltinValueKind::UToUCheckedTrunc:
+  case BuiltinValueKind::SToUCheckedTrunc:
+  case BuiltinValueKind::SToSCheckedTrunc: {
+    SILValue Result;
+    // CheckedTrunc(Ext(x)) -> x
+    if (match(AI, m_CheckedTrunc(m_Ext(m_SILValue(Result)))))
+      if (Result->getType(0) == AI->getType().getTupleElementType(0))
+        if (auto signBit = computeSignBit(Result))
+          if (!signBit.getValue())
+            return Result;
+    }
+    break;
 
       // Check and simplify binary arithmetic with overflow.
 #define BUILTIN(id, name, Attrs)

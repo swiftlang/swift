@@ -13,6 +13,8 @@
 #ifndef SWIFT_SILANALYSIS_VALUETRACKING_H
 #define SWIFT_SILANALYSIS_VALUETRACKING_H
 
+#include "swift/Basic/Optional.h"
+
 namespace swift {
 
 class SILValue;
@@ -33,6 +35,15 @@ enum class IsZeroKind {
 
 /// Check if the value \p Value is known to be zero, non-zero or unknown.
 IsZeroKind isZeroValue(SILValue Value);
+
+/// Checks if a sign bit of a value is known to be set, not set or unknown.
+/// Essentially, it is a simple form of a range analysis.
+/// This approach is inspired by the corresponding implementation of
+/// ComputeSignBit in LLVM's value tracking implementation.
+/// It is planned to extend this approach to track all bits of a value.
+/// Therefore it can be considered to be the beginning of a range analysis
+/// infrastructure for the Swift compiler.
+Optional<bool> computeSignBit(SILValue Value);
 
 } // end namespace swift
 

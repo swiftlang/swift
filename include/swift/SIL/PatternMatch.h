@@ -133,6 +133,51 @@ inline match_combine_and<LTy, RTy> m_CombineAnd(const LTy &L, const RTy &R) {
   return match_combine_and<LTy, RTy>(L, R);
 }
 
+/// Helper class to track the return type of vararg m_CombineOr matcher.
+template <typename ...Arguments>
+struct  OneOf_match;
+
+template <typename T0>
+struct OneOf_match<T0> {
+  typedef T0 Ty;
+};
+
+template <typename T0, typename T1>
+struct OneOf_match<T0, T1> {
+  typedef match_combine_or<T0, T1> Ty;
+};
+
+template <typename T0, typename T1, typename ...Arguments>
+struct OneOf_match<T0, T1, Arguments ...> {
+  typedef typename OneOf_match<match_combine_or<T0, T1>, Arguments ...>::Ty Ty;
+};
+
+/// This is a vararg version of m_CombineOr. It is a boolean "or" of
+/// matchers provided as its parameters.
+template<typename LTy, typename RTy, typename ...RTys>
+inline typename OneOf_match<LTy, RTy, RTys...>::Ty
+m_CombineOr(const LTy &L, const RTy &R, const RTys &...Args) {
+  return m_CombineOr(m_CombineOr(L, R), Args...);
+}
+
+/// boolean or operator for combining matchers using
+/// a conventional || syntax.
+template<typename T1, typename T2, typename T3, typename T4>
+inline typename OneOf_match<match_combine_and<T1, T2>,
+                            match_combine_and<T3, T4>>::Ty
+operator || (const match_combine_and<T1, T2> &Op1,
+             const match_combine_and<T3, T4> &Op2) {
+  return m_CombineOr(Op1, Op2);
+}
+
+template<typename T1, typename T2, typename T3, typename T4>
+inline typename OneOf_match<match_combine_or<T1, T2>,
+                            match_combine_and<T3, T4>>::Ty
+operator || (const match_combine_or<T1, T2> &Op1,
+             const match_combine_and<T3, T4> &Op2) {
+  return m_CombineOr(Op1, Op2);
+}
+
 //===----------------------------------------------------------------------===//
 //                               Base Matchers
 //===----------------------------------------------------------------------===//
@@ -571,6 +616,96 @@ inline typename Apply_match<CalleeTy, T0, Arguments ...>::Ty
 m_ApplyInst(CalleeTy Callee, const T0 &Op0, const Arguments &...Args) {
   return m_CombineAnd(m_ApplyInst<Index+1>(Callee, Args...),
                       m_Argument<Index>(Op0));
+}
+
+//===----------------------------------------------------------------------===//
+//                             Builtin Instructions
+//===----------------------------------------------------------------------===//
+/// Return type of builtin instruction matchers.
+template <typename ...Tys>
+using BuiltinApplyTy = typename Apply_match<BuiltinValueKind, Tys...>::Ty;
+
+
+/// XMacro for generating a matcher for unary builtin instructions that can
+/// apply further matchers to the operands of the builtin operation.
+#define BUILTIN_UNARY_OP_MATCH_WITH_ARG_MATCHER(PatternName, Kind) \
+  template <typename Ty>                                           \
+  BuiltinApplyTy<Ty>                                               \
+  m_##PatternName(const Ty &T) {                                   \
+    return m_ApplyInst(BuiltinValueKind::Kind, T);                 \
+  }
+
+/// XMacro for generating a matcher for binary builtin instructions that can
+/// apply further matchers to the operands of the builtin operation.
+#define BUILTIN_BINARY_OP_MATCH_WITH_ARG_MATCHER(PatternName, Kind) \
+  template <typename Ty1, typename Ty2>                             \
+  BuiltinApplyTy<Ty1, Ty2>                                          \
+  m_##PatternName(const Ty1 &T1, const Ty2 &T2) {                   \
+    return m_ApplyInst(BuiltinValueKind::Kind, T1, T2);             \
+  }
+
+/// XMacro for generating a matcher for varargs builtin instructions that can
+/// apply further matchers to the operands of the builtin operation.
+#define BUILTIN_VARARGS_OP_MATCH_WITH_ARG_MATCHER(PatternName, Kind) \
+  template <typename ...Tys>                                         \
+  BuiltinApplyTy<Tys...>                                             \
+  m_##PatternName(const Tys& ...Args) {                              \
+    return m_ApplyInst(BuiltinValueKind::Kind, Args...);             \
+  }
+
+#define BUILTIN_CAST_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs) \
+  BUILTIN_UNARY_OP_MATCH_WITH_ARG_MATCHER(Id, Id)
+
+#define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs) \
+  BUILTIN_UNARY_OP_MATCH_WITH_ARG_MATCHER(Id, Id)
+
+#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs, Overload) \
+  BUILTIN_BINARY_OP_MATCH_WITH_ARG_MATCHER(Id, Id)
+
+#define BUILTIN_BINARY_PREDICATE(Id, Name, Attrs, Overload) \
+  BUILTIN_BINARY_OP_MATCH_WITH_ARG_MATCHER(Id, Id)
+
+#define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) \
+  BUILTIN_VARARGS_OP_MATCH_WITH_ARG_MATCHER(Id, Id)
+
+#define BUILTIN(Id, Name, Attrs)
+
+// Define matchers for most of builtin instructions.
+#include "swift/AST/Builtins.def"
+
+//===
+// Convenience compound builtin instructions matchers that succeed
+// if any of the sub-matchers succeed.
+//
+
+/// Matcher for any of the builtin checked conversions.
+template <typename T0>
+inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
+m_CheckedConversion(const T0 &Op0)  {
+  return m_USCheckedConversion(Op0) || m_SUCheckedConversion(Op0);
+}
+
+/// Matcher for any of the builtin ExtOrBitCast instructions.
+template <typename T0>
+inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
+m_ExtOrBitCast(const T0 &Op0) {
+  return m_ZExtOrBitCast(Op0) || m_SExtOrBitCast(Op0);
+}
+
+/// Matcher for any of the builtin [SZ]Ext instructions.
+template <typename T0>
+inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
+m_Ext(const T0 &Op0) {
+  return m_ZExt(Op0) || m_SExt(Op0);
+}
+
+/// Matcher for any of the builtin CheckedTrunc instructions.
+template <typename T0>
+inline  typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>,
+                             BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
+m_CheckedTrunc(const T0 &Op0) {
+  return m_UToSCheckedTrunc(Op0) || m_SToUCheckedTrunc(Op0) ||
+         m_UToUCheckedTrunc(Op0) || m_SToSCheckedTrunc(Op0);
 }
 
 } // end namespace PatternMatch

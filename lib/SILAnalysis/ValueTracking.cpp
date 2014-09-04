@@ -399,3 +399,99 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
   return IsZeroKind::Unknown;
 }
 
+/// Check if the sign bit of the value \p V is known to be:
+/// set (true), not set (false) or unknown (Nothing).
+Optional<bool> swift::computeSignBit(SILValue V) {
+  SILValue Value = V;
+  while (true) {
+    auto *Def = Value.getDef();
+    // Inspect integer literals.
+    if (auto *L = dyn_cast<IntegerLiteralInst>(Def)) {
+      if (L->getValue().isNonNegative())
+        return false;
+      return true;
+    }
+
+    switch (Def->getKind()) {
+    // Bitcast of non-negative is non-negative
+    case ValueKind::UncheckedTrivialBitCastInst:
+      Value = cast<SILInstruction>(Def)->getOperand(0);
+      continue;
+    default:
+      break;
+    }
+
+    if (auto *AI = dyn_cast<ApplyInst>(Def)) {
+      auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
+      if (!FR)
+        return Nothing;
+      switch (FR->getBuiltinInfo().ID) {
+      // Sizeof always returns non-negative results.
+      case BuiltinValueKind::Sizeof:
+        return false;
+      case BuiltinValueKind::LShr: {
+        // If count is provably >= 1, then top bit is not set.
+        auto *ILShiftCount = dyn_cast<IntegerLiteralInst>(AI->getArgument(1));
+        if (ILShiftCount) {
+          if (ILShiftCount->getValue().isStrictlyPositive()) {
+            return false;
+          }
+        }
+        // May be top bit is not set in the value being shifted.
+        Value = AI->getArgument(0);
+        continue;
+      }
+
+      // Source and target type sizes are the same.
+      // S->U conversion can only succeed if
+      // the sign bit of its operand is 0, i.e. it is >= 0.
+      // The sign bit of a result is 0 only if the sign
+      // bit of a source operand is 0.
+      case BuiltinValueKind::SUCheckedConversion:
+        Value = AI->getArgument(0);
+        continue;
+
+      // Source and target type sizes are the same.
+      // U->S conversion can only succeed if
+      // the top bit of its operand is 0, i.e.
+      // it is representable as a signed integer >=0.
+      // The sign bit of a result is 0 only if the sign
+      // bit of a source operand is 0.
+      case BuiltinValueKind::USCheckedConversion:
+        Value = AI->getArgument(0);
+        continue;
+
+      // Sign bit of the operand is promoted.
+      case BuiltinValueKind::SExt:
+        Value = AI->getArgument(0);
+        continue;
+
+      // Source type is always smaller than the target type.
+      // Therefore the sign bit of a result is always 0.
+      case BuiltinValueKind::ZExt:
+        return false;
+
+      // Sign bit of the operand is promoted.
+      case BuiltinValueKind::SExtOrBitCast:
+        Value = AI->getArgument(0);
+        continue;
+
+      // TODO: If source type size is smaller than the target type
+      // the result will be always false.
+      case BuiltinValueKind::ZExtOrBitCast:
+        Value = AI->getArgument(0);
+        continue;
+
+      // Inspect casts.
+      case BuiltinValueKind::IntToPtr:
+      case BuiltinValueKind::PtrToInt:
+        Value = AI->getArgument(0);
+        continue;
+      default:
+        return Nothing;
+      }
+    }
+
+    return Nothing;
+  }
+}
