@@ -483,10 +483,10 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
     SILValue Result;
     // CheckedConversion(ExtOrBitCast(x)) -> x
     if (match(AI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
-      if (Result->getType(0) == AI->getType().getTupleElementType(0))
-        if (auto signBit = computeSignBit(Result))
-          if (!signBit.getValue())
-            return Result;
+      if (Result->getType(0) == AI->getType().getTupleElementType(0)) {
+        assert (!computeSignBit(Result).getValue() && "Sign bit should be 0");
+        return Result;
+      }
     }
     break;
 
