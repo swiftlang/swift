@@ -2,12 +2,13 @@
 
 // CHECK-LABEL: define void @test(%C11fixlifetime1C*, %objc_object*, i8**, i8*, %swift.refcounted*, %C11fixlifetime1C*, %objc_object*, i8**, i8*, %swift.refcounted*) {
 // CHECK: entry:
-// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_fixLifetime2 to void (%C11fixlifetime1C*)*)(%C11fixlifetime1C*
-// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_fixLifetime2 to void (%objc_object*)*)(%objc_object*
-// CHECK-NEXT:  call void @swift_fixLifetime2(%swift.refcounted*
-// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_fixLifetime2 to void (%C11fixlifetime1C*)*)(%C11fixlifetime1C*
-// CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_fixLifetime2 to void (%objc_object*)*)(%objc_object*
-// CHECK-NEXT:  call void @swift_fixLifetime2(%swift.refcounted*
+// CHECK:  call void bitcast (void (%swift.refcounted*)* @swift_keepAlive2 to void (%C11fixlifetime1C*)*)(%C11fixlifetime1C*
+// CHECK:  call void bitcast (void (%swift.refcounted*)* @swift_keepAlive2 to void (%objc_object*)*)(%objc_object*
+// CHECK:  call void @swift_keepAlive2(%swift.refcounted*
+// CHECK:  call void bitcast (void (%swift.refcounted*)* @swift_keepAlive2 to void (%C11fixlifetime1C*)*)(%C11fixlifetime1C*
+// CHECK:  call void bitcast (void (%swift.refcounted*)* @swift_keepAlive2 to void (%objc_object*)*)(%objc_object*
+// CHECK:  call void @swift_keepAlive2(%swift.refcounted*
+// CHECK:  call void bitcast (void (%swift.refcounted*)* @swift_keepAlive2 to void (%C11fixlifetime1C**)*)(%C11fixlifetime1C**
 
 class C {}
 protocol P : class {}
@@ -24,6 +25,10 @@ bb0(%0 : $C, %1 : $P, %2 : $@callee_owned () -> (), %3 : $Agg):
   fix_lifetime %1 : $P
   fix_lifetime %2 : $@callee_owned () -> ()
   fix_lifetime %3 : $Agg
-  %4 = tuple()
-  return %4 : $()
+
+  %4 = alloc_stack $C
+  fix_lifetime %4#1 : $*C
+  dealloc_stack %4#0 : $*@local_storage C
+  %9999 = tuple()
+  return %9999 : $()
 }

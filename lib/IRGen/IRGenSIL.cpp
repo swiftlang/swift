@@ -2412,6 +2412,14 @@ void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
+  if (i->getOperand().getType().isAddress()) {
+    // Just pass in the address to fix lifetime if we have one. We will not do
+    // anything to it so nothing bad should happen.
+    emitFixLifetime(getLoweredAddress(i->getOperand()).getAddress());
+    return;
+  }
+
+  // Handle objects.
   Explosion in = getLoweredExplosion(i->getOperand());
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType()))
     .fixLifetime(*this, in);
