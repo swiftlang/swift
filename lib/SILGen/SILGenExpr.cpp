@@ -4641,6 +4641,30 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     break;
   }
   SGF.SelfInitDelegationState = SILGenFunction::NormalSelf;
+
+  // If we are using Objective-C allocation, the caller can return
+  // nil. When this happens with an explicitly-written super.init or
+  // self.init invocation, return early if we did get nil.
+  //
+  // TODO: Remove this when failable initializers are fully implemented.
+  auto classDecl = selfTy->getClassOrBoundGenericClass();
+  if (classDecl && !E->getSubExpr()->isImplicit() &&
+      usesObjCAllocator(classDecl)) {
+    // Check whether the new self is null.
+    SILValue isNonnullSelf = SGF.B.createIsNonnull(E, newSelf.getValue());
+    Condition cond = SGF.emitCondition(isNonnullSelf, E, 
+                                       /*hasFalseCode=*/false,
+                                       /*invertValue=*/true,
+                                       { });
+
+    // If self is null, branch to the epilog.
+    cond.enterTrue(SGF.B);
+    SGF.Cleanups.emitBranchAndCleanups(SGF.ReturnDest, E, { });
+    cond.exitTrue(SGF.B);
+
+    cond.complete(SGF.B);
+  }
+
   return SGF.emitEmptyTupleRValue(E);
 }
 
