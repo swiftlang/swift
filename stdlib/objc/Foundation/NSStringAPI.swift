@@ -219,8 +219,9 @@ extension String {
     usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) {
-    if let ns = NSString(contentsOfFile: path, usedEncoding: usedEncoding,
-                          error: error) {
+    if let ns = NSString(
+      contentsOfFile: path, usedEncoding: usedEncoding, error: error) {
+
       self = ns as String
     } else {
       return nil
@@ -761,8 +762,8 @@ extension String {
   ) {
     let byteArray = Array(bytes)
     if let ns = NSString(
-                  bytes: byteArray, length: byteArray.count, encoding: encoding
-                ) {
+      bytes: byteArray, length: byteArray.count, encoding: encoding) {
+
       self = ns as String
     } else {
       return nil
@@ -784,9 +785,9 @@ extension String {
     encoding: NSStringEncoding, freeWhenDone flag: Bool
   ) {
     if let ns = NSString(
-                  bytesNoCopy: bytes, length: length,
-                  encoding: encoding, freeWhenDone: flag
-                ) {
+      bytesNoCopy: bytes, length: length, encoding: encoding,
+      freeWhenDone: flag) {
+
       self = ns as String
     } else {
       return nil
