@@ -156,3 +156,17 @@ class Child: Parent {
         self.init(string: "")
     }
 }
+
+// overriding
+class Parent2 {
+  init() { }
+  convenience init(int: Int) { self.init() }
+}
+
+class Child2 : Parent2 {
+  convenience init(int: Int) { self.init() }
+}
+
+func testOverride(int: Int) {
+  Child2(int: int) // okay, picks Child2.init
+}

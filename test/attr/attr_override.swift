@@ -202,7 +202,7 @@ class C {
   init(string: String) { } // expected-note{{overridden declaration is here}}
   required init(double: Double) { } // expected-note 3{{overridden required initializer is here}}
 
-  convenience init() { self.init(string: "hello") }
+  convenience init() { self.init(string: "hello") } // expected-note{{attempt to override convenience initializer here}}
 }
 
 class D1 : C {

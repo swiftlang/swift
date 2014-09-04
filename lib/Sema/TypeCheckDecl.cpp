@@ -4632,10 +4632,6 @@ public:
       auto parentVar = cast<VarDecl>(parentDecl);
       if (var->isStatic() != parentVar->isStatic())
         return false;
-    } else if (auto parentCtor = dyn_cast<ConstructorDecl>(parentDecl)) {
-      // Only designated initializers can be overridden.
-      if (!parentCtor->isDesignatedInit())
-        return false;
     }
 
     return true;
