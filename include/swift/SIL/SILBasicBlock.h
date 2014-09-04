@@ -34,7 +34,7 @@ public:
   typedef llvm::iplist<SILInstruction> InstListType;
 private:
   /// A backreference to the containing SILFunction.
-  SILFunction * const Parent;
+  SILFunction *Parent;
 
   /// PrevList - This is a list of all of the terminator operands that are
   /// branching to this block, forming the predecessor list.  This is
@@ -48,6 +48,7 @@ private:
   InstListType InstList;
 
   friend struct llvm::ilist_sentinel_traits<SILBasicBlock>;
+  friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(0) {}
   void operator=(const SILBasicBlock &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
@@ -177,15 +178,13 @@ public:
 
   SILBasicBlock *getSinglePredecessor() {
     if (pred_empty() || std::next(pred_begin()) != pred_end())
-      return 0;
-
+      return nullptr;
     return *pred_begin();
   }
 
   SILBasicBlock *getSingleSuccessor() {
     if (succ_empty() || std::next(succ_begin()) != succ_end())
-      return 0;
-
+      return nullptr;
     return *succ_begin();
   }
 
@@ -234,12 +233,19 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILBasicBlock> :
 public ilist_default_traits<::swift::SILBasicBlock> {
+  typedef ilist_traits<::swift::SILBasicBlock> SelfTy;
   typedef ::swift::SILBasicBlock SILBasicBlock;
+  typedef ::swift::SILFunction SILFunction;
+  typedef ::swift::NullablePtr<SILFunction> FunctionPtrTy;
 
 private:
+  friend class ::swift::SILFunction;
   mutable ilist_half_node<SILBasicBlock> Sentinel;
 
+  SILFunction *Parent;
+
 public:
+
   SILBasicBlock *createSentinel() const {
     return static_cast<SILBasicBlock*>(&Sentinel);
   }
@@ -248,10 +254,17 @@ public:
   SILBasicBlock *provideInitialHead() const { return createSentinel(); }
   SILBasicBlock *ensureHead(SILBasicBlock*) const { return createSentinel(); }
   static void noteHead(SILBasicBlock*, SILBasicBlock*) {}
-  static void deleteNode(SILBasicBlock *V) { V->~SILBasicBlock(); }
+  static void deleteNode(SILBasicBlock *BB) { BB->~SILBasicBlock(); }
+
+  void addNodeToList(SILBasicBlock *BB) {
+  }
+
+  void transferNodesFromList(ilist_traits<SILBasicBlock> &SrcTraits,
+                             ilist_iterator<SILBasicBlock> First,
+                             ilist_iterator<SILBasicBlock> Last);
 
 private:
-  void createNode(const SILBasicBlock &);
+  static void createNode(const SILBasicBlock &);
 };
 
 } // end llvm namespace

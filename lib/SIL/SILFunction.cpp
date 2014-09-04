@@ -79,6 +79,10 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
     Module.functions.push_back(this);
+
+  // Set our BB list to have this function as its parent. This enables us to
+  // splice efficiently basic blocks in between functions.
+  BlockList.Parent = this;
 }
 
 SILFunction::~SILFunction() {

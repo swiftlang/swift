@@ -129,3 +129,20 @@ void SILBasicBlock::moveAfter(SILBasicBlock *After) {
   auto &BlkList = getParent()->getBlocks();
   BlkList.splice(InsertPt, BlkList, this);
 }
+
+void
+llvm::ilist_traits<swift::SILBasicBlock>::
+transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
+                      llvm::ilist_iterator<SILBasicBlock> First,
+                      llvm::ilist_iterator<SILBasicBlock> Last) {
+  assert(&Parent->getModule() == &SrcTraits.Parent->getModule() &&
+         "Module mismatch!");
+
+  // If we are asked to splice into the same function, don't update parent
+  // pointers.
+  if (Parent == SrcTraits.Parent) return;
+
+  // If splicing blocks not in the same function, update the parent pointers.
+  for (; First != Last; ++First)
+    First->Parent = Parent;
+}

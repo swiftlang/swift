@@ -306,6 +306,12 @@ public:
   const SILBasicBlock &front() const { return *begin(); }
 
   SILBasicBlock *createBasicBlock();
+
+  /// Splice the body of \p F into this function at end.
+  void spliceBody(SILFunction *F) {
+    getBlocks().splice(begin(), F->getBlocks());
+  }
+
   //===--------------------------------------------------------------------===//
   // Miscellaneous
   //===--------------------------------------------------------------------===//
