@@ -2207,12 +2207,12 @@ int main(int argc, char *argv[]) {
     options::ModuleCachePath;
   InitInvok.setImportSearchPaths(options::ImportPaths);
   InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
-  InitInvok.getFrontendOptions().EnableSourceImport =
+  InitInvok.getFrontendOptions().EnableSourceImport |=
     options::EnableSourceImport;
   InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =
     options::ImportObjCHeader;
-  InitInvok.getLangOptions().SplitPrepositions = options::SplitObjCSelectors;
-  InitInvok.getClangImporterOptions().InferImplicitProperties =
+  InitInvok.getLangOptions().SplitPrepositions |= options::SplitObjCSelectors;
+  InitInvok.getClangImporterOptions().InferImplicitProperties |=
     options::ImplicitProperties;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
