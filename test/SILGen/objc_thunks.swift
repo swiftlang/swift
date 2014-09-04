@@ -193,17 +193,8 @@ class Hoozit : Gizmo {
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
   // CHECK: unchecked_ref_cast
   // CHECK-NEXT: store [[SELF:%[0-9]+]] to [[SELF_BOX]]#1 : $*Hoozit
-  // CHECK-NEXT: [[NONNULL:%[0-9]+]] = is_nonnull [[SELF]] : $Hoozit
-  // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
-  // CHECK: [[NULL_BB]]:
-  // CHECK:   br [[EPILOG_BB:bb[0-9]+]]
-
-  // CHECK: [[NONNULL_BB]]:
   // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_TF11objc_thunks5otherFT_T_ : $@thin () -> ()
   // CHECK-NEXT: apply [[OTHER_REF]]() : $@thin () -> ()
-  // CHECK-NEXT: br [[EPILOG_BB]]
-
-  // CHECK: [[EPILOG_BB]]:
   // CHECK-NOT: super_method
   // CHECK: return
   override init(bellsOn x : Int) {
@@ -268,19 +259,9 @@ extension Hoozit {
     // CHECK: [[CTOR:%[0-9]+]] = class_method [volatile] [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : Hoozit.Type -> (int: Int) -> Hoozit , $@cc(objc_method) @thin (Int, @owned Hoozit) -> @owned Hoozit
     // CHECK: [[NEW_SELF:%[0-9]+]] = apply [[CTOR]]
     // CHECK: store [[NEW_SELF]] to [[SELF_BOX]]#1 : $*Hoozit
-    // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[NEW_SELF]] : $Hoozit
-    // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
-    // CHECK: [[NULL_BB]]:
-    // CHECK-NEXT: strong_release [[X_BOX]]#0 : $Builtin.NativeObject
-    // CHECK-NEXT: br [[EPILOG_BB:bb[0-9]+]]
-
-    // CHECK: [[NONNULL_BB]]:
-    // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_TF11objc_thunks5otherFT_T_ : $@thin () -> ()
+    // CHECK: [[OTHER_REF:%[0-9]+]] = function_ref @_TF11objc_thunks5otherFT_T_ : $@thin () -> ()
     // CHECK-NEXT: apply [[OTHER_REF]]() : $@thin () -> ()
     // CHECK-NEXT: strong_release [[X_BOX]]#0 : $Builtin.NativeObject
-    // CHECK-NEXT: br [[EPILOG_BB]]
-    
-    // CHECK: [[EPILOG_BB]]:
     // CHECK-NOT: super_method
     // CHECK: return
     self.init(int:Int(d))
