@@ -85,7 +85,7 @@ NSStringAPIs.test("pathWithComponents(_:)") {
       String.pathWithComponents(["flugelhorn", "baritone", "bass"]))
 }
 
-NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
+NSStringAPIs.test("init(contentsOfFile:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   if true {
     var err: NSError?
@@ -107,7 +107,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
   }
 }
 
-NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
+NSStringAPIs.test("init(contentsOfFile:usedEncoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   if true {
     var usedEncoding: NSStringEncoding = 0
@@ -133,7 +133,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
 }
 
 
-NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
+NSStringAPIs.test("init(contentsOfURL:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   let existingURL = NSURL(string: "file://" + existingPath)!
   let nonExistentURL = NSURL(string: "file://" + nonExistentPath)!
@@ -157,7 +157,7 @@ NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
   }
 }
 
-NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
+NSStringAPIs.test("init(contentsOfURL:usedEncoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   let existingURL = NSURL(string: "file://" + existingPath)!
   let nonExistentURL = NSURL(string: "file://" + nonExistentPath)!
@@ -185,7 +185,7 @@ NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
   }
 }
 
-NSStringAPIs.test("stringWithCString(_:encoding:)") {
+NSStringAPIs.test("init(withCString_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
       String(CString: 
           "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
@@ -717,7 +717,7 @@ NSStringAPIs.test("init(bytes:encoding:)") {
   FIXME: Test disabled because the NSString documentation is unclear about
   what should actually happen in this case.
 
-  expectEmpty(String.stringWithBytes(bytes, length: bytes.count,
+  expectEmpty(String(bytes: bytes, length: bytes.count,
       encoding: NSASCIIStringEncoding))
   */
 
@@ -735,7 +735,7 @@ NSStringAPIs.test("init(bytesNoCopy:length:encoding:freeWhenDone:)") {
   FIXME: Test disabled because the NSString documentation is unclear about
   what should actually happen in this case.
 
-  expectEmpty(String.stringWithBytesNoCopy(&bytes, length: bytes.count,
+  expectEmpty(String(bytesNoCopy: &bytes, length: bytes.count,
       encoding: NSASCIIStringEncoding, freeWhenDone: false))
   */
 
