@@ -1,6 +1,10 @@
 Latest
 ------
 
+* OS X apps can now apply the @NSApplicationMain attribute to their app delegate
+  class in order to generate an implicit "main" for the app. This works like
+  the @UIApplicationMain attribute for iOS apps.
+
 * Initializers can now fail by returning 'nil'. A failable initializer is
   declared with 'init?' (to return an explicit optional) or 'init!' (to return
   an implicitly-unwrapped optional). For example, you could implement
