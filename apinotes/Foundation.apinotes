@@ -2077,7 +2077,7 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithBytes:length:'
     MethodKind: Instance
     Nullability:
