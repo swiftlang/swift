@@ -266,7 +266,8 @@ tests.test("basic") {
   if true {
     let s = TestHeapStorage<LifetimeTracked>.create(10)
     expectEqual(0, s.count)
-    expectGE(10, s.capacity)
+    expectLE(10, s.capacity)
+    expectGE(12, s.capacity)  // allow some over-allocation but not too much
     
     expectEqual(1, LifetimeTracked.instances)
     for i in 1..<6 {
