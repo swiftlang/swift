@@ -412,7 +412,7 @@ protocol ProtocolWithExtension1 {
   class var fooStatic : Int { get }
 }
 extension ProtocolWithExtension1 { // expected-error {{protocol 'ProtocolWithExtension1' cannot be extended}}
-  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
+  var fooExt: Int // intentionally not diagnosed
   class var fooExtStatic = 4
 }
 

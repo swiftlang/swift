@@ -5563,9 +5563,11 @@ public:
       validateAttributes(TC, ED);
     }
 
-    for (Decl *Member : ED->getMembers())
-      visit(Member);
-
+    if (!ED->isInvalid()) {
+      for (Decl *Member : ED->getMembers())
+        visit(Member);
+    }
+    
     if (!IsFirstPass) {
       checkExplicitConformance(ED, ED->getExtendedType());
       checkObjCConformances(ED->getProtocols(), ED->getConformances());
@@ -5857,6 +5859,7 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
     !isFirstPass && D->getDeclContext()->isModuleScopeContext();
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
+
 
 void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   // Validate the context. We don't do this for generic parameters, because
@@ -6192,7 +6195,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   }
   }
 
-  assert(D->hasType());  
+  assert(D->hasType());
 }
 
 static Type checkExtensionGenericParams(

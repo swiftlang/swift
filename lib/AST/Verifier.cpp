@@ -79,6 +79,9 @@ struct ASTNodeBase {};
     using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
     SmallVector<ScopeLike, 4> Scopes;
 
+    /// The set of archetypes that are currently available.
+    SmallPtrSet<ArchetypeType *, 4> ActiveArchetypes;
+
     /// \brief The stack of optional evaluations active at this point.
     SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
 
@@ -98,15 +101,28 @@ struct ASTNodeBase {};
                    llvm::SmallBitVector> ClosureDiscriminators;
     DeclContext *CanonicalTopLevelContext = nullptr;
 
+    /// Collect all of the archetypes in this declaration context and its
+    /// parents.
+    void collectAllArchetypes(DeclContext *dc) {
+      for (auto genericParams = dc->getGenericParamsOfContext();
+           genericParams;
+           genericParams = genericParams->getOuterParameters()) {
+        ActiveArchetypes.insert(genericParams->getAllArchetypes().begin(),
+                                genericParams->getAllArchetypes().end());
+      }
+    }
+
   public:
     Verifier(Module *M, DeclContext *DC)
       : M(M), Ctx(M->Ctx), Out(llvm::errs()), HadError(M->Ctx.hadError()) {
       Scopes.push_back(DC);
+      collectAllArchetypes(DC);
     }
     Verifier(SourceFile &SF, DeclContext *DC)
       : M(&SF), Ctx(SF.getASTContext()), Out(llvm::errs()),
         HadError(SF.getASTContext().hadError()) {
       Scopes.push_back(DC);
+      collectAllArchetypes(DC);
     }
 
     static Verifier forDecl(const Decl *D) {
@@ -342,9 +358,15 @@ struct ASTNodeBase {};
     /// @{
     /// These verification functions are always run on type checked ASTs
     /// (even if there were errors).
-    void verifyCheckedAlways(Expr *E) {}
+    void verifyCheckedAlways(Expr *E) {
+      if (E->getType())
+        verifyChecked(E->getType());
+    }
     void verifyCheckedAlways(Stmt *S) {}
-    void verifyCheckedAlways(Pattern *P) {}
+    void verifyCheckedAlways(Pattern *P) {
+      if (P->hasType())
+        verifyChecked(P->getType());
+    }
     void verifyCheckedAlways(Decl *D) {
       if (!D->isInvalid() &&
           D->getAttrs().hasAttribute<OverrideAttr>()) {
@@ -367,28 +389,50 @@ struct ASTNodeBase {};
     /// @{
     /// These verification functions are run on type checked ASTs if there were
     /// no errors.
-    void verifyChecked(Expr *E) {
-      bool failed = E->getType().findIf([&](Type type) -> bool {
-          if (auto archetypeTy = type->getAs<ArchetypeType>()) {
-            if (archetypeTy->getOpenedExistentialType()) {
-              if (OpenedExistentialArchetypes.count(archetypeTy) == 0) {
-                Out << "Found opened existential archetype "
-                    << archetypeTy->getString()
-                    << " outside enclosing OpenExistentialExpr\n";
-                
-                E->dump(Out);
-                return true;
-              }
-            }
-          }
-          return false;
-        });
-      if (failed) assert(false);
-    }
-
+    void verifyChecked(Expr *E) { }
     void verifyChecked(Stmt *S) {}
-    void verifyChecked(Pattern *P) {}
+    void verifyChecked(Pattern *P) { }
     void verifyChecked(Decl *D) {}
+
+    void verifyChecked(Type type) {
+      if (!type)
+        return;
+
+      // Check for type variables that escaped the type checker.
+      if (type->hasTypeVariable()) {
+        Out << "a type variable escaped the type checker";
+        abort();
+      }
+
+      bool foundError = type.findIf([&](Type type) -> bool {
+        if (auto archetype = type->getAs<ArchetypeType>()) {
+          // We should know about archetypes corresponding to opened
+          // existerntial archetypes.
+          if (archetype->getOpenedExistentialType()) {
+            if (OpenedExistentialArchetypes.count(archetype) == 0) {
+              Out << "Found opened existential archetype "
+                  << archetype->getString()
+                  << " outside enclosing OpenExistentialExpr\n";
+              return true;
+            }
+
+            return false;
+          }
+
+          // Otherwise, the archetype needs to be from this scope.
+          if (ActiveArchetypes.count(archetype) > 0)
+            return false;
+
+          llvm::errs() << "AST verification error: archetype " << archetype
+                       << " not allowed in this context\n";
+          return true;
+        }
+        return false;
+      });
+      
+      if (foundError)
+        abort();
+    }
 
     template<typename T>
     void verifyCheckedBase(T ASTNode) {
@@ -398,11 +442,54 @@ struct ASTNodeBase {};
 
     // Specialized verifiers.
 
-    template <class T> void pushScope(T *scope) {
+    /// Retrieve the generic parameters of the specified declaration context,
+    /// without looking into its parent contexts.
+    static GenericParamList *getImmediateGenericParams(DeclContext *dc) {
+      switch (dc->getContextKind()) {
+      case DeclContextKind::Module:
+      case DeclContextKind::FileUnit:
+      case DeclContextKind::TopLevelCodeDecl:
+      case DeclContextKind::Initializer:
+      case DeclContextKind::AbstractClosureExpr:
+        return nullptr;
+
+      case DeclContextKind::AbstractFunctionDecl:
+        return cast<AbstractFunctionDecl>(dc)->getGenericParams();
+
+      case DeclContextKind::NominalTypeDecl:
+        return cast<NominalTypeDecl>(dc)->getGenericParams();
+
+      case DeclContextKind::ExtensionDecl:
+        return cast<ExtensionDecl>(dc)->getGenericParams();
+      }
+    }
+
+    void pushScope(DeclContext *scope) {
+      Scopes.push_back(scope);
+
+      // Add any archetypes from this scope into the set of active archetypes.
+      if (auto genericParams = getImmediateGenericParams(scope))
+        ActiveArchetypes.insert(genericParams->getAllArchetypes().begin(),
+                                genericParams->getAllArchetypes().end());
+    }
+    void pushScope(BraceStmt *scope) {
       Scopes.push_back(scope);
     }
     void popScope(DeclContext *scope) {
       assert(Scopes.back().get<DeclContext*>() == scope);
+
+      // Remove archetypes from this scope from the set of active archetypes.
+      if (auto genericParams
+            = getImmediateGenericParams(Scopes.back().get<DeclContext*>())) {
+        for (auto archetype : genericParams->getAllArchetypes()) {
+          if (!ActiveArchetypes.erase(archetype)) {
+            llvm::errs() << "archetype " << archetype
+                         << " not introduced by scope?\n";
+            abort();
+          }
+        }
+      }
+
       Scopes.pop_back();
     }
     void popScope(BraceStmt *scope) {
@@ -516,12 +603,9 @@ struct ASTNodeBase {};
       if (D->hasName())
         checkMangling(D);
 
-      if (D->hasType() && D->getType()->hasTypeVariable()) {
-        PrettyStackTraceDecl debugStack("verifying type variable", D);
-        Out << "a type variable escaped the type checker";
-        D->dump(Out);
-        abort();
-      }
+      if (D->hasType())
+        verifyChecked(D->getType());
+
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
           PrettyStackTraceDecl debugStack("verifying overriden", D);
@@ -1336,6 +1420,7 @@ struct ASTNodeBase {};
         Out << " does not have accessibility";
         abort();
       }
+
       verifyCheckedBase(VD);
     }
 
