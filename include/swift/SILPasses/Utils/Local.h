@@ -50,13 +50,6 @@ namespace swift {
   /// This routine only examines the state of the instruction at hand.
   bool isInstructionTriviallyDead(SILInstruction *I);
 
-  /// \brief Try to simplify the specified instruction, performing local
-  /// analysis of the operands of the instruction, without looking at its uses
-  /// (e.g. constant folding).  If a simpler result can be found, it is
-  /// returned, otherwise a null SILValue is returned.
-  ///
-  SILValue simplifyInstruction(SILInstruction *I);
-
   /// \brief Recursively erase all of the uses of the instruction (but not the
   /// instruction itself) and delete instructions that will become trivially
   /// dead when this instruction is removed.

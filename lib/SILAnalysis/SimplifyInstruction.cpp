@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify"
+#include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/PatternMatch.h"
@@ -22,7 +23,7 @@ using namespace swift::PatternMatch;
 
 namespace swift {
   class ASTContext;
-}
+} // end namespace swift
 
 namespace {
   class InstSimplifier : public SILInstructionVisitor<InstSimplifier, SILValue>{

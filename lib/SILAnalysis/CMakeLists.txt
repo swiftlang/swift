@@ -10,4 +10,5 @@ add_swift_library(swiftSILAnalysis
   ClassHierarchyAnalysis.cpp
   IVAnalysis.cpp
   CallGraphAnalysis.cpp
+  SimplifyInstruction.cpp
   DEPENDS swiftSILPassesUtils)

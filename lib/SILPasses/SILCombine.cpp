@@ -23,6 +23,7 @@
 #include "SILCombiner.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
