@@ -39,6 +39,20 @@ Latest
   return is implicitly propagated through the current initializer if the
   called initializer fails.
 
+* Objective-C init and factory methods are now imported as failable
+  initializers when they can return nil. In the absence of information
+  about a potentially-nil result, an Objective-C init or factory
+  method will be imported as "init!".
+
+  As part of this change, factory methods that have NSError**
+  parameters, such as +[NSString
+  stringWithContentsOfFile:encoding:error:], will now be imported as
+  (failable) initializers, e.g.,
+
+    init?(contentsOfFile path: String, 
+          encoding: NSStringEncoding,
+          error: NSErrorPointer)
+
 * Nested classes explicitly marked @objc will now properly be included in a
   target's generated header as long as the containing context is also
   (implicitly or explicitly) @objc. Nested classes not explicitly marked @objc
