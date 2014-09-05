@@ -34,6 +34,7 @@ var FooEnum3Y: FooEnum3 { get }
 
 /// Aaa.  FooComparisonResult.  Bbb.
 enum FooComparisonResult : Int {
+  
   // This is ascending
   case OrderedAscending
   case OrderedSame // But this is the same.
@@ -45,6 +46,7 @@ struct FooRuncingOptions : RawOptionSetType {
   init()
   init(_ value: Int)
   var value: Int
+  
   // This is mince.
   static var EnableMince: FooRuncingOptions { get }
   static var EnableQuince: FooRuncingOptions { get } /* But this is quince */

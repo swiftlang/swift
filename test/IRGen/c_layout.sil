@@ -7,6 +7,11 @@ import c_layout
 // CHECK: %VSC11BitfieldOne = type <{ %VSs6UInt32, %VSC6Nested, [1 x i8], i32, i32, %Sf, i8, [7 x i8], %VSs6UInt64, %VSs6UInt32 }>
 // CHECK: %VSC6Nested = type <{ %Sf, i24 }>
 
+// CHECK: %VSC26BitfieldSeparatorReference = type [[BITFIELD_SEP_TYPE:<{ %VSs5UInt8, \[3 x i8\], %VSs5UInt8 }>]]
+// CHECK: %VSC25BitfieldSeparatorSameName = type [[BITFIELD_SEP_TYPE]]
+// CHECK: %VSC36BitfieldSeparatorDifferentNameStruct = type [[BITFIELD_SEP_TYPE]]
+// CHECK: %VSC21BitfieldSeparatorAnon = type [[BITFIELD_SEP_TYPE]]
+
 sil public_external @createBitfieldOne : $@thin @cc(cdecl) () -> BitfieldOne
 sil public_external @consumeBitfieldOne : $@thin @cc(cdecl) (BitfieldOne) -> ()
 
@@ -75,3 +80,14 @@ bb0:
 // CHECK:   store i32 [[M]], i32* [[ADDR_M_V]], align 8
 // CHECK:   call void @consumeBitfieldOne(%VSC11BitfieldOne* byval align 8 [[ARG]])
 // CHECK:   ret void
+
+
+sil public_external @testBitfields : $@thin () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+
+sil @testTypedefs : $() -> () {
+bb0:
+  %0 = function_ref @testBitfields : $@thin () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+  %1 = apply %0() : $@thin () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+  %r = tuple ()
+  return %r : $()
+}

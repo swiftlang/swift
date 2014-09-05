@@ -835,12 +835,23 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
 
   // Use different rules for types imported from C.
   if (D->hasClangNode()) {
-    if (auto clangDecl =
-          dyn_cast_or_null<clang::RecordDecl>(D->getClangNode().getAsDecl())) {
-      ClangRecordLowering lowering(IGM, D, clangDecl,
+    const clang::Decl *clangDecl = D->getClangNode().getAsDecl();
+    assert(clangDecl && "Swift struct from an imported C macro?");
+
+    if (auto clangRecord = dyn_cast<clang::RecordDecl>(clangDecl)) {
+      ClangRecordLowering lowering(IGM, D, clangRecord,
                                    SILType::getPrimitiveObjectType(type));
       lowering.collectRecordFields();
       return lowering.createTypeInfo(ty);
+
+    } else if (isa<clang::EnumDecl>(clangDecl)) {
+      // Fall back to Swift lowering for the enum's representation as a struct.
+      assert(std::distance(D->getStoredProperties().begin(),
+                           D->getStoredProperties().end()) == 1 &&
+             "Struct representation of a Clang enum should wrap one value");
+
+    } else {
+      llvm_unreachable("Swift struct represents unexpected imported type");
     }
   }
 

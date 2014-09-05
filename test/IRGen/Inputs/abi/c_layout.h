@@ -26,3 +26,28 @@ struct A {
   int x;
 };
 struct A createA(void);
+
+
+struct BitfieldSeparatorReference {
+  unsigned char a;
+  unsigned : 0;
+  unsigned char b;
+};
+
+typedef struct BitfieldSeparatorSameName {
+  unsigned char a;
+  unsigned : 0;
+  unsigned char b;
+} BitfieldSeparatorSameName;
+
+typedef struct BitfieldSeparatorDifferentNameStruct {
+  unsigned char a;
+  unsigned : 0;
+  unsigned char b;
+} BitfieldSeparatorDifferentName;
+
+typedef struct {
+  unsigned char a;
+  unsigned : 0;
+  unsigned char b;
+} BitfieldSeparatorAnon;

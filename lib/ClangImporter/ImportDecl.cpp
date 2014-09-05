@@ -4846,13 +4846,13 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (Result)
     importAttributes(ClangDecl, Result);
 
+#ifndef NDEBUG
   auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
-  (void)Canon;
+
   // Note that the decl was imported from Clang.  Don't mark Swift decls as
   // imported.
   if (!Result->getDeclContext()->isModuleScopeContext() ||
       isa<ClangModuleUnit>(Result->getDeclContext())) {
-#ifndef NDEBUG
     // Either the Swift declaration was from stdlib,
     // or we imported the underlying decl of the typedef,
     // or we imported the decl itself.
@@ -4880,11 +4880,12 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
       }
       assert(ImportedCorrectly);
     }
-#endif
     assert(Result->hasClangNode());
-    if (SkippedOverTypedef)
-      Result->updateClangNode(ClangDecl);
   }
+#else
+  (void)SkippedOverTypedef;
+#endif
+
   return Result;
 }
 
