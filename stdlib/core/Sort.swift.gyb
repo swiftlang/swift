@@ -26,14 +26,14 @@ def cmp(a,b,p):
 % for p in preds:
 %{
 if p:
-  orderingRequirement = """
+  orderingRequirement = """\
 /// Requires: `isOrderedBefore` is a `strict weak ordering
 /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
 /// over `elements`."""
-  according = "according to 'isOrderedBefore'"
+  according = " according to `isOrderedBefore`"
 else:
-  orderingRequirement = """
-/// Requires: The less-than operator ('func <') defined in the Comparable
+  orderingRequirement = """\
+/// Requires: The less-than operator (`func <`) defined in the `Comparable`
 /// conformance is a `strict weak ordering
 /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
 /// over `elements`."""
@@ -295,11 +295,27 @@ public func sort<T : Comparable>(inout array: [T]) {
   }
 }
 
-/// Return an `Array` containing the sorted elements of `source`${according}.
-///
+%{
+if p:
+    sortIsUnstable = """\
 /// The sorting algorithm is not stable (can change the relative order of
-/// elements that compare equal).
-${orderingRequirement}
+/// elements for which `isOrderedBefore` does not establish an order)."""
+else:
+    sortIsUnstable = """\
+/// The sorting algorithm is not stable (can change the relative order of
+/// elements that compare equal)."""
+
+sortedDocComment = """\
+/// Return an `Array` containing the sorted elements of `source`{according}.
+///
+{sortIsUnstable}
+///
+{orderingRequirement}""".format(
+    according=according, sortIsUnstable=sortIsUnstable,
+    orderingRequirement=orderingRequirement)
+}%
+
+${sortedDocComment}
 public func sorted<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
@@ -312,11 +328,7 @@ public func sorted<
   return result
 }
 
-/// Return an `Array` containing the sorted elements of `source`${according}.
-///
-/// The sorting algorithm is not stable (can change the relative order of
-/// elements that compare equal).
-${orderingRequirement}
+${sortedDocComment}
 public func sorted<
   C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
 >(
