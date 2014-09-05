@@ -112,18 +112,22 @@ struct ASTNodeBase {};
       }
     }
 
+    Verifier(PointerUnion<Module *, SourceFile *> M, DeclContext *DC)
+      : M(M),
+        Ctx(M.is<Module *>() ? M.get<Module *>()->Ctx
+                             : M.get<SourceFile *>()->getASTContext()),
+        Out(llvm::errs()),
+        HadError(Ctx.hadError())
+    {
+      Scopes.push_back(DC);
+      collectAllArchetypes(DC);
+    }
+
   public:
     Verifier(Module *M, DeclContext *DC)
-      : M(M), Ctx(M->Ctx), Out(llvm::errs()), HadError(M->Ctx.hadError()) {
-      Scopes.push_back(DC);
-      collectAllArchetypes(DC);
-    }
+      : Verifier(PointerUnion<Module *, SourceFile *>(M), DC) { }
     Verifier(SourceFile &SF, DeclContext *DC)
-      : M(&SF), Ctx(SF.getASTContext()), Out(llvm::errs()),
-        HadError(SF.getASTContext().hadError()) {
-      Scopes.push_back(DC);
-      collectAllArchetypes(DC);
-    }
+      : Verifier(&SF, DC) { }
 
     static Verifier forDecl(const Decl *D) {
       DeclContext *DC = D->getDeclContext();
@@ -1532,6 +1536,13 @@ struct ASTNodeBase {};
                 << "\n";
             abort();
           }
+
+          // Make sure that the replacement type only uses archetypes allowed
+          // in the context where the normal conformance exists.
+          auto replacementType
+            = normal->getTypeWitness(assocType, nullptr).getReplacement();
+          Verifier(M, normal->getDeclContext())
+            .verifyChecked(replacementType);
           continue;
         }
         
