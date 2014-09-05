@@ -873,3 +873,81 @@ bb8(%40 : $Builtin.Word):
   %41 = struct $Int (%40 : $Builtin.Word)
   return %41 : $Int
 }
+
+
+/// Don't jumpthread blocks that contain method instructions. We don't support
+/// building phis with function values.
+
+class Bar {
+  init()
+  func foo()
+}
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@owned Bar) -> ()
+
+sil_vtable Bar {
+  #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
+}
+
+
+// CHECK-LABEL: @dont_jumpthread_switch_enum
+// CHECK: class_method
+// CHECK: switch_enum
+// CHECK: return
+
+sil @dont_jumpthread_switch_enum : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %100 = alloc_ref $Bar
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = struct_extract %0 : $Int, #Int.value
+  %4 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = apply %4(%3, %2, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 0
+  %8 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %8 : $Builtin.Int1
+  %10 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %11 = apply %10(%2, %7) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %11, bb8(%1 : $Builtin.Word), bb2
+
+bb2:
+  %14 = integer_literal $Builtin.Word, 2
+  %15 = struct $Int (%2 : $Builtin.Word)
+  %16 = enum $Optional<Int>, #Optional.Some!enumelt.1, %15 : $Int
+  br bb3(%1 : $Builtin.Word, %14 : $Builtin.Word, %16 : $Optional<Int>)
+
+bb3(%18 : $Builtin.Word, %19 : $Builtin.Word, %20 : $Optional<Int>):
+  %101 = class_method %100 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@cc(method) @thin (@owned Bar) -> ()
+  switch_enum %20 : $Optional<Int>, case #Optional.Some!enumelt.1: bb4, case #Optional.None!enumelt: bb5
+
+bb4:
+  %102 = apply %101(%100) : $@cc(method) @thin (@owned Bar) -> ()
+  %22 = unchecked_enum_data %20 : $Optional<Int>, #Optional.Some!enumelt.1
+  %23 = struct_extract %22 : $Int, #Int.value
+  %24 = apply %4(%18, %23, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %25 = tuple_extract %24 : $(Builtin.Word, Builtin.Int1), 0
+  %26 = tuple_extract %24 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %26 : $Builtin.Int1
+  %28 = struct $Int (%19 : $Builtin.Word)
+  %29 = apply %10(%19, %7) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %29, bb6, bb7
+
+bb5:
+  cond_fail %5 : $Builtin.Int1
+  unreachable
+
+bb6:
+  br bb8(%25 : $Builtin.Word)
+
+bb7:
+  %34 = apply %4(%19, %2, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %35 = tuple_extract %34 : $(Builtin.Word, Builtin.Int1), 0
+  %36 = tuple_extract %34 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %36 : $Builtin.Int1
+  %38 = enum $Optional<Int>, #Optional.Some!enumelt.1, %28 : $Int
+  br bb3(%25 : $Builtin.Word, %35 : $Builtin.Word, %38 : $Optional<Int>)
+
+bb8(%40 : $Builtin.Word):
+  %41 = struct $Int (%40 : $Builtin.Word)
+  return %41 : $Int
+}

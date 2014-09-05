@@ -617,9 +617,14 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     // duplicating it would require constructing SSA, which we're not prepared
     // to do.
     if ((HasDestBBDefsUsedOutsideBlock |=
-         isUsedOutsideOfBlock(&Inst, DestBB)))
+         isUsedOutsideOfBlock(&Inst, DestBB))) {
       if (!isThreadableCondBr && !isThreadableEnumInst)
         return false;
+
+      // We can't build SSA for method values.
+      if (isa<MethodInst>(Inst))
+        return false;
+    }
   }
 
 
