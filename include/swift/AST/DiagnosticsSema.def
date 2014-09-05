@@ -1293,6 +1293,8 @@ ERROR(capture_before_declaration,tce_sema,none,
 ERROR(unsupported_local_function_reference,tce_sema,none,
       "cannot reference a local function with captures from another local "
       "function", ())
+ERROR(unsupported_recursive_local_function,tce_sema,none,
+      "local functions cannot reference themselves", ())
 
 WARNING(recursive_accessor_reference,tce_sema,none,
         "attempting to %select{access|modify}1 %0 within its own "

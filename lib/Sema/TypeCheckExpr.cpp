@@ -694,8 +694,7 @@ namespace {
 
       // Only capture var decls at global scope.  Other things can be captured
       // if they are local.
-      if (!isa<VarDecl>(D) &&
-          !DRE->getDecl()->getDeclContext()->isLocalContext())
+      if (!isa<VarDecl>(D) && !D->getDeclContext()->isLocalContext())
         return { false, DRE };
 
       // Can only capture a local that is declared before the capturing entity.
@@ -713,7 +712,15 @@ namespace {
       }
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
-        // TODO: Recursive local function references aren't implemented in
+        // TODO: Local functions cannot be recursive, because SILGen
+        // cannot handle it yet.
+        if (CurExprAsDC == FD) {
+          TC.diagnose(DRE->getLoc(), 
+                      diag::unsupported_recursive_local_function);
+          return { false, DRE };
+        }
+
+        // TODO: Local function references aren't implemented in
         // SILGen yet. However, if there are no local captures, it will work.
         // Keep track of these local function captures so we can check them
         // later.

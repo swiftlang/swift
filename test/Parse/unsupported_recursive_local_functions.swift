@@ -5,7 +5,7 @@ func foo() {
 
   func bar() {
     ++i
-    bar() // expected-error{{cannot reference a local function with captures from another local function}}
+    bar() // expected-error{{local functions cannot reference themselves}}
   }
 
   func bas() {
