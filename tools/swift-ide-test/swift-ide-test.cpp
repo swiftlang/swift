@@ -1026,7 +1026,8 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
                       bool PrintImplicitAttrs,
                       bool PrintAccessibility,
                       bool PrintUnavailableDecls,
-                      Accessibility AccessibilityFilter) {
+                      Accessibility AccessibilityFilter,
+                      StringRef MangledNameToFind) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
 
@@ -1051,7 +1052,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   Options.AccessibilityFilter = AccessibilityFilter;
   Options.SkipUnavailable = !PrintUnavailableDecls;
 
-  if (options::MangledNameToFind.empty()) {
+  if (MangledNameToFind.empty()) {
     Module *M = CI.getMainModule();
     M->getMainSourceFile(Invocation.getInputKind()).print(llvm::outs(),
                                                           Options);
@@ -1061,7 +1062,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   // If we were given a mangled name, do a very simple form of LLDB's logic to
   // look up a type based on that name.
   Demangle::NodePointer node =
-    demangle_wrappers::demangleSymbolAsNode(options::MangledNameToFind);
+    demangle_wrappers::demangleSymbolAsNode(MangledNameToFind);
   using NodeKind = Demangle::Node::Kind;
 
   if (node->getKind() != NodeKind::Global) {
@@ -2272,30 +2273,21 @@ int main(int argc, char *argv[]) {
     break;
 
   case ActionType::PrintASTNotTypeChecked:
+  case ActionType::PrintASTTypeChecked: {
+    bool RunTypeChecker = (options::Action == ActionType::PrintASTTypeChecked);
     ExitCode = doPrintAST(InitInvok,
                           options::SourceFilename,
-                          /*RunTypeChecker=*/false,
+                          RunTypeChecker,
                           /*FunctionDefinitions=*/options::FunctionDefinitions,
                           /*PreferTypeRepr=*/options::PreferTypeRepr,
                           options::ExplodePatternBindingDecls,
                           options::PrintImplicitAttrs,
                           options::PrintAccessibility,
                           !options::SkipUnavailable,
-                          options::AccessibilityFilter);
+                          options::AccessibilityFilter,
+                          options::MangledNameToFind);
     break;
-
-  case ActionType::PrintASTTypeChecked:
-    ExitCode = doPrintAST(InitInvok,
-                          options::SourceFilename,
-                          /*RunTypeChecker=*/true,
-                          /*FunctionDefinitions=*/options::FunctionDefinitions,
-                          /*PreferTypeRepr=*/options::PreferTypeRepr,
-                          options::ExplodePatternBindingDecls,
-                          options::PrintImplicitAttrs,
-                          options::PrintAccessibility,
-                          !options::SkipUnavailable,
-                          options::AccessibilityFilter);
-    break;
+  }
 
   case ActionType::PrintModule: {
     ide::ModuleTraversalOptions TraversalOptions;
