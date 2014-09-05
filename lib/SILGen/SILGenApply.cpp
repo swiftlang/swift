@@ -1260,10 +1260,8 @@ public:
     // If we're using the allocating constructor, we need to pass along the
     // metatype.
     if (useAllocatingCtor) {
-      auto cleanup = self.getCleanup();
-
-      SILValue selfMeta = gen.emitMetatypeOfValue(expr, self.forward(gen));
-      self = ManagedValue(selfMeta, cleanup);
+      SILValue selfMeta = gen.emitMetatypeOfValue(expr, self.getValue());
+      self = ManagedValue::forUnmanaged(selfMeta);
     }
 
     CanType selfFormalType = arg->getType()->getCanonicalType();

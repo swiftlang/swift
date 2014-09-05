@@ -29,6 +29,8 @@ extension Hive {
     // CHECK: [[FACTORY:%[0-9]+]] = class_method [volatile] [[META]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (queen: B!) -> Hive! , $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
     // CHECK: [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
     // CHECK: apply [[FACTORY]]([[QUEEN:%[0-9]+]], [[OBJC_META]]) : $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
+    // CHECK-NOT: return %
+    // CHECK: strong_release [[SELF]] : $Hive
     self.init(queen: other)
   }
 }
