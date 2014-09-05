@@ -4273,6 +4273,18 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   return literal;
 }
 
+/// Determine whether the given type refers to a non-final class (or
+/// dynamic self of one).
+static bool isNonFinalClass(Type type) {
+  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
+    type = dynamicSelf->getSelfType();
+
+  if (auto classDecl = type->getClassOrBoundGenericClass())
+    return !classDecl->isFinal();
+
+  return false;
+}
+
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
@@ -4428,21 +4440,17 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // If we're constructing a class object, either the metatype must be
   // statically derived (rather than an arbitrary value of metatype type) or
-  // the referenced constructor must be abstract.
+  // the referenced constructor must be required.
   // FIXME: The "hasClangNode" check here is a complete hack.
-  if ((ty->getClassOrBoundGenericClass() || ty->is<DynamicSelfType>()) &&
+  if (isNonFinalClass(ty) &&
       !fn->isStaticallyDerivedMetatype() &&
       !decl->hasClangNode() &&
       !cast<ConstructorDecl>(decl)->isRequired()) {
     tc.diagnose(apply->getLoc(), diag::dynamic_construct_class, ty)
       .highlight(fn->getSourceRange());
     auto ctor = cast<ConstructorDecl>(decl);
-    // FIXME: Better description of the initializer than just it's type.
-    if (ctor->isImplicit())
-      tc.diagnose(decl, diag::note_nonrequired_implicit_initializer,
-                  ctor->getArgumentType());
-    else
-      tc.diagnose(decl, diag::note_nonrequired_initializer);
+    tc.diagnose(decl, diag::note_nonrequired_initializer,
+                ctor->isImplicit(), ctor->getFullName());
   } else if (isa<ConstructorDecl>(decl) && ty->isExistentialType() &&
              fn->isStaticallyDerivedMetatype()) {
     tc.diagnose(apply->getLoc(), diag::static_construct_existential, ty)

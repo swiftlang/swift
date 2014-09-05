@@ -21,13 +21,17 @@ enum E {
 }
 
 class C {
-  init(i: Int) { } // expected-note{{selected non-required initializer declared here}}
+  init(i: Int) { } // expected-note{{selected non-required initializer 'init(i:)'}}
 
   required init(d: Double) { }
 
   class Inner {
     init(i: Int) { }
   }
+}
+
+final class D {
+  init(i: Int) { }
 }
 
 // --------------------------------------------------------------------------
@@ -50,7 +54,8 @@ func constructEnumMetatypeValue() {
 func constructClassMetatypeValue() {
   // Only permitted with a @required constructor.
   var c1 = getMetatype(C.self)(d: 1.5) // okay
-  var c2 = getMetatype(C.self)(i: 5) // expected-error{{constructing an object of class type 'C' with a metatype value must have a 'required' initializer}}
+  var c2 = getMetatype(C.self)(i: 5) // expected-error{{constructing an object class type 'C' (or subclass thereof) must use a 'required' initializer}}
+  var d1 = getMetatype(D.self)(i: 5)
 }
 
 // --------------------------------------------------------------------------

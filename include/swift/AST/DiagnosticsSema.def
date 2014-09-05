@@ -1116,12 +1116,11 @@ ERROR(nonclass_convenience_init,sema_tce,none,
       (Type))
 
 ERROR(dynamic_construct_class,sema_tce,none,
-      "constructing an object of class type %0 with a metatype value must have "
-      "a 'required' initializer", (Type))
+      "constructing an object class type %0 (or subclass thereof) must use a "
+      "'required' initializer", (Type))
 NOTE(note_nonrequired_initializer,sema_tce,none,
-      "selected non-required initializer declared here", ())
-NOTE(note_nonrequired_implicit_initializer,sema_tce,none,
-     "selected implicit initializer with type %0", (Type))
+      "selected %select{non-required|implicit}0 initializer %1", 
+     (bool, DeclName))
 ERROR(static_construct_existential,sema_tce,none,
       "constructing an object of protocol type %0 requires a metatype value",
       (Type))
