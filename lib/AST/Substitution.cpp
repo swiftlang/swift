@@ -59,8 +59,10 @@ Substitution::Substitution(ArchetypeType *Archetype,
   assert(Replacement->isMaterializable()
          && "cannot substitute with a non-materializable type");
   
+  assert(Archetype && "missing archetype in substitution");
+  
   // The conformance list must match the archetype conformances.
-  if (Archetype && !Replacement->is<ArchetypeType>()) {
+  if (!Replacement->is<ArchetypeType>()) {
     assert(Conformance.size() == Archetype->getConformsTo().size()
            && "substitution conformances don't match archetype");
   }

@@ -1023,14 +1023,21 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
     llvm_unreachable("unsupported collection upcast kind");
   }
   
+  auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
+  auto fromSubsts = fromCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr);
+  auto toSubsts = toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr);
+  assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
+         "wrong number of generic collection parameters");
+  
   // Form type parameter substitutions.
+  int aIdx = 0;
   SmallVector<Substitution, 4> subs;
-  for (auto sub: fromCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
-    subs.push_back(Substitution{nullptr, sub.getReplacement(),
+  for (auto sub: fromSubsts){
+    subs.push_back(Substitution{fnArcheTypes[aIdx++], sub.getReplacement(),
                                 sub.getConformances()});
   }
-  for (auto sub: toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
-    subs.push_back(Substitution{nullptr, sub.getReplacement(),
+  for (auto sub: toSubsts){
+    subs.push_back(Substitution{fnArcheTypes[aIdx++], sub.getReplacement(),
                                 sub.getConformances()});
   }
 
@@ -1058,7 +1065,6 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
                           source->getType()->getCanonicalType());
   auto toCollection = cast<BoundGenericStructType>(
                         destType->getCanonicalType());
-
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
@@ -1077,14 +1083,21 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
     llvm_unreachable("unsupported collection upcast kind");
   }
 
+  auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
+  auto fromSubsts = fromCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr);
+  auto toSubsts = toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr);
+  assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
+         "wrong number of generic collection parameters");
+  
   // Form type parameter substitutions.
+  int aIdx = 0;
   SmallVector<Substitution, 4> subs;
-  for (auto sub: fromCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
-    subs.push_back(Substitution{nullptr, sub.getReplacement(),
+  for (auto sub: fromSubsts){
+    subs.push_back(Substitution{fnArcheTypes[aIdx++], sub.getReplacement(),
                                 sub.getConformances()});
   }
-  for (auto sub: toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
-    subs.push_back(Substitution{nullptr, sub.getReplacement(),
+  for (auto sub: toSubsts){
+    subs.push_back(Substitution{fnArcheTypes[aIdx++], sub.getReplacement(),
                                 sub.getConformances()});
   }
   
