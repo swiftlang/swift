@@ -22,7 +22,7 @@
 // CHECK: swift
 // CHECK: -o [[OBJECTFILE:.*]]
 
-// CHECK-NEXT: bin/ld{{ }}
+// CHECK-NEXT: bin/ld{{"? }}
 // CHECK-DAG: [[OBJECTFILE]]
 // CHECK-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift/macosx]]
 // CHECK-DAG: -rpath [[STDLIB_PATH]]
@@ -32,7 +32,7 @@
 // CHECK: -o {{[^ ]+}}
 
 
-// SIMPLE: bin/ld{{ }}
+// SIMPLE: bin/ld{{"? }}
 // SIMPLE-NOT: -syslibroot
 // SIMPLE-DAG: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
 // SIMPLE-NOT: -syslibroot
@@ -42,7 +42,7 @@
 // IOS_SIMPLE: swift
 // IOS_SIMPLE: -o [[OBJECTFILE:.*]]
 
-// IOS_SIMPLE: bin/ld{{ }}
+// IOS_SIMPLE: bin/ld{{"? }}
 // IOS_SIMPLE-DAG: [[OBJECTFILE]]
 // IOS_SIMPLE-DAG: -L {{[^ ]+/lib/swift/iphonesimulator}}
 // IOS_SIMPLE-DAG: -lSystem
@@ -51,7 +51,7 @@
 // IOS_SIMPLE: -o linker
 
 
-// COMPLEX: bin/ld{{ }}
+// COMPLEX: bin/ld{{"? }}
 // COMPLEX-DAG: -dylib
 // COMPLEX-DAG: -syslibroot {{.*}}/Inputs/clang-importer-sdk
 // COMPLEX-DAG: -lfoo
@@ -65,7 +65,7 @@
 
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
-// DEBUG-NEXT: bin/ld{{ }}
+// DEBUG-NEXT: bin/ld{{"? }}
 // DEBUG: -add_ast_path {{.*}}/{{[^/]+}}.swiftmodule
 // DEBUG: -o linker
 // DEBUG-NEXT: bin/dsymutil
@@ -73,12 +73,12 @@
 // DEBUG: -o linker.dSYM
 
 
-// NO_ARCLITE: bin/ld{{ }}
+// NO_ARCLITE: bin/ld{{"? }}
 // NO_ARCLITE-NOT: arclite
 // NO_ARCLITE: -o {{[^ ]+}}
 
 
 // INFERRED_NAME: bin/swift
 // INFERRED_NAME: -module-name LINKER
-// INFERRED_NAME: bin/ld{{ }}
+// INFERRED_NAME: bin/ld{{"? }}
 // INFERRED_NAME: -o libLINKER.dylib

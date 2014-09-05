@@ -80,7 +80,7 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "link",
-// CHECK-NEXT:   "command": "{{.*}}/ld {{.*}}/parseable_output-[[OUTPUT]].o {{.*}} -o {{.*}}/parseable_output.swift.tmp.out",
+// CHECK-NEXT:   "command": "{{.*}}/ld{{(\\")?}} {{.*}}/parseable_output-[[OUTPUT]].o {{.*}} -o {{.*}}/parseable_output.swift.tmp.out",
 // CHECK-NEXT:   "inputs": [
 // CHECK-NEXT:     "{{.*}}/parseable_output-[[OUTPUT]].o"
 // CHECK-NEXT:   ],
