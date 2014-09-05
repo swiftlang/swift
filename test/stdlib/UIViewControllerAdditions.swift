@@ -27,7 +27,7 @@ class View6Controller : UIViewController { }
 // no nib
 class MissingViewController : UIViewController { }
 
-let bundle = NSBundle(path:NSString(UTF8String:C_ARGV[1]))
+let bundle = NSBundle(path:NSString(UTF8String:C_ARGV[1])!)
 
 let v1 = View1Controller(nibName:nil, bundle:bundle)
 println("tag 1 0=\(v1.view.tag) you're it")
