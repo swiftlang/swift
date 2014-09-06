@@ -7,7 +7,6 @@ add_subdirectory(Dispatch)
 add_subdirectory(CoreGraphics)
 add_subdirectory(Foundation)
 add_subdirectory(ObjectiveC)
-add_subdirectory(Security)
 add_subdirectory(SpriteKit)
 
 if (SWIFT_SDKS)
