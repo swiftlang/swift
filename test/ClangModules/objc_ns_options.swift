@@ -20,8 +20,8 @@ minceOrQuince &= noMince
 minceOrQuince |= minceAndQuince
 minceOrQuince ^= .EnableMince
 
-var minceValue: UInt = minceAndQuince.toRaw()
-var minceFromMask: NSRuncingOptions = .fromMask(0)
+var minceValue: UInt = minceAndQuince.raw
+var minceFromMask: NSRuncingOptions = NSRuncingOptions(0)
 
 var nothing: NSRuncingOptions = NSRuncingOptions()
 var nothing2: NSRuncingOptions = nil

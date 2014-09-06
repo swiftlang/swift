@@ -27,11 +27,11 @@ public enum Bit : Int, RandomAccessIndexType, Reflectable {
   }
 
   public func distanceTo(other: Bit) -> Int {
-    return toRaw().distanceTo(other.toRaw())
+    return raw.distanceTo(other.raw)
   }
 
   public func advancedBy(distance: Int) -> Bit {
-    return toRaw().advancedBy(distance) > 0 ? One : Zero
+    return raw.advancedBy(distance) > 0 ? One : Zero
   }
 
   public
@@ -72,49 +72,49 @@ struct _BitMirror: MirrorType {
 }
 
 public func == (lhs: Bit, rhs: Bit) -> Bool {
-  return lhs.toRaw() == rhs.toRaw()
+  return lhs.raw == rhs.raw
 }
 
 public func < (lhs: Bit, rhs: Bit) -> Bool {
-  return lhs.toRaw() < rhs.toRaw()
+  return lhs.raw < rhs.raw
 }
 
 extension Bit : IntegerArithmeticType {
   static func _withOverflow(v: (Int, overflow: Bool)) -> (Bit, overflow: Bool) {
-    return (Bit.fromRaw(v.0)!, v.overflow)
+    return (Bit(v.0)!, v.overflow)
   }
   
   public static func addWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.addWithOverflow(lhs.toRaw(), rhs.toRaw()))
+    return _withOverflow(Int.addWithOverflow(lhs.raw, rhs.raw))
   }
 
   public static func subtractWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.subtractWithOverflow(lhs.toRaw(), rhs.toRaw()))
+    return _withOverflow(Int.subtractWithOverflow(lhs.raw, rhs.raw))
   }
 
   public static func multiplyWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.multiplyWithOverflow(lhs.toRaw(), rhs.toRaw()))
+    return _withOverflow(Int.multiplyWithOverflow(lhs.raw, rhs.raw))
   }
 
   public static func divideWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.divideWithOverflow(lhs.toRaw(), rhs.toRaw()))
+    return _withOverflow(Int.divideWithOverflow(lhs.raw, rhs.raw))
   }
 
   public static func remainderWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.remainderWithOverflow(lhs.toRaw(), rhs.toRaw()))
+    return _withOverflow(Int.remainderWithOverflow(lhs.raw, rhs.raw))
   }
 
   public func toIntMax() -> IntMax {
-    return IntMax(toRaw())
+    return IntMax(raw)
   }
 }

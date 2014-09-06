@@ -1312,6 +1312,8 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
         emitEnumConstructor(elt);
       else if (auto func = dyn_cast<FuncDecl>(member))
         emitFunction(func);
+      else if (auto ctor = dyn_cast<ConstructorDecl>(member))
+        emitConstructor(ctor);
     }
     // Emit derived global decls.
     for (auto derived : ed->getDerivedGlobalDecls()) {

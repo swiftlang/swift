@@ -1,11 +1,11 @@
 // RUN: %swift -parse -verify -primary-file %s %S/Inputs/enum_multi_file_helper.swift
 
-var raw1: Int = Foo.A.toRaw()
+var raw1: Int = Foo.A.raw
 var raw2: Bar.Raw = 0
-var cooked1: Foo? = Foo.fromRaw(raw1)
-var cooked2: Bar? = Bar.fromRaw(22)
-var cooked3: Baz? = Baz.fromRaw(0)
-var cooked4: Garply? = Garply.fromRaw("A")
+var cooked1: Foo? = Foo(raw1)
+var cooked2: Bar? = Bar(22)
+var cooked3: Baz? = Baz(0)
+var cooked4: Garply? = Garply("A")
 
 func consume<T: RawRepresentable>(obj: T) {}
 func test() {

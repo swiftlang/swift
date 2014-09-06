@@ -232,19 +232,16 @@ enum QuxEnum : Int {
 // QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Qux2[#QuxEnum.Type -> QuxEnum#]{{$}}
 // QUX_ENUM_TYPE_CONTEXT: End completions
 
-// QUX_ENUM_NO_DOT: Begin completions, 5 items
+// QUX_ENUM_NO_DOT: Begin completions, 4 items
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux1[#QuxEnum.Type -> QuxEnum#]{{$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux2[#QuxEnum.Type -> QuxEnum#]{{$}}
-// QUX_ENUM_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .fromRaw({#Int#})[#QuxEnum?#]{{$}}
-// QUX_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .toRaw({#self: QuxEnum#})[#() -> Int#]{{$}}
+// QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:   ({#Int#})[#QuxEnum?#]{{$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/Super:            .Raw[#Int#]{{$}}
 // QUX_ENUM_NO_DOT-NEXT: End completions
 
-// QUX_ENUM_DOT: Begin completions, 5 items
+// QUX_ENUM_DOT: Begin completions, 3 items
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux1[#QuxEnum.Type -> QuxEnum#]{{$}}
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux2[#QuxEnum.Type -> QuxEnum#]{{$}}
-// QUX_ENUM_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   fromRaw({#Int#})[#QuxEnum?#]{{$}}
-// QUX_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: toRaw({#self: QuxEnum#})[#() -> Int#]{{$}}
 // QUX_ENUM_DOT-NEXT: Decl[TypeAlias]/Super:            Raw[#Int#]{{$}}
 // QUX_ENUM_DOT-NEXT: End completions
 

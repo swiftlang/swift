@@ -162,8 +162,8 @@ public struct GeneratorSequence<
 
 public protocol RawRepresentable {
   typealias Raw
-  class func fromRaw(raw: Raw) -> Self?
-  func toRaw() -> Raw
+  init?(_: Raw)
+  var raw: Raw { get }
 }
 
 // Workaround for our lack of circular conformance checking. Allow == to be
@@ -171,25 +171,24 @@ public protocol RawRepresentable {
 // RawOptionSetType without a circularity our type-checker can't yet handle.
 public protocol _RawOptionSetType: RawRepresentable, Equatable {
   typealias Raw : BitwiseOperationsType, Equatable
-  // A non-failable version of RawRepresentable.fromRaw.
-  class func fromMask(raw: Raw) -> Self
+  init(_: Raw)
 }
 
 public func == <T: _RawOptionSetType>(a: T, b: T) -> Bool {
-  return a.toRaw() == b.toRaw()
+  return a.raw == b.raw
 }
 
 public func & <T: _RawOptionSetType>(a: T, b: T) -> T {
-  return T.fromMask(a.toRaw() & b.toRaw())
+  return T(a.raw & b.raw)
 }
 public func | <T: _RawOptionSetType>(a: T, b: T) -> T {
-  return T.fromMask(a.toRaw() | b.toRaw())
+  return T(a.raw | b.raw)
 }
 public func ^ <T: _RawOptionSetType>(a: T, b: T) -> T {
-  return T.fromMask(a.toRaw() ^ b.toRaw())
+  return T(a.raw ^ b.raw)
 }
 public prefix func ~ <T: _RawOptionSetType>(a: T) -> T {
-  return T.fromMask(~a.toRaw())
+  return T(~a.raw)
 }
 
 // TODO: This is an incomplete implementation of our option sets vision.
@@ -199,7 +198,7 @@ public protocol RawOptionSetType : _RawOptionSetType, BitwiseOperationsType,
   // implementations in protocols)
   // The Clang importer synthesizes these for imported NS_OPTIONS.
 
-  /* class func fromRaw(raw: Raw) -> Self? { return fromMask(raw) } */
+  /* init?(_ raw: Raw) { self.init(raw) } */
 }
 
 /// Conforming to this protocol allows a type to be usable with the 'nil'

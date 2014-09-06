@@ -409,121 +409,15 @@ static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
 }
 
 
-namespace {
-  enum class OptionSetFactoryMethod {
-    FromRaw,
-    FromMask,
-  };
-}
-
-
-/// Build the 'fromMask' or 'fromRaw' method for an option set.
-/// struct NSSomeOptionSet : RawOptionSet {
-///   var value : RawType
-///   static func fromMask(value: RawType) -> NSSomeOptionSet {
-///     return NSSomeOptionSet(value)
-///   }
-///   static func fromRaw(value: RawType) -> NSSomeOptionSet? {
-///     return NSSomeOptionSet(value)
-///   }
-/// }
-static FuncDecl *makeOptionSetFactoryMethod(
-                   StructDecl *optionSetDecl,
-                   VarDecl *valueDecl,
-                   OptionSetFactoryMethod factoryMethod) {
-  auto &C = optionSetDecl->getASTContext();
-  auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
-  auto rawType = valueDecl->getType();
-  
-  VarDecl *selfDecl = createSelfDecl(optionSetDecl, true);
-  Pattern *selfParam = createTypedNamedPattern(selfDecl);
-  VarDecl *rawDecl = new (C) ParamDecl(/*IsLet*/true,
-                                       SourceLoc(), Identifier(),
-                                       SourceLoc(), C.Id_raw,
-                                       Type(), optionSetDecl);
-  rawDecl->setImplicit();
-  rawDecl->setType(rawType);
-  Pattern *rawParam = createTypedNamedPattern(rawDecl);
-  auto rawArgType = TupleType::get(TupleTypeElt(rawType, C.Id_raw), C);
-  rawParam = TuplePattern::create(C, SourceLoc(),
-                                  TuplePatternElt(rawParam), SourceLoc());
-  rawParam->setImplicit();
-  rawParam->setType(rawArgType);
-
-  Pattern *bodyParams[] = {selfParam, rawParam};
-  
-  Type retType;
-  switch (factoryMethod) {
-  case OptionSetFactoryMethod::FromMask:
-    retType = optionSetType;
-    break;
-  case OptionSetFactoryMethod::FromRaw:
-    retType = OptionalType::get(optionSetType);
-    break;
-  }
-  
-  Identifier baseName;
-  switch (factoryMethod) {
-  case OptionSetFactoryMethod::FromMask:
-    baseName = C.Id_fromMask;
-    break;
-  case OptionSetFactoryMethod::FromRaw:
-    baseName = C.Id_fromRaw;
-    break;
-  }
-  
-  DeclName name(C, baseName, { Identifier() });
-  auto factoryDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                                      SourceLoc(),
-                                      name,
-                                      SourceLoc(), nullptr, Type(),
-                                      bodyParams,
-                                      TypeLoc::withoutLoc(retType),
-                                      optionSetDecl);
-  
-  factoryDecl->setStatic();
-  factoryDecl->setImplicit();
-  factoryDecl->setAccessibility(Accessibility::Public);
-  
-  Type factoryType = FunctionType::get(ParenType::get(C, rawType), retType);
-  factoryType = FunctionType::get(selfDecl->getType(), factoryType);
-  factoryDecl->setType(factoryType);
-  factoryDecl->setBodyResultType(retType);
-
-  auto *ctorRef = new (C) DeclRefExpr(ConcreteDeclRef(optionSetDecl),
-                                      SourceLoc(), /*implicit*/ true);
-  auto *rawRef = new (C) DeclRefExpr(ConcreteDeclRef(rawDecl),
-                                     SourceLoc(), /*implicit*/ true);
-  auto *ctorCall = new (C) CallExpr(ctorRef, rawRef,
-                                    /*implicit*/ true);
-  auto *ctorRet = new (C) ReturnStmt(SourceLoc(), ctorCall,
-                                     /*implicit*/ true);
-  
-  auto body = BraceStmt::create(C, SourceLoc(),
-                                ASTNode(ctorRet),
-                                SourceLoc(),
-                                /*implicit*/ true);
-  
-  factoryDecl->setBody(body);
-  
-  // Add as an external definition.
-  C.addedExternalDecl(factoryDecl);
-  
-  return factoryDecl;
-}
-
-// Build the 'toRaw' method for an option set.
+// Build the 'raw' property trivial getter for an option set.
 // struct NSSomeOptionSet : RawOptionSet {
-//   var value: RawType
-//   func toRaw() -> RawType {
-//     return self.value
-//   }
+//   let raw: Raw
 // }
-static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
-                                          ValueDecl *valueDecl) {
+static FuncDecl *makeOptionSetRawTrivialGetter(StructDecl *optionSetDecl,
+                                               ValueDecl *rawDecl) {
   ASTContext &C = optionSetDecl->getASTContext();
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
-  auto rawType = valueDecl->getType();
+  auto rawType = rawDecl->getType();
 
   VarDecl *selfDecl = createSelfDecl(optionSetDecl, false);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
@@ -532,35 +426,34 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
 
-  DeclName name(C, C.Id_toRaw, { });
-  FuncDecl *toRawDecl = FuncDecl::create(
+  FuncDecl *getterDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      name, SourceLoc(), nullptr, Type(), params, 
+      DeclName(), SourceLoc(), nullptr, Type(), params,
       TypeLoc::withoutLoc(rawType), optionSetDecl);
-  toRawDecl->setImplicit();
+  getterDecl->setImplicit();
   
   auto toRawArgType = TupleType::getEmpty(C);
   Type toRawType = FunctionType::get(toRawArgType, rawType);
   toRawType = FunctionType::get(optionSetType, toRawType);
-  toRawDecl->setType(toRawType);
-  toRawDecl->setBodyResultType(rawType);
-  toRawDecl->setAccessibility(Accessibility::Public);
+  getterDecl->setType(toRawType);
+  getterDecl->setBodyResultType(rawType);
+  getterDecl->setAccessibility(Accessibility::Public);
 
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
-                                        valueDecl, SourceLoc(),
+                                        rawDecl, SourceLoc(),
                                         /*implicit*/ true);
   auto valueRet = new (C) ReturnStmt(SourceLoc(), valueRef);
   
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(valueRet),
                                 SourceLoc(),
                                 /*implicit*/ true);
-  toRawDecl->setBody(body);
+  getterDecl->setBody(body);
   
   // Add as an external definition.
-  C.addedExternalDecl(toRawDecl);
+  C.addedExternalDecl(getterDecl);
 
-  return toRawDecl;
+  return getterDecl;
 }
 
 static Expr *
@@ -724,9 +617,6 @@ static FuncDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
   
   return factoryDecl;
 }
-
-
-
 
 // Build the default initializer for an option set.
 // struct NSSomeOptionSet : RawOptionSet {
@@ -1552,14 +1442,15 @@ namespace {
         structDecl->computeType();
         
         // Create a field to store the underlying value.
-        auto varName = Impl.SwiftContext.getIdentifier("value");
+        auto varName = Impl.SwiftContext.Id_raw;
         auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                   /*IsLet*/ false,
+                                                   /*IsLet*/ true,
                                                    SourceLoc(), varName,
                                                    underlyingType,
                                                    structDecl);
-        var->setAccessibility(Accessibility::Internal);
-        var->setSetterAccessibility(Accessibility::Internal);
+        var->setImplicit();
+        var->setAccessibility(Accessibility::Public);
+        var->setSetterAccessibility(Accessibility::Private);
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);
@@ -1568,7 +1459,7 @@ namespace {
             PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), varPattern, nullptr,
                                /*conditional*/ false, structDecl);
-
+        
         // Create a default initializer to get the value with no options set.
         auto defaultConstructor = makeOptionSetDefaultConstructor(structDecl,
                                                                   var);
@@ -1590,15 +1481,11 @@ namespace {
         // Add delayed implicit members to the type.
         DelayedDecl delayedMembers[] = {
           [=](SmallVectorImpl<Decl *> &NewDecls) {
-            NewDecls.push_back(
-                makeOptionSetFactoryMethod(structDecl, var,
-                                           OptionSetFactoryMethod::FromMask));
-            NewDecls.push_back(
-                makeOptionSetFactoryMethod(structDecl, var,
-                                           OptionSetFactoryMethod::FromRaw));
-            NewDecls.push_back(makeOptionSetToRawMethod(structDecl, var));
             makeOptionSetAllZerosProperty(structDecl, NewDecls);
             NewDecls.push_back(makeNilLiteralConformance(structDecl, var));
+            auto rawGetter = makeOptionSetRawTrivialGetter(structDecl, var);
+            NewDecls.push_back(rawGetter);
+            var->makeStoredWithTrivialAccessors(rawGetter, nullptr);
           }
         };
         

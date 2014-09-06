@@ -1091,16 +1091,16 @@ public func NSLog(format: String, args: CVarArgType...) {
 // implicit conversion to NSRectEdge).
 
 public var NSMinXEdge: NSRectEdge {
-  return NSRectEdge(CGRectEdge.MinXEdge.toRaw())
+  return NSRectEdge(CGRectEdge.MinXEdge.raw)
 }
 public var NSMinYEdge: NSRectEdge {
-  return NSRectEdge(CGRectEdge.MinYEdge.toRaw())
+  return NSRectEdge(CGRectEdge.MinYEdge.raw)
 }
 public var NSMaxXEdge: NSRectEdge {
-  return NSRectEdge(CGRectEdge.MaxXEdge.toRaw())
+  return NSRectEdge(CGRectEdge.MaxXEdge.raw)
 }
 public var NSMaxYEdge: NSRectEdge {
-  return NSRectEdge(CGRectEdge.MaxYEdge.toRaw())
+  return NSRectEdge(CGRectEdge.MaxYEdge.raw)
 }
 
 #endif

@@ -3510,11 +3510,6 @@ public:
       checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
     }
 
-    for (Decl *member : ED->getMembers())
-      visit(member);
-    for (Decl *global : ED->getDerivedGlobalDecls())
-      visit(global);
-
     if (!IsFirstPass) {
       if (rawTy) {
         // Check the raw values of the cases.
@@ -3537,7 +3532,7 @@ public:
                         diag::enum_raw_type_here, rawTy);
           }
           
-          // If the union element has no explicit raw value, try to
+          // If the enum element has no explicit raw value, try to
           // autoincrement from the previous value, or start from zero if this
           // is the first element.
           if (!elt->hasRawValueExpr()) {
@@ -3590,6 +3585,13 @@ public:
         }
       }
     }
+    
+    for (Decl *member : ED->getMembers())
+      visit(member);
+    for (Decl *global : ED->getDerivedGlobalDecls())
+      visit(global);
+    
+
     TC.checkDeclAttributes(ED);
   }
 

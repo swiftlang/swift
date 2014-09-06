@@ -44,15 +44,12 @@ enum FooComparisonResult : Int {
 /// Aaa.  FooRuncingOptions.  Bbb.
 struct FooRuncingOptions : RawOptionSetType {
   init()
-  init(_ value: Int)
-  var value: Int
+  init(_ raw: Int)
+  let raw: Int
   
   // This is mince.
   static var EnableMince: FooRuncingOptions { get }
   static var EnableQuince: FooRuncingOptions { get } /* But this is quince */
-  static func fromMask(raw: Int) -> FooRuncingOptions
-  static func fromRaw(raw: Int) -> FooRuncingOptions?
-  func toRaw() -> Int
   static var allZeros: FooRuncingOptions { get }
   static func convertFromNilLiteral() -> FooRuncingOptions
 }

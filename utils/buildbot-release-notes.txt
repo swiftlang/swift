@@ -59,6 +59,16 @@ Latest
   will never be printed in the generated header, even if they extend an
   Objective-C class.
 
+* The RawRepresentable protocol that enums with raw types implicitly conform
+  to has been redefined to take advantage of failable initializers. The
+  "fromRaw(Raw)" static method has been replaced with an initializer
+  "init?(Raw)", and the "toRaw()" method has been replaced with a "raw"
+  property. Enums with raw types can now be used like this:
+
+    enum Foo: Int { case A = 0, B = 1, C = 2 }
+    let foo = Foo(2)! // formerly 'Foo.fromRaw(2)!'
+    println(foo.raw)  // formerly 'foo.toRaw()'
+
 2014-09-02
 ----------
 

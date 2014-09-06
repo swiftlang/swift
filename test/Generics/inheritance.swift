@@ -62,17 +62,17 @@ func testGenericInherit() {
 struct SS<T> : T { } // expected-error{{inheritance from non-protocol type 'T'}}
 enum SE<T> : T { case X } // expected-error{{raw type 'T' is not convertible from any literal}} expected-error{{enum cases require explicit raw values when the raw type is not integer literal convertible}}
 
-// Also need Equatable for fromRaw()
+// Also need Equatable for init?(Raw)
 enum SE2<T : IntegerLiteralConvertible> 
-  : T // expected-error{{'fromRaw' method cannot be synthesized because raw type 'T' is not Equatable}}
+  : T // expected-error{{RawRepresentable 'init' cannot be synthesized because raw type 'T' is not Equatable}}
 { case X }
 
-// ... but not if fromRaw() is directly implemented some other way.
+// ... but not if init?(Raw) is directly implemented some other way.
 enum SE3<T : IntegerLiteralConvertible> : T { 
   case X 
 
-  static func fromRaw(raw: T) -> SE3? {
-    return SE3.X
+  init?(_ raw: T) {
+    self = SE3.X
   }
 }
 

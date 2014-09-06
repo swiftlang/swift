@@ -73,13 +73,10 @@
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : RawOptionSetType {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(){{$}}
-// FOUNDATION-NEXT: {{^}}  init(_ value: UInt){{$}}
-// FOUNDATION-NEXT: {{^}}  var value: UInt{{$}}
+// FOUNDATION-NEXT: {{^}}  init(_ raw: UInt){{$}}
+// FOUNDATION-NEXT: {{^}}  let raw: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  static var EnableMince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var EnableQuince: NSRuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static func fromMask(raw: UInt) -> NSRuncingOptions{{$}}
-// FOUNDATION-NEXT: {{^}}  static func fromRaw(raw: UInt) -> NSRuncingOptions?{{$}}
-// FOUNDATION-NEXT: {{^}}  func toRaw() -> UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  static var allZeros: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static func convertFromNilLiteral() -> NSRuncingOptions{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}

@@ -558,7 +558,7 @@ NOTE(extended_type_here,sema_tcd,none,
 ERROR(type_does_not_conform,sema_tcd,none,
       "type %0 does not conform to protocol %1", (Type, Type))
 ERROR(protocol_derivation_is_broken,sema_tcd,none,
-      "protocol %1 is broken; cannot derive conformance for type %0", (Type, Type))
+      "protocol %0 is broken; cannot derive conformance for type %1", (Type, Type))
 ERROR(type_does_not_inherit,sema_tcd,none,
       "type %0 does not inherit from %1", (Type, Type))
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
@@ -886,7 +886,7 @@ ERROR(raw_type_not_literal_convertible,sema_tcd,none,
       "raw type %0 is not convertible from any literal",
       (Type))
 ERROR(enum_raw_type_not_equatable,sema_tcd,none,
-      "'fromRaw' method cannot be synthesized because raw type %0 is not "
+      "RawRepresentable 'init' cannot be synthesized because raw type %0 is not "
       "Equatable", (Type))
 ERROR(enum_raw_type_access,sema_tcd,none,
       "enum %select{must be declared %select{private|internal|PUBLIC}2"
