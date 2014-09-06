@@ -239,6 +239,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::ArrayToPointer:
           case ExprKind::PointerToPointer:
           case ExprKind::ForeignObjectConversion:
+          case ExprKind::AvailabilityQuery:
             Diagnose = Diagnostic::UnqualifiedMetatypeValue;
             break;
           }

@@ -241,6 +241,8 @@ namespace {
     RValue visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C);
     RValue visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E,
                                             SGFContext C);
+    
+    RValue visitAvailabilityQueryExpr(AvailabilityQueryExpr *E, SGFContext C);
   };
 }
 
@@ -5930,6 +5932,11 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
                         SGF.getLoweredType(E->getType())),
                       orig.getCleanup());
   return RValue(SGF, E, E->getType()->getCanonicalType(), result);
+}
+
+RValue RValueEmitter::visitAvailabilityQueryExpr(AvailabilityQueryExpr *E,
+                                                 SGFContext C) {
+  assert(false && "Unimplemented");
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

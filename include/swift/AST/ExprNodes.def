@@ -152,6 +152,7 @@ EXPR(If, Expr)
 EXPR(Assign, Expr)
 EXPR(DefaultValue, Expr)
 UNCHECKED_EXPR(UnresolvedPattern, Expr)
+EXPR(AvailabilityQuery, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

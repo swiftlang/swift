@@ -34,6 +34,7 @@ namespace llvm {
 namespace swift {
   class ArchetypeType;
   class ASTContext;
+  class VersionConstraintAvailabilitySpec;
   class Type;
   class ValueDecl;
   class Decl;
@@ -3337,6 +3338,29 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedPattern;
+  }
+};
+
+/// \brief An expression that guards execution based on whether the run-time
+/// configuration supports a given API, e.g., #os(iOS >= 7.0).
+class AvailabilityQueryExpr : public Expr {
+  SourceLoc PoundLoc;
+  VersionConstraintAvailabilitySpec *Query;
+
+public:
+  AvailabilityQueryExpr(SourceLoc PoundLoc,
+                        VersionConstraintAvailabilitySpec *Query,
+                        Type Ty = Type())
+      : Expr(ExprKind::AvailabilityQuery, /*Implicit=*/false, Ty),
+        PoundLoc(PoundLoc), Query(Query) {}
+
+  VersionConstraintAvailabilitySpec *getQuery() const { return Query; }
+
+  SourceRange getSourceRange() const;
+  SourceLoc getLoc() const { return PoundLoc; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AvailabilityQuery;
   }
 };
   

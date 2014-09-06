@@ -495,6 +495,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     E->setSubExpr(sub);
     return E;
   }
+  
+  Expr *visitAvailabilityQueryExpr(AvailabilityQueryExpr *E) {
+    assert(false && "Unimplemented");
+  }
 
 #define STMT(Id, Parent) Stmt *visit##Id##Stmt(Id##Stmt *S);
 #include "swift/AST/StmtNodes.def"

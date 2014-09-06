@@ -1719,6 +1719,9 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitAvailabilityQueryExpr(AvailabilityQueryExpr *E) {
+    assert(false && "Unimplemented");
+  }
 };
 
 } // end anonymous namespace.

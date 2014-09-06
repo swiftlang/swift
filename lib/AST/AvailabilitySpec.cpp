@@ -1,4 +1,4 @@
-//===--- AST.h - Umbrella Header for AST Library ----------------*- C++ -*-===//
+//===--- AvailabilitySpec.cpp - Swift Availability Query ASTs ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,24 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file includes the AST data structure headers.
+// This file implements the availability specification AST classes.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_H
-#define SWIFT_AST_H
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilitySpec.h"
-#include "swift/AST/Builtins.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/ExprHandle.h"
-#include "swift/AST/Initializer.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/Stmt.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/TypeRepr.h"
 
-#endif
+using namespace swift;
+
+// Only allow allocation of VersionConstraintAvailabilitySpec using the
+// allocator in ASTContext.
+void *VersionConstraintAvailabilitySpec::
+operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
+  return C.Allocate(Bytes, Alignment);
+}
+
+SourceRange VersionConstraintAvailabilitySpec::getSourceRange() const {
+  return SourceRange(PlatformLoc, VersionSrcRange.End);
+}

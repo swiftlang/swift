@@ -20,6 +20,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
@@ -587,3 +588,6 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   return type->castTo<ArchetypeType>();
 }
 
+SourceRange AvailabilityQueryExpr::getSourceRange() const {
+  return SourceRange(PoundLoc, Query->getSourceRange().End);
+}

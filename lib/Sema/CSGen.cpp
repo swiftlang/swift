@@ -1354,6 +1354,11 @@ namespace {
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
+    
+    Type visitAvailabilityQueryExpr(AvailabilityQueryExpr *expr) {
+      assert(false && "Unimplemented");
+    }
+    
   };
 
   /// \brief AST walker that "sanitizes" an expression for the

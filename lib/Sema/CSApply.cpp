@@ -2799,6 +2799,10 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     
+    Expr *visitAvailabilityQueryExpr(AvailabilityQueryExpr *expr) {
+      assert(false && "Unimplemented");
+    }
+    
     void finalize() {
       // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();
