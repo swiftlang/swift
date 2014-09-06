@@ -80,22 +80,6 @@ assert(size != CGSize.zeroSize)
 
 var vector: CGVector
 
-vector = CGVector(-111.25, -222.25)
-print(vector, "float literals")
-vector = CGVector(-111, -222)
-print(vector, "int literals")
-vector = CGVector(cgfloat1, cgfloat2)
-print(vector, "cgfloats")
-vector = CGVector(dx: double1, dy: double2)
-print(vector, "doubles")
-vector = CGVector(int1, int2)
-print(vector, "ints")
-// CHECK-NEXT: float literals -111.25 -222.25
-// CHECK-NEXT: int literals -111.0 -222.0
-// CHECK-NEXT: cgfloats 1.0 2.0
-// CHECK-NEXT: doubles 1.0 2.0
-// CHECK-NEXT: ints 1.0 2.0
-
 vector = CGVector(dx: -111.25, dy: -222.25)
 print(vector, "named float literals")
 vector = CGVector(dx: -111, dy: -222)

@@ -62,7 +62,7 @@ public func == (lhs: CGSize, rhs: CGSize) -> Bool {
 
 
 public extension CGVector {
-  static var zeroVector: CGVector { get { return CGVector(0, 0) } }
+  static var zeroVector: CGVector { get { return CGVector(dx: 0, dy: 0) } }
 
   init(dx: Int, dy: Int) {
     self.init(dx: CGFloat(dx), dy: CGFloat(dy))
@@ -70,18 +70,6 @@ public extension CGVector {
 
   init(dx: Double, dy: Double) {
     self.init(dx: CGFloat(dx), dy: CGFloat(dy))
-  }
-
-  init(_ dx: CGFloat, _ dy: CGFloat) {
-    self.init(dx: dx, dy: dy)
-  }
-
-  init(_ dx: Double, _ dy: Double) {
-    self.init(CGFloat(dx), CGFloat(dy))
-  }
-
-  init(_ dx: Int, _ dy: Int) {
-    self.init(CGFloat(dx), CGFloat(dy))
   }
 }
 
