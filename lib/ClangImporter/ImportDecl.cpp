@@ -3701,34 +3701,36 @@ namespace {
 
           // Import explicit properties as instance properties, not as separate
           // getter and setter methods.
-          if (objcMethod->isPropertyAccessor()) {
-            auto prop = objcMethod->findPropertyDecl(/*checkOverrides=*/false);
-            assert(prop);
-            (void)Impl.importDecl(const_cast<clang::ObjCPropertyDecl *>(prop));
-            // We may have attached this member to an existing property even
-            // if we've failed to import a new property.
-            if (cast<FuncDecl>(member)->isAccessor())
-              continue;
-          } else if (Impl.InferImplicitProperties) {
-            // Try to infer properties for matched getter/setter pairs.
-            // Be careful to only do this once per matched pair.
-            if (auto counterpart = findImplicitPropertyAccessor(objcMethod)) {
-              if (auto counterpartImported = Impl.importDecl(counterpart)) {
-                if (objcMethod->getReturnType()->isVoidType()) {
-                  if (auto prop = makeImplicitPropertyDecl(counterpartImported,
-                                                           member,
-                                                           swiftContext)) {
-                    members.push_back(prop);
-                  } else {
-                    // If we fail to import the implicit property, fall back to
-                    // adding the accessors as members. We have to add BOTH
-                    // accessors here because we already skipped over the other
-                    // one.
-                    members.push_back(member);
-                    members.push_back(counterpartImported);
-                  }
-                }
+          if (!Impl.isAccessibilityDecl(objcMethod)) {
+            if (objcMethod->isPropertyAccessor()) {
+              auto prop = objcMethod->findPropertyDecl(/*checkOverrides=*/false);
+              assert(prop);
+              (void)Impl.importDecl(const_cast<clang::ObjCPropertyDecl *>(prop));
+              // We may have attached this member to an existing property even
+              // if we've failed to import a new property.
+              if (cast<FuncDecl>(member)->isAccessor())
                 continue;
+            } else if (Impl.InferImplicitProperties) {
+              // Try to infer properties for matched getter/setter pairs.
+              // Be careful to only do this once per matched pair.
+              if (auto counterpart = findImplicitPropertyAccessor(objcMethod)) {
+                if (auto counterpartImported = Impl.importDecl(counterpart)) {
+                  if (objcMethod->getReturnType()->isVoidType()) {
+                    if (auto prop = makeImplicitPropertyDecl(counterpartImported,
+                                                             member,
+                                                             swiftContext)) {
+                      members.push_back(prop);
+                    } else {
+                      // If we fail to import the implicit property, fall back to
+                      // adding the accessors as members. We have to add BOTH
+                      // accessors here because we already skipped over the other
+                      // one.
+                      members.push_back(member);
+                      members.push_back(counterpartImported);
+                    }
+                  }
+                  continue;
+                }
               }
             }
           }
@@ -4393,6 +4395,9 @@ namespace {
                                 DeclContext *dc) {
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
+        return nullptr;
+
+      if (Impl.isAccessibilityDecl(decl))
         return nullptr;
 
       // Check whether there is a function with the same name as this

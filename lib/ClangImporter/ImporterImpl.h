@@ -370,6 +370,13 @@ public:
     Valid
   } CurrentCacheState = CacheState::Invalid;
 
+  /// \brief Check if the declaration is one of the specially handled
+  /// accessibility APIs.
+  ///
+  /// These appaer as both properties and methods in ObjC and should be
+  /// imported as methods into Swift.
+  bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
+
 private:
   /// \brief Generation number that is used for crude versioning.
   ///

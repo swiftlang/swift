@@ -1704,6 +1704,57 @@ FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
   return FactoryAsInitKind::Infer;
 }
 
+/// Check if this method is declared in the context that conforms to
+/// NSAccessibility.
+static bool
+isAccessibilityConformingContext(const clang::DeclContext *ctx) {
+  const clang::ObjCProtocolList *protocols = nullptr;
+
+  if (auto protocol = dyn_cast<clang::ObjCProtocolDecl>(ctx)) {
+    if (protocol->getName() == "NSAccessibility")
+      return true;
+    return false;
+  } else if (auto interface = dyn_cast<clang::ObjCInterfaceDecl>(ctx))
+    protocols = &interface->getReferencedProtocols();
+  else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(ctx))
+    protocols = &category->getReferencedProtocols();
+  else
+    return false;
+
+  for (auto pi : *protocols) {
+    if (pi->getName() == "NSAccessibility")
+      return true;
+  }
+  return false;
+  
+}
+
+bool
+ClangImporter::Implementation::isAccessibilityDecl(const clang::Decl *decl) {
+
+  if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
+    StringRef name = objCMethod->getSelector().getNameForSlot(0);
+    if (!(objCMethod->getSelector().getNumArgs() <= 1 &&
+          (name.startswith("accessibility") ||
+           name.startswith("setAccessibility") ||
+           name.startswith("isAccessibility")))) {
+      return false;
+    }
+
+  } else if (auto objCProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
+    if (!objCProperty->getName().startswith("accessibility"))
+      return false;
+
+  } else {
+    llvm_unreachable("The declaration is not an ObjC property or method.");
+  }
+
+  if (isAccessibilityConformingContext(decl->getDeclContext()))
+    return true;
+
+  return false;
+}
+
 #pragma mark Name lookup
 void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   auto &pp = Impl.Instance->getPreprocessor();
@@ -2268,7 +2319,8 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
 
       // If the method is a property accessor, we want the property.
       const clang::NamedDecl *searchForDecl = list->Method;
-      if (list->Method->isPropertyAccessor()) {
+      if (list->Method->isPropertyAccessor() &&
+          !Impl.isAccessibilityDecl(list->Method)) {
         if (auto property = list->Method->findPropertyDecl()) {
           // ... unless we are enumerating all decls.  In this case, if we see
           // a getter, return a property.  If we see a setter, we know that

@@ -6,6 +6,30 @@
 @interface NSResponder : NSObject
 @end
 
+@protocol NSAccessibilityElement <NSObject>
+@required
+- (id)accessibilityParent;
+@end
+@protocol NSAccessibilityButton <NSAccessibilityElement>
+@required
+- (NSString *)accessibilityLabel;
+- (BOOL)accessibilityPerformPress;
+@end
+// The complete accessibility protocol
+@protocol NSAccessibility <NSObject>
+@required
+// Element containing this UIElement
+// Invokes when clients request NSAccessibilityParentAttribute
+@property (weak) id accessibilityParent;
+// Description of UIElement
+// Invokes when clients request NSAccessibilityDescriptionAttribute
+@property (copy) NSString *accessibilityLabel;
+- (NSString *)accessibilityLabel;
+// Invokes when clients perform NSAccessibilityPressAction
+- (BOOL)accessibilityPerformPress;
+@property (getter = isAccessibilityFocused) BOOL accessibilityFocused;
+@end
+
 // Specifically testing re-adopting a protocol that's adopted by a base class.
 @interface NSWindow : NSResponder <NSAppearanceCustomization>
 @end
@@ -87,7 +111,7 @@
 - (instancetype)init;
 @end
 
-@interface NSView : NSObject <NSCoding>
+@interface NSView : NSObject <NSCoding, NSAccessibility>
 - (instancetype)initWithCoder:(NSCoder *)aDecoder;
 - (BOOL)isDescendantOf:(NSView *)aView;
 - (NSView *)ancestorSharedWithView:(NSView *)aView;
