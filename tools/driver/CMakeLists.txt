@@ -25,7 +25,7 @@ get_filename_component(ARCLITE_BASE ${ARCLITE_BASE} PATH)
 set(SWIFT_REPL_ARCLITE "${ARCLITE_BASE}/lib/arc/libarclite_macosx.a")
 if (SWIFT_REPL_ARCLITE)
   set_property(TARGET swift APPEND_STRING PROPERTY
-    LINK_FLAGS " -lobjc -Wl,-force_load,${SWIFT_REPL_ARCLITE}")
+    LINK_FLAGS " -lobjc -Wl,-force_load,\"${SWIFT_REPL_ARCLITE}\"")
 endif (SWIFT_REPL_ARCLITE)
 
 if(MODULES_SDK)
