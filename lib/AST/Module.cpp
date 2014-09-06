@@ -399,6 +399,53 @@ void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
   FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
 }
 
+void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
+                          const DeclContext *DC, LookupName name,
+                          bool lookIntoExtensions) const {
+  switch (DC->getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+    llvm_unreachable("This context does not support lookup.");
+
+  case DeclContextKind::FileUnit:
+    llvm_unreachable("Use FileUnit::lookupValue instead.");
+
+  case DeclContextKind::ExtensionDecl:
+    llvm_unreachable("Use ExtensionDecl::lookupDirect instead.");
+
+  case DeclContextKind::Module: {
+    assert(DC == this);
+    size_t oldSize = results.size();
+    lookupValue({}, name.Name, NLKind::QualifiedLookup, results);
+
+    if (name.PrivateDiscriminator.empty()) {
+      auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
+                                   [=](ValueDecl *VD) -> bool {
+        return VD->getAccessibility() <= Accessibility::Private;
+      });
+      results.erase(newEnd, results.end());
+    } else {
+      auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
+                                   [=](const ValueDecl *VD) -> bool {
+        if (VD->getAccessibility() > Accessibility::Private)
+          return true;
+        auto enclosingFile =
+          cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
+        auto discriminator = enclosingFile->getDiscriminatorForPrivateValue(VD);
+        return discriminator != name.PrivateDiscriminator;
+      });
+      results.erase(newEnd, results.end());
+    }
+    return;
+  }
+
+  case DeclContextKind::NominalTypeDecl:
+    llvm_unreachable("Unimplemented");
+  }
+}
+
 void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, DeclName name,
                               NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {

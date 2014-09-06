@@ -251,6 +251,13 @@ public:
   void lookupValue(AccessPathTy AccessPath, DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
 
+  /// Find a member named \p name in \p DC that was declared in this module.
+  ///
+  /// If \p name has a private-discriminator, only private decls are returned;
+  /// otherwise, only non-private decls are returned.
+  void lookupMember(SmallVectorImpl<ValueDecl*> &results, const DeclContext *DC,
+                    LookupName name, bool lookIntoExtensions = true) const;
+
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

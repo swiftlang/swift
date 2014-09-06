@@ -1116,18 +1116,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   const Module *M = getModuleByFullName(ctx, contextNode->getText());
   SmallVector<ValueDecl *, 4> results;
-  M->lookupValue({}, lookupName.Name, NLKind::QualifiedLookup, results);
-
-  if (!lookupName.PrivateDiscriminator.empty()) {
-    auto newEnd = std::remove_if(results.begin(), results.end(),
-                                 [=](ValueDecl *VD) {
-      auto enclosingFile =
-        cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
-      auto discriminator = enclosingFile->getDiscriminatorForPrivateValue(VD);
-      return discriminator != lookupName.PrivateDiscriminator;
-    });
-    results.erase(newEnd, results.end());
-  }
+  M->lookupMember(results, M, lookupName);
 
   if (results.empty()) {
     llvm::errs() << "No matching declarations found.\n";
