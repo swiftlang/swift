@@ -400,7 +400,8 @@ void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
 }
 
 void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
-                          const DeclContext *DC, LookupName name,
+                          const DeclContext *DC, DeclName name,
+                          Identifier privateDiscriminator,
                           bool lookIntoExtensions) const {
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
@@ -418,9 +419,9 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   case DeclContextKind::Module: {
     assert(DC == this);
     size_t oldSize = results.size();
-    lookupValue({}, name.Name, NLKind::QualifiedLookup, results);
+    this->lookupValue({}, name, NLKind::QualifiedLookup, results);
 
-    if (name.PrivateDiscriminator.empty()) {
+    if (privateDiscriminator.empty()) {
       auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                    [=](ValueDecl *VD) -> bool {
         return VD->getAccessibility() <= Accessibility::Private;
@@ -434,7 +435,7 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
         auto enclosingFile =
           cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
         auto discriminator = enclosingFile->getDiscriminatorForPrivateValue(VD);
-        return discriminator != name.PrivateDiscriminator;
+        return discriminator != privateDiscriminator;
       });
       results.erase(newEnd, results.end());
     }

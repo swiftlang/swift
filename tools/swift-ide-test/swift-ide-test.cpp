@@ -1091,16 +1091,17 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   ASTContext &ctx = CI.getASTContext();
 
-  LookupName lookupName;
+  DeclName name;
+  Identifier privateDiscriminator;
+
   auto nameNode = node->getChild(1);
   switch (nameNode->getKind()) {
   case NodeKind::Identifier:
-    lookupName.Name = ctx.getIdentifier(nameNode->getText());
+    name = ctx.getIdentifier(nameNode->getText());
     break;
   case NodeKind::PrivateDeclName:
-    lookupName.PrivateDiscriminator =
-      ctx.getIdentifier(nameNode->getChild(0)->getText());
-    lookupName.Name = ctx.getIdentifier(nameNode->getChild(1)->getText());
+    privateDiscriminator = ctx.getIdentifier(nameNode->getChild(0)->getText());
+    name = ctx.getIdentifier(nameNode->getChild(1)->getText());
     break;
   default:
     llvm::errs() << "Unsupported name kind.\n";
@@ -1116,7 +1117,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   const Module *M = getModuleByFullName(ctx, contextNode->getText());
   SmallVector<ValueDecl *, 4> results;
-  M->lookupMember(results, M, lookupName);
+  M->lookupMember(results, M, name, privateDiscriminator);
 
   if (results.empty()) {
     llvm::errs() << "No matching declarations found.\n";

@@ -65,25 +65,6 @@ enum class DeclContextKind : uint8_t {
   Last_DeclContextKind = ExtensionDecl
 };
 
-/// Describes a member to find using qualified lookup.
-class LookupName {
-public:
-  /// The name of the member.
-  DeclName Name;
-
-  /// If non-empty, the discriminator associated with the member's original
-  /// declaration context.
-  Identifier PrivateDiscriminator;
-
-  LookupName() = default;
-
-  /*implicit*/ LookupName(DeclName name,
-                          Identifier discriminator = Identifier())
-    : Name(name), PrivateDiscriminator(discriminator) {}
-
-  /*implicit*/ LookupName(Identifier name) : LookupName(DeclName(name)) {}
-};
-
 /// A DeclContext is an AST object which acts as a semantic container
 /// for declarations.  As a policy matter, we currently define
 /// contexts broadly: a lambda expression in a function is a new
@@ -273,7 +254,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(Type type, LookupName member, unsigned options,
+  bool lookupQualified(Type type, DeclName member, unsigned options,
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 

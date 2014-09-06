@@ -997,7 +997,7 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
 }
 
 bool DeclContext::lookupQualified(Type type,
-                                  LookupName member,
+                                  DeclName member,
                                   unsigned options,
                                   LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
@@ -1021,13 +1021,11 @@ bool DeclContext::lookupQualified(Type type,
   if (auto moduleTy = type->getAs<ModuleType>()) {
     assert(!(options & NL_IgnoreAccessibility) &&
            "accessibility always enforced for module-level lookup");
-    assert(member.PrivateDiscriminator.empty() &&
-           "use Module::lookupValue to look up a top-level private value");
 
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
-      lookupInModule(module, /*accessPath=*/{}, member.Name, decls,
+      lookupInModule(module, /*accessPath=*/{}, member, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                      typeResolver, topLevelScope);
     } else {
@@ -1036,7 +1034,7 @@ bool DeclContext::lookupQualified(Type type,
                            [&](const Module::ImportedModule &import) -> bool {
         if (import.second != module)
           return true;
-        lookupInModule(import.second, import.first, member.Name, decls,
+        lookupInModule(import.second, import.first, member, decls,
                        NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                        typeResolver);
         // If we're able to do an unscoped lookup, we see everything. No need
@@ -1156,12 +1154,12 @@ bool DeclContext::lookupQualified(Type type,
     stack.pop_back();
 
     // Make sure we've resolved implicit constructors, if we need them.
-    if (member.Name.getBaseName() == ctx.Id_init && typeResolver)
+    if (member.getBaseName() == ctx.Id_init && typeResolver)
       typeResolver->resolveImplicitConstructors(current);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
-    for (auto decl : current->lookupDirect(member.Name)) {
+    for (auto decl : current->lookupDirect(member)) {
       // Resolve the declaration signature when we find the
       // declaration.
       if (typeResolver && !decl->isBeingTypeChecked()) {
@@ -1184,7 +1182,7 @@ bool DeclContext::lookupQualified(Type type,
       // If we're looking for initializers, only look at the superclass if the
       // current class permits inheritance. Even then, only find complete
       // object initializers.
-      if (member.Name.getBaseName() == ctx.Id_init) {
+      if (member.getBaseName() == ctx.Id_init) {
         if (classDecl->inheritsSuperclassInitializers(typeResolver))
           onlyCompleteObjectInits = true;
         else
@@ -1228,7 +1226,7 @@ bool DeclContext::lookupQualified(Type type,
     // Collect all of the visible declarations.
     SmallVector<ValueDecl *, 4> allDecls;
     forAllVisibleModules(this, [&](Module::ImportedModule import) {
-      import.second->lookupClassMember(import.first, member.Name, allDecls);
+      import.second->lookupClassMember(import.first, member, allDecls);
     });
 
     // For each declaration whose context is not something we've
@@ -1270,7 +1268,7 @@ bool DeclContext::lookupQualified(Type type,
         // C.init overrides B.init overrides A.init, but only C.init and
         // A.init are in the chain. Make sure we still remove A.init from the
         // set in this case.
-        if (member.Name.getBaseName() == ctx.Id_init) {
+        if (member.getBaseName() == ctx.Id_init) {
           decl = overrides;
           continue;
         }
