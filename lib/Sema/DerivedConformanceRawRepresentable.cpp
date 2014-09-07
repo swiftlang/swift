@@ -477,6 +477,7 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
     return deriveRawRepresentable_init(tc, enumDecl);
 
   if (requirement->getName() == tc.Context.Id_Raw)
+    return deriveRawRepresentable_Raw(tc, enumDecl);
   
   tc.diagnose(requirement->getLoc(),
               diag::broken_raw_representable_requirement);
