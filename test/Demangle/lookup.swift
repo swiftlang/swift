@@ -4,6 +4,7 @@
 
 // RUN: %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_test12PublicStruct
 // RUN: %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_test14InternalStruct
+// RUN: not %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP13PrivateStruct
 // RUN: not %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP1_13PrivateStruct
 // RUN: %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP33_6EB8A1E82BFF39B1A61B6065CAD7A59613PrivateStruct | FileCheck -check-prefix=THIS-FILE %s
 
