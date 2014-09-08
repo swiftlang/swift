@@ -352,6 +352,32 @@ struct NonFailableModel: FailableRequirement, NonFailableRefinement, IUOFailable
   init(foo: Int) {}
 }
 
+// TODO: Will be subsumed by the following TODO.
+protocol NonFailableRequirementOnly {
+  init(foo: Int)
+}
+
+struct IUOFailableModel : NonFailableRequirementOnly {
+  // CHECK-LABEL: sil @_TTWV9witnesses16IUOFailableModelS_26NonFailableRequirementOnlyFS1_CUS1___fMQPS1_FT3fooSi_S2_ 
+  // CHECK: bb0([[SELF:%[0-9]+]] : $*IUOFailableModel, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick IUOFailableModel.Type):
+  // CHECK:   [[META:%[0-9]+]] = metatype $@thin IUOFailableModel.Type
+  // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelCfMS0_FT3fooSi_GSQS0__ : $@thin (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@thin (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]]#1 : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
+  
+  // CHECK:   [[FORCE_FN:%[0-9]+]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_ : $@thin <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
+  // CHECK:   [[RESULT_TEMP:%[0-9]+]] = alloc_stack $IUOFailableModel
+  // CHECK:   apply [transparent] [[FORCE_FN]]<IUOFailableModel>([[RESULT_TEMP]]#1, [[IUO_RESULT_TEMP]]#1) : $@thin <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = load [[RESULT_TEMP]]#1 : $*IUOFailableModel
+  // CHECK:   store [[RESULT]] to [[SELF]] : $*IUOFailableModel
+  // CHECK:   dealloc_stack [[RESULT_TEMP]]#0 : $*@local_storage IUOFailableModel
+  // CHECK:   dealloc_stack [[IUO_RESULT_TEMP]]#0 : $*@local_storage ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   return
+  init!(foo: Int) { return nil }
+}
+
+
 /* TODO
 struct FailableModel: FailableRequirement, IUOFailableRequirement {
   init?(foo: Int) {}
