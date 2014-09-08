@@ -44,7 +44,7 @@ func callInstanceMethod(gizmo: Gizmo) -> Gizmo? {
 // OPT-LABEL: sil @_TF21objc_nonnull_lie_hack15callClassMethod
 // OPT: [[METATYPE:%[0-9]+]] = metatype $@thick Gizmo.Type
 // OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[METATYPE]] : $@thick Gizmo.Type, #Gizmo.nonNilGizmo!1.foreign : Gizmo.Type -> () -> Gizmo , $@cc(objc_method) @thin (@objc_metatype Gizmo.Type) -> @autoreleased Gizmo
-// OPT: [[OBJC_METATYPE:%[0-9]+]] = thick_to_objc_metatype [[METATYPE]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
+// OPT: [[OBJC_METATYPE:%[0-9]+]] = metatype $@objc_metatype Gizmo.Type
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_METATYPE]]) : $@cc(objc_method) @thin (@objc_metatype Gizmo.Type) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_bit_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
 // OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>

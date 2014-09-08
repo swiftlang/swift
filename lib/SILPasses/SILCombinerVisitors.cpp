@@ -1491,3 +1491,60 @@ SILInstruction *SILCombiner::visitEnumIsTagInst(EnumIsTagInst *EIT) {
   return IntegerLiteralInst::create(EIT->getLoc(), EIT->getType(),
                                     APInt(1, SameTag), *EIT->getFunction());
 }
+
+/// Helper function for simplifying convertions between
+/// thick and objc metatypes.
+static SILInstruction *
+visitMetatypeConversionInst(ConversionInst *MCI,
+                            MetatypeRepresentation Representation) {
+  SILValue Op = MCI->getOperand(0);
+  SILModule &Mod = MCI->getModule();
+  // Instruction has a proper target type already.
+  SILType Ty = MCI->getType();
+  auto MetatypeTy = Op.getType().getAs<AnyMetatypeType>();
+
+  if (MetatypeTy->getRepresentation() != Representation)
+    return nullptr;
+
+  if (dyn_cast<MetatypeInst>(Op)) {
+    return new (Mod) MetatypeInst(MCI->getLoc(), Ty);
+  } else if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op)) {
+    return new (Mod) ValueMetatypeInst(MCI->getLoc(),
+                                       Ty,
+                                       VMI->getOperand());
+  } else if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op)) {
+    return new (Mod) ExistentialMetatypeInst(MCI->getLoc(),
+                                             Ty,
+                                             EMI->getOperand());
+  }
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
+  // Perform the following transformations:
+  // (thick_to_objc_metatype (metatype @thick)) ->
+  // (metatype @objc_metatype)
+  //
+  // (thick_to_objc_metatype (value_metatype @thick)) ->
+  // (value_metatype @objc_metatype)
+  //
+  // (thick_to_objc_metatype (existential_metatype @thick)) ->
+  // (existential_metatype @objc_metatype)
+  return visitMetatypeConversionInst(TTOCMI, MetatypeRepresentation::Thick);
+}
+
+SILInstruction *
+SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
+  // Perform the following transformations:
+  // (objc_to_thick_metatype (metatype @objc_metatype)) ->
+  // (metatype @thick)
+  //
+  // (objc_to_thick_metatype (value_metatype @objc_metatype)) ->
+  // (value_metatype @thick)
+  //
+  // (objc_to_thick_metatype (existential_metatype @objc_metatype)) ->
+  // (existential_metatype @thick)
+  return visitMetatypeConversionInst(OCTTMI, MetatypeRepresentation::ObjC);
+}
+

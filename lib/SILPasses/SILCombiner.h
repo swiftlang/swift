@@ -204,6 +204,8 @@ public:
   SILInstruction *visitEnumIsTagInst(EnumIsTagInst *EIT);
   SILInstruction *visitStructExtractInst(StructExtractInst *SEI);
   SILInstruction *visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
+  SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
+  SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
