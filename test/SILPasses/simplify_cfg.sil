@@ -875,17 +875,12 @@ bb8(%40 : $Builtin.Word):
 }
 
 
-/// Don't jumpthread blocks that contain method instructions. We don't support
-/// building phis with function values.
+/// Don't jumpthread blocks that contain objc method instructions. We don't
+/// support building phis with objc method values.
 
 class Bar {
   init()
-  func foo()
-}
-sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@owned Bar) -> ()
-
-sil_vtable Bar {
-  #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
+  @objc func foo()
 }
 
 
@@ -917,11 +912,11 @@ bb2:
   br bb3(%1 : $Builtin.Word, %14 : $Builtin.Word, %16 : $Optional<Int>)
 
 bb3(%18 : $Builtin.Word, %19 : $Builtin.Word, %20 : $Optional<Int>):
-  %101 = class_method %100 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@cc(method) @thin (@owned Bar) -> ()
+  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : Bar -> () -> () , $@cc(objc_method) @thin (Bar) -> ()
   switch_enum %20 : $Optional<Int>, case #Optional.Some!enumelt.1: bb4, case #Optional.None!enumelt: bb5
 
 bb4:
-  %102 = apply %101(%100) : $@cc(method) @thin (@owned Bar) -> ()
+  %102 = apply %101(%100) : $@cc(objc_method) @thin (Bar) -> ()
   %22 = unchecked_enum_data %20 : $Optional<Int>, #Optional.Some!enumelt.1
   %23 = struct_extract %22 : $Int, #Int.value
   %24 = apply %4(%18, %23, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)

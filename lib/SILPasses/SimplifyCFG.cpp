@@ -622,9 +622,10 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
       if (!isThreadableCondBr && !isThreadableEnumInst)
         return false;
 
-      // We can't build SSA for method values.
-      if (isa<MethodInst>(Inst))
-        return false;
+      // We can't build SSA for method values that lower to objc methods.
+      if (auto *MI = dyn_cast<MethodInst>(&Inst))
+        if (MI->getMember().isForeign)
+          return false;
     }
   }
 
