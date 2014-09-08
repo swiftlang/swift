@@ -1301,11 +1301,14 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       if (auto ctor = dyn_cast<ConstructorDecl>(requirement)) {
         // If we have an initializer requirement and the conforming type
         // is a non-final class, the witness must be 'required'.
+        // We exempt Objective-C initializers from this requirement
+        // because there is no equivalent to 'required' in Objective-C.
         ClassDecl *classDecl = nullptr;
         auto witnessCtor = cast<ConstructorDecl>(best.Witness);
         if (((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
              !classDecl->isFinal()) &&
-            !witnessCtor->isRequired()) {
+            !witnessCtor->isRequired() &&
+            !witnessCtor->hasClangNode()) {
           // FIXME: We're not recovering (in the AST), so the Fix-It
           // should move.
           bool inExtension = isa<ExtensionDecl>(best.Witness->getDeclContext());
