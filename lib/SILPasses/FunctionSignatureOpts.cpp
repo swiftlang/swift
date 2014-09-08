@@ -32,6 +32,7 @@ using namespace swift;
 
 STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
+STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
 STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
 
 //===----------------------------------------------------------------------===//
@@ -43,13 +44,50 @@ struct ArgDescriptor {
   SILArgument *Arg;
   SILParameterInfo ParameterInfo;
   bool IsDead;
+  SILInstruction *CalleeRelease;
 
   ArgDescriptor() = default;
   ArgDescriptor(SILArgument *A)
-    : Arg(A), ParameterInfo(A->getParameterInfo()), IsDead(A->use_empty()) {}
+    : Arg(A), ParameterInfo(A->getParameterInfo()), IsDead(A->use_empty()),
+      CalleeRelease() {}
 
 };
 } // end anonymous namespace
+
+/// See if we can find a release on Arg in the exiting BB of F without any side
+/// effects in between the release and the return statement.
+///
+/// We only do this in the last basic block for now since if the ARC optimizer
+/// had meaningfully reduced the lifetime of an object, we don't want to extend
+/// the life if for instance we had moved releases over loops.
+static SILInstruction *searchForCalleeRelease(SILFunction *F,
+                                              SILArgument *Arg) {
+  auto ReturnBB = std::find_if(F->begin(), F->end(),
+                               [](const SILBasicBlock &BB) -> bool {
+                                 const TermInst *TI = BB.getTerminator();
+                                 return isa<ReturnInst>(TI);
+                               });
+  if (ReturnBB == F->end())
+    return nullptr;
+
+  for (auto II = ReturnBB->rbegin(), IE = ReturnBB->rend(); II != IE; ++II) {
+    // TODO: Use ARC infrastructure here.
+    SILInstruction *Target = nullptr;
+    if (isa<ReleaseValueInst>(*II) || isa<StrongReleaseInst>(*II))
+      Target = &*II;
+
+    if (!Target) {
+      if (II->mayHaveSideEffects())
+        return nullptr;
+      continue;
+    }
+
+    SILValue Op = Target->getOperand(0).stripRCIdentityPreservingOps();
+    return Op == SILValue(Arg) ? Target : nullptr;
+  }
+
+  return nullptr;
+}
 
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
@@ -68,6 +106,15 @@ analyzeArguments(SILFunction *F, SmallVectorImpl<ArgDescriptor> &ArgDescList) {
     if (A.IsDead) {
       ShouldOptimize = true;
       ++NumDeadArgsEliminated;
+    }
+
+    // See if we can find a ref count equivalent strong_release or release_value
+    // at the end of this function if our argument is an @owned parameter.
+    if (A.ParameterInfo.isConsumed()) {
+      if ((A.CalleeRelease = searchForCalleeRelease(F, Arg))) {
+        ShouldOptimize = true;
+        ++NumOwnedConvertedToGuaranteed;
+      }
     }
 
     ArgDescList.push_back(A);
@@ -93,15 +140,15 @@ static void createNewName(SILFunction &OldF, ArrayRef<ArgDescriptor> Args,
   // 'n'   => We did nothing to the argument.
   // 'd'   => The argument was dead and will be removed.
   // 'a2v' => Was a loadable address and we promoted it to a value.
-  // 'o2g' => Was an @owned argument, but we changed it to be a gauranteed
+  // 'o2g' => Was an @owned argument, but we changed it to be a guaranteed
   //          parameter.
   // 's'   => Was a loadable value that we exploded into multiple arguments.
   //
   // Currently we only use 'n' and 'd' since we do not perform the other
   // optimizations.
   //
-  // *NOTE* The gauranteed optimization requires knowledge to be taught to the
-  // ARC optimizer among other passes in order to gaurantee safety. That or you
+  // *NOTE* The guaranteed optimization requires knowledge to be taught to the
+  // ARC optimizer among other passes in order to guarantee safety. That or you
   // need to insert a fix_lifetime call to make sure we do not eliminate the
   // retain, release surrounding the call site in the caller.
   //
@@ -114,6 +161,13 @@ static void createNewName(SILFunction &OldF, ArrayRef<ArgDescriptor> Args,
     // If this arg is dead, add 'd' to the packed signature and continue.
     if (Arg.IsDead) {
       buffer << 'd';
+      continue;
+    }
+
+    // If we have an @owned argument and found a callee release for it, convert
+    // the argument to guaranteed.
+    if (Arg.CalleeRelease) {
+      buffer << "o2g";
       continue;
     }
 
@@ -160,6 +214,15 @@ rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
     // Replace all uses of the old apply with the new apply.
     AI->replaceAllUsesWith(NewAI);
 
+    // If we have any arguments that were consumed but are now guaranteed,
+    // insert a fix lifetime instruction and a release_value.
+    for (unsigned i = 0, e = ArgDescs.size(); i != e; ++i) {
+      if (ArgDescs[i].CalleeRelease) {
+        Builder.createFixLifetime(AI->getLoc(), AI->getArgument(i));
+        Builder.createReleaseValue(AI->getLoc(), AI->getArgument(i));
+      }
+    }
+
     // Erase the old apply.
     AI->eraseFromParent();
 
@@ -177,6 +240,18 @@ computeOptimizedInterfaceParams(CanSILFunctionType OldFTy,
     // If we have a dead argument, skip it.
     if (Args[i].IsDead) {
       DeadArgs.push_back(i);
+      continue;
+    }
+
+    // If we found a release in the callee in the last BB on an @owned
+    // parameter, change the parameter to @guaranteed and continue...
+    if (Args[i].CalleeRelease) {
+      const SILParameterInfo &OldInfo = ParameterInfo[i];
+      assert(OldInfo.getConvention() == ParameterConvention::Direct_Owned &&
+             "Can only transform @owned => @guaranteed in this code path");
+      SILParameterInfo NewInfo(OldInfo.getType(),
+                               ParameterConvention::Direct_Guaranteed);
+      OutArray.push_back(NewInfo);
       continue;
     }
 
@@ -222,6 +297,7 @@ createEmptyFunctionWithOptimizedSig(SILFunction *OldF,
 }
 
 static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
+                            ArrayRef<ArgDescriptor> Args,
                             ArrayRef<unsigned> DeadArgs) {
   // TODO: What is the proper location to use here?
   SILLocation Loc = BB->getParent()->getLocation();
@@ -231,12 +307,17 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 
   // Create the args for the thunk's apply, ignoring any dead arguments.
   llvm::SmallVector<SILValue, 8> ThunkArgs;
+  llvm::SmallVector<SILValue, 4> OwnedToGuaranteedArgs;
 
   unsigned deadarg_i = 0, deadarg_e = DeadArgs.size();
   for (unsigned i = 0, e = BB->getNumBBArg(); i < e; ++i) {
     if (deadarg_i < deadarg_e && DeadArgs[deadarg_i] == i) {
       deadarg_i++;
       continue;
+    }
+
+    if (Args[i].CalleeRelease) {
+      OwnedToGuaranteedArgs.push_back(BB->getBBArg(i));
     }
 
     ThunkArgs.push_back(BB->getBBArg(i));
@@ -249,6 +330,14 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   SILValue ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
                                              ArrayRef<Substitution>(),
                                              ThunkArgs, NewF->isTransparent());
+
+  // If we have any arguments that were consumed but are now guaranteed,
+  // insert a fix lifetime instruction and a release_value.
+  for (SILValue V : OwnedToGuaranteedArgs) {
+    Builder.createFixLifetime(Loc, V);
+    Builder.createReleaseValue(Loc, V);
+  }
+
   Builder.createReturn(Loc, ReturnValue);
 }
 
@@ -290,7 +379,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // Intrusively optimize the function signature of NewF.
 
   // Then we create a new body for ThunkBody that calls NewF.
-  createThunkBody(ThunkBody, NewF, DeadArgs);
+  createThunkBody(ThunkBody, NewF, Args, DeadArgs);
 
   return NewF;
 }
@@ -360,6 +449,16 @@ optimizeFunctionSignature(SILFunction *F,
   // Rewrite all apply inst to be to the new function performing any
   // modifications needed to the caller.
   rewriteApplyInstToCallNewFunction(F, NewF, Arguments, CallSites);
+
+  // Remove all Callee releases that we found and made redundent via owned to
+  // guaranteed conversion.
+  //
+  // TODO: If more stuff needs to be placed here, refactor into its own method.
+  for (auto &A : Arguments) {
+    if (A.CalleeRelease) {
+      A.CalleeRelease->eraseFromParent();
+    }
+  }
 
   return true;
 }
