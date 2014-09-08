@@ -307,12 +307,16 @@ public:
   LookupConformanceResult
   lookupConformance(Type type, ProtocolDecl *protocol, LazyResolver *resolver);
 
-  /// Find a member named \p name in \p DC that was declared in this module.
+  /// Find a member named \p name in \p container that was declared in this
+  /// module.
+  ///
+  /// \p container may be \c this for a top-level lookup.
   ///
   /// If \p privateDiscriminator is non-empty, only matching private decls are
   /// returned; otherwise, only non-private decls are returned.
-  void lookupMember(SmallVectorImpl<ValueDecl*> &results, const DeclContext *DC,
-                    DeclName name, Identifier privateDiscriminator,
+  void lookupMember(SmallVectorImpl<ValueDecl*> &results,
+                    const DeclContext *container, DeclName name,
+                    Identifier privateDiscriminator,
                     bool lookIntoExtensions = true) const;
 
   /// \sa getImportedModules

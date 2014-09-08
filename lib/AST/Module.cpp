@@ -400,7 +400,7 @@ void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
 }
 
 void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
-                          const DeclContext *DC, DeclName name,
+                          const DeclContext *container, DeclName name,
                           Identifier privateDiscriminator,
                           bool lookIntoExtensions) const {
   switch (DC->getContextKind()) {
@@ -417,7 +417,7 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
     llvm_unreachable("Use ExtensionDecl::lookupDirect instead.");
 
   case DeclContextKind::Module: {
-    assert(DC == this);
+    assert(container == this);
     size_t oldSize = results.size();
     this->lookupValue({}, name, NLKind::QualifiedLookup, results);
 
