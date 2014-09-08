@@ -2426,8 +2426,7 @@ static bool checkGenericExtensionLimitations(TypeChecker &TC, const Decl *D) {
       DC->getParentModule()
         != DC->getDeclaredInterfaceType()->getAnyNominal()->getModuleContext()&&
       !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isAccessor()) &&
-      DC->getModuleScopeContext()->getParentModule()->Name.str()
-        != FOUNDATION_MODULE_NAME) {
+      DC->getParentModule()->Name.str() != FOUNDATION_MODULE_NAME) {
     TC.diagnose(D, diag::unsupported_generic_extension,
                 DC->getDeclaredInterfaceType());
     return true;
