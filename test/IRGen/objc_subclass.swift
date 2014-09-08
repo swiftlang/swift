@@ -19,6 +19,7 @@
 // CHECK: [[INIT_ENCODING:@.*]] = private unnamed_addr constant [14 x i8] c"@32@0:8q16@24\00"
 // CHECK: [[DEALLOC_ENCODING:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 // CHECK: [[STRING_SWIFTGIZMO:@.*]] = private unnamed_addr constant [32 x i8] c"_TtC13objc_subclass10SwiftGizmo\00"
+
 // CHECK: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}* } {
 // CHECK:   i32 129,
 // CHECK:   i32 40,
@@ -32,6 +33,7 @@
 // CHECK:   i8* null,
 // CHECK:   i8* null
 // CHECK: }, section "__DATA, __objc_const", align 8
+
 // CHECK: @_INSTANCE_METHODS__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 11,
@@ -102,9 +104,10 @@
 // CHECK:    i8* null,
 // CHECK:    @_IVARS__TtC13objc_subclass10SwiftGizmo,
 // CHECK:    i8* null,
-// CHECK:    i8* null
 // CHECK:  }, section "__DATA, __objc_const", align 8
 // CHECK-NOT: @_TMdCSo13SwiftGizmo = {{.*NSObject}}
+
+// CHECK: @_INSTANCE_METHODS__TtC13objc_subclass12GenericGizmo
 
 // CHECK: @_INSTANCE_METHODS__TtC13objc_subclass11SwiftGizmo2 = private constant { i32, {{.*}}] } { 
 // CHECK:   i32 24, 
@@ -177,6 +180,8 @@ class GenericGizmo<T> : Gizmo {
   var x : Int {
     return 0
   }
+
+  var array : [T] = []
 }
 // CHECK: define i64 @_TFC13objc_subclass12GenericGizmog1xSi(
 
@@ -193,3 +198,4 @@ class SwiftGizmo2 : Gizmo {
 
   deinit { }
 }
+

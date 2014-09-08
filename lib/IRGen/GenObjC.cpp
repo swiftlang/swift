@@ -961,17 +961,6 @@ bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {
     ->getClassOrBoundGenericClass();
 }
 
-static llvm::Constant *GetObjCEncodingForType(IRGenModule &IGM, Type T) {
-  // TODO. encode types 'T'.
-  auto clangType = IGM.getClangType(T->getCanonicalType());
-  if (!clangType.isNull()) {
-    std::string TypeStr;
-    IGM.getClangASTContext().getObjCEncodingForType(clangType, TypeStr);
-    return IGM.getAddrOfGlobalString(TypeStr.c_str());
-  }
-  return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-}
-
 static void
 HelperGetObjCEncodingForType(const clang::ASTContext &Context,
                              clang::CanQualType T,
@@ -1206,9 +1195,9 @@ irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
   Selector selector(declRef);
   llvm::Constant *selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the type @encoding.
-  llvm::Constant *atEncoding
-    = GetObjCEncodingForType(IGM, cd->getDestructor()->getType());
+  /// The second element is the type @encoding, which is always "@?"
+  /// for a function type.
+  llvm::Constant *atEncoding = IGM.getAddrOfGlobalString("@?");
 
   /// The third element is the method implementation pointer.
   llvm::Constant *impl = llvm::ConstantExpr::getBitCast(*objcImpl,
