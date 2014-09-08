@@ -1322,14 +1322,28 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
         // An non-failable initializer requirement cannot be satisfied
         // by a failable initializer.
-        if (ctor->getFailability() == OTK_None &&
-            witnessCtor->getFailability() != OTK_None) {
-          TC.diagnose(best.Witness->getLoc(),
-                      diag::witness_initializer_failability,
-                      ctor->getFullName(), 
-                      witnessCtor->getFailability() 
-                        == OTK_ImplicitlyUnwrappedOptional)
-            .highlight(witnessCtor->getFailabilityLoc());
+        if (ctor->getFailability() == OTK_None) {
+          switch (witnessCtor->getFailability()) {
+          case OTK_None:
+            // Okay
+            break;
+
+          case OTK_ImplicitlyUnwrappedOptional:
+            // Only allowed for non-@objc protocols.
+            if (!Proto->isObjC())
+              break;
+
+            SWIFT_FALLTHROUGH;
+
+          case OTK_Optional:
+            TC.diagnose(best.Witness->getLoc(),
+                        diag::witness_initializer_failability,
+                        ctor->getFullName(),
+                        witnessCtor->getFailability()
+                          == OTK_ImplicitlyUnwrappedOptional)
+              .highlight(witnessCtor->getFailabilityLoc());
+            break;
+          }
         }
       }
 

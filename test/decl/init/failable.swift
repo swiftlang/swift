@@ -176,6 +176,10 @@ protocol P1 {
   init(string: String)
 }
 
+@objc protocol P1_objc {
+  init(string: String)
+}
+
 protocol P2 {
   init?(fail: String)
 }
@@ -189,7 +193,11 @@ class C1a : P1 {
 }
 
 class C1b : P1 {
-  required init!(string: String) { } // expected-error{{non-failable initializer requirement 'init(string:)' cannot be satisfied by a failable initializer ('init!')}}
+  required init!(string: String) { } // okay
+}
+
+class C1b_objc : P1_objc {
+  required init!(string: String) { } // expected-error{{non-failable initializer requirement 'init(string:)' in Objective-C protocol cannot be satisfied by a failable initializer ('init!')}}
 }
 
 class C2a : P2 {
