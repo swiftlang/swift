@@ -429,6 +429,15 @@ Optional<bool> swift::computeSignBit(SILValue V) {
       // Sizeof always returns non-negative results.
       case BuiltinValueKind::Sizeof:
         return false;
+      // Strideof always returns non-negative results.
+      case BuiltinValueKind::Strideof:
+        return false;
+      // StrideofNonZero always returns positive results.
+      case BuiltinValueKind::StrideofNonZero:
+        return false;
+      // Alignof always returns non-negative results.
+      case BuiltinValueKind::Alignof:
+        return false;
       case BuiltinValueKind::LShr: {
         // If count is provably >= 1, then top bit is not set.
         auto *ILShiftCount = dyn_cast<IntegerLiteralInst>(AI->getArgument(1));
