@@ -315,9 +315,8 @@ public:
   /// If \p privateDiscriminator is non-empty, only matching private decls are
   /// returned; otherwise, only non-private decls are returned.
   void lookupMember(SmallVectorImpl<ValueDecl*> &results,
-                    const DeclContext *container, DeclName name,
-                    Identifier privateDiscriminator,
-                    bool lookIntoExtensions = true) const;
+                    DeclContext *container, DeclName name,
+                    Identifier privateDiscriminator) const;
 
   /// \sa getImportedModules
   enum class ImportFilter {

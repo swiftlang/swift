@@ -400,10 +400,12 @@ void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
 }
 
 void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
-                          const DeclContext *container, DeclName name,
-                          Identifier privateDiscriminator,
-                          bool lookIntoExtensions) const {
-  switch (DC->getContextKind()) {
+                          DeclContext *container, DeclName name,
+                          Identifier privateDiscriminator) const {
+  size_t oldSize = results.size();
+  bool alreadyInPrivateContext = false;
+
+  switch (container->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
@@ -418,32 +420,53 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
 
   case DeclContextKind::Module: {
     assert(container == this);
-    size_t oldSize = results.size();
     this->lookupValue({}, name, NLKind::QualifiedLookup, results);
-
-    if (privateDiscriminator.empty()) {
-      auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
-                                   [=](ValueDecl *VD) -> bool {
-        return VD->getAccessibility() <= Accessibility::Private;
-      });
-      results.erase(newEnd, results.end());
-    } else {
-      auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
-                                   [=](const ValueDecl *VD) -> bool {
-        if (VD->getAccessibility() > Accessibility::Private)
-          return true;
-        auto enclosingFile =
-          cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
-        auto discriminator = enclosingFile->getDiscriminatorForPrivateValue(VD);
-        return discriminator != privateDiscriminator;
-      });
-      results.erase(newEnd, results.end());
-    }
-    return;
+    break;
   }
 
-  case DeclContextKind::NominalTypeDecl:
-    llvm_unreachable("Unimplemented");
+  case DeclContextKind::NominalTypeDecl: {
+    auto nominal = cast<NominalTypeDecl>(container);
+    auto lookupResults = nominal->lookupDirect(name);
+
+    // Filter out declarations from other modules.
+    std::copy_if(lookupResults.begin(), lookupResults.end(),
+                 std::back_inserter(results),
+                 [this](const ValueDecl *VD) -> bool {
+      return VD->getModuleContext() == this;
+    });
+
+    alreadyInPrivateContext =
+      (nominal->getAccessibility() == Accessibility::Private);
+
+    break;
+  }
+  }
+
+  // Filter by private-discriminator, or filter out private decls if there isn't
+  // one...unless we're already in a private context, in which case everything
+  // is private and a discriminator is unnecessary.
+  if (alreadyInPrivateContext) {
+    assert(privateDiscriminator.empty() && "unnecessary private-discriminator");
+    // Don't remove anything; everything here is private anyway.
+
+  } else if (privateDiscriminator.empty()) {
+    auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
+                                 [](const ValueDecl *VD) -> bool {
+      return VD->getAccessibility() <= Accessibility::Private;
+    });
+    results.erase(newEnd, results.end());
+
+  } else {
+    auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
+                                 [=](const ValueDecl *VD) -> bool {
+      if (VD->getAccessibility() > Accessibility::Private)
+        return true;
+      auto enclosingFile =
+        cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
+      auto discriminator = enclosingFile->getDiscriminatorForPrivateValue(VD);
+      return discriminator != privateDiscriminator;
+    });
+    results.erase(newEnd, results.end());
   }
 }
 

@@ -1091,38 +1091,67 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   ASTContext &ctx = CI.getASTContext();
 
-  DeclName name;
-  Identifier privateDiscriminator;
+  SmallVector<std::pair<DeclName, Identifier>, 4> identifiers;
+  do {
+    switch (node->getKind()) {
+    case NodeKind::Class:
+    case NodeKind::Enum:
+    case NodeKind::Protocol:
+    case NodeKind::Structure:
+      break;
+    default:
+      llvm::errs() << "Name does not refer to a nominal type.\n";
+      return EXIT_FAILURE;
+    }
 
-  auto nameNode = node->getChild(1);
-  switch (nameNode->getKind()) {
-  case NodeKind::Identifier:
-    name = ctx.getIdentifier(nameNode->getText());
-    break;
-  case NodeKind::PrivateDeclName:
-    privateDiscriminator = ctx.getIdentifier(nameNode->getChild(0)->getText());
-    name = ctx.getIdentifier(nameNode->getChild(1)->getText());
-    break;
-  default:
-    llvm::errs() << "Unsupported name kind.\n";
-    return EXIT_FAILURE;
-  }
+    auto nameNode = node->getChild(1);
+    switch (nameNode->getKind()) {
+    case NodeKind::Identifier:
+      identifiers.push_back({ ctx.getIdentifier(nameNode->getText()),
+                              Identifier() });
+      break;
+    case NodeKind::PrivateDeclName:
+      identifiers.push_back({
+        ctx.getIdentifier(nameNode->getChild(1)->getText()),
+        ctx.getIdentifier(nameNode->getChild(0)->getText())
+      });
+      break;
+    default:
+      llvm::errs() << "Unsupported name kind.\n";
+      return EXIT_FAILURE;
+    }
 
-  auto contextNode = node->getFirstChild();
-  // FIXME: Handle nested contexts.
-  if (contextNode->getKind() != NodeKind::Module) {
-    llvm::errs() << "Name does not refer to a top-level declaration.\n";
-    return EXIT_FAILURE;
-  }
+    node = node->getChild(0);
+  } while (node->getKind() != NodeKind::Module);
 
-  const Module *M = getModuleByFullName(ctx, contextNode->getText());
+  Module *M = getModuleByFullName(ctx, node->getText());
   SmallVector<ValueDecl *, 4> results;
-  M->lookupMember(results, M, name, privateDiscriminator);
+  M->lookupMember(results, M, identifiers.back().first,
+                  identifiers.back().second);
 
   if (results.empty()) {
-    llvm::errs() << "No matching declarations found.\n";
+    llvm::errs() << "No matching declarations found for "
+      << MangledNameToFind << ".\n";
     return EXIT_FAILURE;
   }
+
+  // Progressively perform lookup into matching containers.
+  for (auto member : reversed(llvm::makeArrayRef(identifiers).drop_back())) {
+    decltype(results) prevResults;
+    std::swap(results, prevResults);
+
+    for (auto container : prevResults) {
+      M->lookupMember(results, cast<NominalTypeDecl>(container),
+                      member.first, member.second);
+    }
+
+    if (results.empty()) {
+      llvm::errs() << "No matching declarations found for "
+        << MangledNameToFind << ".\n";
+      return EXIT_FAILURE;
+    }
+  }
+
   for (auto *VD : results)
     VD->print(llvm::outs(), Options);
 

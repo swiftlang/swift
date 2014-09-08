@@ -8,6 +8,14 @@
 // RUN: not %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP1_13PrivateStruct
 // RUN: %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtV14swift_ide_testP33_6EB8A1E82BFF39B1A61B6065CAD7A59613PrivateStruct | FileCheck -check-prefix=THIS-FILE %s
 
+// RUN: %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5Outer5Inner
+// RUN: not %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5Outer6Absent
+// RUN: not %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test6Absent5Inner
+// RUN: not %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5Outer12PrivateInner
+// RUN: not %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5OuterP1_12PrivateInner
+// RUN: %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5OuterP33_6EB8A1E82BFF39B1A61B6065CAD7A59612PrivateInner
+// RUN: %swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_testP33_6EB8A1E82BFF39B1A61B6065CAD7A59612PrivateOuter5Inner
+
 // RUN: %swiftc_driver -emit-module -o %t %s %S/Inputs/lookup_other.swift -module-name Lookup -Xfrontend -enable-private-discriminators
 // RUN: echo 'import Lookup' > %t/test.swift
 
@@ -21,6 +29,15 @@ internal struct InternalStruct {}
 
 private struct PrivateStruct {
   let fromMainFile: Int
+}
+
+class Outer {
+  class Inner {}
+  private class PrivateInner {}
+}
+
+private class PrivateOuter {
+  class Inner {}
 }
 
 // THIS-FILE-NOT: fromOtherFile
