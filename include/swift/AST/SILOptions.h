@@ -86,6 +86,8 @@ public:
   /// Should we print out instruction counts if -print-stats is passed in?
   bool PrintInstCounts = false;
 
+  /// Should we optimize function signatures. Disabled by default.
+  bool EnableFuncSigOpts = false;
 };
 
 } // end namespace swift
