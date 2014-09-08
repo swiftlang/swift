@@ -12,16 +12,17 @@
 
 #define DEBUG_TYPE "sil-function-signature-opts"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
-#include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -38,24 +39,23 @@ STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-struct ArgumentDescriptor {
+struct ArgDescriptor {
   SILArgument *Arg;
+  SILParameterInfo ParameterInfo;
   bool IsDead;
 
-  ArgumentDescriptor() = default;
-  ArgumentDescriptor(SILArgument *A) : Arg(A), IsDead(A->use_empty()) {}
+  ArgDescriptor() = default;
+  ArgDescriptor(SILArgument *A)
+    : Arg(A), ParameterInfo(A->getParameterInfo()), IsDead(A->use_empty()) {}
+
 };
-static_assert(std::is_pod<ArgumentDescriptor>::value,
-              "Argument descriptor should be a POD");
 } // end anonymous namespace
 
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
 /// it returns false.
 static bool
-analyzeArguments(SILFunction *F,
-                 llvm::SmallVectorImpl<ArgumentDescriptor> &ArgDescList) {
+analyzeArguments(SILFunction *F, SmallVectorImpl<ArgDescriptor> &ArgDescList) {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResult())
     return false;
@@ -63,7 +63,7 @@ analyzeArguments(SILFunction *F,
   bool ShouldOptimize = false;
 
   for (SILArgument *Arg : F->begin()->getBBArgs()) {
-    ArgumentDescriptor A{Arg};
+    ArgDescriptor A{Arg};
 
     if (A.IsDead) {
       ShouldOptimize = true;
@@ -80,7 +80,7 @@ analyzeArguments(SILFunction *F,
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
-static void createNewName(SILFunction &OldF, ArrayRef<ArgumentDescriptor> Args,
+static void createNewName(SILFunction &OldF, ArrayRef<ArgDescriptor> Args,
                           llvm::SmallString<64> &Name) {
   llvm::raw_svector_ostream buffer(Name);
 
@@ -93,8 +93,6 @@ static void createNewName(SILFunction &OldF, ArrayRef<ArgumentDescriptor> Args,
   // 'n'   => We did nothing to the argument.
   // 'd'   => The argument was dead and will be removed.
   // 'a2v' => Was a loadable address and we promoted it to a value.
-  // 'o2u' => Was an @owned argument, but we changed it to be an unowned
-  //          parameter.
   // 'o2g' => Was an @owned argument, but we changed it to be a gauranteed
   //          parameter.
   // 's'   => Was a loadable value that we exploded into multiple arguments.
@@ -104,15 +102,15 @@ static void createNewName(SILFunction &OldF, ArrayRef<ArgumentDescriptor> Args,
   //
   // *NOTE* The gauranteed optimization requires knowledge to be taught to the
   // ARC optimizer among other passes in order to gaurantee safety. That or you
-  // need to insert a fix_lifetime (swift_keepAlive) call to make sure we do not
-  // eliminate the retain, release surrounding the call site in the caller.
+  // need to insert a fix_lifetime call to make sure we do not eliminate the
+  // retain, release surrounding the call site in the caller.
   //
   // Additionally we use a packed signature since at this point we don't need
   // any '_'. The fact that we can run this optimization multiple times makes me
   // worried about long symbol names so I am trying to keep the symbol names as
   // short as possible especially in light of this being applied to specialized
   // functions.
-  for (const ArgumentDescriptor &Arg : Args) {
+  for (const ArgDescriptor &Arg : Args) {
     // If this arg is dead, add 'd' to the packed signature and continue.
     if (Arg.IsDead) {
       buffer << 'd';
@@ -127,228 +125,16 @@ static void createNewName(SILFunction &OldF, ArrayRef<ArgumentDescriptor> Args,
 }
 
 //===----------------------------------------------------------------------===//
-//                        Optimized Function Creation
-//===----------------------------------------------------------------------===//
-
-namespace {
-class FunctionSignatureOptCloner
-    : public SILClonerWithScopes<FunctionSignatureOptCloner> {
-  using SuperTy = SILClonerWithScopes<FunctionSignatureOptCloner>;
-  friend class SILVisitor<FunctionSignatureOptCloner>;
-  friend class SILCloner<FunctionSignatureOptCloner>;
-
-  SILFunction &Original;
-  ArrayRef<ArgumentDescriptor> ArgDescriptors;
-
-  FunctionSignatureOptCloner(SILFunction &Original,
-                             ArrayRef<ArgumentDescriptor> ArgDescriptors,
-                             StringRef NewName)
-      : SuperTy(*initCloned(Original, ArgDescriptors, NewName)),
-        Original(Original), ArgDescriptors(ArgDescriptors) {}
-
-public:
-  static SILFunction *cloneFunction(SILFunction *F,
-                                    ArrayRef<ArgumentDescriptor> Args,
-                                    StringRef NewName) {
-    FunctionSignatureOptCloner C(*F, Args, NewName);
-    C.populateCloned();
-    ++NumFunctionSignaturesOptimized;
-    return C.getCloned();
-  };
-
-protected:
-  // Remap the value, handling SILArguments specially given our argument
-  // descriptors.
-  SILValue remapValue(SILValue Value) {
-    // If we don't have a SILArgument, just call to our parent class.
-    SILArgument *A = dyn_cast<SILArgument>(Value);
-    if (!A)
-      return SuperTy::remapValue(Value);
-
-    // Grab our argument descriptor.
-    Optional<ArgumentDescriptor> D = argDescriptorForArgument(A);
-
-    // If this is not an argument we are tracking (i.e. from the first BB),
-    // just remap the value.
-    if (!D)
-      return SuperTy::remapValue(Value);
-
-    // Ok, we have a first BB value (i.e. a function arg). First make sure that
-    // we are not attempting to remap a dead argument. A dead argument should
-    // never have the opporunity to be remapped.
-    assert(!D->IsDead && "We should never attempt to remap a dead argument");
-
-    // Otherwise, we did not perform any optimizations to this argument. Just
-    // remap it.
-    return SuperTy::remapValue(Value);
-  }
-
-private:
-  // Do a quick search for the Argument \p A. If A is not in the first BB, we
-  // return None. If we are in the first BB, we return an optional containing
-  // the argument descriptor.
-  Optional<ArgumentDescriptor> argDescriptorForArgument(SILArgument *A) {
-    for (auto &Arg : ArgDescriptors)
-      if (Arg.Arg == A)
-        return Arg;
-    return Nothing;
-  }
-
-  static SILFunction *initCloned(SILFunction &Orig,
-                                 ArrayRef<ArgumentDescriptor> Args,
-                                 StringRef NewName);
-
-  /// Clone the body of the function into the empty function that was created
-  /// by initCloned.
-  void populateCloned();
-  SILFunction *getCloned() { return &getBuilder().getFunction(); }
-};
-
-} // end anonymous namespace
-
-SILFunction *FunctionSignatureOptCloner::initCloned(
-    SILFunction &Orig, ArrayRef<ArgumentDescriptor> Args, StringRef NewName) {
-  SILModule &M = Orig.getModule();
-
-  // TODO: Change this to always be shared perhaps.
-  SILLinkage OptimizedLinkage = getSpecializedLinkage(Orig.getLinkage());
-
-  // Create the new optimized function type.
-  CanSILFunctionType OldFTy = Orig.getLoweredFunctionType();
-  const ASTContext &Ctx = M.getASTContext();
-
-  SmallVector<SILParameterInfo, 4> InterfaceParams;
-  ArrayRef<SILParameterInfo> ParameterInfo = OldFTy->getParameters();
-  for (unsigned i = 0, e = ParameterInfo.size(); i != e; ++i) {
-    if (Args[i].IsDead)
-      continue;
-    InterfaceParams.push_back(ParameterInfo[i]);
-  }
-  SILResultInfo InterfaceResult = OldFTy->getResult();
-  CanSILFunctionType NewFTy = SILFunctionType::get(
-      OldFTy->getGenericSignature(), OldFTy->getExtInfo(),
-      OldFTy->getCalleeConvention(), InterfaceParams, InterfaceResult, Ctx);
-
-  // Create the new function.
-  SILFunction *NewF = SILFunction::create(
-      M, OptimizedLinkage, NewName, NewFTy, nullptr, Orig.getLocation(),
-      Orig.isBare(), Orig.isTransparent(), Orig.getInlineStrategy(),
-      Orig.getEffectsInfo(), 0, Orig.getDebugScope(),
-      Orig.getDeclContext());
-  NewF->setSemanticsAttr(Orig.getSemanticsAttr());
-
-  // Return our newly created F for cloning.
-  return NewF;
-}
-
-void FunctionSignatureOptCloner::populateCloned() {
-  SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
-
-  // Create arguments for the entry block.
-  SILBasicBlock *OrigEntryBB = Original.begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
-
-  // Create the entry basic block with the function arguments.
-  for (size_t i = 0, e = OrigEntryBB->bbarg_size(); i != e; ++i) {
-    // If we have a dead argument, don't create an argument for it.
-    if (ArgDescriptors[i].IsDead)
-      continue;
-
-    // We could grab this from ArgDescriptors[i], but it makes more sense to
-    // keep this independent of the argument descriptors.
-    SILArgument *Arg = OrigEntryBB->getBBArg(i);
-
-    // Otherwise create our mapped value.
-    SILValue MappedValue = new (M)
-        SILArgument(remapType(Arg->getType()), ClonedEntryBB, Arg->getDecl());
-    ValueMap.insert(std::make_pair(Arg, MappedValue));
-  }
-
-  getBuilder().setInsertionPoint(ClonedEntryBB);
-  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
-  // Recursively visit original BBs in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(OrigEntryBB);
-
-  // Now iterate over the BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    getBuilder().setInsertionPoint(BI->second);
-    visit(BI->first->getTerminator());
-  }
-}
-
-//===----------------------------------------------------------------------===//
 //                                Main Routine
 //===----------------------------------------------------------------------===//
-
-/// This function takes in an old function OldF and a new function NewF that
-/// contains the body of OldF that we moved previously into NewF. Then we create
-/// a new body for OldF that just marshalls data from its arguments to the args
-/// of NewF and calls NewF.
-static void convertOldFunctionToThunk(SILFunction *OldF, SILFunction *NewF,
-                                      ArrayRef<ArgumentDescriptor> ArgDescs) {
-  // Then drop all references for the instructions in the first basic block to
-  // handle any forward references. Currently the only way this can happen is
-  // via the terminator, but there is no reason not to be careful here.
-  SILBasicBlock &FirstBB = OldF->front();
-  for (auto II = std::prev(FirstBB.end()), IE = FirstBB.begin(); II != IE;) {
-    SILInstruction &I = *II--;
-    I.eraseFromParent();
-  }
-  FirstBB.begin()->eraseFromParent();
-
-  // Visit each basic block BB and drop all references BB or any instruction
-  // that it contains may have to any other basic block. This enables us to just
-  // perform eraseFromParent on basic blocks without needing to disentangle
-  // use-def lists. We do not need to worry about any references to the first
-  // basic block since by definition the first BB must dominate all BB implying
-  // that such BB have no way to reference the first BB.
-  for (auto BI = std::prev(OldF->end()), BE = OldF->begin(); BI != BE;) {
-    SILBasicBlock *BB = BI;
-    --BI;
-    BB->dropAllReferences();
-  }
-
-  // Eliminate all basic blocks except for the first basic block. We only need
-  // one basic block for our thunk.
-  for (auto BI = std::prev(OldF->end()), BE = OldF->begin(); BI != BE;) {
-    SILBasicBlock *BB = BI;
-    --BI;
-    BB->eraseFromParent();
-  }
-
-  // Create the new thunk basic block.
-  SILLocation Loc = OldF->getLocation(); // TODO: What is the proper location
-                                         // to use here?
-  SILBuilder Builder(&FirstBB);
-  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
-
-  // Create the args for the thunk's apply, ignoring any dead arguments.
-  llvm::SmallVector<SILValue, 8> ThunkArgs;
-  for (unsigned i = 0, e = ArgDescs.size(); i != e; ++i) {
-    if (ArgDescs[i].IsDead)
-      continue;
-    ThunkArgs.push_back(FirstBB.getBBArg(i));
-  }
-
-  // We are ignoring generic functions and functions with out parameters for
-  // now.
-  SILType LoweredType = NewF->getLoweredType();
-  SILType ResultType = LoweredType.getFunctionInterfaceResultType();
-  SILValue ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
-                                             ArrayRef<Substitution>(),
-                                             ThunkArgs, NewF->isTransparent());
-  Builder.createReturn(Loc, ReturnValue);
-}
 
 /// This function takes in OldF and all callsites of OldF and rewrites the
 /// callsites to call the new function.
 static void
 rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
-                                  ArrayRef<ArgumentDescriptor> ArgDescs,
-                                  SmallPtrSet<ApplyInst *, 4> &CallSites) {
-  for (auto *AI : CallSites) {
+                                  ArrayRef<ArgDescriptor> ArgDescs,
+                                  CallGraphNode::CallerCallSiteList CallSites) {
+  for (ApplyInst *AI : CallSites) {
     SILBuilder Builder(AI);
 
     FunctionRefInst *FRI = Builder.createFunctionRef(AI->getLoc(), NewF);
@@ -358,7 +144,7 @@ rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
     for (unsigned i = 0, e = ArgDescs.size(); i != e; ++i) {
       if (ArgDescs[i].IsDead)
         continue;
-      NewArgs.push_back(AI->getOperand(i));
+      NewArgs.push_back(AI->getArgument(i));
     }
 
     // We are ignoring generic functions and functions with out parameters for
@@ -381,6 +167,134 @@ rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
   }
 }
 
+static void
+computeOptimizedInterfaceParams(CanSILFunctionType OldFTy,
+                                ArrayRef<ArgDescriptor> Args,
+                                SmallVectorImpl<unsigned> &DeadArgs,
+                                SmallVectorImpl<SILParameterInfo> &OutArray) {
+  ArrayRef<SILParameterInfo> ParameterInfo = OldFTy->getParameters();
+  for (unsigned i = 0, e = ParameterInfo.size(); i != e; ++i) {
+    // If we have a dead argument, skip it.
+    if (Args[i].IsDead) {
+      DeadArgs.push_back(i);
+      continue;
+    }
+
+    // Otherwise just propagate through the parameter info.
+    OutArray.push_back(ParameterInfo[i]);
+  }
+}
+
+static SILFunction *
+createEmptyFunctionWithOptimizedSig(SILFunction *OldF,
+                                    llvm::SmallString<64> &NewFName,
+                                    ArrayRef<ArgDescriptor> Args,
+                                    SmallVectorImpl<unsigned> &DeadArgs) {
+  SILModule &M = OldF->getModule();
+
+  // TODO: Change this to always be shared perhaps.
+  SILLinkage OptimizedLinkage = getSpecializedLinkage(OldF->getLinkage());
+
+  // Create the new optimized function type.
+  CanSILFunctionType OldFTy = OldF->getLoweredFunctionType();
+  const ASTContext &Ctx = M.getASTContext();
+
+  // The only way that we modify the arity of function parameters is here for
+  // dead arguments. Doing anything else is unsafe since by definition non-dead
+  // arguments will have SSA uses in the function. We would need to be smarter
+  // in our moving to handle such cases.
+  SmallVector<SILParameterInfo, 4> InterfaceParams;
+  computeOptimizedInterfaceParams(OldFTy, Args, DeadArgs, InterfaceParams);
+
+  SILResultInfo InterfaceResult = OldFTy->getResult();
+  CanSILFunctionType NewFTy = SILFunctionType::get(
+      OldFTy->getGenericSignature(), OldFTy->getExtInfo(),
+      OldFTy->getCalleeConvention(), InterfaceParams, InterfaceResult, Ctx);
+
+  // Create the new function.
+  SILFunction *NewF = SILFunction::create(
+      M, OptimizedLinkage, NewFName, NewFTy, nullptr, OldF->getLocation(),
+      OldF->isBare(), OldF->isTransparent(), OldF->getInlineStrategy(),
+      OldF->getEffectsInfo(), 0, OldF->getDebugScope(),
+      OldF->getDeclContext());
+  NewF->setSemanticsAttr(OldF->getSemanticsAttr());
+  return NewF;
+}
+
+static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
+                            ArrayRef<unsigned> DeadArgs) {
+  // TODO: What is the proper location to use here?
+  SILLocation Loc = BB->getParent()->getLocation();
+  SILBuilder Builder(BB);
+
+  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
+
+  // Create the args for the thunk's apply, ignoring any dead arguments.
+  llvm::SmallVector<SILValue, 8> ThunkArgs;
+
+  unsigned deadarg_i = 0, deadarg_e = DeadArgs.size();
+  for (unsigned i = 0, e = BB->getNumBBArg(); i < e; ++i) {
+    if (deadarg_i < deadarg_e && DeadArgs[deadarg_i] == i) {
+      deadarg_i++;
+      continue;
+    }
+
+    ThunkArgs.push_back(BB->getBBArg(i));
+  }
+
+  // We are ignoring generic functions and functions with out parameters for
+  // now.
+  SILType LoweredType = NewF->getLoweredType();
+  SILType ResultType = LoweredType.getFunctionInterfaceResultType();
+  SILValue ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
+                                             ArrayRef<Substitution>(),
+                                             ThunkArgs, NewF->isTransparent());
+  Builder.createReturn(Loc, ReturnValue);
+}
+
+static SILFunction *
+moveFunctionBodyToNewFunctionWithName(SILFunction *F,
+                                      llvm::SmallString<64> &NewFName,
+                                      ArrayRef<ArgDescriptor> Args) {
+  // A list of the indices of our dead args.
+  llvm::SmallVector<unsigned, 4> DeadArgs;
+
+  // First we create an empty function (i.e. no BB) whose function signature has
+  // had its arity modified.
+  //
+  // We only do this to remove dead arguments. All other function signature
+  // optimization is done later by modifying the function signature elements
+  // themselves.
+  SILFunction *NewF = createEmptyFunctionWithOptimizedSig(F, NewFName, Args,
+                                                          DeadArgs);
+
+  // Then we transfer the body of F to NewF. At this point, the arguments of the
+  // first BB will not match.
+  NewF->spliceBody(F);
+
+  // Create a new BB called ThunkBB to use to create F's new body and use NewFs
+  // first BB's arguments as a template for the BB's args.
+  SILBasicBlock *ThunkBody = F->createBasicBlock();
+  SILBasicBlock *NewFEntryBB = &*NewF->begin();
+  for (auto *A : NewFEntryBB->getBBArgs()) {
+    ThunkBody->createArgument(A->getType());
+  }
+
+  // Then erase the dead arguments from NewF using DeadArgs. We go backwards so
+  // we remove arg elements by decreasing index so we don't invalidate our
+  // indices.
+  for (unsigned i : reversed(DeadArgs)) {
+    NewFEntryBB->eraseArgument(i);
+  }
+
+  // Intrusively optimize the function signature of NewF.
+
+  // Then we create a new body for ThunkBody that calls NewF.
+  createThunkBody(ThunkBody, NewF, DeadArgs);
+
+  return NewF;
+}
+
 /// This function takes in a SILFunction F and its callsites in the current
 /// module and produces a new SILFunction that has the body of F but with
 /// optimized function arguments. F is changed to be a thunk that calls NewF to
@@ -389,7 +303,7 @@ rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
 /// returns false otherwise.
 static bool
 optimizeFunctionSignature(SILFunction *F,
-                          llvm::SmallPtrSet<ApplyInst *, 4> &CallSites) {
+                          CallGraphNode::CallerCallSiteList CallSites) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
 
@@ -405,9 +319,9 @@ optimizeFunctionSignature(SILFunction *F,
     return false;
   }
 
-  // An array containing our ArgumentDescriptor objects that contain information
+  // An array containing our ArgDescriptor objects that contain information
   // from our analysis.
-  llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
+  llvm::SmallVector<ArgDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
   if (!analyzeArguments(F, Arguments)) {
@@ -419,6 +333,12 @@ optimizeFunctionSignature(SILFunction *F,
   DEBUG(llvm::dbgs() << "    Has optimizable arguments... Performing "
                         "optimizations...\n");
 
+  ++NumFunctionSignaturesOptimized;
+
+  DEBUG(for (auto *AI : CallSites) {
+    llvm::dbgs()  << "        CALLSITE: " << *AI;
+  });
+
   llvm::SmallString<64> NewFName;
   createNewName(*F, Arguments, NewFName);
 
@@ -426,16 +346,19 @@ optimizeFunctionSignature(SILFunction *F,
   // Ok, we have optimizations that we can perform here. First attempt to look
   // up the optimized function from the module if we already created it in a
   // previous pass manager iteration.
+  //
+  // This can occur if we specialize a function F to a function NewF and then F
+  // is deleted. If F is deleted, we will re-link in F if F is able to be shown
+  // to be used somewhere else due to a different optimization exposing a
+  // function_ref.
   if (!(NewF = F->getModule().lookUpFunction(NewFName))) {
     // Otherwise, create the new function and transfer the current function over
     // to that function.
-    NewF = FunctionSignatureOptCloner::cloneFunction(F, Arguments, NewFName);
+    NewF = moveFunctionBodyToNewFunctionWithName(F, NewFName, Arguments);
   }
 
-  // Change the old function into a thunk.
-  convertOldFunctionToThunk(F, NewF, Arguments);
-
-  // Rewrite all apply inst to be to the new function.
+  // Rewrite all apply inst to be to the new function performing any
+  // modifications needed to the caller.
   rewriteApplyInstToCallNewFunction(F, NewF, Arguments, CallSites);
 
   return true;
@@ -453,30 +376,13 @@ public:
 
   void run() {
     SILModule *M = getModule();
+    auto *CGA = getAnalysis<CallGraphAnalysis>();
 
     DEBUG(llvm::dbgs() << "**** Optimizing Function Signatures ****\n\n");
 
+    CallGraph &CG = CGA->getCallGraph();
+
     // Construct a map from Callee -> Call Site Set.
-    llvm::DenseMap<SILFunction *, llvm::SmallPtrSet<ApplyInst *, 4>>
-    CalleeToCallSiteSetMap;
-    std::vector<SILFunction *> FunctionsToVisit;
-    for (auto &Caller : *M) {
-      FunctionsToVisit.push_back(&Caller);
-      for (auto &BB : Caller) {
-        for (auto &I : BB) {
-          auto *AI = dyn_cast<ApplyInst>(&I);
-          if (!AI)
-            continue;
-
-          auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-          if (!FRI)
-            continue;
-
-          SILFunction *Callee = FRI->getReferencedFunction();
-          CalleeToCallSiteSetMap[Callee].insert(AI);
-        }
-      }
-    }
 
     // Process each function in the callgraph that we are able to optimize.
     //
@@ -485,9 +391,17 @@ public:
     // line more calls may be exposed and the inliner might be able to handle
     // those calls.
     bool Changed = false;
-    for (auto P : CalleeToCallSiteSetMap) {
-      SILFunction *F = P.first;
-      Changed |= optimizeFunctionSignature(F, CalleeToCallSiteSetMap[F]);
+    for (auto &F : *M) {
+      // First try and grab F's call graph node.
+      CallGraphNode *FNode = CG.getCallGraphNode(&F);
+
+      // If we don't have any call graph information for F, skip F.
+      if (!FNode)
+        continue;
+
+      // Now that we have our call graph, optimize F and all of its apply insts.
+      auto CallSites = FNode->getKnownCallerCallSites();
+      Changed |= optimizeFunctionSignature(&F, CallSites);
     }
 
     // If we changed anything, invalidate the call graph.
