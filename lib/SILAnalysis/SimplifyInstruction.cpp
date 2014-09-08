@@ -353,7 +353,7 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
     // trunc(extOrBitCast(x)) -> x
     if (match(Op, m_ExtOrBitCast(m_SILValue(Result)))) {
       // Truncated back to the same bits we started with.
-      if (Result->getType(0) == AI->getType())
+      if (Result.getType() == AI->getType())
         return Result;
     }
 
@@ -363,7 +363,7 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
                      m_ExtOrBitCast(m_SILValue(Result))), 0))) {
       // If the top bit of Result is known to be 0, then
       // it is safe to replace the whole patterb by original bits of x
-      if (Result->getType(0) == AI->getType()) {
+      if (Result.getType() == AI->getType()) {
         if (auto signBit = computeSignBit(Result))
           if (!signBit.getValue())
             return Result;
@@ -484,7 +484,7 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
     SILValue Result;
     // CheckedConversion(ExtOrBitCast(x)) -> x
     if (match(AI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
-      if (Result->getType(0) == AI->getType().getTupleElementType(0)) {
+      if (Result.getType() == AI->getType().getTupleElementType(0)) {
         assert (!computeSignBit(Result).getValue() && "Sign bit should be 0");
         return Result;
       }
@@ -498,7 +498,7 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
     SILValue Result;
     // CheckedTrunc(Ext(x)) -> x
     if (match(AI, m_CheckedTrunc(m_Ext(m_SILValue(Result)))))
-      if (Result->getType(0) == AI->getType().getTupleElementType(0))
+      if (Result.getType() == AI->getType().getTupleElementType(0))
         if (auto signBit = computeSignBit(Result))
           if (!signBit.getValue())
             return Result;
