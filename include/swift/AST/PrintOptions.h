@@ -94,7 +94,7 @@ struct PrintOptions {
   bool PrintImplicitAttrs = true;
 
   /// List of attribute kinds that should not be printed.
-  std::vector<DeclAttrKind> ExcludeAttrList = { DAK_Transparent };
+  std::vector<DeclAttrKind> ExcludeAttrList = { DAK_Transparent, DAK_Effects };
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
