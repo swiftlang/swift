@@ -28,6 +28,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -2422,11 +2423,11 @@ static bool checkGenericExtensionLimitations(TypeChecker &TC, const Decl *D) {
   if (isa<ExtensionDecl>(DC) && isa<ValueDecl>(D) &&
       cast<ValueDecl>(D)->getAccessibility() == Accessibility::Public &&
       DC->getDeclaredInterfaceType()->is<BoundGenericType>() &&
-      DC->getModuleScopeContext()->getParentModule()
+      DC->getParentModule()
         != DC->getDeclaredInterfaceType()->getAnyNominal()->getModuleContext()&&
       !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isAccessor()) &&
       DC->getModuleScopeContext()->getParentModule()->Name.str()
-        != "Foundation") {
+        != FOUNDATION_MODULE_NAME) {
     TC.diagnose(D, diag::unsupported_generic_extension,
                 DC->getDeclaredInterfaceType());
     return true;
