@@ -1031,10 +1031,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
   llvm::DIType DITy = getOrCreateType(DbgTy);
 
   unsigned Derefs = Indirection ? 1 : 0;
-  // If this is a function pointer we need an extra DW_OP_deref, so we
-  // can distinuguish this from a function symbol.
-  if (DbgTy.getType()->getCanonicalType()->is<AnyFunctionType>())
-    ++Derefs;
 
   // If there is no debug info for this type then do not emit debug info
   // for this variable.
