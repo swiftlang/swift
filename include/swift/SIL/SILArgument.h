@@ -61,6 +61,7 @@ public:
 
   /// Returns the SILParameterInfo for this SILArgument.
   SILParameterInfo getParameterInfo() const {
+    assert(isFunctionArg() && "Only function arguments have SILParameterInfo");
     return getFunction()->getLoweredFunctionType()->getParameters()[getIndex()];
   }
 
