@@ -242,7 +242,14 @@ class D6 : C {
   init(double: Double) { } // expected-error{{'required' modifier must be present on all overrides of a required initializer}}
 }
 
+// rdar://problem/18232867
+class C_empty_tuple {
+  init() { }
+}
 
+class D_empty_tuple : C_empty_tuple {
+  override init(foo:()) { } // expected-error{{initializer does not override a designated initializer from its superclass}}
+}
 
 class C_with_let {
   let x = 42  // expected-note {{attempt to override property here}}

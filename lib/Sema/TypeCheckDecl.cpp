@@ -4625,6 +4625,12 @@ public:
   /// declaration in a superclass.
   static bool areOverrideCompatibleSimple(ValueDecl *decl,
                                           ValueDecl *parentDecl) {
+    // If the number of argument labels does not match, these overrides cannot
+    // be compatible.
+    if (decl->getFullName().getArgumentNames().size() !=
+          parentDecl->getFullName().getArgumentNames().size())
+      return false;
+
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       // Specific checking for methods.
       auto parentFunc = cast<FuncDecl>(parentDecl);
