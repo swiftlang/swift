@@ -78,7 +78,7 @@ ERROR(could_not_convert_argument,sema,none,
 ERROR(single_expression_conformance_failure,sema,none,
       "expression does not conform to type %0", (Type))
 
-NOTE(expression_too_complex,sema,none,
+ERROR(expression_too_complex,sema,none,
       "expression was too complex to be solved in reasonable time; "
       "consider breaking up the expression into distinct sub-expressions", ())
 
