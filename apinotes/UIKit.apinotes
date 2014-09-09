@@ -979,8 +979,8 @@ Classes:
   - Selector: 'performBatchUpdates:completion:'
     MethodKind: Instance
     Nullability:
-    - N
-    - U
+    - O
+    - O
     NullabilityOfRet: S
   - Selector: 'registerClass:forCellWithReuseIdentifier:'
     MethodKind: Instance
@@ -1245,7 +1245,9 @@ Classes:
     NullabilityOfRet: S
   Properties:
   - Name: invalidatedItemIndexPaths
-    Nullability: N
+    Nullability: O
+  - Name: invalidatedSupplementaryIndexPaths
+    Nullability: O
 - Name: UICollectionViewTransitionLayout
   Methods:
   - Selector: 'initWithCurrentLayout:nextLayout:'
@@ -2013,7 +2015,7 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'locationInView:'
     MethodKind: Instance
@@ -2305,16 +2307,12 @@ Classes:
     Nullability: N
 - Name: UILabel
   Properties:
-  - Name: font
-    Nullability: N
   - Name: highlightedTextColor
     Nullability: O
   - Name: shadowColor
     Nullability: O
   - Name: text
     Nullability: O
-  - Name: textColor
-    Nullability: N
 - Name: UILexicon
   Properties:
   - Name: entries
@@ -3421,7 +3419,7 @@ Classes:
   - Name: destinationViewController
     Nullability: N
   - Name: identifier
-    Nullability: N
+    Nullability: O
   - Name: sourceViewController
     Nullability: N
 - Name: UISwitch
@@ -3666,7 +3664,7 @@ Classes:
   - Selector: 'selectRowAtIndexPath:animated:scrollPosition:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     - S
     - S
     NullabilityOfRet: S
@@ -4951,7 +4949,7 @@ Protocols:
     Nullability:
     - N
     - N
-    - N
+    - O
     - O
     NullabilityOfRet: S
   - Selector: 'application:performFetchWithCompletionHandler:'

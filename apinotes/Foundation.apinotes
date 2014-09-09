@@ -1077,7 +1077,7 @@ Classes:
     - S
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'dateBySettingHour:minute:second:ofDate:options:'
     MethodKind: Instance
     Nullability:
@@ -1086,7 +1086,7 @@ Classes:
     - S
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'dateBySettingUnit:value:ofDate:options:'
     MethodKind: Instance
     Nullability:
@@ -2401,7 +2401,7 @@ Classes:
     - N
     - S
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'setLocalizedDateFormatFromTemplate:'
     MethodKind: Instance
     Nullability:
@@ -3038,7 +3038,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    - N
+    - O
     - O
     NullabilityOfRet: N
   - Selector: 'initWithName:reason:userInfo:'
@@ -4379,7 +4379,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - O
     - N
     - S
     NullabilityOfRet: N
@@ -6289,7 +6289,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   Properties:
   - Name: attributedStringForNil
     Nullability: O
@@ -6297,12 +6297,26 @@ Classes:
     Nullability: N
   - Name: currencyCode
     Nullability: N
+  - Name: currencyDecimalSeparator
+    Nullability: O
+  - Name: currencyGroupingSeparator
+    Nullability: O
+  - Name: currencySymbol
+    Nullability: O
+  - Name: decimalSeparator
+    Nullability: O
   - Name: exponentSymbol
     Nullability: N
+  - Name: format
+    Nullability: N
+  - Name: internationalCurrencySymbol
+    Nullability: O
   - Name: locale
     Nullability: O
   - Name: minusSign
     Nullability: N
+  - Name: multiplier
+    Nullability: O
   - Name: negativeFormat
     Nullability: N
   - Name: negativeInfinitySymbol
@@ -6315,6 +6329,8 @@ Classes:
     Nullability: N
   - Name: notANumberSymbol
     Nullability: N
+  - Name: paddingCharacter
+    Nullability: O
   - Name: percentSymbol
     Nullability: N
   - Name: perMillSymbol
@@ -6327,6 +6343,16 @@ Classes:
     Nullability: N
   - Name: positiveSuffix
     Nullability: N
+  - Name: roundingBehavior
+    Nullability: O
+  - Name: roundingIncrement
+    Nullability: O
+  - Name: textAttributesForNegativeInfinity
+    Nullability: O
+  - Name: textAttributesForNegativeValues
+    Nullability: O
+  - Name: textAttributesForNil
+    Nullability: O
   - Name: textAttributesForNotANumber
     Nullability: O
   - Name: textAttributesForPositiveInfinity
@@ -6678,7 +6704,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   Properties:
   - Name: array
     Nullability: N
@@ -6833,21 +6859,13 @@ Classes:
   Methods:
   - Selector: 'addConnection:toRunLoop:forMode:'
     MethodKind: Instance
-    Nullability:
-    - O
-    - N
-    - N
-    NullabilityOfRet: S
+    Availability: none
   - Selector: delegate
     MethodKind: Instance
     NullabilityOfRet: O
   - Selector: 'removeConnection:fromRunLoop:forMode:'
     MethodKind: Instance
-    Nullability:
-    - O
-    - N
-    - N
-    NullabilityOfRet: S
+    Availability: none
   - Selector: 'removeFromRunLoop:forMode:'
     MethodKind: Instance
     Nullability:
@@ -7342,7 +7360,7 @@ Classes:
     - N
     - N
     - S
-    - N
+    - O
     NullabilityOfRet: N
   Properties:
   - Name: baseSpecifier
@@ -9416,6 +9434,12 @@ Classes:
     - N
     - O
     NullabilityOfRet: S
+  - Selector: 'setTemporaryResourceValue:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - N
+    NullabilityOfRet: S
   - Selector: 'URLByAppendingPathComponent:'
     MethodKind: Instance
     Nullability:
@@ -9457,7 +9481,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    - U
+    - O
     NullabilityOfRet: O
   - Selector: 'writeBookmarkData:toURL:options:error:'
     MethodKind: Class
@@ -10012,7 +10036,7 @@ Classes:
   - Name: name
     Nullability: N
   - Name: value
-    Nullability: N
+    Nullability: O
 - Name: NSURLRequest
   Methods:
   - Selector: 'initWithURL:'
@@ -12364,8 +12388,8 @@ Protocols:
     Nullability:
     - N
     - N
-    - N
-    - N
+    - O
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'parser:didStartMappingPrefix:toURI:'
