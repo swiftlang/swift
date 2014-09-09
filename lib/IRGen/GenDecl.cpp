@@ -442,9 +442,9 @@ void IRGenModule::emitObjCRegistration() {
 }
 
 /// Add the given global value to @llvm.used.
+///
+/// This value must have a definition by the time the module is finalized.
 void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
-  assert(!global->isDeclaration() &&
-         "Only globals with definition can force usage.");
   LLVMUsed.push_back(global);
 }
 
@@ -509,6 +509,11 @@ void IRGenModule::emitGlobalLists() {
                  llvm::GlobalValue::InternalLinkage);
 
   // @llvm.used
+  assert(std::all_of(LLVMUsed.begin(), LLVMUsed.end(),
+                     [](const llvm::WeakVH &global) {
+    return !isa<llvm::GlobalValue>(global) ||
+           !cast<llvm::GlobalValue>(global)->isDeclaration();
+  }) && "all globals in the 'used' list must be definitions");
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage);
 }
@@ -802,6 +807,13 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
                    entity.isWeakImported(IGM.SILMod->getSwiftModule()));
   global->setLinkage(linkage.first);
   global->setVisibility(linkage.second);
+
+  // Everything externally visible is considered used in Swift.
+  // That mostly means we need to be good at not marking things external.
+  if (linkage.first == llvm::GlobalValue::ExternalLinkage &&
+      linkage.second == llvm::GlobalValue::DefaultVisibility) {
+    IGM.addUsedGlobal(global);
+  }
 }
 
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
@@ -813,6 +825,8 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
   std::tie(result.Linkage, result.Visibility) =
     getIRLinkage(IGM, entity.getLinkage(isDefinition), isDefinition,
                  entity.isWeakImported(IGM.SILMod->getSwiftModule()));
+
+  result.ForDefinition = isDefinition;
 
   return result;
 }
@@ -851,6 +865,15 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   fn->setCallingConv(cc);
   if (!attrs.isEmpty())
     fn->setAttributes(attrs);
+
+  // Everything externally visible is considered used in Swift.
+  // That mostly means we need to be good at not marking things external.
+  if (ForDefinition &&
+      Linkage == llvm::GlobalValue::ExternalLinkage &&
+      Visibility == llvm::GlobalValue::DefaultVisibility) {
+    IGM.addUsedGlobal(fn);
+  }
+
   return fn;
 }
 
@@ -879,6 +902,14 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
                                getLinkage(), /*initializer*/ nullptr,
                                getName());
   var->setVisibility(getVisibility());
+
+  // Everything externally visible is considered used in Swift.
+  // That mostly means we need to be good at not marking things external.
+  if (ForDefinition &&
+      Linkage == llvm::GlobalValue::ExternalLinkage &&
+      Visibility == llvm::GlobalValue::DefaultVisibility) {
+    IGM.addUsedGlobal(var);
+  }
 
   if (IGM.DebugInfo)
     IGM.DebugInfo->

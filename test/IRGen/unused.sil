@@ -1,4 +1,6 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
+// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s > %t
+// RUN: FileCheck %s < %t
+// RUN: FileCheck -check-prefix=NEGATIVE %s < %t
 
 sil_stage canonical
 
@@ -35,14 +37,18 @@ bb0:
   return %1 : $()
 }
 
-// CHECK-NOT: @foo
-// CHECK-NOT: @bar
-// CHECK-NOT: @baz
+sil @frieda : $@thin () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: @llvm.used = appending global [1 x i8*] [i8* bitcast (void ()* @frieda to i8*)], section "llvm.metadata", align 8
+
 // CHECK: define linkonce_odr hidden void @qux()
-// CHECK-NOT: @foo
-// CHECK-NOT: @bar
-// CHECK-NOT: @baz
 // CHECK: define hidden void @fred()
-// CHECK-NOT: @foo
-// CHECK-NOT: @bar
-// CHECK-NOT: @baz
+// CHECK: define void @frieda()
+
+// NEGATIVE-NOT: @foo
+// NEGATIVE-NOT: @bar
+// NEGATIVE-NOT: @baz

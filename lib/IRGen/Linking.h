@@ -433,6 +433,7 @@ class LinkInfo {
   llvm::SmallString<32> Name;
   llvm::GlobalValue::LinkageTypes Linkage;
   llvm::GlobalValue::VisibilityTypes Visibility;
+  ForDefinition_t ForDefinition;
 
 public:
   /// Compute linkage information for the given 
