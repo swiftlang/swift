@@ -21,6 +21,7 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_7 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_8 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_9 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_10 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS_AND_LOCAL1
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_2 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
@@ -135,6 +136,18 @@ struct NestedStructWithClosureMember1 {
   struct Nested {
     var c1 = { #^DELAYED_8^# }
     lazy var c2 = { #^DELAYED_9^# }
+  }
+}
+
+// WITH_GLOBAL_DECLS_AND_LOCAL1: Begin completions
+// WITH_GLOBAL_DECLS_AND_LOCAL1: Decl[LocalVar]/Local: x[#Int#]
+// WITH_GLOBAL_DECLS_AND_LOCAL1: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// WITH_GLOBAL_DECLS_AND_LOCAL1: End completions
+
+struct StructWithClosureMemberAndLocal {
+  var c = {
+    var x = 0
+    #^DELAYED_10^#
   }
 }
 

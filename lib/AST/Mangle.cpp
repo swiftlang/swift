@@ -605,7 +605,8 @@ void Mangler::mangleDeclTypeForDebugger(ValueDecl *decl) {
 
 void Mangler::mangleDeclType(ValueDecl *decl, ResilienceExpansion explosion,
                              unsigned uncurryLevel) {
-  auto type = decl->getType();
+  Type type = decl->hasType() ? decl->getType()
+                              : ErrorType::get(decl->getASTContext());
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
 }
 
