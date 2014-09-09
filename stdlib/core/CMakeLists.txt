@@ -36,6 +36,7 @@ set(SWIFTLIB_ESSENTIAL
   Character.swift
   CocoaArray.swift
   Collection.swift
+  CommonMethods.swift.gyb
   CompilerProtocols.swift
   Concatenate.swift.gyb
   ContiguousArrayBuffer.swift

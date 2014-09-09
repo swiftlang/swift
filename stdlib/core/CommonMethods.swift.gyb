@@ -1,0 +1,36 @@
+//===--- CommonMethods.swift.gyb - Generate methods across many sequences ---===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  Lacking default implementations in protocols, the best we can do
+//  in some cases is to generate duplicate code.
+//
+//===----------------------------------------------------------------------===//
+
+% for Self in [
+%   'Array', 'ContiguousArray', 'Slice', 'LazySequence'] + [
+%   'Lazy%sCollection' % x for x in ('Forward', 'Bidirectional', 'RandomAccess')]:
+extension ${Self} {
+  // FIXME: crazy associated type name logic due to <rdar://problem/18281914>
+  /// Return `true` if and only if `predicate(x)` is true for some
+  /// element `x` of `self`
+  public func any(predicate: (${Self}.${'Generator.Element' if 'Sequence' in Self else '_Element'})->Bool) -> Bool {
+    return Swift.any(self, predicate)
+  }
+
+  /// Return `true` if and only if `predicate(x)` is true for all
+  /// elements `x` of `self`
+  public func all(predicate: (${Self}.${'Generator.Element' if 'Sequence' in Self else '_Element'})->Bool) -> Bool {
+    return Swift.all(self, predicate)
+  }
+}
+
+% end

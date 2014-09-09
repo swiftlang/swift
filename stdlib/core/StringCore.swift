@@ -501,10 +501,10 @@ public struct _StringCore {
     if _fastPath(elementWidth == 1) {
       return true
     }
-    return !contains(
+    return all(
       UnsafeBufferPointer(
         start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress), count: count)
-    ) { $0 > 0x7f }
+    ) { $0 <= 0x7f }
   }
 }
 
@@ -551,7 +551,7 @@ extension _StringCore : ExtensibleCollectionType {
     var width = elementWidth
     if width == 1 {
       if let hasNonAscii = s~>_preprocessingPass({
-          s in contains(s) { $0 > 0x7f }
+          s in any(s) { $0 > 0x7f }
         }) {
         width = hasNonAscii ? 2 : 1
       }
@@ -609,7 +609,7 @@ extension _StringCore : RangeReplaceableCollectionType {
       subRange.endIndex <= count,
       "replaceRange: subRange extends past String end")
     
-    let width = elementWidth == 2 || contains(newValues) { $0 > 0x7f } ? 2 : 1
+    let width = elementWidth == 2 || any(newValues) { $0 > 0x7f } ? 2 : 1
     let replacementCount = numericCast(countElements(newValues)) as Int
     let replacedCount = countElements(subRange)
     let tailCount = count - subRange.endIndex
@@ -662,7 +662,7 @@ extension _StringCore : RangeReplaceableCollectionType {
           initialSize: 0,
           elementWidth:
             width == 1 ? 1
-            : representableAsASCII() && !contains(newValues) { $0 > 0x7f } ? 1
+            : representableAsASCII() && all(newValues) { $0 <= 0x7f } ? 1
             : 2
         ))
       r.extend(self[0..<subRange.startIndex])
