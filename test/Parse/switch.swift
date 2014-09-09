@@ -7,7 +7,7 @@ func ~= (x: (Int,Int), y: (Int,Int)) -> Bool {
 }
 
 func parseError1(x: Int) {
-  switch func {} // expected-error {{expected expression in 'switch' statement}} expected-error {{expected '{' after 'switch' subject expression}} expected-error {{expected identifier in function declaration}} expected-error {{braced block of statements is an unused closure}}
+  switch func {} // expected-error {{expected expression in 'switch' statement}} expected-error {{expected '{' after 'switch' subject expression}} expected-error {{expected identifier in function declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}}
 }
 
 func parseError2(x: Int) {

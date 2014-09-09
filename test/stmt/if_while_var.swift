@@ -30,7 +30,7 @@ if let x: B = d { }
 if let x {} // expected-error{{requires an initializer}}
 
 // TODO poor recovery in these cases
-if let {} // expected-error{{expected pattern}} expected-error{{unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}}
+if let {} // expected-error{{expected pattern}} expected-error{{unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{type of expression is ambiguous without more context}}
 if let x = {} // expected-error{{'{' after 'if'}}
 
 if let x = foo() {

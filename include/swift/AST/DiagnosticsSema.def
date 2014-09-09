@@ -1201,6 +1201,9 @@ ERROR(not_enough_context_for_generic_method_reference,sema_tce,none,
       "reference to generic method %0 is ambiguous without more context",
       (Identifier))
 
+ERROR(type_of_expression_is_ambiguous,sema_tce,none,
+      "type of expression is ambiguous without more context", ())
+
 ERROR(missing_protocol,sema_tce,none,
       "missing protocol %0", (Identifier))
 ERROR(nil_literal_broken_proto,sema_tce,none,

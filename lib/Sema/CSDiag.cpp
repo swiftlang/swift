@@ -1298,6 +1298,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   if (ActiveConstraints.empty() &&
       InactiveConstraints.empty() &&
       !failedConstraint) {
+    
     if (isa<DiscardAssignmentExpr>(expr)) {
       TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
         .highlight(expr->getSourceRange());
@@ -1312,6 +1313,13 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
       
       return true;
     }
+    
+    // If there are no posted constraints or failures, then there was
+    // not enough contextual information available to infer a type for the
+    // expression.
+    TC.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous);
+  
+    return true;
   }
   
   return false;

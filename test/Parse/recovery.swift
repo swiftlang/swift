@@ -89,7 +89,7 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}}
   }
 
   // Ensure that we don't have recovery here.
@@ -109,7 +109,7 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}}
   }
 
   // Ensure that we don't do recovery here.
@@ -175,7 +175,7 @@ func missingControllingExprInFor() {
   }
 
   // A trailing closure is not accepted for the condition.
-  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'BooleanType'}}
+  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'BooleanType'}} expected-error{{type of expression is ambiguous without more context}}
 // expected-error@-1{{expected ';' in 'for' statement}}
 // expected-error@-2{{braced block}}
   }

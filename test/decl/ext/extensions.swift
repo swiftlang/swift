@@ -69,7 +69,7 @@ extension P1 {} // expected-error {{protocol 'P1' cannot be extended}}
 
 protocol P2 {}
 
-extension () {} // expected-error {{expected identifier in extension declaration}}
+extension () {} // expected-error {{expected identifier in extension declaration}} expected-error{{type of expression is ambiguous without more context}}
 // expected-error @-1{{braced block of statements is an unused closure}}
 // expected-error @-2{{cannot begin with a closure expression}}
 // expected-note @-3{{explicitly discard the result}}

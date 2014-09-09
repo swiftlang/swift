@@ -66,7 +66,7 @@ var c3 = C().map // expected-note{{parsing trailing closure for this call}}
 // <rdar://problem/16835718> Ban multiple trailing closures
 func multiTrailingClosure(a : () -> (), b : () -> ()) {
   multiTrailingClosure({}) {} // ok
-  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #2 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{braced block of statements is an unused closure}}
+  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #2 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}}
   
   
 }

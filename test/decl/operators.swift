@@ -60,7 +60,7 @@ prefix func +// this should be a comment, not an operator
 prefix func -/* this also should be a comment, not an operator */
 (arg: Int) -> Int { return arg }
 
-func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}}
+func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{type of expression is ambiguous without more context}}
 func errors() {
   */    // expected-error {{unexpected end of block comment}}
   
@@ -157,11 +157,11 @@ prefix func & (x: Int) {} // expected-error {{cannot declare a custom prefix '&'
 
 // Only allow operators at global scope:
 func operator_in_func_bad () {
-    prefix func + (input: String) -> String { return "+" + input } // expected-error {{operators are only allowed at global scope}} \
+    prefix func + (input: String) -> String { return "+" + input } // expected-error {{operators are only allowed at global scope}} expected-error{{type of expression is ambiguous without more context}} \
                                                                     // expected-error {{braced block of statements is an unused closure}}
 }
 
-infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}}
+infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{type of expression is ambiguous without more context}}
 
 infix operator ??= {}
 
