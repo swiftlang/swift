@@ -85,7 +85,8 @@ public class HeapStorage<Value, Element> {
       )
   }
 
-  /// Make ordinary initialization unavaible
+  // Make ordinary initialization unavailable
+  @availability(*,unavailable, message="Only initialize these by calling create")
   internal init() {
     fatalError("Only initialize these by calling create")
   }
