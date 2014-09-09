@@ -319,6 +319,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     else
       return nullptr;
 
+    if (expr->hasExplicitResultType())
+      if (doIt(expr->getExplicitResultTypeLoc().getTypeRepr()))
+        return nullptr;
+
     // Handle single-expression closures.
     if (expr->hasSingleExpressionBody()) {
       if (Expr *body = doIt(expr->getSingleExpressionBody())) {

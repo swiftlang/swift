@@ -261,3 +261,6 @@ class C11 {
   // CHECK: var <Var>c</Var>: <iStruct@>Int</iStruct> { get { {var <Var>tmp</Var> = 0; return <Var@[[@LINE+1]]:27>tmp</Var>}() } }
   var c: Int { get { {var tmp = 0; return tmp}() } }
 }
+
+// CHECK: var <Var>g1</Var> = { (<Param>x</Param>: <iStruct@>Int</iStruct>) -> <iStruct@>Int</iStruct> in return 0 }
+var g1 = { (x: Int) -> Int in return 0 }

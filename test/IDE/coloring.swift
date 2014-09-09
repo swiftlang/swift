@@ -234,6 +234,9 @@ class MySubClass : MyCls {
     convenience init(a: Int) {}
 }
 
+// CHECK: <kw>var</kw> g1 = { (x: <type>Int</type>) -> <type>Int</type> <kw>in</kw> <kw>return</kw> <int>0</int> }
+var g1 = { (x: Int) -> Int in return 0 }
+
 // CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> ~~ {
 infix operator ~~ {}
 // CHECK: <attr-builtin>prefix</attr-builtin> <kw>operator</kw> *~~ {
