@@ -166,9 +166,9 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   for (auto archetype : generics.getAllArchetypes()) {
     unsigned nextProtocolIndex = 0;
     for (auto protocol : archetype->getConformsTo()) {
+      LocalTypeData key = (LocalTypeData) nextProtocolIndex++;
       if (!requiresProtocolWitnessTable(protocol))
         continue;
-      LocalTypeData key = (LocalTypeData) nextProtocolIndex++;
       llvm::Value *wtable = claimNext(IGF.IGM.WitnessTablePtrTy);
       IGF.setUnscopedLocalTypeData(CanType(archetype), key, wtable);
     }

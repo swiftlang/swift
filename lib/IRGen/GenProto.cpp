@@ -3431,7 +3431,7 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
   // Set the protocol witness tables.
 
   unsigned wtableI = 0;
-  for (unsigned i = 0, e = wtables.size(); i != e; ++i) {
+  for (unsigned i = 0, e = archetype->getConformsTo().size(); i != e; ++i) {
     auto proto = archetype->getConformsTo()[i];
     if (!requiresProtocolWitnessTable(proto)) continue;
     auto wtable = wtables[wtableI++];
