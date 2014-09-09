@@ -87,12 +87,19 @@ struct ${Traversal}CollectionLimiter<
 }
 % end
 
+func expectType<T>(_: T.Type, inout x: T) {}
+
 % arrays = ['Array(%s)', 'Slice(%s)', 'ContiguousArray(%s)']
 % limiters = ['Sequence'] + [ x+'Collection' for x in traversals ]
 % for Self in ['lazy('+x+'Limiter(%s))' for x in limiters] + arrays:
 allTests.test("${Self} any/all") {
   let c = ${Self%'0..<4'}
-  let b: Bool = c.any { $0 > 2 }
+  if true {
+    var anyResult = c.any { $0 > 2 }
+    var allResult = c.all { $0 > 2 }
+    expectType(Bool.self, &anyResult)
+    expectType(Bool.self, &allResult)
+  }
   expectTrue(c.any { $0 > 2 })
   expectFalse(c.any { $0 > 4 })
   expectTrue(c.all { $0 > -1 })
