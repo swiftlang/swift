@@ -574,6 +574,18 @@ static void checkCircularity(TypeChecker &tc, T *decl,
 
   case CircularityCheck::Checking: {
     // We're already checking this protocol, which means we have a cycle.
+    
+    // The type directly references itself.
+    if (path.size() == 1) {
+      tc.diagnose((*path.begin())->getLoc(),
+                  circularDiag,
+                  (*path.begin())->getName().str());
+      
+      decl->setInvalid();
+      decl->overwriteType(ErrorType::get(tc.Context));
+      breakInheritanceCycle(decl);
+      break;
+    }
 
     // Find the beginning of the cycle within the full path.
     auto cycleStart = path.end()-2;
