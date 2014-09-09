@@ -352,13 +352,19 @@ struct NonFailableModel: FailableRequirement, NonFailableRefinement, IUOFailable
   init(foo: Int) {}
 }
 
-// TODO: Will be subsumed by the following TODO.
-protocol NonFailableRequirementOnly {
-  init(foo: Int)
+struct FailableModel: FailableRequirement, IUOFailableRequirement {
+  // CHECK-LABEL: sil @_TTWV9witnesses13FailableModelS_19FailableRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
+
+  // CHECK-LABEL: sil @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
+  // CHECK: bb0([[SELF:%[0-9]+]] : $*ImplicitlyUnwrappedOptional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
+  // CHECK: apply [transparent] [[CHECK_OPTIONAL_FN:%[0-9]+]]<FailableModel>([[RESULT_ADDR:%[0-9]+]]#1) : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+  // CHECK-NEXT: cond_br
+  // CHECK: apply [transparent] [[INJECT_IUO_FN:%[0-9]+]]<FailableModel>([[IUO_TEMP:%[0-9]+]]#1, [[RESULT:%[0-9]+]]#1) : $@thin <τ_0_0> (@out ImplicitlyUnwrappedOptional<τ_0_0>, @in τ_0_0) -> ()
+  init?(foo: Int) {}
 }
 
-struct IUOFailableModel : NonFailableRequirementOnly {
-  // CHECK-LABEL: sil @_TTWV9witnesses16IUOFailableModelS_26NonFailableRequirementOnlyFS1_CUS1___fMQPS1_FT3fooSi_S2_ 
+struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
+  // CHECK-LABEL: sil @_TTWV9witnesses16IUOFailableModelS_21NonFailableRefinementFS1_CUS1___fMQPS1_FT3fooSi_S2_
   // CHECK: bb0([[SELF:%[0-9]+]] : $*IUOFailableModel, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick IUOFailableModel.Type):
   // CHECK:   [[META:%[0-9]+]] = metatype $@thin IUOFailableModel.Type
   // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelCfMS0_FT3fooSi_GSQS0__ : $@thin (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
@@ -376,17 +382,6 @@ struct IUOFailableModel : NonFailableRequirementOnly {
   // CHECK:   return
   init!(foo: Int) { return nil }
 }
-
-
-/* TODO
-struct FailableModel: FailableRequirement, IUOFailableRequirement {
-  init?(foo: Int) {}
-}
-
-struct IUOFailableModel: FailableRequirement, IUOFailableRequirement {
-  init!(foo: Int) {}
-}
- */
 
 protocol FailableClassRequirement: class {
   init?(foo: Int)
@@ -407,13 +402,31 @@ final class NonFailableClassModel: FailableClassRequirement, NonFailableClassRef
   init(foo: Int) {}
 }
 
-/* TODO
 final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequirement {
+  // CHECK-LABEL: sil @_TTWC9witnesses18FailableClassModelS_24FailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
+
+  // CHECK-LABEL: sil @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
+  // CHECK: function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
+  // CHECK: function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+  // CHECK: function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
+  // CHECK: function_ref @_TFSs45_injectNothingIntoImplicitlyUnwrappedOptionalU__FT_GSQQ__
+  // CHECK: return [[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
   init?(foo: Int) {}
 }
 
-final class IUOFailableClassModel: FailableClassRequirement, IUOFailableClassRequirement {
+final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
+  // CHECK-LABEL: sil @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
+  // CHECK: function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
+  // CHECK: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK: function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
+  // CHECK: function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
+  // CHECK: return [[RESULT:%[0-9]+]] : $Optional<IUOFailableClassModel>
+
+  // CHECK-LABEL: sil @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementFS1_CUS1___fMQPS1_FT3fooSi_S2_
+  // CHECK: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK: return [[RESULT:%[0-9]+]] : $IUOFailableClassModel
+
+  // CHECK-LABEL: sil @_TTWC9witnesses21IUOFailableClassModelS_27IUOFailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   init!(foo: Int) {}
 }
- */
 

@@ -689,6 +689,14 @@ static SILValue getThunkInnerResultAddr(SILGenFunction &gen,
   return {};
 }
 
+/// Emit optional-to-optional conversions
+static ManagedValue emitMatchedOptionalToOptional(SILGenFunction &gen,
+                                                  SILLocation loc,
+                                                  ManagedValue input,
+                                                  SILType resultTy) {
+  return input;
+}
+
 /// Return the result of a function application as the result from a thunk.
 static SILValue getThunkResult(SILGenFunction &gen,
                                SILLocation loc,
@@ -735,6 +743,18 @@ static SILValue getThunkResult(SILGenFunction &gen,
                                                    innerResultTL);
   }
 
+  // Local function that produces a temporary copy of "translated" (if needed)
+  // and returns it, for use with optional operations.
+  auto replaceWithTemp = [&](ManagedValue value) -> ManagedValue {
+    if (value.getType().isAddress())
+      return value;
+
+    SILValue allocation = gen.emitTemporaryAllocation(loc, value.getType());
+    value.forwardInto(gen, loc, allocation);
+
+    return ManagedValue::forLValue(allocation);
+  };
+
   if (outerResultAddr) {
     // If we emitted directly, there's nothing more to do.
     // Let the caller claim the result.
@@ -745,6 +765,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
     } else {
       SILValue outerPayloadAddr = outerResultAddr;
       OptionalTypeKind toOTK = OTK_None;
+      bool injectResult = false;
 
       // If the inner result is the object type of an optional outer result,
       // then emit into the payload.
@@ -757,8 +778,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
           outerPayloadAddr = gen.B.createInitEnumDataAddr(loc, outerResultAddr,
                           gen.getASTContext().getOptionalSomeDecl(toOTK),
                           objTy.getAddressType());
-        } else {
-          toOTK = OTK_None;
+          injectResult = true;
         }
       }
       
@@ -767,38 +787,35 @@ static SILValue getThunkResult(SILGenFunction &gen,
                                                substResultType, innerResult,
                                                /*emitInto*/ SGFContext(&init));
 
-      // If the inner result is an implicitly-unwrapped optional and we
-      // expected the underlying value, force the IUO now.
+      // If the inner result is an optional, determine whether we either
+      // need to force it or translate it to a different kind of optional.
       OptionalTypeKind fromOTK = OTK_None;
       if (auto objTy = translated.getType().getAnyOptionalObjectType(
                          gen.SGM.M, fromOTK)) {
         if (objTy.getSwiftRValueType()
               == outerResultAddr.getType().getSwiftRValueType()) {
-          assert(toOTK == OTK_None &&
-                 "Cannot have both from and to optionals in thunk");
+          // Force an implicitly-unwrapped optional.
           assert(fromOTK == OTK_ImplicitlyUnwrappedOptional &&
                  "Cannot force non-implicit optional");
           (void)fromOTK;
 
-          if (!translated.getType().isAddress()) {
-            SILValue translatedValue = gen.emitTemporaryAllocation(
-                                         loc,
-                                         translated.getType());
-            translated.forwardInto(gen, loc, translatedValue);
-
-            translated = ManagedValue::forLValue(translatedValue);
-          }
-
-          translated = gen.emitGetOptionalValueFrom(loc, translated,
+          translated = gen.emitGetOptionalValueFrom(loc,
+                                                    replaceWithTemp(translated),
                                                     innerResultTL,
                                                     SGFContext());
+        } else if (toOTK != OTK_None && fromOTK != toOTK) {
+          // Translate between kinds of optionals.
+          translated = gen.emitOptionalToOptional(loc,
+                                                  replaceWithTemp(translated),
+                                                  outerResultAddr.getType(),
+                                                  emitMatchedOptionalToOptional);
         }
       }
 
       emitForceInto(gen, loc, translated, init);
       
       // Inject the optional tag if necessary.
-      if (toOTK != OTK_None) {
+      if (injectResult) {
         gen.B.createInjectEnumAddr(loc, outerResultAddr,
                                  gen.getASTContext().getOptionalSomeDecl(toOTK));
       }
@@ -814,22 +831,48 @@ static SILValue getThunkResult(SILGenFunction &gen,
     }
   } else {
     // Inject the value into an optional if necessary.
-    OptionalTypeKind OTK;
+    OptionalTypeKind toOTK = OTK_None;
     if (auto objTy
-          = substResultSILType.getAnyOptionalObjectType(gen.SGM.M, OTK)){
+          = substResultSILType.getAnyOptionalObjectType(gen.SGM.M, toOTK)){
       // Optional itself can model protocols, so make sure unwrapping gets us
       // to the right inner type.
       if (objTy.getSwiftRValueType()
             == innerResult.getType().getSwiftRValueType()) {
         auto innerOptional = gen.B.createEnum(loc, innerResult.getValue(),
-                                  gen.getASTContext().getOptionalSomeDecl(OTK),
-                                  substResultSILType);
+                               gen.getASTContext().getOptionalSomeDecl(toOTK),
+                               substResultSILType);
         innerResult = ManagedValue(innerOptional, innerResult.getCleanup());
       }
     }
     
     auto translated = emitTranslatePrimitive(gen, loc, kind, origResultType,
                                              substResultType, innerResult);
+
+    // If the inner result is an optional, determine whether we either
+    // need to force it or translate it to a different kind of optional.
+    OptionalTypeKind fromOTK = OTK_None;
+    if (auto objTy = translated.getType().getAnyOptionalObjectType(
+                       gen.SGM.M, fromOTK)) {
+      if (objTy.getSwiftRValueType()
+            == substResultSILType.getSwiftRValueType()) {
+        // Force an implicitly-unwrapped optional.
+        assert(fromOTK == OTK_ImplicitlyUnwrappedOptional &&
+               "Cannot force non-implicit optional");
+        (void)fromOTK;
+
+        translated = gen.emitGetOptionalValueFrom(loc,
+                                                  replaceWithTemp(translated),
+                                                  innerResultTL,
+                                                  SGFContext());
+      } else if (toOTK != OTK_None && fromOTK != toOTK) {
+        // Translate between kinds of optionals.
+        translated = gen.emitOptionalToOptional(loc,
+                                                replaceWithTemp(translated),
+                                                substResultSILType,
+                                                emitMatchedOptionalToOptional);
+      }
+    }
+
     return translated.forward(gen);
   }
 }
