@@ -72,7 +72,7 @@ import Foundation
 func isOSNewerThan(major: Int, minor: Int, patch: Int = 0) -> Bool {
   let vers = (majorVersion: major, minorVersion: minor, patchVersion: patch)
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
-  let procInfo = NSProcessInfo.processInfo() as AnyObject
+  let procInfo: AnyObject = NSProcessInfo.processInfo()
   return procInfo.isOperatingSystemAtLeastVersion?(
                     NSOperatingSystemVersion(vers)
                   ) == true
