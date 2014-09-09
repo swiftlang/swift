@@ -548,7 +548,7 @@ extension String : ExtensibleCollectionType {
   public init<
       S : SequenceType
       where S.Generator.Element == Character
-  >(seq: S) {
+  >(_ seq: S) {
     self = ""
     self.extend(seq)
   }
