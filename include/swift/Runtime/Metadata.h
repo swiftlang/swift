@@ -94,7 +94,8 @@ class ValueWitnessFlags {
     IsNonPOD =      0x00010000,
     IsNonInline =   0x00020000,
     HasExtraInhabitants = 0x00040000,
-    IsNonBitwiseTakable = 0x00080000,
+    HasSpareBits =  0x00080000,
+    IsNonBitwiseTakable = 0x00100000,
     // Everything else is reserved.
   };
   int_type Data;

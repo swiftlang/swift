@@ -462,3 +462,19 @@ println((NoPayload.x as NoPayload?) == NoPayload.x)
 // CHECK: false
 println((NoPayload.x as NoPayload?) == NoPayload.y)
 
+// rdar://problem/17814752
+class Foo {}
+
+struct Oof {
+  weak var foo: Foo? = nil
+}
+
+protocol Boo {}
+
+struct Goof {
+  var boo: Boo? = nil
+}
+
+let oofs = [Oof()]
+let goofs = [Goof()]
+

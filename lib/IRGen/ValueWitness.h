@@ -300,7 +300,6 @@ namespace ValueWitnessFlags {
     AlignmentMask       = 0x0FFFF,
     IsNonPOD            = 0x10000,
     IsNonInline         = 0x20000,
-    IsNonBitwiseTakable = 0x40000,
     
     /// Flags pertaining to enum representation.
     Enum_FlagMask = 0xC0000,
@@ -318,6 +317,9 @@ namespace ValueWitnessFlags {
     /// HasExtraInhabitants. Both the ExtraInhabitants and SpareBits value
     /// witnesses are present in the value witness table.
     Enum_HasSpareBits = 0xC0000,
+
+    IsNonBitwiseTakable = 0x100000,
+
   };
 }
   
