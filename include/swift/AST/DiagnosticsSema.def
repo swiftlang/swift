@@ -1120,8 +1120,8 @@ ERROR(nonclass_convenience_init,sema_tce,none,
       (Type))
 
 ERROR(dynamic_construct_class,sema_tce,none,
-      "constructing an object class type %0 (or subclass thereof) must use a "
-      "'required' initializer", (Type))
+      "constructing an object of class type %0 with a metatype value must use "
+      "a 'required' initializer", (Type))
 NOTE(note_nonrequired_initializer,sema_tce,none,
       "selected %select{non-required|implicit}0 initializer %1", 
      (bool, DeclName))
