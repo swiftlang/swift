@@ -857,5 +857,10 @@ StringTests.test("growth") {
   expectLE(s.nativeCapacity, 34)
 }
 
+StringTests.test("Construction") {
+  let text = "Thirsty pirates"
+  expectEqual(text, String(Array(text)))
+}
+
 runAllTests()
 
