@@ -859,7 +859,7 @@ StringTests.test("growth") {
 
 StringTests.test("Construction") {
   let text = "Thirsty pirates"
-  expectEqual(text, String(Array(text)))
+  expectEqual(text, String(Array<Character>(text)))
 }
 
 runAllTests()
