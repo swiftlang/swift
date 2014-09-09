@@ -111,6 +111,8 @@ STDLIB_TYPEDEF(__INT16_TYPE__, SInt16);
 STDLIB_TYPEDEF(__INT32_TYPE__, SInt32);
 STDLIB_TYPEDEF(__INT64_TYPE__, SInt64);
 
+typedef SInt32 OSStatus;
+
 // Types from stdint.h.
 #include <stdint.h>
 STDLIB_TEST(__UINT8_TYPE__, uint8_t);
