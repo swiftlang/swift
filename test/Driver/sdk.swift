@@ -3,11 +3,11 @@
 
 // CHECK-NOT: warning: no such SDK:
 // CHECK: bin/swift
-// CHECK: sdk.swift
+// CHECK: Driver/sdk.swift
 // CHECK: -sdk {{.*}}/Inputs/clang-importer-sdk
 // CHECK-NEXT: bin/swift
 // CHECK: -sdk {{.*}}/Inputs/clang-importer-sdk
-// CHECK-NEXT: bin/ld{{"?}} {{.*}}.o
+// CHECK-NEXT: bin/ld{{"?}} {{.*}}.o{{[ "]}}
 // CHECK: -syslibroot {{.*}}/Inputs/clang-importer-sdk
 
 // RUN: %swift_driver -driver-print-jobs -repl -sdk %S/Inputs/nonexistent-sdk 2>&1 | FileCheck %s --check-prefix=SDKWARNING

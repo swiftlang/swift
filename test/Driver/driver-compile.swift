@@ -39,12 +39,12 @@
 
 
 // CHECK: bin/swift
-// CHECK: driver-compile.swift
+// CHECK: Driver/driver-compile.swift
 // CHECK: -o
 
 // COMPLEX: bin/swift
 // COMPLEX: -c
-// COMPLEX: driver-compile.swift
+// COMPLEX: Driver/driver-compile.swift
 // COMPLEX-DAG: -sdk {{.*}}/Inputs/clang-importer-sdk
 // COMPLEX-DAG: -foo -bar
 // COMPLEX-DAG: -Xllvm -baz
