@@ -338,5 +338,8 @@ Algorithm.test("sorted/complexity") {
   expectTrue(comparisons_1000/comparisons_100 < 20)
 }
 
+Algorithm.test("sorted/return type") {
+  let x: Array = sorted([5, 4, 3, 2, 1] as Slice)
+}
 runAllTests()
 
