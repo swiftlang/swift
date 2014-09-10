@@ -82,6 +82,9 @@ ERROR(expression_too_complex,sema,none,
       "expression was too complex to be solved in reasonable time; "
       "consider breaking up the expression into distinct sub-expressions", ())
 
+ERROR(cannot_convert_existential_to_metatype,sema,none,
+      "cannot convert existential metatype %0 to metatype %1", (Type, Type))
+
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------

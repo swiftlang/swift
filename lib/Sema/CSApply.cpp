@@ -4141,6 +4141,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto toMeta = toType->castTo<MetatypeType>();
     return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
   }
+  
+  // We do not currently support existential metatype to metatype coercions.
+  // We'll emit a diagnostic here, rather than induce a solver failure, so that
+  // a more specific diagnostic can be displayed.
+  if (fromType->is<ExistentialMetatypeType>() && toType->is<MetatypeType>()) {
+    tc.diagnose(expr->getLoc(),
+                diag::cannot_convert_existential_to_metatype,
+                fromType, toType);
+    return expr;
+  }
 
   llvm_unreachable("Unhandled coercion");
 }
