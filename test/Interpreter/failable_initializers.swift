@@ -320,6 +320,26 @@ protocol FailableOnDemand {
 extension GuineaPig: FailableOnDemand {}
 extension PolarBear: FailableOnDemand {}
 
+struct IUOGuineaPig : FailableOnDemand {
+  let canary: Canary
+
+  init() { canary = Canary() }
+
+  init!(fail: Bool) {
+    canary = Canary()
+    if fail { return nil }
+  }
+}
+
+final class IUOPolarBear: Bear, FailableOnDemand {
+  let y: Canary
+
+  override init!(fail: Bool) {
+    y = Canary()
+    super.init(fail: fail)
+  }
+}
+
 func tryInitFail<T: FailableOnDemand>(_: T.Type, #fail: Bool) {
   if let x = T(fail: fail) {
     println("it's alive")
@@ -351,6 +371,30 @@ println("--") // CHECK-NEXT: --
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 tryInitFail(PolarBear.self, fail: true)
+
+// CHECK-NEXT: it's alive
+tryInitFail(IUOGuineaPig.self, fail: false)
+// CHECK-NEXT: died
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+tryInitFail(IUOGuineaPig.self, fail: true)
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: it's alive
+// CHECK-NEXT: died
+// CHECK-NEXT: died
+tryInitFail(IUOPolarBear.self, fail: false)
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+tryInitFail(IUOPolarBear.self, fail: true)
 
 // CHECK-NEXT: done
 println("done")

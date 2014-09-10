@@ -749,10 +749,8 @@ static SILValue getThunkResult(SILGenFunction &gen,
     if (value.getType().isAddress())
       return value;
 
-    SILValue allocation = gen.emitTemporaryAllocation(loc, value.getType());
-    value.forwardInto(gen, loc, allocation);
-
-    return ManagedValue::forLValue(allocation);
+    Materialize materialized = gen.emitMaterialize(loc, value);
+    return ManagedValue(materialized.address, materialized.valueCleanup);
   };
 
   if (outerResultAddr) {
