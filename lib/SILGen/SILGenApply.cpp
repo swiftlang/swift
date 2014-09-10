@@ -559,7 +559,7 @@ public:
   getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
     bool transparent = isTransparent;
-    SILConstantInfo constantInfo = {};
+    SILConstantInfo constantInfo;
 
     switch (kind) {
     case Kind::IndirectValue:
