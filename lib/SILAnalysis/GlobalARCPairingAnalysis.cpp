@@ -54,14 +54,25 @@ struct ARCMatchingSetBuilder {
   llvm::SmallVector<SILInstruction *, 8> NewDecrements;
   bool MatchedPair;
   ARCMatchingSet MatchSet;
+  bool PtrIsGuaranteedArg;
 
 public:
   ARCMatchingSetBuilder(TDMapTy &TDMap, BUMapTy &BUMap)
-    : TDMap(TDMap), BUMap(BUMap), MatchedPair(false) {}
+    : TDMap(TDMap), BUMap(BUMap), MatchedPair(false),
+      PtrIsGuaranteedArg(false) {}
 
   void init(SILInstruction *Inst) {
     clear();
     MatchSet.Ptr = Inst->getOperand(0).stripRCIdentityPreservingOps();
+
+    // If we have a function argument that is guaranteed, set the guaranteed
+    // flag so we know that it is always known safe.
+    if (auto *A = dyn_cast<SILArgument>(MatchSet.Ptr)) {
+      if (A->isFunctionArg()) {
+        auto C = A->getParameterInfo().getConvention();
+        PtrIsGuaranteedArg = C == ParameterConvention::Direct_Guaranteed;
+      }
+    }
     NewIncrements.push_back(Inst);
   }
 
@@ -300,7 +311,7 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
       break;
   }
 
-  bool UnconditionallySafe = KnownSafeTD && KnownSafeBU;
+  bool UnconditionallySafe = (KnownSafeTD && KnownSafeBU) || PtrIsGuaranteedArg;
   if (UnconditionallySafe) {
     DEBUG(llvm::dbgs() << "UNCONDITIONALLY SAFE! DELETING INSTS.\n");
     MatchSet.IncrementInsertPts.clear();

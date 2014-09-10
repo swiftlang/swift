@@ -1446,3 +1446,17 @@ bb0(%0 : $Builtin.NativeObject):
   %2 = tuple()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil @guaranteed_is_always_known_safe : $@thin (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: retain
+// CHECK-NOT: release
+sil @guaranteed_is_always_known_safe : $@thin (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
