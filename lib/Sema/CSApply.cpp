@@ -4148,7 +4148,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   if (fromType->is<ExistentialMetatypeType>() && toType->is<MetatypeType>()) {
     tc.diagnose(expr->getLoc(),
                 diag::cannot_convert_existential_to_metatype,
-                fromType, toType);
+                fromType);
     return expr;
   }
 

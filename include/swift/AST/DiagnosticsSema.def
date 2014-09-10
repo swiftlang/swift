@@ -83,7 +83,7 @@ ERROR(expression_too_complex,sema,none,
       "consider breaking up the expression into distinct sub-expressions", ())
 
 ERROR(cannot_convert_existential_to_metatype,sema,none,
-      "cannot convert existential metatype %0 to metatype %1", (Type, Type))
+      "accessing members of protocol type value %0 is unimplemented", (Type))
 
 //------------------------------------------------------------------------------
 // Name Binding

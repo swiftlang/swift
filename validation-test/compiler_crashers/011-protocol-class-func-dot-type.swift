@@ -8,6 +8,6 @@ protocol b {
 struct c {
     var d: b.Type
     func e() {
-        d.e() // expected-error {{cannot convert existential metatype 'b.Type' to metatype 'b.Protocol'}}
+        d.e() // expected-error {{accessing members of protocol type value 'b.Type' is unimplemented}}
     }
 }

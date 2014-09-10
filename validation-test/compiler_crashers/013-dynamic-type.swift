@@ -10,4 +10,4 @@ class b: a {
     class func c() { }
 }
 
-(b() as a).dynamicType.c() // expected-error {{cannot convert existential metatype '(a).Type' to metatype '(a).Protocol'}}
+(b() as a).dynamicType.c() // expected-error {{accessing members of protocol type value '(a).Type' is unimplemented}}
