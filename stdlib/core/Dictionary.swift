@@ -455,7 +455,7 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   }
 
   func indexForKey(key: Key) -> Index? {
-    var (i, found) = _find(key, _bucket(key))
+    let (i, found) = _find(key, _bucket(key))
     return found ? i : .None
   }
 
@@ -473,7 +473,7 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   }
 
   func maybeGet(key: Key) -> Value? {
-    var (i, found) = _find(key, _bucket(key))
+    let (i, found) = _find(key, _bucket(key))
     if found {
       return self[i.offset]!.value
     }
