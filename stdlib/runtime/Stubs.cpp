@@ -213,3 +213,45 @@ extern "C" bool swift_stdlib_atomicCompareExchangeStrongPtr(
       object, expected, desired, memory_order_seq_cst, memory_order_seq_cst);
 }
 
+extern "C" bool swift_stdlib_atomicCompareExchangeStrongUInt32(
+    _Atomic(uint32_t) * object, uint32_t *expected, uint32_t desired) {
+  return __c11_atomic_compare_exchange_strong(
+      object, expected, desired, memory_order_seq_cst, memory_order_seq_cst);
+}
+
+extern "C" bool swift_stdlib_atomicCompareExchangeStrongUInt64(
+    _Atomic(uint64_t) * object, uint64_t *expected, uint64_t desired) {
+  return __c11_atomic_compare_exchange_strong(
+      object, expected, desired, memory_order_seq_cst, memory_order_seq_cst);
+}
+
+extern "C" void swift_stdlib_atomicStoreUInt32(
+    _Atomic(uint32_t) * object, uint32_t desired) {
+  return __c11_atomic_store(object, desired, memory_order_seq_cst);
+}
+
+extern "C" void swift_stdlib_atomicStoreUInt64(
+    _Atomic(uint64_t) * object, uint64_t desired) {
+  return __c11_atomic_store(object, desired, memory_order_seq_cst);
+}
+
+extern "C" uint32_t swift_stdlib_atomicLoadUInt32(
+    _Atomic(uint32_t) * object) {
+  return __c11_atomic_load(object, memory_order_seq_cst);
+}
+
+extern "C" uint64_t swift_stdlib_atomicLoadUInt64(
+    _Atomic(uint64_t) * object) {
+  return __c11_atomic_load(object, memory_order_seq_cst);
+}
+
+extern "C" uint32_t swift_stdlib_atomicFetchAddUInt32(
+    _Atomic(uint32_t) * object, uint32_t operand) {
+  return __c11_atomic_fetch_add(object, operand, memory_order_seq_cst);
+}
+
+extern "C" uint64_t swift_stdlib_atomicFetchAddUInt64(
+    _Atomic(uint64_t) * object, uint64_t operand) {
+  return __c11_atomic_fetch_add(object, operand, memory_order_seq_cst);
+}
+

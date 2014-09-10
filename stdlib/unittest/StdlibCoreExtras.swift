@@ -47,6 +47,33 @@ func scan<
   return result
 }
 
+public func _stdlib_randomShuffle<T>(a: [T]) -> [T] {
+  var result = a
+  for var i = a.count - 1; i != 0; --i {
+    // FIXME: 32 bits are not enough in general case!
+    let j = Int(rand32(exclusiveUpperBound: i + 1))
+    swap(&result[i], &result[j])
+  }
+  return result
+}
+
+public func _stdlib_gather<T>(a: [T], idx: [Int]) -> [T] {
+  var result = [T]()
+  result.reserveCapacity(a.count)
+  for i in 0..<a.count {
+    result.append(a[idx[i]])
+  }
+  return result
+}
+
+public func _stdlib_scatter<T>(a: [T], idx: [Int]) -> [T] {
+  var result = a
+  for i in 0..<a.count {
+    result[idx[i]] = a[i]
+  }
+  return result
+}
+
 func findSubstring(string: String, substring: String) -> String.Index? {
   if substring.isEmpty {
     return string.startIndex

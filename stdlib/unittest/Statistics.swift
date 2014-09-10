@@ -5,6 +5,10 @@ public func rand32() -> UInt32 {
   return arc4random()
 }
 
+public func rand32(#exclusiveUpperBound: UInt32) -> UInt32 {
+  return arc4random_uniform(exclusiveUpperBound)
+}
+
 public func rand64() -> UInt64 {
   return (UInt64(arc4random()) << 32) | UInt64(arc4random())
 }

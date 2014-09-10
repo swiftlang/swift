@@ -1,0 +1,399 @@
+//===--- RaceTest.swift ---------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+///
+/// This file implements support for race tests.
+///
+/// Race test harness executes the given operation in multiple threads over a
+/// set of shared data, trying to ensure that executions overlap in time.
+///
+/// The name "race test" does not imply that the race actually happens in the
+/// harness or in the operation being tested.  The harness contains all the
+/// necessary synchronization for its own data, and for publishing test data to
+/// threads.  But if the operation under test is, in fact, racy, it should be
+/// easier to discover the bug in this environment.
+///
+/// Every execution of a race test is called a trial.  During a single trial
+/// the operation under test is executed multiple times in each thread over
+/// different data items (`RaceData` instances).  Different threads process
+/// data in different order.  Choosing an appropriate balance between the
+/// number of threads and data items, the harness uses the birthday paradox to
+/// increase the probability of "collisions" between threads.
+///
+/// After performing the operation under test, the thread should observe the
+/// data in a test-dependent way to detect if presence of other concurrent
+/// actions disturbed the result.  The observation should be as short as
+/// possible, and the results should be returned as `Observation`.  Evaluation
+/// (cross-checking) of observations is deferred until the end of the trial.
+///
+//===----------------------------------------------------------------------===//
+
+import Darwin
+
+/// Race tests that need a fresh set of data for every trial should implement
+/// this protocol.
+///
+/// All racing threads execute the same operation, `thread1`.
+///
+/// Types conforming to this protocol should be structs.  (The type
+/// should be a struct to reduce unnecessary reference counting during
+/// the test.)  The types should be stateless.
+public protocol RaceTestWithPerTrialDataType {
+
+  /// Input for threads.
+  ///
+  /// This type should be a class.  (The harness will not pass struct instances
+  /// between threads correctly.)
+  typealias RaceData //: AnyObject FIXME
+
+  /// Results of the observation made after performing an operation.
+  typealias Observation
+
+  init()
+
+  /// Creates a fresh instance of `RaceData`.
+  func makeRaceData() -> RaceData
+
+  /// Performs the operation under test and makes an observation.
+  func thread1(raceData: RaceData) -> Observation
+
+  /// Evaluates the observations made by all threads for a particular instance
+  /// of `RaceData`.
+  func evaluateObservations<
+    S : SinkType where S.Element == RaceTestObservationEvaluation
+  >(observations: [Observation], inout _ sink: S)
+}
+
+/// The result of evaluating observations.
+///
+/// Case payloads can carry test-specific data.  Results will be grouped
+/// according to it.
+public enum RaceTestObservationEvaluation : Equatable, Printable {
+  /// Normal 'pass'.
+  case Pass
+
+  /// An unusual 'pass'.
+  case PassInteresting(String)
+
+  /// A failure.
+  case Failure
+  case FailureInteresting(String)
+
+  public var description: String {
+    switch self {
+    case .Pass:
+      return "Pass"
+
+    case .PassInteresting(let s):
+      return "Pass(\(s))"
+
+    case .Failure:
+      return "Failure"
+
+    case .FailureInteresting(let s):
+      return "Failure(\(s))"
+    }
+  }
+}
+
+public func == (
+  lhs: RaceTestObservationEvaluation, rhs: RaceTestObservationEvaluation
+) -> Bool {
+  switch (lhs, rhs) {
+  case (.Pass, .Pass),
+       (.Failure, .Failure):
+    return true
+
+  case (.PassInteresting(let s1), .PassInteresting(let s2)):
+    return s1 == s2
+
+  default:
+    return false
+  }
+}
+
+/// An observation result that consists of one `UWord`.
+public struct Observation1UWord : Equatable, Printable {
+  public var uw1: UWord
+
+  public init(_ uw1: UWord) {
+    self.uw1 = uw1
+  }
+
+  public var description: String {
+    return "(\(uw1))"
+  }
+}
+
+public func == (lhs: Observation1UWord, rhs: Observation1UWord) -> Bool {
+  return lhs.uw1 == rhs.uw1
+}
+
+/// An observation result that consists of four `Word`\ s.
+public struct Observation4Word : Equatable, Printable {
+  public var w1: Word
+  public var w2: Word
+  public var w3: Word
+  public var w4: Word
+
+  public init(_ w1: Word, _ w2: Word, _ w3: Word, _ w4: Word) {
+    self.w1 = w1
+    self.w2 = w2
+    self.w3 = w3
+    self.w4 = w4
+  }
+
+  public var description: String {
+    return "(\(w1), \(w2), \(w3), \(w4))"
+  }
+}
+
+public func == (lhs: Observation4Word, rhs: Observation4Word) -> Bool {
+  return
+    lhs.w1 == rhs.w1 &&
+    lhs.w2 == rhs.w2 &&
+    lhs.w3 == rhs.w3 &&
+    lhs.w4 == rhs.w4
+}
+
+/// A helper that is useful to implement
+/// `RaceTestWithPerTrialDataType.evaluateObservations()` in race tests.
+public func evaluateObservationsAllEqual<T : Equatable>(observations: [T])
+  -> RaceTestObservationEvaluation {
+  let first = observations.first!
+  for x in observations {
+    if x != first {
+      return .Failure
+    }
+  }
+  return .Pass
+}
+
+struct _RaceTestAggregatedEvaluations : Printable {
+  var passCount: Int = 0
+  var passInterestingCount = [String: Int]()
+  var failureCount: Int = 0
+  var failureInterestingCount = [String: Int]()
+
+  init() {}
+
+  mutating func addEvaluation(evaluation: RaceTestObservationEvaluation) {
+    switch evaluation {
+    case .Pass:
+      ++passCount
+
+    case .PassInteresting(let s):
+      if passInterestingCount[s] == nil {
+        passInterestingCount[s] = 0
+      }
+      passInterestingCount[s] = passInterestingCount[s]! + 1
+
+    case .Failure:
+      ++failureCount
+
+    case .FailureInteresting(let s):
+      if failureInterestingCount[s] == nil {
+        failureInterestingCount[s] = 0
+      }
+      failureInterestingCount[s] = failureInterestingCount[s]! + 1
+    }
+  }
+
+  var isFailed: Bool {
+    return failureCount != 0 || !failureInterestingCount.isEmpty
+  }
+
+  var description: String {
+    var result = ""
+    result += "Pass: \(passCount) times\n"
+    for desc in sorted(passInterestingCount.keys) {
+      let count = passInterestingCount[desc]!
+      result += "Pass \(desc): \(count) times\n"
+    }
+    result += "Failure: \(failureCount) times\n"
+    for desc in sorted(failureInterestingCount.keys) {
+      let count = failureInterestingCount[desc]!
+      result += "Failure \(desc): \(count) times\n"
+    }
+    return result
+  }
+}
+
+// FIXME: protect this class against false sharing.
+class _RaceTestWorkerState<RT : RaceTestWithPerTrialDataType> {
+  // FIXME: protect every element of 'raceData' against false sharing.
+  var raceData: [RT.RaceData] = []
+  var raceDataShuffle: [Int] = []
+  var observations: [RT.Observation] = []
+}
+
+class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
+  var racingThreadCount: Int
+
+  var trialBarrier: _stdlib_Barrier
+  var trialSpinBarrier: _stdlib_AtomicInt = _stdlib_AtomicInt()
+
+  var raceData: [RT.RaceData] = []
+  var workerStates: [_RaceTestWorkerState<RT>] = []
+  var aggregatedEvaluations: _RaceTestAggregatedEvaluations =
+    _RaceTestAggregatedEvaluations()
+
+  init(racingThreadCount: Int) {
+    self.racingThreadCount = racingThreadCount
+    self.trialBarrier = _stdlib_Barrier(threadCount: racingThreadCount + 1)
+
+    self.workerStates.reserveCapacity(racingThreadCount)
+    for i in 0..<racingThreadCount {
+      self.workerStates.append(_RaceTestWorkerState<RT>())
+    }
+  }
+}
+
+func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
+  sharedState: _RaceTestSharedState<RT>
+) {
+  let racingThreadCount = sharedState.racingThreadCount
+  let raceDataCount = racingThreadCount * racingThreadCount
+  let rt = RT()
+
+  sharedState.raceData.removeAll(keepCapacity: true)
+  sharedState.raceData.extend(
+    lazy(0..<raceDataCount).map { i in rt.makeRaceData() })
+
+  let identityShuffle = Array(0..<sharedState.raceData.count)
+  sharedState.workerStates.removeAll(keepCapacity: true)
+  sharedState.workerStates.extend(
+    lazy(0..<racingThreadCount).map {
+      i in
+      let workerState = _RaceTestWorkerState<RT>()
+
+      // Shuffle the data so that threads process it in different order.
+      let shuffle = _stdlib_randomShuffle(identityShuffle)
+      workerState.raceData = _stdlib_scatter(sharedState.raceData, shuffle)
+      workerState.raceDataShuffle = shuffle
+
+      workerState.observations = []
+      workerState.observations.reserveCapacity(sharedState.raceData.count)
+
+      return workerState
+    })
+
+  sharedState.trialSpinBarrier.store(0)
+  sharedState.trialBarrier.wait()
+  // Race happens.
+  sharedState.trialBarrier.wait()
+
+  // Collect and compare results.
+  for i in 0..<racingThreadCount {
+    let shuffle = sharedState.workerStates[i].raceDataShuffle
+    sharedState.workerStates[i].raceData =
+      _stdlib_gather(sharedState.workerStates[i].raceData, shuffle)
+  }
+  if true {
+    // FIXME: why doesn't the bracket syntax work?
+    //var observations = [RT.Observation]()
+    var observations = Array<RT.Observation>()
+    observations.reserveCapacity(racingThreadCount)
+    for i in 0..<raceDataCount {
+      for j in 0..<racingThreadCount {
+        observations.append(sharedState.workerStates[j].observations[i])
+      }
+      var sink = SinkOf<RaceTestObservationEvaluation>({
+        sharedState.aggregatedEvaluations.addEvaluation($0)
+      })
+      rt.evaluateObservations(observations, &sink)
+      observations.removeAll(keepCapacity: true)
+    }
+  }
+}
+
+func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
+  tid: Int, sharedState: _RaceTestSharedState<RT>
+) {
+  sharedState.trialBarrier.wait()
+  let racingThreadCount = sharedState.racingThreadCount
+  let workerState = sharedState.workerStates[tid]
+  let rt = RT()
+  if true {
+    let trialSpinBarrier = sharedState.trialSpinBarrier
+    trialSpinBarrier.fetchAndAdd(1)
+    while trialSpinBarrier.load() < racingThreadCount {}
+  }
+  // Perform racy operations.
+  // Warning: do not add any synchronization in this loop, including
+  // any implicit reference counting of shared data.
+  for rd in workerState.raceData {
+    workerState.observations.append(rt.thread1(rd))
+  }
+  sharedState.trialBarrier.wait()
+}
+
+public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
+  _: RT.Type,
+  #trials: Int,
+  threads: Int? = nil
+) {
+  let racingThreadCount = threads ?? _stdlib_getHardwareConcurrency()
+  let sharedState = _RaceTestSharedState<RT>(racingThreadCount: racingThreadCount)
+
+  let masterThreadBody: (_: ())->() = {
+    (_: ())->() in
+    for trial in 0..<trials {
+      println("trial \(trial)")
+      _masterThreadOneTrial(sharedState)
+    }
+  }
+
+  let racingThreadBody: (Int)->() = {
+    (tid: Int)->() in
+    for trial in 0..<trials {
+      _workerThreadOneTrial(tid, sharedState)
+    }
+  }
+
+  var allTids = [pthread_t]()
+
+  // Create the master thread.
+  if true {
+    let (ret, tid) = _stdlib_pthread_create_block(
+      nil, masterThreadBody, ())
+    expectEqual(0, ret)
+    allTids.append(tid!)
+  }
+
+  // Create racing threads.
+  for i in 0..<racingThreadCount {
+    let (ret, tid) = _stdlib_pthread_create_block(
+      nil, racingThreadBody, i)
+    expectEqual(0, ret)
+    allTids.append(tid!)
+  }
+
+  // Join all threads.
+  for tid in allTids {
+    let (ret, _) = _stdlib_pthread_join(tid, Void.self)
+    expectEqual(0, ret)
+  }
+
+  let aggregatedEvaluations = sharedState.aggregatedEvaluations
+  expectFalse(aggregatedEvaluations.isFailed)
+  println(aggregatedEvaluations)
+}
+
+public func consumeCPU(#units: Int) {
+  for i in 0..<units {
+    let scale = 16
+    for j in 0..<scale {
+      _blackHole(42)
+    }
+  }
+}
+

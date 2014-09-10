@@ -23,6 +23,14 @@ func _opaqueIdentity<T>(x: T) -> T {
   return result
 }
 
+func _blackHolePtr<T>(x: UnsafePointer<T>) {
+  _stdlib_getPointer(COpaquePointer(x))
+}
+
+func _blackHole<T>(var x: T) {
+  _blackHolePtr(&x)
+}
+
 @inline(never)
 public func getInt8(x: Int8) -> Int8 { return _opaqueIdentity(x) }
 

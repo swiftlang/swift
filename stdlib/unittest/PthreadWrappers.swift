@@ -159,3 +159,49 @@ public func _stdlib_pthread_join<Result>(
   }
 }
 
+func _stdlib_sysctlbyname_Int32(name: String) -> Int32 {
+  return name.withCString {
+    (nameUtf8) -> Int32 in
+    var resultSize: size_t = 4
+    var result: Int32 = 0
+    sysctlbyname(nameUtf8, &result, &resultSize, nil, 0)
+    return result
+  }
+}
+
+func _stdlib_getHardwareConcurrency() -> Int {
+  let result = Int(_stdlib_sysctlbyname_Int32("hw.physicalcpu"))
+  if result < 1 {
+    fatalError("_stdlib_getHardwareConcurrency(): could not query sysctl")
+  }
+  return result
+}
+
+public class _stdlib_Barrier {
+  var _pthreadBarrier: _stdlib_pthread_barrier_t
+
+  var _pthreadBarrierPtr: UnsafeMutablePointer<_stdlib_pthread_barrier_t> {
+    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+  }
+
+  public init(threadCount: Int) {
+    self._pthreadBarrier = _stdlib_pthread_barrier_t()
+    let ret = _stdlib_pthread_barrier_init(
+      _pthreadBarrierPtr, nil, CUnsignedInt(threadCount))
+    if ret != 0 {
+      fatalError("_stdlib_pthread_barrier_init() failed")
+    }
+  }
+
+  deinit {
+    _stdlib_pthread_barrier_destroy(_pthreadBarrierPtr)
+  }
+
+  public func wait() {
+    let ret = _stdlib_pthread_barrier_wait(_pthreadBarrierPtr)
+    if !(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD) {
+      fatalError("_stdlib_pthread_barrier_wait() failed")
+    }
+  }
+}
+

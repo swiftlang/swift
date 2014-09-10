@@ -162,6 +162,14 @@ public func unsafeDowncast<T: AnyObject>(x: AnyObject) -> T {
   return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(x))
 }
 
+public func _getUnsafePointerToStoredProperties(x: AnyObject)
+  -> UnsafeMutablePointer<UInt8> {
+  let storedPropertyOffset = _roundUpToAlignment(
+    sizeof(_HeapObject.self), alignof(Optional<AnyObject>.self))
+  return UnsafeMutablePointer<UInt8>(Builtin.bridgeToRawPointer(x)) +
+    storedPropertyOffset
+}
+
 //===----------------------------------------------------------------------===//
 // Branch hints
 //===----------------------------------------------------------------------===//

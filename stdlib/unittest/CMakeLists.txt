@@ -11,6 +11,7 @@ set(SWIFTUNITTEST_SOURCES
   OpaqueIdentityFunctions.swift
   PthreadBarriers.swift
   PthreadWrappers.swift
+  RaceTest.swift
   Statistics.swift
   StdlibCoreExtras.swift
   SwiftBlockToCFunctionThunks.cpp
