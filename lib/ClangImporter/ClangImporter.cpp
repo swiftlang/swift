@@ -382,7 +382,8 @@ ClangImporter::create(ASTContext &ctx,
 
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);
-  assert(canBegin);
+  if (!canBegin)
+    return nullptr; // there was an error related to the compiler arguments.
 
   clang::Preprocessor &clangPP = instance.getPreprocessor();
   clangPP.enableIncrementalProcessing();

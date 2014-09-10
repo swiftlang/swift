@@ -150,13 +150,13 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   }
 
   const ASTContext &ctx = ImporterImpl.SwiftContext;
-  clang::SourceManager &clangSrcMgr = clangDiag.getSourceManager();
 
   if (clangDiag.getID() == clang::diag::err_module_not_built &&
       CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
     SourceLoc loc = DiagLoc;
     if (clangDiag.getLocation().isValid())
-      loc = resolveSourceLocation(ctx, clangSrcMgr, clangDiag.getLocation());
+      loc = resolveSourceLocation(ctx, clangDiag.getSourceManager(),
+                                  clangDiag.getLocation());
 
     ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
                        CurrentImport->getName());
@@ -193,16 +193,27 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
       break;
     }
 
-    SourceLoc noteLoc = resolveSourceLocation(ctx, clangSrcMgr, clangNoteLoc);
+    SourceLoc noteLoc;
+    if (clangNoteLoc.isValid())
+      noteLoc = resolveSourceLocation(ctx, clangDiag.getSourceManager(),
+                                      clangNoteLoc);
     ctx.Diags.diagnose(noteLoc, diagKind, message);
   };
 
-  ClangDiagRenderer renderer(ImporterImpl.getClangASTContext(),
-                             std::cref(emitDiag));
-
   llvm::SmallString<128> message;
   clangDiag.FormatDiagnostic(message);
-  renderer.emitDiagnostic(clangDiag.getLocation(), clangDiagLevel, message,
-                          clangDiag.getRanges(), clangDiag.getFixItHints(),
-                          &clangSrcMgr);
+
+  if (clangDiag.getLocation().isInvalid()) {
+    // Diagnostic about the compiler arguments.
+    emitDiag(clangDiag.getLocation(), clangDiagLevel, message);
+  } else {
+    ClangDiagRenderer renderer(ImporterImpl.getClangASTContext(),
+                               std::cref(emitDiag));
+    clang::SourceManager *clangSrcMgr =
+        clangDiag.hasSourceManager() ? &clangDiag.getSourceManager() : nullptr;
+
+    renderer.emitDiagnostic(clangDiag.getLocation(), clangDiagLevel, message,
+                            clangDiag.getRanges(), clangDiag.getFixItHints(),
+                            clangSrcMgr);
+  }
 }
