@@ -93,6 +93,14 @@ typedef NS_ENUM(unsigned, NSNegativeUnsignedOptions) {
   NSNegativeUnsignedBar = -0x7FFFFFFF - 1,
 };
 
+typedef NS_ENUM(unsigned, NeverActuallyMentionedByName) {
+  ValueOfThatEnumType = 5
+};
+@interface TestThatEnumType
+- (instancetype)init;
+- (NeverActuallyMentionedByName)getValue;
+@end
+
 enum RawEnumInGizmo {
   InGizmoOne=0x7FFFFFFF,
   InGizmoTwo,
