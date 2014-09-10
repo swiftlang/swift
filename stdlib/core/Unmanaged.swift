@@ -30,6 +30,9 @@ public struct Unmanaged<T: AnyObject> {
   ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @transparent public
   static func fromOpaque(value: COpaquePointer) -> Unmanaged {
+    _precondition(
+      value != nil,
+      "attempt to create an Unmanaged instance from a null pointer")
     return Unmanaged(_private: unsafeBitCast(value, T.self))
   }
 

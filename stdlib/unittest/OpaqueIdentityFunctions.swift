@@ -78,3 +78,7 @@ public func getFloat64(x: Float64) -> Float64 { return _opaqueIdentity(x) }
 public func getFloat80(x: Float80) -> Float80 { return _opaqueIdentity(x) }
 #endif
 
+public func getPtr(x: COpaquePointer) -> COpaquePointer {
+  return _opaqueIdentity(x)
+}
+
