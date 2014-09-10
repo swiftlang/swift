@@ -4146,6 +4146,7 @@ namespace {
         if (Impl.ImportForwardDeclarations) {
           // Fake it by making an unavailable opaque @objc root class.
           auto result = createRootClass();
+          result->setImplicit();
           auto attr = AvailabilityAttr::createUnavailableAttr(Impl.SwiftContext,
               "This Objective-C class has only been forward-declared; "
               "import its owning module to use it");
