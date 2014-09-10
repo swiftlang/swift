@@ -317,27 +317,14 @@ sortedDocComment = """\
 
 ${sortedDocComment}
 public func sorted<
-  C: MutableCollectionType where C.Index: RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
->(
-  source: C ${"," if p else ""}
-  ${"isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
-) -> C {
-  var result = source
-  sort(&result ${", isOrderedBefore" if p else ""})
-  return result
-}
-
-${sortedDocComment}
-public func sorted<
   C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
 >(
   source: C ${"," if p else ""}
   ${"isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> [C.Generator.Element] {
-  var result = Array(source)
-  sort(&result ${", isOrderedBefore" if p else ""})
-  return result
+  var result = ContiguousArray(source)
+  result.sort(${"isOrderedBefore" if p else "{ $0 < $1 }"})  
+  return Array(result)
 }
 % end
 // for p in preds

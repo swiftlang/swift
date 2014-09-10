@@ -181,11 +181,10 @@ Algorithm.test("sorted/strings") {
     [ "Banana", "apple", "cherry" ],
     sorted([ "apple", "Banana", "cherry" ]))
 
-  expectEqual(
-    [ "Banana", "cherry", "apple" ],
-    sorted(["apple", "Banana", "cherry"]) {
-      countElements($0) > countElements($1)
-    })
+  let s = sorted(["apple", "Banana", "cherry"]) {
+    countElements($0) > countElements($1)
+  }
+  expectEqual([ "Banana", "cherry", "apple" ], s)
 }
 
 // A wrapper around Array<T> that disables any type-specific algorithm
