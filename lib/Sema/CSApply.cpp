@@ -5000,9 +5000,12 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Solve the system.
   SmallVector<Solution, 1> solutions;
-  bool failed = cs.solve(solutions);
-  (void)failed;
-  assert(!failed && "Unable to solve for call to witness?");
+  
+  // If the system failed to produce a solution, post any available diagnostics.
+  if(cs.solve(solutions)) {
+    cs.salvage(solutions, base);
+    return nullptr;
+  }
 
   Solution &solution = solutions.front();
   ExprRewriter rewriter(cs, solution);

@@ -1,8 +1,8 @@
-// RUN: not --crash %swift %s -emit-ir
+// RUN: %swift %s -parse -verify
 // Test case submitted to project by https://github.com/tmu (Teemu Kurppa)
 // rdar://18175202
 func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
-    for (mx : T?) in xs {
+    for (mx : T?) in xs { // // expected-error {{type of expression is ambiguous without more context}}
         if let x = mx {
             return x
         }
