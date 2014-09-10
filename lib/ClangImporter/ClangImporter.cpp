@@ -387,7 +387,8 @@ ClangImporter::create(ASTContext &ctx,
 
   clang::Preprocessor &clangPP = instance.getPreprocessor();
   clangPP.enableIncrementalProcessing();
-  clangPP.addPPCallbacks(new HeaderImportCallbacks(*importer, importer->Impl));
+  auto *CB = new HeaderImportCallbacks(*importer, importer->Impl);
+  clangPP.addPPCallbacks(std::unique_ptr<clang::PPCallbacks>(CB));
 
   instance.createModuleManager();
   instance.getModuleManager()->addListener(
