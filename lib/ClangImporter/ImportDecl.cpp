@@ -4095,6 +4095,27 @@ namespace {
       if (name.empty())
         return nullptr;
 
+      auto createRootClass = [=](DeclContext *dc = nullptr) -> ClassDecl * {
+        if (!dc) {
+          dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
+                                          /*forwardDeclaration=*/true);
+        }
+
+        auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
+                                                        SourceLoc(), name,
+                                                        SourceLoc(), None,
+                                                        nullptr, dc);
+        result->computeType();
+        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+        result->setCircularityCheck(CircularityCheck::Checked);
+        result->setSuperclass(Type());
+        result->setCheckedInheritanceClause();
+        result->setAddedImplicitInitializers(); // suppress all initializers
+        addObjCAttribute(result, name);
+        Impl.registerExternalDecl(result);
+        return result;
+      };
+
       // Special case for Protocol, which gets forward-declared as an ObjC
       // class which is hidden in modern Objective-C runtimes.
       // We treat it as a foreign class (like a CF type) because it doesn't
@@ -4107,39 +4128,37 @@ namespace {
           return nullptr;
         const ClassDecl *nsObjectDecl =
           nsObjectTy->getClassOrBoundGenericClass();
-        auto dc = nsObjectDecl->getDeclContext();
 
-        auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                                        SourceLoc(), name,
-                                                        SourceLoc(), None,
-                                                        nullptr, dc);
-        result->computeType();
-        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-        result->setCircularityCheck(CircularityCheck::Checked);
-        result->setSuperclass(Type()); // FIXME: NSObject maybe?
-        result->setCheckedInheritanceClause();
-        result->setAddedImplicitInitializers(); // suppress all initializers
+        auto result = createRootClass(nsObjectDecl->getDeclContext());
         result->setForeign(true);
-        addObjCAttribute(result, name);
-        Impl.registerExternalDecl(result);
         return result;
       }
 
-      // Check if this class is implemented in its adapter.
       if (!decl->hasDefinition()) {
-        if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
+        // Check if this class is implemented in its adapter.
+        if (auto clangModule = Impl.getClangModuleForDecl(decl, true)) {
           if (auto native = resolveSwiftDecl<ClassDecl>(decl, name,
-                                                        clangModule))
+                                                        clangModule)) {
             return native;
-      }
+          }
+        }
 
-      // FIXME: Figure out how to deal with incomplete types, since that
-      // notion doesn't exist in Swift.
-      decl = decl->getDefinition();
-      if (!decl) {
+        if (Impl.ImportForwardDeclarations) {
+          // Fake it by making an unavailable opaque @objc root class.
+          auto result = createRootClass();
+          auto attr = AvailabilityAttr::createUnavailableAttr(Impl.SwiftContext,
+              "This Objective-C class has only been forward-declared; "
+              "import its owning module to use it");
+          result->getAttrs().add(attr);
+          return result;
+        }
+
         forwardDeclaration = true;
         return nullptr;
       }
+
+      decl = decl->getDefinition();
+      assert(decl);
 
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)

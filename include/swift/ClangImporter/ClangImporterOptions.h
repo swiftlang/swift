@@ -37,6 +37,10 @@ public:
   /// If true, Clang diagnostics will be dumped to stderr using Clang's
   /// diagnostic printer as well as being passed to Swift's diagnostic engine.
   bool DumpClangDiagnostics = false;
+
+  /// If true, forward declarations will be imported using unavailable types
+  /// instead of dropped altogether when possible.
+  bool ImportForwardDeclarations = false;
 };
 
 } // end namespace swift

@@ -170,6 +170,11 @@ EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+ObjCForwardDeclarations("enable-objc-forward-declarations",
+    llvm::cl::desc("Import Objective-C forward declarations when possible"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 SplitObjCSelectors("split-objc-selectors",
                    llvm::cl::desc("Split Objective-C selectors"),
                    llvm::cl::init(false));
@@ -2234,6 +2239,8 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().SplitPrepositions |= options::SplitObjCSelectors;
   InitInvok.getClangImporterOptions().InferImplicitProperties |=
     options::ImplicitProperties;
+  InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
+    options::ObjCForwardDeclarations;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

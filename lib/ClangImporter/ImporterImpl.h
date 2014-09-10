@@ -228,6 +228,7 @@ public:
 
   const bool SplitPrepositions;
   const bool InferImplicitProperties;
+  const bool ImportForwardDeclarations;
 
   constexpr static const char * const bridgingHeaderBufferName =
     "<bridging-header-import>";
