@@ -1,4 +1,4 @@
-// RUN: not --crash %swift %s -emit-ir
+// RUN: %swift %s -emit-ir
 func a(x: Any, y: Any) -> (((Any, Any) -> Any) -> Any) {
     return {
         (m: (Any, Any) -> Any) -> Any in
