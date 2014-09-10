@@ -35,7 +35,7 @@
 using namespace swift;
 using namespace Mangle;
 
-bool Mangler::UsePrivateDiscriminators = false;
+bool Mangler::UsePrivateDiscriminators = true;
 
 /// Translate the given operator character into its mangled form.
 ///

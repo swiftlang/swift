@@ -88,7 +88,7 @@ namespace swift {
     /// This option is for staging purposes only; it will soon go away.
     /// In particular, setting this will not actually change the mangler's
     /// behavior; it just affects what the compiler \em thinks will happen.
-    bool UsePrivateDiscriminators = false;
+    bool UsePrivateDiscriminators = true;
     
     /// The minimum platform version to which code will be deployed.
     clang::VersionTuple MinPlatformVersion;

@@ -1,14 +1,14 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %swift -emit-module -o %t %S/Inputs/mangling_private_helper.swift -enable-private-discriminators
-// RUN: %swift -emit-silgen %S/Inputs/mangling_private_helper.swift -enable-private-discriminators | FileCheck %s -check-prefix=CHECK-BASE
+// RUN: %swift -emit-module -o %t %S/Inputs/mangling_private_helper.swift
+// RUN: %swift -emit-silgen %S/Inputs/mangling_private_helper.swift | FileCheck %s -check-prefix=CHECK-BASE
 
-// RUN: %swift %s -I %t -emit-silgen -enable-private-discriminators | FileCheck %s
+// RUN: %swift %s -I %t -emit-silgen | FileCheck %s
 
 // RUN: cp %s %t
-// RUN: %swift %t/mangling_private.swift -I %t -emit-silgen -enable-private-discriminators | FileCheck %s
+// RUN: %swift %t/mangling_private.swift -I %t -emit-silgen | FileCheck %s
 
 // RUN: cp %s %t/other_name.swift
-// RUN: %swift %t/other_name.swift -I %t -emit-silgen -enable-private-discriminators -module-name mangling_private | FileCheck %s -check-prefix=OTHER-NAME
+// RUN: %swift %t/other_name.swift -I %t -emit-silgen -module-name mangling_private | FileCheck %s -check-prefix=OTHER-NAME
 
 import mangling_private_helper
 
