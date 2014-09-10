@@ -463,7 +463,9 @@ public func ~> <
   source: S, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<S.Generator.Element>
 {
-  var result = _ContiguousArrayBuffer<S.Generator.Element>()
+  let initialCapacity = source~>_underestimateCount()
+  var result = _ContiguousArrayBuffer<S.Generator.Element>(
+    count: 0, minimumCapacity: initialCapacity)
 
   // Using GeneratorSequence here essentially promotes the sequence to
   // a SequenceType from _Sequence_Type so we can iterate the elements
