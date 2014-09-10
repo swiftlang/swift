@@ -726,7 +726,8 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     DeprecatedAsUnavailableFilter =
       [](unsigned major, llvm::Optional<unsigned> minor) {
-        return minor.hasValue() && minor.getValue() <= 9;
+        return major < 10 ||
+               major == 10 && (!minor.hasValue() || minor.getValue() <= 9);
     };
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
