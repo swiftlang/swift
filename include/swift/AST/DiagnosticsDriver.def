@@ -89,10 +89,16 @@ ERROR(error_unsupported_option,driver,none,
       "unsupported option '%0' for '%1'; did you mean '%2 %0'?",
       (StringRef, StringRef, StringRef))
 
-ERROR(error_os_minimum_deployment,frontend,none,
+ERROR(error_os_minimum_deployment,driver,none,
       "Swift requires a minimum deployment target of %0", (StringRef))
 ERROR(error_sdk_too_old,driver,none,
       "the SDK '%0' does not support Swift", (StringRef))
+
+ERROR(error_two_files_same_name,driver,none,
+      "filename \"%0\" used twice: '%1' and '%2'", (StringRef, StringRef, StringRef))
+NOTE(note_explain_two_files_same_name,driver,none,
+     "filenames are used to distinguish private declarations with the same "
+     "name", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

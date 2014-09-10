@@ -1,3 +1,5 @@
+// RUN: rm -rf %t && mkdir -p %t
+
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: FileCheck %s < %t.simple.txt
 
@@ -28,6 +30,10 @@
 // RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s 2>&1 > %t.c.txt
 // RUN: FileCheck %s < %t.c.txt
 // RUN: FileCheck -check-prefix OBJ %s < %t.c.txt
+
+// RUN: not %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %s 2>&1 | FileCheck -check-prefix DUPLICATE-NAME %s
+// RUN: cp %s %t
+// RUN: not %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %t/driver-compile.swift 2>&1 | FileCheck -check-prefix DUPLICATE-NAME %s
 
 // REQUIRES: X86
 
@@ -72,3 +78,6 @@
 // OBJ: bin/swift
 // OBJ: -c{{ }}
 // OBJ: -o {{[^-]}}
+
+// DUPLICATE-NAME: error: filename "driver-compile.swift" used twice: '{{.*}}test/Driver/driver-compile.swift' and '{{.*}}driver-compile.swift'
+// DUPLICATE-NAME: note: filenames are used to distinguish private declarations with the same name

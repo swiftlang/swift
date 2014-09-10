@@ -402,8 +402,8 @@ DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
 
 /// \brief Check that the file referenced by Value exists. If it doesn't,
 /// issue a diagnostic and return false.
-static bool diagnoseInputExistence(const Driver &D, const DerivedArgList &Args,
-                                   DiagnosticEngine &Diags, StringRef Input) {
+static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
+                                DiagnosticEngine &Diags, StringRef Input) {
   if (!D.getCheckInputFilesExist())
     return true;
 
@@ -424,9 +424,11 @@ void Driver::buildInputs(const ToolChain &TC,
   types::ID InputType = types::TY_Nothing;
   Arg *InputTypeArg = nullptr;
 
+  llvm::StringMap<StringRef> sourceFileNames;
+
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {
-      const char *Value = A->getValue();
+      StringRef Value = A->getValue();
       types::ID Ty = types::TY_INVALID;
 
       if (InputType == types::TY_Nothing) {
@@ -435,7 +437,7 @@ void Driver::buildInputs(const ToolChain &TC,
           InputTypeArg->claim();
 
         // stdin must be handled specially.
-        if (memcmp(Value, "-", 2) == 0) {
+        if (Value.equals("-")) {
           // By default, treat stdin as Swift input.
           // FIXME: should we limit this inference to specific modes?
           Ty = types::TY_Swift;
@@ -454,8 +456,17 @@ void Driver::buildInputs(const ToolChain &TC,
         Ty = InputType;
       }
 
-      if (diagnoseInputExistence(*this, Args, Diags, Value))
+      if (checkInputExistence(*this, Args, Diags, Value))
         Inputs.push_back(std::make_pair(Ty, A));
+
+      if (Ty == types::TY_Swift) {
+        StringRef basename = llvm::sys::path::filename(Value);
+        if (!sourceFileNames.insert({basename, Value}).second) {
+          Diags.diagnose(SourceLoc(), diag::error_two_files_same_name,
+                         basename, sourceFileNames[basename], Value);
+          Diags.diagnose(SourceLoc(), diag::note_explain_two_files_same_name);
+        }
+      }
     }
 
     // FIXME: add -x support (or equivalent)
