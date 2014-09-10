@@ -31,7 +31,7 @@ add_swift_library(swiftBasic
   ${UNICODE_TABLES}
   )
 
-set(SWIFT_VERSION "1.0")
+set(SWIFT_VERSION "1.1")
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 
 string(REGEX REPLACE "([0-9]+)\\.[0-9]+(\\.[0-9]+)?" "\\1" SWIFT_VERSION_MAJOR
