@@ -18,6 +18,12 @@ _swift_dispatch_queue_concurrent(void) {
   return DISPATCH_QUEUE_CONCURRENT;
 }
 
+__attribute__((visibility("hidden")))
+extern "C" dispatch_data_t
+_swift_dispatch_data_empty(void) {
+  return dispatch_data_empty;
+}
+
 #define SOURCE(t)                               \
   __attribute__((visibility("hidden")))         \
   extern "C" dispatch_source_type_t             \

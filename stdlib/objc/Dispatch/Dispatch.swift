@@ -39,6 +39,14 @@ public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t {
 @asmname("_swift_dispatch_queue_concurrent") 
 func _swift_dispatch_queue_concurrent() -> dispatch_queue_attr_t
 
+// dispatch/data.h
+public var dispatch_data_empty : dispatch_data_t {
+get { return _swift_dispatch_data_empty() }
+}
+
+@asmname("_swift_dispatch_data_empty")
+func _swift_dispatch_data_empty() -> dispatch_data_t
+
 // dispatch/source.h
 // FIXME: DISPATCH_SOURCE_TYPE_*
 public let DISPATCH_MACH_SEND_DEAD = dispatch_source_mach_send_flags_t(1)

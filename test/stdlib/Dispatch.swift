@@ -10,5 +10,7 @@ println(DISPATCH_PROC_EXIT)
 println(DISPATCH_QUEUE_CONCURRENT.description)
 // CHECK-NEXT: OS_dispatch_queue_attr
 
+println(dispatch_data_empty.description)
+// CHECK-NEXT: <>
 
 
