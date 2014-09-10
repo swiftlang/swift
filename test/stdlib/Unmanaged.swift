@@ -6,7 +6,7 @@ import StdlibUnittest
 var UnmanagedTests = TestSuite("Unmanaged")
 
 UnmanagedTests.test("fromOpaque()/trap") {
-  let null = getPtr(COpaquePointer())
+  let null = getPointer(COpaquePointer())
   expectCrashLater()
   Unmanaged<AnyObject>.fromOpaque(null)
 }
