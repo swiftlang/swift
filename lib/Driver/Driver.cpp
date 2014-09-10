@@ -400,7 +400,7 @@ DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
   return DAL;
 }
 
-/// \brief Check that the file referenced by Value exists. If it doesn't,
+/// \brief Check that the file referenced by \p Input exists. If it doesn't,
 /// issue a diagnostic and return false.
 static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
                                 DiagnosticEngine &Diags, StringRef Input) {
@@ -424,7 +424,7 @@ void Driver::buildInputs(const ToolChain &TC,
   types::ID InputType = types::TY_Nothing;
   Arg *InputTypeArg = nullptr;
 
-  llvm::StringMap<StringRef> sourceFileNames;
+  llvm::StringMap<StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {
@@ -460,10 +460,10 @@ void Driver::buildInputs(const ToolChain &TC,
         Inputs.push_back(std::make_pair(Ty, A));
 
       if (Ty == types::TY_Swift) {
-        StringRef basename = llvm::sys::path::filename(Value);
-        if (!sourceFileNames.insert({basename, Value}).second) {
+        StringRef Basename = llvm::sys::path::filename(Value);
+        if (!SourceFileNames.insert({Basename, Value}).second) {
           Diags.diagnose(SourceLoc(), diag::error_two_files_same_name,
-                         basename, sourceFileNames[basename], Value);
+                         Basename, SourceFileNames[Basename], Value);
           Diags.diagnose(SourceLoc(), diag::note_explain_two_files_same_name);
         }
       }

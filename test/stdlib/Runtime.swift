@@ -529,6 +529,27 @@ Runtime.test("dynamicCastToExistential1") {
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref as AnyObject, P1.self))
 }
 
+extension Int {
+  class ExtensionClassConformsToP2 : P2 {
+    var description: String { return "abc" }
+  }
+
+  private class PrivateExtensionClassConformsToP2 : P2 {
+    var description: String { return "def" }
+  }
+}
+
+Runtime.test("dynamicCastToExistential1 with cross-module extensions") {
+  let internalObj = Int.ExtensionClassConformsToP2()
+  let privateObj = Int.PrivateExtensionClassConformsToP2()
+
+  expectTrue(_stdlib_conformsToProtocol(internalObj, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(privateObj, P2.self))
+
+  expectEqual("abc", _stdlib_dynamicCastToExistential1(internalObj, P2.self)!.description)
+  expectEqual("def", _stdlib_dynamicCastToExistential1(privateObj, P2.self)!.description)
+}
+
 class SomeClass {}
 @objc class SomeObjCClass {}
 class SomeNSObjectSubclass : NSObject {}

@@ -763,9 +763,9 @@ substitution (``[S]``) of a nominal type, or an ``entity-kind``
 An ``entity-name`` starts with ``[AaCcDggis]`` or a ``decl-name``.
 A ``decl-name`` starts with ``[LP]`` or an ``identifier`` (``[0-9oX]``).
 
-A ``context`` starts with either an ``entity`` or a ``module``, which
-might be an ``identifier`` (``[0-9oX]``) or a substitution of a module
-(``[S]``).
+A ``context`` starts with either an ``entity``, an ``extension`` (which starts
+with ``[E]``), or a ``module``, which might be an ``identifier`` (``[0-9oX]``)
+or a substitution of a module (``[S]``).
 
 A global mangling starts with an ``entity`` or ``[MTWw]``.
 
@@ -783,7 +783,7 @@ within the enclosing module. The second identifier is the name of the entity.
 
 Not all declarations marked ``private`` declarations will use the 
 ``<private-decl-name>`` mangling; if the entity's context is enough to uniquely
-identify the entity, the simple ``identifier`` form may be used.
+identify the entity, the simple ``identifier`` form is preferred.
 
 The types in a ``<reabstract-signature>`` are always non-polymorphic
 ``<impl-function-type>`` types.
@@ -817,13 +817,21 @@ Declaration Contexts
 ::
 
   context ::= module
+  context ::= extension
   context ::= entity
   module ::= substitution                    // other substitution
   module ::= identifier                      // module name
   module ::= known-module                    // abbreviation
+  extension ::= 'E' module entity
 
 These manglings identify the enclosing context in which an entity was declared,
 such as its enclosing module, function, or nominal type.
+
+An ``extension`` mangling is used whenever an entity's declaration context is
+an extension *and* the entity being extended is in a different module. In this
+case the extension's module is mangled first, followed by the entity being
+extended. If the extension and the extended entity are in the same module, the
+plain ``entity`` mangling is preferred.
 
 When mangling the context of a local entity within a constructor or
 destructor, the non-allocating or non-deallocating variant is used.
