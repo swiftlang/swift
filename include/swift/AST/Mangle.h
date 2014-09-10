@@ -89,8 +89,7 @@ public:
           bool usePunycode = true)
     : Buffer(buffer), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
   void mangleContextOf(ValueDecl *decl, BindGenerics shouldBind);
-  void mangleContext(DeclContext *ctx, BindGenerics shouldBind,
-                     bool mangleExtensionModule = false);
+  void mangleContext(DeclContext *ctx, BindGenerics shouldBind);
   void mangleModule(Module *module);
   void mangleDeclName(ValueDecl *decl);
   void mangleDeclType(ValueDecl *decl, ResilienceExpansion expansion,

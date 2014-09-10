@@ -188,11 +188,7 @@ void Mangler::mangleContextOf(ValueDecl *decl, BindGenerics shouldBind) {
   }
 
   // Just mangle the decl's DC.
-  // If we are mangling a FunctionDecl or a SubscriptDecl and it is defined
-  // within an extension, turn on mangleExtensionModule to check if we
-  // need to mangle the module.
-  mangleContext(decl->getDeclContext(), shouldBind,
-                isa<FuncDecl>(decl) || isa<SubscriptDecl>(decl));
+  mangleContext(decl->getDeclContext(), shouldBind);
 }
 
 namespace {
@@ -244,8 +240,7 @@ static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
   return var;
 }
 
-void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind,
-                            bool mangleExtensionModule) {
+void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module:
     return mangleModule(cast<Module>(ctx));
@@ -271,8 +266,7 @@ void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind,
     assert(decl && "extension of non-nominal type?");
     // Mangle the module name if extension is defined in a different module from
     // the actual nominal type decl.
-    if (mangleExtensionModule &&
-        ExtD->getParentModule() != decl->getParentModule()) {
+    if (ExtD->getParentModule() != decl->getParentModule()) {
       Buffer << 'E';
       mangleModule(ExtD->getParentModule());
     }

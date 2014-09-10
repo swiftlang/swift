@@ -117,8 +117,8 @@ var NSS : NSString = NSString()
 
 // -- NSString methods don't convert 'self'
 extension NSString {
-  // CHECK: define internal [[OPAQUE:.*]]* @_TToFCSo8NSStringg13nsstrFakePropS_([[OPAQUE:.*]]*, i8*) unnamed_addr
-  // CHECK: define internal void @_TToFCSo8NSStrings13nsstrFakePropS_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
+  // CHECK: define internal [[OPAQUE:.*]]* @_TToFE20objc_nsstring_bridgeCSo8NSStringg13nsstrFakePropS0_([[OPAQUE:.*]]*, i8*) unnamed_addr
+  // CHECK: define internal void @_TToFE20objc_nsstring_bridgeCSo8NSStrings13nsstrFakePropS0_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
   var nsstrFakeProp : NSString {
     get {
       return NSS

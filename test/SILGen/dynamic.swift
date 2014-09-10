@@ -306,19 +306,19 @@ func foreignMethodDispatch() {
 }
 
 extension Gizmo {
-  // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT22convenienceInExtensionSi_S_
+  // CHECK-LABEL: sil @_TFE7dynamicCSo5GizmocfMS0_FT22convenienceInExtensionSi_S0_
   // CHECK:         class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.init!initializer.1.foreign
   convenience init(convenienceInExtension: Int) {
     self.init(bellsOn: convenienceInExtension)
   }
 
-  // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT19foreignClassFactorySi_S_
+  // CHECK-LABEL: sil @_TFE7dynamicCSo5GizmoCfMS0_FT19foreignClassFactorySi_S0_
   // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassFactory x: Int) {
     self.init(stuff: x)
   }
 
-  // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT24foreignClassExactFactorySi_S_
+  // CHECK-LABEL: sil @_TFE7dynamicCSo5GizmoCfMS0_FT24foreignClassExactFactorySi_S0_
   // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassExactFactory x: Int) {
     self.init(exactlyStuff: x)

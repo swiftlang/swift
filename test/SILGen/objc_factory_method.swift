@@ -23,7 +23,7 @@ extension Hive {
   // FIXME: This whole approach is wrong. This should be a factory
   // initializer, not a convenience initializer, which means it does
   // not have an initializing entry point at all.
-  // CHECK-LABEL: sil @_TFCSo4HivecfMS_FT10otherQueenCSo1B_S_ : $@cc(method) @thin (@owned B, @owned Hive) -> @owned Hive
+  // CHECK-LABEL: sil @_TFE19objc_factory_methodCSo4HivecfMS0_FT10otherQueenCSo1B_S0_ : $@cc(method) @thin (@owned B, @owned Hive) -> @owned Hive
   convenience init(otherQueen other: B) {
     // CHECK: [[META:%[0-9]+]] = value_metatype $@thick Hive.Type, [[SELF:%[0-9]+]] : $Hive
     // CHECK: [[FACTORY:%[0-9]+]] = class_method [volatile] [[META]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (queen: B!) -> Hive! , $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>

@@ -168,11 +168,11 @@ extension NSString {
     get { return NSS }
     set {}
   }
-  // CHECK-LABEL: sil  @_TToFCSo8NSStringg13nsstrFakePropS_
+  // CHECK-LABEL: sil  @_TToFE13objc_bridgingCSo8NSStringg13nsstrFakePropS0_
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
-  // CHECK-LABEL: sil  @_TToFCSo8NSStrings13nsstrFakePropS_
+  // CHECK-LABEL: sil  @_TToFE13objc_bridgingCSo8NSStrings13nsstrFakePropS0_
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
