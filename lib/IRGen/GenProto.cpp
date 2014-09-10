@@ -4604,7 +4604,8 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                Explosion &out,
                                SILType outType,
                                llvm::Value *instance,
-                               SILType instanceType,
+                               CanType instanceFormalType,
+                               SILType instanceLoweredType,
                                ArrayRef<ProtocolConformance*> conformances) {
   assert(outType.isClassExistentialType() &&
          "creating a non-class existential type");
@@ -4617,7 +4618,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   out.add(opaqueInstance);
   
   // Emit the witness table pointers.
-  forEachProtocolWitnessTable(IGF, instanceType, outType,
+  forEachProtocolWitnessTable(IGF, instanceLoweredType, outType,
                               destTI.getProtocols(),
                               conformances,
                               [&](unsigned i, llvm::Value *ptable) {
@@ -4630,21 +4631,18 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
 Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                   Address dest,
                                   SILType destType,
-                                  SILType srcType,
+                                  CanType formalSrcType,
+                                  SILType loweredSrcType,
                                   ArrayRef<ProtocolConformance*> conformances) {
   assert(!destType.isClassExistentialType() &&
          "initializing a class existential container as opaque");
   auto &destTI = IGF.getTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
-  auto &srcTI = IGF.getTypeInfo(srcType);
+  auto &srcTI = IGF.getTypeInfo(loweredSrcType);
   OpaqueExistentialLayout destLayout = destTI.getLayout();
   assert(destTI.getProtocols().size() == conformances.size());
   
-  assert(!srcType.isExistentialType() &&
-         "existential-to-existential erasure should be done with "
-         "upcast_existential");
-  
   // First, write out the metadata.
-  llvm::Value *metadata = IGF.emitTypeMetadataRef(srcType);
+  llvm::Value *metadata = IGF.emitTypeMetadataRef(formalSrcType);
   IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
   
   // Compute basic layout information about the type.  If we have a
@@ -4661,7 +4659,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   }
   
   // Next, write the protocol witness tables.
-  forEachProtocolWitnessTable(IGF, srcType, destType,
+  forEachProtocolWitnessTable(IGF, loweredSrcType, destType,
                               destTI.getProtocols(), conformances,
                               [&](unsigned i, llvm::Value *ptable) {
     Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
@@ -4688,7 +4686,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                    Alignment(1));
   } else {
     // Otherwise, allocate using what we know statically about the type.
-    return emitAllocateBuffer(IGF, srcType.getSwiftRValueType(),
+    return emitAllocateBuffer(IGF, loweredSrcType.getSwiftRValueType(),
                               srcTI, packing, buffer);
   }
 }

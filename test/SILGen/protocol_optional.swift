@@ -16,7 +16,7 @@ func optionalMethodGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int -> ()>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
-  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $P1
+  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T : $T, $P1
   // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $P1 to $@sil_self P1
   // CHECK-NEXT: alloc_stack $Optional<Int -> ()>
   // CHECK-NEXT: dynamic_method_br [[EXIST_REF_PROJ]] : $@sil_self P1, #P1.method!1.foreign
@@ -31,7 +31,7 @@ func optionalPropertyGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
-  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $P1
+  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T : $T, $P1
   // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $P1 to $@sil_self P1
   // CHECK-NEXT: alloc_stack $Optional<Int>
   // CHECK-NEXT: dynamic_method_br [[EXIST_REF_PROJ]] : $@sil_self P1, #P1.prop!getter.1.foreign
@@ -46,7 +46,7 @@ func optionalSubscriptGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
-  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T, $AnyObject
+  // CHECK-NEXT: [[EXIST_REF:%[0-9]+]] = init_existential_ref [[T]] : $T : $T, $AnyObject
   // CHECK-NEXT: [[EXIST_REF_PROJ:%[0-9]+]] = project_existential_ref [[EXIST_REF]] : $AnyObject to $@sil_self AnyObject
   // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSi33_convertFromBuiltinIntegerLiteral
   // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int.Type

@@ -333,7 +333,7 @@ bb0:
 // CHECK-LABEL: sil @init_existential_crash
 sil @init_existential_crash : $() -> () {
   %99 = alloc_stack $BooleanType
-  %100 = init_existential %99#1 : $*BooleanType, $*Bool
+  %100 = init_existential %99#1 : $*BooleanType, $Bool
   %105 = integer_literal $Builtin.Int1, 0
   %106 = struct $Bool (%105 : $Builtin.Int1)
   store %106 to %100 : $*Bool

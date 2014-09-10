@@ -266,6 +266,7 @@ namespace sil_block {
     SILTypeCategoryField, // operand type category
     ValueIDField,         // operand id
     SILValueResultField,  // operand result id
+    TypeIDField,          // formal concrete type
     BCFixed<32>           // number of conformances
                           // followed by conformances
   >;

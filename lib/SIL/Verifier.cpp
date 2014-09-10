@@ -1388,9 +1388,21 @@ public:
             "init_existential must be applied to address of existential");
     require(!exType.isClassExistentialType(),
             "init_existential must be applied to non-class existential");
-    require(!AEI->getConcreteType().isExistentialType(),
+    require(!AEI->getLoweredConcreteType().isExistentialType(),
             "init_existential cannot put an existential container inside "
             "an existential container");
+    
+    // The lowered type must be the properly-abstracted form of the AST type.
+    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+    
+    auto loweredTy = F.getModule().Types.getLoweredType(
+                                Lowering::AbstractionPattern(archetype),
+                                AEI->getFormalConcreteType())
+                      .getAddressType();
+    
+    requireSameType(loweredTy, AEI->getLoweredConcreteType(),
+                    "init_existential result type must be the lowered "
+                    "formal type at the right abstraction level");
 
     for (ProtocolConformance *C : AEI->getConformances())
       // We allow for null conformances.
@@ -1406,6 +1418,17 @@ public:
             "init_existential_ref result must be a class existential type");
     require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");
+    
+    // The operand must be at the right abstraction level for the existential.
+    auto archetype = ArchetypeType::getOpened(
+                                          IEI->getType().getSwiftRValueType());
+    auto loweredTy = F.getModule().Types.getLoweredType(
+                                       Lowering::AbstractionPattern(archetype),
+                                       IEI->getFormalConcreteType());
+    requireSameType(concreteType, loweredTy,
+                    "init_existential_ref operand must be lowered to the right "
+                    "abstraction level for the existential");
+    
     for (ProtocolConformance *C : IEI->getConformances())
       // We allow for null conformances.
       require(!C || IEI->getModule().lookUpWitnessTable(C, false).first,

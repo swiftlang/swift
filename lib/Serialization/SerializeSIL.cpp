@@ -326,6 +326,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::InitExistentialRefInst: {
     SILValue operand;
     SILType Ty;
+    CanType FormalConcreteType;
     ArrayRef<ProtocolConformance*> conformances;
     SmallVector<ProtocolDecl *, 4> protocols;
 
@@ -335,7 +336,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::InitExistentialInst: {
       auto &IEI = cast<InitExistentialInst>(SI);
       operand = IEI.getOperand();
-      Ty = IEI.getConcreteType();
+      Ty = IEI.getLoweredConcreteType();
+      FormalConcreteType = IEI.getFormalConcreteType();
       conformances = IEI.getConformances();
       existentialType = IEI.getOperand().getType().getSwiftRValueType();
       break;
@@ -344,6 +346,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       auto &IERI = cast<InitExistentialRefInst>(SI);
       operand = IERI.getOperand();
       Ty = IERI.getType();
+      FormalConcreteType = IERI.getFormalConcreteType();
       conformances = IERI.getConformances();
       existentialType = IERI.getType().getSwiftRValueType();
       break;
@@ -363,6 +366,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
        (unsigned)operand.getType().getCategory(),
        addValueRef(operand),
        operand.getResultNumber(),
+       S.addTypeRef(FormalConcreteType),
        conformances.size());
 
     for (unsigned i = 0, n = conformances.size(); i != n; ++i) {

@@ -1487,7 +1487,7 @@ namespace {
   };
 }
 
-static RValue emitClassBoundErasure(SILGenFunction &gen, ErasureExpr *E) {
+static RValue emitClassBoundedErasure(SILGenFunction &gen, ErasureExpr *E) {
   ManagedValue sub = gen.emitRValueAsSingleValue(E->getSubExpr());
   SILType resultTy = gen.getLoweredLoadableType(E->getType());
   
@@ -1501,8 +1501,9 @@ static RValue emitClassBoundErasure(SILGenFunction &gen, ErasureExpr *E) {
   else
     // Otherwise, create a new existential container value around the class
     // instance.
-    v = gen.B.createInitExistentialRef(E, resultTy, sub.getValue(),
-                                       E->getConformances());
+    v = gen.B.createInitExistentialRef(E, resultTy,
+                                 E->getSubExpr()->getType()->getCanonicalType(),
+                                 sub.getValue(), E->getConformances());
 
   return RValue(gen, E, ManagedValue(v, sub.getCleanup()));
 }
@@ -1536,12 +1537,25 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     // scratch.
     
     // Allocate the concrete value inside the container.
+    auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
+    
+    auto archetype = ArchetypeType::getOpened(E->getType());
+    AbstractionPattern abstractionPattern(archetype);
+    auto &concreteTL = gen.getTypeLowering(abstractionPattern,
+                                           concreteFormalType);
+    
     SILValue valueAddr = gen.B.createInitExistential(E, existential,
-                                gen.getLoweredType(E->getSubExpr()->getType()),
+                                concreteFormalType,
+                                concreteTL.getLoweredType(),
                                 E->getConformances());
     // Initialize the concrete value in-place.
     InitializationPtr init(new ExistentialValueInitialization(valueAddr));
-    gen.emitExprInto(E->getSubExpr(), init.get());
+    ManagedValue mv = gen.emitRValueAsOrig(E->getSubExpr(), abstractionPattern,
+                                           concreteTL, SGFContext(init.get()));
+    if (!mv.isInContext()) {
+      mv.forwardInto(gen, E, init->getAddress());
+      init->finishInitialization(gen);
+    }
   }
 
   return RValue(gen, E,
@@ -1550,7 +1564,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   if (E->getType()->isClassExistentialType())
-    return emitClassBoundErasure(SGF, E);
+    return emitClassBoundedErasure(SGF, E);
   return emitAddressOnlyErasure(SGF, E, C);
 }
 

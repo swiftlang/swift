@@ -183,7 +183,7 @@ func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializab
 // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype @opened(0) Initializable.Type, $@opened(0) Initializable
 // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method [volatile] $@opened(0) Initializable, #Initializable.init!initializer.1.foreign : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
 // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened(0) Initializable>([[I]], [[I2_ALLOC]]) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
-// CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened(0) Initializable, $Initializable
+// CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened(0) Initializable : $@opened(0) Initializable, $Initializable
 // CHECK:   store [[I2_EXIST_CONTAINER]] to [[I2_BOX]]#1 : $*Initializable
 // CHECK:   [[I2:%[0-9]+]] = load [[I2_BOX]]#1 : $*Initializable
 // CHECK:   strong_retain [[I2]] : $Initializable

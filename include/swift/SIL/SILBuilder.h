@@ -648,17 +648,23 @@ public:
   InitExistentialInst *
   createInitExistential(SILLocation Loc,
                         SILValue Existential,
-                        SILType ConcreteType,
+                        CanType FormalConcreteType,
+                        SILType LoweredConcreteType,
                         ArrayRef<ProtocolConformance*> Conformances) {
-    return insert(InitExistentialInst::create(Loc, Existential, ConcreteType,
+    return insert(InitExistentialInst::create(Loc, Existential,
+                                              FormalConcreteType,
+                                              LoweredConcreteType,
                                               Conformances, &F));
   }
   
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
+                           CanType FormalConcreteType,
                            SILValue Concrete,
                            ArrayRef<ProtocolConformance*> Conformances) {
-    return insert(InitExistentialRefInst::create(Loc, ExistentialType, Concrete,
+    return insert(InitExistentialRefInst::create(Loc, ExistentialType,
+                                                 FormalConcreteType,
+                                                 Concrete,
                                                  Conformances, &F));
   }
   

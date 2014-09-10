@@ -1010,9 +1010,10 @@ void
 SILCloner<ImplClass>::visitInitExistentialInst(InitExistentialInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createInitExistential(getOpLocation(Inst->getLoc()),
-                                       getOpValue(Inst->getOperand()),
-                                       getOpType(Inst->getConcreteType()),
-                                       Inst->getConformances()));
+                                   getOpValue(Inst->getOperand()),
+                                   getOpASTType(Inst->getFormalConcreteType()),
+                                   getOpType(Inst->getLoweredConcreteType()),
+                                   Inst->getConformances()));
 }
 
 template<typename ImplClass>
@@ -1021,9 +1022,10 @@ SILCloner<ImplClass>::
 visitInitExistentialRefInst(InitExistentialRefInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createInitExistentialRef(getOpLocation(Inst->getLoc()),
-                                          getOpType(Inst->getType()),
-                                          getOpValue(Inst->getOperand()),
-                                          Inst->getConformances()));
+                                    getOpType(Inst->getType()),
+                                    getOpASTType(Inst->getFormalConcreteType()),
+                                    getOpValue(Inst->getOperand()),
+                                    Inst->getConformances()));
 }
 
 template<typename ImplClass>

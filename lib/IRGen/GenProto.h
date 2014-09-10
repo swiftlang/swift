@@ -43,7 +43,8 @@ namespace irgen {
   Address emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                    Address dest,
                                    SILType destType,
-                                   SILType srcType,
+                                   CanType formalSrcType,
+                                   SILType loweredSrcType,
                                    ArrayRef<ProtocolConformance*> conformances);
   
   /// Emit a class existential container from a class instance value
@@ -52,7 +53,8 @@ namespace irgen {
                                  Explosion &out,
                                  SILType outType,
                                  llvm::Value *instance,
-                                 SILType instanceType,
+                                 CanType instanceFormalType,
+                                 SILType instanceLoweredType,
                                  ArrayRef<ProtocolConformance*> conformances);
 
   /// Initialize an opaque existential container using the value and metadata

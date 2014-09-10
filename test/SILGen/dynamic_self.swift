@@ -69,7 +69,7 @@ func testExistentialDispatch(p: P) {
 // CHECK:   copy_addr [[P]] to [initialization] [[PCOPY]]#1 : $*P
 // CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential [[PCOPY]]#1 : $*P to $*@opened([[N:[0-9]+]]) P
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
-// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential [[P_RESULT]]#1 : $*P, $*@opened([[N]]) P
+// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential [[P_RESULT]]#1 : $*P, $@opened([[N]]) P
 // CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @inout τ_0_0) -> ()
 // CHECK:   apply [[P_F_METHOD]]<@opened([[N]]) P>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @inout τ_0_0) -> ()
 // CHECK:   destroy_addr [[P_RESULT]]#1 : $*P
@@ -87,7 +87,7 @@ func testExistentialDispatchClass(cp: CP) {
 // CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:[0-9]+]]) CP
 // CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> @owned τ_0_0
 // CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]]) CP>([[CP_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> @owned τ_0_0
-// CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]]) CP, $CP
+// CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
 // CHECK:   strong_release [[CP_F_RESULT]] : $@opened([[N]]) CP
 // CHECK:   strong_release [[CP]] : $CP
   cp.f()

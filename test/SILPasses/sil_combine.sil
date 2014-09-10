@@ -796,7 +796,7 @@ sil @print_a_number : $@thin (Int) -> ()
 sil @remove_init_ex : $@thin (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_stack $BooleanType
-  %2 = init_existential %1#1 : $*BooleanType, $*Bool
+  %2 = init_existential %1#1 : $*BooleanType, $Bool
   %3 = integer_literal $Builtin.Int1, 1
   %4 = struct $Bool (%3 : $Builtin.Int1)
   store %4 to %2 : $*Bool

@@ -2072,25 +2072,34 @@ public:
 class InitExistentialInst
   : public UnaryInstructionBase<ValueKind::InitExistentialInst>
 {
+  CanType ConcreteType;
   ArrayRef<ProtocolConformance*> Conformances;
 
   InitExistentialInst(SILLocation Loc,
                       SILValue Existential,
-                      SILType ConcreteType,
+                      CanType ConcreteType,
+                      SILType ConcreteLoweredType,
                       ArrayRef<ProtocolConformance*> Conformances)
-    : UnaryInstructionBase(Loc, Existential, ConcreteType.getAddressType()),
+    : UnaryInstructionBase(Loc, Existential,
+                           ConcreteLoweredType.getAddressType()),
+      ConcreteType(ConcreteType),
       Conformances(Conformances)
   {}
 public:
   static InitExistentialInst *
-  create(SILLocation Loc, SILValue Existential, SILType ConcreteType,
+  create(SILLocation Loc, SILValue Existential, CanType ConcreteType,
+         SILType ConcreteLoweredType,
          ArrayRef<ProtocolConformance *> Conformances, SILFunction *Parent);
 
   ArrayRef<ProtocolConformance*> getConformances() const {
     return Conformances;
   }
+  
+  CanType getFormalConcreteType() const {
+    return ConcreteType;
+  }
 
-  SILType getConcreteType() const {
+  SILType getLoweredConcreteType() const {
     return getType();
   }
 };
@@ -2101,19 +2110,27 @@ public:
 class InitExistentialRefInst
   : public UnaryInstructionBase<ValueKind::InitExistentialRefInst>
 {
+  CanType ConcreteType;
   ArrayRef<ProtocolConformance*> Conformances;
 
   InitExistentialRefInst(SILLocation Loc,
                          SILType ExistentialType,
+                         CanType FormalConcreteType,
                          SILValue Instance,
                          ArrayRef<ProtocolConformance*> Conformances)
     : UnaryInstructionBase(Loc, Instance, ExistentialType),
+      ConcreteType(FormalConcreteType),
       Conformances(Conformances)
   {}
 public:
   static InitExistentialRefInst *
-  create(SILLocation Loc, SILType ExistentialType, SILValue Instance,
-         ArrayRef<ProtocolConformance *> Conformances, SILFunction *Parent);
+  create(SILLocation Loc, SILType ExistentialType, CanType ConcreteType,
+         SILValue Instance, ArrayRef<ProtocolConformance *> Conformances,
+         SILFunction *Parent);
+  
+  CanType getFormalConcreteType() const {
+    return ConcreteType;
+  }
 
   ArrayRef<ProtocolConformance*> getConformances() const {
     return Conformances;

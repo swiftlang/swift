@@ -164,7 +164,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // existential.
   if (LegalUsers && IEI) {
     auto *ConcAlloc = Builder->createAllocStack(AS->getLoc(),
-                                                IEI->getConcreteType());
+                                                IEI->getLoweredConcreteType());
     SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
     eraseInstFromFunction(*IEI);
 

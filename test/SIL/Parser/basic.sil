@@ -847,8 +847,8 @@ sil @test_init_existential : $@thin (@out Bendable, Spoon) -> () {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
   store %1 to %2#1 : $*Spoon
-  // CHECK: init_existential %{{.*}} : $*Bendable, $*Spoon
-  %4 = init_existential %0 : $*Bendable, $*Spoon
+  // CHECK: init_existential %{{.*}} : $*Bendable, $Spoon
+  %4 = init_existential %0 : $*Bendable, $Spoon
   // CHECK: deinit_existential %{{.*}} : $*Bendable
   deinit_existential %0 : $*Bendable
   %5 = load %2#1 : $*Spoon
@@ -865,8 +865,8 @@ bb0(%0 : $ConcreteClass):
   store %0 to %1#1 : $*ConcreteClass
   %3 = load %1#1 : $*ConcreteClass
   strong_retain %3 : $ConcreteClass
-  // CHECK: init_existential_ref %{{.*}} : $ConcreteClass, $ClassP
-  %5 = init_existential_ref %3 : $ConcreteClass, $ClassP
+  // CHECK: init_existential_ref %{{.*}} : $ConcreteClass : $ConcreteClass, $ClassP
+  %5 = init_existential_ref %3 : $ConcreteClass : $ConcreteClass, $ClassP
   strong_release %1#0 : $Builtin.NativeObject
   return %5 : $ClassP
 }

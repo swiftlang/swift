@@ -3159,10 +3159,11 @@ void IRGenSILFunction::visitIndexRawPointerInst(swift::IndexRawPointerInst *i) {
 void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   SILType destType = i->getOperand().getType();
-  SILType srcType = i->getConcreteType();
   Address buffer = emitOpaqueExistentialContainerInit(*this,
                                                 container,
-                                                destType, srcType,
+                                                destType,
+                                                i->getFormalConcreteType(),
+                                                i->getLoweredConcreteType(),
                                                 i->getConformances());
   setLoweredAddress(SILValue(i, 0), buffer);
 }
@@ -3172,7 +3173,9 @@ void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
   Explosion result;
   emitClassExistentialContainer(*this,
                                result, i->getType(),
-                               instance.claimNext(), i->getOperand().getType(),
+                               instance.claimNext(),
+                               i->getFormalConcreteType(),
+                               i->getOperand().getType(),
                                i->getConformances());
   setLoweredExplosion(SILValue(i, 0), result);
 }

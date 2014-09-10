@@ -613,6 +613,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
            IsTransparent = 0, NumSubs = 0;
   ValueID ValID, ValID2;
   TypeID TyID, TyID2;
+  TypeID ConcreteTyID;
   SourceLoc SLoc;
   ArrayRef<uint64_t> ListOfValues;
   SILLocation Loc = SILFileLocation(SLoc);
@@ -642,7 +643,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILInitExistentialLayout::readRecord(scratch, OpCode,
                                          TyID, TyCategory,
                                          TyID2, TyCategory2,
-                                         ValID, ValResNum, Attr);
+                                         ValID, ValResNum,
+                                         ConcreteTyID,
+                                         Attr);
     break;
   case SIL_INST_CAST:
     SILInstCastLayout::readRecord(scratch, OpCode, Attr,
@@ -753,6 +756,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ty2 = MF->getType(TyID2);
+    auto ConcreteTy = MF->getType(ConcreteTyID)->getCanonicalType();
     SILValue operand = getLocalValue(ValID, ValResNum,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
 
@@ -769,12 +773,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::InitExistentialInst:
-      ResultVal = Builder.createInitExistential(Loc, operand, Ty,
+      ResultVal = Builder.createInitExistential(Loc, operand,
+                                                ConcreteTy,
+                                                Ty,
                                                 ctxConformances);
       break;
     case ValueKind::InitExistentialRefInst:
-      ResultVal = Builder.createInitExistentialRef(Loc, Ty, operand,
-                                                   ctxConformances);
+      ResultVal = Builder.createInitExistentialRef(Loc, Ty,
+                                         ConcreteTy,
+                                         operand,
+                                         ctxConformances);
       break;
     }
     break;

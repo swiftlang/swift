@@ -15,6 +15,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -2693,27 +2694,44 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::InitExistentialInst: {
-    SILType Ty;
+    CanType Ty;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(Ty))
+        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTType(Ty))
       return true;
+    
+    // Lower the type at the abstraction level of the existential.
+    auto archetype
+      = ArchetypeType::getOpened(Val.getType().getSwiftRValueType())
+        ->getCanonicalType();
+    
+    SILType LoweredTy = SILMod.Types.getLoweredType(
+                                    Lowering::AbstractionPattern(archetype), Ty)
+      .getAddressType();
+    
     // FIXME: Conformances in InitExistentialInst is currently not included in
     // SIL.rst.
-    ResultVal = B.createInitExistential(InstLoc, Val, Ty,
+    ResultVal = B.createInitExistential(InstLoc, Val, Ty, LoweredTy,
                   ArrayRef<ProtocolConformance*>());
     break;
   }
   case ValueKind::InitExistentialRefInst: {
-    SILType Ty;
+    CanType FormalConcreteTy;
+    SILType ExistentialTy;
     if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTType(FormalConcreteTy) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(Ty))
+        parseSILType(ExistentialTy))
       return true;
+    
     // FIXME: Conformances in InitExistentialRefInst is currently not included
     // in SIL.rst.
-    ResultVal = B.createInitExistentialRef(InstLoc, Ty, Val,
-                  ArrayRef<ProtocolConformance*>());
+    ResultVal = B.createInitExistentialRef(InstLoc, ExistentialTy,
+                                           FormalConcreteTy, Val,
+                                           ArrayRef<ProtocolConformance*>());
     break;
   }
   case ValueKind::DynamicMethodBranchInst: {

@@ -1032,12 +1032,13 @@ public:
        << " to " << OI->getType();
   }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
-    OS << "init_existential " << getIDAndType(AEI->getOperand()) << ", ";
-    AEI->getConcreteType().print(OS);
+    OS << "init_existential " << getIDAndType(AEI->getOperand()) << ", $";
+    AEI->getFormalConcreteType().print(OS);
   }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
-    OS << "init_existential_ref " << getIDAndType(AEI->getOperand()) << ", ";
-    AEI->getType().print(OS);
+    OS << "init_existential_ref " << getIDAndType(AEI->getOperand())
+       << " : $" << AEI->getFormalConcreteType()
+       << ", " << AEI->getType();
   }
   void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {
     OS << "upcast_existential ";

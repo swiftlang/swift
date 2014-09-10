@@ -1347,7 +1347,8 @@ WitnessMethodInst::create(SILLocation Loc, SILType LookupType,
 
 InitExistentialInst *
 InitExistentialInst::create(SILLocation Loc, SILValue Existential,
-                            SILType ConcreteType,
+                            CanType ConcreteType,
+                            SILType ConcreteLoweredType,
                             ArrayRef<ProtocolConformance *> Conformances,
                             SILFunction *F) {
   SILModule &Mod = F->getModule();
@@ -1355,12 +1356,15 @@ InitExistentialInst::create(SILLocation Loc, SILValue Existential,
                               alignof(InitExistentialInst));
   for (ProtocolConformance *C : Conformances)
     declareWitnessTable(Mod, C);
-  return ::new (Buffer) InitExistentialInst(Loc, Existential, ConcreteType,
+  return ::new (Buffer) InitExistentialInst(Loc, Existential,
+                                            ConcreteType,
+                                            ConcreteLoweredType,
                                             Conformances);
 }
 
 InitExistentialRefInst *
 InitExistentialRefInst::create(SILLocation Loc, SILType ExistentialType,
+                               CanType ConcreteType,
                                SILValue Instance,
                                ArrayRef<ProtocolConformance *> Conformances,
                                SILFunction *F) {
@@ -1372,6 +1376,7 @@ InitExistentialRefInst::create(SILLocation Loc, SILType ExistentialType,
       declareWitnessTable(Mod, C);
 
   return ::new (Buffer) InitExistentialRefInst(Loc, ExistentialType,
+                                               ConcreteType,
                                                Instance,
                                                Conformances);
 }
