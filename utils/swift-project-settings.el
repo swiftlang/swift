@@ -19,7 +19,7 @@
 
 ;; Associate .swift files with swift-mode
 (setq auto-mode-alist
-   (append '(("\\.swift$" . swift-mode)) auto-mode-alist))
+   (append '(("\\.swift$" . swift-mode) ("\\.gyb$" python-mode t)) auto-mode-alist))
 
 ;; Make sure we know where to find swift-mode
 (autoload 'swift-mode "swift-mode"
