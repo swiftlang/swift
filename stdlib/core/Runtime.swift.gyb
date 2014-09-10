@@ -188,7 +188,7 @@ func _swift_stdlib_atomicFetchAddInt(
   return Int(Int32(bitPattern:
     _swift_stdlib_atomicFetchAddUInt32(
       object: UnsafeMutablePointer(object),
-      operand: UInt32(bitPattern: Int32(desired)))))
+      operand: UInt32(bitPattern: Int32(operand)))))
 #elseif arch(x86_64) || arch(arm64)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicFetchAddUInt64(
