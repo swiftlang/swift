@@ -71,6 +71,15 @@ extension ObjCBool : Printable {
   }
 }
 
+// Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
+
+internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+  return ObjCBool(x)
+}
+internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+  return Bool(x)
+}
+
 /// The Objective-C SEL type.
 ///
 /// The Objective-C SEL type is typically an opaque pointer. Swift
@@ -151,13 +160,19 @@ extension Selector : Reflectable {
   }
 }
 
-// Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
+//===----------------------------------------------------------------------===//
+// NSZone
+//===----------------------------------------------------------------------===//
 
-internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
-  return ObjCBool(x)
-}
-internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
-  return Bool(x)
+public struct NSZone : NilLiteralConvertible {
+  var pointer : COpaquePointer
+
+  public init() { pointer = nil }
+
+  @transparent public
+  static func convertFromNilLiteral() -> NSZone {
+    return NSZone()
+  }
 }
 
 //===----------------------------------------------------------------------===//

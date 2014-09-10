@@ -2484,6 +2484,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("Selector"));
     StdlibTypeNames.push_back(Context.getIdentifier("ObjCBool"));
+    StdlibTypeNames.push_back(Context.getIdentifier("NSZone"));
     lookupLibraryTypes(*this, ObjCModule, StdlibTypeNames, ObjCMappedTypes);
   }
 
@@ -2499,7 +2500,6 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   Identifier ID_Foundation = Context.getIdentifier(FOUNDATION_MODULE_NAME);
   if (auto FoundationModule = Context.getLoadedModule(ID_Foundation)) {
     StdlibTypeNames.clear();
-    StdlibTypeNames.push_back(Context.getIdentifier("NSZone"));
     StdlibTypeNames.push_back(Context.getIdentifier("NSErrorPointer"));
     lookupLibraryTypes(*this, FoundationModule, StdlibTypeNames,
                        ObjCMappedTypes);

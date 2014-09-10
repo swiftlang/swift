@@ -440,9 +440,7 @@ private:
       Identifier ID_ObjectiveC = ctx.getIdentifier(OBJC_MODULE_NAME);
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] = "BOOL";
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = "SEL";
-
-      Identifier ID_Foundation = ctx.getIdentifier(FOUNDATION_MODULE_NAME);
-      specialNames[{ID_Foundation, ctx.getIdentifier("NSZone")}] = "NSZone *";
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] = "NSZone *";
     }
 
     auto iter = specialNames.find({moduleName, name});
@@ -1051,6 +1049,9 @@ public:
            "typedef uint_least16_t char16_t;\n"
            "typedef uint_least32_t char32_t;\n"
            "#endif\n"
+           "\n"
+           "typedef struct _NSZone NSZone;\n"
+           "\n"
            "#if !defined(SWIFT_PASTE)\n"
            "# define SWIFT_PASTE_HELPER(x, y) x##y\n"
            "# define SWIFT_PASTE(x, y) SWIFT_PASTE_HELPER(x, y)\n"

@@ -194,13 +194,12 @@ namespace {
       auto pointeeQualType = type->getPointeeType();
 
       // Special case for NSZone*, which has its own Swift wrapper.
-      if (auto pointee = pointeeQualType->getAs<clang::TypedefType>()) {
-        const clang::RecordType *pointeeStruct = pointee->getAsStructureType();
-        if (pointeeStruct &&
-            !pointeeStruct->getDecl()->isCompleteDefinition() &&
-            pointee->getDecl()->getName() == "NSZone") {
-          Module *Foundation = Impl.getNamedModule(FOUNDATION_MODULE_NAME);
-          Type wrapperTy = Impl.getNamedSwiftType(Foundation, "NSZone");
+      if (const clang::RecordType *pointee =
+            pointeeQualType->getAsStructureType()) {
+        if (pointee && !pointee->getDecl()->isCompleteDefinition() &&
+            pointee->getDecl()->getName() == "_NSZone") {
+          Module *objCModule = Impl.getNamedModule(OBJC_MODULE_NAME);
+          Type wrapperTy = Impl.getNamedSwiftType(objCModule, "NSZone");
           if (wrapperTy)
             return wrapperTy;
         }

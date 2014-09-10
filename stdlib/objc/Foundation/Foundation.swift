@@ -979,21 +979,6 @@ extension NSRange {
 }
 
 //===----------------------------------------------------------------------===//
-// NSZone
-//===----------------------------------------------------------------------===//
-
-public struct NSZone : NilLiteralConvertible {
-  var pointer : COpaquePointer
-
-  public init() { pointer = nil }
-  
-  @transparent public
-  static func convertFromNilLiteral() -> NSZone {
-    return NSZone()
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // NSLocalizedString
 //===----------------------------------------------------------------------===//
 

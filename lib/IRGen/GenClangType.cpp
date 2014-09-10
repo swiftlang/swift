@@ -558,13 +558,7 @@ void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
         IGM.Context.getLoadedModule(IGM.Context.getIdentifier("ObjectiveC"))) {
     CACHE_TYPE(objcModule, "ObjCBool", ctx.ObjCBuiltinBoolTy);
     CACHE_TYPE(objcModule, "Selector", getClangSelectorType(ctx));
-  }
-
-  // These types come from the Foundation module.
-  if (auto foundationModule =
-        IGM.Context.getLoadedModule(IGM.Context.getIdentifier("Foundation"))) {
-    // We import NSZone* (a struct pointer) as NSZone.
-    CACHE_TYPE(foundationModule, "NSZone", ctx.VoidPtrTy);
+    CACHE_TYPE(objcModule, "NSZone", ctx.VoidPtrTy);
   }
 
 #undef CACHE_STDLIB_TYPE

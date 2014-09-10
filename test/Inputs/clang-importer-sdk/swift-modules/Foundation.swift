@@ -8,15 +8,6 @@ func _convertStringToNSString(string: String) -> NSString
 @asmname("swift_NSStringToString") internal
 func _convertNSStringToString(nsstring: NSString) -> String
 
-public struct NSZone: NilLiteralConvertible {
-  public var pointer : COpaquePointer
-
-  @transparent public
-  static func convertFromNilLiteral() -> NSZone {
-    return NSZone(pointer: COpaquePointer())
-  }
-}
-
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
