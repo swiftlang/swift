@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-function-signature-opts"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/LLVM.h"
@@ -61,7 +62,8 @@ struct ArgDescriptor {
 /// had meaningfully reduced the lifetime of an object, we don't want to extend
 /// the life if for instance we had moved releases over loops.
 static SILInstruction *searchForCalleeRelease(SILFunction *F,
-                                              SILArgument *Arg) {
+                                              SILArgument *Arg,
+                                              RCIdentityAnalysis *RCIA) {
   auto ReturnBB = std::find_if(F->begin(), F->end(),
                                [](const SILBasicBlock &BB) -> bool {
                                  const TermInst *TI = BB.getTerminator();
@@ -82,7 +84,7 @@ static SILInstruction *searchForCalleeRelease(SILFunction *F,
       continue;
     }
 
-    SILValue Op = Target->getOperand(0).stripRCIdentityPreservingOps();
+    SILValue Op = RCIA->getRCIdentityRoot(Target->getOperand(0));
     return Op == SILValue(Arg) ? Target : nullptr;
   }
 
@@ -93,7 +95,8 @@ static SILInstruction *searchForCalleeRelease(SILFunction *F,
 /// to optimize in which case it returns true. If we have nothing to optimize,
 /// it returns false.
 static bool
-analyzeArguments(SILFunction *F, SmallVectorImpl<ArgDescriptor> &ArgDescList) {
+analyzeArguments(SILFunction *F, SmallVectorImpl<ArgDescriptor> &ArgDescList,
+                 RCIdentityAnalysis *RCIA) {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResult())
     return false;
@@ -111,7 +114,7 @@ analyzeArguments(SILFunction *F, SmallVectorImpl<ArgDescriptor> &ArgDescList) {
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     if (A.ParameterInfo.isConsumed()) {
-      if ((A.CalleeRelease = searchForCalleeRelease(F, Arg))) {
+      if ((A.CalleeRelease = searchForCalleeRelease(F, Arg, RCIA))) {
         ShouldOptimize = true;
         ++NumOwnedConvertedToGuaranteed;
       }
@@ -392,7 +395,8 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 /// returns false otherwise.
 static bool
 optimizeFunctionSignature(SILFunction *F,
-                          CallGraphNode::CallerCallSiteList CallSites) {
+                          CallGraphNode::CallerCallSiteList CallSites,
+                          RCIdentityAnalysis *RCIA) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
 
@@ -413,7 +417,7 @@ optimizeFunctionSignature(SILFunction *F,
   llvm::SmallVector<ArgDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  if (!analyzeArguments(F, Arguments)) {
+  if (!analyzeArguments(F, Arguments, RCIA)) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
     return false;
@@ -476,6 +480,7 @@ public:
   void run() {
     SILModule *M = getModule();
     auto *CGA = getAnalysis<CallGraphAnalysis>();
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>();
 
     DEBUG(llvm::dbgs() << "**** Optimizing Function Signatures ****\n\n");
 
@@ -500,7 +505,7 @@ public:
 
       // Now that we have our call graph, optimize F and all of its apply insts.
       auto CallSites = FNode->getKnownCallerCallSites();
-      Changed |= optimizeFunctionSignature(&F, CallSites);
+      Changed |= optimizeFunctionSignature(&F, CallSites, RCIA);
     }
 
     // If we changed anything, invalidate the call graph.

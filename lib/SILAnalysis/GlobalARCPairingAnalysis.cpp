@@ -23,6 +23,7 @@
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -56,14 +57,17 @@ struct ARCMatchingSetBuilder {
   ARCMatchingSet MatchSet;
   bool PtrIsGuaranteedArg;
 
+  RCIdentityAnalysis *RCIA;
+
 public:
-  ARCMatchingSetBuilder(TDMapTy &TDMap, BUMapTy &BUMap)
+  ARCMatchingSetBuilder(TDMapTy &TDMap, BUMapTy &BUMap,
+                        RCIdentityAnalysis *RCIA)
     : TDMap(TDMap), BUMap(BUMap), MatchedPair(false),
-      PtrIsGuaranteedArg(false) {}
+      PtrIsGuaranteedArg(false), RCIA(RCIA) {}
 
   void init(SILInstruction *Inst) {
     clear();
-    MatchSet.Ptr = Inst->getOperand(0).stripRCIdentityPreservingOps();
+    MatchSet.Ptr = RCIA->getRCIdentityRoot(Inst->getOperand(0));
 
     // If we have a function argument that is guaranteed, set the guaranteed
     // flag so we know that it is always known safe.
@@ -356,11 +360,14 @@ struct ARCMatchingSetComputationContext {
   BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
   BlotMapVector<SILInstruction *, BottomUpRefCountState> IncToDecStateMap;
   ARCSequenceDataflowEvaluator Evaluator;
+  RCIdentityAnalysis *RCIA;
 
   ARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
-                                   PostOrderAnalysis *POTA)
+                                   PostOrderAnalysis *POTA,
+                                   RCIdentityAnalysis *RCIA)
     : DecToIncStateMap(), IncToDecStateMap(),
-      Evaluator(F, AA, POTA, DecToIncStateMap, IncToDecStateMap) {}
+      Evaluator(F, AA, POTA, RCIA, DecToIncStateMap, IncToDecStateMap),
+      RCIA(RCIA) {}
 };
 
 } // end namespace arc
@@ -369,7 +376,8 @@ struct ARCMatchingSetComputationContext {
 ARCMatchingSetComputationContext *
 swift::arc::
 createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
-                                       PostOrderAnalysis *POTA) {
+                                       PostOrderAnalysis *POTA,
+                                       RCIdentityAnalysis *RCIA) {
   unsigned Size = F.size();
 
   // We do not handle CFGs with more than INT_MAX BBs. Fail gracefully.
@@ -378,7 +386,7 @@ createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
 
   // We pass in size to avoid expensively recomputing size over and over
   // again. Currently F has to do a walk to perform that computation.
-  auto *C = new ARCMatchingSetComputationContext(F, AA, POTA);
+  auto *C = new ARCMatchingSetComputationContext(F, AA, POTA, RCIA);
   C->Evaluator.init();
   return C;
 }
@@ -415,7 +423,8 @@ computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
 
     DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
     ARCMatchingSetBuilder Builder(Ctx->DecToIncStateMap,
-                                  Ctx->IncToDecStateMap);
+                                  Ctx->IncToDecStateMap,
+                                  Ctx->RCIA);
     Builder.init(Increment);
     if (Builder.matchUpIncDecSetsForPtr()) {
       ARCMatchingSet &M = Builder.getResult();

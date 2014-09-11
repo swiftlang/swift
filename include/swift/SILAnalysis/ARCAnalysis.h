@@ -25,6 +25,7 @@ class SILValue;
 class SILInstruction;
 class AliasAnalysis;
 class PostOrderAnalysis;
+class RCIdentityAnalysis;
 class SILFunction;
 
 } // end namespace swift
@@ -88,7 +89,8 @@ struct ARCMatchingSetComputationContext;
 /// using AliasAnalysis AA.
 ARCMatchingSetComputationContext *
 createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
-                                       PostOrderAnalysis *POTA);
+                                       PostOrderAnalysis *POTA,
+                                       RCIdentityAnalysis *RCIA);
 
 /// Destroy the context.
 void

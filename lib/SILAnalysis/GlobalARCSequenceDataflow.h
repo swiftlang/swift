@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "ReferenceCountState.h"
+#include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/PreallocatedMap.h"
-#include "swift/SILAnalysis/PostOrderAnalysis.h"
 
 namespace swift {
 
@@ -165,6 +165,11 @@ class ARCSequenceDataflowEvaluator {
   /// post orders.
   PostOrderAnalysis *POTA;
 
+  /// An analysis which computes the identity root of a SILValue(), i.e. the
+  /// dominating origin SILValue of the reference count that by retaining or
+  /// releasing this value one is affecting.
+  RCIdentityAnalysis *RCIA;
+
   /// The map from dataflow terminating decrements -> increment dataflow state.
   BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap;
 
@@ -194,10 +199,11 @@ class ARCSequenceDataflowEvaluator {
 public:
   ARCSequenceDataflowEvaluator(
       SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
+      RCIdentityAnalysis *RCIA,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
-      : F(F), AA(AA), POTA(POTA), DecToIncStateMap(DecToIncStateMap),
-        IncToDecStateMap(IncToDecStateMap),
+      : F(F), AA(AA), POTA(POTA), RCIA(RCIA),
+        DecToIncStateMap(DecToIncStateMap), IncToDecStateMap(IncToDecStateMap),
 #ifndef NDEBUG
         BBToBBID(),
 #endif

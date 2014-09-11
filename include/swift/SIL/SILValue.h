@@ -202,12 +202,6 @@ public:
   // current SILValue.
   SILValue stripCasts();
 
-  // Return the underlying SILValue after stripping off all casts and typed geps
-  // that yield ref count equivalent values.
-  //
-  // TODO: This needs a better name.
-  SILValue stripRCIdentityPreservingOps();
-
   // Return the underlying SILValue after stripping off all casts and
   // address projection instructions.
   //

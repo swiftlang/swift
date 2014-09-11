@@ -16,6 +16,10 @@
 
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
 /// Returns true if V is an enum without a payload.
 ///
 /// We perform this computation by checking if V is an enum instruction without
@@ -28,6 +32,144 @@ static bool isNoPayloadEnum(SILValue V) {
 
   return !EI->hasOperand();
 }
+
+static bool isRCIdentityPreservingCast(ValueKind Kind) {
+  switch (Kind) {
+  case ValueKind::UpcastInst:
+  case ValueKind::AddressToPointerInst:
+  case ValueKind::PointerToAddressInst:
+  case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedAddrCastInst:
+  case ValueKind::RefToRawPointerInst:
+  case ValueKind::RawPointerToRefInst:
+  case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UncheckedRefBitCastInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                           Old Code To Be Removed
+//===----------------------------------------------------------------------===//
+
+/// Return the underlying SILValue after stripping off identity SILArguments if
+/// we belong to a BB with one predecessor.
+static SILValue stripSinglePredecessorArgs(SILValue V) {
+  while (true) {
+    auto *A = dyn_cast<SILArgument>(V);
+    if (!A)
+      return V;
+
+    SILBasicBlock *BB = A->getParent();
+
+    // First try and grab the single predecessor of our parent BB. If we don't
+    // have one, bail.
+    SILBasicBlock *Pred = BB->getSinglePredecessor();
+    if (!Pred)
+      return V;
+
+    // Then grab the terminator of Pred...
+    TermInst *PredTI = Pred->getTerminator();
+
+    // And attempt to find our matching argument.
+    if (auto *BI = dyn_cast<BranchInst>(PredTI)) {
+      V = BI->getArg(A->getIndex());
+      continue;
+    }
+
+    if (auto *CBI = dyn_cast<CondBranchInst>(PredTI)) {
+      if (SILValue Arg = CBI->getArgForDestBB(BB, A)) {
+        V = Arg;
+        continue;
+      }
+    }
+
+    return V;
+  }
+}
+
+/// Return the underlying SILValue after stripping off SILArguments that can not
+/// affect RC identity if our BB has only one predecessor.
+static SILValue stripSinglePredecessorRCIdentityPreservingArgs(SILValue V) {
+  while (true) {
+    // First strip off non PHI args that
+    V = stripSinglePredecessorArgs(V);
+
+    auto *A = dyn_cast<SILArgument>(V);
+    if (!A)
+      return V;
+
+    SILBasicBlock *BB = A->getParent();
+
+    // First try and grab the single predecessor of our parent BB. If we don't
+    // have one, bail.
+    SILBasicBlock *Pred = BB->getSinglePredecessor();
+    if (!Pred)
+      return V;
+
+    // Then grab the terminator of Pred...
+    TermInst *PredTI = Pred->getTerminator();
+
+    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(PredTI)) {
+      V = CCBI->getOperand();
+      continue;
+    }
+
+    if (auto *SWEI = dyn_cast<SwitchEnumInst>(PredTI)) {
+      V = SWEI->getOperand();
+      continue;
+    }
+
+    return V;
+  }
+}
+
+static SILValue oldStripRCIdentityPreservingOps(SILValue V) {
+  while (true) {
+    V = stripSinglePredecessorRCIdentityPreservingArgs(V);
+
+    // Strip off RC identity preserving casts.
+    if (isRCIdentityPreservingCast(V->getKind())) {
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    }
+
+    // Then if we have a struct_extract that is extracting a non-trivial member
+    // from a struct with no other non-trivial members, a ref count operation on
+    // the struct is equivalent to a ref count operation on the extracted
+    // member. Strip off the extract.
+    if (auto *SEI = dyn_cast<StructExtractInst>(V)) {
+      if (SEI->isFieldOnlyNonTrivialField()) {
+        V = SEI->getOperand();
+        continue;
+      }
+    }
+
+    // If we have an unchecked_enum_data, strip off the unchecked_enum_data.
+    if (auto *UEDI = dyn_cast<UncheckedEnumDataInst>(V)) {
+      V = UEDI->getOperand();
+      continue;
+    }
+
+    // If we have an enum instruction with a payload, strip off the enum to
+    // expose the enum's payload.
+    if (auto *EI = dyn_cast<EnumInst>(V)) {
+      if (EI->hasOperand()) {
+        V = EI->getOperand();
+        continue;
+      }
+    }
+
+    return V;
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                                  Analysis
+//===----------------------------------------------------------------------===//
+
 
 /// Return the underlying SILValue after stripping off SILArguments that can not
 /// affect RC identity if our BB has only one predecessor.
@@ -108,23 +250,6 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
 
   // Ok all our values match! Return FirstIV.
   return FirstIV;
-}
-
-static bool isRCIdentityPreservingCast(ValueKind Kind) {
-  switch (Kind) {
-  case ValueKind::UpcastInst:
-  case ValueKind::AddressToPointerInst:
-  case ValueKind::PointerToAddressInst:
-  case ValueKind::UncheckedRefCastInst:
-  case ValueKind::UncheckedAddrCastInst:
-  case ValueKind::RefToRawPointerInst:
-  case ValueKind::RawPointerToRefInst:
-  case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::UncheckedRefBitCastInst:
-    return true;
-  default:
-    return false;
-  }
 }
 
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
@@ -213,7 +338,7 @@ SILValue RCIdentityAnalysis::getRCIdentityRoot(SILValue V) {
   // If the analysis is not enabled, just call the old SILValue method. We don't
   // want this risk for OzU.
   if (!EnableRCIdentityAnalysis)
-    return V.stripRCIdentityPreservingOps();
+    return oldStripRCIdentityPreservingOps(V);
 
   SILValue Root = getRCIdentityRootInner(V, 0);
   VisitedArgs.clear();

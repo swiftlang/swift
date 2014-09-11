@@ -17,9 +17,10 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
-#include "swift/SILAnalysis/ARCAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -144,7 +145,8 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
 //===----------------------------------------------------------------------===//
 
 static bool processFunction(SILFunction &F, AliasAnalysis *AA,
-                            PostOrderAnalysis *POTA) {
+                            PostOrderAnalysis *POTA,
+                            RCIdentityAnalysis *RCIA) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
@@ -160,7 +162,7 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA,
   // Construct our context once. A context contains the RPOT as well as maps
   // that contain state for each BB in F. This is a major place where the
   // optimizer allocates memory in one large chunk.
-  auto *Ctx =  createARCMatchingSetComputationContext(F, AA, POTA);
+  auto *Ctx =  createARCMatchingSetComputationContext(F, AA, POTA, RCIA);
 
   // If Ctx is null, we failed to initialize and can not do anything so just
   // return false.
@@ -222,7 +224,8 @@ class GlobalARCOpts : public SILFunctionTransform {
 
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
-    if (processFunction(*getFunction(), AA, POTA))
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    if (processFunction(*getFunction(), AA, POTA, RCIA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 

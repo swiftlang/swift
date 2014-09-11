@@ -22,6 +22,7 @@
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Hashing.h"
@@ -728,7 +729,8 @@ public:
   bool visitReleaseValueInst(ReleaseValueInst *RVI);
   bool process();
   bool hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA);
-  bool sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA);
+  bool sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
+                                        RCIdentityAnalysis *RCIA);
   void handlePredSwitchEnum(SwitchEnumInst *S);
   void handlePredCondEnumIsTag(CondBranchInst *CondBr);
 
@@ -1170,19 +1172,20 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
 
 static SILInstruction *
 findLastSinkableMatchingEnumValueRCIncrementInPred(AliasAnalysis *AA,
+                                                   RCIdentityAnalysis *RCIA,
                                                    SILValue EnumValue,
                                                    SILBasicBlock *BB) {
     // Otherwise, see if we can find a retain_value or strong_retain associated
     // with that enum in the relevant predecessor.
     auto FirstInc = std::find_if(BB->rbegin(), BB->rend(),
-      [&EnumValue](const SILInstruction &I) -> bool {
+      [&RCIA, &EnumValue](const SILInstruction &I) -> bool {
       // If I is not an increment, ignore it.
       if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
         return false;
 
       // Otherwise, if the increments operand stripped of RC identity preserving
       // ops matches EnumValue, it is the first increment we are interested in.
-      return EnumValue == I.getOperand(0).stripRCIdentityPreservingOps();
+      return EnumValue == RCIA->getRCIdentityRoot(I.getOperand(0));
     });
 
     // If we do not find a ref count increment in the relevant BB, skip this
@@ -1203,7 +1206,7 @@ findLastSinkableMatchingEnumValueRCIncrementInPred(AliasAnalysis *AA,
 
 static bool
 findRetainsSinkableFromSwitchRegionForEnum(
-  AliasAnalysis *AA, SILValue EnumValue,
+  AliasAnalysis *AA, RCIdentityAnalysis *RCIA, SILValue EnumValue,
   EnumBBCaseList &Map, SmallVectorImpl<SILInstruction *> &DeleteList) {
 
   // For each predecessor with argument type...
@@ -1221,6 +1224,7 @@ findRetainsSinkableFromSwitchRegionForEnum(
     // are no ref count decrements in between the increment and the terminator
     // of the BB, then we can sink the retain out of the switch enum.
     auto *Inc = findLastSinkableMatchingEnumValueRCIncrementInPred(AA,
+                                                                   RCIA,
                                                                    EnumValue,
                                                                    PredBB);
     // If we do not find such an increment, there is nothing we can do, bail.
@@ -1236,7 +1240,8 @@ findRetainsSinkableFromSwitchRegionForEnum(
 }
 
 bool
-BBEnumTagDataflowState::sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA) {
+BBEnumTagDataflowState::
+sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA, RCIdentityAnalysis *RCIA) {
   bool Changed = false;
   unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
   llvm::SmallVector<SILInstruction *, 4> DeleteList;
@@ -1250,7 +1255,7 @@ BBEnumTagDataflowState::sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA) {
     // this value... Skip it.
     if (!P.first)
       continue;
-    SILValue EnumValue = P.first.stripRCIdentityPreservingOps();
+    SILValue EnumValue = RCIA->getRCIdentityRoot(P.first);
     EnumBBCaseList &Map = P.second;
 
     // If we do not have a tag associated with this enum value for each
@@ -1263,7 +1268,7 @@ BBEnumTagDataflowState::sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA) {
     // enum value for every payloaded case that *could* be sunk. If we miss an
     // increment from any of the payloaded case there is nothing we can do here,
     // so skip this enum value.
-    if (!findRetainsSinkableFromSwitchRegionForEnum(AA, EnumValue, Map,
+    if (!findRetainsSinkableFromSwitchRegionForEnum(AA, RCIA, EnumValue, Map,
                                                     DeleteList))
       continue;
 
@@ -1293,7 +1298,8 @@ BBEnumTagDataflowState::sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA) {
 //===----------------------------------------------------------------------===//
 
 static bool processFunction(SILFunction *F, AliasAnalysis *AA,
-                            PostOrderAnalysis *POTA) {
+                            PostOrderAnalysis *POTA,
+                            RCIdentityAnalysis *RCIA) {
 
   bool Changed = false;
 
@@ -1323,7 +1329,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     DEBUG(llvm::dbgs() << "    Attempting to move releases into "
           "predecessors!\n");
     Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
-    Changed |= State.sinkIncrementsOutOfSwitchRegions(AA);
+    Changed |= State.sinkIncrementsOutOfSwitchRegions(AA, RCIA);
 
 
     // Then attempt to sink code from predecessors. This can include retains
@@ -1353,11 +1359,12 @@ class SILCodeMotion : public SILFunctionTransform {
     auto *F = getFunction();
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>();
 
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F->getName() <<
           " *****\n");
 
-    if (processFunction(F, AA, POTA))
+    if (processFunction(F, AA, POTA, RCIA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 

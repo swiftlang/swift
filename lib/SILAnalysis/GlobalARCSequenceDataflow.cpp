@@ -13,6 +13,8 @@
 #define DEBUG_TYPE "sil-global-arc-opts"
 #include "GlobalARCSequenceDataflow.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
+#include "swift/SILAnalysis/PostOrderAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILSuccessor.h"
@@ -364,7 +366,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
 static bool processBBTopDown(
     ARCBBState &BBState,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-    AliasAnalysis *AA) {
+    AliasAnalysis *AA, RCIdentityAnalysis *RCIA) {
   DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
 
   SILBasicBlock &BB = BBState.getBB();
@@ -409,7 +411,7 @@ static bool processBBTopDown(
     if (isRefCountIncrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
-      Op = I.getOperand(0).stripRCIdentityPreservingOps();
+      Op = RCIA->getRCIdentityRoot(I.getOperand(0));
       TopDownRefCountState &State = BBState.getTopDownRefCountState(Op);
       NestingDetected |= State.initWithInst(&I);
 
@@ -423,7 +425,7 @@ static bool processBBTopDown(
     // If we have a reference count decrement...
     if (isRefCountDecrement(I)) {
       // Look up the state associated with its operand...
-      Op = I.getOperand(0).stripRCIdentityPreservingOps();
+      Op = RCIA->getRCIdentityRoot(I.getOperand(0));
       TopDownRefCountState &RefCountState = BBState.getTopDownRefCountState(Op);
 
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
@@ -551,7 +553,7 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
     mergePredecessors(BBState, BB);
 
     // Then perform the basic block optimization.
-    NestingDetected |= processBBTopDown(BBState, DecToIncStateMap, AA);
+    NestingDetected |= processBBTopDown(BBState, DecToIncStateMap, AA, RCIA);
   }
 
   return NestingDetected;
@@ -570,7 +572,7 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
 static bool processBBBottomUp(
     ARCBBState &BBState,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
-    AliasAnalysis *AA) {
+    AliasAnalysis *AA, RCIdentityAnalysis *RCIA) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
   SILBasicBlock &BB = BBState.getBB();
 
@@ -594,7 +596,7 @@ static bool processBBBottomUp(
     if (isRefCountDecrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
-      Op = I.getOperand(0).stripRCIdentityPreservingOps();
+      Op = RCIA->getRCIdentityRoot(I.getOperand(0));
       BottomUpRefCountState &State = BBState.getBottomUpRefCountState(Op);
       NestingDetected |= State.initWithInst(&I);
 
@@ -608,7 +610,7 @@ static bool processBBBottomUp(
     // If we have a reference count decrement...
     if (isRefCountIncrement(I)) {
       // Look up the state associated with its operand...
-      Op = I.getOperand(0).stripRCIdentityPreservingOps();
+      Op = RCIA->getRCIdentityRoot(I.getOperand(0));
       BottomUpRefCountState &RefCountState =
           BBState.getBottomUpRefCountState(Op);
 
@@ -741,7 +743,7 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
     mergeSuccessors(BBState, BB);
 
     // Then perform the basic block optimization.
-    NestingDetected |= processBBBottomUp(BBState, IncToDecStateMap, AA);
+    NestingDetected |= processBBBottomUp(BBState, IncToDecStateMap, AA, RCIA);
   }
 
   return NestingDetected;
