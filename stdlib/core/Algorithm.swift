@@ -207,7 +207,7 @@ public struct EnumerateGenerator<
   var base: Base
   var count: Int
 
-  init(_ base: Base) {
+  public init(_ base: Base) {
     self.base = base
     count = 0
   }
@@ -225,14 +225,26 @@ public struct EnumerateGenerator<
   }
 }
 
-public func enumerate<Seq : SequenceType>(
-  seq: Seq
-) -> EnumerateGenerator<Seq.Generator> {
-  return EnumerateGenerator(seq.generate())
+public struct EnumerateSequence<
+  Base: SequenceType
+> : SequenceType {
+  var base: Base
+
+  public init(_ base: Base) {
+    self.base = base
+  }
+
+  public func generate() -> EnumerateGenerator<Base.Generator> {
+    return EnumerateGenerator(base.generate())
+  }
 }
 
+public func enumerate<Seq : SequenceType>(
+  seq: Seq
+) -> EnumerateSequence<Seq> {
+  return EnumerateSequence(seq)
+}
 
-/// Return true iff `a1` and `a2` contain the same elements.
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
