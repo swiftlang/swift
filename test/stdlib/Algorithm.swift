@@ -123,15 +123,10 @@ Algorithm.test("equal/predicate") {
 
 Algorithm.test("contains") {
   let _0_4 = [0, 1, 2, 3]
-  expectFalse(contains(_0_4, element: 7))
-  expectTrue(contains(_0_4, element: 2))
-}
-
-Algorithm.test("any, all") {
-  expectFalse(any(0..<4) { $0 - 10 > 0  })
-  expectTrue(any(0..<4) { $0 % 3 == 0 })
-  expectTrue(all(0..<4) { $0 - 10 < 0  })
-  expectFalse(all(0..<4) { $0 % 3 == 0 })
+  expectFalse(contains(_0_4, 7))
+  expectTrue(contains(_0_4, 2))
+  expectFalse(contains(_0_4, { $0 - 10 > 0  }))
+  expectTrue(contains(_0_4, { $0 % 3 == 0 }))
 }
 
 Algorithm.test("min,max") {

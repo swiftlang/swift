@@ -348,15 +348,7 @@ public func lexicographicalCompare<
 }
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.
-@availability(*, unavailable, renamed="any")
 public func contains<
-  S: SequenceType, L: BooleanType
->(seq: S, predicate: (S.Generator.Element)->L) -> Bool {
-  return any(seq, predicate)
-}
-
-/// Return `true` iff an element in `seq` satisfies `predicate`.
-public func any<
   S: SequenceType, L: BooleanType
 >(seq: S, predicate: (S.Generator.Element)->L) -> Bool {
   for a in seq {
@@ -367,18 +359,11 @@ public func any<
   return false
 }
 
-/// Return `true` iff all elements in `seq` satisfy `predicate`.
-public func all<
-  S: SequenceType, L: BooleanType
->(seq: S, predicate: (S.Generator.Element)->L) -> Bool {
-  return !any(seq) { !predicate($0) }
-}
-
 /// Return `true` iff `x` is in `seq`.
 public func contains<
   S: SequenceType where S.Generator.Element: Equatable
->(seq: S, element x: S.Generator.Element) -> Bool {
-  return any(seq, { $0 == x })
+>(seq: S, x: S.Generator.Element) -> Bool {
+  return contains(seq, { $0 == x })
 }
 
 /// Return the result of repeatedly calling `combine` with an
