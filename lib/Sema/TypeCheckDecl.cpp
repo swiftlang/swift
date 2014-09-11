@@ -3024,7 +3024,6 @@ public:
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
     if (VD->hasStorage()) {
-
       // In a protocol context, variables written as "var x : Int" are errors
       // and recovered by building a computed property with just a getter.
       // Diagnose this and create the getter decl now.
@@ -3048,6 +3047,12 @@ public:
         VD->setInvalid();
         VD->overwriteType(ErrorType::get(TC.Context));
       }
+
+      // If this is a 'let' property in a class, mark it implicitly final, since
+      // it cannot be overridden.
+      if (VD->isLet() && !VD->isFinal() &&
+          VD->getDeclContext()->isClassOrClassExtensionContext())
+        VD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
 
 

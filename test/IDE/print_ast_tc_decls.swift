@@ -680,21 +680,21 @@ class d0250_ExplodePattern {
   let instanceLet1 = 0
   let instanceLet2 = 0.0
   let instanceLet3 = ""
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet1: Int{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet2: Double{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet3: String{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet1: Int{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet2: Double{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet3: String{{$}}
 
   let instanceLet4 = FooStruct()
   let (instanceLet5, instanceLet6) = (FooStruct(), FooStruct())
   let (instanceLet7, instanceLet8: FooStruct) = (FooStruct(), FooStruct())
   let (instanceLet9, instanceLet10: FooStruct) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet4: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet5: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet6: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet7: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet8: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet9: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet10: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet4: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet5: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet6: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet7: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet8: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet9: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet10: FooStruct{{$}}
 }
 
 class d0260_ExplodePattern_TestClassBase {

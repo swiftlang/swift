@@ -840,3 +840,19 @@ func genericPropsInGenericContext<U>(x: GenericClass<U>) {
   let _ = x.z
 }
 
+
+// <rdar://problem/18275556> 'let' properties in a class should be implicitly final
+class ClassWithLetProperty {
+  let p = 42
+  func ReturnConstant() -> Int { return p }
+}
+// CHECK-LABEL: sil @_TFC10properties20ClassWithLetProperty14ReturnConstantfS0_FT_Si
+// CHECK-NEXT:  bb0(%0 : $ClassWithLetProperty):
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr %0 : $ClassWithLetProperty, #ClassWithLetProperty.p
+// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [[PTR]] : $*Int
+// CHECK-NEXT:    strong_release %0 : $ClassWithLetProperty
+// CHECK-NEXT:   return [[VAL]] : $Int
+
+
+
