@@ -844,8 +844,10 @@ func genericPropsInGenericContext<U>(x: GenericClass<U>) {
 // <rdar://problem/18275556> 'let' properties in a class should be implicitly final
 class ClassWithLetProperty {
   let p = 42
+  dynamic let q = 97
+
+  // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }
-}
 // CHECK-LABEL: sil @_TFC10properties20ClassWithLetProperty14ReturnConstantfS0_FT_Si
 // CHECK-NEXT:  bb0(%0 : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
@@ -855,4 +857,8 @@ class ClassWithLetProperty {
 // CHECK-NEXT:   return [[VAL]] : $Int
 
 
-
+  // This property is marked dynamic, so go through the getter, always.
+  func ReturnDynamicConstant() -> Int { return q }
+// CHECK-LABEL: sil @_TFC10properties20ClassWithLetProperty21ReturnDynamicConstantfS0_FT_Si
+// CHECK: class_method [volatile] %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
+}

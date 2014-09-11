@@ -3050,7 +3050,7 @@ public:
 
       // If this is a 'let' property in a class, mark it implicitly final, since
       // it cannot be overridden.
-      if (VD->isLet() && !VD->isFinal() &&
+      if (VD->isLet() && !VD->isFinal() && !VD->isDynamic() &&
           VD->getDeclContext()->isClassOrClassExtensionContext())
         VD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
