@@ -54,6 +54,11 @@ public protocol RaceTestWithPerTrialDataType {
   /// between threads correctly.)
   typealias RaceData //: AnyObject FIXME
 
+  /// Type of thread-local data.
+  ///
+  /// Thread-local data is newly created for every trial.
+  typealias ThreadLocalData
+
   /// Results of the observation made after performing an operation.
   typealias Observation
 
@@ -62,8 +67,12 @@ public protocol RaceTestWithPerTrialDataType {
   /// Creates a fresh instance of `RaceData`.
   func makeRaceData() -> RaceData
 
+  /// Creates a fresh instance of `ThreadLocalData`.
+  func makeThreadLocalData() -> ThreadLocalData
+
   /// Performs the operation under test and makes an observation.
-  func thread1(raceData: RaceData) -> Observation
+  func thread1(
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData) -> Observation
 
   /// Evaluates the observations made by all threads for a particular instance
   /// of `RaceData`.
@@ -135,6 +144,33 @@ public struct Observation1UWord : Equatable, Printable {
 
 public func == (lhs: Observation1UWord, rhs: Observation1UWord) -> Bool {
   return lhs.uw1 == rhs.uw1
+}
+
+/// An observation result that consists of four `UWord`\ s.
+public struct Observation4UWord : Equatable, Printable {
+  public var uw1: UWord
+  public var uw2: UWord
+  public var uw3: UWord
+  public var uw4: UWord
+
+  public init(_ uw1: UWord, _ uw2: UWord, _ uw3: UWord, _ uw4: UWord) {
+    self.uw1 = uw1
+    self.uw2 = uw2
+    self.uw3 = uw3
+    self.uw4 = uw4
+  }
+
+  public var description: String {
+    return "(\(uw1), \(uw2), \(uw3), \(uw4))"
+  }
+}
+
+public func == (lhs: Observation4UWord, rhs: Observation4UWord) -> Bool {
+  return
+    lhs.uw1 == rhs.uw1 &&
+    lhs.uw2 == rhs.uw2 &&
+    lhs.uw3 == rhs.uw3 &&
+    lhs.uw4 == rhs.uw4
 }
 
 /// An observation result that consists of four `Word`\ s.
@@ -296,6 +332,8 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
     let shuffle = sharedState.workerStates[i].raceDataShuffle
     sharedState.workerStates[i].raceData =
       _stdlib_gather(sharedState.workerStates[i].raceData, shuffle)
+    sharedState.workerStates[i].observations =
+      _stdlib_gather(sharedState.workerStates[i].observations, shuffle)
   }
   if true {
     // FIXME: why doesn't the bracket syntax work?
@@ -322,6 +360,7 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
   let racingThreadCount = sharedState.racingThreadCount
   let workerState = sharedState.workerStates[tid]
   let rt = RT()
+  var threadLocalData = rt.makeThreadLocalData()
   if true {
     let trialSpinBarrier = sharedState.trialSpinBarrier
     trialSpinBarrier.fetchAndAdd(1)
@@ -330,8 +369,8 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
   // Perform racy operations.
   // Warning: do not add any synchronization in this loop, including
   // any implicit reference counting of shared data.
-  for rd in workerState.raceData {
-    workerState.observations.append(rt.thread1(rd))
+  for raceData in workerState.raceData {
+    workerState.observations.append(rt.thread1(raceData, &threadLocalData))
   }
   sharedState.trialBarrier.wait()
 }
@@ -341,7 +380,7 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   #trials: Int,
   threads: Int? = nil
 ) {
-  let racingThreadCount = threads ?? _stdlib_getHardwareConcurrency()
+  let racingThreadCount = threads ?? max(2, _stdlib_getHardwareConcurrency())
   let sharedState = _RaceTestSharedState<RT>(racingThreadCount: racingThreadCount)
 
   let masterThreadBody: (_: ())->() = {

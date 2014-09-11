@@ -13,13 +13,20 @@ struct RaceTest1 : RaceTestWithPerTrialDataType {
     init() {}
   }
 
+  typealias ThreadLocalData = Void
   typealias Observation = Observation1UWord
 
   func makeRaceData() -> RaceData {
     return RaceData()
   }
 
-  func thread1(raceData: RaceData) -> Observation {
+  func makeThreadLocalData() -> Void {
+    return Void()
+  }
+
+  func thread1(
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+  ) -> Observation {
     switch RaceTest1.iterationCountdown.fetchAndAdd(-1) {
     case 0:
       return Observation(0x1)

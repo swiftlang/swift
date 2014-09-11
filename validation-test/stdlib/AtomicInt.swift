@@ -22,13 +22,20 @@ class AtomicInt4RaceData {
 
 struct AtomicIntRaceTest : RaceTestWithPerTrialDataType {
   typealias RaceData = AtomicInt4RaceData
+  typealias ThreadLocalData = Void
   typealias Observation = Observation4Word
 
   func makeRaceData() -> RaceData {
     return RaceData(0, 0, 0)
   }
 
-  func thread1(raceData: RaceData) -> Observation {
+  func makeThreadLocalData() -> Void {
+    return Void()
+  }
+
+  func thread1(
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+  ) -> Observation {
     if raceData.writerStarted.fetchAndAdd(1) == 0 {
       // Writer.
       consumeCPU(units: 256)
@@ -60,9 +67,126 @@ struct AtomicIntRaceTest : RaceTestWithPerTrialDataType {
         sink.put(.PassInteresting(toString(observation)))
 
       default:
-        sink.put(.Failure)
+        sink.put(.FailureInteresting(toString(observation)))
       }
     }
+  }
+}
+
+class HeapBool {
+  var value: Bool
+  init(_ value: Bool) {
+    self.value = value
+  }
+}
+
+var dummyObjectCount = _stdlib_ShardedAtomicCounter()
+
+struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
+  class DummyObject {
+    var payload: UWord = 0x12345678
+    var randomInt: Int
+    var destroyedFlag: HeapBool
+    init(destroyedFlag: HeapBool, randomInt: Int) {
+      self.destroyedFlag = destroyedFlag
+      self.randomInt = randomInt
+      dummyObjectCount.add(1, randomInt: self.randomInt)
+    }
+    deinit {
+      self.destroyedFlag.value = true
+      dummyObjectCount.add(-1, randomInt: self.randomInt)
+    }
+  }
+
+  class RaceData {
+    var _atomicReference: AnyObject? = nil
+
+    var atomicReferencePtr: UnsafeMutablePointer<AnyObject?> {
+      return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+    }
+
+    init() {}
+  }
+
+  typealias ThreadLocalData = _stdlib_ShardedAtomicCounter.PRNG
+  typealias Observation = Observation4UWord
+
+  func makeRaceData() -> RaceData {
+    return RaceData()
+  }
+
+  func makeThreadLocalData() -> ThreadLocalData {
+    return ThreadLocalData()
+  }
+
+  func thread1(
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+  ) -> Observation {
+    var observation = Observation4UWord(0, 0, 0, 0)
+    var initializerDestroyed = HeapBool(false)
+    if true {
+      let initializer = DummyObject(
+        destroyedFlag: initializerDestroyed,
+        randomInt: threadLocalData.randomInt())
+      let wonRace = _stdlib_atomicInitializeARCRef(
+        object: raceData.atomicReferencePtr, desired: initializer)
+      observation.uw1 = wonRace ? 1 : 0
+      if let ref: AnyObject =
+        _stdlib_atomicLoadARCRef(object: raceData.atomicReferencePtr) {
+        let dummy = ref as DummyObject
+        observation.uw2 = unsafeBitCast(ref, UWord.self)
+        observation.uw3 = dummy.payload
+      }
+    }
+    observation.uw4 = initializerDestroyed.value ? 1 : 0
+    return observation
+  }
+
+  func evaluateObservations<
+    S : SinkType where S.Element == RaceTestObservationEvaluation
+  >(observations: [Observation], inout _ sink: S) {
+    let ref = observations[0].uw2
+    if any(observations, { $0.uw2 != ref }) {
+      for observation in observations {
+        sink.put(.FailureInteresting("mismatched reference, expected \(ref): \(observation)"))
+      }
+      return
+    }
+    if any(observations, { $0.uw3 != 0x12345678 }) {
+      for observation in observations {
+        sink.put(.FailureInteresting("wrong data: \(observation)"))
+      }
+      return
+    }
+
+    var wonRace = 0
+    var lostRace = 0
+    for observation in observations {
+      switch (observation.uw1, observation.uw4) {
+      case (1, 0):
+        // Won race, value not destroyed.
+        ++wonRace
+      case (0, 1):
+        // Lost race, value destroyed.
+        ++lostRace
+      default:
+        sink.put(.FailureInteresting(toString(observation)))
+      }
+    }
+    if wonRace != 1 {
+      for observation in observations {
+        sink.put(.FailureInteresting("zero or more than one thread won race: \(observation)"))
+      }
+      return
+    }
+    if lostRace < 1 {
+      for observation in observations {
+        sink.put(.FailureInteresting("no thread lost race: \(observation)"))
+      }
+      return
+    }
+
+    sink.put(.Pass)
   }
 }
 
@@ -70,6 +194,13 @@ var AtomicIntTestSuite = TestSuite("AtomicInt")
 
 AtomicIntTestSuite.test("fetchAndAdd") {
   runRaceTest(AtomicIntRaceTest.self, trials: 100)
+}
+
+var AtomicARCRefTestSuite = TestSuite("AtomicARCRef")
+
+AtomicARCRefTestSuite.test("initialize,load") {
+  runRaceTest(AtomicInitializeARCRefRaceTest.self, trials: 100)
+  expectEqual(0, dummyObjectCount.getSum())
 }
 
 runAllTests()

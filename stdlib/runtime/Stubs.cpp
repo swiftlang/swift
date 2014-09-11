@@ -245,6 +245,11 @@ extern "C" uint64_t swift_stdlib_atomicLoadUInt64(
   return __c11_atomic_load(object, memory_order_seq_cst);
 }
 
+extern "C" uintptr_t swift_stdlib_atomicLoadPtr(
+    _Atomic(uintptr_t) * object) {
+  return __c11_atomic_load(object, memory_order_seq_cst);
+}
+
 extern "C" uint32_t swift_stdlib_atomicFetchAddUInt32(
     _Atomic(uint32_t) * object, uint32_t operand) {
   return __c11_atomic_fetch_add(object, operand, memory_order_seq_cst);
