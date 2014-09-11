@@ -1,0 +1,261 @@
+//===--- DiscriminatedBridgeObject.swift ----------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  Bridged types are notionally single-word beasts that either store
+//  an objc class or a native Swift class.  We'd like to be able to
+//  distinguish these cases efficiently, which is why we have
+//  <rdar://problem/18125016>.  This prototype contains two emulations
+//  of the type requested in that radar.
+//
+//===----------------------------------------------------------------------===//
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
+// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib -module-cache-path %t/clang-module-cache %t/out.swift -o %t/a.out
+
+import Swift
+
+//===--- Code destined for stdlib -----------------------------------------===//
+import SwiftShims
+
+@asmname("_swift_usesNativeSwiftReferenceCounting_nonNull")
+func _swift_usesNativeSwiftReferenceCounting_nonNull(_: UnsafePointer<Void>) -> Bool
+
+@asmname("_swift_isUniquelyReferencedNative_nonNull")
+func _swift_isUniquelyReferencedNative_nonNull(_: UnsafePointer<Void>) -> Bool
+
+@asmname("_swift_isUniquelyReferenced")
+func _swift_isUniquelyReferenced(_: UnsafeMutablePointer<HeapObject>) -> Bool
+
+protocol BridgeStorage {
+  typealias Native : AnyObject
+  typealias Cocoa : AnyObject
+
+  init(_ native: Native, bits: Int)
+  init(Cocoa)
+
+  mutating func isUniquelyReferenced() -> Bool
+  var native: Native? {get}
+  var cocoa: Cocoa? {get}
+  var spareBits: Int {get}
+}
+
+// on i386, we have 2 spare bits.  Other platforms have more.
+enum DiscriminatedBridgeStorage<
+  NativeType: AnyObject, CocoaType: AnyObject
+> : BridgeStorage {
+  typealias Native = NativeType
+  typealias Cocoa = CocoaType
+  
+case Native0(Native)
+case Native1(Native)
+case Native2(Native)
+case Cocoa0(CocoaType)
+
+  init(_ native: Native, bits: Int) {
+    switch bits {
+    case 0: self = .Native0(native)
+    case 1: self = .Native1(native)
+    case 2: self = .Native2(native)
+    default:
+      _sanityCheckFailure(
+        "BridgeStorage can't store bits outside the range 0-2")
+    }
+  }
+  
+  init(_ cocoa: Cocoa) {
+    self = .Cocoa0(cocoa)
+  }
+  
+  var native: Native? {
+    switch self {
+    case Native0(let x):
+      return x
+    case Native1(let x):
+      return x
+    case Native2(let x):
+      return x
+    default:
+      return nil
+    }
+  }
+  
+  var cocoa: Cocoa? {
+    switch self {
+    case Cocoa0(let x):
+      return x
+    default:
+      return nil
+    }
+  }
+  
+  var spareBits: Int {
+    switch self {
+    case Native1:
+      return 1
+    case Native2:
+      return 2
+    default:
+      return 0
+    }
+  }
+  
+  mutating func isUniquelyReferenced() -> Bool {
+    if let n = native.map({ Builtin.bridgeToRawPointer($0) }) {
+      return _swift_isUniquelyReferenced(UnsafeMutablePointer(n))
+    }
+    return false
+  }
+}
+
+struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject> : BridgeStorage {
+  
+  typealias Native = NativeType
+  typealias Cocoa = CocoaType
+
+  init(_ native: Native, bits: Int) {
+    _sanityCheck(
+      bits >= 0 && bits < 3,
+      "BridgeObject can't store bits outside the range 0-2")
+    
+    self.object = native
+    self.bits = UInt8(truncatingBitPattern: bits)
+  }
+  
+  init(_ cocoa: Cocoa) {
+    self.object = cocoa
+    self.bits = 0
+  }
+
+  mutating func isUniquelyReferenced() -> Bool {
+    return _swift_isUniquelyReferencedNative_nonNull(address)
+  }
+  
+  var native: Native? {
+    return _swift_usesNativeSwiftReferenceCounting_nonNull(address)
+    ? .Some(Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(object))) : nil
+  }
+    
+  var cocoa: Cocoa? {
+    return _swift_usesNativeSwiftReferenceCounting_nonNull(address)
+    ? nil : .Some(Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(object)))
+  }
+    
+  var spareBits: Int {
+    return Int(bits)
+  }
+  
+  var address: UnsafePointer<Void> {
+    return unsafeAddressOf(object)
+  }
+  
+  let object: AnyObject
+  let bits: UInt8
+}
+
+//===----------------------------------------------------------------------===//
+//===--- Testing code -----------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+import StdlibUnittest
+var allTests = TestSuite("DiscriminatedBridgeObject")
+
+// CHECK: testing...
+println("testing...")
+
+class C {
+  deinit {
+    println("bye C!")
+  }
+}
+import Foundation
+
+func isOSNewerThan(major: Int, minor: Int, patch: Int = 0) -> Bool {
+  let vers = (majorVersion: major, minorVersion: minor, patchVersion: patch)
+  // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
+  let procInfo: AnyObject = NSProcessInfo.processInfo()
+  return procInfo.isOperatingSystemAtLeastVersion?(
+                    NSOperatingSystemVersion(vers)
+                  ) == true
+}
+
+func expectTagged(s: NSString, expected: Bool) -> NSString {
+#if arch(x86_64)
+  let mask: UWord = 0x8000000000000001
+#elseif arch(arm64)
+  let mask: UWord = 0x8000000000000000
+#else
+  let mask: UWord = 0
+#endif
+
+  var taggedStringsSupported: Bool
+#if os(iOS)
+  // NSTaggedPointerString is not yet enabled as of iOS 8.0.
+  taggedStringsSupported = false
+#elseif os(OSX)
+  // NSTaggedPointerString is enabled starting in OS X 10.10.
+  taggedStringsSupported = isOSNewerThan(10,10)  &&  mask != 0
+#endif
+
+  let tagged = unsafeBitCast(s, UWord.self) & mask != 0
+
+  if taggedStringsSupported  &&  expected == tagged {
+    // okay
+  } else if !taggedStringsSupported  &&  !tagged {
+    // okay
+  } else {
+    let un = !tagged ? "un" : ""
+    fatalError("Unexpectedly \(un)tagged pointer for string \"\(s)\"")
+  }
+
+  return s
+}
+
+var taggedNSString : NSString {
+  return expectTagged(NSString(format: "foo"), true)
+}
+
+var unTaggedNSString : NSString {
+  return expectTagged("fûtbōl" as NSString, false)
+}
+
+% for Self in 'DiscriminatedBridgeStorage', 'BridgeObject':
+allTests.test("${Self}") {
+  typealias B = ${Self}<C,NSString>
+  
+  for i in 0..<3 {
+    var b = B(C(), bits: i)
+    expectEmpty(b.cocoa)
+    expectNotEmpty(b.native)
+    expectTrue(b.isUniquelyReferenced())
+    expectEqual(i, b.spareBits)
+  }
+  
+  var b = B(C(), bits: 0)
+  expectTrue(b.isUniquelyReferenced())
+  
+  // Add a reference and verify that it's still native but no longer unique
+  var c = b
+  expectFalse(b.isUniquelyReferenced())
+  _fixLifetime(c) // make sure c is not killed early
+  
+  var d = B(taggedNSString)
+  expectFalse(d.isUniquelyReferenced())
+  expectEmpty(d.native)
+  expectNotEmpty(d.cocoa)
+
+  d = B(unTaggedNSString)
+  expectFalse(d.isUniquelyReferenced())
+  expectEmpty(d.native)
+  expectNotEmpty(d.cocoa)
+}
+% end
+
+runAllTests()
+println("done.") // CHECK- NEXT: done
