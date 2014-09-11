@@ -208,7 +208,9 @@ namespace sil_block {
   using GlobalVarLayout = BCRecordLayout<
     SIL_GLOBALVAR,
     SILLinkageField,
-    TypeIDField
+    TypeIDField,
+    DeclIDField,
+    BCFixed<1>           // Is this a declaration.
   >;
 
   using SILFunctionLayout = BCRecordLayout<

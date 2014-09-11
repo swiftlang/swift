@@ -1577,8 +1577,9 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   (void)kind;
 
   TypeID TyID;
-  unsigned rawLinkage;
-  GlobalVarLayout::readRecord(scratch, rawLinkage, TyID);
+  DeclID dID;
+  unsigned rawLinkage, IsDeclaration;
+  GlobalVarLayout::readRecord(scratch, rawLinkage, TyID, dID, IsDeclaration);
   if (TyID == 0) {
     DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
     return nullptr;
@@ -1594,8 +1595,11 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
                            SILMod, linkage.getValue(),
-                           Name.str(), getSILType(Ty, SILValueCategory::Object));
+                           Name.str(), getSILType(Ty, SILValueCategory::Object),
+                           Nothing,
+                           dID ? cast<VarDecl>(MF->getDecl(dID)): nullptr);
   globalVarOrOffset = v;
+  v->setDeclaration(IsDeclaration);
 
   if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), v);
   return v;

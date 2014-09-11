@@ -1342,10 +1342,11 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   GlobalVarList[Ctx.getIdentifier(g.getName())] = GlobalVarID++;
   GlobalVarOffset.push_back(Out.GetCurrentBitNo());
   TypeID TyID = S.addTypeRef(g.getLoweredType().getSwiftType());
+  DeclID dID = S.addDeclRef(g.getDecl());
   GlobalVarLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[GlobalVarLayout::Code],
                               toStableSILLinkage(g.getLinkage()),
-                              TyID);
+                              TyID, dID, unsigned(!g.isDefinition()));
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {

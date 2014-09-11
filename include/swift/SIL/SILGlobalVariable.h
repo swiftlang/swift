@@ -28,6 +28,7 @@ namespace swift {
 
 class ASTContext;
 class SILModule;
+class VarDecl;
   
 /// A global variable that has been referenced in SIL.
 class SILGlobalVariable
@@ -55,14 +56,21 @@ private:
   /// The linkage of the global variable.
   unsigned Linkage : NumSILLinkageBits;
 
+  /// The VarDecl associated with this SILGlobalVariable. For debugger purpose.
+  VarDecl *VDecl;
+
+  /// Whether or not this is a declaration.
+  bool IsDeclaration;
+
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
                     StringRef mangledName, SILType loweredType,
-                    Optional<SILLocation> loc);
+                    Optional<SILLocation> loc, VarDecl *decl);
   
 public:
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
                                    StringRef MangledName, SILType LoweredType,
-                                   Optional<SILLocation> Loc = Nothing);
+                                   Optional<SILLocation> Loc = Nothing,
+                                   VarDecl *Decl = nullptr);
 
   ~SILGlobalVariable();
 
@@ -75,17 +83,16 @@ public:
     
   StringRef getName() const { return Name; }
   
-  /// True if this is a declaration of a variable defined in another module.
-  bool isExternalDeclaration() const {
-    return isAvailableExternally(getLinkage());
-  }
+  void setDeclaration(bool isD) { IsDeclaration = isD; }
 
   /// True if this is a definition of the variable.
-  bool isDefinition() const { return !isExternalDeclaration(); }
-  
+  bool isDefinition() const { return !IsDeclaration; }
+
   /// Get this function's linkage attribute.
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
+
+  VarDecl *getDecl() const { return VDecl; }
 
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }
