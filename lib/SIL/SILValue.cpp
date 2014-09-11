@@ -41,7 +41,6 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   }
 }
 
-
 /// Return the underlying SILValue after stripping off identity SILArguments if
 /// we belong to a BB with one predecessor.
 static SILValue stripSinglePredecessorArgs(SILValue V) {

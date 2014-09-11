@@ -332,6 +332,7 @@ static void runCommandLineSelectedPasses(SILModule *Module,
   PM.registerAnalysis(createInductionVariableAnalysis(Module));
   PM.registerAnalysis(createPostOrderAnalysis(Module));
   PM.registerAnalysis(createClassHierarchyAnalysis(Module));
+  PM.registerAnalysis(createRCIdentityAnalysis(Module));
 
   for (auto Pass : Passes) {
     switch (Pass) {
