@@ -65,6 +65,10 @@ public:
     return getFunction()->getLoweredFunctionType()->getParameters()[getIndex()];
   }
 
+  /// Returns true if we were able to find incoming values for each predecessor
+  /// of this arguments basic block. The found values are stored in OutArray.
+  bool getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray);
+
 private:
   // A special constructor, only intended for use in SILBasicBlock::replaceBBArg.
   explicit SILArgument(SILType Ty, const ValueDecl *D =nullptr) :

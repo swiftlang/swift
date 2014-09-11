@@ -3,6 +3,7 @@ add_swift_library(swiftSIL
   DynamicCasts.cpp
   PrettyStackTrace.cpp
   SIL.cpp
+  SILArgument.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
   SILFunction.cpp

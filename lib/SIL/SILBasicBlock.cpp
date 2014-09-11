@@ -23,33 +23,6 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-// SILArgument Implementation
-//===----------------------------------------------------------------------===//
-
-SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB, const ValueDecl *D)
-  : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
-  // Function arguments need to have a decl.
-  assert(
-    !ParentBB->getParent()->isBare() &&
-    ParentBB->getParent()->size() == 1
-          ? D != nullptr
-          : true );
-  ParentBB->addArgument(this);
-}
-
-
-SILFunction *SILArgument::getFunction() {
-  return getParent()->getParent();
-}
-const SILFunction *SILArgument::getFunction() const {
-  return getParent()->getParent();
-}
-
-SILModule &SILArgument::getModule() const {
-  return getFunction()->getModule();
-}
-
-//===----------------------------------------------------------------------===//
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
