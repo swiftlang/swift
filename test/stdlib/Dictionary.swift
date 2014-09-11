@@ -3448,18 +3448,11 @@ DictionaryTestSuite.test("misc") {
 }
 
 DictionaryTestSuite.setUp {
-  keyCount = 0
-  valueCount = 0
-  TestObjCKeyTy.objectCount = 0
-  TestObjCValueTy.objectCount = 0
+  resetLeaksOfDictionaryKeysValues()
 }
 
 DictionaryTestSuite.tearDown {
-  expectEqual(0, keyCount) { "key leak" }
-  expectEqual(0, valueCount) { "value leak" }
-
-  expectEqual(0, TestObjCKeyTy.objectCount) { "ObjC key leak" }
-  expectEqual(0, TestObjCValueTy.objectCount) { "ObjC value leak" }
+  expectNoLeaksOfDictionaryKeysValues()
 }
 
 runAllTests()
