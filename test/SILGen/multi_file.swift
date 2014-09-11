@@ -18,3 +18,11 @@ func lazyRefPropertiesAreNotStored(container: LazyContainerClass) {
   // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : LazyContainerClass -> () -> Int , $@cc(method) @thin (@owned LazyContainerClass) -> Int
   println(container.lazyVar)
 }
+
+// CHECK-LABEL: sil @_TF10multi_file25finalVarsAreDevirtualizedFCS_18FinalPropertyClassT_
+func finalVarsAreDevirtualized(obj: FinalPropertyClass) {
+  // CHECK: ref_element_addr %0 : $FinalPropertyClass, #FinalPropertyClass.foo
+  println(obj.foo)
+  // CHECK: class_method %0 : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
+  println(obj.bar)
+}

@@ -19,3 +19,16 @@ func test2() {
 func testOverriding(sub: Subclass) {
   sub.method()
 }
+
+
+class Base {
+  func foo() {}
+  var prop: Int = 0
+}
+
+class Sub : Base {
+  override func foo() {}
+  override var prop: Int {
+    didSet { println("hi") }
+  }
+}

@@ -17,3 +17,8 @@ struct LazyContainer {
 class LazyContainerClass {
   lazy var lazyVar = 42
 }
+
+class FinalPropertyClass {
+  final var foo = 50
+  var bar = 55
+}

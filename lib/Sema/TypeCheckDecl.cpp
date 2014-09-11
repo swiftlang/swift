@@ -1375,7 +1375,7 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, TypeChecker &TC) {
                                                       VD->getDeclContext()));
     
     // Add a no-parameters clause.
-  GetterParams.push_back(TuplePattern::create(VD->getASTContext(), Loc,
+  GetterParams.push_back(TuplePattern::create(Context, Loc,
                                               ArrayRef<TuplePatternElt>(),
                                               Loc, /*hasVararg=*/false,
                                               SourceLoc(),
@@ -1390,6 +1390,11 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, TypeChecker &TC) {
       /*GenericParams=*/nullptr, Type(), GetterParams,
       TypeLoc::withoutLoc(Ty), VD->getDeclContext());
   Get->setImplicit();
+
+  // If the var is marked final, then so is the getter.
+  if (VD->isFinal())
+    Get->getAttrs().add(new (Context) FinalAttr(/*IsImplicit=*/true));
+
   return Get;
 }
 
@@ -1418,7 +1423,11 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl,
   
   // Setters default to mutating.
   Set->setMutating();
-  
+
+  // If the var is marked final, then so is the getter.
+  if (VD->isFinal())
+    Set->getAttrs().add(new (Context) FinalAttr(/*IsImplicit=*/true));
+
   return Set;
 }
 
@@ -1610,10 +1619,6 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD,
   // just want it for abstraction purposes (i.e., to make access to the variable
   // uniform and to be able to put the getter in a vtable).
   Get->getAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
-
-  // If the var is marked final, then so is the getter.
-  if (VD->isFinal())
-    Get->getAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
 }
 
 /// Synthesize the body of a trivial setter.
@@ -1632,10 +1637,6 @@ static void synthesizeTrivialSetter(FuncDecl *Set, VarDecl *VD,
 
   // Mark it transparent, there is no user benefit to this actually existing.
   Set->getAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
-
-  if (VD->isFinal())
-    Set->getAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
-
 }
 
 
@@ -3009,18 +3010,6 @@ public:
     if (VD->isObjC())
       checkBridgedFunctions();
 
-    if (IsFirstPass && !checkOverrides(VD)) {
-      // If a property has an override attribute but does not override
-      // anything, complain.
-      if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!VD->getOverriddenDecl()) {
-          TC.diagnose(VD, diag::property_does_not_override)
-              .highlight(OA->getLocation());
-          OA->setInvalid();
-        }
-      }
-    }
-
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
     if (VD->hasStorage()) {
@@ -3087,20 +3076,7 @@ public:
         !VD->getGetter()->getBody())
       synthesizeObservingAccessors(VD, TC);
 
-    // If this variable is marked final and has a getter or setter, mark the
-    // getter and setter as final as well.
-    if (VD->isFinal()) {
-      if (VD->getGetter() && !VD->getGetter()->isFinal())
-        VD->getGetter()->getAttrs().add(
-            new (TC.Context) FinalAttr(/*IsImplicit=*/true));
-      if (VD->getSetter() && !VD->getSetter()->isFinal())
-        VD->getSetter()->getAttrs().add(
-            new (TC.Context) FinalAttr(/*IsImplicit=*/true));
-    }
     TC.checkDeclAttributes(VD);
-
-
-
   }
 
 
@@ -3325,7 +3301,7 @@ public:
     if (auto setter = SD->getSetter())
       TC.validateDecl(setter);
 
-    if (!checkOverrides(SD)) {
+    if (!checkOverrides(TC, SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
       if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -4622,7 +4598,7 @@ public:
       markAsObjC(FD, isObjC);
     }
     
-    if (!checkOverrides(FD)) {
+    if (!checkOverrides(TC, FD)) {
       // If a method has an 'override' keyword but does not override anything,
       // complain.
       if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -4641,7 +4617,9 @@ public:
 
   /// Adjust the type of the given declaration to appear as if it were
   /// in the given subclass of its actual declared class.
-  Type adjustSuperclassMemberDeclType(const ValueDecl *decl, Type subclass) {
+  static Type adjustSuperclassMemberDeclType(TypeChecker &TC,
+                                             const ValueDecl *decl,
+                                             Type subclass) {
     ClassDecl *superclassDecl =
       decl->getDeclContext()->getDeclaredTypeInContext()
         ->getClassOrBoundGenericClass();
@@ -4722,10 +4700,12 @@ public:
   }
 
   /// Diagnose overrides of '(T) -> T?' with '(T!) -> T!'.
-  void diagnoseUnnecessaryIUOs(const AbstractFunctionDecl *method,
-                               const AbstractFunctionDecl *parentMethod,
-                               Type owningTy) {
-    Type plainParentTy = adjustSuperclassMemberDeclType(parentMethod, owningTy);
+  static void diagnoseUnnecessaryIUOs(TypeChecker &TC,
+                                      const AbstractFunctionDecl *method,
+                                      const AbstractFunctionDecl *parentMethod,
+                                      Type owningTy) {
+    Type plainParentTy = adjustSuperclassMemberDeclType(TC, parentMethod,
+                                                        owningTy);
     const auto *parentTy = plainParentTy->castTo<AnyFunctionType>();
     parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
 
@@ -4844,7 +4824,7 @@ public:
   /// (if any).
   ///
   /// \returns true if an error occurred.
-  bool checkOverrides(ValueDecl *decl) {
+  static bool checkOverrides(TypeChecker &TC, ValueDecl *decl) {
     if (decl->isInvalid() || decl->getOverriddenDecl())
       return false;
 
@@ -4958,8 +4938,9 @@ public:
 
       // Check whether the types are identical.
       // FIXME: It's wrong to use the uncurried types here for methods.
-      auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl, owningTy)
-                            ->getUnlabeledType(TC.Context);
+      auto parentDeclTy = adjustSuperclassMemberDeclType(TC, parentDecl,
+                                                         owningTy);
+      parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
       if (method) {
         parentDeclTy = parentDeclTy->getWithoutNoReturn(2);
         parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
@@ -5108,7 +5089,8 @@ public:
         // Private migration help for overrides of Objective-C methods.
         if ((!isa<FuncDecl>(method) || !cast<FuncDecl>(method)->isAccessor()) &&
             superclass->getClassOrBoundGenericClass()->isObjC()) {
-          diagnoseUnnecessaryIUOs(method, cast<AbstractFunctionDecl>(matchDecl),
+          diagnoseUnnecessaryIUOs(TC, method,
+                                  cast<AbstractFunctionDecl>(matchDecl),
                                   owningTy);
         }
 
@@ -5125,7 +5107,7 @@ public:
         }
       } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
         auto propertyTy = property->getInterfaceType();
-        auto parentPropertyTy = adjustSuperclassMemberDeclType(matchDecl,
+        auto parentPropertyTy = adjustSuperclassMemberDeclType(TC, matchDecl,
                                                                superclass);
         
         if (!propertyTy->canOverride(parentPropertyTy, false, &TC)) {
@@ -5153,7 +5135,7 @@ public:
         }
       }
 
-      return recordOverride(decl, matchDecl);
+      return recordOverride(TC, decl, matchDecl);
     }
 
     // We override more than one declaration. Complain.
@@ -5325,7 +5307,8 @@ public:
   /// \c overridden declaration.
   ///
   /// \returns true if an error occurred.
-  bool recordOverride(ValueDecl *override, ValueDecl *base) {
+  static bool recordOverride(TypeChecker &TC, ValueDecl *override,
+                             ValueDecl *base) {
     // Check property and subscript overriding.
     if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {
       auto *overrideASD = cast<AbstractStorageDecl>(override);
@@ -5441,7 +5424,7 @@ public:
               new (TC.Context) OverrideAttr(loc));
         }
           
-        recordOverride(overridingGetter, baseASD->getGetter());
+        recordOverride(TC, overridingGetter, baseASD->getGetter());
       }
       if (baseASD->getSetter() && overridingASD->getSetter() &&
           baseASD->isSetterAccessibleFrom(override->getDeclContext())) {
@@ -5452,7 +5435,7 @@ public:
           overridingSetter->getAttrs().add(
               new (TC.Context) OverrideAttr(loc));
         }
-        recordOverride(overridingASD->getSetter(), baseASD->getSetter());
+        recordOverride(TC, overridingASD->getSetter(), baseASD->getSetter());
       }
       
     } else {
@@ -5770,7 +5753,7 @@ public:
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
-    if (!checkOverrides(CD)) {
+    if (!checkOverrides(TC, CD)) {
       // If an initializer has an override attribute but does not override
       // anything or overrides something that doesn't need an 'override'
       // keyword (e.g., a convenience initializer), complain.
@@ -6188,10 +6171,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (!VD->didEarlyAttrValidation()) {
       checkDeclAttributesEarly(VD);
 
+      // FIXME: Guarding the rest of these things together with early attribute
+      // validation is a hack. It's necessary because properties can get types
+      // before validateDecl is called.
+
       // If this is a property, check if it needs to be exposed to Objective-C.
-      // FIXME: Guarding this together with early attribute validation is a
-      // hack. It's necessary because properties can get types before
-      // validateDecl is called.
       if (VD->getDeclContext()->getDeclaredTypeInContext()) {
         auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());
         ObjCReason reason = ObjCReason::DontDiagnose;
@@ -6215,6 +6199,28 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
 
       inferDynamic(Context, VD);
+      if (!DeclChecker::checkOverrides(*this, VD)) {
+        // If a property has an override attribute but does not override
+        // anything, complain.
+        if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
+          if (!VD->getOverriddenDecl()) {
+            diagnose(VD, diag::property_does_not_override)
+              .highlight(OA->getLocation());
+            OA->setInvalid();
+          }
+        }
+      }
+
+      // If this variable is marked final and has a getter or setter, mark the
+      // getter and setter as final as well.
+      if (VD->isFinal()) {
+        if (VD->getGetter() && !VD->getGetter()->isFinal())
+          VD->getGetter()->getAttrs().add(
+              new (Context) FinalAttr(/*IsImplicit=*/true));
+        if (VD->getSetter() && !VD->getSetter()->isFinal())
+          VD->getSetter()->getAttrs().add(
+              new (Context) FinalAttr(/*IsImplicit=*/true));
+      }
     }
 
     break;
@@ -6755,7 +6761,7 @@ createDesignatedInitOverride(TypeChecker &tc,
 
   // Wire up the overrides.
   ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*Implicit=*/true));
-  DeclChecker(tc, false, false).checkOverrides(ctor);
+  DeclChecker::checkOverrides(tc, ctor);
 
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.

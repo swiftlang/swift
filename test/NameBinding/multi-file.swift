@@ -19,3 +19,8 @@ func test() {
 func conformsToItself(inout x: P3, y: P3) {
   x = y
 }
+
+func testOverrides(obj: Sub) {
+  obj.foo()
+  obj.prop = 5
+}
