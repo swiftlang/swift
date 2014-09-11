@@ -4,8 +4,8 @@ enum Foo : Int {
   case A, B, C
 }
 
-var raw1: Int = Foo.A.raw
-var raw2: Foo.Raw = raw1
+var raw1: Int = Foo.A.rawValue
+var raw2: Foo.RawValue = raw1
 var cooked1: Foo? = Foo(0)
 var cooked2: Foo? = Foo(22)
 
@@ -17,27 +17,27 @@ func localEnum() -> Int {
   enum LocalEnum : Int {
     case A, B, C
   }
-  return LocalEnum.A.raw
+  return LocalEnum.A.rawValue
 }
 
 enum MembersReferenceRawType : Int {
   case A, B, C
 
-  init?(_ x: Int) {
-    self = MembersReferenceRawType(x)!
+  init?(rawValue: Int) {
+    self = MembersReferenceRawType(rawValue: rawValue)!
   }
 
   func successor() -> MembersReferenceRawType {
-    return MembersReferenceRawType(raw + 1)!
+    return MembersReferenceRawType(rawValue: rawValue + 1)!
   }
 }
 
-func serialize<T : RawRepresentable>(values: [T]) -> [T.Raw] {
-  return values.map { $0.raw }
+func serialize<T : RawRepresentable>(values: [T]) -> [T.RawValue] {
+  return values.map { $0.rawValue }
 }
 
-func deserialize<T : RawRepresentable>(serialized: [T.Raw]) -> [T] {
-  return serialized.map { T($0)! }
+func deserialize<T : RawRepresentable>(serialized: [T.RawValue]) -> [T] {
+  return serialized.map { T(rawValue: $0)! }
 }
 
 var ints: [Int] = serialize([Foo.A, .B, .C])
@@ -46,18 +46,18 @@ var doubles: [Double] = serialize([Bar.A, .B, .C])
 var foos: [Foo] = deserialize([1, 2, 3])
 var bars: [Bar] = deserialize([1.2, 3.4, 5.6])
 
-// Infer Raw from witnesses.
+// Infer RawValue from witnesses.
 enum Color : Int, RawRepresentable {
   case Red
   case Blue
 
-  init?(_ raw: Double) {
+  init?(rawValue: Double) {
     return nil
   }
 
-  var raw: Double {
+  var rawValue: Double {
     return 1.0
   }
 }
 
-var colorRaw: Color.Raw = 7.5
+var colorRaw: Color.RawValue = 7.5

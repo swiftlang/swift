@@ -10,4 +10,4 @@ println(opts & (.LastEqual | .InsertionIndex) == .InsertionIndex)
 println((opts & .LastEqual) != nil)
 
 // CHECK: {{^}}0 0 0{{$}}
-println("\((nil as NSBinarySearchingOptions).raw) \(NSBinarySearchingOptions.allZeros.raw) \(NSBinarySearchingOptions(0).raw)")
+println("\((nil as NSBinarySearchingOptions).rawValue) \(NSBinarySearchingOptions.allZeros.rawValue) \(NSBinarySearchingOptions(0).rawValue)")

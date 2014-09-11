@@ -18,11 +18,11 @@ let one: Bit = .One
 println("testing")
 
 // CHECK-NEXT: 1
-println((one - zero).raw)
+println((one - zero).rawValue)
 // CHECK-NEXT: 1
-println(zero.successor().raw)
+println(zero.successor().rawValue)
 // CHECK-NEXT: 0
-println(one.predecessor().raw)
+println(one.predecessor().rawValue)
 
 // CHECK: done.
 println("done.")

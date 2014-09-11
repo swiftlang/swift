@@ -1,7 +1,7 @@
 // RUN: %swift -parse -verify -primary-file %s %S/Inputs/enum_multi_file_helper.swift
 
-var raw1: Int = Foo.A.raw
-var raw2: Bar.Raw = 0
+var raw1: Int = Foo.A.rawValue
+var raw2: Bar.RawValue = 0
 var cooked1: Foo? = Foo(raw1)
 var cooked2: Bar? = Bar(22)
 var cooked3: Baz? = Baz(0)

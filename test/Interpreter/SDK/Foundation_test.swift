@@ -16,7 +16,7 @@ func asString(ns: NSString) -> String { return ns }
 FoundationTestSuite.test("NSString") {
   var str = "Hello"
   var nsStr : NSString = str
-  assert(nsStr.compare(str).raw == NSComparisonResult.OrderedSame.raw)
+  assert(nsStr.compare(str).rawValue == NSComparisonResult.OrderedSame.rawValue)
   assert(nsStr.compare(str) == NSComparisonResult.OrderedSame)
   nsStr = "World"
   str = nsStr

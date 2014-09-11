@@ -5,7 +5,7 @@ import gizmo
 
 
 // CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsCfMS_FSiGSqS__
-// CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg3rawSi
+// CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg8rawValueSi
 // CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg9hashValueSi
 
 // CHECK-DAG: sil shared @_TF5gizmooi2eeFTOSC16NSRuncingOptionsS0__Sb
@@ -17,7 +17,7 @@ import gizmo
 
 var runcing: NSRuncingOptions = .Mince
 
-var raw = runcing.raw
+var raw = runcing.rawValue
 var eq = runcing == .QuinceSliced
 var hash = runcing.hashValue
 
@@ -39,7 +39,7 @@ extension NSRuncingOptions: Bub {}
 // CHECK-DAG: sil_witness_table shared NSRuncingOptions: Hashable module gizmo
 // CHECK-DAG: sil_witness_table shared NSFungingMask: RawRepresentable module gizmo
 
-// CHECK-DAG: sil shared @_TTWOSC16NSRuncingOptionsSs16RawRepresentableFS0_CUS0__U__fMQPS0_FQS1_3RawGSqS1__
+// CHECK-DAG: sil shared @_TTWOSC16NSRuncingOptionsSs16RawRepresentableFS0_CUS0__U__fMQPS0_FT8rawValueQS1_8RawValue_GSqS1__
 
 // Extension conformances get public linkage as normal.
 // CHECK-DAG: sil_witness_table NSRuncingOptions: Bub module objc_enum

@@ -22,7 +22,7 @@ assert(CFGetTypeID(nsObject) == CFGetTypeID(swiftObject))
 func testCFStringAnyObject() {
   // Create a CFString
   let cfStr: CFString
-    = CFStringCreateWithCString(nil, "Swift", CFStringBuiltInEncodings.ASCII.raw)
+    = CFStringCreateWithCString(nil, "Swift", CFStringBuiltInEncodings.ASCII.rawValue)
 
   // CHECK: Swift
   println(cfStr)
@@ -62,7 +62,7 @@ testCFStringAnyObject()
 // Check CFString.Type <-> AnyObject.Type
 func testCFStringAnyObjectType() {
   let cfStr: CFString
-    = CFStringCreateWithCString(nil, "Swift", CFStringBuiltInEncodings.ASCII.raw)
+    = CFStringCreateWithCString(nil, "Swift", CFStringBuiltInEncodings.ASCII.rawValue)
 
   let cfStrType = cfStr.dynamicType
   // CHECK: Metatype

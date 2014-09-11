@@ -9,19 +9,19 @@ import user_objc
 var mince = NSRuncingMode.Mince
 var quince = NSRuncingMode.Quince
 
-var rawMince: UInt = NSRuncingMode.Mince.raw
-var rawFoo: CInt = NSUnderlyingType.Foo.raw
+var rawMince: UInt = NSRuncingMode.Mince.rawValue
+var rawFoo: CInt = NSUnderlyingType.Foo.rawValue
 var rawNegativeOne: CUnsignedInt
-  = NSUnsignedUnderlyingTypeNegativeValue.NegativeOne.raw
+  = NSUnsignedUnderlyingTypeNegativeValue.NegativeOne.rawValue
 
-var rawWordBreakA: Int = NSPrefixWordBreak.Banjo.raw
-var rawWordBreakB: Int = NSPrefixWordBreak.Bandana.raw
+var rawWordBreakA: Int = NSPrefixWordBreak.Banjo.rawValue
+var rawWordBreakB: Int = NSPrefixWordBreak.Bandana.rawValue
 
-var rawWordBreak2A: Int = NSPrefixWordBreak2.BreakBarBas.raw
-var rawWordBreak2B: Int = NSPrefixWordBreak2.BreakBareBass.raw
+var rawWordBreak2A: Int = NSPrefixWordBreak2.BreakBarBas.rawValue
+var rawWordBreak2B: Int = NSPrefixWordBreak2.BreakBareBass.rawValue
 
-var rawWordBreak3A: Int = NSPrefixWordBreak3.Break1Bob.raw
-var rawWordBreak3B: Int = NSPrefixWordBreak3.Break1Ben.raw
+var rawWordBreak3A: Int = NSPrefixWordBreak3.Break1Bob.rawValue
+var rawWordBreak3B: Int = NSPrefixWordBreak3.Break1Ben.rawValue
 
 var singleConstant = NSSingleConstantEnum.Value
 

@@ -27,11 +27,11 @@ public enum Bit : Int, RandomAccessIndexType, Reflectable {
   }
 
   public func distanceTo(other: Bit) -> Int {
-    return raw.distanceTo(other.raw)
+    return rawValue.distanceTo(other.rawValue)
   }
 
   public func advancedBy(distance: Int) -> Bit {
-    return raw.advancedBy(distance) > 0 ? One : Zero
+    return rawValue.advancedBy(distance) > 0 ? One : Zero
   }
 
   public
@@ -72,11 +72,11 @@ struct _BitMirror: MirrorType {
 }
 
 public func == (lhs: Bit, rhs: Bit) -> Bool {
-  return lhs.raw == rhs.raw
+  return lhs.rawValue == rhs.rawValue
 }
 
 public func < (lhs: Bit, rhs: Bit) -> Bool {
-  return lhs.raw < rhs.raw
+  return lhs.rawValue < rhs.rawValue
 }
 
 extension Bit : IntegerArithmeticType {
@@ -87,34 +87,34 @@ extension Bit : IntegerArithmeticType {
   public static func addWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.addWithOverflow(lhs.raw, rhs.raw))
+    return _withOverflow(Int.addWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
   public static func subtractWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.subtractWithOverflow(lhs.raw, rhs.raw))
+    return _withOverflow(Int.subtractWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
   public static func multiplyWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.multiplyWithOverflow(lhs.raw, rhs.raw))
+    return _withOverflow(Int.multiplyWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
   public static func divideWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.divideWithOverflow(lhs.raw, rhs.raw))
+    return _withOverflow(Int.divideWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
   public static func remainderWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.remainderWithOverflow(lhs.raw, rhs.raw))
+    return _withOverflow(Int.remainderWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
   public func toIntMax() -> IntMax {
-    return IntMax(raw)
+    return IntMax(rawValue)
   }
 }

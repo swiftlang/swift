@@ -82,7 +82,7 @@ static TypeDecl *deriveRawRepresentable_Raw(TypeChecker &tc,
   auto rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl,
                                                       rawInterfaceType);
   auto rawTypeDecl = new (C) TypeAliasDecl(SourceLoc(),
-                                   C.Id_Raw,
+                                   C.Id_RawValue,
                                    SourceLoc(),
                                    TypeLoc::withoutLoc(rawType),
                                    enumDecl);
@@ -218,7 +218,7 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   // Define the property.
   VarDecl *propDecl = new (C) VarDecl(/*static*/ false,
                                       /*let*/ false,
-                                      SourceLoc(), C.Id_raw,
+                                      SourceLoc(), C.Id_rawValue,
                                       rawType, enumDecl);
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
@@ -368,7 +368,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
                                        SourceLoc(),
                                        Identifier(),
                                        SourceLoc(),
-                                       C.Id_raw,
+                                       C.Id_rawValue,
                                        rawType,
                                        enumDecl);
   rawDecl->setImplicit();
@@ -470,13 +470,13 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   for (auto elt : enumDecl->getAllElements())
     tc.validateDecl(elt);
 
-  if (requirement->getName() == tc.Context.Id_raw)
+  if (requirement->getName() == tc.Context.Id_rawValue)
     return deriveRawRepresentable_raw(tc, enumDecl);
   
   if (requirement->getName() == tc.Context.Id_init)
     return deriveRawRepresentable_init(tc, enumDecl);
 
-  if (requirement->getName() == tc.Context.Id_Raw)
+  if (requirement->getName() == tc.Context.Id_RawValue)
     return deriveRawRepresentable_Raw(tc, enumDecl);
   
   tc.diagnose(requirement->getLoc(),

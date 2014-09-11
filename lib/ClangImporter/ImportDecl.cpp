@@ -1442,7 +1442,7 @@ namespace {
         structDecl->computeType();
         
         // Create a field to store the underlying value.
-        auto varName = Impl.SwiftContext.Id_raw;
+        auto varName = Impl.SwiftContext.Id_rawValue;
         auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                    /*IsLet*/ true,
                                                    SourceLoc(), varName,
@@ -1465,11 +1465,15 @@ namespace {
                                                                   var);
         
         // Create a constructor to initialize that value from a value of the
-        // underlying type.
+        // underlying type. We need both an unlabeled conversion form and
+        // a labeled form to satisfy RawRepresentable's requirements.
         Decl *varDecl = var;
         auto valueConstructor = createValueConstructor(
                                   structDecl, varDecl,
                                   /*wantCtorParamNames=*/false);
+        auto labeledValueConstructor = createValueConstructor(
+                                                 structDecl, varDecl,
+                                                 /*wantCtorParamNames=*/true);
 
         // Build a delayed RawOptionSet conformance for the type.
         DelayedProtocolDecl delayedProtocols[] = {
@@ -1495,7 +1499,8 @@ namespace {
         // Set the members of the struct.
         structDecl->addMember(defaultConstructor);
         structDecl->addMember(valueConstructor);
-        structDecl->addMember(patternBinding); 
+        structDecl->addMember(labeledValueConstructor);
+        structDecl->addMember(patternBinding);
         structDecl->addMember(var);
         result = structDecl;
         computeEnumCommonWordPrefix(decl, name);

@@ -44,8 +44,9 @@ enum FooComparisonResult : Int {
 /// Aaa.  FooRuncingOptions.  Bbb.
 struct FooRuncingOptions : RawOptionSetType {
   init()
-  init(_ raw: Int)
-  let raw: Int
+  init(_ rawValue: Int)
+  init(rawValue: Int)
+  let rawValue: Int
   
   // This is mince.
   static var EnableMince: FooRuncingOptions { get }
