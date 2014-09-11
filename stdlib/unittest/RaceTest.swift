@@ -52,7 +52,10 @@ public protocol RaceTestWithPerTrialDataType {
   ///
   /// This type should be a class.  (The harness will not pass struct instances
   /// between threads correctly.)
-  typealias RaceData //: AnyObject FIXME
+  typealias RaceData //: AnyObject
+  // FIXME: can not add a class constraint because of:
+  // <rdar://problem/18305834> "AnyObject" superclass on an associated type
+  // causes a runtime crash
 
   /// Type of thread-local data.
   ///
@@ -337,7 +340,8 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
   }
   if true {
     // FIXME: why doesn't the bracket syntax work?
-    //var observations = [RT.Observation]()
+    // <rdar://problem/18305718> Array sugar syntax does not work when used
+    // with associated types
     var observations = Array<RT.Observation>()
     observations.reserveCapacity(racingThreadCount)
     for i in 0..<raceDataCount {
