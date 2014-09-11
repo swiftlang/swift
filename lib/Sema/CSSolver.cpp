@@ -553,6 +553,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   // Consider each of the constraints related to this type variable.
   PotentialBindings result;
   llvm::SmallPtrSet<CanType, 4> exactTypes;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> literalProtocols;
   auto &tc = cs.getTypeChecker();
   for (auto constraint : constraints) {
     // Only visit each constraint once.
@@ -629,6 +630,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       auto defaultType = tc.getDefaultType(constraint->getProtocol(), cs.DC);
       if (!defaultType)
         continue;
+
+      // Note that we have a literal constraint with this protocol.
+      literalProtocols.insert(constraint->getProtocol());
 
       // Handle unspecialized types directly.
       if (!defaultType->isUnspecializedGeneric()) {
@@ -774,6 +778,58 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     if (exactTypes.insert(type->getCanonicalType()))
       result.Bindings.push_back({type, kind, Nothing});
+  }
+
+  // If we have any literal constraints, check whether there is already a
+  // binding that provides a type that conforms to that literal protocol. In
+  // such cases, remove the default binding suggestion because the existing
+  // suggestion is better.
+  if (!literalProtocols.empty()) {
+    SmallPtrSet<ProtocolDecl *, 5> coveredLiteralProtocols;
+    for (const auto &binding : result.Bindings) {
+      // Skip defaulted-protocol constraints.
+      if (binding.DefaultedProtocol)
+        continue;
+
+      Type testType;
+      switch (binding.Kind) {
+      case AllowedBindingKind::Exact:
+        testType = binding.BindingType;
+        break;
+
+      case AllowedBindingKind::Subtypes:
+      case AllowedBindingKind::Supertypes:
+        testType = binding.BindingType->getRValueType();
+        break;
+      }
+
+      // Check each non-covered literal protocol to determine which ones
+      for (auto proto : literalProtocols) {
+        if (coveredLiteralProtocols.count(proto) > 0)
+          continue;
+
+        // If the type conforms to this protocol, we're covered.
+        if (tc.conformsToProtocol(testType, proto, cs.DC))
+          coveredLiteralProtocols.insert(proto);
+      }
+
+      // If we've covered all of the literal protocols, we're done.
+      if (literalProtocols.size() == coveredLiteralProtocols.size())
+        break;
+    }
+
+    // For any literal type that has been covered, remove the default literal
+    // type.
+    if (!coveredLiteralProtocols.empty()) {
+      result.Bindings.erase(
+        std::remove_if(result.Bindings.begin(),
+                       result.Bindings.end(),
+                       [&](PotentialBinding &binding) {
+                         return binding.DefaultedProtocol &&
+                         coveredLiteralProtocols.count(*binding.DefaultedProtocol) > 0;
+                       }),
+        result.Bindings.end());
+    }
   }
 
   return result;

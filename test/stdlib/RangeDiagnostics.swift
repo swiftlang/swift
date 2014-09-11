@@ -28,10 +28,10 @@ let r1: Range = UInt(10)..<100
 let r2: Range = 10...100
 let r3: Range = UInt(10)...100
 r0[0]       // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
-r1[UInt(0)] // expected-error {{type '()' does not conform to protocol 'IntegerLiteralConvertible'}}
-r1[0]       // expected-error {{'Int' is not convertible to 'UInt'}}
+r1[UInt(0)] // expected-error {{could not find an overload for 'init' that accepts the supplied arguments}}
+r1[0]       // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
 r2[0]       // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
-r3[0]       // expected-error {{'Int' is not convertible to 'UInt'}}
+r3[0]       // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
 r0[0..<4]   // expected-error {{'HalfOpenInterval<T>' is not convertible to 'Int'}}
 r1[0..<4]   // expected-error {{'HalfOpenInterval<T>' is not convertible to 'UInt'}}
 r2[0..<4]   // expected-error {{'HalfOpenInterval<T>' is not convertible to 'Int'}}
