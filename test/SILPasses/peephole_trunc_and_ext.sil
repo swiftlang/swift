@@ -399,7 +399,7 @@ bb3:                                              // Preds: bb2
 // CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVSs5Int32VSs4Int8 : $@thin (Int32) -> Int8
 // CHECK: builtin_function_ref "and_Int32"
 // CHECK: builtin_function_ref "s_to_s_checked_trunc_Int32_Int8"
-// CHECK-NOT: builtin_function_ref "cond_fail"
+// CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_s_to_s_checked_trunc_of_and (Swift.Int32) -> Swift.Int8
 sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVSs5Int32VSs4Int8 : $@thin (Int32) -> Int8 {
@@ -424,7 +424,7 @@ bb0(%0 : $Int32):
 // CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVSs5Int32VSs5UInt8 : $@thin (Int32) -> UInt8
 // CHECK: builtin_function_ref "and_Int32"
 // CHECK: builtin_function_ref "s_to_u_checked_trunc_Int32_Int8"
-// CHECK-NOT: builtin_function_ref "cond_fail"
+// CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_s_to_u_checked_trunc_of_and (Swift.Int32) -> Swift.UInt8
 sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVSs5Int32VSs5UInt8 : $@thin (Int32) -> UInt8 {
@@ -449,7 +449,7 @@ bb0(%0 : $Int32):
 // CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVSs6UInt32VSs5UInt8 : $@thin (UInt32) -> UInt8
 // CHECK: builtin_function_ref "and_Int32"
 // CHECK: builtin_function_ref "u_to_u_checked_trunc_Int32_Int8"
-// CHECK-NOT: builtin_function_ref "cond_fail"
+// CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_u_to_u_checked_trunc_of_and (Swift.UInt32) -> Swift.UInt8
 sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVSs6UInt32VSs5UInt8 : $@thin (UInt32) -> UInt8 {
@@ -474,7 +474,7 @@ bb0(%0 : $UInt32):
 // CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVSs6UInt32VSs4Int8 : $@thin (UInt32) -> Int8
 // CHECK: builtin_function_ref "and_Int32"
 // CHECK: builtin_function_ref "u_to_s_checked_trunc_Int32_Int8"
-// CHECK-NOT: builtin_function_ref "cond_fail"
+// CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_u_to_s_checked_trunc_of_and (Swift.UInt32) -> Swift.Int8
 sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVSs6UInt32VSs4Int8 : $@thin (UInt32) -> Int8 {
