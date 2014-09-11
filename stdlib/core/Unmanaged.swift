@@ -30,9 +30,12 @@ public struct Unmanaged<T: AnyObject> {
   ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @transparent public
   static func fromOpaque(value: COpaquePointer) -> Unmanaged {
-    _precondition(
+    // Null pointer check is a debug check, because it guards only against one
+    // specific bad pointer value.
+    _debugPrecondition(
       value != nil,
       "attempt to create an Unmanaged instance from a null pointer")
+
     return Unmanaged(_private: unsafeBitCast(value, T.self))
   }
 
