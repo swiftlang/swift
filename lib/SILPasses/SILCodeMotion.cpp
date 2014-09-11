@@ -1065,9 +1065,9 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
     //
     // TODO: We need information from the ARC optimizer to prove that property
     // if we are going to use it.
-    if (arc::valueHasARCUsesInInstructionRange(Op, getBB()->begin(),
-                                               SILBasicBlock::iterator(RVI),
-                                               AA)) {
+    if (valueHasARCUsesInInstructionRange(Op, getBB()->begin(),
+                                          SILBasicBlock::iterator(RVI),
+                                          AA)) {
       DEBUG(llvm::dbgs() << "            Release value has use that stops "
             "hoisting! Bailing!\n");
       continue;
