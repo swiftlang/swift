@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/JSONSerialization.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Format.h"
 
 using namespace swift::json;
@@ -154,7 +155,68 @@ void Output::endBitSetScalar() {
 void Output::scalarString(StringRef &S, bool MustQuote) {
   if (MustQuote) {
     Stream << '"';
-    Stream.write_escaped(S);
+    for (unsigned char c : S) {
+      // According to the JSON standard, the following characters must be
+      // escaped:
+      //   - Quotation mark (U+0022)
+      //   - Reverse solidus (U+005C)
+      //   - Control characters (U+0000 to U+001F)
+      // We need to check for these and escape them if present.
+      //
+      // Since these are represented by a single byte in UTF8 (and will not be
+      // present in any multi-byte UTF8 representations), we can just switch on
+      // the value of the current byte.
+      //
+      // Any other bytes present in the string should therefore be emitted
+      // as-is, without any escaping.
+      switch (c) {
+      // First, check for characters for which JSON has custom escape sequences.
+      case '"':
+        Stream << '\\' << '"';
+        break;
+      case '\\':
+        Stream << '\\' << '\\';
+        break;
+      case '/':
+        Stream << '\\' << '/';
+        break;
+      case '\b':
+        Stream << '\\' << 'b';
+        break;
+      case '\f':
+        Stream << '\\' << 'f';
+        break;
+      case '\n':
+        Stream << '\\' << 'n';
+        break;
+      case '\r':
+        Stream << '\\' << 'r';
+        break;
+      case '\t':
+        Stream << '\\' << 't';
+        break;
+      default:
+        // Otherwise, check to see if the current byte is a control character.
+        if (c >= '\x00' && c <= '\x1F') {
+          // Since we have a control character, we need to escape it using
+          // JSON's only valid escape sequence: \uxxxx (where x is a hex digit).
+
+          // The upper two digits for control characters are always 00.
+          Stream << "\\u00";
+
+          // Convert the current character into hexadecimal digits.
+          Stream << llvm::hexdigit((c >> 4) & 0xF);
+          Stream << llvm::hexdigit((c >> 0) & 0xF);
+        }
+        else {
+          // This isn't a control character, so we don't need to escape it.
+          // As a result, emit it directly; if it's part of a multi-byte UTF8
+          // representation, all bytes will be emitted in this fashion.
+          Stream << c;
+        }
+        break;
+      }
+    }
     Stream << '"';
   }
   else
