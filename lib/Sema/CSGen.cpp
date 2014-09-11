@@ -1356,7 +1356,9 @@ namespace {
     }
     
     Type visitAvailabilityQueryExpr(AvailabilityQueryExpr *expr) {
-      assert(false && "Unimplemented");
+      Type BoolType = CS.getTypeChecker().lookupBoolType(CS.DC);
+      expr->setType(BoolType);
+      return BoolType;
     }
     
   };

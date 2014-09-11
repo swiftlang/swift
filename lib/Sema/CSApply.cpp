@@ -2800,7 +2800,7 @@ namespace {
     }
     
     Expr *visitAvailabilityQueryExpr(AvailabilityQueryExpr *expr) {
-      assert(false && "Unimplemented");
+      return expr;
     }
     
     void finalize() {

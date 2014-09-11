@@ -5950,7 +5950,17 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
 
 RValue RValueEmitter::visitAvailabilityQueryExpr(AvailabilityQueryExpr *E,
                                                  SGFContext C) {
-  assert(false && "Unimplemented");
+  // For now, we just emit the boolean constant true. In the future, this will
+  // check the OS version at run time.
+  auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+  SILValue trueValue = SGF.B.createIntegerLiteral(E, i1Ty, 1);
+
+  // Call the _getBool library intrinsic.
+  ASTContext &ctx = SGF.SGM.M.getASTContext();
+  auto result =
+      SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
+                                      ManagedValue::forUnmanaged(trueValue), C);
+  return RValue(SGF, E, result);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

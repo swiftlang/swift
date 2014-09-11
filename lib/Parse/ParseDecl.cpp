@@ -702,8 +702,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                            (ArgumentKind == IsDeprecated) ? Deprecated :
                                                             Obsoleted;
 
+        SourceRange VersionRange;
+        
         if (parseVersionTuple(
-                VersionArg,
+                VersionArg, VersionRange,
                 Diagnostic(diag::attr_availability_expected_version,
                            AttrName))) {
           DiscardAttribute = true;
@@ -877,6 +879,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 }
 
 bool Parser::parseVersionTuple(clang::VersionTuple &Version,
+                               SourceRange &Range,
                                const Diagnostic &D) {
   // A version number is either an integer (8), a float (8.1), or a
   // float followed by a dot and an integer (8.1.0).
@@ -885,6 +888,8 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
     return true;
   }
 
+  SourceLoc StartLoc = Tok.getLoc();
+  
   if (Tok.is(tok::integer_literal)) {
     unsigned major = 0;
     if (Tok.getText().getAsInteger(10, major)) {
@@ -894,6 +899,7 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
       return true;
     }
     Version = clang::VersionTuple(major);
+    Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
     return false;
   }
@@ -908,7 +914,9 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
     return true;
   }
 
+  Range = SourceRange(StartLoc, Tok.getLoc());
   consumeToken();
+  
   if (consumeIf(tok::period)) {
     unsigned micro = 0;
     if (!Tok.is(tok::integer_literal) ||
@@ -920,7 +928,10 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
         consumeToken();
       return true;
     }
+    
+    Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
+    
     Version = clang::VersionTuple(major, minor, micro);
   } else {
     Version = clang::VersionTuple(major, minor);

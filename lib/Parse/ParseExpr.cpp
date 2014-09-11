@@ -19,6 +19,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -881,6 +882,39 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::l_square:
     Result = parseExprCollection();
     break;
+
+  case tok::pound_os: {     // #os(...)
+    SourceLoc PoundLoc = consumeToken(tok::pound_os);
+    
+    if (!Tok.isFollowingLParen()) {
+      diagnose(Tok, diag::avail_query_expected_condition);
+      return nullptr;
+    }
+    
+    SourceLoc LParenLoc = Tok.getLoc();
+    StructureMarkerRAII ParsingAvailabilitySpecList(*this, Tok);
+    
+    consumeToken();
+    
+    // For the moment, we only support a single specification. In the future,
+    // we will extend this to allow multiple specifications.
+    auto SpecResult = parseVersionConstraintSpec();
+    VersionConstraintAvailabilitySpec *Spec = SpecResult.getPtrOrNull();
+    if (!Spec) return nullptr;
+    
+    Expr *QueryExpr = new (Context) AvailabilityQueryExpr(PoundLoc,
+                                                  Spec);
+    
+    SourceLoc RParenLoc;
+    if (parseMatchingToken(tok::r_paren, RParenLoc,
+                           diag::avail_query_expected_rparen, LParenLoc)) {
+      Result = makeParserErrorResult(QueryExpr);
+    } else {
+      Result = makeParserResult(QueryExpr);
+    }
+    
+    break;
+  }
 
   case tok::code_complete:
     if (CodeCompletion)
@@ -2140,3 +2174,71 @@ void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
   }
 }
 
+/// Parse version constraint specification.
+///
+///  target-config-condition:
+///     identifier version-comparison version-tuple
+ParserResult<VersionConstraintAvailabilitySpec>
+Parser::parseVersionConstraintSpec() {
+  Identifier PlatformIdentifier;
+  SourceLoc PlatformLoc;
+  if (parseIdentifier(PlatformIdentifier, PlatformLoc,
+                      diag::avail_query_expected_platform_name)) {
+    return nullptr;
+  }
+
+  Optional<PlatformKind> Platform =
+      AvailabilityAttr::platformFromString(PlatformIdentifier.str());
+
+  if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
+    diagnose(Tok, diag::avail_query_unrecognized_platform_name,
+             PlatformIdentifier);
+    return nullptr;
+  }
+
+  VersionComparison Comparison;
+  SourceLoc ComparisonLoc;
+
+  if (parseVersionComparison(Comparison, ComparisonLoc)) {
+    return nullptr;
+  }
+
+  clang::VersionTuple Version;
+  SourceRange VersionRange;
+
+  if (parseVersionTuple(Version, VersionRange,
+                        diag::avail_query_expected_version_number)) {
+    return nullptr;
+  }
+
+  return makeParserResult(new (Context) VersionConstraintAvailabilitySpec(
+      Platform.getValue(), PlatformLoc, Comparison, ComparisonLoc, Version,
+      VersionRange));
+}
+
+bool Parser::parseVersionComparison(VersionComparison &Comparison,
+                                    SourceLoc &OpLoc) {
+  if (!Tok.is(tok::oper_binary)) {
+    diagnose(Tok, diag::avail_query_config_expected_comparison);
+    return true;
+  }
+
+  // For the moment, we only handle greater-than-or-equal comparisons. We will
+  // extend this to additional comparison operators in the future.
+  Optional<VersionComparison> ParsedComparison =
+      llvm::StringSwitch<Optional<VersionComparison>>(Tok.getText())
+          .Case(">=", VersionComparison::GreaterThanEqual)
+          .Default(Nothing);
+
+  if (!ParsedComparison.hasValue()) {
+    diagnose(Tok, diag::avail_query_config_expected_comparison);
+    return true;
+  }
+
+  Comparison = ParsedComparison.getValue();
+
+  OpLoc = Tok.getLoc();
+  consumeToken();
+
+  return false;
+}

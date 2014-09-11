@@ -661,7 +661,8 @@ public:
   
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
-  bool parseVersionTuple(clang::VersionTuple &Version, const Diagnostic &D);
+  bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
+                         const Diagnostic &D);
 
   bool parseTypeAttributeList(TypeAttributes &Attributes) {
     if (Tok.is(tok::at_sign))
@@ -1120,6 +1121,13 @@ public:
   bool parseGenericWhereClause(SourceLoc &WhereLoc,
                                SmallVectorImpl<RequirementRepr> &Requirements);
 
+  //===--------------------------------------------------------------------===//
+  // Availability Specification Parsing
+  
+  ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
+  
+  /// Parse a version comparison operator. Returns true on error.
+  bool parseVersionComparison(VersionComparison &Comparison, SourceLoc &OpLoc);
 };
 
 } // end namespace swift

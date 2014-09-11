@@ -501,7 +501,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitAvailabilityQueryExpr(AvailabilityQueryExpr *E) {
-    assert(false && "Unimplemented");
+    return E;
   }
 
 #define STMT(Id, Parent) Stmt *visit##Id##Stmt(Id##Stmt *S);

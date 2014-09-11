@@ -1460,6 +1460,11 @@ Restart:
       CurPtr += 4;
       return formToken(tok::pound_line, TokStart);
     }
+    
+    if (getSubstring(TokStart + 1, 2).equals("os")) {
+      CurPtr += 2;
+      return formToken(tok::pound_os, TokStart);
+    }
 
     // Allow a hashbang #! line at the beginning of the file.
     if (CurPtr - 1 == BufferStart && *CurPtr == '!') {

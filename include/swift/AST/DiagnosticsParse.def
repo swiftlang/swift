@@ -1034,6 +1034,22 @@ ERROR(unsupported_target_config_argument_type,parsing,none,
 ERROR(unsupported_config_conditional_expression_type,parsing,none,
 "unexpected configuration expression type", ())
 
+//------------------------------------------------------------------------------
+// Availability query parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(avail_query_expected_condition,parsing,PointsToFirstBadToken,
+      "expected availability condition", ())
+ERROR(avail_query_expected_platform_name,parsing,PointsToFirstBadToken,
+      "expected platform name", ())
+ERROR(avail_query_config_expected_comparison,parsing,
+      none,"expected version comparison", ())
+ERROR(avail_query_expected_version_number,parsing,PointsToFirstBadToken,
+      "expected version number", ())
+ERROR(avail_query_expected_rparen,parsing,PointsToFirstBadToken,
+      "expected ')' in availability query", ())
+
+ERROR(avail_query_unrecognized_platform_name,avail_query_expected_condition,
+      PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
 
 //------------------------------------------------------------------------------
 // Code Migration.
