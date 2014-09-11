@@ -104,6 +104,29 @@ FormalLinkage swift::getTypeLinkage(CanType type) {
   return result;
 }
 
+SILLinkage swift::getSILLinkage(FormalLinkage linkage,
+                                ForDefinition_t forDefinition) {
+  switch (linkage) {
+  case FormalLinkage::PublicUnique:
+    return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
+
+  case FormalLinkage::PublicNonUnique:
+    // FIXME: any place we have to do this that actually requires
+    // uniqueness is buggy.
+    return (forDefinition ? SILLinkage::Shared : SILLinkage::PublicExternal);
+
+  case FormalLinkage::HiddenUnique:
+    return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
+
+  case FormalLinkage::HiddenNonUnique:
+    return (forDefinition ? SILLinkage::Shared : SILLinkage::HiddenExternal);
+
+  case FormalLinkage::Private:
+    return SILLinkage::Private;
+  }
+  llvm_unreachable("bad formal linkage");
+}
+
 /// Returns true if we are able to find an address projection path from V1 to
 /// V2. Inserts the found path into Path.
 bool

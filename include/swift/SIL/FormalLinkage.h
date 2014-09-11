@@ -18,6 +18,8 @@ namespace swift {
 class CanType;
 class Decl;
 class ProtocolConformance;
+enum class SILLinkage : unsigned char;
+enum ForDefinition_t : bool;
 
 // Bits useful in defining the below.
 enum {
@@ -87,6 +89,8 @@ inline FormalLinkage &operator^=(FormalLinkage &lhs, FormalLinkage rhs) {
 
 FormalLinkage getTypeLinkage(CanType type);
 FormalLinkage getDeclLinkage(Decl *decl);
+SILLinkage getSILLinkage(FormalLinkage linkage,
+                         ForDefinition_t forDefinition);
 
 } // end swift namespace
 
