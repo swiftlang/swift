@@ -350,7 +350,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   PMBuilder.OptLevel = 2;
   PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
   llvm::PassManager ModulePasses;
-  ModulePasses.add(new llvm::DataLayoutPass(*Module->getDataLayout()));
+  ModulePasses.add(new llvm::DataLayoutPass());
   PMBuilder.populateModulePassManager(ModulePasses);
   ModulePasses.run(*Module);
 

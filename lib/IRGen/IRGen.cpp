@@ -280,7 +280,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);
-  FunctionPasses.add(new llvm::DataLayoutPass(*DataLayout));
+  FunctionPasses.add(new llvm::DataLayoutPass());
   TargetMachine->addAnalysisPasses(FunctionPasses);
   if (Opts.Verify)
     FunctionPasses.add(createVerifierPass());
@@ -300,7 +300,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Configure the module passes.
   PassManager ModulePasses;
-  ModulePasses.add(new llvm::DataLayoutPass(*DataLayout));
+  ModulePasses.add(new llvm::DataLayoutPass());
   TargetMachine->addAnalysisPasses(ModulePasses);
   PMBuilder.populateModulePassManager(ModulePasses);
 
