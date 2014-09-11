@@ -16,7 +16,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
-#include "swift/SILAnalysis/SILLoopInfo.h"
+#include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"

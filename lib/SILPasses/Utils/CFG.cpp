@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILAnalysis/SILLoopInfo.h"
 #include "swift/SILPasses/Utils/CFG.h"
 
 using namespace swift;

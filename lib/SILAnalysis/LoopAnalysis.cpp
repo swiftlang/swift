@@ -1,4 +1,4 @@
-//===-------------- SILLoopInfo.cpp - SIL Loop Analysis -*- C++ -*---------===//
+//===-------------- LoopAnalysis.cpp - SIL Loop Analysis -*- C++ -*--------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,27 +12,11 @@
 
 #include "swift/SIL/Dominance.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/SILLoopInfo.h"
+#include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/PassManager.h"
-#include "llvm/Analysis/LoopInfoImpl.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-
-// Instantiate template members.
-template class llvm::LoopBase<SILBasicBlock, SILLoop>;
-template class llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
-
-
-void SILLoop::dump() const {
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  print(llvm::dbgs());
-#endif
-}
-
-SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
-  LI.Analyze(*DT);
-}
 
 SILLoopInfo *SILLoopAnalysis::getLoopInfo(SILFunction *F) {
   if (!LoopInfos.count(F)) {
@@ -47,22 +31,4 @@ SILLoopInfo *SILLoopAnalysis::getLoopInfo(SILFunction *F) {
 
 SILAnalysis *swift::createLoopInfoAnalysis(SILModule *M, SILPassManager *PM) {
   return new SILLoopAnalysis(M, PM);
-}
-
-void SILLoopInfo::verify() const {
-  llvm::DenseSet<const SILLoop*> Loops;
-  for (iterator I = begin(), E = end(); I != E; ++I) {
-    assert(!(*I)->getParentLoop() && "Top-level loop has a parent!");
-    (*I)->verifyLoopNest(&Loops);
-  }
-
-  // We need access to the map for this.
-  // Verify that blocks are mapped to valid loops.
-  for (llvm::DenseMap<SILBasicBlock *, SILLoop *>::const_iterator
-           I = LI.getBlockMap().begin(),
-           E = LI.getBlockMap().end();
-       I != E; ++I) {
-    assert(Loops.count(I->second) && "orphaned loop");
-    assert(I->second->contains(I->first) && "orphaned block");
-  }
 }

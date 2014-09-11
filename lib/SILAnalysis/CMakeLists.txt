@@ -6,7 +6,7 @@ add_swift_library(swiftSILAnalysis
   ValueTracking.cpp
   GlobalARCPairingAnalysis.cpp
   GlobalARCSequenceDataflow.cpp
-  SILLoopInfo.cpp
+  LoopAnalysis.cpp
   ClassHierarchyAnalysis.cpp
   IVAnalysis.cpp
   CallGraphAnalysis.cpp

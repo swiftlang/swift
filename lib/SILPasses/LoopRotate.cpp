@@ -15,7 +15,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/SILLoopInfo.h"
+#include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"

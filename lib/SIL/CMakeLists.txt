@@ -21,6 +21,7 @@ add_swift_library(swiftSIL
   SILType.cpp
   SILValue.cpp
   SILDeclRef.cpp
+  LoopInfo.cpp
   DEPENDS swiftAST)
 
 # Clang dependencies.

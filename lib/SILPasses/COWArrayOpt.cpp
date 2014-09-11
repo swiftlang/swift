@@ -16,7 +16,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/SILLoopInfo.h"
+#include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
