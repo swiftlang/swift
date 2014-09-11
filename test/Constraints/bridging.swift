@@ -137,3 +137,6 @@ inferDouble = d
 var inferDouble2 = 1 % 3 / 3.0
 let d2: Double = 3.14159
 inferDouble2 = d2
+
+// rdar://problem/18269449
+var i1: Int = 1.5 * 3.5 // expected-error{{cannot invoke '*' with an argument list of type '(FloatLiteralConvertible, FloatLiteralConvertible)'}}

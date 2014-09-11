@@ -1203,6 +1203,24 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
   return false;
 }
 
+/// Determine whether the given type is a value type to which we can implicitly
+/// bridge a value of its corresponding class type, such as 'String' implicitly
+/// bridging from NSString.
+static bool allowsImplicitBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
+                                           Type type) {
+  auto objcType = tc.getBridgedToObjC(dc, type);
+  if (!objcType)
+    return nullptr;
+
+  auto objcClass = objcType->getClassOrBoundGenericClass();
+  if (!objcClass)
+    return nullptr;
+
+  // FIXME: As a temporary hack, eliminate implicit bridging from NSNumber. We
+  // want to eventually eliminate all implicit bridging.
+  return objcClass->getName().str() != "NSNumber";
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1687,7 +1705,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     if (type1->mayHaveSuperclass() && type2->isPotentiallyBridgedValueType() &&
         type2->getAnyNominal() 
           != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-        TC.getBridgedToObjC(DC, type2) &&
+        allowsImplicitBridgingFromObjC(TC, DC, type2) &&
         !HandlingFavoredConstraint) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
     }

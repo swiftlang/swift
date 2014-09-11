@@ -127,7 +127,7 @@ CGFloatTestSuite.test("bridging") {
     expectEqual("4.125", "\(nsnum)")
 
     // NSNumber -> CGFloat
-    let bridgedBack: CGFloat = nsnum
+    let bridgedBack: CGFloat = nsnum as CGFloat
     expectEqual(flt, bridgedBack)
   }
 
