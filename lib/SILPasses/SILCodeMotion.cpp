@@ -680,7 +680,12 @@ class BBEnumTagDataflowState
                                               EnumElementDecl *>, 4>>;
   ValueToCaseSmallBlotMapVectorTy ValueToCaseMap;
 
-  llvm::MapVector<SILValue, EnumBBCaseList> EnumToEnumBBCaseListMap;
+  using EnumToEnumBBCaseListMapTy =
+    BlotMapVector<SILValue, EnumBBCaseList,
+                  llvm::SmallDenseMap<SILValue, unsigned>,
+                  llvm::SmallVector<std::pair<SILValue, EnumBBCaseList>, 4>>;
+
+  EnumToEnumBBCaseListMapTy EnumToEnumBBCaseListMap;
 
 public:
   BBEnumTagDataflowState() = default;
@@ -722,12 +727,25 @@ public:
   bool visitRetainValueInst(RetainValueInst *RVI);
   bool visitReleaseValueInst(ReleaseValueInst *RVI);
   bool process();
-  void
-  mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
   bool hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA);
   bool sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA);
   void handlePredSwitchEnum(SwitchEnumInst *S);
   void handlePredCondEnumIsTag(CondBranchInst *CondBr);
+
+  /// Helper method which initializes this state map with the data from the
+  /// first predecessor BB.
+  ///
+  /// We will be performing an intersection in a later step of the merging.
+  bool initWithFirstPred(BBToDataflowStateMap &BBToStateMap,
+                         SILBasicBlock *FirstPredBB);
+
+  /// Top level merging function for predecessors.
+  void mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
+
+  /// 
+  void mergeSinglePredTermInfoIntoState(BBToDataflowStateMap &BBToStateMap,
+                                        SILBasicBlock *Pred);
+
 };
 
 /// Map all blocks to BBEnumTagDataflowState in RPO order.
@@ -843,6 +861,53 @@ void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
   }
 }
 
+bool
+BBEnumTagDataflowState::
+initWithFirstPred(BBToDataflowStateMap &BBToStateMap,
+                  SILBasicBlock *FirstPredBB) {
+  // Try to look up the state for the first pred BB.
+  BBEnumTagDataflowState *FirstPredState = BBToStateMap.getBBState(FirstPredBB);
+
+  // If we fail, we found an unreachable block, bail.
+  if (FirstPredState == nullptr) {
+    DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
+    return false;
+  }
+
+  // Ok, our state is in the map, copy in the predecessors value to case map.
+  ValueToCaseMap = FirstPredState->ValueToCaseMap;
+
+  // If we are predecessors only successor, we can potentially hoist releases
+  // into it, so associate the first pred BB and the case for each value that we
+  // are tracking with it.
+  //
+  // TODO: I am writing this too fast. Clean this up later.
+  if (FirstPredBB->getSingleSuccessor())
+    for (auto P : ValueToCaseMap.getItems())
+      EnumToEnumBBCaseListMap[P.first].push_back({FirstPredBB, P.second});
+
+  return true;
+}
+
+void
+BBEnumTagDataflowState::
+mergeSinglePredTermInfoIntoState(BBToDataflowStateMap &BBToStateMap,
+                                 SILBasicBlock *Pred) {
+  // Grab the terminator of our one predecessor and if it is a switch enum, mix
+  // it into this state.
+  TermInst *PredTerm = Pred->getTerminator();
+  if (auto *S = dyn_cast<SwitchEnumInst>(PredTerm)) {
+    handlePredSwitchEnum(S);
+    return;
+  }
+
+  auto *CondBr = dyn_cast<CondBranchInst>(PredTerm);
+  if (!CondBr)
+    return;
+
+  handlePredCondEnumIsTag(CondBr);
+}
+
 void
 BBEnumTagDataflowState::
 mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
@@ -859,40 +924,38 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
     return;
   }
 
-  // Initialize our state with our first predecessor...
-  SILBasicBlock *OtherBB = *PI;
-  BBEnumTagDataflowState *FirstPredState = BBToStateMap.getBBState(OtherBB);
-  if (FirstPredState == nullptr) {
-    DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
-    return;
-  }
+  // Grab the first predecessor BB.
+  SILBasicBlock *FirstPred = *PI;
   ++PI;
-  ValueToCaseMap = FirstPredState->ValueToCaseMap;
 
-  // If we are predecessors only successor, we can potentially hoist releases
-  // into it.
-  if (OtherBB->getSingleSuccessor()) {
-    for (auto P : ValueToCaseMap.getItems())
-      EnumToEnumBBCaseListMap[P.first].push_back({OtherBB, P.second});
-  }
+  // Attempt to initialize our state with our first predecessor's state by just
+  // copying. We will be doing an intersection with all of the other BB.
+  if (!initWithFirstPred(BBToStateMap, FirstPred))
+    return;
 
-  // If we only have one predecessor...
+  // If we only have one predecessor see if we can gain any information and or
+  // knowledge from the terminator of our one predecessor. There is nothing more
+  // that we can do, return.
+  //
+  // This enables us to get enum information from switch_enum and cond_br about
+  // the value that an enum can take in our block. This is a common case that
+  // comes up.
   if (PI == PE) {
-    // Grab the terminator of that successor and if it is a switch enum, mix it
-    // into this state.
-    TermInst *PredTerm = OtherBB->getTerminator();
-    if (auto *S = dyn_cast<SwitchEnumInst>(PredTerm))
-      handlePredSwitchEnum(S);
-    else if (auto *CondBr = dyn_cast<CondBranchInst>(PredTerm))
-      handlePredCondEnumIsTag(CondBr);
-
-    // There are no other predecessors to merge in. return.
+    mergeSinglePredTermInfoIntoState(BBToStateMap, FirstPred);
     return;
   }
 
-  DEBUG(llvm::dbgs() << "            Merging in rest of perdecessors...\n");
+  DEBUG(llvm::dbgs() << "            Merging in rest of predecessors...\n");
 
-  llvm::SmallVector<SILValue, 4> ValuesToBlot;
+  // Enum values that while merging we found conflicting values for. We blot
+  // them after the loop in order to ensure that we can still find the ends of
+  // switch regions.
+  llvm::SmallVector<SILValue, 4> CurBBValuesToBlot;
+
+  // If we do not find state for a specific value in any of our predecessor BBs,
+  // we can not be the end of a switch region since we can not cover our
+  // predecessor BBs with enum decls. Blot after the loop.
+  llvm::SmallVector<SILValue, 4> PredBBValuesToBlot;
 
   // And for each remaining predecessor...
   do {
@@ -903,10 +966,10 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
     }
 
     // Grab the predecessors state...
-    OtherBB = *PI;
+    SILBasicBlock *PredBB = *PI;
 
-    BBEnumTagDataflowState *PredState = BBToStateMap.getBBState(OtherBB);
-    if (PredState == nullptr) {
+    BBEnumTagDataflowState *PredBBState = BBToStateMap.getBBState(PredBB);
+    if (PredBBState == nullptr) {
       DEBUG(llvm::dbgs() << "            Found an unreachable block!\n");
       return;
     }
@@ -915,51 +978,57 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
 
     // Then for each (SILValue, Enum Tag) that we are tracking...
     for (auto P : ValueToCaseMap.getItems()) {
-      // If the entry was blotted, skip it...
+      // If this SILValue was blotted, there is nothing left to do, we found
+      // some sort of conflicting definition and are being conservative.
       if (!P.first)
         continue;
 
-      // Then attempt to look up the enum state for our SILValue in the other
-      // predecessor.
-      auto OtherValue = PredState->ValueToCaseMap.find(P.first);
+      // Then attempt to look up the enum state associated in our SILValue in
+      // the predecessor we are processing.
+      auto PredValue = PredBBState->ValueToCaseMap.find(P.first);
 
-      // If we find the state and it was not blotted...
-      if (OtherValue != PredState->ValueToCaseMap.end() && OtherValue->first) {
-
-        // Check if out predecessor has any other successors. If that is true we
-        // clear all the state since we can not hoist safely.
-        if (!OtherBB->getSingleSuccessor()) {
-          EnumToEnumBBCaseListMap.clear();
-          DEBUG(llvm::dbgs() << "                Predecessor has other "
-                "successors. Clearing BB cast list map.\n");
-        } else {
-          // Otherwise, add this case to our predecessor case list. We will unique
-          // this after we have finished processing all predecessors.
-          auto Case = std::make_pair(OtherBB, OtherValue->second);
-          EnumToEnumBBCaseListMap[OtherValue->first].push_back(Case);
-        }
-
-        // And the states match, the enum state propagates to this BB.
-        if (OtherValue->second == P.second)
-          continue;
-      } else {
-        // If we fail to find any state, we can not cover the switch along every
-        // BB path... Clear all predecessor cases that we are tracking so we
-        // don't attempt to perform that optimization.
-        EnumToEnumBBCaseListMap.clear();
-        DEBUG(llvm::dbgs() << "                Failed to find state. Clearing "
-              "BB cast list map.\n");
+      // If we can not find the state associated with this SILValue in this
+      // predecessor or the value in the corresponding predecessor was blotted,
+      // we can not find a covering switch for this BB or forward any enum tag
+      // information for this enum value.
+      if (PredValue == PredBBState->ValueToCaseMap.end() || !PredValue->first) {
+        // Otherwise, we are conservative and do not forward the EnumTag that we
+        // are tracking. Blot it!
+        DEBUG(llvm::dbgs() << "                Blotting: " << P.first);
+        CurBBValuesToBlot.push_back(P.first);
+        PredBBValuesToBlot.push_back(P.first);
+        continue;
       }
+
+      // Check if out predecessor has any other successors. If that is true we
+      // clear all the state since we can not hoist safely.
+      if (!PredBB->getSingleSuccessor()) {
+        EnumToEnumBBCaseListMap.clear();
+        DEBUG(llvm::dbgs() << "                Predecessor has other "
+              "successors. Clearing BB cast list map.\n");
+      } else {
+        // Otherwise, add this case to our predecessor case list. We will unique
+        // this after we have finished processing all predecessors.
+        auto Case = std::make_pair(PredBB, PredValue->second);
+        EnumToEnumBBCaseListMap[PredValue->first].push_back(Case);
+      }
+
+      // And the states match, the enum state propagates to this BB.
+      if (PredValue->second == P.second)
+        continue;
 
       // Otherwise, we are conservative and do not forward the EnumTag that we
       // are tracking. Blot it!
       DEBUG(llvm::dbgs() << "                Blotting: " << P.first);
-      ValuesToBlot.push_back(P.first);
+      CurBBValuesToBlot.push_back(P.first);
     }
   } while (PI != PE);
 
-  for (SILValue V : ValuesToBlot) {
+  for (SILValue V : CurBBValuesToBlot) {
     ValueToCaseMap.blot(V);
+  }
+  for (SILValue V : PredBBValuesToBlot) {
+    EnumToEnumBBCaseListMap.blot(V);
   }
 }
 

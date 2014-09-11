@@ -1337,3 +1337,26 @@ bb5:
   %1 = tuple()
   return %1 : $()
 }
+
+// Make sure that we blot pointers from the enumbbtoenumbbcaselist map after
+// merging predecessors. This ensures that the failure to merge unrelating
+// values does not stop sinking out of retain, release regions.
+// CHECK-LABEL: sil @enumbbtoenumbbcaselist_invalidation_test : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: bb3:
+// CHECK: retain_value
+sil @enumbbtoenumbbcaselist_invalidation_test : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  retain_value %0 : $FakeOptional<Builtin.NativeObject>
+  br bb3
+
+bb2:
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb3
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
