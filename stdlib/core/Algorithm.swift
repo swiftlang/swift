@@ -200,6 +200,18 @@ public func startsWith<
   return prefixGenerator.next() != nil ? false : true
 }
 
+/// The `GeneratorType` for `EnumerateSequence`.  `EnumerateGenerator`
+/// wraps a `Base` `GeneratorType` and yields successive `Int` values,
+/// starting at zero, along with the elements of the underlying
+/// `Base`::
+///
+///   var g = EnumerateGenerator(["foo", "bar"].generate())
+///   g.next() // (0, "foo")
+///   g.next() // (1, "bar")
+///   g.next() // nil
+///
+/// Note:: idiomatic usage is to call `enumerate` instead of
+/// constructing an `EnumerateGenerator` directly.
 public struct EnumerateGenerator<
   Base: GeneratorType
 > : GeneratorType, SequenceType {
@@ -207,11 +219,14 @@ public struct EnumerateGenerator<
   var base: Base
   var count: Int
 
+  /// Construct from a `Base` generator
   public init(_ base: Base) {
     self.base = base
     count = 0
   }
 
+  /// If all elements are exhausted, return `nil`.  Otherwise, advance
+  /// to the next element and return it.
   public mutating func next() -> Element? {
     var b = base.next()
     if b == nil { return .None }
@@ -220,31 +235,58 @@ public struct EnumerateGenerator<
 
   // Every GeneratorType is also a single-pass SequenceType
   public typealias Generator = EnumerateGenerator<Base>
+  
+  /// `EnumerateGenerator` is also a `SequenceType`, so it `generate`\
+  /// 's a copy of itself
   public func generate() -> Generator {
     return self
   }
 }
 
+/// The `SequenceType` returned by `enumerate()`.  `EnumerateSequence`
+/// is a sequence of pairs (*n*, *x*), where *n*\ s are consecutive
+/// `Int`\ s starting at zero, and *x*\ s are the elements of a `Base`
+/// `SequenceType`::
+///
+///   var s = EnumerateSequence(["foo", "bar"])
+///   Array(s) // [(0, "foo"), (1, "bar")]
+///
+/// Note:: idiomatic usage is to call `enumerate` instead of
+/// constructing an `EnumerateSequence` directly.
 public struct EnumerateSequence<
   Base: SequenceType
 > : SequenceType {
   var base: Base
 
+  /// Construct from a `Base` sequence
   public init(_ base: Base) {
     self.base = base
   }
 
+  /// Return a generator for this sequence's elements.
   public func generate() -> EnumerateGenerator<Base.Generator> {
     return EnumerateGenerator(base.generate())
   }
 }
 
+/// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
+/// *n*\ s are consecutive `Int`\ s starting at zero, and *x*\ s are
+/// the elements of `base`::
+///
+///   > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" )}
+///   0: 'S'
+///   1: 'w'
+///   2: 'i'
+///   3: 'f'
+///   4: 't'
 public func enumerate<Seq : SequenceType>(
-  seq: Seq
+  base: Seq
 ) -> EnumerateSequence<Seq> {
-  return EnumerateSequence(seq)
+  return EnumerateSequence(base)
 }
 
+/// Return `true` iff `a1` and `a2` contain the same elements in the
+/// same order.
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
