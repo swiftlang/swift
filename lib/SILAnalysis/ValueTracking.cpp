@@ -17,8 +17,10 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SIL/PatternMatch.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
+using namespace swift::PatternMatch;
 
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
@@ -506,12 +508,66 @@ Optional<bool> swift::computeSignBit(SILValue V) {
   }
 }
 
+/// Check if a checked trunc instruction can overflow.
+/// Returns false if it can be proven that no overflow can happen.
+/// Otherwise returns true.
+static bool checkTruncOverflow(ApplyInst *AI, BuiltinFunctionRefInst *BFRI) {
+  SILValue Left, Right;
+  if (match(AI, m_CheckedTrunc(m_And(m_SILValue(Left),
+                               m_SILValue(Right))))) {
+    // [US]ToSCheckedTrunc(And(x, mask)) cannot overflow
+    // if mask has the following properties:
+    // Only the first (N-1) bits are allowed to be set, where N is the width
+    // of the trunc result type.
+    //
+    // [US]ToUCheckedTrunc(And(x, mask)) cannot overflow
+    // if mask has the following properties:
+    // Only the first N bits are allowed to be set, where N is the width
+    // of the trunc result type.
+    if (auto BITy = AI->getType().
+                        getTupleElementType(0).
+                        getAs<BuiltinIntegerType>()) {
+      unsigned Width = BITy->getFixedWidth();
+
+      switch (BFRI->getBuiltinInfo().ID) {
+      case BuiltinValueKind::SToSCheckedTrunc:
+      case BuiltinValueKind::UToSCheckedTrunc:
+        // If it is a trunc to a signed value
+        // then sign bit should not be set to avoid overflows.
+        --Width;
+        break;
+      default:
+        break;
+      }
+
+      if (auto *ILLeft = dyn_cast<IntegerLiteralInst>(Left)) {
+        APInt Value = ILLeft->getValue();
+        if (Value.isIntN(Width)) {
+          return false;
+        }
+      }
+
+      if (auto *ILRight = dyn_cast<IntegerLiteralInst>(Right)) {
+        APInt Value = ILRight->getValue();
+        if (Value.isIntN(Width)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 /// Check if execution of a given Apply instruction can result in overflows.
 /// Returns true if an overflow can happen. Otherwise returns false.
 bool swift::canOverflow(ApplyInst *AI) {
   if (simplifyOverflowBuiltinInstruction(AI) != SILValue())
     return false;
 
+  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
+    if (!checkTruncOverflow(AI, BFRI))
+      return false;
+  }
   // Conservatively assume that an overflow can happen
   return true;
 }

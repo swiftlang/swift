@@ -395,7 +395,105 @@ bb3:                                              // Preds: bb2
   return %32 : $UInt16                            // id: %33
 }
 
+// peephole: Int8(x & 127) -> remove overflow check
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVSs5Int32VSs4Int8 : $@thin (Int32) -> Int8
+// CHECK: builtin_function_ref "and_Int32"
+// CHECK: builtin_function_ref "s_to_s_checked_trunc_Int32_Int8"
+// CHECK-NOT: builtin_function_ref "cond_fail"
+// CHECK: return
+// peephole_trunc_and_ext.test_s_to_s_checked_trunc_of_and (Swift.Int32) -> Swift.Int8
+sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVSs5Int32VSs4Int8 : $@thin (Int32) -> Int8 {
+bb0(%0 : $Int32):
+  debug_value %0 : $Int32  // let x               // id: %1
+  %2 = integer_literal $Builtin.Int32, 127        // user: %5
+  %3 = builtin_function_ref "and_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %5
+  %4 = struct_extract %0 : $Int32, #Int32.value   // user: %5
+  %5 = apply %3(%4, %2) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %6
+  %6 = struct $Int32 (%5 : $Builtin.Int32)        // user: %7
+  %7 = struct_extract %6 : $Int32, #Int32.value   // user: %9
+  %8 = builtin_function_ref "s_to_s_checked_trunc_Int32_Int8" : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // user: %9
+  %9 = apply %8(%7) : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $Int8 (%10 : $Builtin.Int8)        // user: %14
+  return %13 : $Int8                              // id: %14
+}
 
+// peephole: UInt8(x & 255) -> remove overflow check
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVSs5Int32VSs5UInt8 : $@thin (Int32) -> UInt8
+// CHECK: builtin_function_ref "and_Int32"
+// CHECK: builtin_function_ref "s_to_u_checked_trunc_Int32_Int8"
+// CHECK-NOT: builtin_function_ref "cond_fail"
+// CHECK: return
+// peephole_trunc_and_ext.test_s_to_u_checked_trunc_of_and (Swift.Int32) -> Swift.UInt8
+sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVSs5Int32VSs5UInt8 : $@thin (Int32) -> UInt8 {
+bb0(%0 : $Int32):
+  debug_value %0 : $Int32  // let x               // id: %1
+  %2 = integer_literal $Builtin.Int32, 255        // user: %5
+  %3 = builtin_function_ref "and_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %5
+  %4 = struct_extract %0 : $Int32, #Int32.value   // user: %5
+  %5 = apply %3(%4, %2) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %6
+  %6 = struct $Int32 (%5 : $Builtin.Int32)        // user: %7
+  %7 = struct_extract %6 : $Int32, #Int32.value   // user: %9
+  %8 = builtin_function_ref "s_to_u_checked_trunc_Int32_Int8" : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // user: %9
+  %9 = apply %8(%7) : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $UInt8 (%10 : $Builtin.Int8)       // user: %14
+  return %13 : $UInt8                             // id: %14
+}
+
+// peephole: UInt8(x & 255) -> remove overflow check
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVSs6UInt32VSs5UInt8 : $@thin (UInt32) -> UInt8
+// CHECK: builtin_function_ref "and_Int32"
+// CHECK: builtin_function_ref "u_to_u_checked_trunc_Int32_Int8"
+// CHECK-NOT: builtin_function_ref "cond_fail"
+// CHECK: return
+// peephole_trunc_and_ext.test_u_to_u_checked_trunc_of_and (Swift.UInt32) -> Swift.UInt8
+sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVSs6UInt32VSs5UInt8 : $@thin (UInt32) -> UInt8 {
+bb0(%0 : $UInt32):
+  debug_value %0 : $UInt32  // let x              // id: %1
+  %2 = integer_literal $Builtin.Int32, 255        // user: %5
+  %3 = builtin_function_ref "and_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %5
+  %4 = struct_extract %0 : $UInt32, #UInt32.value // user: %5
+  %5 = apply %3(%4, %2) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %6
+  %6 = struct $UInt32 (%5 : $Builtin.Int32)       // user: %7
+  %7 = struct_extract %6 : $UInt32, #UInt32.value // user: %9
+  %8 = builtin_function_ref "u_to_u_checked_trunc_Int32_Int8" : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // user: %9
+  %9 = apply %8(%7) : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $UInt8 (%10 : $Builtin.Int8)       // user: %14
+  return %13 : $UInt8                             // id: %14
+}
+
+// peephole: Int8(x & 127) -> remove overflow check
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVSs6UInt32VSs4Int8 : $@thin (UInt32) -> Int8
+// CHECK: builtin_function_ref "and_Int32"
+// CHECK: builtin_function_ref "u_to_s_checked_trunc_Int32_Int8"
+// CHECK-NOT: builtin_function_ref "cond_fail"
+// CHECK: return
+// peephole_trunc_and_ext.test_u_to_s_checked_trunc_of_and (Swift.UInt32) -> Swift.Int8
+sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVSs6UInt32VSs4Int8 : $@thin (UInt32) -> Int8 {
+bb0(%0 : $UInt32):
+  debug_value %0 : $UInt32  // let x              // id: %1
+  %2 = integer_literal $Builtin.Int32, 127        // user: %5
+  %3 = builtin_function_ref "and_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %5
+  %4 = struct_extract %0 : $UInt32, #UInt32.value // user: %5
+  %5 = apply %3(%4, %2) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %6
+  %6 = struct $UInt32 (%5 : $Builtin.Int32)       // user: %7
+  %7 = struct_extract %6 : $UInt32, #UInt32.value // user: %9
+  %8 = builtin_function_ref "u_to_s_checked_trunc_Int32_Int8" : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // user: %9
+  %9 = apply %8(%7) : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $Int8 (%10 : $Builtin.Int8)       // user: %14
+  return %13 : $Int8                             // id: %14
+}
 
 // Swift._fatalErrorMessage (Swift.StaticString, Swift.StaticString, Swift.StaticString, Swift.UInt) -> ()
 sil [noinline] @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_ : $@thin @noreturn (StaticString, StaticString, StaticString, UInt) -> ()
