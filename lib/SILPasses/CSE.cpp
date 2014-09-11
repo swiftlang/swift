@@ -68,6 +68,7 @@ struct SimpleValue {
     case ValueKind::FunctionRefInst:
     case ValueKind::BuiltinFunctionRefInst:
     case ValueKind::GlobalAddrInst:
+    case ValueKind::SILGlobalAddrInst:
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
     case ValueKind::StringLiteralInst:
@@ -139,6 +140,10 @@ public:
 
   hash_code visitGlobalAddrInst(GlobalAddrInst *X) {
     return llvm::hash_combine(X->getKind(), X->getGlobal());
+  }
+
+  hash_code visitSILGlobalAddrInst(SILGlobalAddrInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getReferencedGlobal());
   }
 
   hash_code visitIntegerLiteralInst(IntegerLiteralInst *X) {

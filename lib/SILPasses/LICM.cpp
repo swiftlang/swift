@@ -100,6 +100,8 @@ static SILInstruction *addressIndependent(SILValue Addr) {
   Addr = Addr.stripCasts();
   if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(Addr))
     return GAI;
+  if (SILGlobalAddrInst *SGAI = dyn_cast<SILGlobalAddrInst>(Addr))
+    return SGAI;
   if (StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(Addr))
     return addressIndependent(SEAI->getOperand());
   return nullptr;

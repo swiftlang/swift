@@ -242,6 +242,11 @@ namespace {
       return X->getGlobal() == RHS->getGlobal();
     }
 
+    bool visitSILGlobalAddrInst(const SILGlobalAddrInst *RHS) {
+      auto *X = cast<SILGlobalAddrInst>(LHS);
+      return X->getReferencedGlobal() == RHS->getReferencedGlobal();
+    }
+
     bool visitIntegerLiteralInst(const IntegerLiteralInst *RHS) {
       APInt X = cast<IntegerLiteralInst>(LHS)->getValue();
       APInt Y = RHS->getValue();

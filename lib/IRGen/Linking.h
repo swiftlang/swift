@@ -417,6 +417,10 @@ public:
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(Module *module) const {
+    if (getKind() == Kind::SILGlobalVariable &&
+        getSILGlobalVariable()->getDecl())
+      return getSILGlobalVariable()->getDecl()->isWeakImported(module);
+
     if (!isDeclKind(getKind()))
       return false;
 

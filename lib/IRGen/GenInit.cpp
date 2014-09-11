@@ -42,12 +42,14 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   }
   
   /// Get the global variable.
-  Address addr = getAddrOfSILGlobalVariable(var, ForDefinition);
+  Address addr = getAddrOfSILGlobalVariable(var,
+                     var->isDefinition() ? ForDefinition : NotForDefinition);
   
   /// Add a zero initializer.
-  auto gvar = cast<llvm::GlobalVariable>(addr.getAddress());
-  gvar->setInitializer(llvm::Constant::getNullValue(type.getStorageType()));
-  
+  if (var->isDefinition()) {
+    auto gvar = cast<llvm::GlobalVariable>(addr.getAddress());
+    gvar->setInitializer(llvm::Constant::getNullValue(type.getStorageType()));
+  }
   return addr;
 }
 

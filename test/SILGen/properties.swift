@@ -551,7 +551,7 @@ var global_observing_property : Int = zero {
 // The property is initialized with "zero".
 // CHECK-LABEL: sil private @globalinit_func1 : $@thin () -> () {
 // CHECK-NEXT: bb0:
-// CHECK-NEXT: %0 = global_addr #global_observing_property
+// CHECK-NEXT: %0 = sil_global_addr @_Tv10properties25global_observing_propertySi : $*Int
 // CHECK: properties.zero.addressor
 // CHECK: return
 

@@ -425,8 +425,9 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
   // VarLocs.
   auto &entryBB = gen.getFunction().getBlocks().front();
   SILBuilder B(&entryBB, entryBB.begin());
-  auto addr = B.createGlobalAddr(loc, var,
-                          gen.getLoweredType(var->getType()).getAddressType());
+
+  auto *silG = gen.SGM.getSILGlobalVariable(var, NotForDefinition);
+  SILValue addr = B.createSILGlobalAddr(var, silG);
 
   gen.VarLocs[var] = SILGenFunction::VarLoc::getAddress(addr);
   return ManagedValue::forLValue(addr);
@@ -4466,8 +4467,9 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
   
   // Return the address of the global variable.
   // FIXME: It'd be nice to be able to return a SIL address directly.
-  SILValue addr = B.createGlobalAddr(global, global,
-                           getLoweredType(global->getType()).getAddressType());
+  auto *silG = SGM.getSILGlobalVariable(global, NotForDefinition);
+  SILValue addr = B.createSILGlobalAddr(global, silG);
+
   addr = B.createAddressToPointer(global, addr, rawPointerSILTy);
   B.createReturn(global, addr);
 }

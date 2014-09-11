@@ -414,7 +414,8 @@ void SILGenModule::emitForeignThunk(SILDeclRef thunk) {
 }
 
 void SILGenModule::addGlobalVariable(VarDecl *global) {
-  M.globals.insert(global);
+  // We create SILGlobalVariable here.
+  getSILGlobalVariable(global, ForDefinition); 
 }
 
 void SILGenModule::emitConstructor(ConstructorDecl *decl) {

@@ -4,7 +4,7 @@
 // CHECK: bb0:
 
 // -- initialize x
-// CHECK: [[X:%[0-9]+]] = global_addr #x : $*Int
+// CHECK: [[X:%[0-9]+]] = sil_global_addr @_Tv8toplevel1xSi : $*Int
 // CHECK: integer_literal $Builtin.Int2048, 999
 // CHECK: store {{.*}} to [[X]]
 
@@ -15,7 +15,7 @@
 // CHECK: apply [[PRINT_X]]
 
 // -- assign y
-// CHECK: [[Y1:%[0-9]+]] = global_addr #y : $*Int
+// CHECK: [[Y1:%[0-9]+]] = sil_global_addr @_Tv8toplevel1ySi : $*Int
 // CHECK: [[Y:%[0-9]+]] = mark_uninitialized [var] [[Y1]]
 // CHECK: assign {{.*}} to [[Y]]
 // CHECK: [[PRINT_Y:%[0-9]+]] = function_ref @_TF8toplevel7print_yFT_T_
@@ -45,7 +45,7 @@ print_y()
 
 // CHECK: sil @_TF8toplevel13testGlobalCSEFT_Si
 // CHECK-NOT: global_addr
-// CHECK: %0 = global_addr #x : $*Int
+// CHECK: %0 = sil_global_addr @_Tv8toplevel1xSi : $*Int
 // CHECK-NOT: global_addr
 // CHECK: return
 func testGlobalCSE() -> Int {

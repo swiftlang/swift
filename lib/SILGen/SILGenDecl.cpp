@@ -14,6 +14,7 @@
 #include "Initialization.h"
 #include "RValue.h"
 #include "Scope.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILType.h"
@@ -23,6 +24,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Fallthrough.h"
+#include "clang/AST/Attr.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/SmallString.h"
 #include <iterator>
 using namespace swift;
@@ -606,6 +609,60 @@ struct MarkPatternUninitialized
 
 } // end anonymous namespace
 
+/// Get or create SILGlobalVariable for a given global VarDecl.
+SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
+                                                      ForDefinition_t forDef) {
+  // First mangle the global VarDecl.
+  llvm::SmallString<32> mangledName;
+  {
+    llvm::raw_svector_ostream buffer(mangledName);
+
+    // As a special case, Clang functions and globals don't get mangled at all.
+    // FIXME: When we can import C++, use Clang's mangler.
+    bool specialCase = false;
+    if (auto clangDecl = gDecl->getClangDecl()) {
+      if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
+        if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
+          buffer << '\01' << asmLabel->getLabel();
+        } else {
+          buffer << namedClangDecl->getName();
+        }
+        specialCase = true;
+      }
+    }
+
+    if (!specialCase) {
+      buffer << "_T";
+      Mangler mangler(buffer);
+      mangler.mangleEntity(gDecl, ResilienceExpansion(0), 0);
+    }
+  }
+
+  // Check if it is already created, and update linkage if necessary.
+  for (SILGlobalVariable &v : M.getSILGlobals()) {
+    if (v.getName() == mangledName) {
+      // Update the SILLinkage here if this is a definition.
+      if (forDef == ForDefinition) {
+        v.setLinkage(getSILLinkage(getDeclLinkage(gDecl), ForDefinition));
+        v.setDeclaration(false);
+      }
+      return &v;
+    }
+  }
+
+  // Get the linkage for SILGlobalVariable.
+  SILLinkage link = getSILLinkage(getDeclLinkage(gDecl), forDef);
+
+  auto silTy = M.Types.getLoweredType(AbstractionPattern(gDecl->getType()),
+                 gDecl->getType()->getCanonicalType()).getObjectType();
+
+  auto *silGlobal = SILGlobalVariable::create(M, link, mangledName, silTy,
+                                              Nothing, gDecl);
+  silGlobal->setDeclaration(!forDef);
+
+  return silGlobal;
+}
+
 InitializationPtr
 SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
                                              Type patternType) {
@@ -642,8 +699,8 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
   // cleanups.
   InitializationPtr Result;
   if (!vd->getDeclContext()->isLocalContext()) {
-    SILValue addr = B.createGlobalAddr(vd, vd,
-                                getLoweredType(vd->getType()).getAddressType());
+    auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
+    SILValue addr = B.createSILGlobalAddr(vd, silG);
     
     VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr);
     Result = InitializationPtr(new GlobalInitialization(addr));
@@ -1937,6 +1994,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
   
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
                                              onceTokenName, onceSILTy);
+  onceToken->setDeclaration(false);
   
   // Emit the initialization code into a function.
   llvm::SmallString<20> onceFuncName;

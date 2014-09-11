@@ -9,13 +9,13 @@
 import def_transparent
 
 // SIL-LABEL: sil private @top_level_code : $@thin () -> () {
-// SIL: [[RAW:%.+]] = global_addr #raw : $*Bool
+// SIL: [[RAW:%.+]] = sil_global_addr @_Tv11transparent3rawSb : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_TF15def_transparent15testTransparentFT1xSb_Sb : $@thin (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [transparent] [[FUNC]]({{%.+}}) : $@thin (Bool) -> Bool
 // SIL: store [[RESULT]] to [[RAW]] : $*Bool
 var raw = testTransparent(x: false)
 
-// SIL: [[TMP:%.+]] = global_addr #tmp : $*Int
+// SIL: [[TMP:%.+]] = sil_global_addr @_Tv11transparent3tmpSi : $*Int
 // SIL: [[FUNC2:%.+]] = function_ref @_TF15def_transparent11testBuiltinFT_Si : $@thin () -> Int
 // SIL: [[RESULT2:%.+]] = apply [transparent] [[FUNC2]]() : $@thin () -> Int
 // SIL: store [[RESULT2]] to [[TMP]] : $*Int

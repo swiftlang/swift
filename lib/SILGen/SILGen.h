@@ -266,6 +266,10 @@ public:
     return M.getASTContext().Diags.diagnose(loc.getSourceLoc(),
                                      diag, std::forward<U>(args)...);
   }
+
+  /// Get or create SILGlobalVariable for a given global VarDecl.
+  SILGlobalVariable *getSILGlobalVariable(VarDecl *gDecl,
+                                          ForDefinition_t forDef);
 };
  
 } // end namespace Lowering

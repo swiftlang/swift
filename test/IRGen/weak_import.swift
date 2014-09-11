@@ -7,11 +7,11 @@
 
 import Foundation
 
-// CHECK-10_9: @"OBJC_CLASS_$_NSUserNotificationAction" = extern_weak global %objc_class
-// CHECK-10_10: @"OBJC_CLASS_$_NSUserNotificationAction" = external global %objc_class
-
 // CHECK-10_9: @weak_variable = extern_weak global
 // CHECK-10_10: @weak_variable = extern_weak global
+
+// CHECK-10_9: @"OBJC_CLASS_$_NSUserNotificationAction" = extern_weak global %objc_class
+// CHECK-10_10: @"OBJC_CLASS_$_NSUserNotificationAction" = external global %objc_class
 
 func testObjCClass() {
   let action = NSUserNotificationAction()

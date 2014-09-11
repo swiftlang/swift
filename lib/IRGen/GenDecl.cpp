@@ -1018,14 +1018,23 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   auto &ti = getTypeInfo(var->getLoweredType());
-  // There is no VarDecl for a SILGlobalVariable, and thus also no context.
-  DeclContext *DeclCtx = nullptr;
-  DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(), ti, DeclCtx);
-  Optional<SILLocation> loc;
-  if (var->hasLocation())
-    loc = var->getLocation();
-  gvar = link.createVariable(*this, ti.StorageType, DbgTy,
-                             loc, var->getName());
+  if (var->getDecl()) {
+    // If we have the VarDecl, use it for more accurate debugging information.
+    DebugTypeInfo DbgTy(var->getDecl(), ti);
+    gvar = link.createVariable(*this, ti.StorageType, DbgTy, var->getDecl(),
+                               var->getDecl()->getName().str());
+  } else {
+    // There is no VarDecl for a SILGlobalVariable, and thus also no context.
+    DeclContext *DeclCtx = nullptr;
+    DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(), ti,
+                        DeclCtx);
+
+    Optional<SILLocation> loc;
+    if (var->hasLocation())
+      loc = var->getLocation();
+    gvar = link.createVariable(*this, ti.StorageType, DbgTy, loc,
+                               var->getName());
+  }
   
   // Set the alignment from the TypeInfo.
   Address gvarAddr = ti.getAddressForPointer(gvar);

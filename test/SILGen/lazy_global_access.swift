@@ -13,7 +13,7 @@ struct Fooo {
 }
 
 // MAIN: sil @_TF18lazy_global_access8usePropsFT_TSiSi_ : $@thin () -> (Int, Int) {
-// MAIN:   global_addr #globalProp : $*Int
+// MAIN:   sil_global_addr @_Tv18lazy_global_access10globalPropSi : $*Int
 // MAIN:   function_ref @_TFV18lazy_global_access4Foooa10staticPropSi : $@thin () -> Builtin.RawPointer
 // LIBRARY: sil @_TF18lazy_global_access8usePropsFT_TSiSi_ : $@thin () -> (Int, Int) {
 // LIBRARY:   function_ref @_TF18lazy_global_accessa10globalPropSi : $@thin () -> Builtin.RawPointer
