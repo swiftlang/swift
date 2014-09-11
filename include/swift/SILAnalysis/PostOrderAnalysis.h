@@ -64,8 +64,8 @@ public:
   PostOrderAnalysis(SILModule *) : SILAnalysis(AnalysisKind::PostOrder) {}
 
   // This is a cache and shouldn't be copied around.
-  PostOrderAnalysis(const PostOrderAnalysis &) LLVM_DELETED_FUNCTION;
-  PostOrderAnalysis &operator=(const PostOrderAnalysis &) LLVM_DELETED_FUNCTION;
+  PostOrderAnalysis(const PostOrderAnalysis &) = delete;
+  PostOrderAnalysis &operator=(const PostOrderAnalysis &) = delete;
 
   using iterator = std::vector<SILBasicBlock *>::iterator;
   using reverse_iterator = std::vector<SILBasicBlock *>::reverse_iterator;
