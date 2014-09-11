@@ -587,6 +587,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalPatterns |= Args.hasArg(OPT_enable_experimental_patterns);
 
+  Opts.EnableExperimentalAvailabilityChecking |=
+      Args.hasArg(OPT_enable_experimental_availability_checking);
+  
   Opts.EnableCharacterLiterals |= Args.hasArg(OPT_enable_character_literals);
   Opts.UsePrivateDiscriminators |=
     Args.hasArg(OPT_enable_private_discriminators);

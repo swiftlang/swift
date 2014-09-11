@@ -128,6 +128,10 @@ def enable_dynamic_value_type_layout :
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
 
+def enable_experimental_availability_checking : Flag<["-"],
+  "enable-experimental-availability-checking">,
+  HelpText<"Enable experimental checking for API availability">;
+
 def enable_character_literals : Flag<["-"], "enable-character-literals">,
   HelpText<"Enable legacy character literals">;
 

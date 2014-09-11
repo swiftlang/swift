@@ -1,4 +1,4 @@
-// RUN: %swift -parse -target x86_64-apple-macosx10.9 -verify %s
+// RUN: %swift -parse -enable-experimental-availability-checking -target x86_64-apple-macosx10.9 -verify %s
 
 if #os(OSX >= 10.10) {
 }

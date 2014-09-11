@@ -884,6 +884,11 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     break;
 
   case tok::pound_os: {     // #os(...)
+    if (!Context.LangOpts.EnableExperimentalAvailabilityChecking) {
+      diagnose(Tok, diag::avail_query_not_enabled);
+      return nullptr;
+    }
+    
     SourceLoc PoundLoc = consumeToken(tok::pound_os);
     
     if (!Tok.isFollowingLParen()) {
