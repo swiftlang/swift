@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-value-tracking"
 #include "swift/SILAnalysis/ValueTracking.h"
+#include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -504,3 +505,14 @@ Optional<bool> swift::computeSignBit(SILValue V) {
     return Nothing;
   }
 }
+
+/// Check if execution of a given Apply instruction can result in overflows.
+/// Returns true if an overflow can happen. Otherwise returns false.
+bool swift::canOverflow(ApplyInst *AI) {
+  if (simplifyOverflowBuiltinInstruction(AI) != SILValue())
+    return false;
+
+  // Conservatively assume that an overflow can happen
+  return true;
+}
+

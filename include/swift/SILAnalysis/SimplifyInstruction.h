@@ -28,4 +28,14 @@ class SILInstruction;
 /// returned, otherwise a null SILValue is returned.
 SILValue simplifyInstruction(SILInstruction *I);
 
+/// Simplify invocations of builtin operations that may overflow.
+/// All such operations return a tuple (result, overflow_flag).
+/// This function try to simplify such operations, but returns only a
+/// simplified first element of a tuple. The overflow flag is not returned
+/// explicitly, because this simplification is only possible if there is
+/// no overflow. Therefore the overflow flag is known to have a value of 0 if
+/// simplification was successful.
+/// In case when a simplification is not possible, a null SILValue is returned.
+SILValue simplifyOverflowBuiltinInstruction(ApplyInst *AI);
+
 } // end namespace swift

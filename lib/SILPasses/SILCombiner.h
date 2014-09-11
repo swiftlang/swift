@@ -206,6 +206,7 @@ public:
   SILInstruction *visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
+  SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);

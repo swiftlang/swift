@@ -1548,3 +1548,15 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   return visitMetatypeConversionInst(OCTTMI, MetatypeRepresentation::ObjC);
 }
 
+SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
+  // tuple_extract(apply([add|sub|...]overflow(x, 0)), 1) -> 0
+  // if it can be proven that no overflow can happen.
+  if (TEI->getFieldNo() != 1)
+    return nullptr;
+
+  if (auto *AI = dyn_cast<ApplyInst>(TEI->getOperand()))
+    if (!canOverflow(AI))
+      return IntegerLiteralInst::create(TEI->getLoc(), TEI->getType(),
+                                        APInt(1, 0), *TEI->getFunction());
+  return nullptr;
+}

@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil -Ounchecked -o - -verify | FileCheck %s
+// RUN: %swift %s -emit-sil -O -o - -verify | FileCheck %s
 sil_stage canonical
 
 import Builtin
