@@ -270,7 +270,23 @@ func _heapSort<
     _siftDown(&elements, lo, lo..<hi ${", &isOrderedBefore" if p else ""})
   }
 }
+
+%{
+if p:
+    sortIsUnstable = """\
+/// The sorting algorithm is not stable (can change the relative order of
+/// elements for which `isOrderedBefore` does not establish an order)."""
+else:
+    sortIsUnstable = """\
+/// The sorting algorithm is not stable (can change the relative order of
+/// elements that compare equal)."""
+
+}%
+
 /// Sort `collection` in-place${according}.
+///
+${sortIsUnstable}
+///
 ${orderingRequirement}
 public func sort<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
@@ -283,6 +299,9 @@ public func sort<
 }
 
 /// Sort `array` in-place${according}.
+///
+${sortIsUnstable}
+///
 ${orderingRequirement}
 % if p:
 public func sort<T>(inout array: [T], isOrderedBefore: (T, T) -> Bool) {
@@ -295,27 +314,11 @@ public func sort<T : Comparable>(inout array: [T]) {
   }
 }
 
-%{
-if p:
-    sortIsUnstable = """\
-/// The sorting algorithm is not stable (can change the relative order of
-/// elements for which `isOrderedBefore` does not establish an order)."""
-else:
-    sortIsUnstable = """\
-/// The sorting algorithm is not stable (can change the relative order of
-/// elements that compare equal)."""
-
-sortedDocComment = """\
 /// Return an `Array` containing the sorted elements of `source`{according}.
 ///
-{sortIsUnstable}
+${sortIsUnstable}
 ///
-{orderingRequirement}""".format(
-    according=according, sortIsUnstable=sortIsUnstable,
-    orderingRequirement=orderingRequirement)
-}%
-
-${sortedDocComment}
+${orderingRequirement}
 public func sorted<
   C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
 >(
