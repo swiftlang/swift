@@ -198,14 +198,6 @@ public:
 
   inline bool hasOneUse();
 
-  // Return the underlying SILValue after stripping off SILArguments if the BB
-  // we are in has only one predecessor.
-  SILValue stripSinglePredecessorArgs();
-
-  // Return the underlying SILValue after stripping off SILArguments that can
-  // not affect RC Identity if the BB we are in has only one predecessor.
-  SILValue stripSinglePredecessorRCIdentityPreservingArgs();
-
   // Return the underlying SILValue after stripping off all casts from the
   // current SILValue.
   SILValue stripCasts();

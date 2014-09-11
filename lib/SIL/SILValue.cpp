@@ -41,113 +41,10 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   }
 }
 
-SILValue SILValue::stripCasts() {
-  SILValue V = *this;
-
-  while (true) {
-    V = V.stripSinglePredecessorArgs();
-
-    auto K = V->getKind();
-    if (isRCIdentityPreservingCast(K) ||
-        K == ValueKind::UncheckedTrivialBitCastInst) {
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
-      continue;
-    }
-
-    return V;
-  }
-}
-
-SILValue SILValue::stripAddressProjections() {
-  SILValue V = *this;
-
-  while (true) {
-    V = V.stripSinglePredecessorArgs();
-
-    switch (V->getKind()) {
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::RefElementAddrInst:
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
-      continue;
-    default:
-      return V;
-    }
-  }
-}
-
-SILValue SILValue::stripAggregateProjections() {
-  SILValue V = *this;
-
-  while (true) {
-    V = V.stripSinglePredecessorArgs();
-
-    switch (V->getKind()) {
-    case ValueKind::StructExtractInst:
-    case ValueKind::TupleExtractInst:
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
-      continue;
-    default:
-      return V;
-    }
-  }
-}
-
-SILValue SILValue::stripIndexingInsts() {
-  SILValue V = *this;
-  while (true) {
-    if (!isa<IndexingInst>(V.getDef()))
-      return V;
-    V = cast<IndexingInst>(V)->getBase();
-  }
-}
-
-SILValue SILValue::stripRCIdentityPreservingOps() {
-  SILValue V = *this;
-  while (true) {
-    V = V.stripSinglePredecessorRCIdentityPreservingArgs();
-
-    // Strip off RC identity preserving casts.
-    if (isRCIdentityPreservingCast(V->getKind())) {
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
-      continue;
-    }
-
-    // Then if we have a struct_extract that is extracting a non-trivial member
-    // from a struct with no other non-trivial members, a ref count operation on
-    // the struct is equivalent to a ref count operation on the extracted
-    // member. Strip off the extract.
-    if (auto *SEI = dyn_cast<StructExtractInst>(V)) {
-      if (SEI->isFieldOnlyNonTrivialField()) {
-        V = SEI->getOperand();
-        continue;
-      }
-    }
-
-    // If we have an unchecked_enum_data, strip off the unchecked_enum_data.
-    if (auto *UEDI = dyn_cast<UncheckedEnumDataInst>(V)) {
-      V = UEDI->getOperand();
-      continue;
-    }
-
-    // If we have an enum instruction with a payload, strip off the enum to
-    // expose the enum's payload.
-    if (auto *EI = dyn_cast<EnumInst>(V)) {
-      if (EI->hasOperand()) {
-        V = EI->getOperand();
-        continue;
-      }
-    }
-
-    return V;
-  }
-}
 
 /// Return the underlying SILValue after stripping off identity SILArguments if
 /// we belong to a BB with one predecessor.
-SILValue SILValue::stripSinglePredecessorArgs() {
-  SILValue V = *this;
-
+static SILValue stripSinglePredecessorArgs(SILValue V) {
   while (true) {
     auto *A = dyn_cast<SILArgument>(V);
     if (!A)
@@ -181,14 +78,74 @@ SILValue SILValue::stripSinglePredecessorArgs() {
   }
 }
 
-/// Return the underlying SILValue after stripping off SILArguments that can not
-/// affect RC identity if our BB has only one predecessor.
-SILValue SILValue::stripSinglePredecessorRCIdentityPreservingArgs() {
+SILValue SILValue::stripCasts() {
   SILValue V = *this;
 
   while (true) {
+    V = stripSinglePredecessorArgs(V);
+
+    auto K = V->getKind();
+    if (isRCIdentityPreservingCast(K) ||
+        K == ValueKind::UncheckedTrivialBitCastInst) {
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    }
+
+    return V;
+  }
+}
+
+SILValue SILValue::stripAddressProjections() {
+  SILValue V = *this;
+
+  while (true) {
+    V = stripSinglePredecessorArgs(V);
+
+    switch (V->getKind()) {
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::RefElementAddrInst:
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    default:
+      return V;
+    }
+  }
+}
+
+SILValue SILValue::stripAggregateProjections() {
+  SILValue V = *this;
+
+  while (true) {
+    V = stripSinglePredecessorArgs(V);
+
+    switch (V->getKind()) {
+    case ValueKind::StructExtractInst:
+    case ValueKind::TupleExtractInst:
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    default:
+      return V;
+    }
+  }
+}
+
+SILValue SILValue::stripIndexingInsts() {
+  SILValue V = *this;
+  while (true) {
+    if (!isa<IndexingInst>(V.getDef()))
+      return V;
+    V = cast<IndexingInst>(V)->getBase();
+  }
+}
+
+
+/// Return the underlying SILValue after stripping off SILArguments that can not
+/// affect RC identity if our BB has only one predecessor.
+static SILValue stripSinglePredecessorRCIdentityPreservingArgs(SILValue V) {
+  while (true) {
     // First strip off non PHI args that
-    V = V.stripSinglePredecessorArgs();
+    V = stripSinglePredecessorArgs(V);
 
     auto *A = dyn_cast<SILArgument>(V);
     if (!A)
@@ -213,6 +170,47 @@ SILValue SILValue::stripSinglePredecessorRCIdentityPreservingArgs() {
     if (auto *SWEI = dyn_cast<SwitchEnumInst>(PredTI)) {
       V = SWEI->getOperand();
       continue;
+    }
+
+    return V;
+  }
+}
+
+SILValue SILValue::stripRCIdentityPreservingOps() {
+  SILValue V = *this;
+  while (true) {
+    V = stripSinglePredecessorRCIdentityPreservingArgs(V);
+
+    // Strip off RC identity preserving casts.
+    if (isRCIdentityPreservingCast(V->getKind())) {
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    }
+
+    // Then if we have a struct_extract that is extracting a non-trivial member
+    // from a struct with no other non-trivial members, a ref count operation on
+    // the struct is equivalent to a ref count operation on the extracted
+    // member. Strip off the extract.
+    if (auto *SEI = dyn_cast<StructExtractInst>(V)) {
+      if (SEI->isFieldOnlyNonTrivialField()) {
+        V = SEI->getOperand();
+        continue;
+      }
+    }
+
+    // If we have an unchecked_enum_data, strip off the unchecked_enum_data.
+    if (auto *UEDI = dyn_cast<UncheckedEnumDataInst>(V)) {
+      V = UEDI->getOperand();
+      continue;
+    }
+
+    // If we have an enum instruction with a payload, strip off the enum to
+    // expose the enum's payload.
+    if (auto *EI = dyn_cast<EnumInst>(V)) {
+      if (EI->hasOperand()) {
+        V = EI->getOperand();
+        continue;
+      }
     }
 
     return V;
