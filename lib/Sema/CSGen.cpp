@@ -73,9 +73,8 @@ namespace {
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
                   TVO_CanBindToLValue);
-      // FIXME: Constraint below should be a ::Member constraint?
       CS.addValueMemberConstraint(baseTy, name, tv,
-        CS.getConstraintLocator(expr, ConstraintLocator::MemberRefBase));
+        CS.getConstraintLocator(expr, ConstraintLocator::Member));
       return tv;
     }
 

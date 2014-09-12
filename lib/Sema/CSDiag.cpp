@@ -292,6 +292,7 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
+    case ConstraintLocator::Member:
     case ConstraintLocator::MemberRefBase:
       if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(anchor)) {
         // No additional target locator information.

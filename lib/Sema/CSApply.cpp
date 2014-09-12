@@ -2004,7 +2004,7 @@ namespace {
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(
                           expr,
-                          ConstraintLocator::MemberRefBase));
+                          ConstraintLocator::Member));
 
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
