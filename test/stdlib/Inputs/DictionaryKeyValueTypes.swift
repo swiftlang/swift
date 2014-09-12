@@ -33,8 +33,10 @@ func isCocoaNSDictionary(d: NSDictionary) -> Bool {
 }
 
 // Compare two arrays as sets.
-func equalsUnordered(lhs: Array<(Int, Int)>, rhs: Array<(Int, Int)>) -> Bool {
-  func comparePair(lhs: (Int, Int), rhs: (Int, Int)) -> Bool {
+func equalsUnordered<T : Comparable>(
+  lhs: Array<(T, T)>, rhs: Array<(T, T)>
+) -> Bool {
+  func comparePair(lhs: (T, T), rhs: (T, T)) -> Bool {
     return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
   }
   return equal(sorted(lhs, comparePair), sorted(rhs, comparePair)) {
