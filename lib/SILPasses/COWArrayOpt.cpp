@@ -198,17 +198,6 @@ protected:
 };
 } // namespace
 
-/// \return true if the callee is tagged with array semantics.
-static bool isArraySemanticCall(ApplyInst *AI) {
-  if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee())) {
-    // All methods with "array" semantics are safe w.r.t make_mutable.
-    if (FRI->getReferencedFunction()->hasDefinedSemantics() &&
-        FRI->getReferencedFunction()->getSemanticsString().startswith("array"))
-      return true;
-  }
-  return false;
-}
-
 /// \return true if the given instruction releases the given value.
 static bool isRelease(SILInstruction *Inst, SILValue Value) {
   if (isa<ReleaseValueInst>(Inst) && Inst->getOperand(0) == Value)
@@ -307,7 +296,7 @@ protected:
   bool checkSafeArrayValueUses(UserList &ArrayValueUsers);
   bool checkSafeArrayElementUse(SILInstruction *UseInst, SILValue ArrayVal);
   bool checkSafeElementValueUses(UserOperList &ElementValueUsers);
-  bool hoistMakeMutable(ApplyInst *MakeMutable, SILValue ArrayAddr);
+  bool hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue ArrayAddr);
 };
 } // namespace
 
@@ -407,7 +396,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
   for (auto *UseInst : AddressUsers) {
     if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
-      if (isArraySemanticCall(AI))
+      if (ArraySemanticsCall(AI))
         continue;
 
       // Check of this escape can reach the current loop.
@@ -451,7 +440,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
   for (auto *UseInst : ArrayValueUsers) {
     if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
-      if (isArraySemanticCall(AI))
+      if (ArraySemanticsCall(AI))
         continue;
 
     } else if (auto *SEI = dyn_cast<StructExtractInst>(UseInst)) {
@@ -541,7 +530,7 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
 
 /// Check if this call to "make_mutable" is hoistable, and move it, or delete it
 /// if it's already hoisted.
-bool COWArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue ArrayAddr) {
+bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue ArrayAddr) {
   DEBUG(llvm::dbgs() << "    Checking mutable array: " << ArrayAddr);
 
   SILBasicBlock *ArrayBB = ArrayAddr.getDef()->getParentBB();
@@ -572,8 +561,7 @@ bool COWArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue ArrayAddr) {
 
   // Hoist this call to make_mutable.
   DEBUG(llvm::dbgs() << "    Hoisting make_mutable: " << *MakeMutable);
-  MakeMutable->moveBefore(Preheader->getTerminator());
-  placeFuncRef(MakeMutable, DomTree);
+  MakeMutable.hoist(Preheader->getTerminator(), DomTree);
   return true;
 }
 
@@ -591,25 +579,20 @@ bool COWArrayOpt::run() {
     for (auto II = BB->begin(), IE = BB->end(); II != IE;) {
       // Inst may be moved by hoistMakeMutable.
       SILInstruction *Inst = II++;
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst)) {
-        if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee())) {
-          if (FRI->getReferencedFunction()
-              ->hasSemanticsString("array.make_mutable")) {
-            SILValue ArrayAddr = AI->getSelfArgument();
-            auto HoistedCallEntry = ArrayMakeMutableMap.find(ArrayAddr);
-            if (HoistedCallEntry == ArrayMakeMutableMap.end()) {
-              if (hoistMakeMutable(AI, ArrayAddr)) {
-                ArrayMakeMutableMap[ArrayAddr] = AI;
-                HasChanged = true;
-              } else
-                ArrayMakeMutableMap[ArrayAddr] = nullptr;
-            }
-            else if (HoistedCallEntry->second) {
-              DEBUG(llvm::dbgs() << "    Removing make_mutable call: " << *AI);
-              AI->eraseFromParent();
-              HasChanged = true;
-            }
-          }
+      ArraySemanticsCall MakeMutableCall(Inst, "array.make_mutable");
+      if (MakeMutableCall) {
+        SILValue ArrayAddr = MakeMutableCall.getSelf();
+        auto HoistedCallEntry = ArrayMakeMutableMap.find(ArrayAddr);
+        if (HoistedCallEntry == ArrayMakeMutableMap.end()) {
+          if (hoistMakeMutable(MakeMutableCall, ArrayAddr)) {
+            ArrayMakeMutableMap[ArrayAddr] = MakeMutableCall;
+            HasChanged = true;
+          } else
+            ArrayMakeMutableMap[ArrayAddr] = nullptr;
+        } else if (HoistedCallEntry->second) {
+          DEBUG(llvm::dbgs() << "    Removing make_mutable call: " << *MakeMutableCall);
+          MakeMutableCall.remove();
+          HasChanged = true;
         }
       }
     }
