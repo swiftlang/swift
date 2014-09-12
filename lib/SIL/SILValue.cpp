@@ -137,3 +137,11 @@ SILValue SILValue::stripIndexingInsts() {
     V = cast<IndexingInst>(V)->getBase();
   }
 }
+
+SILBasicBlock *ValueBase::getParentBB() {
+  if (auto Inst = dyn_cast<SILInstruction>(this))
+    return Inst->getParent();
+  if (auto Arg = dyn_cast<SILArgument>(this))
+    return Arg->getParent();
+  return nullptr;
+}

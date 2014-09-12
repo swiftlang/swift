@@ -30,6 +30,7 @@ namespace swift {
   class SILValue;
   class ValueBaseUseIterator;
   class ValueUseIterator;
+  class SILBasicBlock;
   class SILInstruction;
   class SILLocation;
 
@@ -119,6 +120,8 @@ public:
   void printInContext(raw_ostream &OS) const;
 
   static bool classof(const ValueBase *V) { return true; }
+
+  SILBasicBlock *getParentBB();
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
