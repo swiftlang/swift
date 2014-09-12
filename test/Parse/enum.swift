@@ -298,3 +298,25 @@ enum DuplicateMembers6 {
   case Foo // expected-error {{duplicate definition of enum element}}
 }
 
+enum PlaygroundRepresentation : UInt8 {
+  case Class = 1
+  case Struct = 2
+  case Tuple = 3
+  case Enum = 4
+  case Aggregate = 5
+  case Container = 6
+  case IDERepr = 7
+  case Gap = 8
+  case ScopeEntry = 9
+  case ScopeExit = 10
+  case Error = 11
+  case IndexContainer = 12
+  case KeyContainer = 13
+  case MembershipContainer = 14
+  case Unknown = 0xFF
+
+  static func fromByte(byte : UInt8) -> PlaygroundRepresentation {
+    let repr = PlaygroundRepresentation(rawValue: byte)
+    if repr == .None { return .Unknown } else { return repr! }
+  }
+}

@@ -4,7 +4,7 @@
 import gizmo
 
 
-// CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsCfMS_FSiGSqS__
+// CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsCfMS_FT8rawValueSi_GSqS__
 // CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg8rawValueSi
 // CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg9hashValueSi
 

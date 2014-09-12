@@ -235,7 +235,7 @@ enum QuxEnum : Int {
 // QUX_ENUM_NO_DOT: Begin completions, 4 items
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux1[#QuxEnum.Type -> QuxEnum#]{{$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux2[#QuxEnum.Type -> QuxEnum#]{{$}}
-// QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:   ({#Int#})[#QuxEnum?#]{{$}}
+// QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:   ({#rawValue: Int#})[#QuxEnum?#]{{$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/Super:            .RawValue[#Int#]{{$}}
 // QUX_ENUM_NO_DOT-NEXT: End completions
 

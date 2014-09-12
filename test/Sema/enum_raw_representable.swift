@@ -6,8 +6,8 @@ enum Foo : Int {
 
 var raw1: Int = Foo.A.rawValue
 var raw2: Foo.RawValue = raw1
-var cooked1: Foo? = Foo(0)
-var cooked2: Foo? = Foo(22)
+var cooked1: Foo? = Foo(rawValue: 0)
+var cooked2: Foo? = Foo(rawValue: 22)
 
 enum Bar : Double {
   case A, B, C

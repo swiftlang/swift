@@ -382,7 +382,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   rawParam->setImplicit();
   
   auto retTy = OptionalType::get(enumType);
-  DeclName name(C, C.Id_init, { Identifier() });
+  DeclName name(C, C.Id_init, { C.Id_rawValue });
   
   auto initDecl = new (C) ConstructorDecl(name, SourceLoc(),
                                           /*failability*/ OTK_Optional,
@@ -397,7 +397,11 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
 
   // Compute the type of the initializer.
   GenericParamList *genericParams = nullptr;
-  Type type = FunctionType::get(rawType, retTy);
+  
+  TupleTypeElt element(rawType, C.Id_rawValue);
+  auto argType = TupleType::get(element, C);
+  
+  Type type = FunctionType::get(argType, retTy);
   Type selfType = initDecl->computeSelfType(&genericParams);
   Type selfMetatype = MetatypeType::get(selfType->getInOutObjectType());
   

@@ -1,3 +1,3 @@
 func foo() {
-    let x: GraphicType? = GraphicType(0)
+    let x: GraphicType? = GraphicType(rawValue: 0)
 }

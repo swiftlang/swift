@@ -104,7 +104,7 @@ struct _GraphemeClusterBreakPropertyRawValue {
   // Use with care: this operation is expensive (even with optimization
   // turned on the compiler generates code for a switch).
   var cookedValue: _GraphemeClusterBreakPropertyValue {
-    return _GraphemeClusterBreakPropertyValue(Int(rawValue))!
+    return _GraphemeClusterBreakPropertyValue(rawValue: Int(rawValue))!
   }
 }
 

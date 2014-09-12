@@ -2,10 +2,10 @@
 
 var raw1: Int = Foo.A.rawValue
 var raw2: Bar.RawValue = 0
-var cooked1: Foo? = Foo(raw1)
-var cooked2: Bar? = Bar(22)
-var cooked3: Baz? = Baz(0)
-var cooked4: Garply? = Garply("A")
+var cooked1: Foo? = Foo(rawValue: raw1)
+var cooked2: Bar? = Bar(rawValue: 22)
+var cooked3: Baz? = Baz(rawValue: 0)
+var cooked4: Garply? = Garply(rawValue: "A")
 
 func consume<T: RawRepresentable>(obj: T) {}
 func test() {
