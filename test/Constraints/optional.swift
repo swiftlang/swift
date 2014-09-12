@@ -98,3 +98,5 @@ func test10(i: Int, io: Int?) {
 
 var z: Int? = nil
 z = z ?? 3
+
+var fo: Float? = 3.14159

@@ -786,7 +786,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   // suggestion is better.
   if (!literalProtocols.empty()) {
     SmallPtrSet<ProtocolDecl *, 5> coveredLiteralProtocols;
-    for (const auto &binding : result.Bindings) {
+    for (auto &binding : result.Bindings) {
       // Skip defaulted-protocol constraints.
       if (binding.DefaultedProtocol)
         continue;
@@ -804,18 +804,33 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       }
 
       // Check each non-covered literal protocol to determine which ones
+      bool updatedBindingType = false;
       for (auto proto : literalProtocols) {
-        if (coveredLiteralProtocols.count(proto) > 0)
-          continue;
+        do {
+          // If the type conforms to this protocol, we're covered.
+          if (tc.conformsToProtocol(testType, proto, cs.DC)) {
+            coveredLiteralProtocols.insert(proto);
+            break;
+          }
 
-        // If the type conforms to this protocol, we're covered.
-        if (tc.conformsToProtocol(testType, proto, cs.DC))
-          coveredLiteralProtocols.insert(proto);
+          // If we're allowed to bind to subtypes, look through optionals.
+          // FIXME: This is really crappy special case of computing a reasonable
+          // result based on the given constraints.
+          if (binding.Kind == AllowedBindingKind::Subtypes) {
+            if (auto objTy = testType->getAnyOptionalObjectType()) {
+              updatedBindingType = true;
+              testType = objTy;
+              continue;
+            }
+          }
+
+          updatedBindingType = false;
+          break;
+        } while (true);
       }
 
-      // If we've covered all of the literal protocols, we're done.
-      if (literalProtocols.size() == coveredLiteralProtocols.size())
-        break;
+      if (updatedBindingType)
+        binding.BindingType = testType;
     }
 
     // For any literal type that has been covered, remove the default literal
