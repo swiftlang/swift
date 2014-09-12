@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -170,6 +171,15 @@ static SILValue oldStripRCIdentityPreservingOps(SILValue V) {
 //                                  Analysis
 //===----------------------------------------------------------------------===//
 
+/// Returns true if FirstIV is a SILArgument or SILInstruction in a BB that
+/// dominates the BB of A.
+static bool dominatesArgument(DominanceInfo *DI, SILArgument *A,
+                              SILValue FirstIV) {
+  SILBasicBlock *OtherBB = FirstIV->getParentBB();
+  if (!OtherBB)
+    return false;
+  return DI->dominates(OtherBB, A->getParent());
+}
 
 /// Return the underlying SILValue after stripping off SILArguments that can not
 /// affect RC identity if our BB has only one predecessor.
@@ -226,6 +236,12 @@ stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
     if (!FirstIV)
       return SILValue();
   }
+
+  // Ok, we have our value. Make sure that it dominates this basic block. If it
+  // does not dominate, there is nothing we can do here.
+  DominanceInfo *DI = DA->getDomInfo(A->getFunction());
+  if (!dominatesArgument(DI, A, FirstIV))
+    return SILValue();
 
   // Then compare the rest of the arguments with FirstIV now that we know that
   // FirstIV is not a no payload enum.
@@ -350,6 +366,6 @@ SILValue RCIdentityAnalysis::getRCIdentityRoot(SILValue V) {
   return Root;
 }
 
-SILAnalysis *swift::createRCIdentityAnalysis(SILModule *M) {
-  return new RCIdentityAnalysis(M);
+SILAnalysis *swift::createRCIdentityAnalysis(SILModule *M, SILPassManager *PM) {
+  return new RCIdentityAnalysis(M, PM);
 }

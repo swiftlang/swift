@@ -45,6 +45,7 @@ enum FakeOptional<T> {
   case None
   case Some(T)
 }
+sil @fakeoptional_user : $@thin (FakeOptional<Builtin.NativeObject>) -> ()
 
 enum Either<LTy, RTy> {
   case Left(LTy)
@@ -187,4 +188,29 @@ bb7(%5 : $FakeCasesOptional<Builtin.NativeObject>):
   release_value %0 : $FakeCasesOptional<Builtin.NativeObject>
   %6 = tuple()
   return %6 : $()
+}
+
+// CHECK-LABEL: sil @silargument_nondominated_strip : $@thin (@in FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @silargument_nondominated_strip : $@thin (@in FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $*FakeOptional<Builtin.NativeObject>):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = load %0 : $*FakeOptional<Builtin.NativeObject>
+  br bb3(%1 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %2 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.None!enumelt
+  br bb3(%2 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%3 : $FakeOptional<Builtin.NativeObject>):
+  %4 = function_ref @fakeoptional_user : $@thin (FakeOptional<Builtin.NativeObject>) -> ()
+  retain_value %3 : $FakeOptional<Builtin.NativeObject>
+  apply %4(%3) : $@thin (FakeOptional<Builtin.NativeObject>) -> ()
+  apply %4(%3) : $@thin (FakeOptional<Builtin.NativeObject>) -> ()
+  release_value %3 : $FakeOptional<Builtin.NativeObject>
+  %5 = tuple()
+  return %5 : $()
 }

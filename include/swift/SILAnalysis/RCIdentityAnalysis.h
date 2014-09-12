@@ -22,20 +22,27 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SILPasses/PassManager.h"
 
 namespace swift {
+
+class DominanceAnalysis;
 
 /// This class is a simple wrapper around an identity cache.
 class RCIdentityAnalysis : public SILAnalysis {
   llvm::DenseMap<SILValue, SILValue> Cache;
   llvm::DenseSet<SILArgument *> VisitedArgs;
+  DominanceAnalysis *DA;
 
   /// This number is arbitrary and conservative. At some point if compile time
   /// is not an issue, this value should be made more aggressive (i.e. greater).
   enum { MaxRecursionDepth = 16 };
 
 public:
-  RCIdentityAnalysis(SILModule *) : SILAnalysis(AnalysisKind::RCIdentity) {}
+  RCIdentityAnalysis(SILModule *, SILPassManager *PM)
+    : SILAnalysis(AnalysisKind::RCIdentity), Cache(), VisitedArgs(),
+      DA(PM->getAnalysis<DominanceAnalysis>()) {}
   RCIdentityAnalysis(const RCIdentityAnalysis &) = delete;
   RCIdentityAnalysis &operator=(const RCIdentityAnalysis &) = delete;
 

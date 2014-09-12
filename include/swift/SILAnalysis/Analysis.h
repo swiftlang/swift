@@ -125,7 +125,7 @@ namespace swift {
   SILAnalysis *createInductionVariableAnalysis(SILModule *M);
   SILAnalysis *createPostOrderAnalysis(SILModule *M);
   SILAnalysis *createClassHierarchyAnalysis(SILModule *M);
-  SILAnalysis *createRCIdentityAnalysis(SILModule *M);
+  SILAnalysis *createRCIdentityAnalysis(SILModule *M, SILPassManager *PM);
 } // end namespace swift
 
 #endif
