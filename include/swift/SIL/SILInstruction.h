@@ -471,6 +471,11 @@ public:
   /// Return the ith argument passed to this instruction.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
 
+  // Set the ith argument of this instruction.
+  void setArgument(unsigned i, SILValue V) {
+    return getArgumentOperands()[i].set(V);
+  }
+
   /// The collection of following routines wrap the representation difference in
   /// between the self substitution being first, but the self parameter of a
   /// function being last.
@@ -488,6 +493,13 @@ public:
            "arguments.");
     return getArgument(getNumArguments()-1);
   }
+
+  void setSelfArgument(SILValue V) {
+    assert(getNumArguments() && "Should only be called when Callee has "
+                                "arguments.");
+    getArgumentOperands()[getNumArguments() - 1].set(V);
+  }
+
   OperandValueArrayRef getArgumentsWithoutSelf() const {
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
