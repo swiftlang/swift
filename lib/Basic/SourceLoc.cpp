@@ -65,6 +65,7 @@ bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
 
   CharSourceRange range = CharSourceRange(*this, loc, end);
   VirtualFiles[end.Value.getPointer()] = { range, name, lineOffset };
+  CachedVFile = {};
   return true;
 }
 
