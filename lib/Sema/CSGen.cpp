@@ -157,7 +157,7 @@ namespace {
       
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType(),
-                       CS.getConstraintLocator(CS.rootExpr));
+                       CS.getConstraintLocator(expr));
       return tv;
     }
 
@@ -176,11 +176,11 @@ namespace {
 
       // The type of the expression must conform to the
       // StringInterpolationConvertible protocol.
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                      TVO_PrefersSubtypeBinding);
+      auto locator = CS.getConstraintLocator(expr);
+      auto tv = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        interpolationProto->getDeclaredType(),
-                       CS.getConstraintLocator(CS.rootExpr));
+                       locator);
 
       // Each of the segments is passed as an argument to
       // convertFromStringInterpolationSegment().
@@ -274,9 +274,10 @@ namespace {
         type = E->getTypeLoc().getType();
       if (!type) return Type();
       
-      type = CS.openType(type);
+      auto locator = CS.getConstraintLocator(E);
+      type = CS.openType(type, locator);
       E->getTypeLoc().setType(type, /*validated=*/true);
-      return MetatypeType::get(CS.openType(type));
+      return MetatypeType::get(type);
     }
 
     Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
@@ -494,10 +495,11 @@ namespace {
 
           // Bind the specified generic arguments to the type variables in the
           // open type.
+          auto locator = CS.getConstraintLocator(expr);
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             CS.addConstraint(ConstraintKind::Equal,
                              typeVars[i], specializations[i].getType(),
-                             CS.getConstraintLocator(CS.rootExpr));
+                             locator);
           }
           
           return baseTy;
@@ -755,8 +757,8 @@ namespace {
 
       case PatternKind::Typed: {
         auto typedPattern = cast<TypedPattern>(pattern);
-
-        Type openedType = CS.openType(typedPattern->getType());
+        // FIXME: Need a better locator for a pattern as a base.
+        Type openedType = CS.openType(typedPattern->getType(), locator);
         if (auto weakTy = openedType->getAs<WeakStorageType>())
           openedType = weakTy->getReferentType();
 
@@ -1186,7 +1188,9 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType());
+      // FIXME: Locator for the cast type?
+      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
+                                CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto locator = CS.getConstraintLocator(expr,
@@ -1221,7 +1225,9 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType());
+      // FIXME: Locator for the cast type?
+      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
+                                CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = expr->getSubExpr()->getType();
@@ -1239,7 +1245,9 @@ namespace {
         return nullptr;
 
       // Open up the type we're checking.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType());
+      // FIXME: Locator for the cast type?
+      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
+                                CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       // Add a checked cast constraint.

@@ -4965,12 +4965,13 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
     return nullptr;
 
   // Form a reference to the witness itself.
+  auto locator = cs.getConstraintLocator(base);
   Type openedFullType, openedType;
   std::tie(openedFullType, openedType)
     = cs.getTypeOfMemberReference(base->getType(), witness,
                                   /*isTypeReference=*/false,
-                                  /*isDynamicResult=*/false);
-  auto locator = cs.getConstraintLocator(base);
+                                  /*isDynamicResult=*/false,
+                                  locator);
 
   // Form the call argument.
   Expr *arg;

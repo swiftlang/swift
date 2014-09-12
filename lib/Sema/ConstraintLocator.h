@@ -564,8 +564,8 @@ public:
       }
     }
 
-    // We only get here if there was no locator; fail gracefully.
-    path.clear();
+    // There was no locator. Just reverse the path.
+    std::reverse(path.begin(), path.end());
     return nullptr;
   }
 

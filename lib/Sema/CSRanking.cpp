@@ -461,13 +461,17 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   // Construct a constraint system to compare the two declarations.
   ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
 
+  auto locator = cs.getConstraintLocator(nullptr);
+  // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
-  Type openedType2 = cs.openType(type2,decl2->getPotentialGenericDeclContext());
+  Type openedType2 = cs.openType(type2, locator,
+                                 decl2->getPotentialGenericDeclContext());
 
   // Get the type of a reference to the first declaration, swapping in
   // archetypes for the dependent types.
   ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
-  Type openedType1 = cs.openType(type1, decl1->getPotentialGenericDeclContext(),
+  Type openedType1 = cs.openType(type1, locator,
+                                 decl1->getPotentialGenericDeclContext(),
                                  /*skipProtocolSelfConstraint=*/false,
                                  &opener);
 
@@ -485,8 +489,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     openedType2 = funcTy2->getResult();
   }
   
-  auto locator = cs.getConstraintLocator(cs.rootExpr);
-
   // Determine the relationship between the 'self' types and add the
   // appropriate constraints. The constraints themselves never fail, but
   // they help deduce type variables that were opened.

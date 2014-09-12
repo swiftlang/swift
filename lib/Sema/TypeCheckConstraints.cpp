@@ -891,9 +891,6 @@ bool TypeChecker::typeCheckExpression(
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   
-  llvm::SaveAndRestore<Expr*> rootExpr(cs.rootExpr, expr);
-
-  
   if (!contextualType.isNull()) {
     cs.setContextualType(expr, &contextualType);
   }
@@ -1600,7 +1597,7 @@ bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
   cs.addConstraint(ConstraintKind::Subtype,
                    type1,
                    type2,
-                   cs.getConstraintLocator(cs.rootExpr));
+                   cs.getConstraintLocator(nullptr));
   SmallVector<Solution, 1> solutions;
   return !cs.solve(solutions);
 }
@@ -1610,7 +1607,7 @@ bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
   cs.addConstraint(ConstraintKind::Conversion,
                    type1,
                    type2,
-                   cs.getConstraintLocator(cs.rootExpr));
+                   cs.getConstraintLocator(nullptr));
   SmallVector<Solution, 1> solutions;
   return !cs.solve(solutions);
 }
@@ -1618,7 +1615,7 @@ bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-  auto locator = cs.getConstraintLocator(cs.rootExpr);
+  auto locator = cs.getConstraintLocator(nullptr);
 
   // Add all of the requirements of the archetype to the given type.
   // FIXME: Short-circuit if any of the constraints fails.

@@ -930,13 +930,15 @@ static bool tryTypeVariableBindings(
           if (anySolved)
             break;
         }
-        type = cs.openBindingType(type);
+        type = cs.openBindingType(type, typeVar->getImpl().getLocator());
       }
 
+      // FIXME: We want the locator that indicates where the binding came
+      // from.
       cs.addConstraint(ConstraintKind::Bind,
                        typeVar,
                        type,
-                       cs.getConstraintLocator(cs.rootExpr));
+                       typeVar->getImpl().getLocator());
       if (!cs.solve(solutions, allowFreeTypeVariables))
         anySolved = true;
 

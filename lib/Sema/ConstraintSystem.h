@@ -1091,11 +1091,6 @@ public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
   
-  /// \brief When constraints are being gathered for a specific expression,
-  /// we store aside the expression in case we need a default anchor for
-  /// otherwise 'anonymous' constraints.
-  Expr* rootExpr = nullptr;
-
   friend class Fix;
   class SolverScope;
 
@@ -1718,11 +1713,13 @@ public:
   /// protocol's 'Self' type.
   ///
   /// \returns The opened type.
-  Type openType(Type type, DeclContext *dc = nullptr,
+  Type openType(Type type, ConstraintLocatorBuilder locator,
+                DeclContext *dc = nullptr,
                 bool skipProtocolSelfConstraint = false,
                 DependentTypeOpener *opener = nullptr) {
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    return openType(type, replacements, dc, skipProtocolSelfConstraint, opener);
+    return openType(type, locator, replacements, dc, skipProtocolSelfConstraint,
+                    opener);
   }
 
   /// \brief "Open" the given type by replacing any occurrences of generic
@@ -1743,6 +1740,7 @@ public:
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type,
+                ConstraintLocatorBuilder locator,
                 llvm::DenseMap<CanType, TypeVariableType *> &replacements,
                 DeclContext *dc = nullptr,
                 bool skipProtocolSelfConstraint = false,
@@ -1758,7 +1756,8 @@ public:
   ///
   /// \param type The type to open.
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openBindingType(Type type, DeclContext *dc = nullptr);
+  Type openBindingType(Type type, ConstraintLocatorBuilder locator,
+                       DeclContext *dc = nullptr);
 
   /// Open the generic parameter list and its requirements, creating
   /// type variables for each of the type parameters.
@@ -1767,6 +1766,7 @@ public:
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
                    DependentTypeOpener *opener,
+                   ConstraintLocatorBuilder locator,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);
 
   /// \brief Retrieve the type of a reference to the given value declaration.
@@ -1788,6 +1788,7 @@ public:
                           ValueDecl *decl,
                           bool isTypeReference,
                           bool isSpecialized,
+                          ConstraintLocatorBuilder locator,
                           DependentTypeOpener *opener = nullptr);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
@@ -1809,6 +1810,7 @@ public:
                           Type baseTy, ValueDecl *decl,
                           bool isTypeReference,
                           bool isDynamicResult,
+                          ConstraintLocatorBuilder locator,
                           DependentTypeOpener *opener = nullptr);
 
   /// \brief Add a new overload set to the list of unresolved overload

@@ -552,17 +552,21 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
   Type openedFullWitnessType;
   llvm::DenseMap<TypeVariableType *, CanType> openedWitnessTypeVars;
   WitnessTypeOpener witnessOpener(tc.Context, openedWitnessTypeVars);
+  // FIXME: witness as a base locator?
+  auto locator = cs.getConstraintLocator(nullptr);
   if (witness->getDeclContext()->isTypeContext()) {
     std::tie(openedFullWitnessType, openWitnessType) 
       = cs.getTypeOfMemberReference(model, witness,
                                     /*isTypeReference=*/false,
                                     /*isDynamicResult=*/false,
+                                    locator,
                                     &witnessOpener);
   } else {
     std::tie(openedFullWitnessType, openWitnessType) 
       = cs.getTypeOfReference(witness,
                               /*isTypeReference=*/false,
                               /*isDynamicResult=*/false,
+                              locator,
                               &witnessOpener);
   }
   openWitnessType = openWitnessType->getRValueType();
@@ -578,6 +582,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     = cs.getTypeOfMemberReference(model, req,
                                   /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false,
+                                  locator,
                                   &reqTypeOpener);
   reqType = reqType->getRValueType();
 
@@ -597,8 +602,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     if (!ignoreReturnType) {
       auto typePair = getTypesToCompare(req, reqResultType, witnessResultType);
       cs.addConstraint(constraints::ConstraintKind::Equal,
-                       typePair.first, typePair.second,
-                       cs.getConstraintLocator(cs.rootExpr));
+                       typePair.first, typePair.second, locator);
       // FIXME: Check whether this has already failed.
     }
 
@@ -640,8 +644,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
       // Check whether the parameter types match.
       cs.addConstraint(constraints::ConstraintKind::Equal,
-                       typePair.first, typePair.second,
-                       cs.getConstraintLocator(cs.rootExpr));
+                       typePair.first, typePair.second, locator);
       // FIXME: Check whether this failed.
 
       // FIXME: Consider default arguments here?
@@ -650,8 +653,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     // Simple case: add the constraint.
     auto typePair = getTypesToCompare(req, reqType, openWitnessType);
     cs.addConstraint(constraints::ConstraintKind::Equal,
-                     typePair.first, typePair.second,
-                     cs.getConstraintLocator(cs.rootExpr));
+                     typePair.first, typePair.second, locator);
   }
 
   // Try to solve the system.
