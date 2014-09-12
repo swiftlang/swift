@@ -794,6 +794,7 @@ public:
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
+  Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
 
   virtual bool walk(ASTWalker &walker) override;
 

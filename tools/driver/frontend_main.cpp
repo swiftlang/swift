@@ -211,6 +211,19 @@ static bool performCompile(CompilerInstance &Instance,
     SM->verify();
   }
 
+  // If the module contains only one source file get that source
+  // file's private discriminator.
+  std::string FlagsBuf;
+  if (!PrimarySourceFile && Instance.getMainModule()) {
+    auto &SF = Instance.getMainModule()->getMainSourceFile(opts.InputKind);
+    Identifier PD = SF.getPrivateDiscriminator();
+    if (!PD.empty()) {
+      FlagsBuf = (IRGenOpts.DWARFDebugFlags+
+                  " -private-discriminator "+PD.str()).str();
+      IRGenOpts.DWARFDebugFlags = FlagsBuf;
+    }
+  }
+
   if (!opts.ObjCHeaderOutputPath.empty()) {
     (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                       opts.ImplicitObjCHeaderPath);
