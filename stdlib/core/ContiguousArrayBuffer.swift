@@ -22,7 +22,7 @@ let emptyNSSwiftArray = unsafeBitCast(
 // The class that implements the storage for a ContiguousArray<T>
 final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   typealias Buffer = _ContiguousArrayBuffer<T>
-  
+
   deinit {
     let b = Buffer(self)
     b.baseAddress.destroy(b.count)
@@ -64,7 +64,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
       "Verbatim bridging for getObjects:range: unhandled _NSSwiftArray")
-    
+
     let b = Buffer(self)
     let unmanagedObjects = _UnmanagedAnyObjectArray(aBuffer)
     for i in range.location..<range.location + range.length {
@@ -73,7 +73,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
       unmanagedObjects[i - range.location] = bridgedElement
     }
   }
-  
+
   override func bridgingCountByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
@@ -82,19 +82,19 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
       "Verbatim bridging for countByEnumeratingWithState:objects:count: unhandled _NSSwiftArray")
-    
+
     var enumerationState = state.memory
-    
+
     enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     enumerationState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
-    
+
     let location = Int(enumerationState.state)
     if _fastPath(location < count) {
       let batchCount = min(bufferSize, count - location)
-      
+
       bridgingGetObjects(
         objects, range: _SwiftNSRange(location: location, length: batchCount))
-      
+
       enumerationState.state = UInt(location + batchCount)
       state.memory = enumerationState
       return batchCount
@@ -107,7 +107,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
 }
 
 public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
-  
+
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
   /// result's .baseAddress or set the result's .count to zero.
@@ -123,14 +123,15 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       bridged = _isBridgedVerbatimToObjectiveC(T.self)
     }
 
-    _base.value = _ArrayBody(count: count, capacity: _base._capacity(),  
-                            elementTypeIsBridgedVerbatim: bridged)
+    _base.value = _ArrayBody(
+      count: count, capacity: _base._capacity(),
+      elementTypeIsBridgedVerbatim: bridged)
   }
 
   init(_ storage: _ContiguousArrayStorage<T>?) {
     _base = unsafeBitCast(storage , HeapBuffer<_ArrayBody, T>.self)
   }
-  
+
   public var hasStorage: Bool {
     return _base.hasStorage
   }
@@ -149,8 +150,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
-  public
-  func withUnsafeBufferPointer<R>(
+  public func withUnsafeBufferPointer<R>(
     body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
     let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
@@ -159,9 +159,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
-  /// over the underlying contiguous storage.  
-  public
-  mutating func withUnsafeMutableBufferPointer<R>(
+  /// over the underlying contiguous storage.
+  public mutating func withUnsafeMutableBufferPointer<R>(
     body: (UnsafeMutableBufferPointer<T>)->R
   ) -> R {
     let ret = body(
@@ -193,7 +192,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   public init(_ buffer: _ContiguousArrayBuffer) {
     self = buffer
   }
-  
+
   public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> _ContiguousArrayBuffer<Element>?
   {
@@ -206,26 +205,27 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   public mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
-  
+
   /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's baseAddress may
   /// not match ours, if we are a _SliceBuffer.
   public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     return self
   }
-  
+
   /// Replace the given subRange with the first newCount elements of
   /// the given collection.
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
   /// _ContiguousArrayBuffer
-  public
-  mutating func replace<C: CollectionType where C.Generator.Element == Element>(
+  public mutating func replace<
+    C: CollectionType where C.Generator.Element == Element
+  >(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   ) {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }
-  
+
   /// Get/set the value of the ith element
   public subscript(i: Int) -> T {
     get {
@@ -254,13 +254,13 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
     nonmutating set {
       _sanityCheck(newValue >= 0)
-      
+
       _sanityCheck(
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
       _sanityCheck(_base.hasStorage || newValue == 0)
-      
+
       if _base.hasStorage {
         _base.value.count = newValue
       }
@@ -287,14 +287,13 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  public
-  func _uninitializedCopy(
+  public func _uninitializedCopy(
     subRange: Range<Int>, target: UnsafeMutablePointer<T>
   ) -> UnsafeMutablePointer<T> {
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
     _sanityCheck(subRange.endIndex <= count)
-    
+
     var dst = target
     var src = baseAddress + subRange.startIndex
     for i in subRange {
@@ -303,7 +302,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     _fixLifetime(owner)
     return dst
   }
-  
+
   /// Return a _SliceBuffer containing the given subRange of values
   /// from this buffer.
   public subscript(subRange: Range<Int>) -> _SliceBuffer<T>
@@ -314,7 +313,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       count: subRange.endIndex - subRange.startIndex,
       hasNativeBuffer: true)
   }
-  
+
   /// Return true iff this buffer's storage is uniquely-referenced.
   /// NOTE: this does not mean the buffer is mutable.  Other factors
   /// may need to be considered, such as whether the buffer could be
@@ -332,8 +331,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Convert to an NSArray.
   /// Precondition: T is bridged to Objective-C
   /// O(1).
-  public
-  func _asCocoaArray() -> _CocoaArrayType {
+  public func _asCocoaArray() -> _CocoaArrayType {
     _sanityCheck(
         _isBridgedToObjectiveC(T.self),
         "Array element type is not bridged to ObjectiveC")
@@ -342,18 +340,16 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
     return unsafeBitCast(_base.storage, _CocoaArrayType.self)
   }
-  
+
   /// An object that keeps the elements stored in this buffer alive
-  public
-  var owner: AnyObject? {
+  public var owner: AnyObject? {
     return _storage
   }
 
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty, or if their buffers
   /// have the same identity and count.
-  public
-  var identity: Word {
+  public var identity: Word {
     return unsafeBitCast(baseAddress, Word.self)
   }
 
@@ -379,7 +375,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
         return true
       }
     }
-    
+
     // Check the elements
     for x in self {
       // FIXME: unsafeBitCast works around <rdar://problem/16953026>
@@ -389,13 +385,13 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
     return true
   }
-  
+
   //===--- private --------------------------------------------------------===//
   typealias _OptionalStorage = _ContiguousArrayStorage<T>?
   var _storage: _ContiguousArrayStorage<T>? {
     return unsafeBitCast(_base.storage, _OptionalStorage.self)
   }
-  
+
   typealias _Base = HeapBuffer<_ArrayBody, T>
   var _base: _Base
 }
@@ -415,12 +411,11 @@ public func += <
   }
   else {
     let newLHS = _ContiguousArrayBuffer<T>(
-      count: newCount, 
+      count: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
-    
+
     if lhs._base.hasStorage {
-      newLHS.baseAddress.moveInitializeFrom(lhs.baseAddress, 
-                                               count: oldCount)
+      newLHS.baseAddress.moveInitializeFrom(lhs.baseAddress, count: oldCount)
       lhs._base.value.count = 0
     }
     lhs._base = newLHS._base
@@ -475,7 +470,7 @@ public func ~> <
   return result.take()
 }
 
-public func ~> <  
+public func ~> <
   C: protocol<_CollectionType,_Sequence_Type>
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
@@ -492,7 +487,7 @@ internal func _copyCollectionToNativeArrayBuffer<
   if count == 0 {
     return _ContiguousArrayBuffer()
   }
-  
+
   var result = _ContiguousArrayBuffer<C.Generator.Element>(
     count: numericCast(count),
     minimumCapacity: 0
@@ -502,7 +497,7 @@ internal func _copyCollectionToNativeArrayBuffer<
   for x in GeneratorSequence(source.generate()) {
     (p++).initialize(x)
   }
-  
+
   return result
 }
 
