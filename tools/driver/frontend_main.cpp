@@ -211,17 +211,16 @@ static bool performCompile(CompilerInstance &Instance,
     SM->verify();
   }
 
-  // If the module contains only one source file get that source
-  // file's private discriminator.
+  // Get the main source file's private discriminator and attach it to
+  // the compile unit's flags.
   std::string FlagsBuf;
-  if (!PrimarySourceFile && Instance.getMainModule()) {
-    auto &SF = Instance.getMainModule()->getMainSourceFile(opts.InputKind);
-    Identifier PD = SF.getPrivateDiscriminator();
-    if (!PD.empty()) {
-      FlagsBuf = (IRGenOpts.DWARFDebugFlags+
-                  " -private-discriminator "+PD.str()).str();
-      IRGenOpts.DWARFDebugFlags = FlagsBuf;
-    }
+  auto &MainSourceFile = PrimarySourceFile ? *PrimarySourceFile
+    : Instance.getMainModule()->getMainSourceFile(opts.InputKind);
+  Identifier PD = MainSourceFile.getPrivateDiscriminator();
+  if (!PD.empty()) {
+    FlagsBuf = (IRGenOpts.DWARFDebugFlags+
+                " -private-discriminator "+PD.str()).str();
+    IRGenOpts.DWARFDebugFlags = FlagsBuf;
   }
 
   if (!opts.ObjCHeaderOutputPath.empty()) {

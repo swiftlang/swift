@@ -1,4 +1,5 @@
 // RUN: %swift -emit-ir %s -g -o - | FileCheck %s
+// RUN: %swift %S/../Inputs/empty.swift -primary-file %s -emit-ir -g | FileCheck %s
 // CHECK: -private-discriminator [[DISCRIMINATOR:_[A-Z0-9]+]]{{.*}}; [ DW_TAG_compile_unit ]
 class A {
   init(val : Int) { member = val }
@@ -8,5 +9,7 @@ class A {
   func getVal() -> Int { return getMember() }  
 }
 
-let a = A(val: 42)
-println(a.getVal())
+func f() {
+  let a = A(val: 42)
+  println(a.getVal())
+}
