@@ -1046,12 +1046,16 @@ DictionaryTestSuite.test("convertFromDictionaryLiteral") {
 // NSDictionary -> Dictionary bridging tests.
 //===---
 
-// Expect some number of autoreleased key and value objects.
-// `opt` applies to platforms that have the return-autoreleased optimization.
-// `unopt` applies to platforms that don't.
-// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
-func expectAutoreleasedKeysAndValues(#opt: (Int, Int) = (0, 0), 
-                                     #unopt: (Int, Int)) {
+/// Expect some number of autoreleased key and value objects.
+///
+/// :param: opt applies to platforms that have the return-autoreleased
+///   optimization.
+///
+/// :param: unopt applies to platforms that don't.
+///
+/// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
+func expectAutoreleasedKeysAndValues(
+  opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
   var expectedKeys = 0
   var expectedValues = 0
 #if arch(i386)
@@ -1062,62 +1066,6 @@ func expectAutoreleasedKeysAndValues(#opt: (Int, Int) = (0, 0),
 
   TestObjCKeyTy.objectCount -= expectedKeys
   TestObjCValueTy.objectCount -= expectedValues
-}
-
-func slurpFastEnumeration(
-  d: NSDictionary, fe: NSFastEnumeration, maxItems: Int? = nil
-) -> Array<(Int, Int)> {
-  var state = NSFastEnumerationState()
-
-  let stackBufLength = 3
-  var stackBuf = HeapBuffer<(), AnyObject?>(
-      HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
-
-  var pairs = Array<(Int, Int)>()
-  while true {
-    var returnedCount = fe.countByEnumeratingWithState(
-        &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
-        count: stackBufLength)
-    assert(state.state != 0)
-    assert(state.mutationsPtr != .null())
-    if returnedCount == 0 {
-      break
-    }
-    for i in 0..<returnedCount {
-      let key: AnyObject = state.itemsPtr[i]!
-      let value: AnyObject = d.objectForKey(key)!
-      let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
-      pairs += [kv]
-    }
-    if maxItems != nil && pairs.count >= maxItems! {
-      return pairs
-    }
-  }
-
-  for i in 0..<3 {
-    let returnedCount = fe.countByEnumeratingWithState(
-        &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
-        count: stackBufLength)
-    assert(returnedCount == 0)
-  }
-
-  return pairs
-}
-
-import SlurpFastEnumeration
-
-func slurpFastEnumerationFromObjC(
-    d: NSDictionary, fe: NSFastEnumeration
-) -> Array<(Int, Int)> {
-  var objcPairs = NSMutableArray()
-  slurpFastEnumerationFromObjCImpl(d, fe, objcPairs)
-  var pairs = Array<(Int, Int)>()
-  for i in 0..<objcPairs.count/2 {
-    let key = (objcPairs[i * 2] as TestObjCKeyTy).value
-    let value = (objcPairs[i * 2 + 1] as TestObjCValueTy).value
-    pairs += [(key, value)]
-  }
-  return pairs
 }
 
 func getAsNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
@@ -2383,36 +2331,69 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   var v: AnyObject? = d.objectForKey(TestObjCKeyTy(10))
-  assert((v as TestObjCValueTy).value == 1010)
+  expectEqual(1010, (v as TestObjCValueTy).value)
+  let idValue10 = unsafeBitCast(v, UWord.self)
 
   v = d.objectForKey(TestObjCKeyTy(20))
-  assert((v as TestObjCValueTy).value == 1020)
+  expectEqual(1020, (v as TestObjCValueTy).value)
+  let idValue20 = unsafeBitCast(v, UWord.self)
 
   v = d.objectForKey(TestObjCKeyTy(30))
-  assert((v as TestObjCValueTy).value == 1030)
+  expectEqual(1030, (v as TestObjCValueTy).value)
+  let idValue30 = unsafeBitCast(v, UWord.self)
 
-  assert(d.objectForKey(TestObjCKeyTy(40)) == nil)
+  expectEmpty(d.objectForKey(TestObjCKeyTy(40)))
 
-  expectAutoreleasedKeysAndValues(unopt:(0, 3))
+  for i in 0..<3 {
+    expectEqual(idValue10, unsafeBitCast(
+      d.objectForKey(TestObjCKeyTy(10)), UWord.self))
+
+    expectEqual(idValue20, unsafeBitCast(
+      d.objectForKey(TestObjCKeyTy(20)), UWord.self))
+
+    expectEqual(idValue30, unsafeBitCast(
+      d.objectForKey(TestObjCKeyTy(30)), UWord.self))
+  }
+
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
-  let enumerator = d.keyEnumerator()
 
-  var pairs = Array<(Int, Int)>()
-  while let key: AnyObject = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)!
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
-    pairs.append(kv)
+  var capturedIdentityPairs = Array<(UWord, UWord)>()
+
+  for i in 0..<3 {
+    let enumerator = d.keyEnumerator()
+
+    var dataPairs = Array<(Int, Int)>()
+    var identityPairs = Array<(UWord, UWord)>()
+    while let key: AnyObject = enumerator.nextObject() {
+      let value: AnyObject = d.objectForKey(key)!
+
+      let dataPair =
+        ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+      dataPairs.append(dataPair)
+
+      let identityPair =
+        (unsafeBitCast(key, UWord.self), unsafeBitCast(value, UWord.self))
+      identityPairs.append(identityPair)
+    }
+    expectTrue(
+      equalsUnordered(dataPairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+
+    if capturedIdentityPairs.isEmpty {
+      capturedIdentityPairs = identityPairs
+    } else {
+      expectTrue(equalsUnordered(capturedIdentityPairs, identityPairs))
+    }
+
+    assert(enumerator.nextObject() == nil)
+    assert(enumerator.nextObject() == nil)
+    assert(enumerator.nextObject() == nil)
   }
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
-  assert(enumerator.nextObject() == nil)
-  assert(enumerator.nextObject() == nil)
-  assert(enumerator.nextObject() == nil)
-
-  expectAutoreleasedKeysAndValues(unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject_Empty") {
@@ -2427,57 +2408,77 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject_Empty"
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromSwift") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  var pairs = slurpFastEnumeration(d, d.keyEnumerator())
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromSwift(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d.keyEnumerator() },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromObjC") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  var pairs = slurpFastEnumerationFromObjC(d, d.keyEnumerator())
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromObjC(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d.keyEnumerator() },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_Empty") {
   let d = getBridgedEmptyNSDictionary()
 
-  var pairs = slurpFastEnumeration(d, d.keyEnumerator())
-  assert(equalsUnordered(pairs, []))
+  checkDictionaryFastEnumerationFromSwift(
+    [], d, { d.keyEnumerator() },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  pairs = slurpFastEnumerationFromObjC(d, d.keyEnumerator())
-  assert(equalsUnordered(pairs, []))
+  checkDictionaryFastEnumerationFromObjC(
+    [], d, { d.keyEnumerator() },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  var pairs = slurpFastEnumeration(d, d)
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromSwift(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt:(0, 3))
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromObjC") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  var pairs = slurpFastEnumerationFromObjC(d, d)
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromObjC(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt:(0, 3))
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
   let d = getBridgedEmptyNSDictionary()
 
-  var pairs = slurpFastEnumeration(d, d)
-  assert(equalsUnordered(pairs, []))
+  checkDictionaryFastEnumerationFromSwift(
+    [], d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  pairs = slurpFastEnumerationFromObjC(d, d)
-  assert(equalsUnordered(pairs, []))
+  checkDictionaryFastEnumerationFromObjC(
+    [], d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 }
 
 //===---
@@ -2498,62 +2499,69 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
-  expectAutoreleasedKeysAndValues(unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
 
-  var pairs = slurpFastEnumeration(d, d.keyEnumerator())
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromSwift(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d.keyEnumerator() },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(opt:(3, 0), unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift.Partial") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
     numElements: 9)
-  let enumerator = d.keyEnumerator()
 
-  var pairs = slurpFastEnumeration(d, enumerator, maxItems: 5)
-  while let key: AnyObject = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)!
-    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
-    pairs.append(kv)
-  }
-  assert(equalsUnordered(
-    pairs,
+  checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030), (40, 1040), (50, 1050),
-      (60, 1060), (70, 1070), (80, 1080), (90, 1090) ]))
+      (60, 1060), (70, 1070), (80, 1080), (90, 1090) ],
+    d, maxFastEnumerationItems: 5,
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(opt:(5, 0), unopt:(9, 9))
+  expectAutoreleasedKeysAndValues(unopt: (9, 9))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromObjC") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
 
-  var pairs = slurpFastEnumerationFromObjC(d, d.keyEnumerator())
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromObjC(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d.keyEnumerator() },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(opt:(3, 0), unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
 
-  var pairs = slurpFastEnumeration(d, d)
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromSwift(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(opt:(3, 0), unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
 
-  var pairs = slurpFastEnumerationFromObjC(d, d)
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromObjC(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(opt:(3, 0), unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
@@ -2583,7 +2591,7 @@ DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
-  expectAutoreleasedKeysAndValues(unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 func getBridgedNSDictionaryOfValue_ValueTypeCustomBridged() -> NSDictionary {
@@ -2613,7 +2621,7 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
-  expectAutoreleasedKeysAndValues(unopt:(3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 
@@ -2691,10 +2699,13 @@ DictionaryTestSuite.test("DictionaryToNSDictionaryCoversion") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
   let nsd: NSDictionary = d
 
-  var pairs = slurpFastEnumeration(d, d)
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  checkDictionaryFastEnumerationFromSwift(
+    [ (10, 1010), (20, 1020), (30, 1030) ],
+    d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt:(0, 3))
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 //===---
@@ -2861,7 +2872,7 @@ DictionaryTestSuite.test("DictionaryDowncastEntryPoint") {
   v = dCC[TestObjCKeyTy(30)]
   assert(v!.value == 1030)
 
-  expectAutoreleasedKeysAndValues(unopt:(0, 3))
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 DictionaryTestSuite.test("DictionaryDowncast") {
@@ -2882,7 +2893,7 @@ DictionaryTestSuite.test("DictionaryDowncast") {
   v = dCC[TestObjCKeyTy(30)]
   assert(v!.value == 1030)
 
-  expectAutoreleasedKeysAndValues(unopt:(0, 3))
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {

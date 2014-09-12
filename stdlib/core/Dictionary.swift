@@ -175,29 +175,18 @@
 // bridged.  Otherwise, a runtime error is raised.
 //
 // * if both `K` and `V` are bridged verbatim, then `Dictionary<K, V>` bridges
-//   to `NSDictionary` in `O(1)`, without memory allocation.
+//   to `NSDictionary` in `O(1)`, without memory allocation.  Access to
+//   elements does not cause memory allocation.
 //
 // * otherwise, `K` and/or `V` are unconditionally or conditionally bridged.
 //   In this case, `Dictionary<K, V>` is bridged to `NSDictionary` in `O(1)`,
-//   without memory allocation.  Bridging is performed lazily on-demand when
-//   elements are accessed.  The bridged `NSDictionary` only retains a
-//   reference to native storage and it does not keep references to keys and
-//   values bridged on-demand.  This has a few implications:
+//   without memory allocation.  Complete bridging is performed when the first
+//   access to elements happens.  The bridged `NSDictionary` has a cache of
+//   pointers it returned, so that:
 //   - Every time keys or values are accessed on the bridged `NSDictionary`,
-//     new objects are created.
+//     new objects are not created.
 //   - Accessing the same element (key or value) multiple times will return
-//     objects with different reference identity.  (Although they should be
-//     semantically equivalent.)
-//   - Fast enumeration over the bridged `NSDictionary` has to autorelease the
-//     returned objects.  (The objects are returned via an enumeration buffer
-//     that contains unowned objects, and something should to keep them alive.
-//     There is no callback to the fast enumeration object when enumeration is
-//     terminated, so fast enumeration object can not own these objects.)
-//   - In other cases when an object is bridged to Objective-C and returned,
-//     bridged `NSDictionary` does not keep any references to it, but ARC (just
-//     as always) will ensure that this object is alive across the function
-//     return, so we don't need to autorelease it explcitly.  Absolutely no
-//     magic here.
+//     the same pointer.
 //
 
 /// This protocol is only used for compile-time checks that
@@ -242,19 +231,20 @@ struct _DictionaryBody {
 
 /// An element of the variable-length array part of the native storage for
 /// `Dictionary`.
-struct _DictionaryElement<Key : Hashable, Value> {
+struct _DictionaryElement<Key, Value> {
   let key: Key
   var value: Value
 }
 
 /// An instance of this class has all dictionary data tail-allocated.  It is
 /// used as a `HeapBuffer` storage.
-final class _NativeDictionaryStorageImpl<Key : Hashable, Value> {
+final class _NativeDictionaryStorageImpl<Key, Value> {
 
   typealias Element = _DictionaryElement<Key, Value>
   typealias DictionaryHeapBuffer = HeapBuffer<_DictionaryBody, Element?>
 
   deinit {
+    // FIXME: this cast is invalid.
     let buffer = DictionaryHeapBuffer(
       unsafeBitCast(self, DictionaryHeapBuffer.Storage.self))
     let body = buffer.value
@@ -518,6 +508,66 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   }
 }
 
+/// Storage for bridged `Dictionary` elements.  We could have used
+/// `Dictionary<AnyObject, AnyObject>`, but `AnyObject` can not be a
+/// `Dictionary` key because it is not `Hashable`.
+struct _BridgedNativeDictionaryStorage {
+
+  typealias Element = _DictionaryElement<AnyObject, AnyObject>
+  typealias StorageImpl = _NativeDictionaryStorageImpl<AnyObject, AnyObject>
+
+  let buffer: StorageImpl.DictionaryHeapBuffer
+
+  init(buffer: StorageImpl.DictionaryHeapBuffer) {
+    self.buffer = buffer
+  }
+
+  @transparent
+  var body: _DictionaryBody {
+    get {
+      return buffer.value
+    }
+    nonmutating set(newValue) {
+      buffer.value = newValue
+    }
+  }
+
+  @transparent
+  var elements: UnsafeMutablePointer<Element?> {
+    return buffer.baseAddress
+  }
+
+  @transparent
+  var capacity: Int {
+    get {
+      return body.capacity
+    }
+    nonmutating set(newValue) {
+      body.capacity = newValue
+    }
+  }
+
+  subscript(i: Int) -> Element? {
+    @transparent
+    get {
+      _precondition(i >= 0 && i < capacity)
+      return (elements + i).memory
+    }
+    @transparent
+    nonmutating set {
+      _precondition(i >= 0 && i < capacity)
+      (elements + i).memory = newValue
+    }
+  }
+
+  func assertingGet(i: Int) -> (AnyObject, AnyObject) {
+    let e = self[i]
+    _precondition(
+      e != nil, "attempting to access Dictionary elements using an invalid Index")
+    return (e!.key, e!.value)
+  }
+}
+
 /// This class existis only to work around a compiler limitation.
 /// Specifically, we can not have @objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
@@ -577,24 +627,23 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
 class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
     : _NativeDictionaryStorageKeyNSEnumeratorBase {
 
-  typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
+  typealias NativeStorageOwner = _NativeDictionaryStorageOwner<Key, Value>
   typealias Index = _NativeDictionaryIndex<Key, Value>
 
   required init() {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  init(_ nativeStorage: NativeStorage) {
-    nextIndex = nativeStorage.startIndex
-    endIndex = nativeStorage.endIndex
+  init(_ nativeStorageOwner: NativeStorageOwner) {
+    self.nativeStorageOwner = nativeStorageOwner
+    nextIndex = nativeStorageOwner.nativeStorage.startIndex
+    endIndex = nativeStorageOwner.nativeStorage.endIndex
     super.init(dummy: (0, ()))
   }
 
+  var nativeStorageOwner: NativeStorageOwner
   var nextIndex: Index
   var endIndex: Index
-  var nativeStorage: NativeStorage {
-    return nextIndex.nativeStorage
-  }
 
   //
   // Dictionary -> NSDictionary bridging.
@@ -604,9 +653,9 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
     if nextIndex == endIndex {
       return nil
     }
-    let (nativeKey, _) = nextIndex.nativeStorage.assertingGet(nextIndex)
+    let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
     nextIndex = nextIndex.successor()
-    return _bridgeToObjectiveC(nativeKey)
+    return bridgedKey
   }
 
   override func bridgingCountByEnumeratingWithState(
@@ -627,11 +676,9 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
 
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
-    var (nativeKey, _) = nativeStorage.assertingGet(nextIndex)
+    let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
     nextIndex = nextIndex.successor()
 
-    var bridgedKey: AnyObject =
-      _bridgeToObjectiveCUnconditionalAutorelease(nativeKey)
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = bridgedKey
     state.memory = theState
@@ -742,6 +789,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     : _NativeDictionaryStorageOwnerBase {
 
   typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
+  typealias BridgedNativeStorage = _BridgedNativeDictionaryStorage
 
   required init(
     objects: UnsafePointer<AnyObject?>,
@@ -761,7 +809,110 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     super.init()
   }
 
+  // This stored property should be stored at offset zero.  We perform atomic
+  // operations on it.
+  //
+  // Do not access this property directly.
+  var _heapBufferBridged_DoNotUse: AnyObject? = nil
+
   var nativeStorage: NativeStorage
+
+  /// Returns the pointer to the stored property, which contains bridged
+  /// Dictionary elements.
+  var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
+    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+  }
+
+  /// The storage for bridged Dictionary elements, if present.
+  var _heapBufferBridged:
+    BridgedNativeStorage.StorageImpl.DictionaryHeapBuffer.Storage? {
+    if let ref: AnyObject =
+      _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
+      // FIXME: this cast is invalid.
+      return unsafeBitCast(
+        ref,
+        BridgedNativeStorage.StorageImpl.DictionaryHeapBuffer.Storage.self)
+    }
+    return nil
+  }
+
+  /// Attach a storage for bridged Dictionary elements.
+  func _initializeHeapBufferBridged(newBuffer: AnyObject) {
+    _stdlib_atomicInitializeARCRef(
+      object: _heapBufferBridgedPtr, desired: newBuffer)
+  }
+
+  /// Detach the storage of bridged Dictionary elements.
+  ///
+  /// Call this before mutating the dictionary storage owned by this owner.
+  func deinitializeHeapBufferBridged() {
+    // Perform a non-atomic store because storage should be
+    // uniquely-referenced.
+    let ptr = UnsafeMutablePointer<COpaquePointer>(_heapBufferBridgedPtr).memory
+    if ptr != nil {
+      Unmanaged<AnyObject>.fromOpaque(ptr).takeRetainedValue()
+      _heapBufferBridgedPtr.memory = nil
+    }
+  }
+
+  /// Returns the bridged Dictionary values.
+  var bridgedNativeStorage: BridgedNativeStorage {
+    return BridgedNativeStorage(buffer: HeapBuffer(_heapBufferBridged!))
+  }
+
+  func _createBridgedNativeStorage(capacity: Int) -> BridgedNativeStorage {
+    let body = _DictionaryBody(capacity: capacity)
+    let buffer = BridgedNativeStorage.StorageImpl.DictionaryHeapBuffer(
+      BridgedNativeStorage.StorageImpl.self, body, capacity)
+    let elements = buffer.baseAddress
+    for var i = 0; i < capacity; ++i {
+      (elements + i).initialize(.None)
+    }
+    return BridgedNativeStorage(buffer: buffer)
+  }
+
+  func bridgeEverything() {
+    if _fastPath(_heapBufferBridged != nil) {
+      return
+    }
+
+    // Create storage for bridged data.
+    let bridged = _createBridgedNativeStorage(nativeStorage.capacity)
+
+    // Bridge everything.
+    for var i = 0; i < nativeStorage.capacity; ++i {
+      if let nativeElement = nativeStorage[i] {
+        bridged[i] = _DictionaryElement<AnyObject, AnyObject>(
+          key: _bridgeToObjectiveCUnconditional(nativeElement.key),
+          value: _bridgeToObjectiveCUnconditional(nativeElement.value))
+      }
+    }
+
+    // Atomically put the bridged elements in place.
+    _initializeHeapBufferBridged(bridged.buffer.storage!)
+  }
+
+  //
+  // Entry points for bridging Dictionary elements.  In implementations of
+  // Foundation subclasses (NSDictionary, NSEnumerator), don't access any
+  // storage directly, use these functions.
+  //
+
+  func _getBridgedKey(i: _NativeDictionaryIndex<Key, Value>) -> AnyObject {
+    if _fastPath(_isClassOrObjCExistential(Key.self)) {
+      return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i).0)
+    }
+    bridgeEverything()
+    return bridgedNativeStorage.assertingGet(i.offset).0
+  }
+
+  func _getBridgedValue(i: _NativeDictionaryIndex<Key, Value>) -> AnyObject {
+    if _fastPath(_isClassOrObjCExistential(Value.self)) {
+      return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i).1)
+    }
+    bridgeEverything()
+    return bridgedNativeStorage.assertingGet(i.offset).1
+  }
 
   //
   // Dictionary -> NSDictionary bridging.
@@ -773,8 +924,10 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
 
   override func bridgingObjectForKey(aKey: AnyObject, dummy: ()) -> AnyObject? {
     let nativeKey = _forceBridgeFromObjectiveC(aKey, Key.self)
-    if let nativeValue = nativeStorage.maybeGet(nativeKey) {
-      return _bridgeToObjectiveCUnconditional(nativeValue)
+    let (i, found) = nativeStorage._find(
+      nativeKey, nativeStorage._bucket(nativeKey))
+    if found {
+      return _getBridgedValue(i)
     }
     return nil
   }
@@ -784,8 +937,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     // <rdar://problem/16825366> Hole in type safety with initializer
     // requirements in protocols
     let result: _NativeDictionaryStorageKeyNSEnumeratorBase =
-        _NativeDictionaryStorageKeyNSEnumerator<Key, Value>(
-            nativeStorage)
+      _NativeDictionaryStorageKeyNSEnumerator<Key, Value>(self)
     return result
   }
 
@@ -809,10 +961,8 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
       if (currIndex == endIndex) {
         break
       }
-      var (nativeKey, _) = nativeStorage.assertingGet(currIndex)
 
-      var bridgedKey: AnyObject =
-        _bridgeToObjectiveCUnconditionalAutorelease(nativeKey)
+      var bridgedKey: AnyObject = _getBridgedKey(currIndex)
       unmanagedObjects[i] = bridgedKey
       ++stored
       currIndex = currIndex.successor()
@@ -960,6 +1110,13 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
       let oldNativeStorage = native
       let oldCapacity = oldNativeStorage.capacity
       if isUniquelyReferenced() && oldCapacity >= minimumCapacity {
+        // Clear the cache of bridged elements.
+        switch self {
+        case .Native(let owner):
+          owner.deinitializeHeapBufferBridged()
+        case .Cocoa:
+          _sanityCheckFailure("internal error: not backed by native storage")
+        }
         return (reallocated: false, capacityChanged: false)
       }
 
