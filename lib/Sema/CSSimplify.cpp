@@ -1443,7 +1443,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
 
       // Check for CF <-> ObjectiveC bridging.
-      if (desugar1->getKind() == TypeKind::Class) {
+      if (desugar1->getKind() == TypeKind::Class &&
+          kind >= TypeMatchKind::Subtype) {
         auto class1 = cast<ClassDecl>(nominal1->getDecl());
         auto class2 = cast<ClassDecl>(nominal2->getDecl());
 

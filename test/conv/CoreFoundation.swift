@@ -67,3 +67,11 @@ func testUncheckableCasts(anyObject: AnyObject, nsObject: NSObject,
   if let cfTreeType = anyObjectType as? CFTree.Type { } // expected-error{{conditional downcast to CoreFoundation type 'CFTree.Type' will always succeed}}
   if let cfTreeType = nsObjectType as? CFTree.Type { } // expected-error{{'CFTree' is not a subtype of 'NSObject'}}
 }
+
+func testCFConvWithIUO(x: CFString!, y: NSString!) {
+  func acceptCFString(a: CFString!) { }
+  func acceptNSString(b: NSString!) { }
+
+  acceptNSString(x)
+  acceptCFString(y)
+}
