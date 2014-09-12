@@ -37,7 +37,8 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "where")
+                    "typealias" "enum" "var" "where"
+                    "private" "public" "internal")
                   'words) . font-lock-keyword-face)
    ;; Statements
    `(,(regexp-opt '("if" "in" "else" "for" "do" "while" "return" "break"
