@@ -539,21 +539,12 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
   return true;
 }
 
-/// TODO: Isn't there a helper for this somewhere?
-static SILBasicBlock *getValBB(SILValue Val) {
-  if (auto Inst = dyn_cast<SILInstruction>(Val.getDef()))
-    return Inst->getParent();
-  if (auto Arg = dyn_cast<SILArgument>(Val.getDef()))
-    return Arg->getParent();
-  return nullptr;
-}
-
 /// Check if this call to "make_mutable" is hoistable, and move it, or delete it
 /// if it's already hoisted.
 bool COWArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue ArrayAddr) {
   DEBUG(llvm::dbgs() << "    Checking mutable array: " << ArrayAddr);
 
-  SILBasicBlock *ArrayBB = getValBB(ArrayAddr);
+  SILBasicBlock *ArrayBB = ArrayAddr.getDef()->getParentBB();
   if (ArrayBB && !DomTree->dominates(ArrayBB, Preheader)) {
     DEBUG(llvm::dbgs() << "    Skipping Array: does not dominate loop!\n");
     return false;
