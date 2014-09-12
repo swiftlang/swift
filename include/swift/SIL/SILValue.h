@@ -121,6 +121,8 @@ public:
 
   static bool classof(const ValueBase *V) { return true; }
 
+  // If this is a SILArgument or a SILInstruction get its parent basic block,
+  // otherwise return null.
   SILBasicBlock *getParentBB();
 };
 
