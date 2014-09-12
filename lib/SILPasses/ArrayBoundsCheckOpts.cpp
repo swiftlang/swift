@@ -64,20 +64,6 @@ using ArrayAccessDesc = llvm::PointerIntPair<ValueBase *, 1, bool>;
 using IndexedArraySet = llvm::DenseSet<std::pair<ValueBase *, ArrayAccessDesc>>;
 using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 16>;
 
-/// The kind of array operation identified by looking at the semantics attribute
-/// of the called function.
-enum class ArrayCallKind {
-  kNone = 0,
-  kCheckSubscript,
-  kCheckIndex,
-  kGetCount,
-  kGetCapacity,
-  kGetElement,
-  kMakeMutable,
-  kSetElement,
-  kMutateUnknown
-};
-
 /// The effect an instruction can have on array bounds.
 enum class ArrayBoundsEffect {
   kNone = 0,

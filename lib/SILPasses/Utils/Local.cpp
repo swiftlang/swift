@@ -16,6 +16,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include <deque>
 
@@ -316,4 +317,191 @@ SILLinkage swift::getSpecializedLinkage(SILLinkage L) {
     // Specializations of private symbols should remain so.
     return SILLinkage::Private;
   }
+}
+
+/// Match array semantic calls.
+swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
+                                              StringRef SemanticStr,
+                                              bool MatchPartialName) {
+  if (auto AI = dyn_cast<ApplyInst>(V))
+    if (auto FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+      if (auto FunRef = FRI->getReferencedFunction()) {
+        if (MatchPartialName) {
+          if (FunRef->hasDefinedSemantics() &&
+              FunRef->getSemanticsString().startswith(SemanticStr)) {
+            SemanticsCall = AI;
+            return;
+          }
+        } else {
+          if (FunRef->hasSemanticsString(SemanticStr)) {
+            SemanticsCall = AI;
+            return;
+          }
+        }
+      }
+  // Otherwise, this is not the semantic call we are looking for.
+  SemanticsCall = nullptr;
+}
+
+/// Determine which kind of array semantics call this is.
+ArrayCallKind swift::ArraySemanticsCall::getKind() {
+  if (!SemanticsCall)
+    return ArrayCallKind::kNone;
+
+  auto F = cast<FunctionRefInst>(SemanticsCall->getCallee())
+               ->getReferencedFunction();
+
+  auto Kind = llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
+      .Case("array.init", ArrayCallKind::kArrayInit)
+      .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
+      .Case("array.check_index", ArrayCallKind::kCheckIndex)
+      .Case("array.get_count", ArrayCallKind::kGetCount)
+      .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
+      .Case("array.get_element", ArrayCallKind::kGetElement)
+      .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
+      .Case("array.set_element", ArrayCallKind::kSetElement)
+      .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
+      .Default(ArrayCallKind::kNone);
+
+  return Kind;
+}
+
+SILValue swift::ArraySemanticsCall::getSelf() {
+  assert(SemanticsCall && "Must have a semantics call");
+  assert(SemanticsCall->getNumArguments() && "Must have arguments");
+  return SemanticsCall->getSelfArgument();
+}
+
+SILValue swift::ArraySemanticsCall::getIndex() {
+  assert(SemanticsCall && "Must have a semantics call");
+  assert(SemanticsCall->getNumArguments() && "Must have arguments");
+  assert(getKind() == ArrayCallKind::kCheckSubscript ||
+         getKind() == ArrayCallKind::kCheckIndex ||
+         getKind() == ArrayCallKind::kGetElement ||
+         getKind() == ArrayCallKind::kSetElement);
+
+  return SemanticsCall->getArgument(0);
+}
+
+static bool canHoistArrayArgument(SILValue Arr, SILInstruction *InsertBefore,
+                                  DominanceInfo *DT) {
+  auto *SelfVal = Arr.getDef();
+  auto *SelfBB = SelfVal->getParentBB();
+  if (DT->dominates(SelfBB, InsertBefore->getParent()))
+    return true;
+
+  if (auto LI = dyn_cast<LoadInst>(SelfVal)) {
+    // Are we loading a value from an address in a struct defined at a point
+    // dominating the hoist point.
+    auto Val = LI->getOperand().getDef();
+    bool DoesNotDominate;
+    StructElementAddrInst *SEI;
+    while ((DoesNotDominate = !DT->dominates(Val->getParentBB(),
+                                             InsertBefore->getParent())) &&
+           (SEI = dyn_cast<StructElementAddrInst>(Val)))
+      Val = SEI->getOperand().getDef();
+    return DoesNotDominate == false;
+  }
+
+  return false;
+}
+
+bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
+                                         DominanceInfo *DT) {
+  switch (getKind()) {
+  case ArrayCallKind::kCheckSubscript:
+  case ArrayCallKind::kCheckIndex: {
+    return canHoistArrayArgument(getSelf(), InsertBefore, DT);
+  }
+
+  default:
+    break;
+  }
+  return false;
+}
+
+/// Copy the array load to the insert point.
+static SILValue copyArrayLoad(SILValue ArrayStructValue,
+                               SILInstruction *InsertBefore,
+                               DominanceInfo *DT) {
+  if (isa<SILArgument>(ArrayStructValue.getDef())) {
+    // Assume that the argument dominates the insert point.
+    assert(DT->dominates(ArrayStructValue.getDef()->getParentBB(),
+                         InsertBefore->getParent()));
+    return ArrayStructValue;
+  }
+
+  auto *LI = cast<LoadInst>(ArrayStructValue.getDef());
+  if (DT->dominates(LI->getParent(), InsertBefore->getParent()))
+    return ArrayStructValue;
+
+  // Recursively move struct_element_addr.
+  auto *Val = LI->getOperand().getDef();
+  auto *InsertPt = InsertBefore;
+  while (!DT->dominates(Val->getParentBB(), InsertBefore->getParent())) {
+    auto *Inst = cast<StructElementAddrInst>(Val);
+    Inst->moveBefore(InsertPt);
+    Val = Inst->getOperand().getDef();
+    InsertPt = Inst;
+  }
+
+  return SILValue(LI->clone(InsertBefore), 0);
+}
+
+static ApplyInst *hoistOrCopyCall(ApplyInst *AI, SILInstruction *InsertBefore,
+                                  bool LeaveOriginal, DominanceInfo *DT) {
+  if (!LeaveOriginal) {
+    AI->moveBefore(InsertBefore);
+  } else {
+    // Leave the original and 'hoist' a clone.
+    AI = cast<ApplyInst>(AI->clone(InsertBefore));
+  }
+  placeFuncRef(AI, DT);
+  return AI;
+}
+
+ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
+                                                  DominanceInfo *DT,
+                                                  bool LeaveOriginal) {
+  auto Kind = getKind();
+  switch (Kind) {
+
+  case ArrayCallKind::kCheckSubscript:
+  case ArrayCallKind::kCheckIndex: {
+    auto Self = getSelf();
+    // We are going to have a retain, emit a matching release.
+    if (!LeaveOriginal)
+      SILBuilder(SemanticsCall)
+          .createReleaseValue(SemanticsCall->getLoc(), Self);
+
+    // Hoist the array load, if neccessary.
+    SILBuilder B(InsertBefore);
+    auto NewArrayStructValue = copyArrayLoad(Self, InsertBefore, DT);
+
+    // Retain the array.
+    B.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue);
+    auto Call = hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
+    Call->setSelfArgument(NewArrayStructValue);
+    return Call;
+  }
+
+  case ArrayCallKind::kMakeMutable: {
+    assert(!LeaveOriginal && "Copying not yet implemented");
+    SemanticsCall->moveBefore(InsertBefore);
+    placeFuncRef(SemanticsCall, DT);
+    return SemanticsCall;
+  }
+
+  default:
+    llvm_unreachable("Don't know how to hoist this instruction");
+    break;
+  } // End switch.
+}
+
+void swift::ArraySemanticsCall::replaceByRetainValue() {
+  assert(getKind() < ArrayCallKind::kMakeMutable &&
+         "Must be a semantics call that passes the array by value");
+  SILBuilder(SemanticsCall)
+      .createReleaseValue(SemanticsCall->getLoc(), getSelf());
+  SemanticsCall->eraseFromParent();
 }

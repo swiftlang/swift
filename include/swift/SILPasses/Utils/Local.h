@@ -93,6 +93,81 @@ namespace swift {
   /// the given linkage.
   SILLinkage getSpecializedLinkage(SILLinkage L);
 
+  /// The kind of array operation identified by looking at the semantics attribute
+  /// of the called function.
+  enum class ArrayCallKind {
+    kNone = 0,
+    kCheckSubscript,
+    kCheckIndex,
+    kGetCount,
+    kGetCapacity,
+    kGetElement,
+    kMakeMutable,
+    kSetElement,
+    kMutateUnknown,
+    kArrayInit
+  };
+
+  /// Wrapper around array semantic calls.
+  class ArraySemanticsCall {
+    ApplyInst *SemanticsCall;
+
+  public:
+    /// Match array semantic calls.
+    ArraySemanticsCall(ValueBase *V, StringRef SemanticStr,
+                       bool MatchPartialName);
+
+    /// Match any array semantics call.
+    ArraySemanticsCall(ValueBase *V) : ArraySemanticsCall(V, "array.", true) {}
+
+    /// Match a specific array semantic call.
+    ArraySemanticsCall(ValueBase *V, StringRef SemanticStr)
+        : ArraySemanticsCall(V, SemanticStr, false) {}
+
+    /// Can we hoist this call.
+    bool canHoist(SILInstruction *To, DominanceInfo *DT);
+
+    /// Determine which kind of array semantics call this is.
+    ArrayCallKind getKind();
+
+    /// Get the self argument.
+    SILValue getSelf();
+
+    /// Get the index for operations that have one.
+    SILValue getIndex();
+
+    /// Remove instruction by replacing it with a retain_value of the array
+    /// argument.
+    void replaceByRetainValue();
+
+    /// Remove the instruction. This is to be used for calls that receive self
+    /// by reference (and hence need no matching retain).
+    void remove() { SemanticsCall->eraseFromParent(); }
+
+    /// Hoist the call to the insert point.
+    void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {
+      hoistOrCopy(InsertBefore, DT, false);
+    }
+
+    /// Copy the call to the insert point and return the newly created call.
+    ApplyInst *copyTo(SILInstruction *InsertBefore, DominanceInfo *DT) {
+      return hoistOrCopy(InsertBefore, DT, true);
+    }
+
+    /// Get the semantics call as an ApplyInst.
+    operator ApplyInst *() { return SemanticsCall; }
+
+    /// Is this an semantics call.
+    operator bool() { return SemanticsCall != nullptr; }
+
+  protected:
+    /// Hoist or copy the call to the insert point. If LeaveOriginal is true the
+    /// call is copied to the insert point. Returns the copied call.
+    ApplyInst *hoistOrCopy(SILInstruction *InsertBefore, DominanceInfo *DT,
+                           bool LeaveOriginal);
+
+  };
+
 } // end namespace swift
 
 #endif
