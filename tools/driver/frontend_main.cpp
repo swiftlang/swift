@@ -213,14 +213,10 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Get the main source file's private discriminator and attach it to
   // the compile unit's flags.
-  std::string FlagsBuf;
-  auto &MainSourceFile = PrimarySourceFile ? *PrimarySourceFile
-    : Instance.getMainModule()->getMainSourceFile(opts.InputKind);
-  Identifier PD = MainSourceFile.getPrivateDiscriminator();
-  if (!PD.empty()) {
-    FlagsBuf = (IRGenOpts.DWARFDebugFlags+
-                " -private-discriminator "+PD.str()).str();
-    IRGenOpts.DWARFDebugFlags = FlagsBuf;
+  if (PrimarySourceFile) {
+    Identifier PD = PrimarySourceFile->getPrivateDiscriminator();
+    if (!PD.empty())
+      IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
   }
 
   if (!opts.ObjCHeaderOutputPath.empty()) {
