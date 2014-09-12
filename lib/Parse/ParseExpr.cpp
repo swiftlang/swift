@@ -2193,7 +2193,7 @@ Parser::parseVersionConstraintSpec() {
   }
 
   Optional<PlatformKind> Platform =
-      AvailabilityAttr::platformFromString(PlatformIdentifier.str());
+      platformFromString(PlatformIdentifier.str());
 
   if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
     diagnose(Tok, diag::avail_query_unrecognized_platform_name,

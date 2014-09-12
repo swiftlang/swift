@@ -58,12 +58,16 @@ public:
   VersionComparison getComparison() const { return Comparison; }
   SourceLoc getConstraintLoc() const { return ComparisonLoc; }
 
+  StringRef getComparisonAsString() const;
+  
   // The platform version to compare against.
-  clang::VersionTuple getVersion() { return Version; }
+  clang::VersionTuple getVersion() const { return Version; }
   SourceRange getVersionSrcRange() const { return VersionSrcRange; }
 
   SourceRange getSourceRange() const;
 
+  void print(raw_ostream &OS, unsigned Indent) const;
+  
   void *
   operator new(size_t Bytes, ASTContext &C,
                unsigned Alignment = alignof(VersionConstraintAvailabilitySpec));

@@ -742,7 +742,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (!DiscardAttribute) {
-      auto PlatformKind = AvailabilityAttr::platformFromString(Platform);
+      auto PlatformKind = platformFromString(Platform);
       if (PlatformKind.hasValue()) {
         Attributes.add(new (Context)
                        AvailabilityAttr(AtLoc, AttrRange,

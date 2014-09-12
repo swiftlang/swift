@@ -645,20 +645,14 @@ public:
     return Platform != PlatformKind::none;
   }
 
-  /// Returns the string for the specified platform.
-  static StringRef platformString(PlatformKind Platform);
-
   /// Returns the string for the platform of the attribute.
   StringRef platformString() const {
-    return platformString(Platform);
+    return swift::platformString(Platform);
   }
-
-  /// Returns the human-readable string for the specified platform.
-  static StringRef prettyPlatformString(PlatformKind Platform);
 
   /// Returns the human-readable string for the platform of the attribute.
   StringRef prettyPlatformString() const {
-    return prettyPlatformString(Platform);
+    return swift::prettyPlatformString(Platform);
   }
 
   /// Returns true if this attribute is active given the current platform.
@@ -668,9 +662,6 @@ public:
   /// version (assuming the this attribute pertains to the active platform).
   MinVersionComparison getMinVersionAvailability(
                          clang::VersionTuple minVersion) const;
-
-  /// Returns the PlatformKind for a given string.
-  static Optional<PlatformKind> platformFromString(StringRef);
 
   /// Create an AvailabilityAttr that indicates 'unavailable' for all platforms.
   static AvailabilityAttr *createUnavailableAttr(ASTContext &C,

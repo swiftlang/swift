@@ -397,36 +397,6 @@ AvailabilityAttr *AvailabilityAttr::createUnavailableAttr(ASTContext &C,
     /* isImplicit */ false);
 }
 
-StringRef
-AvailabilityAttr::platformString(PlatformKind platform) {
-  switch (platform) {
-    case PlatformKind::none: return "*";
-#define AVAILABILITY_PLATFORM(X, PrettyName) case PlatformKind::X: return #X;
-#include "swift/AST/PlatformKinds.def"
-  }
-}
-
-StringRef AvailabilityAttr::prettyPlatformString(
-            PlatformKind platform) {
-  switch (platform) {
-    case PlatformKind::none: return "*";
-#define AVAILABILITY_PLATFORM(X, PrettyName) case PlatformKind::X: \
-            return PrettyName;
-#include "swift/AST/PlatformKinds.def"
-  }
-}
-
-Optional<PlatformKind>
-AvailabilityAttr::platformFromString(StringRef Name) {
-  if (Name == "*")
-    return PlatformKind::none;
-  return
-    llvm::StringSwitch<Optional<PlatformKind>>(Name)
-#define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
-#include "swift/AST/PlatformKinds.def"
-    .Default(Optional<PlatformKind>());
-}
-
 bool AvailabilityAttr::isActivePlatform(const ASTContext &ctx) const {
   if (!hasPlatform())
     return true;

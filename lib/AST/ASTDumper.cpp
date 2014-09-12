@@ -1720,7 +1720,9 @@ public:
     OS << ')';
   }
   void visitAvailabilityQueryExpr(AvailabilityQueryExpr *E) {
-    assert(false && "Unimplemented");
+    printCommon(E, "availability_query_expr") << '\n';
+    E->getQuery()->print(OS, Indent + 2);
+    OS << ')';
   }
 };
 

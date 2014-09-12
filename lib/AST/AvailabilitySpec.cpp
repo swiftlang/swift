@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -26,6 +27,22 @@ operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
+StringRef VersionConstraintAvailabilitySpec::getComparisonAsString() const {
+  switch (getComparison()) {
+  case VersionComparison::GreaterThanEqual:
+    return ">=";
+  }
+}
+
 SourceRange VersionConstraintAvailabilitySpec::getSourceRange() const {
   return SourceRange(PlatformLoc, VersionSrcRange.End);
+}
+
+void VersionConstraintAvailabilitySpec::print(raw_ostream &OS,
+                                              unsigned Indent) const {
+  OS.indent(Indent) << '(' << "version_constraint_availability_spec"
+                    << " platform='" << platformString(getPlatform()) << "'"
+                    << " comparison='" << getComparisonAsString() << "'"
+                    << " version='" << getVersion() << "'"
+                    << ')';
 }
