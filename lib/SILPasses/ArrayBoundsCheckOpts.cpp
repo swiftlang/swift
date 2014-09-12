@@ -21,7 +21,6 @@
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/IVAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
-#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
@@ -71,43 +70,6 @@ enum class ArrayBoundsEffect {
   kMayChangeAny  // Might change any array.
 };
 
-/// Classify the instruction with respect to its high level array semantics.
-static ArrayCallKind isArrayKindCall(SILInstruction *I, SILValue &Array) {
-  auto *AI = dyn_cast<ApplyInst>(I);
-  // Not an apply.
-  if (!AI)
-    return ArrayCallKind::kNone;
-  auto *FR = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (!FR)
-    return ArrayCallKind::kNone;
-  auto *F = FR->getReferencedFunction();
-
-  // No semantics attribute.
-  if (!F || !F->hasDefinedSemantics())
-   return ArrayCallKind::kNone;
-
-  auto Kind = llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
-      .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
-      .Case("array.check_index", ArrayCallKind::kCheckIndex)
-      .Case("array.get_count", ArrayCallKind::kGetCount)
-      .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
-      .Case("array.get_element", ArrayCallKind::kGetElement)
-      .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
-      .Case("array.set_element", ArrayCallKind::kSetElement)
-      .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
-      .Default(ArrayCallKind::kNone);
-
-  if (Kind == ArrayCallKind::kNone)
-    return Kind;
-
-  // We must have a self argument.
-  if (AI->getNumArguments() < 1)
-    return ArrayCallKind::kNone;
-
-  Array = AI->getSelfArgument();
-  return Kind;
-}
-
 static bool mayHaveSideEffects(SILInstruction *I) {
   if (auto *AI = dyn_cast<ApplyInst>(I))
     if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
@@ -137,13 +99,15 @@ static ArrayBoundsEffect mayChangeArraySize(SILInstruction *I,
 
   // TODO: What else.
   if (isa<StrongRetainInst>(I) || isa<RetainValueInst>(I) ||
-      isa<CondFailInst>(I) || isa<DeallocStackInst>(I) ||
-      isa<AllocationInst>(I))
+      isa<ReleaseValueInst>(I) || isa<CondFailInst>(I) ||
+      isa<DeallocStackInst>(I) || isa<AllocationInst>(I))
     return ArrayBoundsEffect::kNone;
 
   // Check array bounds semantic.
-  Kind = isArrayKindCall(I, Array);
+  ArraySemanticsCall ArrayCall(I);
+  Kind = ArrayCall.getKind();
   if (Kind != ArrayCallKind::kNone) {
+    Array = ArrayCall.getSelf();
     if (Kind < ArrayCallKind::kMutateUnknown) {
       // These methods are not mutating and pass the array owned. Therefore we
       // will potentially see a load of the array struct if there are mutating
@@ -290,88 +254,6 @@ private:
   }
 };
 
-/// Check whether this a retain on the storage of the array.
-static SILInstruction *isArrayBufferStorageRetain(SILInstruction *R,
-                                                  SILValue Array,
-                                                  RCIdentityAnalysis *RCIA) {
-  // Is this a retain.
-  if (!isa<RetainValueInst>(R))
-    return nullptr;
-
-  SILValue RetainedVal = R->getOperand(0);
-  if (!RetainedVal)
-    return nullptr;
-
-  // Find the projection from the array:
-  // We can either have something like
-  //
-  //  %42 = SILValue(Array, ...) : $Array<Int>
-  //  %43 = struct_extract %42 : $Array<Int>, #Array._buffer
-  //  %44 = struct_extract %43 : $_ArrayBuffer<Int>, #_ArrayBuffer.storage
-  //  retain_value %44
-  //
-  // Or we can have a retain directly on the array:
-  //  %42 = SILValue(Array, ...) : $Array<Int>
-  // retain %42
-  RetainedVal = RCIA->getRCIdentityRoot(RetainedVal);
-  if (RetainedVal != Array)
-    return nullptr;
-  return R;
-}
-
-/// Find a matching preceeding retain on the same array.
-static SILInstruction *
-findMatchingRetain(RCIdentityAnalysis *RCIA, SILInstruction *BoundsCheck) {
-  auto ApplyBoundsCheck = dyn_cast<ApplyInst>(BoundsCheck);
-  assert(ApplyBoundsCheck);
-  auto Array = ApplyBoundsCheck->getSelfArgument();
-  unsigned BoundSearch = 4;
-  for (auto E = BoundsCheck->getParent()->rend(),
-            Iter = SILBasicBlock::reverse_iterator(BoundsCheck);
-       Iter != E; ++Iter) {
-    if (auto R = isArrayBufferStorageRetain(&*Iter, Array, RCIA))
-      return R;
-    if (!BoundSearch--)
-      return nullptr;
-  }
-  return nullptr;
-}
-
-static SILValue getArrayIndex(SILInstruction *BoundsCheck) {
-  auto AI = dyn_cast<ApplyInst>(BoundsCheck);
-  if (!AI) {
-    DEBUG(llvm::dbgs() << " not an apply " << *BoundsCheck);
-    return SILValue();
-  }
-  if (AI->getNumArguments() != 2) {
-    DEBUG(llvm::dbgs() << " not an two args " << *BoundsCheck);
-    return SILValue();
-  }
-  return AI->getArgument(0);
-}
-
-static bool
-eraseArrayBoundsCheckAndMatchingRetain(RCIdentityAnalysis *RCIA,
-                                       SILInstruction *BoundsCheck) {
-  // TODO: This could be quadratic if we don't find the retain immediatly before
-  // the bounds check instruction (which seems to be the common case). We should
-  // preprocess the block first to build matching retain and apply instructions.
-  // For now we bound this by looking only at the preceeding 5 instructions.
-  // Retain is always the preceeding instruction in all examples I have seen so
-  // far.
-  if (auto Retain = findMatchingRetain(RCIA, BoundsCheck)) {
-    DEBUG(llvm::dbgs() << " removing " << *BoundsCheck << "  and matching "
-                       << *Retain);
-    BoundsCheck->eraseFromParent();
-    Retain->eraseFromParent();
-    return true;
-  }
-
-  DEBUG(llvm::dbgs() << " ABC not removing " << *BoundsCheck);
-  DEBUG(llvm::dbgs() << "  could not find matching retain\n");
-  return false;
-}
-
 // Get the pair of array and index. Because we want to disambiguate between the
 // two types of check bounds checks merge in the type into the lower bit of one
 // of the addresse index.
@@ -388,8 +270,7 @@ getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
 /// Remove redundant checks in a basic block. This pass will reset the state
 /// after an instruction that may modify any array allowing removal of redundant
 /// checks up to that point and after that point.
-static bool removeRedundantChecksInBlock(RCIdentityAnalysis *RCIA,
-                                         SILBasicBlock &BB) {
+static bool removeRedundantChecksInBlock(SILBasicBlock &BB) {
   ABCAnalysis ABC(false);
   IndexedArraySet RedundantChecks;
   bool Changed = false;
@@ -411,14 +292,15 @@ static bool removeRedundantChecksInBlock(RCIdentityAnalysis *RCIA,
 
     ArraySet &SafeArrays = ABC.getSafeArrays();
 
-    SILValue Array;
     // Is this a check_bounds.
-    auto Kind = isArrayKindCall(Inst, Array);
+    ArraySemanticsCall ArrayCall(Inst);
+    auto Kind = ArrayCall.getKind();
     if (Kind != ArrayCallKind::kCheckSubscript &&
         Kind != ArrayCallKind::kCheckIndex) {
       DEBUG(llvm::dbgs() << " not a check_bounds call " << *Inst);
       continue;
     }
+    auto Array = ArrayCall.getSelf();
 
     // Get the underlying array pointer.
     Array = getArrayStructPointer(Kind, Array);
@@ -430,7 +312,7 @@ static bool removeRedundantChecksInBlock(RCIdentityAnalysis *RCIA,
     }
 
     // Get the array index.
-    auto ArrayIndex = getArrayIndex(Inst);
+    auto ArrayIndex = ArrayCall.getIndex();
     if (!ArrayIndex)
       continue;
 
@@ -447,16 +329,15 @@ static bool removeRedundantChecksInBlock(RCIdentityAnalysis *RCIA,
       continue;
     }
 
-    // Remove the bounds check together with the matching retain if we can find
-    // the retain. This will erase Inst and the preceeding retain on success.
-    Changed |= eraseArrayBoundsCheckAndMatchingRetain(RCIA, Inst);
+    // Remove the bounds check.
+    ArrayCall.replaceByRetainValue();
+    Changed = true;
   }
   return Changed;
 }
 
 /// Walk down the dominator tree removing redundant checks.
-static bool removeRedundantChecks(RCIdentityAnalysis *RCIA,
-                                  DominanceInfoNode *CurBB,
+static bool removeRedundantChecks(DominanceInfoNode *CurBB,
                                   ArraySet &SafeArrays,
                                   IndexedArraySet &DominatingSafeChecks) {
   auto *BB = CurBB->getBlock();
@@ -471,14 +352,15 @@ static bool removeRedundantChecks(RCIdentityAnalysis *RCIA,
     auto Inst = &*Iter;
     ++Iter;
 
-    SILValue Array;
     // Is this a check_bounds.
-    auto Kind = isArrayKindCall(Inst, Array);
+    ArraySemanticsCall ArrayCall(Inst);
+    auto Kind = ArrayCall.getKind();
     if (Kind != ArrayCallKind::kCheckSubscript &&
         Kind != ArrayCallKind::kCheckIndex) {
       DEBUG(llvm::dbgs() << " not a check_bounds call " << *Inst);
       continue;
     }
+    auto Array = ArrayCall.getSelf();
 
     // Get the underlying array pointer.
     Array = getArrayStructPointer(Kind, Array);
@@ -490,7 +372,7 @@ static bool removeRedundantChecks(RCIdentityAnalysis *RCIA,
     }
 
     // Get the array index.
-    auto ArrayIndex = getArrayIndex(Inst);
+    auto ArrayIndex = ArrayCall.getIndex();
     if (!ArrayIndex)
       continue;
     auto IndexedArray =
@@ -505,15 +387,15 @@ static bool removeRedundantChecks(RCIdentityAnalysis *RCIA,
       continue;
     }
 
-    // Remove the bounds check together with the matching retain if we can find
-    // the retain. This will erase Inst and the preceeding retain on success.
-    Changed |= eraseArrayBoundsCheckAndMatchingRetain(RCIA, Inst);
+    // Remove the bounds check.
+    ArrayCall.replaceByRetainValue();
+    Changed = true;
   }
 
   // Traverse the children in the dominator tree.
   for (auto Child: *CurBB)
     Changed |=
-      removeRedundantChecks(RCIA, Child, SafeArrays, DominatingSafeChecks);
+        removeRedundantChecks(Child, SafeArrays, DominatingSafeChecks);
 
   // Remove checks we have seen for the first time.
   std::for_each(SafeChecksToPop.begin(), SafeChecksToPop.end(),
@@ -633,10 +515,8 @@ static bool isRangeChecked(SILValue Start, SILValue End,
 }
 
 static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
-  if (auto *Arg = dyn_cast<SILArgument>(V.getDef()))
-    return DT->properlyDominates(Arg->getParent(), B);
-  if (auto *Inst = dyn_cast<SILInstruction>(V.getDef()))
-    return DT->properlyDominates(Inst->getParent(), B);
+  if (auto ValueBB = V.getDef()->getParentBB())
+    return DT->dominates(ValueBB, B);
   return false;
 }
 
@@ -881,45 +761,6 @@ private:
   }
 };
 
-/// Hoist the bounds check \p CheckToHoist to the preheader updating the index
-/// to \p Index.
-/// The set of instructions to retain the array starting at the load is to be
-/// specified in \p RetainSequence.
-static void hoistBoundsCheckCallWithIndex(RCIdentityAnalysis *RCIA,
-                                          SILInstruction *CheckToHoist,
-                                          SILInstruction *Retain,
-                                          SILValue Index,
-                                          SILBasicBlock *Preheader) {
-  auto Arr = Retain->getOperand(0);
-  assert(Arr && Arr.getDef() && "Should have a valid retain instruction");
-
-  Arr = RCIA->getRCIdentityRoot(Arr);
-  assert(isa<LoadInst>(Arr.getDef()) ||
-         isa<SILArgument>(Arr.getDef()) &&
-             "Expect a LoadInst or an Array parameter");
-  auto *InsertPt = Preheader->getTerminator();
-
-  // Clone and fixup the load, retain sequenence to the header.
-  auto *LI =
-    dyn_cast<LoadInst>(Arr.getDef());
-  // We might also have an array argument.
-  ValueBase *PrevI = LI ? LI->clone(InsertPt) : Arr.getDef();
-  ValueBase *Array = PrevI;
-
-  SILBuilder(InsertPt).createRetainValue(Retain->getLoc(), SILValue(Array, 0));
-
-  // Clone the check and update index and array.
-  auto NewCheck = cast<ApplyInst>(CheckToHoist->clone(InsertPt));
-  // Set index.
-  NewCheck->setOperand(1, Index);
-  // Set array.
-  NewCheck->setOperand(2, Array);
-  // Clone the function reference.
-  auto ClonedRef =
-      cast<FunctionRefInst>(NewCheck->getOperand(0))->clone(NewCheck);
-  NewCheck->setOperand(0, ClonedRef);
-}
-
 /// A block in the loop is guarantueed to be excuted if it dominates the exiting
 /// block.
 static bool isGuarantueedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
@@ -959,102 +800,59 @@ public:
 
   /// Hoists the necessary check for beginning and end of the induction
   /// encapsulated by this acess function to the header.
-  void hoistCheckToPreheader(RCIdentityAnalysis *RCIA,
-                             SILInstruction *CheckToHoist,
-                             SILInstruction *Retain,
-                             SILBasicBlock *Preheader) {
+  void hoistCheckToPreheader(ArraySemanticsCall CheckToHoist,
+                             SILBasicBlock *Preheader,
+                             DominanceInfo *DT) {
     SILBuilder Builder(Preheader->getTerminator());
-    SILLocation Loc = CheckToHoist->getLoc();
+    ApplyInst *AI = CheckToHoist;
+    SILLocation Loc = AI->getLoc();
 
     // Get the first induction value.
     auto FirstVal = Ind->getFirstValue();
     // Clone the struct for the start index.
-    auto Start = cast<SILInstruction>(CheckToHoist->getOperand(1))
+    auto Start = cast<SILInstruction>(CheckToHoist.getIndex())
                      ->clone(Preheader->getTerminator());
     // Set the new start index to the first value of the induction.
     Start->setOperand(0, FirstVal);
 
-    hoistBoundsCheckCallWithIndex(RCIA, CheckToHoist, Retain, Start, Preheader);
+      // Clone and fixup the load, retain sequenence to the header.
+    auto NewCheck = CheckToHoist.copyTo(Preheader->getTerminator(), DT);
+    NewCheck->setOperand(1, Start);
 
     // Get the last induction value.
     auto LastVal = Ind->getLastValue(Loc, Builder);
     // Clone the struct for the end index.
-    auto End = cast<SILInstruction>(CheckToHoist->getOperand(1))
+    auto End = cast<SILInstruction>(CheckToHoist.getIndex())
                    ->clone(Preheader->getTerminator());
     // Set the new end index to the last value of the induction.
     End->setOperand(0, LastVal);
 
-    hoistBoundsCheckCallWithIndex(RCIA, CheckToHoist, Retain, End, Preheader);
+    NewCheck = CheckToHoist.copyTo(Preheader->getTerminator(), DT);
+    NewCheck->setOperand(1, End);
   }
 };
 
 /// Eliminate a check by hoisting it to the loop's preheader.
-static bool hoistCheck(RCIdentityAnalysis *RCIA, SILBasicBlock *Preheader,
-                       SILInstruction *CheckToHoist, AccessFunction &Access) {
-  auto Retain = findMatchingRetain(RCIA, CheckToHoist);
-  if (!Retain)
-    return false;
-  auto Arr = Retain->getOperand(0);
-  if (!Arr)
-    return false;
-
-  Arr = RCIA->getRCIdentityRoot(Arr);
-  // The start of the retain sequence needs to be a load or the array struct
-  // passed as an argument.
-  if (!isa<LoadInst>(Arr.getDef()) && !isa<SILArgument>(Arr.getDef()))
-    return false;
-
+static bool hoistCheck(SILBasicBlock *Preheader, ArraySemanticsCall CheckToHoist,
+                       AccessFunction &Access, DominanceInfo *DT) {
   // Hoist the access function and the check to the preheader for start and end
   // of the induction.
-  Access.hoistCheckToPreheader(RCIA, CheckToHoist, Retain, Preheader);
+  assert(CheckToHoist.canHoist(Preheader->getTerminator(), DT) &&
+         "Must be able to hoist the call");
 
-  // Remove the old check in the loop and the matching retain.
-  CheckToHoist->eraseFromParent();
-  Retain->eraseFromParent();
+  Access.hoistCheckToPreheader(CheckToHoist, Preheader, DT);
+
+  // Remove the old check in the loop and the match the retain with a release.
+  CheckToHoist.replaceByRetainValue();
 
   DEBUG(llvm::dbgs() << "  Bounds check hoisted\n");
   return true;
 }
 
-/// Hoists an loop invariant bounds check.
-static bool hoistInvariantCheck(RCIdentityAnalysis *RCIA,
-                                SILBasicBlock *Preheader,
-                                SILInstruction *Check) {
-  auto Retain = findMatchingRetain(RCIA, Check);
-  if (!Retain)
-    return false;
-
-  SILValue Arr = RCIA->getRCIdentityRoot(Retain->getOperand(0));
-  if (!isa<LoadInst>(Arr.getDef()) && !isa<SILArgument>(Arr.getDef()))
-    return false;
-
-  auto FR = dyn_cast<FunctionRefInst>(Check->getOperand(0));
-  if (!FR)
-    return false;
-
-  auto PreheaderTerm = Preheader->getTerminator();
-  assert(PreheaderTerm && "We better have a terminator");
-  auto NewFR = FR->clone(PreheaderTerm);
-  assert(NewFR && "Cloning failed?!");
-
-  // Hoist the retain by moving the load and then creating a retain of the
-  // loaded value.
-  if (!isa<SILArgument>(Arr.getDef()))
-    cast<SILInstruction>(Arr.getDef())->moveBefore(PreheaderTerm);
-  SILBuilder(PreheaderTerm).createRetainValue(Retain->getLoc(), Arr);
-  Retain->eraseFromParent();
-
-  // Move the check.
-  Check->moveBefore(Preheader->getTerminator());
-  Check->setOperand(0, NewFR);
-
-  return true;
-}
 
 /// Hoist bounds check in the loop to the loop preheader.
 static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
                               ArraySet &SafeArrays, InductionAnalysis &IndVars,
-                              RCIdentityAnalysis *RCIA,
                               SILBasicBlock *Preheader, SILBasicBlock *Header,
                               SILBasicBlock *ExitingBlk) {
 
@@ -1067,14 +865,14 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     auto Inst = &*Iter;
     ++Iter;
 
-    SILValue ArrayVal;
-    // Is this a check_bounds.
-    auto Kind = isArrayKindCall(Inst, ArrayVal);
+    ArraySemanticsCall ArrayCall(Inst);
+    auto Kind = ArrayCall.getKind();
     if (Kind != ArrayCallKind::kCheckSubscript &&
         Kind != ArrayCallKind::kCheckIndex) {
       DEBUG(llvm::dbgs() << " not a check_bounds call " << *Inst);
       continue;
     }
+    auto ArrayVal = ArrayCall.getSelf();
 
     // Get the underlying array pointer.
     SILValue Array = getArrayStructPointer(Kind, ArrayVal);
@@ -1092,15 +890,20 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     }
 
     // Get the array index.
-    auto ArrayIndex = getArrayIndex(Inst);
+    auto ArrayIndex = ArrayCall.getIndex();
     if (!ArrayIndex)
       continue;
 
     // Invariant check.
-    if (dominates(DT, ArrayIndex, Header)) {
-      Changed |= hoistInvariantCheck(RCIA, Preheader, Inst);
-      DEBUG(llvm::dbgs() << " " << (Changed ? "could " : "couldn't ")
-                         << "hoist invariant bounds check: " << *Inst);
+    if (dominates(DT, ArrayIndex, Preheader)) {
+      assert(ArrayCall.canHoist(Preheader->getTerminator(), DT) &&
+             "Must be able to hoist the instruction.");
+      assert((isa<SILArgument>(Array.getDef()) ||
+              isa<AllocStackInst>(Array.getDef())) &&
+             "Expect an argument or an alloc_stack instruction");
+      Changed = true;
+      ArrayCall.hoist(Preheader->getTerminator(), DT);
+      DEBUG(llvm::dbgs() << " could hoist invariant bounds check: " << *Inst);
       continue;
     }
 
@@ -1111,14 +914,14 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
       continue;
 
     DEBUG(llvm::dbgs() << " can hoist " << *Inst);
-    Changed |= hoistCheck(RCIA, Preheader, Inst, F);
+    Changed |= hoistCheck(Preheader, ArrayCall, F, DT);
   }
 
   DEBUG(Preheader->getParent()->dump());
   // Traverse the children in the dominator tree.
   for (auto Child: *DTNode)
-    Changed |= hoistChecksInLoop(DT, Child, SafeArrays, IndVars, RCIA,
-                                 Preheader, Header, ExitingBlk);
+    Changed |= hoistChecksInLoop(DT, Child, SafeArrays, IndVars, Preheader,
+                                 Header, ExitingBlk);
 
   return Changed;
 }
@@ -1126,8 +929,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 /// Analyse the loop for arrays that are not modified and perform dominator tree
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
-                              IVInfo &IVs, RCIdentityAnalysis *RCIA,
-                              bool ShouldVerify) {
+                              IVInfo &IVs, bool ShouldVerify) {
   auto *Header = Loop->getHeader();
   if (!Header) return false;
 
@@ -1162,7 +964,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   // Remove redundant checks down the dominator tree starting at the header.
   IndexedArraySet DominatingSafeChecks;
-  bool Changed = removeRedundantChecks(RCIA, DT->getNode(Header), SafeArrays,
+  bool Changed = removeRedundantChecks(DT->getNode(Header), SafeArrays,
                                        DominatingSafeChecks);
 
   if (!EnableABCHoisting)
@@ -1202,7 +1004,10 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   // Hoist bounds checks.
   if (!SafeArrays.empty())
     Changed |= hoistChecksInLoop(DT, DT->getNode(Header), SafeArrays, IndVars,
-                                 RCIA, Preheader, Header, ExitingBlk);
+                                 Preheader, Header, ExitingBlk);
+  if (Changed) {
+    Preheader->getParent()->verify();
+  }
   return Changed;
 }
 
@@ -1213,10 +1018,11 @@ static void reportBoundsChecks(SILFunction *F) {
   F->dump();
   for (auto &BB : *F) {
     for (auto &Inst : BB) {
-      SILValue Array;
-      auto Kind = isArrayKindCall(&Inst, Array);
+      ArraySemanticsCall ArrayCall(&Inst);
+      auto Kind = ArrayCall.getKind();
       if (Kind != ArrayCallKind::kCheckSubscript)
         continue;
+      auto Array = ArrayCall.getSelf();
       ++NumBCs;
       llvm::dbgs() << " # CheckBounds: " << Inst
                    << "     with array arg: " << *Array.getDef()
@@ -1251,8 +1057,6 @@ public:
     assert(DA);
     IVAnalysis *IVA = PM->getAnalysis<IVAnalysis>();
     assert(IVA);
-    RCIdentityAnalysis *RCIA = PM->getAnalysis<RCIdentityAnalysis>();
-    assert(RCIA);
 
     SILFunction *F = getFunction();
     assert(F);
@@ -1267,7 +1071,7 @@ public:
     // Remove redundant checks on a per basic block basis.
     bool Changed = false;
     for (auto &BB : *F)
-      Changed |= removeRedundantChecksInBlock(RCIA, BB);
+      Changed |= removeRedundantChecksInBlock(BB);
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
 
@@ -1291,7 +1095,7 @@ public:
 
         while (!Worklist.empty()) {
           Changed |= hoistBoundsChecks(Worklist.pop_back_val(), DT, LI, IVs,
-                                       RCIA, ShouldVerify);
+                                       ShouldVerify);
         }
       }
 
