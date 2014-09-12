@@ -23,22 +23,166 @@
 //
 //===----------------------------------------------------------------------===//
 
-% arrayTypes = [
-%     ('ContiguousArray', 'a ContiguousArray'),
-%     ('Slice', 'a Slice'),
-%     ('Array', 'an Array')
-% ]
+%{
+  arrayTypes = [
+    ('ContiguousArray', 'a ContiguousArray'),
+    ('Slice', 'a `Slice`'),
+    ('Array', 'an `Array`')
+  ]
+}%
+
 % for (Self, a_Self) in arrayTypes:
+
+%{
+    O1 = ("O(1) unless `self`'s storage is"
+       + ' shared with another live array; O(`count`) '
+       + ('if `self` does not wrap a bridged `NSArray`; '
+       + 'otherwise the efficiency is unspecified.'
+         if Self == 'Array' else 'otherwise.'))
+ 
+    contiguousCaveat = (
+      ' If no such storage exists, it is first created.' if Self == 'Array'
+      else '')
+}%
+
+%   if Self == 'ContiguousArray':
+/// A fast, contiguously-stored array of `T`.
+///
+/// Efficiency is equivalent to that of `Array`, unless `T` is a
+/// `class` or `@objc` `protocol` type, in which case using
+/// `ContiguousArray` may be more efficient.  Note, however, that
+/// `ContiguousArray` does not bridge to Objective-C.  See `Array`,
+/// with which `ContiguousArray` shares most properties, for more
+/// detail.
+%   elif Self == 'Slice':
+/// The `Array`-like type that represents a sub-sequence of any
+/// `Array`, `ContiguousArray`, or other `Slice`.
+///
+/// `Slice` always uses contiguous storage and does not bridge to
+/// Objective-C.
+///
+/// .. Warning:: Long-term storage of `Slice` instances is discouraged
+///
+///    Because a `Slice` presents a *view* onto the storage of some
+///    larger array even after the original array's lifetime ends,
+///    storing the slice may prolong the lifetime of elements that are
+///    no longer accessible, which can manifest as apparent memory and
+///    object leakage.  To prevent this effect, use `Slice` only for
+///    transient computation.
+%   elif Self == 'Array':
+/// Conceptually_, `Array` is an efficient, tail-growable random-access
+/// collection of arbitrary elements.
+///
+/// Common Properties of Array Types
+/// ================================
+///
+/// The information in this section applies to all three of Swift's
+/// array types, `Array<T>`, `ContiguousArray<T>`, and `Slice<T>`.
+/// When you read the word "array" here in a normal typeface, it
+/// applies to all three of them.
+///
+/// Value Semantics
+/// ---------------
+///
+/// Each array variable, let binding, or stored property has an
+/// independent value that includes the values of all of its elements.
+/// Therefore, mutations to the array are not observable through its
+/// copies::
+///
+///   var a = [1, 2, 3]
+///   var b = a
+///   b[0] = 4
+///   println("a=\(a), b=\(b)")     // a=[1, 2, 3], b=[4, 2, 3]
+///
+/// (Of course, if the array stores `class` references, the objects
+/// are shared; only the values of the references are independent)
+///
+/// Arrays use Copy-on-Write so that their storage and elements are
+/// only copied lazily, upon mutation, when more than one array
+/// instance is using the same buffer.  Therefore, the first in any
+/// sequence of mutating operations may cost `O(N)` time and space,
+/// where `N` is the length of the array.
+///
+/// Growth and Capacity
+/// -------------------
+///
+/// When an array's contiguous storage fills up, new storage must be
+/// allocated and elements must be moved to the new storage.  `Array`,
+/// `ContiguousArray`, and `Slice` share an exponential growth
+/// strategy that makes `append` a constant time operation *when
+/// amortized over many invocations*.  In addition to a `count`
+/// property, these array types have a `capacity` that reflects their
+/// potential to store elements without reallocation, and when you
+/// know how many elements you'll store, you can call
+/// `reserveCapacity` to pre-emptively reallocate and prevent
+/// intermediate reallocations.
+///
+/// .. _Conceptually:
+///
+/// Objective-C Bridge
+/// ==================
+///
+/// The main distinction between `Array` and the other array types is
+/// that it interoperates seamlessly and efficiently with Objective-C.
+///
+/// `Array<T>` is considered bridged to Objective-C iff `T` is bridged
+/// to Objective-C.
+///
+/// When `T` is a `class` or `@objc` protocol type, `Array` may store
+/// its elements in an `NSArray`.  Since any arbitrary subclass of
+/// `NSArray` can become an `Array`, there are no guarantees about
+/// representation or efficiency in this case (see also
+/// `ContiguousArray`).  Since `NSArray` is immutable, it is just as
+/// though the storage was shared by some copy: the first in any
+/// sequence of mutating operations causes elements to be copied into
+/// unique, contiguous storage which may cost `O(N)` time and space,
+/// where `N` is the length of the array (or more, if the underlying
+/// `NSArray` is has unusual performance characteristics).
+///
+/// Bridging to Objective-C
+/// -----------------------
+///
+/// Any bridged `Array` can be implicitly converted to an `NSArray`.
+/// When `T` is a `class` or `@objc` protocol, bridging takes O(1)
+/// time and O(0) space.  Other `Array`\ s must be bridged
+/// element-by-element, allocating a new object for each element, at a
+/// cost of at least O(`count`) time and space.
+///
+/// Bridging from Objective-C
+/// -------------------------
+///
+/// An `NSArray` can be implicitly or explicitly converted to any
+/// bridged `Array<T>`.  This conversion calls `copyWithZone` on the
+/// `NSArray`, to ensure it won't be modified, and stores the result
+/// in the `Array`.  Type-checking, to ensure the `NSArray`\ 's
+/// elements match or can be bridged to `T`, is deferred until the
+/// first element access.
+//
+// FIXME: the above is about to be, but is not yet true.  Also, need
+// to write about up/down-casting.
+%   else:
+
+%     raise AssertionError('Unhandled case: ' + Self)
+
+%   end
 public struct ${Self}<T> : MutableCollectionType, Sliceable {
+  /// The type of element stored by this `${Self}`
   public typealias Element = T
+
+  /// The first element of a non-empty `${Self}` is always at index
+  /// zero.
   public var startIndex: Int {
     return 0
   }
 
+  /// A "past-the-end" element index; the successor of the last valid
+  /// subscript argument.
   public var endIndex: Int {
     return _getCount()
   }
 
+  /// Access the `index`\ th element. Reading is O(1).  Writing is
+  /// ${O1}.
   public subscript(index: Int) -> Element {
     get {
       _checkSubscript(index)
@@ -51,11 +195,16 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
     }
   }
 
+  /// Return a `GeneratorType` over the elements
   public func generate() -> IndexingGenerator<${Self}> {
     return IndexingGenerator(self)
   }
-  
+
+  /// A type that can represent a sub-range of ${a_Self} 
   public typealias SubSlice = Slice<T>
+
+  /// Access the elements indicated by the given half-open
+  /// `subRange`.  O(1)
   public subscript(subRange: Range<Int>) -> SubSlice {
     get {
       _checkIndex(subRange.startIndex)
@@ -162,6 +311,7 @@ extension ${Self} : ArrayType {
     _buffer = _Buffer()
   }
 
+  /// Construct from an arbitrary sequence with elements of type `T`
   public init<
     S: SequenceType where S.Generator.Element == _Buffer.Element
   >(_ s: S) {
@@ -408,10 +558,12 @@ extension ${Self} : Printable, DebugPrintable {
     return result
   }
 
+  /// A textual representation of `self`
   public var description: String {
     return _makeDescription(isDebug: false)
   }
 
+  /// A textual representation of `self`, suitable for debugging
   public var debugDescription: String {
     return _makeDescription(isDebug: true)
   }
@@ -431,13 +583,26 @@ extension ${Self} {
 }
 
 extension ${Self} {
-  /// Call body(p), where p is a pointer to the ${Self}'s contiguous storage
+  /// Call `body(p)`, where `p` is a pointer to the `${Self}`\ 's
+  /// contiguous storage.${contiguousCaveat}
+  ///
+  /// Often, the optimizer can eliminate bounds checks within an
+  /// array algorithm, but when that fails, invoking the
+  /// same algorithm on `body`\ 's argument lets you trade safety for
+  /// speed.
   public func withUnsafeBufferPointer<R>(
     body: (UnsafeBufferPointer<T>) -> R
   ) -> R {
     return _buffer.withUnsafeBufferPointer(body)
   }
 
+  /// Call `body(p)`, where `p` is a pointer to the `${Self}`\ 's
+  /// mutable contiguous storage.${contiguousCaveat}
+  ///
+  /// Often, the optimizer can eliminate bounds- and uniqueness-checks
+  /// within an array algorithm, but when that fails, invoking the
+  /// same algorithm on `body`\ 's argument lets you trade safety for
+  /// speed.
   public mutating func withUnsafeMutableBufferPointer<R>(
     body: (inout UnsafeMutableBufferPointer<T>)->R
   ) -> R {
@@ -591,6 +756,9 @@ func _growArrayCapacity(capacity: Int) -> Int {
 
 % for (Self, a_Self) in arrayTypes:
 extension ${Self} {
+  /// Replace the given `subRange` of elements with `newValues`.
+  /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newValues)`\ , O(N) otherwise.
   @semantics("array.mutate_unknown")
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == _Buffer.Element
@@ -615,6 +783,7 @@ extension ${Self} {
     }
   }
   
+  /// Insert the elements of `s` at index `i`
   public mutating func splice<
     S: CollectionType where S.Generator.Element == T
   >(s: S, atIndex i: Int) {
@@ -622,12 +791,14 @@ extension ${Self} {
     // Swift.splice(&self, s, atIndex: i)
     self.replaceRange(i..<i, with: s)
   }
-  
+
+  /// Remove the elements in the given subrange.  Complexity: O(N)
   public mutating func removeRange(subRange: Range<Int>) {
     Swift.removeRange(&self, subRange)
   }
 }
 
+/// Extend `lhs` with the elements of `rhs`
 public
 func += <
   T, S: SequenceType
@@ -644,6 +815,7 @@ where S.Generator.Element == T
   _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
+/// Extend `lhs` with the elements of `rhs`
 public
 func += <
   T, C: CollectionType
