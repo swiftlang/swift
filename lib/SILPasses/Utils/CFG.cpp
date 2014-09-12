@@ -221,6 +221,34 @@ static OperandValueArrayRef getEdgeArgs(TermInst *T, unsigned EdgeIdx) {
   llvm_unreachable("Not yet implemented");
 }
 
+/// Splits the basic block at the iterator with an unconditional branch and
+/// updates the dominator tree and loop info.
+SILBasicBlock *swift::splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
+                                               DominanceInfo *DT,
+                                               SILLoopInfo *LI) {
+  auto *OrigBB = SplitBeforeInst->getParent();
+  auto *NewBB = OrigBB->splitBasicBlockAndBranch(SplitBeforeInst,
+                                                 SplitBeforeInst->getLoc());
+
+  // Update the dominator tree.
+  if (DT) {
+    auto OrigBBDTNode = DT->getNode(OrigBB);
+    if (OrigBBDTNode) {
+      auto NewBBDTNode = DT->addNewBlock(NewBB, OrigBB);
+      for (auto *Child : *OrigBBDTNode)
+        if (Child != NewBBDTNode)
+          DT->changeImmediateDominator(Child, NewBBDTNode);
+    }
+  }
+
+  // Update loop info.
+  if (LI)
+    if (auto *OrigBBLoop = LI->getLoopFor(OrigBB)) {
+      OrigBBLoop->addBasicBlockToLoop(NewBB, LI->getBase());
+    }
+
+  return NewBB;
+}
 /// Splits the n-th critical edge from the terminator and updates dominance and
 /// loop info if set.
 /// Returns the newly created basic block on success or nullptr otherwise (if

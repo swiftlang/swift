@@ -65,6 +65,11 @@ SILBasicBlock *splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
 bool rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
                 bool RotateSingleBlockLoops, SILBasicBlock *UpTo,
                 bool ShouldVerify);
-}
 
+/// \brief Splits the basic block before the instruction with an unconditional
+/// branch and updates the dominator tree and loop info.
+SILBasicBlock *splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
+                                        DominanceInfo *DT, SILLoopInfo *LI);
+
+} // End namespace swift.
 #endif
