@@ -141,23 +141,6 @@ protocol <loc>FooProtocolBase</loc> {
   <decl:Func>class func <loc>fooBaseClassFunc0()</loc></decl>
 }</decl>
 
-<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
-  <decl:Func>class func <loc>_internalMeth3()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>func <loc>_internalMeth3()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
-}</decl>
-
-<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
-  <decl:Func>class func <loc>_internalMeth2()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>func <loc>_internalMeth2()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>class func <loc>nonInternalMeth()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>func <loc>nonInternalMeth()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
-}</decl>
-
-<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
-  <decl:Func>class func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
-}</decl>
-
 <decl:Class>/// Aaa.  FooClassDerived.  Bbb.
 class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
   <decl:Var>var <loc>fooProperty1</loc>: <ref:Struct>Int32</ref></decl>
@@ -197,6 +180,20 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
 <decl:Func>func <loc>_internalTopLevelFunc()</loc></decl>
 <decl:Struct>struct <loc>_InternalStruct</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
+}</decl>
+<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
+  <decl:Func>class func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+}</decl>
+<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
+  <decl:Func>class func <loc>_internalMeth2()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc>_internalMeth2()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>class func <loc>nonInternalMeth()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc>nonInternalMeth()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+}</decl>
+<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
+  <decl:Func>class func <loc>_internalMeth3()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc>_internalMeth3()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
 }</decl>
 <decl:Protocol>protocol <loc>_InternalProt</loc> {
 }</decl>

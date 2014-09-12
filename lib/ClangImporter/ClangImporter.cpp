@@ -2012,12 +2012,11 @@ public:
         ModuleFilter(CMU) {}
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    if (isDeclaredInModule(ModuleFilter, VD)) {
+    if (isDeclaredInModule(ModuleFilter, VD))
       NextConsumer.foundDecl(VD, Reason);
-      return;
-    }
-    // Also report the extensions of the module that extend types from another
-    // module.
+
+    // Also report the extensions declared in this module (whether the extended
+    // type is from this module or not).
     if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
       for (auto Ext : NTD->getExtensions()) {
         if (isDeclaredInModule(ModuleFilter, Ext))

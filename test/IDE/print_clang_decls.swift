@@ -87,6 +87,8 @@
 // FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, name: String)
 // FOUNDATION-NEXT: NSZoneName(zone: NSZone) -> String
 
+// APPKIT-LABEL: {{^}}extension NSString {{{$}}
+
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility, NSObjectProtocol {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
 // APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool

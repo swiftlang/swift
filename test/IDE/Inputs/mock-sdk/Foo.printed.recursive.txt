@@ -141,23 +141,6 @@ class FooClassBase {
   class func fooBaseClassFunc0()
 }
 
-extension FooClassBase {
-  class func _internalMeth3() -> AnyObject!
-  func _internalMeth3() -> AnyObject!
-}
-
-extension FooClassBase {
-  class func _internalMeth2() -> AnyObject!
-  func _internalMeth2() -> AnyObject!
-  class func nonInternalMeth() -> AnyObject!
-  func nonInternalMeth() -> AnyObject!
-}
-
-extension FooClassBase {
-  class func _internalMeth1() -> AnyObject!
-  func _internalMeth1() -> AnyObject!
-}
-
 /// Aaa.  FooClassDerived.  Bbb.
 class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   var fooProperty1: Int32
@@ -197,6 +180,20 @@ func theLastDeclInFoo()
 func _internalTopLevelFunc()
 struct _InternalStruct {
   var x: Int32
+}
+extension FooClassBase {
+  class func _internalMeth1() -> AnyObject!
+  func _internalMeth1() -> AnyObject!
+}
+extension FooClassBase {
+  class func _internalMeth2() -> AnyObject!
+  func _internalMeth2() -> AnyObject!
+  class func nonInternalMeth() -> AnyObject!
+  func nonInternalMeth() -> AnyObject!
+}
+extension FooClassBase {
+  class func _internalMeth3() -> AnyObject!
+  func _internalMeth3() -> AnyObject!
 }
 protocol _InternalProt {
 }

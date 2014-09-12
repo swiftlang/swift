@@ -229,17 +229,6 @@ void swift::ide::printSubmoduleInterface(
 
     if (D->hasClangNode()) {
       addToClangDecls(D);
-      // When picking regular comments from clang headers, make sure that
-      // extensions/categories are printed in the right source location
-      // otherwise the comments will be out-of-place.
-      if (Options.PrintRegularClangComments) {
-        if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-          for (auto Ext : NTD->getExtensions()) {
-            if (Ext->hasClangNode())
-              addToClangDecls(Ext);
-          }
-        }
-      }
       continue;
     }
     if (FullModuleName.empty()) {
@@ -298,11 +287,14 @@ void swift::ide::printSubmoduleInterface(
 
   auto PrintDecl = [&](Decl *D) -> bool {
     if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
-      // When picking regular comments from clang headers, make sure that
-      // extensions/categories are printed in the right source location
-      // otherwise the comments will be out-of-place.
-      if (!(Options.PrintRegularClangComments && Ext->hasClangNode()))
-        return false;
+      // Clang extensions (categories) are always printed in source order.
+      // Swift extensions are printed with their associated type unless it's
+      // a cross-module extension.
+      if (!Ext->hasClangNode()) {
+        auto ExtendedNominal = Ext->getExtendedType()->getAnyNominal();
+        if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
+          return false;
+      }
     }
 
     ASTPrinter &Printer = *PrinterToUse;
@@ -310,7 +302,7 @@ void swift::ide::printSubmoduleInterface(
       Printer << "\n";
       if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
         for (auto Ext : NTD->getExtensions()) {
-          if (Options.PrintRegularClangComments && Ext->hasClangNode())
+          if (Ext->hasClangNode())
             continue; // will be printed in its source location, see above.
           Printer << "\n";
           Ext->print(Printer, AdjustedOptions);
