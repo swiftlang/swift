@@ -368,9 +368,18 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 } // end llvm namespace
 #endif
 
+llvm::cl::opt<std::string>
+TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
+               llvm::cl::desc("Only print out the cfg for this function"));
+
+
 void SILFunction::viewCFG() const {
 /// When asserts are disabled, this should be a NoOp.
 #ifndef NDEBUG
+    // If we have a target function, only print that function out.
+    if (!TargetFunction.empty() && !(getName().str() == TargetFunction))
+      return;
+
   ViewGraph(const_cast<SILFunction *>(this), "cfg" + getName().str());
 #endif
 }
