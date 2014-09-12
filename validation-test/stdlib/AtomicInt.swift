@@ -146,13 +146,13 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
     S : SinkType where S.Element == RaceTestObservationEvaluation
   >(observations: [Observation], inout _ sink: S) {
     let ref = observations[0].uw2
-    if any(observations, { $0.uw2 != ref }) {
+    if contains(observations, { $0.uw2 != ref }) {
       for observation in observations {
         sink.put(.FailureInteresting("mismatched reference, expected \(ref): \(observation)"))
       }
       return
     }
-    if any(observations, { $0.uw3 != 0x12345678 }) {
+    if contains(observations, { $0.uw3 != 0x12345678 }) {
       for observation in observations {
         sink.put(.FailureInteresting("wrong data: \(observation)"))
       }
