@@ -1,7 +1,7 @@
 // RUN: %swift -parse -verify %s
 
-Array.map // expected-error{{reference to generic method 'map' is ambiguous without more context}}
+Array.map // expected-error{{argument for generic parameter 'T' could not be inferred}}
 
 let a = [1, 2, 3]
-a.map // expected-error{{reference to generic method 'map' is ambiguous without more context}}
+a.map // expected-error{{argument for generic parameter 'U' could not be inferred}}
 

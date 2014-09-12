@@ -136,6 +136,11 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     out << getFirstType().getString()
         << " does not have any public initializers";
     break;
+
+  case UnboundGenericParameter:
+    out << getFirstType().getString()
+        << " is an unbound generic parameter";
+    break;
   }
 
   out << ")\n";
@@ -809,6 +814,14 @@ static bool diagnoseFailure(ConstraintSystem &cs,
       .highlight(range1);
     if (targetLocator && !useExprLoc)
       noteTargetOfDiagnostic(cs, failure, targetLocator);
+    break;
+  }
+
+  case Failure::UnboundGenericParameter: {
+    tc.diagnose(loc, diag::unbound_generic_parameter, failure.getFirstType())
+      .highlight(range1);
+    if (!useExprLoc)
+      noteTargetOfDiagnostic(cs, failure, locator);
     break;
   }
 

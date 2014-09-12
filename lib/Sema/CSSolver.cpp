@@ -1071,8 +1071,41 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
     // If any free type variables remain and we're not allowed to have them,
     // fail.
     if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow &&
-        hasFreeTypeVariables())
+        hasFreeTypeVariables()) {
+      if (shouldRecordFailures()) {
+        // Find a free type variable that refers to an archetype.
+        for (auto tv : TypeVariables) {
+          if (tv->getImpl().hasRepresentativeOrFixed())
+            continue;
+
+          auto locator = tv->getImpl().getLocator();
+          if (!locator || locator->getPath().empty() ||
+              locator->getPath().back().getKind()
+                != ConstraintLocator::Archetype)
+            continue;
+
+          // We found one; diagnose it.
+          SmallVector<LocatorPathElt, 2> path;
+          auto anchor = ConstraintLocatorBuilder(locator).getLocatorParts(path);
+
+          // Only diagnose archetypes that don't have a parent, i.e., ones
+          // that correspond to generic parameters.
+          auto archetype = path.back().getArchetype();
+          if (archetype->getParent())
+            continue;
+
+          auto shortPath = llvm::makeArrayRef(path.data(), path.size()-1);
+          recordFailure(getConstraintLocator(
+                          anchor,
+                          shortPath,
+                          ConstraintLocator::getSummaryFlagsForPath(shortPath)),
+                        Failure::UnboundGenericParameter,
+                        archetype);
+          break;
+        }
+      }
       return true;
+    }
 
     auto solution = finalize(allowFreeTypeVariables);
     if (TC.getLangOpts().DebugConstraintSolver) {

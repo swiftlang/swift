@@ -79,10 +79,10 @@ func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, y, y) // expected-error{{cannot convert the expression's type '((Int) -> Float, Float, Float)' to type 'Float'}}
 }
 
-func returnTuple<T, U>(_: T) -> (T, U) { }
+func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note{{in call to function 'returnTuple'}}
 
 func testReturnTuple(x: Int, y: Float) {
-  returnTuple(x) // expected-error{{cannot convert the expression's type 'Int' to type 'T'}}
+  returnTuple(x) // expected-error{{argument for generic parameter 'U' could not be inferred}}
   var rt1 : (Int, Float) = returnTuple(x)
   var rt2 : (Float, Float) = returnTuple(y)
   var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot convert the expression's type 'U' to type 'Float'}}

@@ -297,6 +297,8 @@ ERROR(extra_argument_positional,sema_tcc,none,
 ERROR(no_accessible_initializers,sema_tcc,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
+ERROR(unbound_generic_parameter,sema_tcc,none,
+      "argument for generic parameter %0 could not be inferred", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

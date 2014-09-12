@@ -396,6 +396,8 @@ public:
     ExtraArgument,
     /// \brief Type has no public initializers.
     NoPublicInitializers,
+    /// \brief A generic parameter that cannot be bound to a specific type.
+    UnboundGenericParameter,
   };
 
 private:
@@ -490,6 +492,7 @@ public:
     case IsNotOptional:
     case MissingArgument:
     case NoPublicInitializers:
+    case UnboundGenericParameter:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                     value);
 
