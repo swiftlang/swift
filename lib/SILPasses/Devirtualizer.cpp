@@ -94,7 +94,7 @@ static ClassDecl *getClassFromConstructor(SILValue S) {
 /// \p AI is the apply to devirtualize.
 /// \p Member is the class member to devirtualize.
 /// \p ClassInstance is the operand for the ClassMethodInst or an alternative
-///    reference (duch as downcasted class reference).
+///    reference (such as downcasted class reference).
 /// \p KnownClass (can be null) is a specific class type to devirtualize to.
 static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
                          SILValue ClassInstance, ClassDecl *Class) {
