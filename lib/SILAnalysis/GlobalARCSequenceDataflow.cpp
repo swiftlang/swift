@@ -19,6 +19,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -792,27 +793,35 @@ bool swift::arc::ARCSequenceDataflowEvaluator::run() {
   return NestingDetected;
 }
 
-/// Match a call to int_trap.
-static bool matchTrappingUnreachableBB(SILBasicBlock *BB) {
-  auto II = BB->begin();
-  auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(&*II);
-  if (!BFRI || !BFRI->getName().str().equals("int_trap"))
-    return false;
-  ++II;
+static bool ignoreableApplyInstInUnreachableBlock(ApplyInst *AI) {
+  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
+    const BuiltinInfo &BInfo = BFRI->getBuiltinInfo();
+    if (BInfo.ID == BuiltinValueKind::CondUnreachable)
+      return true;
 
-  auto *AI = dyn_cast<ApplyInst>(&*II);
-  if (!AI || AI->getCallee() != SILValue(BFRI))
+    const IntrinsicInfo &IInfo = BFRI->getIntrinsicInfo();
+    if (IInfo.ID == llvm::Intrinsic::trap)
+      return true;
+  }
+
+  const char *fatalName =
+    "_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_";
+  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+  if (!FRI || !FRI->getReferencedFunction()->getName().equals(fatalName))
     return false;
-  ++II;
+
   return true;
 }
 
 /// Match a call to a BB with no ARC relevant side effects.
 static bool matchNoSideEffectUnreachableBB(SILBasicBlock *BB) {
-  auto II = BB->begin();
-  while (true) {
-    // Ignore any literal insts.
-    if (isa<LiteralInst>(II)) {
+  auto II = BB->begin(), IE = BB->end();
+  while (II != IE) {
+    if (isa<UnreachableInst>(&*II))
+      return true;
+
+    // Ignore any instructions without side effects.
+    if (!II->mayHaveSideEffects()) {
       ++II;
       continue;
     }
@@ -823,11 +832,20 @@ static bool matchNoSideEffectUnreachableBB(SILBasicBlock *BB) {
       continue;
     }
 
-    return isa<UnreachableInst>(&*II);
+    // Check for apply insts that we can ignore.
+    if (auto *AI = dyn_cast<ApplyInst>(&*II)) {
+      if (ignoreableApplyInstInUnreachableBlock(AI)) {
+        ++II;
+        continue;
+      }
+    }
+
+    return false;
   }
+
+  return false;
 }
 
 void swift::arc::ARCBBState::initializeTrapStatus() {
-  IsTrapBB = matchTrappingUnreachableBB(BB) ||
-             matchNoSideEffectUnreachableBB(BB);
+  IsTrapBB = matchNoSideEffectUnreachableBB(BB);
 }
