@@ -693,20 +693,36 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     return Type();
 
   // Special case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
-  PointerTypeKind PTK;
-  if (importKind == ImportTypeKind::Parameter)
-    if (auto elementType = importedType->getAnyPointerElementType(PTK))
-      if (PTK == PTK_AutoreleasingUnsafeMutablePointer)
-        if (auto elementObj = elementType->getAnyOptionalObjectType())
-          if (auto elementClass = elementObj->getClassOrBoundGenericClass())
-            if (elementClass->getName() == impl.SwiftContext.getIdentifier("NSError")
-                && elementClass->getModuleContext()->Name
-                     == impl.SwiftContext.getIdentifier("Foundation")
-                && impl.hasFoundationModule()) {
-              auto FM = impl.getFoundationModule();
-              if (auto Ty = impl.getNamedSwiftType(FM, "NSErrorPointer"))
-                return Ty;
-            }
+  auto maybeImportNSErrorPointer = [&]() -> Type {
+    if (importKind != ImportTypeKind::Parameter)
+      return Type();
+
+    PointerTypeKind PTK;
+    auto elementType = importedType->getAnyPointerElementType(PTK);
+    if (!elementType || PTK != PTK_AutoreleasingUnsafeMutablePointer)
+      return Type();
+
+    auto elementObj = elementType->getAnyOptionalObjectType();
+    if (!elementObj)
+      return Type();
+
+    auto elementClass = elementObj->getClassOrBoundGenericClass();
+    if (!elementClass)
+      return Type();
+
+    // FIXME: Avoid string comparison by caching this identifier.
+    if (elementClass->getName().str() != "NSError")
+      return Type();
+
+    Module *foundationModule = impl.tryLoadFoundationModule();
+    if (!foundationModule ||
+        foundationModule->Name != elementClass->getModuleContext()->Name)
+      return Type();
+
+    return impl.getNamedSwiftType(foundationModule, "NSErrorPointer");
+  };
+  if (Type result = maybeImportNSErrorPointer())
+    return result;
 
   // Turn block pointer types back into normal function types in any
   // context where bridging is possible, unless the block has a typedef.
@@ -738,8 +754,12 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // When NSString* is the type of a function parameter or a function
   // result type, map it to String.
+  // FIXME: It's not really safe to do this when Foundation is missing.
+  // We do it anyway for ImportForwardDeclarations mode so that generated
+  // interfaces are correct, but trying to use the resulting declarations
+  // may result in compiler crashes further down the line.
   if (hint == ImportHint::NSString && canBridgeTypes(importKind) &&
-      impl.hasFoundationModule()) {
+      (impl.tryLoadFoundationModule() || impl.ImportForwardDeclarations)) {
     importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "String");
   }
 
@@ -747,7 +767,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // When NSArray* is the type of a function parameter or a function
   // result type, map it to [AnyObject].
   if (hint == ImportHint::NSArray && canBridgeTypes(importKind) &&
-      impl.hasFoundationModule()) {
+      impl.tryLoadFoundationModule()) {
     Type anyObject = impl.getNamedSwiftType(impl.getStdlibModule(), 
                                             "AnyObject");
     importedType = ArraySliceType::get(anyObject);
@@ -756,7 +776,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // When NSDictionary* is the type of a function parameter or a function
   // result type, map it to [NSObject : AnyObject].
   if (hint == ImportHint::NSDictionary && canBridgeTypes(importKind) &&
-      impl.hasFoundationModule()) {
+      impl.tryLoadFoundationModule()) {
     importedType = DictionaryType::get(
                      impl.getNSObjectType(),
                      impl.getNamedSwiftType(impl.getStdlibModule(),
@@ -1120,12 +1140,19 @@ Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
   return SwiftContext.getLoadedModule(SwiftContext.getIdentifier(name));
 }
 
-bool ClangImporter::Implementation::hasFoundationModule() {
+Module *ClangImporter::Implementation::tryLoadFoundationModule() {
   if (!checkedFoundationModule.hasValue()) {
     Identifier name = SwiftContext.getIdentifier(FOUNDATION_MODULE_NAME);
-    checkedFoundationModule = SwiftContext.getModule({ {name, SourceLoc()} });
+
+    // If we're synthesizing forward declarations, we don't want to pull in
+    // Foundation too eagerly.
+    if (ImportForwardDeclarations)
+      checkedFoundationModule = SwiftContext.getLoadedModule(name);
+    else
+      checkedFoundationModule = SwiftContext.getModule({ {name, SourceLoc()} });
   }
-  return checkedFoundationModule.getValue() != nullptr;
+
+  return checkedFoundationModule.getValue();
 }
 
 Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
