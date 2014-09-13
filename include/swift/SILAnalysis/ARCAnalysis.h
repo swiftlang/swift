@@ -63,6 +63,9 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
                                               SILBasicBlock::iterator End,
                                               AliasAnalysis *AA);
 
+/// Match a call to a trap BB with no ARC relevant side effects.
+bool isARCInertTrapBB(SILBasicBlock *BB);
+
 /// A set of matching reference count increments, decrements, increment
 /// insertion pts, and decrement insertion pts.
 struct ARCMatchingSet {

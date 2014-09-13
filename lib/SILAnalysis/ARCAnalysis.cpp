@@ -392,3 +392,60 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
   // If all such instructions can not decrement Op, return nothing.
   return Nothing;
 }
+
+//===----------------------------------------------------------------------===//
+//           Utilities for recognizing trap BBs that are ARC inert
+//===----------------------------------------------------------------------===//
+
+static bool ignoreableApplyInstInUnreachableBlock(ApplyInst *AI) {
+  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
+    const BuiltinInfo &BInfo = BFRI->getBuiltinInfo();
+    if (BInfo.ID == BuiltinValueKind::CondUnreachable)
+      return true;
+
+    const IntrinsicInfo &IInfo = BFRI->getIntrinsicInfo();
+    if (IInfo.ID == llvm::Intrinsic::trap)
+      return true;
+  }
+
+  const char *fatalName =
+    "_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_";
+  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+  if (!FRI || !FRI->getReferencedFunction()->getName().equals(fatalName))
+    return false;
+
+  return true;
+}
+
+/// Match a call to a trap BB with no ARC relevant side effects.
+bool swift::arc::isARCInertTrapBB(SILBasicBlock *BB) {
+  auto II = BB->begin(), IE = BB->end();
+  while (II != IE) {
+    if (isa<UnreachableInst>(&*II))
+      return true;
+
+    // Ignore any instructions without side effects.
+    if (!II->mayHaveSideEffects()) {
+      ++II;
+      continue;
+    }
+
+    // Ignore cond fail.
+    if (isa<CondFailInst>(II)) {
+      ++II;
+      continue;
+    }
+
+    // Check for apply insts that we can ignore.
+    if (auto *AI = dyn_cast<ApplyInst>(&*II)) {
+      if (ignoreableApplyInstInUnreachableBlock(AI)) {
+        ++II;
+        continue;
+      }
+    }
+
+    return false;
+  }
+
+  return false;
+}

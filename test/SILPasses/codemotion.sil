@@ -1360,3 +1360,23 @@ bb3:
   %2 = tuple()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil @delete_instead_of_sinkretainsintounreachable_bb : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: bb0(
+// CHECK-NOT: retain_value
+// CHECK: bb1:
+// CHECK-NOT: retain_value
+// CHECK: bb2:
+// CHECK: retain_value
+sil @delete_instead_of_sinkretainsintounreachable_bb : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  retain_value %0 : $FakeOptional<Builtin.NativeObject>
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %1 = tuple()
+  return %1 : $()
+}

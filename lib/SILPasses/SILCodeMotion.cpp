@@ -594,12 +594,16 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   }
 
   // Ok, it is legal for us to sink this increment to our successors. Create a
-  // copy of this instruction in each one of our successors.
-
+  // copy of this instruction in each one of our successors unless they are
+  // ignoreable trap blocks.
   DEBUG(llvm::dbgs() << "    Sinking " << *I);
   SILBuilder Builder(T);
   for (auto &Succ : T->getParent()->getSuccs()) {
     SILBasicBlock *SuccBB = Succ.getBB();
+
+    if (isARCInertTrapBB(SuccBB))
+      continue;
+
     Builder.setInsertionPoint(&*SuccBB->begin());
     if (isa<StrongRetainInst>(I)) {
       Builder.createStrongRetain(I->getLoc(), Ptr);
