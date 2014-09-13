@@ -368,9 +368,11 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 } // end llvm namespace
 #endif
 
+#ifndef NDEBUG
 llvm::cl::opt<std::string>
 TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
                llvm::cl::desc("Only print out the cfg for this function"));
+#endif
 
 
 void SILFunction::viewCFG() const {
