@@ -32,7 +32,7 @@ static inline StringRef getUSRSpacePrefix() {
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   using namespace Mangle;
 
-  if (isa<VarDecl>(D) && !D->hasName())
+  if (!isa<FuncDecl>(D) && !D->hasName())
     return true; // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
     return true; // Ignore.
