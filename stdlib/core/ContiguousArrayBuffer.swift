@@ -49,21 +49,21 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   }
 
   /// Returns the object located at the specified index.
-  override func bridgingObjectAtIndex(index: Int, _: Void = ()) -> AnyObject {
+  override func bridgingObjectAtIndex(index: Int, dummy: Void) -> AnyObject {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for objectAtIndex unhandled _NSSwiftArray")
+      "Verbatim bridging for objectAtIndex should be handled by _NSSwiftArray")
     let b = Buffer(self)
     return _bridgeToObjectiveCUnconditional(b[index])
   }
 
   override func bridgingGetObjects(
     aBuffer: UnsafeMutablePointer<AnyObject>,
-    range: _SwiftNSRange, _: Void = ()
+    range: _SwiftNSRange, dummy: Void
   ) {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for getObjects:range: unhandled _NSSwiftArray")
+      "Verbatim bridging for getObjects:range: should be handled by _NSSwiftArray")
 
     let b = Buffer(self)
     let unmanagedObjects = _UnmanagedAnyObjectArray(aBuffer)
@@ -77,11 +77,11 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   override func bridgingCountByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
-    count bufferSize: Int, _: Void = ()
+    count bufferSize: Int, dummy: Void
   ) -> Int {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for countByEnumeratingWithState:objects:count: unhandled _NSSwiftArray")
+      "Verbatim bridging for countByEnumeratingWithState:objects:count: should be handled by _NSSwiftArray")
 
     var enumerationState = state.memory
 
@@ -93,7 +93,8 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
       let batchCount = min(bufferSize, count - location)
 
       bridgingGetObjects(
-        objects, range: _SwiftNSRange(location: location, length: batchCount))
+        objects, range: _SwiftNSRange(location: location, length: batchCount),
+        dummy: ())
 
       enumerationState.state = UInt(location + batchCount)
       state.memory = enumerationState
