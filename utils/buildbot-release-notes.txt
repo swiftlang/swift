@@ -5,6 +5,29 @@ Latest
   class in order to generate an implicit "main" for the app. This works like
   the @UIApplicationMain attribute for iOS apps.
 
+* Objective-C init and factory methods are now imported as failable
+  initializers when they can return nil. In the absence of information
+  about a potentially-nil result, an Objective-C init or factory
+  method will be imported as "init!".
+
+  As part of this change, factory methods that have NSError**
+  parameters, such as +[NSString
+  stringWithContentsOfFile:encoding:error:], will now be imported as
+  (failable) initializers, e.g.,
+
+    init?(contentsOfFile path: String, 
+          encoding: NSStringEncoding,
+          error: NSErrorPointer)
+
+* Nested classes explicitly marked @objc will now properly be included in a
+  target's generated header as long as the containing context is also
+  (implicitly or explicitly) @objc. Nested classes not explicitly marked @objc
+  will never be printed in the generated header, even if they extend an
+  Objective-C class.
+
+2014-09-15
+----------
+
 * Initializers can now fail by returning 'nil'. A failable initializer is
   declared with 'init?' (to return an explicit optional) or 'init!' (to return
   an implicitly-unwrapped optional). For example, you could implement
@@ -38,26 +61,6 @@ Latest
   'super.init' is used to delegate to a failable initializer, then the 'nil'
   return is implicitly propagated through the current initializer if the
   called initializer fails.
-
-* Objective-C init and factory methods are now imported as failable
-  initializers when they can return nil. In the absence of information
-  about a potentially-nil result, an Objective-C init or factory
-  method will be imported as "init!".
-
-  As part of this change, factory methods that have NSError**
-  parameters, such as +[NSString
-  stringWithContentsOfFile:encoding:error:], will now be imported as
-  (failable) initializers, e.g.,
-
-    init?(contentsOfFile path: String, 
-          encoding: NSStringEncoding,
-          error: NSErrorPointer)
-
-* Nested classes explicitly marked @objc will now properly be included in a
-  target's generated header as long as the containing context is also
-  (implicitly or explicitly) @objc. Nested classes not explicitly marked @objc
-  will never be printed in the generated header, even if they extend an
-  Objective-C class.
 
 * The RawRepresentable protocol that enums with raw types implicitly conform
   to has been redefined to take advantage of failable initializers. The
