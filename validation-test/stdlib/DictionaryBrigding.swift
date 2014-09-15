@@ -78,7 +78,7 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
   ) -> Observation {
     let nsd = raceData.nsd
     let objcPairs = NSMutableArray()
-    slurpFastEnumerationFromObjCImpl(nsd, nsd, objcPairs)
+    slurpFastEnumerationOfDictionaryFromObjCImpl(nsd, nsd, objcPairs)
     return Observation(
       unsafeBitCast(objcPairs[0], UWord.self),
       unsafeBitCast(objcPairs[1], UWord.self),

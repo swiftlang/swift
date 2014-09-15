@@ -1046,28 +1046,6 @@ DictionaryTestSuite.test("convertFromDictionaryLiteral") {
 // NSDictionary -> Dictionary bridging tests.
 //===---
 
-/// Expect some number of autoreleased key and value objects.
-///
-/// :param: opt applies to platforms that have the return-autoreleased
-///   optimization.
-///
-/// :param: unopt applies to platforms that don't.
-///
-/// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
-func expectAutoreleasedKeysAndValues(
-  opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
-  var expectedKeys = 0
-  var expectedValues = 0
-#if arch(i386)
-  (expectedKeys, expectedValues) = unopt
-#else
-  (expectedKeys, expectedValues) = opt
-#endif
-
-  TestObjCKeyTy.objectCount -= expectedKeys
-  TestObjCValueTy.objectCount -= expectedValues
-}
-
 func getAsNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
   let keys = NSMutableArray()
   let values = NSMutableArray()
@@ -2562,6 +2540,21 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
     { ($0 as TestObjCValueTy).value })
 
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
+    numElements: 0)
+
+  checkDictionaryFastEnumerationFromSwift(
+    [], d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
+
+  checkDictionaryFastEnumerationFromObjC(
+    [], d, { d },
+    { ($0 as TestObjCKeyTy).value },
+    { ($0 as TestObjCValueTy).value })
 }
 
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {

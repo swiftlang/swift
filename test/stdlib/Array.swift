@@ -5,23 +5,6 @@ import Foundation
 println("testing...")
 // CHECK: testing
 
-println(sizeofValue([ 0 ]) - sizeofValue(0))
-// CHECK-NEXT: 0
-
-func testCountAndIsEmpty() {
-  var emptyVec = Array<String>()
-  // CHECK-NEXT: {{^}}emptyVec: 0 true{{$}}
-  println("emptyVec: \(emptyVec.count) \(emptyVec.isEmpty)")
-
-  var nonEmptyVec = Array<String>()
-  nonEmptyVec.append("1")
-  nonEmptyVec.append("2")
-  // CHECK-NEXT: {{^}}nonEmptyVec: 2 false{{$}}
-  println("nonEmptyVec: \(nonEmptyVec.count) \(nonEmptyVec.isEmpty)")
-}
-
-testCountAndIsEmpty()
-
 var primes0 = [2, 3, 5, 7, 11]
 
 func testTakeActualArray() {
