@@ -15,7 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/LangOptions.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -48,4 +50,26 @@ Optional<PlatformKind> swift::platformFromString(StringRef Name) {
 #define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
 #include "swift/AST/PlatformKinds.def"
       .Default(Optional<PlatformKind>());
+}
+
+bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
+  if (Platform == PlatformKind::none)
+    return true;
+  
+  if (Platform == PlatformKind::OSXApplicationExtension ||
+      Platform == PlatformKind::iOSApplicationExtension)
+    if (!LangOpts.EnableAppExtensionRestrictions)
+      return false;
+  
+  // FIXME: This is an awful way to get the current OS.
+  switch (Platform) {
+    case PlatformKind::OSX:
+    case PlatformKind::OSXApplicationExtension:
+      return LangOpts.getTargetConfigOption("os") == "OSX";
+    case PlatformKind::iOS:
+    case PlatformKind::iOSApplicationExtension:
+      return LangOpts.getTargetConfigOption("os") == "iOS";
+    case PlatformKind::none:
+      llvm_unreachable("handled above");
+  }
 }

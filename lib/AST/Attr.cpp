@@ -398,25 +398,7 @@ AvailabilityAttr *AvailabilityAttr::createUnavailableAttr(ASTContext &C,
 }
 
 bool AvailabilityAttr::isActivePlatform(const ASTContext &ctx) const {
-  if (!hasPlatform())
-    return true;
-
-  if (Platform == PlatformKind::OSXApplicationExtension ||
-      Platform == PlatformKind::iOSApplicationExtension)
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions)
-      return false;
-
-  // FIXME: This is an awful way to get the current OS.
-  switch (Platform) {
-  case PlatformKind::OSX:
-  case PlatformKind::OSXApplicationExtension:
-    return ctx.LangOpts.getTargetConfigOption("os") == "OSX";
-  case PlatformKind::iOS:
-  case PlatformKind::iOSApplicationExtension:
-    return ctx.LangOpts.getTargetConfigOption("os") == "iOS";
-  case PlatformKind::none:
-    llvm_unreachable("handled above");
-  }
+  return isPlatformActive(Platform, ctx.LangOpts);
 }
 
 MinVersionComparison AvailabilityAttr::getMinVersionAvailability(

@@ -23,6 +23,8 @@
 
 namespace swift {
 
+class LangOptions;
+
 /// Available platforms for the availability attribute.
 enum class PlatformKind {
   none,
@@ -42,6 +44,15 @@ Optional<PlatformKind> platformFromString(StringRef Name);
 /// for emission in diagnostics (e.g., "OS X").
 StringRef prettyPlatformString(PlatformKind platform);
 
+/// Returns whether the passed-in platform is active, given the language
+/// options. A platform is active if either it is the target platform or its
+/// AppExtension variant is the target platform. For example, OSX is
+/// considered active when the target operating system is OSX and app extension
+/// restrictions are enabled, but OSXApplicationExtension is not considered
+/// active when the target platform is OSX and app extension restrictions are
+/// disabled. PlatformKind::none is always considered active.
+bool isPlatformActive(PlatformKind Platform, LangOptions &LangOpts);
+  
 } // end namespace swift
 
 #endif
