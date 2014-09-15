@@ -25,6 +25,14 @@ func _isValidArrayIndex(index: Int, count: Int) -> Bool {
   return (index >= 0) & (index <= count)
 }
 
+/// Return whether the given `index` is valid for subscripting, i.e.
+/// `0 ≤ index < count`
+@transparent
+func _isValidArraySubscript(index: Int, count: Int) -> Bool {
+  return (index >= 0) & (index < count)
+}
+
+
 /// Base class of the heap buffer backing arrays.
 @objc class _NSSwiftArray : _CocoaArrayType {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
@@ -83,6 +91,10 @@ func _isValidArrayIndex(index: Int, count: Int) -> Bool {
   /// Returns the object located at the specified `index`.
   func objectAtIndex(index: Int) -> AnyObject {
     let buffer = unsafeBitCast(self, Buffer.self)
+    _precondition(
+      _isValidArraySubscript(index, buffer.value.count),
+      "Array index out of range")
+
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
       return buffer[index]
     }

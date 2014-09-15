@@ -104,11 +104,6 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/count") {
   expectEqual(3, a.count)
 }
 
-/*
-Disabled because of:
-<rdar://problem/18336202> Array allows out-of-bounds access through
-objectAtIndex() on the bridged NSArray
-
 for index in [ -100, -1, 0, 1, 100 ] {
   ArrayTestSuite.test(
     "BridgedToObjC/Verbatim/objectAtIndex/empty/trap/\(index)") {
@@ -125,7 +120,6 @@ for index in [ -100, -1, 3, 4, 100 ] {
     a.objectAtIndex(index)
   }
 }
-*/
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
