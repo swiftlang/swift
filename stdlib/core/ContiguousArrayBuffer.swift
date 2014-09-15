@@ -101,7 +101,8 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
       return batchCount
     }
     else {
-      enumerationState.state = UInt(min(count, 1))
+      enumerationState.state = UInt(max(count, 1))
+      state.memory = enumerationState
       return 0
     }
   }

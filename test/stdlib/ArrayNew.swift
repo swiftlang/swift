@@ -204,14 +204,13 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/copyWithZone") {
   expectEqual(unsafeBitCast(a, UWord.self), unsafeBitCast(copy, UWord.self))
 }
 
-/* FIXME
 ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromSwift/Empty") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 0)
 
   checkArrayFastEnumerationFromSwift(
     [], a, { a },
     { ($0 as TestObjCValueTy).value })
-} */
+}
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromSwift/3") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
@@ -417,14 +416,13 @@ ArrayTestSuite.test("BridgedToObjC/Custom/copyWithZone") {
   expectEqual(unsafeBitCast(a, UWord.self), unsafeBitCast(copy, UWord.self))
 }
 
-/* FIXME
 ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/Empty") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 0)
 
   checkArrayFastEnumerationFromSwift(
     [], a, { a },
     { ($0 as TestObjCValueTy).value })
-} */
+}
 
 ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/3") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
