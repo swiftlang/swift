@@ -32,7 +32,12 @@ public let DISPATCH_QUEUE_PRIORITY_DEFAULT    = dispatch_queue_priority_t(0)
 public let DISPATCH_QUEUE_PRIORITY_LOW        = dispatch_queue_priority_t(-2)
 public let DISPATCH_QUEUE_PRIORITY_BACKGROUND = dispatch_queue_priority_t(-32768)
 
-public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t { 
+public func dispatch_get_global_queue(identifier: qos_class_t,
+                                      flags: UInt) -> dispatch_queue_t {
+  return dispatch_get_global_queue(Int(identifier.value), flags);
+}
+
+public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t {
   get { return _swift_dispatch_queue_concurrent() } 
 }
 

@@ -14,6 +14,7 @@ dispatch_set_target_queue(nil, DISPATCH_TARGET_QUEUE_DEFAULT)
 dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL)      
 dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0)
 dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0)
+dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0)
 
 // dispatch/source.h
 dispatch_source_merge_data(nil, DISPATCH_MACH_SEND_DEAD)
