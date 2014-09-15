@@ -14,20 +14,35 @@
 # error "Must define NON_CF(NAME) before including this file."
 #endif
 
-NON_CF(AuthorizationRef)
+// AudioToolbox
+NON_CF(AudioAnalyzerRef)
+NON_CF(AudioConverterRef)
+NON_CF(AudioQueueRef)
+NON_CF(AudioQueueTimelineRef)
+NON_CF(AudioQueueProcessingTapRef)
+NON_CF(AQOfflineMixerRef)
+NON_CF(AUParameterListenerRef)
+NON_CF(CAClockRef)
+NON_CF(ExtAudioFileRef)
 
+// CommonCrypto
 NON_CF(CCCryptorRef)
 
+// CoreGraphics
 NON_CF(CGPDFArrayRef)
 NON_CF(CGPDFDictionaryRef)
 NON_CF(CGPDFObjectRef)
 NON_CF(CGPDFStreamRef)
 NON_CF(CGPDFStringRef)
 
-NON_CF(ExtAudioFileRef)
-
+// CoreServices
 NON_CF(FSEventStreamRef)
 NON_CF(ConstFSEventStreamRef)
+
+// Security
+NON_CF(AuthorizationRef)
+NON_CF(AuthorizationEngineRef)
+NON_CF(SecureDownloadRef)
 
 #undef NON_CF
 
