@@ -44,6 +44,8 @@ class SourceManager {
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {};
 
 public:
+  ~SourceManager();
+
   llvm::SourceMgr &getLLVMSourceMgr() {
     return LLVMSourceMgr;
   }

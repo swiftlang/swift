@@ -91,9 +91,10 @@ static SourceLoc findEndOfLine(SourceManager &SM, SourceLoc loc,
   return loc.getAdvancedLoc(newlineOffset);
 }
 
-static SourceLoc resolveSourceLocation(const ASTContext &ctx,
-                                       clang::SourceManager &clangSrcMgr,
-                                       clang::SourceLocation clangLoc) {
+SourceLoc ClangDiagnosticConsumer::resolveSourceLocation(
+    clang::SourceManager &clangSrcMgr,
+    clang::SourceLocation clangLoc) {
+  SourceManager &swiftSrcMgr = ImporterImpl.SwiftContext.SourceMgr;
   SourceLoc loc;
 
   clangLoc = clangSrcMgr.getFileLoc(clangLoc);
@@ -104,17 +105,16 @@ static SourceLoc resolveSourceLocation(const ASTContext &ctx,
   auto buffer = clangSrcMgr.getBuffer(decomposedLoc.first);
 
   auto mirrorID =
-    ctx.SourceMgr.getIDForBufferIdentifier(buffer->getBufferIdentifier());
+    swiftSrcMgr.getIDForBufferIdentifier(buffer->getBufferIdentifier());
   if (!mirrorID) {
     std::unique_ptr<llvm::MemoryBuffer> mirrorBuffer{
       llvm::MemoryBuffer::getMemBuffer(buffer->getBuffer(),
                                        buffer->getBufferIdentifier(),
                                        /*nullTerminated=*/true)
     };
-    mirrorID = ctx.SourceMgr.addNewSourceBuffer(std::move(mirrorBuffer));
+    mirrorID = swiftSrcMgr.addNewSourceBuffer(std::move(mirrorBuffer));
   }
-  loc = ctx.SourceMgr.getLocForOffset(mirrorID.getValue(),
-                                      decomposedLoc.second);
+  loc = swiftSrcMgr.getLocForOffset(mirrorID.getValue(), decomposedLoc.second);
 
   auto presumedLoc = clangSrcMgr.getPresumedLoc(clangLoc);
   if (!presumedLoc.getFilename())
@@ -127,13 +127,23 @@ static SourceLoc resolveSourceLocation(const ASTContext &ctx,
   StringRef presumedFile = presumedLoc.getFilename();
   SourceLoc startOfLine = loc.getAdvancedLoc(-presumedLoc.getColumn() + 1);
   bool isNewVirtualFile =
-    ctx.SourceMgr.openVirtualFile(startOfLine, presumedFile,
-                                  presumedLoc.getLine() - bufferLineNumber);
+    swiftSrcMgr.openVirtualFile(startOfLine, presumedFile,
+                                presumedLoc.getLine() - bufferLineNumber);
   if (isNewVirtualFile) {
-    SourceLoc endOfLine = findEndOfLine(ctx.SourceMgr, loc,
-                                        mirrorID.getValue());
-    ctx.SourceMgr.closeVirtualFile(endOfLine);
+    SourceLoc endOfLine = findEndOfLine(swiftSrcMgr, loc, mirrorID.getValue());
+    swiftSrcMgr.closeVirtualFile(endOfLine);
   }
+
+  using SourceManagerRef = llvm::IntrusiveRefCntPtr<clang::SourceManager>;
+  auto iter = std::lower_bound(sourceManagersWithDiagnostics.begin(),
+                               sourceManagersWithDiagnostics.end(),
+                               &clangSrcMgr,
+                               [](const SourceManagerRef &inArray,
+                                  clang::SourceManager *toInsert) {
+    return std::less<clang::SourceManager *>()(inArray.get(), toInsert);
+  });
+  if (iter->get() != &clangSrcMgr)
+    sourceManagersWithDiagnostics.insert(iter, &clangSrcMgr);
 
   return loc;
 }
@@ -155,7 +165,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
       CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
     SourceLoc loc = DiagLoc;
     if (clangDiag.getLocation().isValid())
-      loc = resolveSourceLocation(ctx, clangDiag.getSourceManager(),
+      loc = resolveSourceLocation(clangDiag.getSourceManager(),
                                   clangDiag.getLocation());
 
     ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
@@ -195,7 +205,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
     SourceLoc noteLoc;
     if (clangNoteLoc.isValid())
-      noteLoc = resolveSourceLocation(ctx, clangDiag.getSourceManager(),
+      noteLoc = resolveSourceLocation(clangDiag.getSourceManager(),
                                       clangNoteLoc);
     ctx.Diags.diagnose(noteLoc, diagKind, message);
   };

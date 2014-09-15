@@ -13,9 +13,23 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+
+SourceManager::~SourceManager() {
+#ifndef NDEBUG
+  llvm::PrettyStackTraceString backtrace{
+    "Checking that all source buffers are still valid"
+  };
+
+  // FIXME: This depends on the buffer IDs chosen by llvm::SourceMgr.
+  __attribute__((used)) static char arbitraryTotal = 0;
+  for (unsigned i = 1, e = LLVMSourceMgr.getNumBuffers(); i <= e; ++i)
+    arbitraryTotal += *LLVMSourceMgr.getMemoryBuffer(i)->getBufferStart();
+#endif
+}
 
 SourceLoc SourceManager::getCodeCompletionLoc() const {
   return getLocForBufferStart(CodeCompletionBufferID)

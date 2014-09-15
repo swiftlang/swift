@@ -53,9 +53,24 @@ private:
   friend struct LoadModuleRAII;
 
   ClangImporter::Implementation &ImporterImpl;
+
+  /// Keeps alive the Clang source managers where diagnostics have been
+  /// reported.
+  ///
+  /// This is a bit of a hack, but LLVM's source manager (and by extension
+  /// Swift's) does not support buffers going away.
+  //
+  // This is not using SmallPtrSet or similar because we need the
+  // IntrusiveRefCntPtr to stay a ref-counting pointer.
+  SmallVector<llvm::IntrusiveRefCntPtr<clang::SourceManager>, 4>
+    sourceManagersWithDiagnostics;
+
   const clang::IdentifierInfo *CurrentImport = nullptr;
   SourceLoc DiagLoc;
-  bool DumpToStderr;
+  const bool DumpToStderr;
+
+  SourceLoc resolveSourceLocation(clang::SourceManager &clangSrcMgr,
+                                  clang::SourceLocation clangLoc);
 
 public:
   ClangDiagnosticConsumer(ClangImporter::Implementation &impl,
