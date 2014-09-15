@@ -371,11 +371,12 @@ func testPropertyAndMethodCollision(obj: PropertyAndMethodCollision,
 func testSubscriptAndPropertyRedeclaration(obj: SubscriptAndProperty) {
   let _ = obj.x
   obj.x = 5
+  obj.objectAtIndexedSubscript(5) // expected-error{{'objectAtIndexedSubscript' is unavailable: use subscripting}}
   obj.setX(5) // expected-error{{'SubscriptAndProperty' does not have a member named 'setX'}}
 
   let _ = obj[0]
   obj[1] = obj
-  obj.setObject(obj, atIndexedSubscript: 2) // should error...
+  obj.setObject(obj, atIndexedSubscript: 2) // expected-error{{'setObject(_:atIndexedSubscript:)' is unavailable: use subscripting}}
 }
 
 func testSubscriptAndPropertyWithProtocols(obj: SubscriptAndPropertyWithProto) {
@@ -385,7 +386,7 @@ func testSubscriptAndPropertyWithProtocols(obj: SubscriptAndPropertyWithProto) {
 
   let _ = obj[0]
   obj[1] = obj
-  obj.setObject(obj, atIndexedSubscript: 2) // should error...
+  obj.setObject(obj, atIndexedSubscript: 2) // expected-error{{'setObject(_:atIndexedSubscript:)' is unavailable: use subscripting}}
 }
 
 func testProtocolMappingSameModule(obj: AVVideoCompositionInstruction, p: AVVideoCompositionInstructionProtocol) {

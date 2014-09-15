@@ -3227,6 +3227,12 @@ namespace {
       Impl.Subscripts[{getter, setter}] = subscript;
       Impl.Subscripts[{getterThunk, nullptr}] = subscript;
 
+      // Make the getter/setter methods unavailable.
+      if (!getter->getAttrs().isUnavailable(Impl.SwiftContext))
+        Impl.markUnavailable(getter, "use subscripting");
+      if (setter && !setter->getAttrs().isUnavailable(Impl.SwiftContext))
+        Impl.markUnavailable(setter, "use subscripting");
+
       // Determine whether this subscript operation overrides another subscript
       // operation.
       // FIXME: This ends up looking in the superclass for entirely bogus

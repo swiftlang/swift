@@ -106,8 +106,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .nested1_Property1[#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .nested2_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .nested2_Property[#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectAtIndexedSubscript!({#(idx): Int32#})[#AnyObject!#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectForKeyedSubscript!({#(key): AnyObject!#})[#AnyObject!#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG-NOT:.objectAtIndexedSubscript
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .returnsObjcClass!({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .topLevelClass_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .topLevelClass_ObjcProperty1[#Int?#]{{$}}
@@ -153,8 +152,6 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    nested1_Property1[#Int?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: nested2_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    nested2_Property[#Int?#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectAtIndexedSubscript!({#(idx): Int32#})[#AnyObject!#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectForKeyedSubscript!({#(key): AnyObject!#})[#AnyObject!#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: returnsObjcClass!({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: topLevelClass_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    topLevelClass_ObjcProperty1[#Int?#]{{$}}
@@ -189,8 +186,6 @@ protocol Bar { func bar() }
 // DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .nested1_ObjcInstanceFunc1({#self: ContainerForNestedClass1.Nested1#})[#() -> Void#]{{$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule:   .nested2_ObjcClassFunc1()[#Void#]{{$}}
 // DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .nested2_ObjcInstanceFunc1({#self: ContainerForNestedClass2.Nested2#})[#() -> Void#]{{$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectAtIndexedSubscript({#self: Baz_Class#})[#(Int32) -> AnyObject!#]{{$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectForKeyedSubscript({#self: Self#})[#(AnyObject!) -> AnyObject!#]{{$}}
 // DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .returnsObjcClass({#self: TopLevelObjcClass#})[#(Int) -> TopLevelObjcClass#]{{$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule:   .topLevelClass_ObjcClassFunc1()[#Void#]{{$}}
 // DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .topLevelClass_ObjcInstanceFunc1({#self: TopLevelClass#})[#() -> Void#]{{$}}
@@ -225,8 +220,6 @@ protocol Bar { func bar() }
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule: nested1_ObjcInstanceFunc1({#self: ContainerForNestedClass1.Nested1#})[#() -> Void#]{{$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule:   nested2_ObjcClassFunc1()[#Void#]{{$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule: nested2_ObjcInstanceFunc1({#self: ContainerForNestedClass2.Nested2#})[#() -> Void#]{{$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectAtIndexedSubscript({#self: Baz_Class#})[#(Int32) -> AnyObject!#]{{$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectForKeyedSubscript({#self: Self#})[#(AnyObject!) -> AnyObject!#]{{$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule: returnsObjcClass({#self: TopLevelObjcClass#})[#(Int) -> TopLevelObjcClass#]{{$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule:   topLevelClass_ObjcClassFunc1()[#Void#]{{$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule: topLevelClass_ObjcInstanceFunc1({#self: TopLevelClass#})[#() -> Void#]{{$}}
