@@ -929,7 +929,7 @@ public:
   Expr *callWitness(Expr *base, DeclContext *dc,
                     ProtocolDecl *protocol,
                     ProtocolConformance *conformance,
-                    Identifier name,
+                    DeclName name,
                     MutableArrayRef<Expr *> arguments,
                     Diag<> brokenProtocolDiag);
   

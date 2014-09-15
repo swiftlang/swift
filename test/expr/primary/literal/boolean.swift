@@ -13,8 +13,8 @@ func defaultBoolLiterals() {
 struct CustomBool : BooleanLiteralConvertible {
   let value: Bool
 
-  static func convertFromBooleanLiteral(value: Bool) -> CustomBool {
-    return CustomBool(value: value)
+  init(booleanLiteral value: Bool) {
+    self.value = value
   }
 }
 

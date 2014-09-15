@@ -166,7 +166,7 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
 /// \returns The named witness.
 template <typename DeclTy>
 static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
-                                    ProtocolDecl *proto, Identifier name,
+                                    ProtocolDecl *proto, DeclName name,
                                     Diag<> diag) {
   // Find the named requirement.
   DeclTy *requirement = nullptr;
@@ -175,7 +175,7 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
     if (!d || !d->hasName())
       continue;
 
-    if (d->getName() == name) {
+    if (d->getFullName().matchesRef(name)) {
       requirement = d;
       break;
     }
@@ -854,10 +854,10 @@ namespace {
                          Type openedType,
                          ProtocolDecl *protocol,
                          TypeOrName literalType,
-                         Identifier literalFuncName,
+                         DeclName literalFuncName,
                          ProtocolDecl *builtinProtocol,
                          TypeOrName builtinLiteralType,
-                         Identifier builtinLiteralFuncName,
+                         DeclName builtinLiteralFuncName,
                          bool (*isBuiltinArgType)(Type),
                          Diag<> brokenProtocolDiag,
                          Diag<> brokenBuiltinProtocolDiag);
@@ -1395,17 +1395,21 @@ namespace {
         return nullptr;
 
       auto type = simplifyType(expr->getType());
+      DeclName initName(tc.Context, tc.Context.Id_init,
+                        { tc.Context.Id_BooleanLiteral });
+      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+                               { tc.Context.Id_BuiltinBooleanLiteral });
       return convertLiteral(
                expr,
                type,
                expr->getType(),
                protocol,
                tc.Context.Id_BooleanLiteralType,
-               tc.Context.Id_ConvertFromBooleanLiteral,
+               initName,
                builtinProtocol,
                Type(BuiltinIntegerType::get(BuiltinIntegerWidth::fixed(1), 
                                             tc.Context)),
-               tc.Context.Id_ConvertFromBuiltinBooleanLiteral,
+               builtinInitName,
                nullptr,
                diag::boolean_literal_broken_proto,
                diag::builtin_boolean_literal_broken_proto);
@@ -4187,10 +4191,10 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
                                    Type openedType,
                                    ProtocolDecl *protocol,
                                    TypeOrName literalType,
-                                   Identifier literalFuncName,
+                                   DeclName literalFuncName,
                                    ProtocolDecl *builtinProtocol,
                                    TypeOrName builtinLiteralType,
-                                   Identifier builtinLiteralFuncName,
+                                   DeclName builtinLiteralFuncName,
                                    bool (*isBuiltinArgType)(Type),
                                    Diag<> brokenProtocolDiag,
                                    Diag<> brokenBuiltinProtocolDiag) {
@@ -4948,7 +4952,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
 Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                ProtocolDecl *protocol,
                                ProtocolConformance *conformance,
-                               Identifier name,
+                               DeclName name,
                                MutableArrayRef<Expr *> arguments,
                                Diag<> brokenProtocolDiag) {
   // Construct an empty constraint system and solution.
@@ -4959,8 +4963,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   if (auto metaType = type->getAs<AnyMetatypeType>())
     type = metaType->getInstanceType();
   
-  auto witness = findNamedWitness(*this, dc, type->getRValueType(), protocol,
-                                  name, brokenProtocolDiag);
+  auto witness = findNamedWitnessImpl<AbstractFunctionDecl>(
+                   *this, dc, type->getRValueType(), protocol,
+                   name, brokenProtocolDiag);
   if (!witness)
     return nullptr;
 
@@ -4975,17 +4980,25 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Form the call argument.
   Expr *arg;
-  if (arguments.size() == 1)
+  if (arguments.size() == 1 && name.isSimpleName()) {
     arg = arguments[0];
-  else {
+  } else {
     SmallVector<TupleTypeElt, 4> elementTypes;
-    for (auto elt : arguments)
-      elementTypes.push_back(TupleTypeElt(elt->getType()));
+    auto names = witness->getFullName().getArgumentNames();
+    unsigned i = 0;
+    for (auto elt : arguments) {
+      Identifier name;
+      if (i < names.size())
+        name = names[i];
+
+      elementTypes.push_back(TupleTypeElt(elt->getType(), name));
+      ++i;
+    }
 
     arg = TupleExpr::create(Context,
                             base->getStartLoc(),
                             arguments,
-                            witness->getFullName().getArgumentNames(),
+                            names,
                             { },
                             base->getEndLoc(),
                             /*hasTrailingClosure=*/false,

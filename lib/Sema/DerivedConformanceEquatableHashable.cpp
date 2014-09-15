@@ -57,32 +57,38 @@ static Expr *getBooleanLiteral(ASTContext &C, bool value) {
   // need to rely on it already having been type-checked. This only
   // matters when building the standard library.
   auto boolDecl = C.getBoolDecl();
-  auto convertFunc
-    = boolDecl->lookupDirect(C.Id_ConvertFromBuiltinBooleanLiteral)[0];
-  auto convertFuncAppliedTy = FunctionType::get(ParenType::get(C, i1Ty),
+  DeclName initName(C, C.Id_init, { C.Id_BuiltinBooleanLiteral });
+
+  auto convertInit = boolDecl->lookupDirect(initName)[0];
+  auto convertFuncParamTy = TupleType::get(
+                              {TupleTypeElt(i1Ty, C.Id_BuiltinBooleanLiteral)},
+                              C);
+  auto convertFuncAppliedTy = FunctionType::get(convertFuncParamTy,
                                                 boolDecl->getDeclaredType());
   auto convertFuncTy = FunctionType::get(boolDecl->getType(), 
                                          convertFuncAppliedTy);
-  assert(!convertFunc->hasType() || 
-         convertFunc->getType()->isEqual(convertFuncTy) &&
-         "_convertFromBuiltinBooleanLiteral has unexpected type");
-  auto convertRef = new (C) DeclRefExpr(convertFunc, SourceLoc(), 
-                                        /*implicit*/ true, 
-                                        /*direct access*/false,
-                                        convertFuncTy);
+  assert(!convertInit->hasType() ||
+         convertInit->getType()->isEqual(convertFuncTy) &&
+         "init(_builtinBooleanLiteral:) has unexpected type");
+  auto initRef = new (C) DeclRefExpr(convertInit, SourceLoc(),
+                                     /*implicit*/ true,
+                                     /*direct access*/false,
+                                     convertFuncTy);
 
-  // Form Bool._convertFromBuiltinBooleanLiteral
+  // Form Bool.init(_builtinBooleanLiteral:).
   auto boolRef = TypeExpr::createImplicit(boolDecl->getDeclaredType(), C);
-  Expr *call = new (C) DotSyntaxCallExpr(convertRef, SourceLoc(), boolRef);
+  Expr *call = new (C) ConstructorRefCallExpr(initRef, boolRef,
+                                              convertFuncAppliedTy);
   call->setImplicit(true);
-  call->setType(convertFuncAppliedTy);
 
-  // Call Bool._convertFromBuiltinBooleanLiteral.
-  Expr *arg = new (C) ParenExpr(SourceLoc(), lit, SourceLoc(), 
-                                /*has trailing closure*/ false,
-                                lit->getType());
-  arg->setImplicit();
-  call = new (C) CallExpr(call, arg, /*implicit*/ true, 
+  // Call Bool.init(_builtinBooleanLiteral:).
+  Expr *arg = TupleExpr::create(
+                C, SourceLoc(), lit,
+                { C.Id_BuiltinBooleanLiteral }, { SourceLoc() },
+                SourceLoc(), /*hasTrailingClosure=*/false,
+                /*Implicit=*/true, convertFuncParamTy);
+
+  call = new (C) CallExpr(call, arg, /*implicit*/ true,
                           boolDecl->getDeclaredType());
   return call;
 }

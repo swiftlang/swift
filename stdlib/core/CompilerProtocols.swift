@@ -228,13 +228,12 @@ public protocol FloatLiteralConvertible {
 }
 
 public protocol _BuiltinBooleanLiteralConvertible {
-  class func _convertFromBuiltinBooleanLiteral(
-                value: Builtin.Int1) -> Self
+  init(_builtinBooleanLiteral value: Builtin.Int1)
 }
 
 public protocol BooleanLiteralConvertible {
   typealias BooleanLiteralType : _BuiltinBooleanLiteralConvertible
-  class func convertFromBooleanLiteral(value: BooleanLiteralType) -> Self
+  init(booleanLiteral value: BooleanLiteralType)
 }
 
 public protocol _BuiltinCharacterLiteralConvertible {

@@ -26,14 +26,13 @@ public struct Bool {
 
 extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
   @transparent
-  public static func _convertFromBuiltinBooleanLiteral(value: Builtin.Int1) 
-                       -> Bool {
-    return Bool(value)
+  public init(_builtinBooleanLiteral value: Builtin.Int1) {
+    self.value = value
   }
 
   @transparent
-  public static func convertFromBooleanLiteral(value: Bool) -> Bool {
-    return value
+  public init(booleanLiteral value: Bool) {
+    self = value
   }
 }
 

@@ -54,8 +54,8 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
   }
 
   @transparent
-  public static func convertFromBooleanLiteral(value: Bool) -> ObjCBool {
-    return ObjCBool(value)
+  public init(booleanLiteral value: Bool) {
+    self.init(value)
   }
 }
 

@@ -72,9 +72,8 @@ IDENTIFIER_WITH_NAME(ConvertFromFloatLiteral, "convertFromFloatLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinFloatLiteral,
                      "_convertFromBuiltinFloatLiteral")
 IDENTIFIER(BooleanLiteralType)
-IDENTIFIER_WITH_NAME(ConvertFromBooleanLiteral, "convertFromBooleanLiteral")
-IDENTIFIER_WITH_NAME(ConvertFromBuiltinBooleanLiteral,
-                     "_convertFromBuiltinBooleanLiteral")
+IDENTIFIER_WITH_NAME(BuiltinBooleanLiteral, "_builtinBooleanLiteral")
+IDENTIFIER_WITH_NAME(BooleanLiteral, "booleanLiteral")
 
 IDENTIFIER(CharacterLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromCharacterLiteral,

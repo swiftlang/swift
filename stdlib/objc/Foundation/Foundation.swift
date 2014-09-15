@@ -585,8 +585,8 @@ extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
     return self(double: value)
   }
 
-  public class func convertFromBooleanLiteral(value: Bool) -> Self {
-    return self(bool: value)
+  public convenience init(bool value: Bool) {
+    self.init(booleanLiteral: value)
   }
 }
 

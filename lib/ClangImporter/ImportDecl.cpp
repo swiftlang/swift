@@ -2481,7 +2481,18 @@ namespace {
       
       return Impl.mapSelectorToDeclName(selector, /*initializer*/true);
     }
-    
+
+    /// Determine whether the given class is NSNumber or a subclass thereof.
+    static bool isNSNumberSubclass(const clang::ObjCInterfaceDecl *classDecl) {
+      if (!classDecl)
+        return nullptr;
+
+      if (classDecl->getName() == "NSNumber")
+        return true;
+
+      return isNSNumberSubclass(classDecl->getSuperClass());
+    }
+
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -2547,6 +2558,17 @@ namespace {
                                        bool variadic,
                                        bool &redundant) {
       redundant = false;
+
+      // Map NSNumber's initializers over to their corresponding literal-
+      // conversion initializers.
+      // FIXME: This would go away if we could implement convenience factory
+      // initializers in Swift.
+      if (objcMethod->getSelector() == Impl.initWithBool &&
+          isNSNumberSubclass(objcMethod->getClassInterface())) {
+        name = DeclName(Impl.SwiftContext, Impl.SwiftContext.Id_init,
+                        { Impl.SwiftContext.Id_BooleanLiteral });
+        required = true;
+      }
 
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
@@ -2636,6 +2658,10 @@ namespace {
         if (!ctor || ctor->isInvalid() ||
             ctor->getAttrs().isUnavailable(Impl.SwiftContext))
           continue;
+
+        // Resolve the type of the constructor.
+        if (!ctor->hasType())
+          Impl.getTypeResolver()->resolveDeclSignature(ctor);
 
         // If the types don't match, this is a different constructor with
         // the same selector. This can happen when an overlay overloads an
