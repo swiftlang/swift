@@ -155,7 +155,7 @@ public:
   /// Objective-C header files.
   ///
   /// \sa importHeader
-  Module *getImportedHeaderModule();
+  Module *getImportedHeaderModule() const override;
 
   std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
                                         time_t &fileModTime);

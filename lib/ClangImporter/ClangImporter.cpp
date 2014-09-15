@@ -684,7 +684,7 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
   return result;
 }
 
-Module *ClangImporter::getImportedHeaderModule() {
+Module *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 

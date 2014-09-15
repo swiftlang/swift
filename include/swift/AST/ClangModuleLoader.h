@@ -29,6 +29,10 @@ public:
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
   virtual void printStatistics() const = 0;
+
+  /// Returns the module that contains imports and declarations from all loaded
+  /// Objective-C header files.
+  virtual Module *getImportedHeaderModule() const = 0;
 };
 
 } // namespace swift
