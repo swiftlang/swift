@@ -97,6 +97,19 @@ FUNCTION(FixLifetime,        swift_fixLifetime,       RuntimeCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_unknownRetain(void *ptr);
+FUNCTION(UnknownRetain,        swift_unknownRetain,       RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownRelease(void *ptr);
+FUNCTION(UnknownRelease,        swift_unknownRelease,       RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+
 // void swift_retainUnowned(void *ptr);
 FUNCTION(RetainUnowned,  swift_retainUnowned, RuntimeCC,
          RETURNS(VoidTy),

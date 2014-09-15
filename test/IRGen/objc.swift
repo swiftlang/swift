@@ -46,10 +46,10 @@ class Test2 : Gizmo {
 }
 
 // CHECK:    define %objc_object* @_TF4objc5test0{{.*}}(%objc_object*)
-// CHECK-NOT:  call {{.*}} @swift_retain
-// CHECK:      call {{.*}} @objc_retain
-// CHECK-NOT:  call {{.*}} @swift_release
-// CHECK:      call {{.*}} @objc_release
+// CHECK-NOT:  call {{.*}} @swift_unknownRetain
+// CHECK:      call {{.*}} @swift_unknownRetain
+// CHECK-NOT:  call {{.*}} @swift_unknownRelease
+// CHECK:      call {{.*}} @swift_unknownRelease
 // CHECK:      ret %objc_object*
 func test0(arg: id) -> id {
   var x : id

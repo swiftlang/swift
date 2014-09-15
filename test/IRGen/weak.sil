@@ -72,7 +72,8 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 // CHECK-NEXT: store i8** [[TMPTAB]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_unknownWeakAssign([[WEAK]]* [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
-// CHECK: call void @objc_release([[UNKNOWN]]*
+// CHECK: [[RECOMPUTED_TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
+// CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* [[RECOMPUTED_TMPOBJ]])
 
 sil @test_weak_alloc_stack : $@thin (Optional<P>) -> () {
 bb0(%0 : $Optional<P>):

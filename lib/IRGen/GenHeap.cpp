@@ -1022,9 +1022,11 @@ void IRGenFunction::emitFixLifetime(llvm::Value *value) {
 }
 
 void IRGenFunction::emitUnknownRetain(llvm::Value *value, Explosion &e) {
-  if (!IGM.ObjCInterop)
-    return emitRetain(value, e);
-  return emitObjCRetain(value, e);
+  if (!IGM.ObjCInterop) {
+    emitRetain(value, e);
+    return;
+  }
+  emitUnaryRefCountCall(*this, IGM.getUnknownRetainFn(), value);
 }
 
 llvm::Value *IRGenFunction::emitUnknownRetainCall(llvm::Value *value) {
@@ -1032,13 +1034,16 @@ llvm::Value *IRGenFunction::emitUnknownRetainCall(llvm::Value *value) {
     emitRetainCall(value);
     return value;
   }
-  return emitObjCRetainCall(value);
+  emitUnaryRefCountCall(*this, IGM.getUnknownRetainFn(), value);
+  return value;
 }
 
 void IRGenFunction::emitUnknownRelease(llvm::Value *value) {
-  if (!IGM.ObjCInterop)
-    return emitRelease(value);
-  return emitObjCRelease(value);
+  if (!IGM.ObjCInterop) {
+    emitRelease(value);
+    return;
+  }
+  emitUnaryRefCountCall(*this, IGM.getUnknownReleaseFn(), value);
 }
 
 #define DEFINE_VALUE_OP(ID)                                           \
