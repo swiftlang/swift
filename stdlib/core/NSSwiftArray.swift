@@ -19,6 +19,12 @@
 
 import SwiftShims
 
+/// Return whether the given `index` is valid, i.e. `0 ≤ index ≤ count`
+@transparent
+func _isValidArrayIndex(index: Int, count: Int) -> Bool {
+  return (index >= 0) & (index <= count)
+}
+
 /// Base class of the heap buffer backing arrays.
 @objc class _NSSwiftArray : _CocoaArrayType {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
@@ -89,6 +95,12 @@ import SwiftShims
     aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
     let buffer = unsafeBitCast(self, Buffer.self)
+    _precondition(
+      _isValidArrayIndex(range.location, buffer.value.count),
+      "Array index out of range")
+    _precondition(
+      _isValidArrayIndex(range.location + range.length, buffer.value.count),
+      "Array index out of range")
 
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim || count == 0) {
       // These objects are "returned" at +0, so treat them as values to

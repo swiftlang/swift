@@ -155,9 +155,6 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
 for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] {
   ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects/trap/\(indexRange)")
     .crashOutputMatches("Array index out of range")
-    .xfail(
-      .Custom({ true },
-      reason: "<rdar://problem/18320164> Array allows out-of-bounds access through getObjects on the bridged NSArray"))
     .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 3, capacity: 16)
