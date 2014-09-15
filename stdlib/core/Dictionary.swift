@@ -933,12 +933,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
   }
 
   override func bridgingKeyEnumerator(dummy: ()) -> _SwiftNSEnumeratorType {
-    // Extra variable to work around a bug:
-    // <rdar://problem/16825366> Hole in type safety with initializer
-    // requirements in protocols
-    let result: _NativeDictionaryStorageKeyNSEnumeratorBase =
-      _NativeDictionaryStorageKeyNSEnumerator<Key, Value>(self)
-    return result
+    return _NativeDictionaryStorageKeyNSEnumerator<Key, Value>(self)
   }
 
   override func bridgingCountByEnumeratingWithState(
