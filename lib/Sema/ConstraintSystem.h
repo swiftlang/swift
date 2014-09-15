@@ -394,10 +394,12 @@ public:
     MissingArgument,
     /// Extra argument in a call.
     ExtraArgument,
-    /// \brief Type has no public initializers.
+    /// Type has no public initializers.
     NoPublicInitializers,
-    /// \brief A generic parameter that cannot be bound to a specific type.
+    /// A generic parameter that cannot be bound to a specific type.
     UnboundGenericParameter,
+    /// A generic parameter has been bound to a non-@objc existential type.
+    ExistentialGenericParameter,
   };
 
 private:
@@ -477,6 +479,7 @@ public:
     case DoesNotConformToProtocol:
     case IsForbiddenLValue:
     case IsNotMetatype:
+    case ExistentialGenericParameter:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getSecondType());
 

@@ -1221,6 +1221,29 @@ static bool allowsImplicitBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
   return objcClass->getName().str() != "NSNumber";
 }
 
+/// Determine whether this type variable represents a "non-trivial"
+/// generic parameter, meaning that the generic parameter has a
+/// non-Objective-C protocol requirement.
+///
+/// FIXME: This matches a limitation of our generics system, where we
+/// cannot pass the witness tables from
+///
+/// \returns the archetype for the generic parameter.
+static Type representsNonTrivialGenericParameter(TypeVariableType *typeVar) {
+  auto locator = typeVar->getImpl().getLocator();
+  if (!locator || locator->getPath().empty() ||
+      locator->getPath().back().getKind() != ConstraintLocator::Archetype)
+    return nullptr;
+
+  auto archetype = locator->getPath().back().getArchetype();
+  for (auto proto : archetype->getConformsTo()) {
+    if (!proto->isObjC())
+      return archetype;
+  }
+
+  return nullptr;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1307,6 +1330,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           }
 
           // Okay. Bind below.
+        }
+
+        // A generic parameter can only be bound to an existential
+        // type if the existential type is compatible with
+        // Objective-C.
+        Type archetype;
+        if (type2->isExistentialType() && 
+            (archetype = representsNonTrivialGenericParameter(typeVar1))) {
+          if (shouldRecordFailures()) {
+            recordFailure(getConstraintLocator(locator),
+                          Failure::ExistentialGenericParameter, 
+                          archetype, type2);
+          }
+
+          return SolutionKind::Error;
         }
 
         assignFixedType(typeVar1, type2);

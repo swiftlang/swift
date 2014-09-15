@@ -141,6 +141,12 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     out << getFirstType().getString()
         << " is an unbound generic parameter";
     break;
+
+  case ExistentialGenericParameter:
+    out << getFirstType().getString()
+        << " bound to non-@objc existential type "
+        << getSecondType().getString();
+    break;
   }
 
   out << ")\n";
@@ -819,6 +825,15 @@ static bool diagnoseFailure(ConstraintSystem &cs,
 
   case Failure::UnboundGenericParameter: {
     tc.diagnose(loc, diag::unbound_generic_parameter, failure.getFirstType())
+      .highlight(range1);
+    if (!useExprLoc)
+      noteTargetOfDiagnostic(cs, failure, locator);
+    break;
+  }
+
+  case Failure::ExistentialGenericParameter: {
+    tc.diagnose(loc, diag::generic_parameter_binds_to_non_objc_existential,
+                failure.getFirstType(), failure.getSecondType())
       .highlight(range1);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);

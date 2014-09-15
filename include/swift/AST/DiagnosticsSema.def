@@ -299,6 +299,9 @@ ERROR(no_accessible_initializers,sema_tcc,none,
       (Type))
 ERROR(unbound_generic_parameter,sema_tcc,none,
       "argument for generic parameter %0 could not be inferred", (Type))
+ERROR(generic_parameter_binds_to_non_objc_existential,sema_tcc,none,
+      "generic parameter %0 cannot be bound to non-@objc protocol type %1",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
