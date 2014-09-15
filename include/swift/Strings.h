@@ -26,6 +26,8 @@ namespace swift {
   static const char OBJC_MODULE_NAME[] = "ObjectiveC";
   /// The name of the Foundation module.
   static const char FOUNDATION_MODULE_NAME[] = "Foundation";
+  /// The name of the module created for the imported header.
+  static const char IMPORTED_HEADER_MODULE_NAME[] = "__ObjC";
   /// The prefix of module names used by LLDB to capture Swift expressions
   static const char LLDB_EXPRESSIONS_MODULE_NAME_PREFIX[] = "__lldb_expr_";
 } // end namespace swift

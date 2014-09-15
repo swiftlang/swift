@@ -30,6 +30,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
+#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -428,7 +429,8 @@ ClangImporter::create(ASTContext &ctx,
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
   // Set up the imported header module.
-  auto *importedHeaderModule = Module::create(ctx.getIdentifier("__ObjC"), ctx);
+  auto *importedHeaderModule = Module::create(
+      ctx.getIdentifier(IMPORTED_HEADER_MODULE_NAME), ctx);
   importer->Impl.ImportedHeaderUnit =
     new (ctx) ClangModuleUnit(*importedHeaderModule, *importer, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
