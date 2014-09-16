@@ -2427,22 +2427,6 @@ func _stdlib_NSDictionary_allKeys(nsd: _SwiftNSDictionaryType)
   return buffer
 }
 
-/// This class is derived from `_NSSwiftDictionaryBase` (through runtime magic),
-/// which is derived from `NSDictionary`.
-///
-/// This allows us to subclass an Objective-C class and use the fast Swift
-/// memory allocator.
-@objc
-public class _NSSwiftDictionary {}
-
-/// This class is derived from `_NSSwiftEnumeratorBase` (through runtime magic),
-/// which is derived from `NSEnumerator`.
-///
-/// This allows us to subclass an Objective-C class and use the fast Swift
-/// memory allocator.
-@objc
-class _NSSwiftEnumerator {}
-
 //===--- Bridging ---------------------------------------------------------===//
 
 extension Dictionary {

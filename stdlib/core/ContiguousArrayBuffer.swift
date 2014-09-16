@@ -14,13 +14,13 @@ import SwiftShims
 
 // The empty array prototype.  We use the same object for all empty
 // [Native]Array<T>s.
-let emptyNSSwiftArray = unsafeBitCast(
+let _emptyContiguousArrayStorageBase = unsafeBitCast(
   _ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0),
-  _NSSwiftArray.self
+  _ContiguousArrayStorageBase.self
 )
 
 // The class that implements the storage for a ContiguousArray<T>
-final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
+final internal class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
   typealias Buffer = _ContiguousArrayBuffer<T>
 
   deinit {
@@ -52,7 +52,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   override func bridgingObjectAtIndex(index: Int, dummy: Void) -> AnyObject {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for objectAtIndex should be handled by _NSSwiftArray")
+      "Verbatim bridging for objectAtIndex should be handled by _ContiguousArrayStorageBase")
     let b = Buffer(self)
     return _bridgeToObjectiveCUnconditional(b[index])
   }
@@ -63,7 +63,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   ) {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for getObjects:range: should be handled by _NSSwiftArray")
+      "Verbatim bridging for getObjects:range: should be handled by _ContiguousArrayStorageBase")
 
     let b = Buffer(self)
     let unmanagedObjects = _UnmanagedAnyObjectArray(aBuffer)
@@ -81,7 +81,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   ) -> Int {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for countByEnumeratingWithState:objects:count: should be handled by _NSSwiftArray")
+      "Verbatim bridging for countByEnumeratingWithState:objects:count: should be handled by _ContiguousArrayStorageBase")
 
     var enumerationState = state.memory
 
@@ -338,7 +338,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
         _isBridgedToObjectiveC(T.self),
         "Array element type is not bridged to ObjectiveC")
     if count == 0 {
-      return emptyNSSwiftArray
+      return _emptyContiguousArrayStorageBase
     }
     return unsafeBitCast(_base.storage, _CocoaArrayType.self)
   }

@@ -390,4 +390,12 @@ func _rawPointerToString(value: Builtin.RawPointer) -> String {
   return "0x" + result
 }
 
+// These classes are derived from `_NSSwiftXXXBase` (through runtime magic),
+// which are derived from `NSXXX`.
+//
+// This allows us to subclass an Objective-C class and use the fast Swift
+// memory allocator.
+@objc class _NSSwiftArray {}
+@objc class _NSSwiftDictionary {}
+@objc class _NSSwiftEnumerator {}
 

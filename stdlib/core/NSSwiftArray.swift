@@ -10,10 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  _NSSwiftArray supplies the implementation of the _CocoaArrayType API
-//  (and thus, NSArray the API) for our _ContiguousArrayStorage<T>.  We
-//  can't put this implementation directly on _ContiguousArrayStorage
-//  because generic classes can't override Objective-C selectors.
+//  _ContiguousArrayStorageBase supplies the implementation of the
+//  _CocoaArrayType API (and thus, NSArray the API) for our
+//  _ContiguousArrayStorage<T>.  We can't put this implementation
+//  directly on _ContiguousArrayStorage because generic classes can't
+//  override Objective-C selectors.
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,7 +35,7 @@ func _isValidArraySubscript(index: Int, count: Int) -> Bool {
 
 
 /// Base class of the heap buffer backing arrays.
-@objc class _NSSwiftArray : _CocoaArrayType {
+@objc class _ContiguousArrayStorageBase : _NSSwiftArray, _CocoaArrayType {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
 
   // The optional Void arguments prevent these methods from being
