@@ -2767,8 +2767,13 @@ RValue RValueEmitter::visitClosureExpr(ClosureExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
-  // Generate the closure function.
-  SGF.SGM.emitClosure(e);
+  // Generate the closure function, if we haven't already.
+  // We may visit the same closure expr multiple times in some cases, for
+  // instance, when closures appear as in-line initializers of stored properties,
+  // in which case the closure will be emitted into every initializer of the
+  // containing type.
+  if (!SGF.SGM.hasFunction(SILDeclRef(e)))
+    SGF.SGM.emitClosure(e);
 
   // Generate the closure value (if any) for the closure expr's function
   // reference.
