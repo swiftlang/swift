@@ -39,7 +39,7 @@ struct <loc>FooRuncingOptions</loc> : <ref:Protocol>RawOptionSetType</ref> {
   <decl:Var>static var <loc>EnableMince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
   <decl:Var>static var <loc>EnableQuince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
   <decl:Var>static var <loc>allZeros</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
-  <decl:Func>static func <loc>convertFromNilLiteral()</loc> -> <ref:Struct>FooRuncingOptions</ref></decl>
+  <decl:Constructor><loc>init(nilLiteral _: ())</loc></decl>
 }</decl>
 <decl:Struct>struct <loc>FooStruct1</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>

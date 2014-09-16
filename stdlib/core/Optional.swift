@@ -37,8 +37,8 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
   }
 
   @transparent
-  public static func convertFromNilLiteral() -> Optional<T> {
-    return .None
+  public init(nilLiteral: ()) {
+    self = .None
   }
 }
 
@@ -131,8 +131,7 @@ public func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
 // isn't equatable.
 public struct _OptionalNilComparisonType : NilLiteralConvertible {
   @transparent
-  public static func convertFromNilLiteral() -> _OptionalNilComparisonType {
-    return _OptionalNilComparisonType()
+  public init(nilLiteral: ()) {
   }
 }
 @transparent public

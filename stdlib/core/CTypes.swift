@@ -81,7 +81,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
 
   @transparent
   public init() {
-    value = Builtin.inttoptr_Word(0.value)
+    value = _nilRawPointer
   }
 
   @transparent
@@ -133,8 +133,8 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   }
   
   @transparent public
-  static func convertFromNilLiteral() -> COpaquePointer {
-    return COpaquePointer()
+  init(nilLiteral: ()) {
+    value = _nilRawPointer
   }
 }
 
@@ -168,8 +168,8 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   }
 
   @transparent public
-  static func convertFromNilLiteral() -> CFunctionPointer {
-    return CFunctionPointer()
+  init(nilLiteral: ()) {
+    value = COpaquePointer()
   }
 }
 

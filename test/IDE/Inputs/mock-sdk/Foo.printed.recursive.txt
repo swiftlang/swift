@@ -39,7 +39,7 @@ struct FooRuncingOptions : RawOptionSetType {
   static var EnableMince: FooRuncingOptions { get }
   static var EnableQuince: FooRuncingOptions { get }
   static var allZeros: FooRuncingOptions { get }
-  static func convertFromNilLiteral() -> FooRuncingOptions
+  init(nilLiteral _: ())
 }
 struct FooStruct1 {
   var x: Int32

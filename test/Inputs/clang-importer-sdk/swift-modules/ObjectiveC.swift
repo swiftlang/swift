@@ -62,8 +62,8 @@ public struct NSZone: NilLiteralConvertible {
   public var pointer : COpaquePointer
 
   @transparent public
-  static func convertFromNilLiteral() -> NSZone {
-    return NSZone(pointer: COpaquePointer())
+  init(nilLiteral: ()) {
+    pointer = COpaquePointer()
   }
 }
 

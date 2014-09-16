@@ -34,8 +34,8 @@ public enum ImplicitlyUnwrappedOptional<T>
 
   // Make nil work with ImplicitlyUnwrappedOptional
   @transparent public
-  static func convertFromNilLiteral() -> ImplicitlyUnwrappedOptional<T> {
-    return .None
+  init(nilLiteral: ()) {
+    self = .None
   }
 
   /// Haskell's fmap, which was mis-named

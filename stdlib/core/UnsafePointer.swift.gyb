@@ -95,8 +95,8 @@ public struct ${Self}<T>
 
   // Make nil work with ${Self}.
   @transparent public
-  static func convertFromNilLiteral() -> ${Self}<T> {
-    return .null()
+  init(nilLiteral: ()) {
+    self = .null()
   }
 
   @transparent

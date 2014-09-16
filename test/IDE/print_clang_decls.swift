@@ -79,7 +79,7 @@
 // FOUNDATION-NEXT: {{^}}  static var EnableMince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var EnableQuince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var allZeros: NSRuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static func convertFromNilLiteral() -> NSRuncingOptions{{$}}
+// FOUNDATION-NEXT: {{^}}  init(nilLiteral _: ()){{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}

@@ -1318,9 +1318,11 @@ namespace {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
-      
+
+      DeclName initName(tc.Context, tc.Context.Id_init,
+                        { tc.Context.Id_NilLiteral });
       return convertLiteral(expr, type, expr->getType(), protocol,
-                            Identifier(), tc.Context.Id_ConvertFromNilLiteral,
+                            Identifier(), initName,
                             nullptr, Identifier(),
                             Identifier(),
                             [] (Type type) -> bool {

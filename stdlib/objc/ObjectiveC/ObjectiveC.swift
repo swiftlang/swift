@@ -121,8 +121,8 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   }
   
   @transparent public
-  static func convertFromNilLiteral() -> Selector {
-    return Selector()
+  init(nilLiteral: ()) {
+    ptr = nil
   }
 }
 
@@ -170,8 +170,8 @@ public struct NSZone : NilLiteralConvertible {
   public init() { pointer = nil }
 
   @transparent public
-  static func convertFromNilLiteral() -> NSZone {
-    return NSZone()
+  init(nilLiteral: ()) {
+    pointer = nil
   }
 }
 

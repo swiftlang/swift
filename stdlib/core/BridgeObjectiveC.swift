@@ -401,8 +401,8 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   }
   
   @transparent public
-  static func convertFromNilLiteral() -> AutoreleasingUnsafeMutablePointer {
-    return AutoreleasingUnsafeMutablePointer(_nilRawPointer)
+  init(nilLiteral: ()) {
+    value = _nilRawPointer
   }
   
   @transparent public

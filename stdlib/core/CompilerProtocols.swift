@@ -204,7 +204,7 @@ public protocol RawOptionSetType : _RawOptionSetType, BitwiseOperationsType,
 /// Conforming to this protocol allows a type to be usable with the 'nil'
 /// literal.
 public protocol NilLiteralConvertible {
-  class func convertFromNilLiteral() -> Self
+  init(nilLiteral: ())
 }
 
 public protocol _BuiltinIntegerLiteralConvertible {

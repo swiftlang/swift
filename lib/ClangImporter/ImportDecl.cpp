@@ -564,58 +564,71 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
 // Build the NilLiteralConvertible conformance:
 //
 // extension NSSomeOptionSet : NilLiteralConvertible {
-//  static func convertFromNilLiteral() -> S {
-//    return S()
+//  init(nilLiteral: ())
+//    self = S()
 //  }
 // }
-static FuncDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
-                                           ValueDecl *valueDecl) {
+static ConstructorDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
+                                                  ValueDecl *valueDecl) {
   auto &C = optionSetDecl->getASTContext();
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   
-  VarDecl *selfDecl = createSelfDecl(optionSetDecl, true);
+  VarDecl *selfDecl = createSelfDecl(optionSetDecl, /*staticMethod=*/false);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
-  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
-  methodParam->setType(TupleType::getEmpty(C));
-  Pattern *params[] = {selfParam, methodParam};
 
-  Identifier baseName = C.getIdentifier("convertFromNilLiteral");
-  
-  DeclName name(C, baseName, { });
-  auto factoryDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                                      SourceLoc(),
-                                      name,
-                                      SourceLoc(), nullptr, Type(), params,
-                                      TypeLoc::withoutLoc(optionSetType),
-                                      optionSetDecl);
-  
-  factoryDecl->setStatic();
-  factoryDecl->setImplicit();
-  factoryDecl->setAccessibility(Accessibility::Public);
+  VarDecl *nilDecl = new (C) ParamDecl(/*isLet=*/true, SourceLoc(),
+                                       C.Id_NilLiteral, SourceLoc(),
+                                       Identifier(),
+                                       TupleType::getEmpty(C),
+                                       optionSetDecl);
+  Pattern *nilParam = createTypedNamedPattern(nilDecl);
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),
+                                              { TuplePatternElt(nilParam) },
+                                              SourceLoc());
+  methodParam->setType(ParenType::get(C, nilParam->getType()));
 
-  Type factoryType = FunctionType::get(TupleType::getEmpty(C), optionSetType);
-  factoryType = FunctionType::get(selfDecl->getType(), factoryType);
-  factoryDecl->setType(factoryType);
-  factoryDecl->setBodyResultType(optionSetType);
+  DeclName initName(C, C.Id_init, { C.Id_NilLiteral });
+  auto initDecl = new (C) ConstructorDecl(initName, SourceLoc(), OTK_None,
+                                          SourceLoc(), selfParam, methodParam,
+                                          nullptr, optionSetDecl);
+  initDecl->setImplicit();
+  initDecl->setAccessibility(Accessibility::Public);
 
+  Type metaType = MetatypeType::get(optionSetType);
+  Type paramType = TupleType::get({ TupleTypeElt(methodParam->getType(),
+                                                 C.Id_NilLiteral) },
+                                  C);
+  Type fnType = FunctionType::get(paramType, optionSetType);
+  Type allocFnType = FunctionType::get(metaType, fnType);
+  Type initFnType = FunctionType::get(optionSetType, fnType);
+  initDecl->setType(allocFnType);
+  initDecl->setInitializerType(initFnType);
+
+  // Form the body of the initializer.
   auto *ctorRef = new (C) DeclRefExpr(ConcreteDeclRef(optionSetDecl),
                                       SourceLoc(), /*implicit*/ true);
   auto *arg = TupleExpr::createEmpty(C, SourceLoc(), SourceLoc(),
                                      /*implicit*/ true);
   auto *ctorCall = new (C) CallExpr(ctorRef, arg, /*implicit*/ true);
-  auto *ctorRet = new (C) ReturnStmt(SourceLoc(), ctorCall, /*implicit*/ true);
+
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true,
+                                     /*UsesDirectPropertyAccess=*/false,
+                                     selfDecl->getType());
+
+  auto *assign = new (C) AssignExpr(selfRef, SourceLoc(), ctorCall,
+                                    /*implicit*/ true);
   
   auto body = BraceStmt::create(C, SourceLoc(),
-                                ASTNode(ctorRet),
+                                ASTNode(assign),
                                 SourceLoc(),
                                 /*implicit*/ true);
   
-  factoryDecl->setBody(body);
+  initDecl->setBody(body);
   
   // Add as an external definition.
-  C.addedExternalDecl(factoryDecl);
+  C.addedExternalDecl(initDecl);
   
-  return factoryDecl;
+  return initDecl;
 }
 
 // Build the default initializer for an option set.
