@@ -12,27 +12,23 @@
 // BooleanType
 //===----------------------------------------------------------------------===//
 
+/// Return the result of inverting `a`\ 's logic value
 public prefix func !<T : BooleanType>(a: T) -> Bool {
   return !a.boolValue
 }
 
-// Short circuiting logical operators.
-
-// FIXME: these operators should be fully generic
-// BLOCKED ON: <rdar://problem/13251236> [remapping bound function type not
-// implemented yet (deduced closure types)].
-//
-// FIXME: the generic versions of these operators probably shouldn't
-// be @transparent; ideally they will be overloaded with transparent
-// bool-specific operators.  BLOCKED ON: <rdar://problem/11510876>
-// [Implement overload resolution].
-
+/// If `lhs` is `false`, return it.  Otherwise, evaluate `rhs` and
+/// return its `boolValue`.
+@inline(__always)
 public func && <T: BooleanType, U: BooleanType>(
   lhs: T, rhs: @autoclosure () -> U
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
+/// If `lhs` is `true`, return it.  Otherwise, evaluate `rhs` and
+/// return its `boolValue`.
+@inline(__always)
 public func || <T: BooleanType, U: BooleanType>(
   lhs: T, rhs: @autoclosure () -> U
 ) -> Bool {
@@ -55,4 +51,3 @@ func || <T: BooleanType>(
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }
-

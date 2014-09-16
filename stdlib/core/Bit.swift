@@ -13,34 +13,47 @@
 //  Used to index SequenceOfOne<T>
 //
 //===----------------------------------------------------------------------===//
+
+/// A `RandomAccessIndexType` that has two possible values.  Used as
+/// the `Index` type for `SequenceOfOne<T>`.
 public enum Bit : Int, RandomAccessIndexType, Reflectable {
   case Zero = 0, One = 1
 
+  /// Return the next consecutive value in a discrete sequence of
+  /// `Bit` values
   public func successor() -> Bit {
     _precondition(self == .Zero, "Can't increment past one")
     return .One
   }
 
+  /// Return the previous consecutive value in a discrete sequence of
+  /// `Bit` values.
   public func predecessor() -> Bit {
     _precondition(self == .One, "Can't decrement past zero")
     return .Zero
   }
 
+  /// Return the minimum number of applications of `successor` or
+  /// `predecessor` required to reach `other` from `self`. O(1).
   public func distanceTo(other: Bit) -> Int {
     return rawValue.distanceTo(other.rawValue)
   }
 
+  /// If `n > 0` returns the result of `successor` to `self` `n`
+  /// times.  Otherwise, if `n < 0`, returns the result of applying
+  /// `predecessor` to `self` `-n` times. Otherwise, returns
+  /// `self`. O(1)
   public func advancedBy(distance: Int) -> Bit {
     return rawValue.advancedBy(distance) > 0 ? One : Zero
   }
 
-  public
-  func getMirror() -> MirrorType {
+  /// Reflection
+  public func getMirror() -> MirrorType {
     return _BitMirror(self)
   }
 }
 
-struct _BitMirror: MirrorType {
+internal struct _BitMirror: MirrorType {
   let _value: Bit
   
   init(_ v: Bit) {

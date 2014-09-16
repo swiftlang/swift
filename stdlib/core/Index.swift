@@ -96,6 +96,9 @@ public struct _DisabledRangeIndex_ {
 //===----------------------------------------------------------------------===//
 
 public protocol _ForwardIndexType : _Incrementable {
+  /// A type that can represent the number of steps between arbitrary
+  /// pairs of `Self` values where one value is reachable from the
+  /// other.
   typealias Distance : _SignedIntegerType = Int
 
   // See the implementation of Range for an explanation of these
@@ -249,8 +252,15 @@ func ~> <T: _BidirectionalIndexType>(
 //===----------------------------------------------------------------------===//
 //===--- RandomAccessIndexType --------------------------------------------===//
 public protocol _RandomAccessIndexType : _BidirectionalIndexType, Strideable {
-  func distanceTo(Self) -> Distance
-  func advancedBy(Distance) -> Self
+  /// Return the minimum number of applications of `successor` or
+  /// `predecessor` required to reach `other` from `self`. O(1).
+  func distanceTo(other: Self) -> Distance
+
+  /// If `n > 0` returns the result of `successor` to `self` `n`
+  /// times.  Otherwise, if `n < 0`, returns the result of applying
+  /// `predecessor` to `self` `-n` times. Otherwise, returns
+  /// `self`. O(1)
+  func advancedBy(n: Distance) -> Self
 }
 
 public protocol RandomAccessIndexType

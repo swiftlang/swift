@@ -423,13 +423,11 @@ extension _ArrayBuffer {
     return 0
   }
 
-  public
-  var endIndex: Int {
+  public var endIndex: Int {
     return count
   }
 
-  public
-  func generate() -> IndexingGenerator<_ArrayBuffer> {
+  public func generate() -> IndexingGenerator<_ArrayBuffer> {
     return IndexingGenerator(self)
   }
   
