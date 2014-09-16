@@ -46,6 +46,11 @@ def maskBits(n):
 public typealias IntMax = Int${int_max_bits}
 public typealias UIntMax = UInt${int_max_bits}
 
+/// This protocol is an implementation detail of `IntegerType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `IntegerType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _IntegerType
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
@@ -57,22 +62,42 @@ public protocol _IntegerType
 {
 }
 
+/// A set of common requirements for Swift's integer types.
 public protocol IntegerType : _IntegerType, RandomAccessIndexType {
 }
 
+/// This protocol is an implementation detail of `SignedIntegerType`;
+/// do not use it directly.
+///
+/// Its requirements are inherited by `SignedIntegerType` and thus
+/// must be satisifed by concrete instances of that protocol.
 public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
+  /// Represent this number using Swift's widest native integer type.
   func toIntMax() -> IntMax
+  
+  // Convert from Swift's widest signed integer type, trapping on
+  // overflow.
   init(IntMax)
 }
 
+/// A set of common requirements for Swift's signed integer types.
 public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
 }
 
+/// This protocol is an implementation detail of `SignedIntegerType`;
+/// do not use it directly.
+///
+/// Its requirements are inherited by `SignedIntegerType` and thus
+/// must be satisifed by concrete instances of that protocol.
 public protocol _UnsignedIntegerType : _IntegerType {
   func toUIntMax() -> UIntMax
+
+  // Convert from Swift's widest unsigned integer type, trapping on
+  // overflow.
   init(UIntMax)
 }
 
+/// A set of common requirements for Swift's unsigned integer types.
 public protocol UnsignedIntegerType : _UnsignedIntegerType, IntegerType {
 }
 
