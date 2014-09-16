@@ -249,7 +249,7 @@ func _heapify<
   // We skip the rightmost half of the array, because these nodes don't have
   // any children.
   let root = range.startIndex
-  var node = advance(root, C.Index.Distance.from(count(range).toIntMax()/2))
+  var node = advance(root, C.Index.Distance(count(range).toIntMax()/2))
   while node-- != root {
     _siftDown(&elements, node, range ${", &isOrderedBefore" if p else ""})
   }

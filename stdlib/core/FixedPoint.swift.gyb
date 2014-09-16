@@ -63,7 +63,7 @@ public protocol IntegerType : _IntegerType, RandomAccessIndexType {
 
 public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
   func toIntMax() -> IntMax
-  class func from(IntMax) -> Self
+  init(IntMax)
 }
 
 public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
@@ -71,7 +71,7 @@ public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
 
 public protocol _UnsignedIntegerType : _IntegerType {
   func toUIntMax() -> UIntMax
-  class func from(UIntMax) -> Self
+  init(UIntMax)
 }
 
 public protocol UnsignedIntegerType : _UnsignedIntegerType, IntegerType {
@@ -80,25 +80,25 @@ public protocol UnsignedIntegerType : _UnsignedIntegerType, IntegerType {
 public func numericCast<
   T : _SignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
-  return .from(x.toIntMax())
+  return U(x.toIntMax())
 }
 
 public func numericCast<
   T : _UnsignedIntegerType, U : _UnsignedIntegerType
 >(x: T) -> U {
-  return .from(x.toUIntMax())
+  return U(x.toUIntMax())
 }
 
 public func numericCast<
   T : _SignedIntegerType, U : _UnsignedIntegerType
 >(x: T) -> U {
-  return .from(UIntMax(x.toIntMax()))
+  return U(UIntMax(x.toIntMax()))
 }
 
 public func numericCast<
 T : _UnsignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
-  return .from(IntMax(x.toUIntMax()))
+  return U(IntMax(x.toUIntMax()))
 }
 
 % for self_ty in all_integer_types(word_bits):
@@ -319,10 +319,6 @@ extension ${Self} {
     return IntMax(toUIntMax())
   }
 % end
-  @transparent public
-  static func from(x: ${U}IntMax) -> ${Self} {
-    return ${'x' if Self == U+'Int%s'%int_max_bits else Self+'(x)'}
-  }
 }
 
 % if signed:

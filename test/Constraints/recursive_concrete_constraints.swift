@@ -10,7 +10,7 @@ struct S<A: CollectionType where A.Index == Int> : CollectionType {
   }
   
   var startIndex: Index {
-    return .from(0)
+    return Int(0)
   }
   
   var endIndex: Index {
