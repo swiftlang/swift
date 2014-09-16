@@ -3091,6 +3091,13 @@ bool Parser::parseDeclSIL() {
   if (!FunctionState.P.Diags.hadAnyError())
     FunctionState.F->verify();
 
+  // Link the static initializer for global variables.
+  for (SILGlobalVariable &v : FunctionState.SILMod.getSILGlobals()) {
+    if (v.getInitializer())
+      if (FnName.str() == v.getInitializer()->getName())
+        v.setInitializer(FunctionState.F);
+  }
+
   return false;
 }
 
@@ -3152,8 +3159,28 @@ bool Parser::parseSILGlobal() {
     GlobalLinkage = SILLinkage::DefaultForDefinition;
 
   // FIXME: check for existing global variable?
-  SILGlobalVariable::create(*SIL->M, GlobalLinkage.getValue(), GlobalName.str(),
-                            GlobalType, SILFileLocation(NameLoc));
+  auto *GV = SILGlobalVariable::create(*SIL->M, GlobalLinkage.getValue(),
+                                       GlobalName.str(),GlobalType,
+                                       SILFileLocation(NameLoc));
+
+  // Parse static initializer if exists.
+  if (State.P.consumeIf(tok::comma)) {
+    Identifier Name;
+    SILType Ty;
+    SourceLoc Loc = State.P.Tok.getLoc();
+    if (State.parseGlobalName(Name) ||
+        State.P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
+        State.parseSILType(Ty))
+      return true;
+
+    auto FnTy = Ty.getAs<SILFunctionType>();
+    if (!FnTy || !Ty.isObject()) {
+      State.P.diagnose(Loc, diag::expected_sil_function_type);
+      return true;
+    }
+
+    GV->setInitializer(State.getGlobalNameForReference(Name, FnTy, Loc));
+  }
   return false;
 }
 

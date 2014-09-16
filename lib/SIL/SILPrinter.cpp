@@ -1374,6 +1374,12 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printName(OS);
   OS << " : " << LoweredType;
 
+  if (getInitializer()) {
+    OS << ", ";
+    getInitializer()->printName(OS);
+    OS << " : " << getInitializer()->getLoweredType();
+  }
+
   OS << "\n\n";
 }
 
