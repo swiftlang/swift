@@ -184,6 +184,7 @@ static bool canonicalizeInputFunction(Function &F) {
     
     switch (classifyInstruction(Inst)) {
     case RT_Unknown:
+    case RT_UnknownRetain:
     case RT_AllocObject:
     case RT_NoMemoryAccessed:
       break;
@@ -412,6 +413,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     }
 
     case RT_Unknown:
+    case RT_UnknownRetain:
     case RT_ObjCRelease:
     case RT_ObjCRetain:
       // BBI->dump();
@@ -473,7 +475,9 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
       // protection by retain/release.
       break;
         
-    case RT_RetainNoResult: {  // swift_retain_noresult(obj)
+    case RT_RetainNoResult:
+    case RT_UnknownRetain:
+    case RT_ObjCRetain: {  // swift_retain_noresult(obj)
       //CallInst &ThisRetain = cast<CallInst>(CurInst);
       //Value *ThisRetainedObject = ThisRetain.getArgOperand(0);
       
@@ -520,7 +524,6 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     }
 
     case RT_Unknown:
-    case RT_ObjCRetain:
 
       // Load, store, memcpy etc can't do a release.
       if (isa<LoadInst>(CurInst) || isa<StoreInst>(CurInst) ||
@@ -639,6 +642,7 @@ static DtorKind analyzeDestructor(Value *P) {
         
       case RT_ObjCRelease:
       case RT_ObjCRetain:
+      case RT_UnknownRetain:
         // Objective-C retain and release can have arbitrary side effects.
         break;
           
@@ -736,6 +740,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     case RT_Unknown:
     case RT_ObjCRelease:
     case RT_ObjCRetain:
+    case RT_UnknownRetain:
 
       // Otherwise, this really is some unhandled instruction.  Bail out.
       return false;
@@ -1115,6 +1120,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       case RT_Release:
       case RT_AllocObject:
       case RT_NoMemoryAccessed:
+      case RT_UnknownRetain:
       case RT_ObjCRelease:
       case RT_ObjCRetain:  // TODO: Could chain together objc_retains.
         // Remember returns in the first pass.

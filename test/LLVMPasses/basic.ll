@@ -7,6 +7,7 @@ target triple = "x86_64-apple-macosx10.9"
 %swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
 %objc_object = type opaque
 
+declare void @swift_unknownRetain(%swift.refcounted*)
 declare %objc_object* @objc_retain(%objc_object*)
 declare void @objc_release(%objc_object*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
@@ -109,4 +110,26 @@ define void @swift_fixLifetimeTest(%swift.refcounted* %A) {
   ret void
 }
 
+; CHECK-LABEL: @move_retain_across_unknown_retain
+; CHECK-NOT: swift_retain
+; CHECK: swift_unknownRetain
+; CHECK-NOT: swift_release
+; CHECK: ret
+define void @move_retain_across_unknown_retain(%swift.refcounted* %A, %swift.refcounted* %B) {
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  tail call void @swift_unknownRetain(%swift.refcounted* %B)
+  tail call void @swift_release(%swift.refcounted* %A) nounwind
+  ret void
+}
 
+; CHECK-LABEL: @move_retain_across_objc_retain
+; CHECK-NOT: swift_retain
+; CHECK: objc_retain
+; CHECK-NOT: swift_release
+; CHECK: ret
+define void @move_retain_across_objc_retain(%swift.refcounted* %A, %objc_object* %B) {
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  tail call %objc_object* @objc_retain(%objc_object* %B)
+  tail call void @swift_release(%swift.refcounted* %A) nounwind
+  ret void
+}

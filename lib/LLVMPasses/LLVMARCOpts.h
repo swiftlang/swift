@@ -42,6 +42,9 @@ enum RT_Kind {
   RT_ObjCRelease,
   /// %objc_object* objc_retain(%objc_object* %P)
   RT_ObjCRetain,
+
+  /// void swift_unknownRetain(%swift.refcounted* %P)
+  RT_UnknownRetain,
   
   /// This is not a runtime function that we support.  Maybe it is not a call,
   /// or is a call to something we don't care about.
@@ -68,6 +71,7 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
     .Case("swift_retainAndReturnThree", RT_RetainAndReturnThree)
     .Case("objc_release", RT_ObjCRelease)
     .Case("objc_retain", RT_ObjCRetain)
+    .Case("swift_unknownRetain", RT_UnknownRetain)
     .Default(RT_Unknown);
 }
 
