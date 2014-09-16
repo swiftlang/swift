@@ -1088,12 +1088,12 @@ public:
     // FIXME: This is hideous. We should be letting emitRawApply figure this
     // out.
     SGFContext allowPlusZero = SGFContext::AllowPlusZero;
-    if (cast<ProtocolDecl>(fd->getDeclContext())->requiresClass())
+    auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
+    if (proto->requiresClass())
       allowPlusZero = SGFContext();
     
     auto baseVal = gen.emitRValueAsSingleValue(e->getBase(), allowPlusZero);
 
-    auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
     auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
 
     // Figure out the kind of declaration reference we're working with.
@@ -1119,8 +1119,9 @@ public:
       if (fd->isInstanceMember()
           && !proto->requiresClass()
           && !baseVal.getType().isAddress()) {
-        auto materialized = gen.emitMaterialize(e, baseVal);
-        baseVal = ManagedValue(materialized.address, materialized.valueCleanup);
+        auto temp = gen.emitTemporaryAllocation(e, baseVal.getType());
+        gen.B.createStore(e, baseVal.getValue(), temp);
+        baseVal = ManagedValue(temp, baseVal.getCleanup());
       }
 
       setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
