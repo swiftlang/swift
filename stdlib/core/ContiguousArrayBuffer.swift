@@ -20,7 +20,7 @@ let _emptyContiguousArrayStorageBase = unsafeBitCast(
 )
 
 // The class that implements the storage for a ContiguousArray<T>
-final internal class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
+final class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
   typealias Buffer = _ContiguousArrayBuffer<T>
 
   deinit {
@@ -271,7 +271,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// Return whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  internal func _isValidSubscript(index : Int) -> Bool {
+  func _isValidSubscript(index : Int) -> Bool {
     /// Instead of returning 0 for no storage, we explicitly check
     /// for the existance of storage.
     /// Note that this is better than folding hasStorage in to
@@ -481,7 +481,7 @@ public func ~> <
   return _copyCollectionToNativeArrayBuffer(source)
 }
 
-internal func _copyCollectionToNativeArrayBuffer<
+func _copyCollectionToNativeArrayBuffer<
   C: protocol<_CollectionType,_Sequence_Type>
 >(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
 {
@@ -503,7 +503,7 @@ internal func _copyCollectionToNativeArrayBuffer<
   return result
 }
 
-internal protocol _ArrayType : CollectionType {
+protocol _ArrayType : CollectionType {
   var count: Int {get}
 
   typealias _Buffer : _ArrayBufferType
