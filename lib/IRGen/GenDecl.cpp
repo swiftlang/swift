@@ -530,6 +530,56 @@ void IRGenModule::prepare() {
   }
 }
 
+static void emitStaticInitializers(IRGenModule &IGM) {
+  SmallVector<SILFunction*, 8> StaticInitializers;
+  for (SILGlobalVariable &v : IGM.SILMod->getSILGlobals())
+    if (v.getInitializer())
+      StaticInitializers.push_back(v.getInitializer());
+
+  if (StaticInitializers.empty())
+    return;
+
+  // Create a single swift initializer: _GLOBAL__module_name().
+  llvm::Type *VoidTy = llvm::Type::getVoidTy(IGM.LLVMContext);
+  llvm::FunctionType *FTy = llvm::FunctionType::get(VoidTy, false);
+  llvm::Function *SwiftInitializer = llvm::Function::Create(FTy,
+    llvm::GlobalValue::InternalLinkage,
+    llvm::Twine("_GLOBAL__", IGM.Opts.ModuleName), &IGM.Module);
+  // FIXME: Should we put it in StaticInit section?
+
+  // Generate calls to the static initializers associated with a
+  // SILGlobalVariable.
+  IRGenFunction initIGF(IGM, SwiftInitializer);
+  for (auto *staticInit : StaticInitializers) {
+    // Find the corresponding llvm Function.
+    auto *staticInitFunc = IGM.getAddrOfSILFunction(staticInit,
+                                                    NotForDefinition);
+    initIGF.Builder.CreateCall(staticInitFunc);
+  }
+  initIGF.Builder.CreateRetVoid();
+
+  // Create @llvm.global_ctors.
+  llvm::FunctionType* CtorFTy = llvm::FunctionType::get(VoidTy, false);
+  llvm::Type *CtorPFTy = llvm::PointerType::getUnqual(CtorFTy);
+
+  // Get the type of a ctor entry, { i32, void ()*, i8* }.
+  llvm::StructType *CtorStructTy = llvm::StructType::get(
+    IGM.Int32Ty, CtorPFTy, IGM.Int8PtrTy, NULL);
+  SmallVector<llvm::Constant*, 8> Ctors;
+  llvm::Constant *S[] = {
+    llvm::ConstantInt::get(IGM.Int32Ty, 65535, false),
+    llvm::ConstantExpr::getBitCast(SwiftInitializer, CtorPFTy),
+    llvm::Constant::getNullValue(IGM.Int8PtrTy)
+  };
+  Ctors.push_back(llvm::ConstantStruct::get(CtorStructTy, makeArrayRef(S)));
+
+  llvm::ArrayType *AT = llvm::ArrayType::get(CtorStructTy, 1);
+  new llvm::GlobalVariable(IGM.Module, AT, false,
+                           llvm::GlobalValue::AppendingLinkage,
+                           llvm::ConstantArray::get(AT, Ctors),
+                           "llvm.global_ctors");
+}
+
 void IRGenModule::emitGlobalTopLevel() {
   // Emit global variables.
   for (VarDecl *global : SILMod->getGlobals()) {
@@ -548,6 +598,9 @@ void IRGenModule::emitGlobalTopLevel() {
 
     emitSILFunction(&f);
   }
+
+  // Emit static initializers.
+  emitStaticInitializers(*this);
 
   // Emit witness tables.
   for (SILWitnessTable &wt : SILMod->getWitnessTableList()) {
