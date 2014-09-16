@@ -70,7 +70,7 @@ llvm::BitVector getBitVectorFromAPInt(const APInt &bits,
 void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
                                                    Explosion &params,
                                                    Address dest,
-                                                   CanType T) const {
+                                                   SILType T) const {
   if (TIK >= Loadable)
     return initialize(IGF, params, dest);
   Address src = TI->getAddressForPointer(params.claimNext());
@@ -89,7 +89,7 @@ namespace {
     {}
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                     CanType type,
+                                     SILType Type,
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) {
       llvm_unreachable("should not call this");
@@ -127,7 +127,7 @@ namespace {
     void storeTag(IRGenFunction &IGF,
                   EnumElementDecl *elt,
                   Address enumAddr,
-                  CanType T) const override {
+                  SILType T) const override {
     }
 
     Address destructiveProjectDataForLoad(IRGenFunction &IGF,
@@ -137,7 +137,7 @@ namespace {
     }
 
     void emitIndirectSwitch(IRGenFunction &IGF,
-                            CanType T,
+                            SILType T,
                             Address enumAddr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
@@ -170,7 +170,7 @@ namespace {
     void getSchema(ExplosionSchema &schema) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
 
@@ -179,30 +179,30 @@ namespace {
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                      Address dest, CanType T) const override {
+                                      Address dest, SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     void assignWithCopy(IRGenFunction &IGF, Address dest,
-                        Address src, CanType T) const override {
+                        Address src, SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     void assignWithTake(IRGenFunction &IGF, Address dest,
-                        Address src, CanType T) const override {
+                        Address src, SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                            Address src, CanType T) const override {
+                            Address src, SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     void initializeWithTake(IRGenFunction &IGF, Address dest,
-                            Address src, CanType T) const override {
+                            Address src, SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
 
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override {
+                            SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
 
@@ -212,13 +212,13 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                  Address src,
-                                         CanType T) const override {
+                                         SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
     void storeExtraInhabitant(IRGenFunction &IGF,
                                       llvm::Value *index,
                                       Address dest,
-                              CanType T) const override {
+                              SILType T) const override {
       llvm_unreachable("unimplemented enums shouldn't delegate type info");
     }
 
@@ -297,12 +297,11 @@ namespace {
                              getSingleton()->getStorageType()->getPointerTo());
     }
 
-    CanType getSingletonType(IRGenModule &IGM, CanType T) const {
+    SILType getSingletonType(IRGenModule &IGM, SILType T) const {
       assert(!ElementsWithPayload.empty());
-      return T->getTypeOfMember(IGM.SILMod->getSwiftModule(),
-                                ElementsWithPayload[0].decl, nullptr,
-                                ElementsWithPayload[0].decl->getArgumentType())
-        ->getCanonicalType();
+      
+      return T.getEnumElementType(ElementsWithPayload[0].decl,
+                                  *IGM.SILMod);
     }
 
   public:
@@ -321,7 +320,7 @@ namespace {
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                      CanType type,
+                                      SILType Type,
                                       EnumDecl *theEnum,
                                       llvm::StructType *enumTy) override;
 
@@ -346,7 +345,7 @@ namespace {
     }
 
     void emitIndirectSwitch(IRGenFunction &IGF,
-                            CanType T,
+                            SILType T,
                             Address addr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
@@ -401,7 +400,7 @@ namespace {
     void storeTag(IRGenFunction &IGF,
                   EnumElementDecl *elt,
                   Address enumAddr,
-                  CanType T) const override {
+                  SILType T) const override {
       // No tag, nothing to do.
     }
 
@@ -442,7 +441,7 @@ namespace {
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
+                        SILType T) const {
       if (!getSingleton()) return;
       dest = getSingletonAddress(IGF, dest);
       src = getSingletonAddress(IGF, src);
@@ -451,7 +450,7 @@ namespace {
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
+                        SILType T) const {
       if (!getSingleton()) return;
       dest = getSingletonAddress(IGF, dest);
       src = getSingletonAddress(IGF, src);
@@ -465,7 +464,7 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            CanType T)
+                            SILType T)
     const override {
       if (!getSingleton()) return;
       dest = getSingletonAddress(IGF, dest);
@@ -475,7 +474,7 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            CanType T)
+                            SILType T)
     const override {
       if (!getSingleton()) return;
       dest = getSingletonAddress(IGF, dest);
@@ -502,7 +501,7 @@ namespace {
       if (getLoadableSingleton()) getLoadableSingleton()->fixLifetime(IGF, src);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       if (getSingleton() && !getSingleton()->isPOD(ResilienceScope::Local))
         getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
                                 getSingletonType(IGF.IGM, T));
@@ -529,7 +528,7 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override {
+                            SILType T) const override {
       // Fixed-size enums don't need dynamic witness table initialization.
       if (TIK >= Fixed) return;
 
@@ -589,7 +588,7 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address src, CanType T)
+                                         Address src, SILType T)
     const override {
       if (!getSingleton()) {
         // Any empty value is a valid value.
@@ -603,7 +602,7 @@ namespace {
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest, CanType T) const override {
+                              Address dest, SILType T) const override {
       if (!getSingleton()) {
         // Nothing to store for empty singletons.
         return;
@@ -714,7 +713,7 @@ namespace {
     }
 
     void emitIndirectSwitch(IRGenFunction &IGF,
-                            CanType T,
+                            SILType T,
                             Address addr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
@@ -767,7 +766,7 @@ namespace {
     }
 
     void storeTag(IRGenFunction &IGF, EnumElementDecl *elt, Address enumAddr,
-                  CanType T)
+                  SILType T)
     const override {
       llvm::Value *discriminator = getDiscriminatorIndex(elt);
       Address discriminatorAddr
@@ -778,7 +777,7 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override {
+                            SILType T) const override {
       // No-payload enums are always fixed-size so never need dynamic value
       // witness table initialization.
     }
@@ -798,7 +797,7 @@ namespace {
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {}
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            CanType T)
+                            SILType T)
     const override {
       // No-payload enums are always POD, so we can always initialize by
       // primitive copy.
@@ -866,7 +865,7 @@ namespace {
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                     CanType type,
+                                     SILType Type,
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
 
@@ -895,7 +894,7 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address src, CanType T)
+                                         Address src, SILType T)
     const override {
       auto &C = IGF.IGM.getLLVMContext();
 
@@ -925,7 +924,7 @@ namespace {
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest, CanType T) const override {
+                              Address dest, SILType T) const override {
       auto &C = IGF.IGM.getLLVMContext();
       auto payloadTy = llvm::IntegerType::get(C,
                       cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
@@ -978,7 +977,7 @@ namespace {
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                     CanType type,
+                                     SILType Type,
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
 
@@ -1003,13 +1002,13 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address src, CanType T) const override {
+                                         Address src, SILType T) const override {
       llvm_unreachable("no extra inhabitants");
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest, CanType T) const override {
+                              Address dest, SILType T) const override {
       llvm_unreachable("no extra inhabitants");
     }
   };
@@ -1161,7 +1160,7 @@ namespace {
   protected:
     /// Do a primitive copy of the enum from one address to another.
     void emitPrimitiveCopy(IRGenFunction &IGF, Address dest, Address src,
-                           CanType T) const {
+                           SILType T) const {
       // If the layout is fixed, load and store the fixed-size payload and tag.
       if (TIK >= Fixed) {
         llvm::Value *payload, *extraTag;
@@ -1249,11 +1248,9 @@ namespace {
       return ElementsWithPayload[0].decl;
     }
 
-    CanType getPayloadType(IRGenModule &IGM, CanType T) const {
-      return T->getTypeOfMember(IGM.SILMod->getSwiftModule(),
-                                ElementsWithPayload[0].decl, nullptr,
-                                ElementsWithPayload[0].decl->getArgumentType())
-        ->getCanonicalType();
+    SILType getPayloadType(IRGenModule &IGM, SILType T) const {
+      return T.getEnumElementType(ElementsWithPayload[0].decl,
+                                  *IGM.SILMod);
     }
 
     const TypeInfo &getPayloadTypeInfo() const {
@@ -1266,9 +1263,9 @@ namespace {
       return cast<LoadableTypeInfo>(*ElementsWithPayload[0].ti);
     }
 
-    llvm::Value *emitPayloadMetadata(IRGenFunction &IGF,
-                                     CanType T) const {
-      return IGF.emitTypeMetadataRef(getPayloadType(IGF.IGM, T));
+    llvm::Value *emitPayloadMetadataForLayout(IRGenFunction &IGF,
+                                     SILType T) const {
+      return IGF.emitTypeMetadataRefForLayout(getPayloadType(IGF.IGM, T));
     }
 
     /// More efficient value semantics implementations for certain enum layouts.
@@ -1358,16 +1355,16 @@ namespace {
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                      CanType type,
+                                      SILType Type,
                                       EnumDecl *theEnum,
                                       llvm::StructType *enumTy) override;
   private:
     TypeInfo *completeFixedLayout(TypeConverter &TC,
-                                  CanType type,
+                                  SILType Type,
                                   EnumDecl *theEnum,
                                   llvm::StructType *enumTy);
     TypeInfo *completeDynamicLayout(TypeConverter &TC,
-                                    CanType type,
+                                    SILType Type,
                                     EnumDecl *theEnum,
                                     llvm::StructType *enumTy);
 
@@ -1542,12 +1539,12 @@ namespace {
     }
 
     void emitDynamicSwitch(IRGenFunction &IGF,
-                           CanType T,
+                           SILType T,
                            Address addr,
                            ArrayRef<std::pair<EnumElementDecl*,
                                               llvm::BasicBlock*>> dests,
                            llvm::BasicBlock *defaultDest) const {
-      auto payloadMetadata = emitPayloadMetadata(IGF, T);
+      auto payloadMetadata = emitPayloadMetadataForLayout(IGF, T);
       auto numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
       auto opaqueAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
@@ -1597,7 +1594,7 @@ namespace {
     }
 
     void emitIndirectSwitch(IRGenFunction &IGF,
-                            CanType T,
+                            SILType T,
                             Address addr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
@@ -1803,7 +1800,7 @@ namespace {
     llvm::BasicBlock *
     testEnumContainsPayload(IRGenFunction &IGF,
                             Address addr,
-                            CanType T) const {
+                            SILType T) const {
       auto &C = IGF.IGM.getLLVMContext();
 
       if (TIK >= Fixed) {
@@ -1817,7 +1814,7 @@ namespace {
       auto *noPayloadBB = llvm::BasicBlock::Create(C);
 
       // Look up the metadata for the payload.
-      llvm::Value *metadata = emitPayloadMetadata(IGF, T);
+      llvm::Value *metadata = emitPayloadMetadataForLayout(IGF, T);
 
       // Ask the runtime what case we have.
       llvm::Value *opaqueAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
@@ -2030,7 +2027,7 @@ namespace {
 
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       switch (CopyDestroyKind) {
       case POD:
         return;
@@ -2072,7 +2069,7 @@ namespace {
     /// Initialize the extra tag bits, if any, to zero to indicate a payload.
     void emitInitializeExtraTagBitsForPayload(IRGenFunction &IGF,
                                               Address dest,
-                                              CanType T) const {
+                                              SILType T) const {
       if (TIK >= Fixed) {
         // We statically know whether we have extra tag bits.
         // Store zero directly to the fixed-layout extra tag field.
@@ -2086,7 +2083,7 @@ namespace {
       // Ask the runtime to store the tag.
       llvm::Value *opaqueAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
                                                           IGF.IGM.OpaquePtrTy);
-      llvm::Value *metadata = emitPayloadMetadata(IGF, T);
+      llvm::Value *metadata = emitPayloadMetadataForLayout(IGF, T);
       IGF.Builder.CreateCall4(IGF.IGM.getStoreEnumTagSinglePayloadFn(),
                               opaqueAddr, metadata,
                               llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1),
@@ -2096,7 +2093,7 @@ namespace {
 
     /// Emit an reassignment sequence from an enum at one address to another.
     void emitIndirectAssign(IRGenFunction &IGF,
-       Address dest, Address src, CanType T,
+       Address dest, Address src, SILType T,
        IsTake_t isTake)
     const {
       auto &C = IGF.IGM.getLLVMContext();
@@ -2187,7 +2184,7 @@ namespace {
     /// Emit an initialization sequence, initializing an enum at one address
     /// with another at a different address.
     void emitIndirectInitialize(IRGenFunction &IGF,
-                                Address dest, Address src, CanType T,
+                                Address dest, Address src, SILType T,
                                 IsTake_t isTake)
     const {
       auto &C = IGF.IGM.getLLVMContext();
@@ -2248,25 +2245,25 @@ namespace {
 
   public:
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T)
+                        SILType T)
     const override {
       emitIndirectAssign(IGF, dest, src, T, IsNotTake);
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T)
+                        SILType T)
     const override {
       emitIndirectAssign(IGF, dest, src, T, IsTake);
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            CanType T)
+                            SILType T)
     const override {
       emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            CanType T)
+                            SILType T)
     const override {
       emitIndirectInitialize(IGF, dest, src, T, IsTake);
     }
@@ -2274,10 +2271,10 @@ namespace {
     void storeTag(IRGenFunction &IGF,
                   EnumElementDecl *elt,
                   Address enumAddr,
-                  CanType T) const override {
+                  SILType T) const override {
       if (TIK < Fixed) {
         // If the enum isn't fixed-layout, get the runtime to do this for us.
-        llvm::Value *payload = emitPayloadMetadata(IGF, T);
+        llvm::Value *payload = emitPayloadMetadataForLayout(IGF, T);
         llvm::Value *caseIndex;
         if (elt == getPayloadElement()) {
           caseIndex = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
@@ -2326,14 +2323,14 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override
+                            SILType T) const override
     {
       // Fixed-size enums don't need dynamic witness table initialization.
       if (TIK >= Fixed) return;
 
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
-      auto payloadMetadata = emitPayloadMetadata(IGF, T);
+      auto payloadMetadata = emitPayloadMetadataForLayout(IGF, T);
       auto emptyCasesVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
 
@@ -2372,7 +2369,7 @@ namespace {
 
     llvm::Value *
     getExtraInhabitantIndex(IRGenFunction &IGF,
-                            Address src, CanType T) const override {
+                            Address src, SILType T) const override {
       auto payload = projectPayloadData(IGF, src);
       llvm::Value *index
         = getPayloadTypeInfo().getExtraInhabitantIndex(IGF, payload,
@@ -2392,7 +2389,7 @@ namespace {
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest, CanType T) const override {
+                              Address dest, SILType T) const override {
       // Offset the index to skip the extra inhabitants we used.
       index = IGF.Builder.CreateAdd(index,
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size()));
@@ -2539,7 +2536,7 @@ namespace {
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                      CanType type,
+                                      SILType Type,
                                       EnumDecl *theEnum,
                                       llvm::StructType *enumTy) override;
 
@@ -2749,7 +2746,7 @@ namespace {
     }
 
     void emitIndirectSwitch(IRGenFunction &IGF,
-                            CanType T,
+                            SILType T,
                             Address addr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
@@ -3128,7 +3125,7 @@ namespace {
   private:
     /// Emit a reassignment sequence from an enum at one address to another.
     void emitIndirectAssign(IRGenFunction &IGF,
-                            Address dest, Address src, CanType T,
+                            Address dest, Address src, SILType T,
                             IsTake_t isTake) const {
       auto &C = IGF.IGM.getLLVMContext();
 
@@ -3178,7 +3175,7 @@ namespace {
 
     void emitIndirectInitialize(IRGenFunction &IGF,
                                 Address dest, Address src,
-                                CanType T,
+                                SILType T,
                                 IsTake_t isTake) const{
       auto &C = IGF.IGM.getLLVMContext();
 
@@ -3215,10 +3212,8 @@ namespace {
 
         unsigned tagIndex = 0;
         for (auto &payloadCasePair : ElementsWithPayload) {
-          CanType PayloadT = T->getTypeOfMember(IGF.IGM.SILMod->getSwiftModule(),
-                                  payloadCasePair.decl, nullptr,
-                                  payloadCasePair.decl->getArgumentType())
-            ->getCanonicalType();
+          SILType PayloadT = T.getEnumElementType(payloadCasePair.decl,
+                                                  *IGF.IGM.SILMod);
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial payloads can all share the default path.
           if (payloadTI.isPOD(ResilienceScope::Local)) {
@@ -3271,25 +3266,25 @@ namespace {
 
   public:
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T)
+                        SILType T)
     const override {
       emitIndirectAssign(IGF, dest, src, T, IsNotTake);
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T)
+                        SILType T)
     const override {
       emitIndirectAssign(IGF, dest, src, T, IsTake);
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            CanType T)
+                            SILType T)
     const override {
       emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            CanType T)
+                            SILType T)
     const override {
       emitIndirectInitialize(IGF, dest, src, T, IsTake);
     }
@@ -3317,7 +3312,7 @@ namespace {
       }
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, CanType T)
+    void destroy(IRGenFunction &IGF, Address addr, SILType T)
     const override {
       switch (CopyDestroyKind) {
       case POD:
@@ -3345,12 +3340,8 @@ namespace {
             preparePayloadForLoad(IGF, addr, tagIndex);
             // Destroy the data.
             Address dataAddr = IGF.Builder.CreateBitCast(addr,
-                                        elt.ti->getStorageType()->getPointerTo());
-            CanType payloadT = T->getTypeOfMember(IGF.IGM.SILMod->getSwiftModule(),
-                                                  elt.decl, nullptr,
-                                                  elt.decl->getArgumentType())
-              ->getCanonicalType();
-
+                                      elt.ti->getStorageType()->getPointerTo());
+            SILType payloadT = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
             elt.ti->destroy(IGF, dataAddr, payloadT);
           });
         return;
@@ -3429,7 +3420,7 @@ namespace {
     void storeTag(IRGenFunction &IGF,
                   EnumElementDecl *elt,
                   Address enumAddr,
-                  CanType T) const override {
+                  SILType T) const override {
       // See whether this is a payload or empty case we're emitting.
       auto payloadI = std::find_if(ElementsWithPayload.begin(),
                                    ElementsWithPayload.end(),
@@ -3468,7 +3459,7 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override {
+                            SILType T) const override {
       // FIXME
     }
 
@@ -3480,14 +3471,14 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
-                                         CanType T) const override {
+                                         SILType T) const override {
       llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address dest,
-                              CanType T) const override {
+                              SILType T) const override {
       llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
 
@@ -3558,8 +3549,8 @@ namespace {
 } // end anonymous namespace
 
 EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
-                                          CanType type,
-                                          EnumDecl *theEnum)
+                                        SILType type,
+                                        EnumDecl *theEnum)
 {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
@@ -3593,15 +3584,8 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       // *Now* apply the substitutions and get the type info for the instance's
       // payload type, since we know this case carries an apparent payload in
       // the generic case.
-      auto *substArgTI = argTI;
-      if (theEnum->isGenericContext()) {
-        Type origArgTy = elt->getArgumentType();
-        Type substArgTy = type->getTypeOfMember(theEnum->getModuleContext(),
-                                                elt, nullptr,
-                                                origArgTy);
-        substArgTI = &TC.IGM.getTypeInfoForUnlowered(AbstractionPattern(origArgTy),
-                                                     substArgTy);
-      }
+      SILType fieldTy = type.getEnumElementType(elt, *TC.IGM.SILMod);
+      auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
       elementsWithPayload.push_back({elt, substArgTI});
       if (!substArgTI->isFixedSize())
@@ -3672,36 +3656,36 @@ namespace {
     void getSchema(ExplosionSchema &s) const override {
       return Strategy.getSchema(s);
     }
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       return Strategy.destroy(IGF, addr, T);
     }
     bool isIndirectArgument() const override {
       return Strategy.isIndirectArgument();
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address dest, CanType T) const override {
+                              Address dest, SILType T) const override {
       return Strategy.initializeFromParams(IGF, params, dest, T);
     }
     void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                            Address src, CanType T) const override {
+                            Address src, SILType T) const override {
       return Strategy.initializeWithCopy(IGF, dest, src, T);
     }
     void initializeWithTake(IRGenFunction &IGF, Address dest,
-                            Address src, CanType T) const override {
+                            Address src, SILType T) const override {
       return Strategy.initializeWithTake(IGF, dest, src, T);
     }
     void assignWithCopy(IRGenFunction &IGF, Address dest,
-                        Address src, CanType T) const override {
+                        Address src, SILType T) const override {
       return Strategy.assignWithCopy(IGF, dest, src, T);
     }
     void assignWithTake(IRGenFunction &IGF, Address dest,
-                        Address src, CanType T) const override {
+                        Address src, SILType T) const override {
       return Strategy.assignWithTake(IGF, dest, src, T);
     }
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override {
+                            SILType T) const override {
       return Strategy.initializeMetadata(IGF, metadata, vwtable, T);
     }
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -3709,13 +3693,13 @@ namespace {
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
-                                         CanType T) const override {
+                                         SILType T) const override {
       return Strategy.getExtraInhabitantIndex(IGF, src, T);
     }
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address dest,
-                              CanType T) const override {
+                              SILType T) const override {
       return Strategy.storeExtraInhabitant(IGF, index, dest, T);
     }
   };
@@ -3832,9 +3816,9 @@ IRGenModule::getUnimplementedEnumImplStrategy() {
 }
 
 const EnumImplStrategy &
-irgen::getEnumImplStrategy(IRGenModule &IGM, CanType ty) {
-  assert(ty->getEnumOrBoundGenericEnum() && "not an enum");
-  auto *ti = &IGM.getTypeInfoForLowered(ty);
+irgen::getEnumImplStrategy(IRGenModule &IGM, SILType ty) {
+  assert(ty.getEnumOrBoundGenericEnum() && "not an enum");
+  auto *ti = &IGM.getTypeInfo(ty);
   if (isa<UnimplementedTypeInfo>(ti))
     return IGM.getUnimplementedEnumImplStrategy();
   if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(ti))
@@ -3845,8 +3829,9 @@ irgen::getEnumImplStrategy(IRGenModule &IGM, CanType ty) {
 }
 
 const EnumImplStrategy &
-irgen::getEnumImplStrategy(IRGenModule &IGM, SILType ty) {
-  return getEnumImplStrategy(IGM, ty.getSwiftRValueType());
+irgen::getEnumImplStrategy(IRGenModule &IGM, CanType ty) {
+  // Nominal types are always preserved through SIL lowering.
+  return getEnumImplStrategy(IGM, SILType::getPrimitiveAddressType(ty));
 }
 
 TypeInfo *
@@ -3873,7 +3858,7 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
 namespace {
   TypeInfo *
   SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                   CanType type,
+                                                   SILType Type,
                                                    EnumDecl *theEnum,
                                                    llvm::StructType *enumTy) {
     if (ElementsWithPayload.empty()) {
@@ -3912,7 +3897,7 @@ namespace {
 
   TypeInfo *
   NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                    CanType type,
+                                                    SILType Type,
                                                     EnumDecl *theEnum,
                                                     llvm::StructType *enumTy) {
     // Since there are no payloads, we need just enough bits to hold a
@@ -3941,7 +3926,7 @@ namespace {
 
   TypeInfo *
   CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                      CanType type,
+                                                      SILType Type,
                                                       EnumDecl *theEnum,
                                                       llvm::StructType *enumTy){
     // The type should have come from Clang and should have a raw type.
@@ -3979,7 +3964,7 @@ namespace {
 
   TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
                                       TypeConverter &TC,
-                                      CanType type,
+                                      SILType Type,
                                       EnumDecl *theEnum,
                                       llvm::StructType *enumTy) {
     // See whether the payload case's type has extra inhabitants.
@@ -4044,7 +4029,7 @@ namespace {
 
   TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
                                                   TypeConverter &TC,
-                                                  CanType type,
+                                                  SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
     // The body is runtime-dependent, so we can't put anything useful here
@@ -4061,7 +4046,7 @@ namespace {
 
   TypeInfo *
   SinglePayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                  CanType type,
+                                                  SILType type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
     if (TIK >= Fixed)
@@ -4071,7 +4056,7 @@ namespace {
 
   TypeInfo *
   MultiPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                  CanType type,
+                                                  SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
     // TODO Dynamic layout for multi-payload enums.
@@ -4191,12 +4176,14 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 
   // Create a forward declaration for that type.
   addForwardDecl(key, convertedStruct);
+  
+  SILType loweredTy = SILType::getPrimitiveAddressType(type);
 
   // Determine the implementation strategy.
-  EnumImplStrategy *strategy = EnumImplStrategy::get(*this, type, theEnum);
+  EnumImplStrategy *strategy = EnumImplStrategy::get(*this, loweredTy, theEnum);
 
   // Create the TI.
-  auto *ti = strategy->completeEnumTypeLayout(*this, type,
+  auto *ti = strategy->completeEnumTypeLayout(*this, loweredTy,
                                               theEnum, convertedStruct);
   // Assert that the layout query functions for fixed-layout enums work, for
   // LLDB's sake.
@@ -4408,7 +4395,7 @@ void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
                                                      llvm::BasicBlock *>> dests,
                                   llvm::BasicBlock *defaultDest) {
   auto &strategy = getEnumImplStrategy(IGF.IGM, enumTy);
-  strategy.emitIndirectSwitch(IGF, enumTy.getSwiftRValueType(),
+  strategy.emitIndirectSwitch(IGF, enumTy,
                               enumAddr, dests, defaultDest);
 }
 
@@ -4449,7 +4436,7 @@ void irgen::emitStoreEnumTagToAddress(IRGenFunction &IGF,
                                        Address enumAddr,
                                        EnumElementDecl *theCase) {
   getEnumImplStrategy(IGF.IGM, enumTy)
-    .storeTag(IGF, theCase, enumAddr, enumTy.getSwiftRValueType());
+    .storeTag(IGF, theCase, enumAddr, enumTy);
 }
 
 APInt irgen::getAPIntFromBitVector(const llvm::BitVector &bits) {

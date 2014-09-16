@@ -286,13 +286,13 @@ public:
   }
 
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                       CanType T)
+                                       SILType T)
   const override {
     return getHeapObjectExtraInhabitantIndex(IGF, src);
   }
 
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                            Address dest, CanType T) const override {
+                            Address dest, SILType T) const override {
     return storeHeapObjectExtraInhabitant(IGF, index, dest);
   }
 };

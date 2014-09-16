@@ -210,14 +210,14 @@ public:
     
   /// Return the size and alignment of this type.
   virtual std::pair<llvm::Value*,llvm::Value*>
-    getSizeAndAlignmentMask(IRGenFunction &IGF, CanType T) const = 0;
+    getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
   virtual std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-    getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, CanType T) const = 0;
-  virtual llvm::Value *getSize(IRGenFunction &IGF, CanType T) const = 0;
-  virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, CanType T) const = 0;
-  virtual llvm::Value *getStride(IRGenFunction &IGF, CanType T) const = 0;
+    getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getSize(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getStride(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
-                                                 CanType T) const = 0;
+                                                 SILType T) const = 0;
 
   /// Return the statically-known size of this type, or null if it is
   /// not known.
@@ -243,48 +243,48 @@ public:
 
   /// Allocate a variable of this type on the stack.
   virtual ContainedAddress allocateStack(IRGenFunction &IGF,
-                                         CanType T,
+                                         SILType T,
                                          const llvm::Twine &name) const = 0;
 
   /// Deallocate a variable of this type.
   virtual void deallocateStack(IRGenFunction &IGF, Address addr,
-                               CanType T) const = 0;
+                               SILType T) const = 0;
 
   /// Allocate a box of this type on the heap.
-  virtual OwnedAddress allocateBox(IRGenFunction &IGF, CanType T,
+  virtual OwnedAddress allocateBox(IRGenFunction &IGF, SILType T,
                                    const llvm::Twine &name) const = 0;
 
   /// Deallocate an uninitialized box of this type on the heap.
   virtual void deallocateBox(IRGenFunction &IGF,
                              llvm::Value *boxOwner,
-                             CanType T) const = 0;
+                             SILType T) const = 0;
   
   /// Copy a value out of an object and into another, destroying the
   /// old value in the destination.
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
-                              Address src, CanType T) const = 0;
+                              Address src, SILType T) const = 0;
 
   /// Move a value out of an object and into another, destroying the
   /// old value there and leaving the source object in an invalid state.
   virtual void assignWithTake(IRGenFunction &IGF, Address dest,
-                              Address src, CanType T) const = 0;
+                              Address src, SILType T) const = 0;
 
   /// Perform a "take-initialization" from the given object.  A
   /// take-initialization is like a C++ move-initialization, except that
   /// the old object is actually no longer permitted to be destroyed.
   virtual void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                                  Address srcAddr, CanType T) const = 0;
+                                  Address srcAddr, SILType T) const = 0;
 
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                                  Address srcAddr, CanType T) const = 0;
+                                  Address srcAddr, SILType T) const = 0;
 
   /// Take-initialize an address from a parameter explosion.
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                    Address src, CanType T) const = 0;
+                                    Address src, SILType T) const = 0;
 
   /// Destroy an object of this type in memory.
-  virtual void destroy(IRGenFunction &IGF, Address address, CanType T) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address address, SILType T) const = 0;
   
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single Swift-retainable object pointer?
@@ -310,7 +310,7 @@ public:
   /// has extra inhabitants.
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src,
-                                               CanType T) const = 0;
+                                               SILType T) const = 0;
   
   /// Store the extra inhabitant representation indexed by a 31-bit identifier
   /// to memory.
@@ -320,32 +320,32 @@ public:
   virtual void storeExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest,
-                                    CanType T) const = 0;
+                                    SILType T) const = 0;
   
   /// Initialize a freshly instantiated value witness table. Should be a no-op
   /// for fixed-size types.
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
                                   llvm::Value *vwtable,
-                                  CanType T) const = 0;
+                                  SILType T) const = 0;
   
   /// Compute the packing of values of this type into a fixed-size buffer.
   FixedPacking getFixedPacking(IRGenModule &IGM) const;
   
   /// Index into an array of objects of this type.
   Address indexArray(IRGenFunction &IGF, Address base, llvm::Value *offset,
-                     CanType T) const;
+                     SILType T) const;
   
   /// Destroy an array of objects of this type in memory.
   virtual void destroyArray(IRGenFunction &IGF, Address base,
-                            llvm::Value *count, CanType T) const;
+                            llvm::Value *count, SILType T) const;
   
   /// Initialize an array of objects of this type in memory by copying the
   /// values from another array. The arrays must not overlap.
   virtual void initializeArrayWithCopy(IRGenFunction &IGF,
                                        Address dest,
                                        Address src,
-                                       llvm::Value *count, CanType T) const;
+                                       llvm::Value *count, SILType T) const;
   
   /// Initialize an array of objects of this type in memory by taking the
   /// values from another array. The destination array may overlap the head of
@@ -353,7 +353,7 @@ public:
   /// order.
   virtual void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
                                        Address dest, Address src,
-                                       llvm::Value *count, CanType T) const;
+                                       llvm::Value *count, SILType T) const;
   
   /// Initialize an array of objects of this type in memory by taking the
   /// values from another array. The destination array may overlap the tail of
@@ -361,7 +361,7 @@ public:
   /// order.
   virtual void initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
                                        Address dest, Address src,
-                                       llvm::Value *count, CanType T) const;
+                                       llvm::Value *count, SILType T) const;
 };
 
 } // end namespace irgen

@@ -142,7 +142,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.
   if (destClass && hasKnownSwiftImplementation(IGF.IGM, destClass)) {
-    metadataRef = IGF.emitTypeMetadataRef(toType);
+    metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -156,7 +156,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // If the destination type is a foreign class or a non-specific
   // class-bounded archetype, use the most general cast entrypoint.
   } else if (!destClass || destClass->isForeign()) {
-    metadataRef = IGF.emitTypeMetadataRef(toType);
+    metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -204,7 +204,8 @@ emitOpaqueDowncast(IRGenFunction &IGF,
                                                 IGF.IGM.OpaquePtrTy);
 
   srcMetadata = IGF.Builder.CreateBitCast(srcMetadata, IGF.IGM.Int8PtrTy);
-  llvm::Value *destMetadata = IGF.emitTypeMetadataRef(destType);
+  // FIXME: We should take the formal destination type.
+  llvm::Value *destMetadata = IGF.emitTypeMetadataRef(destType.getSwiftRValueType());
   destMetadata = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
 
   llvm::Value *castFn;
@@ -283,7 +284,8 @@ Address irgen::emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
                                            SILType srcType,
                                            SILType destType,
                                            CheckedCastMode mode) {
-  llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
+  // FIXME: We should take the formal source and destination types.
+  llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType.getSwiftRValueType());
   return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }
 

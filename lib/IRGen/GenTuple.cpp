@@ -56,15 +56,14 @@ namespace {
       return Name;
     }
     
-    const TupleTypeElt &getField(CanType t) const {
-      auto tup = cast<TupleType>(t);
+    const TupleTypeElt &getField(SILType T) const {
+      auto tup = T.castTo<TupleType>();
       
       return tup->getFields()[Index];
     }
     
-    CanType getType(IRGenModule&, CanType t) const {
-      auto tup = cast<TupleType>(t);
-      return tup.getElementType(Index);
+    SILType getType(IRGenModule&, SILType t) const {
+      return t.getTupleElementType(Index);
     }
   };
 
@@ -103,7 +102,7 @@ namespace {
     /// single element.
     Address projectElementAddress(IRGenFunction &IGF,
                                   Address tuple,
-                                  CanType T,
+                                  SILType T,
                                   unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       if (field.isEmpty())
@@ -117,7 +116,7 @@ namespace {
       llvm_unreachable("unexploded tuple as argument?");
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address src, CanType T) const override {
+                              Address src, SILType T) const override {
       llvm_unreachable("unexploded tuple as argument?");
     }
 
@@ -172,7 +171,7 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address tupleAddr,
-                                         CanType tupleType) const override {
+                                         SILType tupleType) const override {
       Address eltAddr =
         asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
       auto &elt = asImpl().getFields()[0];
@@ -183,7 +182,7 @@ namespace {
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address tupleAddr,
-                              CanType tupleType) const override {
+                              SILType tupleType) const override {
       Address eltAddr =
         asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
       auto &elt = asImpl().getFields()[0];
@@ -208,7 +207,7 @@ namespace {
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
-                                 CanType T) const { return Nothing; }
+                                 SILType T) const { return Nothing; }
   };
 
   /// Type implementation for fixed-size but non-loadable tuples.
@@ -228,21 +227,22 @@ namespace {
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
-                                 CanType T) const { return Nothing; }
+                                 SILType T) const { return Nothing; }
   };
 
   /// An accessor for the non-fixed offsets for a tuple type.
   class TupleNonFixedOffsets : public NonFixedOffsetsImpl {
-    CanType TheType;
+    // TODO: Should be a SILType.
+    SILType TheType;
   public:
-    TupleNonFixedOffsets(CanType type) : TheType(type) {
-      assert(isa<TupleType>(TheType));
+    TupleNonFixedOffsets(SILType type) : TheType(type) {
+      assert(TheType.is<TupleType>());
     }
 
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) {
       // Fetch the metadata as a tuple type.  We cache this because
       // we might repeatedly need the bitcast.
-      auto metadata = IGF.emitTypeMetadataRef(TheType);
+      auto metadata = IGF.emitTypeMetadataRefForLayout(TheType);
       auto asTuple = IGF.Builder.CreateBitCast(metadata,
                                                IGF.IGM.TupleTypeMetadataPtrTy);
 
@@ -272,14 +272,14 @@ namespace {
       : TupleTypeInfoBase(fields, T, minAlign, isPOD, isBT) {}
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
-                                            CanType T) const {
+                                            SILType T) const {
       return TupleNonFixedOffsets(T);
     }
 
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override {
+                            SILType T) const override {
       // Tuple value witness tables are instantiated by the runtime along with
       // their metadata. We should never try to initialize one in the compiler.
       llvm_unreachable("initializing value witness table for tuple?!");
@@ -289,10 +289,10 @@ namespace {
   class TupleTypeBuilder :
       public SequentialTypeBuilder<TupleTypeBuilder, TupleFieldInfo,
                                    TupleTypeElt> {
-    CanType TheTuple;
+    SILType TheTuple;
 
   public:
-    TupleTypeBuilder(IRGenModule &IGM, CanType theTuple)
+    TupleTypeBuilder(IRGenModule &IGM, SILType theTuple)
       : SequentialTypeBuilder(IGM), TheTuple(theTuple) {}
 
     FixedTupleTypeInfo *createFixed(ArrayRef<TupleFieldInfo> fields,
@@ -343,7 +343,7 @@ namespace {
 }
 
 const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
-  TupleTypeBuilder builder(IGM, CanType(tuple));
+  TupleTypeBuilder builder(IGM, SILType::getPrimitiveAddressType(CanType(tuple)));
   return builder.layout(tuple->getFields());
 }
 
@@ -374,5 +374,5 @@ Address irgen::projectTupleElementAddress(IRGenFunction &IGF,
                                           SILType tupleType,
                                           unsigned fieldNo) {
   FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress, tuple,
-                 tupleType.getSwiftRValueType(), fieldNo);
+                 tupleType, fieldNo);
 }

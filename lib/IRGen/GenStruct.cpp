@@ -66,10 +66,8 @@ namespace {
       return Field->getName().str();
     }
     
-    CanType getType(IRGenModule &IGM, CanType T) const {
-      return T->getTypeOfMember(IGM.SILMod->getSwiftModule(),
-                                Field, nullptr)
-        ->getCanonicalType();
+    SILType getType(IRGenModule &IGM, SILType T) const {
+      return T.getFieldType(Field, *IGM.SILMod);
     }
   };
 
@@ -88,15 +86,13 @@ namespace {
       return "<unimported>";
     }
 
-    CanType getType(IRGenModule &IGM, CanType T) const {
+    SILType getType(IRGenModule &IGM, SILType T) const {
       if (Field)
-        return T->getTypeOfMember(IGM.SILMod->getSwiftModule(),
-                                  Field, nullptr)
-          ->getCanonicalType();
+        return T.getFieldType(Field, *IGM.SILMod);
 
       // The Swift-field-less cases use opaque storage, which is
       // guaranteed to ignore the type passed to it.
-      return CanType();
+      return {};
     }
   };
 
@@ -146,7 +142,7 @@ namespace {
     /// single element.
     Address projectFieldAddress(IRGenFunction &IGF,
                                 Address addr,
-                                CanType T,
+                                SILType T,
                                 VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
@@ -219,7 +215,7 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address structAddr,
-                                         CanType structType) const override {
+                                         SILType structType) const override {
       auto &field = asImpl().getFields()[0];
       Address fieldAddr =
         asImpl().projectFieldAddress(IGF, structAddr, structType, field.Field);
@@ -230,7 +226,7 @@ namespace {
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address structAddr,
-                              CanType structType) const override {
+                              SILType structType) const override {
       auto &field = asImpl().getFields()[0];
       Address fieldAddr =
         asImpl().projectFieldAddress(IGF, structAddr, structType, field.Field);
@@ -258,11 +254,11 @@ namespace {
       return false;
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address addr, CanType T) const override {
+                              Address addr, SILType T) const override {
       ClangRecordTypeInfo::initialize(IGF, params, addr);
     }
 
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
       return Nothing;
     }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -288,10 +284,10 @@ namespace {
 
     bool isIndirectArgument() const override { return false; }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address addr, CanType T) const override {
+                              Address addr, SILType T) const override {
       LoadableStructTypeInfo::initialize(IGF, params, addr);
     }
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
       return Nothing;
     }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -313,7 +309,7 @@ namespace {
                            fields, T, size, std::move(spareBits), align,
                            isPOD, isBT)
     {}
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
       return Nothing;
     }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
@@ -359,17 +355,17 @@ namespace {
   
   /// Accessor for the non-fixed offsets of a struct type.
   class StructNonFixedOffsets : public NonFixedOffsetsImpl {
-    CanType TheStruct;
+    SILType TheStruct;
   public:
-    StructNonFixedOffsets(CanType type) : TheStruct(type) {
-      assert(TheStruct->getStructOrBoundGenericStruct());
+    StructNonFixedOffsets(SILType type) : TheStruct(type) {
+      assert(TheStruct.getStructOrBoundGenericStruct());
     }
     
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) {
       // Get the field offset vector from the struct metadata.
-      llvm::Value *metadata = IGF.emitTypeMetadataRef(TheStruct);
+      llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF,
-                                    TheStruct->getStructOrBoundGenericStruct(),
+                                    TheStruct.getStructOrBoundGenericStruct(),
                                     metadata);
       
       // Grab the indexed offset.
@@ -399,22 +395,22 @@ namespace {
     }
 
     StructNonFixedOffsets
-    getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
+    getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
       return StructNonFixedOffsets(T);
     }
 
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override {
+                            SILType T) const override {
       // Get the field offset vector.
       llvm::Value *fieldVector = emitAddressOfFieldOffsetVector(IGF,
-                                    T->getStructOrBoundGenericStruct(),
+                                    T.getStructOrBoundGenericStruct(),
                                     metadata).getAddress();
 
       // Collect the stored properties of the type.
       llvm::SmallVector<VarDecl*, 4> storedProperties;
-      for (auto prop : T->getStructOrBoundGenericStruct()
+      for (auto prop : T.getStructOrBoundGenericStruct()
                         ->getStoredProperties()) {
         storedProperties.push_back(prop);
       }
@@ -427,8 +423,8 @@ namespace {
                                      IGF.IGM.TypeMetadataPtrTy->getPointerTo());
       unsigned index = 0;
       for (auto prop : storedProperties) {
-        llvm::Value *metadata = IGF.emitTypeMetadataRef(
-                                          prop->getType()->getCanonicalType());
+        auto propTy = T.getFieldType(prop, *IGF.IGM.SILMod);
+        llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(propTy);
         Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
                                                       IGF.IGM.getPointerSize());
         IGF.Builder.CreateStore(metadata, field);
@@ -742,7 +738,7 @@ Address irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                   SILType baseType,
                                                   VarDecl *field) {
   FOR_STRUCT_IMPL(IGF, baseType, projectFieldAddress, base,
-                  baseType.getSwiftRValueType(), field);
+                  baseType, field);
 }
 
 void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,

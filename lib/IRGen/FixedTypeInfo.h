@@ -22,6 +22,7 @@
 #include "Address.h"
 #include "TypeInfo.h"
 #include "llvm/ADT/BitVector.h"
+#include "swift/SIL/SILType.h"
 
 namespace llvm {
   class ConstantInt;
@@ -69,30 +70,30 @@ public:
   /// Whether this type is known to be empty.
   bool isKnownEmpty() const { return StorageSize.isZero(); }
 
-  ContainedAddress allocateStack(IRGenFunction &IGF, CanType T,
+  ContainedAddress allocateStack(IRGenFunction &IGF, SILType T,
                                  const llvm::Twine &name) const override;
-  void deallocateStack(IRGenFunction &IGF, Address addr, CanType T) const override;
+  void deallocateStack(IRGenFunction &IGF, Address addr, SILType T) const override;
 
-  OwnedAddress allocateBox(IRGenFunction &IGF, CanType T,
+  OwnedAddress allocateBox(IRGenFunction &IGF, SILType T,
                            const llvm::Twine &name) const override;
 
   void deallocateBox(IRGenFunction &IGF, llvm::Value *boxOwner,
-                     CanType T) const override;
+                     SILType T) const override;
 
   // We can give these reasonable default implementations.
 
   void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr, CanType T) const override;
+                          Address srcAddr, SILType T) const override;
 
   std::pair<llvm::Value*, llvm::Value*>
-  getSizeAndAlignmentMask(IRGenFunction &IGF, CanType T) const override;
+  getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const override;
   std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, CanType T) const override;
-  llvm::Value *getSize(IRGenFunction &IGF, CanType T) const override;
-  llvm::Value *getAlignmentMask(IRGenFunction &IGF, CanType T) const override;
-  llvm::Value *getStride(IRGenFunction &IGF, CanType T) const override;
+  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
-                                         CanType T) const override;
+                                         SILType T) const override;
 
   llvm::Constant *getStaticSize(IRGenModule &IGM) const override;
   llvm::Constant *getStaticAlignmentMask(IRGenModule &IGM) const override;
@@ -172,7 +173,7 @@ public:
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src, CanType T) const override {
+                                       Address src, SILType T) const override {
     return getSpareBitExtraInhabitantIndex(IGF, src);
   }
   
@@ -185,7 +186,7 @@ public:
   /// to memory.
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
-                            Address dest, CanType T) const override {
+                            Address dest, SILType T) const override {
     storeSpareBitExtraInhabitant(IGF, index, dest);
   }
   
@@ -224,7 +225,7 @@ public:
   void initializeMetadata(IRGenFunction &IGF,
                           llvm::Value *metadata,
                           llvm::Value *vwtable,
-                          CanType T) const override {}
+                          SILType T) const override {}
   
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }

@@ -48,6 +48,8 @@ namespace irgen {
 
   /// \brief Convert a class object to the given destination type,
   /// using a runtime-checked cast.
+  ///
+  /// FIXME: toType should be an AST CanType.
   llvm::Value *emitClassDowncast(IRGenFunction &IGF,
                                  llvm::Value *from,
                                  SILType toType,

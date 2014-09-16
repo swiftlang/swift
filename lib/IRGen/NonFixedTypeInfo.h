@@ -58,24 +58,24 @@ public:
   static bool isFixed() { return false; }
 
   OwnedAddress allocateBox(IRGenFunction &IGF,
-                           CanType T,
+                           SILType T,
                            const llvm::Twine &name) const override {
     // Allocate a new object using the allocBox runtime call.
-    llvm::Value *metadata = IGF.emitTypeMetadataRef(T);
+    llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(T);
     llvm::Value *box, *address;
     IGF.emitAllocBoxCall(metadata, box, address);
     return OwnedAddress(getAsBitCastAddress(IGF, address), box);
   }
   
   void deallocateBox(IRGenFunction &IGF, llvm::Value *boxOwner,
-                     CanType T) const override {
+                     SILType T) const override {
     // Deallocate the box using the deallocBox runtime call.
-    llvm::Value *metadata = IGF.emitTypeMetadataRef(T);
+    llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(T);
     IGF.emitDeallocBoxCall(boxOwner, metadata);
   }
 
   ContainedAddress allocateStack(IRGenFunction &IGF,
-                                 CanType T,
+                                 SILType T,
                                  const llvm::Twine &name) const override {
     // Make a fixed-size buffer.
     Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
@@ -83,25 +83,25 @@ public:
                                       name);
 
     // Allocate an object of the appropriate type within it.
-    llvm::Value *metadata = IGF.emitTypeMetadataRef(T);
+    llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(T);
     llvm::Value *address =
       emitAllocateBufferCall(IGF, metadata, buffer);
     return { buffer, getAsBitCastAddress(IGF, address) };
   }
 
   void deallocateStack(IRGenFunction &IGF, Address buffer,
-                       CanType T) const override {
-    llvm::Value *metadata = IGF.emitTypeMetadataRef(T);
+                       SILType T) const override {
+    llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(T);
     emitDeallocateBufferCall(IGF, metadata, buffer);
   }
 
-  llvm::Value *getValueWitnessTable(IRGenFunction &IGF, CanType T) const {
-    auto metadata = IGF.emitTypeMetadataRef(T);
+  llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {
+    auto metadata = IGF.emitTypeMetadataRefForLayout(T);
     return IGF.emitValueWitnessTableRefForMetadata(metadata);
   }
 
   std::pair<llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMask(IRGenFunction &IGF, CanType T) const override {
+  getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const override {
     auto wtable = getValueWitnessTable(IGF, T);
     auto size = emitLoadOfSize(IGF, wtable);
     auto align = emitLoadOfAlignmentMask(IGF, wtable);
@@ -109,7 +109,7 @@ public:
   }
 
   std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, CanType T) const override {
+  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, SILType T) const override {
     auto wtable = getValueWitnessTable(IGF, T);
     auto size = emitLoadOfSize(IGF, wtable);
     auto align = emitLoadOfAlignmentMask(IGF, wtable);
@@ -117,23 +117,23 @@ public:
     return std::make_tuple(size, align, stride);
   }
 
-  llvm::Value *getSize(IRGenFunction &IGF, CanType T) const override {
+  llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
     auto wtable = getValueWitnessTable(IGF, T);
     return emitLoadOfSize(IGF, wtable);
   }
 
-  llvm::Value *getAlignmentMask(IRGenFunction &IGF, CanType T) const override {
+  llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override {
     auto wtable = getValueWitnessTable(IGF, T);
     return emitLoadOfAlignmentMask(IGF, wtable);
   }
 
-  llvm::Value *getStride(IRGenFunction &IGF, CanType T) const override {
+  llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override {
     auto wtable = getValueWitnessTable(IGF, T);
     return emitLoadOfStride(IGF, wtable);
   }
 
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
-                                         CanType T) const override {
+                                         SILType T) const override {
     auto wtable = getValueWitnessTable(IGF, T);
     return emitLoadOfIsInline(IGF, wtable);
   }
@@ -141,12 +141,12 @@ public:
   /// FIXME: Dynamic extra inhabitant lookup.
   bool mayHaveExtraInhabitants(IRGenModule &) const override { return false; }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src, CanType T) const override {
+                                       Address src, SILType T) const override {
     llvm_unreachable("dynamic extra inhabitants not supported");
   }
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
-                            Address dest, CanType T) const override {
+                            Address dest, SILType T) const override {
     llvm_unreachable("dynamic extra inhabitants not supported");
   }
 

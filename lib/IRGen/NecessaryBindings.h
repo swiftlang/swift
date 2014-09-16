@@ -38,7 +38,7 @@ class NecessaryBindings {
   llvm::SetVector<ArchetypeType*> Types;
 
 public:
-  NecessaryBindings(IRGenModule &IGM, CanType type);
+  NecessaryBindings(IRGenModule &IGM, SILType type);
 
   /// Is the work to do trivial?
   bool empty() const { return Types.empty(); }

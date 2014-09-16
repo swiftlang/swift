@@ -74,7 +74,7 @@ Address IRGenModule::emitGlobalVariable(VarDecl *var,
   return addr;
 }
 
-ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, CanType T,
+ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
                                               const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty()) {
@@ -90,12 +90,12 @@ ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, CanType T,
 }
 
 void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
-                                    CanType T) const {
+                                    SILType T) const {
   // TODO: lifetime intrinsics?
 }
 
 /// Allocate an object with fixed layout.
-OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF, CanType T,
+OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF, SILType T,
                                         const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty())
@@ -123,7 +123,7 @@ OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF, CanType T,
 
 // Deallocate a fixed-layout box that is uninitialized.
 void FixedTypeInfo::deallocateBox(IRGenFunction &IGF, llvm::Value *boxOwner,
-                                  CanType T) const {
+                                  SILType T) const {
   // If the type is known to be empty, a box isn't actually allocated.
   if (isKnownEmpty())
     return;

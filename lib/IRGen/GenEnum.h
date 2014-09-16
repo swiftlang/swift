@@ -242,14 +242,14 @@ public:
   
   /// Construct a layout strategy appropriate to the enum type.
   static EnumImplStrategy *get(TypeConverter &TC,
-                               CanType type,
+                               SILType Type,
                                EnumDecl *theEnum);
   
   /// Given an incomplete StructType for the enum, completes layout of the
   /// storage type, calculates its size and alignment, and produces the
   /// TypeInfo for the enum.
   virtual TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                            CanType type,
+                                            SILType Type,
                                             EnumDecl *theEnum,
                                             llvm::StructType *enumTy) = 0;
   
@@ -322,7 +322,7 @@ public:
   virtual void storeTag(IRGenFunction &IGF,
                         EnumElementDecl *elt,
                         Address enumAddr,
-                        CanType T) const = 0;
+                        SILType T) const = 0;
   
   /// Clears tag bits from within the payload of an enum in memory and
   /// projects the address of the data for a case. Does not check
@@ -337,7 +337,7 @@ public:
   /// Performs the branching for a SIL 'switch_enum_addr'
   /// instruction.
   virtual void emitIndirectSwitch(IRGenFunction &IGF,
-                                  CanType T,
+                                  SILType T,
                                   Address enumAddr,
                                   ArrayRef<std::pair<EnumElementDecl*,
                                                      llvm::BasicBlock*>> dests,
@@ -372,38 +372,38 @@ public:
   /// \group Delegated TypeInfo operations
   
   virtual void getSchema(ExplosionSchema &schema) const = 0;
-  virtual void destroy(IRGenFunction &IGF, Address addr, CanType T) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address addr, SILType T) const = 0;
   
   virtual bool isIndirectArgument() const {
     return TIK < Loadable;
   }
   
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                    Address dest, CanType T) const;
+                                    Address dest, SILType T) const;
   
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
-                              Address src, CanType T) const = 0;
+                              Address src, SILType T) const = 0;
   virtual void assignWithTake(IRGenFunction &IGF, Address dest,
-                              Address src, CanType T) const = 0;
+                              Address src, SILType T) const = 0;
   virtual void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                                  Address src, CanType T) const = 0;
+                                  Address src, SILType T) const = 0;
   virtual void initializeWithTake(IRGenFunction &IGF, Address dest,
-                                  Address src, CanType T) const = 0;
+                                  Address src, SILType T) const = 0;
   
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
                                   llvm::Value *vwtable,
-                                  CanType T) const = 0;
+                                  SILType T) const = 0;
 
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
 
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src,
-                                               CanType T) const = 0;
+                                               SILType T) const = 0;
   virtual void storeExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest,
-                                    CanType T) const = 0;
+                                    SILType T) const = 0;
   
   /// \group Delegated FixedTypeInfo operations
   

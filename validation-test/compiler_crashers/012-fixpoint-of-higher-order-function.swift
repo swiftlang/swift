@@ -1,4 +1,4 @@
-// RUN: not --crash %swift -emit-ir %s
+// RUN: %swift -emit-ir %s
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // http://www.openradar.me/17822208
 // https://twitter.com/rob_rix/status/493199478879682561

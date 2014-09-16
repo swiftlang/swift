@@ -809,7 +809,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   // we wouldn't need to create a separate heap object here.
   auto *selfTypeInfo = &IGF.getTypeInfo(selfType);
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal,
-                    selfType.getSwiftRValueType(), selfTypeInfo);
+                    selfType, selfTypeInfo);
   llvm::Value *data = IGF.emitUnmanagedAlloc(layout, "closure");
   // FIXME: non-fixed offsets
   NonFixedOffsets offsets = Nothing;

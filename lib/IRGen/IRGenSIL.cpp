@@ -889,7 +889,7 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
          && "Coerced types should not differ in size!");
 
   // Create a temporary.
-  Address temporary = paramTI.allocateStack(IGF, paramType.getSwiftRValueType(),
+  Address temporary = paramTI.allocateStack(IGF, paramType,
                                             "coerced-param").getAddress();
 
   // Write the input parameters into the temporary:
@@ -914,7 +914,7 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
   paramTI.loadAsTake(IGF, temporary, out);
 
   // Deallocate the temporary.
-  paramTI.deallocateStack(IGF, temporary, paramType.getSwiftRValueType());
+  paramTI.deallocateStack(IGF, temporary, paramType);
 }
 
 /// Emit entry point arguments for a SILFunction with the Swift calling
@@ -2510,7 +2510,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     "";
 
   auto addr = type.allocateStack(*this,
-                                 i->getElementType().getSwiftRValueType(),
+                                 i->getElementType(),
                                  dbgname);
   if (IGM.DebugInfo && Decl && !isAvailableExternally()) {
     // Discard any inout or lvalue qualifiers. Since the object itself
@@ -2552,7 +2552,7 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   const TypeInfo &type = getTypeInfo(i->getOperand().getType());
   Address addr = getLoweredAddress(i->getOperand());
   type.deallocateStack(*this, addr,
-                       i->getOperand().getType().getSwiftRValueType());
+                       i->getOperand().getType());
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
@@ -2567,7 +2567,7 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
   const TypeInfo &type = getTypeInfo(i->getElementType());
   Explosion owner = getLoweredExplosion(i->getOperand());
   llvm::Value *ownerPtr = owner.claimNext();
-  type.deallocateBox(*this, ownerPtr, i->getElementType().getSwiftRValueType());
+  type.deallocateBox(*this, ownerPtr, i->getElementType());
 }
 
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
@@ -2584,7 +2584,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     "";
 # endif
   OwnedAddress addr = type.allocateBox(*this,
-                                       i->getElementType().getSwiftRValueType(),
+                                       i->getElementType(),
                                        DbgName);
   
   Explosion box;
@@ -2613,7 +2613,7 @@ void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
   
   Explosion lengthEx = getLoweredExplosion(i->getNumElements());
   llvm::Value *lengthValue = lengthEx.claimNext();
-  HeapArrayInfo arrayInfo(*this, i->getElementType().getSwiftType());
+  HeapArrayInfo arrayInfo(*this, i->getElementType());
   Address ptr;
   llvm::Value *box = arrayInfo.emitUnmanagedAlloc(*this, lengthValue, ptr, "");
   Explosion boxEx;
@@ -3137,7 +3137,7 @@ void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
   auto baseTy = i->getBase().getType();
   auto &ti = getTypeInfo(baseTy);
   
-  Address dest = ti.indexArray(*this, base, index, baseTy.getSwiftRValueType());
+  Address dest = ti.indexArray(*this, base, index, baseTy);
   setLoweredAddress(SILValue(i, 0), dest);
 }
 
@@ -3346,7 +3346,6 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc().getType();
-  CanType valTy = addrTy.getSwiftRValueType();
   Address src = getLoweredAddress(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
   const TypeInfo &addrTI = getTypeInfo(addrTy);
@@ -3357,16 +3356,16 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   
   switch (takeAndOrInitialize) {
   case ASSIGN | COPY:
-    addrTI.assignWithCopy(*this, dest, src, valTy);
+    addrTI.assignWithCopy(*this, dest, src, addrTy);
     break;
   case INITIALIZE | COPY:
-    addrTI.initializeWithCopy(*this, dest, src, valTy);
+    addrTI.initializeWithCopy(*this, dest, src, addrTy);
     break;
   case ASSIGN | TAKE:
-    addrTI.assignWithTake(*this, dest, src, valTy);
+    addrTI.assignWithTake(*this, dest, src, addrTy);
     break;
   case INITIALIZE | TAKE:
-    addrTI.initializeWithTake(*this, dest, src, valTy);
+    addrTI.initializeWithTake(*this, dest, src, addrTy);
     break;
   default:
     llvm_unreachable("unexpected take/initialize attribute combination?!");
@@ -3375,10 +3374,9 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
 
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand().getType();
-  CanType valTy = addrTy.getSwiftRValueType();
   Address base = getLoweredAddress(i->getOperand());
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-  addrTI.destroy(*this, base, valTy);
+  addrTI.destroy(*this, base, addrTy);
 }
 
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {

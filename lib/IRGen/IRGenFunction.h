@@ -147,8 +147,24 @@ public:
   
   void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
+  // Emit a reference to the canonical type metadata record for the given AST
+  // type. This can be used to identify the type at runtime. For types with
+  // abstraction difference, the metadata contains the layout information for
+  // values in the maximally-abstracted representation of the type; this is
+  // correct for all uses of reabstractable values in opaque contexts.
   llvm::Value *emitTypeMetadataRef(CanType type);
-  llvm::Value *emitTypeMetadataRef(SILType type);
+  
+  // Emit a reference to a metadata object that can be used for layout, but
+  // cannot be used to identify a type. This will produce a layout appropriate
+  // to the abstraction level of the given type. It may be able to avoid runtime
+  // calls if there is a standard metadata object with the correct layout for
+  // the type.
+  //
+  // TODO: It might be better to return just a value witness table reference
+  // here, since for some types it's easier to get a shared reference to one
+  // than a metadata reference, and it would be more type-safe.
+  llvm::Value *emitTypeMetadataRefForLayout(SILType type);
+  
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
 
   /// Emit a load of a reference to the given Objective-C selector.

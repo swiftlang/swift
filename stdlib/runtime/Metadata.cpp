@@ -1432,21 +1432,9 @@ static MetadataCache<MetatypeCacheEntry> MetatypeTypes;
 /// \brief Find the appropriate value witness table for the given type.
 static const ValueWitnessTable *
 getMetatypeValueWitnesses(const Metadata *instanceType) {
-  // The following metatypes have non-trivial representation
-  // in the concrete:
-  //   - class types
-  //   - metatypes of types that require value witnesses
-
-  // For class types, return the unmanaged-pointer witnesses.
-  if (instanceType->isClassType())
-    return &getUnmanagedPointerPointerValueWitnesses();
-
-  // Metatypes preserve the triviality of their instance type.
-  if (instanceType->getKind() == MetadataKind::Metatype)
-    return instanceType->getValueWitnesses();
-
-  // Everything else is trivial and can use the empty-tuple metadata.
-  return &_TWVT_;
+  // When metatypes are accessed opaquely, they always have a "thick"
+  // representation.
+  return &getUnmanagedPointerPointerValueWitnesses();
 }
 
 /// \brief Fetch a uniqued metadata for a metatype type.

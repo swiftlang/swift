@@ -58,7 +58,7 @@ static llvm::ConstantInt *getSizeMax(IRGenFunction &IGF) {
 
 /// Perform the layout required for a heap object.
 HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
-                       ArrayRef<CanType> fieldTypes,
+                       ArrayRef<SILType> fieldTypes,
                        ArrayRef<const TypeInfo *> fieldTypeInfos,
                        llvm::StructType *typeToFill)
   : StructLayout(IGM, LayoutKind::HeapObject, strategy,
@@ -195,8 +195,8 @@ static void bindNecessaryBindings(IRGenFunction &IGF,
 }
 
 /// Compute the basic information for how to lay out a heap array.
-HeapArrayInfo::HeapArrayInfo(IRGenFunction &IGF, CanType T)
-  : ElementType(T), ElementTI(IGF.getTypeInfoForLowered(T)),
+HeapArrayInfo::HeapArrayInfo(IRGenFunction &IGF, SILType T)
+  : ElementType(T), ElementTI(IGF.getTypeInfo(T)),
     Bindings(IGF.IGM, T) {}
 
 /// Lay out the allocation in this IGF.
@@ -263,7 +263,7 @@ HeapArrayInfo::Layout HeapArrayInfo::getLayout(IRGenFunction &IGF) const {
 /// Destroy all the elements of an array.
 static void emitArrayDestroy(IRGenFunction &IGF,
                              llvm::Value *begin, llvm::Value *end,
-                             CanType elementType,
+                             SILType elementType,
                              const TypeInfo &elementTI) {
   assert(!elementTI.isPOD(ResilienceScope::Local));
 
@@ -330,7 +330,7 @@ createArrayDtorFn(IRGenModule &IGM,
   Address lengthPtr = arrayInfo.getLengthPointer(IGF, layout, header);
   llvm::Value *length = IGF.Builder.CreateLoad(lengthPtr, "length");
 
-  CanType eltTy = arrayInfo.getElementType();
+  SILType eltTy = arrayInfo.getElementType();
   auto &eltTI = arrayInfo.getElementTypeInfo();
 
   // If the layout isn't known to be POD, we actually have to do work here.
@@ -599,6 +599,33 @@ namespace {
                                const llvm::BitVector &spareBits,
                                Size size, Alignment alignment)
       : PODSingleScalarTypeInfo(type, size, spareBits, alignment) {}
+  
+    // Unmanaged types have the same spare bits as managed heap objects.
+    
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return getHeapObjectExtraInhabitantCount(IGM);
+    }
+
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                  unsigned bits,
+                                                  unsigned index) const override {
+      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
+    }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                         SILType T)
+    const override {
+      return getHeapObjectExtraInhabitantIndex(IGF, src);
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T) const override {
+      return storeHeapObjectExtraInhabitant(IGF, index, dest);
+    }
   };
 }
 
@@ -650,26 +677,26 @@ namespace {
       : IndirectTypeInfo(weakType, size, alignment), ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, CanType T) const override {
+                            Address srcAddr, SILType T) const override {
       IGF.emitWeakCopyInit(destAddr, srcAddr);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, CanType T) const override {
+                            Address srcAddr, SILType T) const override {
       IGF.emitWeakTakeInit(destAddr, srcAddr);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, CanType T) const override {
+                        Address srcAddr, SILType T) const override {
       IGF.emitWeakCopyAssign(destAddr, srcAddr);
     }
 
     void assignWithTake(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, CanType T) const override {
+                        Address srcAddr, SILType T) const override {
       IGF.emitWeakTakeAssign(destAddr, srcAddr);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       IGF.emitWeakDestroy(addr);
     }
 
@@ -770,26 +797,26 @@ namespace {
       : IndirectTypeInfo(weakType, size, alignment), ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, CanType T) const override {
+                            Address srcAddr, SILType T) const override {
       IGF.emitUnknownWeakCopyInit(destAddr, srcAddr);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, CanType T) const override {
+                            Address srcAddr, SILType T) const override {
       IGF.emitUnknownWeakTakeInit(destAddr, srcAddr);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, CanType T) const override {
+                        Address srcAddr, SILType T) const override {
       IGF.emitUnknownWeakCopyAssign(destAddr, srcAddr);
     }
 
     void assignWithTake(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, CanType T) const override {
+                        Address srcAddr, SILType T) const override {
       IGF.emitUnknownWeakTakeAssign(destAddr, srcAddr);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       IGF.emitUnknownWeakDestroy(addr);
     }
                                 

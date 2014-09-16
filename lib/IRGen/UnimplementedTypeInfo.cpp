@@ -17,6 +17,7 @@
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
 #include "UnimplementedTypeInfo.h"
+#include "swift/SIL/SILType.h"
 
 using namespace swift;
 using namespace irgen;
@@ -46,7 +47,7 @@ getUndefOpaqueAddress(llvm::Type *storageTy) {
 }
 
 std::pair<llvm::Value*,llvm::Value*>
-UnimplementedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF, CanType T)
+UnimplementedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T)
 const
 {
   llvm::Value *undef = getUndefSize(IGF.IGM);
@@ -55,20 +56,20 @@ const
 
 std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
 UnimplementedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF,
-                                                        CanType T) const {
+                                                        SILType T) const {
   llvm::Value *undef = getUndefSize(IGF.IGM);
   return {undef, undef, undef};
 }
 
-llvm::Value *UnimplementedTypeInfo::getSize(IRGenFunction &IGF, CanType T)
+llvm::Value *UnimplementedTypeInfo::getSize(IRGenFunction &IGF, SILType T)
 const {
   return getUndefSize(IGF.IGM);
 }
 llvm::Value *UnimplementedTypeInfo::getAlignmentMask(IRGenFunction &IGF,
-                                                     CanType T) const {
+                                                     SILType T) const {
   return getUndefSize(IGF.IGM);
 }
-llvm::Value *UnimplementedTypeInfo::getStride(IRGenFunction &IGF, CanType T)
+llvm::Value *UnimplementedTypeInfo::getStride(IRGenFunction &IGF, SILType T)
 const {
   return getUndefSize(IGF.IGM);
 }
@@ -91,7 +92,7 @@ void UnimplementedTypeInfo::getSchema(ExplosionSchema &schema) const {
 }
 
 ContainedAddress UnimplementedTypeInfo::allocateStack(IRGenFunction &IGF,
-                                                      CanType T,
+                                                      SILType T,
                                                       const llvm::Twine &name)
 const {
   return ContainedAddress(Address(llvm::UndefValue::get(IGF.IGM.getFixedBufferTy()),
@@ -100,49 +101,49 @@ const {
 }
 
 void UnimplementedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
-                                            CanType T) const {
+                                            SILType T) const {
   
 }
 
-OwnedAddress UnimplementedTypeInfo::allocateBox(IRGenFunction &IGF, CanType T,
+OwnedAddress UnimplementedTypeInfo::allocateBox(IRGenFunction &IGF, SILType T,
                                                 const llvm::Twine &name) const {
   return OwnedAddress(getUndefOpaqueAddress(getStorageType()),
                       llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy));
 }
 
 void UnimplementedTypeInfo::deallocateBox(IRGenFunction &IGF,
-                                          llvm::Value *boxOwner, CanType T)
+                                          llvm::Value *boxOwner, SILType T)
 const {
 }
 
 void UnimplementedTypeInfo::assignWithCopy(IRGenFunction &IGF, Address dest,
-                                           Address src, CanType T) const {
+                                           Address src, SILType T) const {
   
 }
 
 void UnimplementedTypeInfo::assignWithTake(IRGenFunction &IGF, Address dest,
-                                           Address src, CanType T) const {
+                                           Address src, SILType T) const {
   
 }
 
 void UnimplementedTypeInfo::initializeWithTake(IRGenFunction &IGF, Address dest,
-                                               Address src, CanType T) const {
+                                               Address src, SILType T) const {
   
 }
 
 void UnimplementedTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address dest,
-                                               Address src, CanType T) const {
+                                               Address src, SILType T) const {
   
 }
 
 void UnimplementedTypeInfo::initializeFromParams(IRGenFunction &IGF,
                                                  Explosion &params,
-                                                 Address src, CanType T) const {
+                                                 Address src, SILType T) const {
   
 }
 
 void UnimplementedTypeInfo::destroy(IRGenFunction &IGF, Address address,
-                                    CanType T) const {
+                                    SILType T) const {
   
 }
 
@@ -152,24 +153,24 @@ bool UnimplementedTypeInfo::mayHaveExtraInhabitants(IRGenModule &IGM) const {
 
 llvm::Value *UnimplementedTypeInfo::getExtraInhabitantIndex(IRGenFunction &IGF,
                                                             Address src,
-                                                            CanType T) const {
+                                                            SILType T) const {
   return llvm::UndefValue::get(IGF.IGM.Int32Ty);
 }
 
 void UnimplementedTypeInfo::storeExtraInhabitant(IRGenFunction &IGF,
                                                  llvm::Value *index,
                                                  Address dest,
-                                                 CanType T) const {
+                                                 SILType T) const {
   
 }
 void UnimplementedTypeInfo::initializeMetadata(IRGenFunction &IGF,
                                                llvm::Value *metadata,
                                                llvm::Value *vwtable,
-                                               CanType T) const {
+                                               SILType T) const {
   
 }
 
 llvm::Value *UnimplementedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
-                                                              CanType T) const {
+                                                              SILType T) const {
   return llvm::UndefValue::get(IGF.IGM.Int1Ty);
 }

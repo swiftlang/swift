@@ -89,7 +89,7 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
 }
 
 Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
-                             llvm::Value *index, CanType T) const {
+                             llvm::Value *index, SILType T) const {
   // The stride of a Swift type may not match its LLVM size. If we know we have
   // a fixed stride different from our size, or we have a dynamic size,
   // do a byte-level GEP with the proper stride.
@@ -117,7 +117,7 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
 }
 
 void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,
-                            llvm::Value *count, CanType T) const {
+                            llvm::Value *count, SILType T) const {
   if (isPOD(ResilienceScope::Local))
     return;
   
@@ -158,10 +158,10 @@ static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
                                            Address destArray,
                                            Address srcArray,
                                            llvm::Value *count,
-                                           CanType T,
+                                           SILType T,
                  void (TypeInfo::*emitInitializeElement)(IRGenFunction &,
                                                          Address, Address,
-                                                         CanType) const) {
+                                                         SILType) const) {
   auto &IGM = IGF.IGM;
                    
   auto entry = IGF.Builder.GetInsertBlock();
@@ -208,10 +208,10 @@ static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
                                            Address destArray,
                                            Address srcArray,
                                            llvm::Value *count,
-                                           CanType T,
+                                           SILType T,
                  void (TypeInfo::*emitInitializeElement)(IRGenFunction &,
                                                          Address, Address,
-                                                         CanType) const) {
+                                                         SILType) const) {
   auto &IGM = IGF.IGM;
   
   auto destEnd = type.indexArray(IGF, destArray, count, T);
@@ -258,7 +258,7 @@ static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
 
 void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
                                        Address dest, Address src,
-                                       llvm::Value *count, CanType T) const {
+                                       llvm::Value *count, SILType T) const {
   if (isPOD(ResilienceScope::Local)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
@@ -273,7 +273,7 @@ void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
 
 void TypeInfo::initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
                                                   Address dest, Address src,
-                                                  llvm::Value *count, CanType T)
+                                                  llvm::Value *count, SILType T)
 const {
   if (isBitwiseTakable(ResilienceScope::Local)) {
     llvm::Value *stride = getStride(IGF, T);
@@ -289,7 +289,7 @@ const {
 
 void TypeInfo::initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
                                                   Address dest, Address src,
-                                                  llvm::Value *count, CanType T)
+                                                  llvm::Value *count, SILType T)
 const {
   if (isBitwiseTakable(ResilienceScope::Local)) {
     llvm::Value *stride = getStride(IGF, T);
@@ -332,7 +332,7 @@ bool TypeInfo::isKnownEmpty() const {
 void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
                                        Address destAddr,
                                        Address srcAddr,
-                                       CanType T) const {
+                                       SILType T) const {
   assert(isBitwiseTakable(ResilienceScope::Local)
         && "non-bitwise-takable type must override default initializeWithTake");
   
@@ -356,7 +356,7 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
 void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
                                           Address destAddr,
                                           Address srcAddr,
-                                          CanType T) const {
+                                          SILType T) const {
   // Use memcpy if that's legal.
   if (isPOD(ResilienceScope::Local)) {
     return initializeWithTake(IGF, destAddr, srcAddr, T);
@@ -375,19 +375,19 @@ static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
 /// Return the size and alignment of this type.
 std::pair<llvm::Value*,llvm::Value*>
 FixedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF,
-                                       CanType T) const {
+                                       SILType T) const {
   return {FixedTypeInfo::getSize(IGF, T),
           FixedTypeInfo::getAlignmentMask(IGF, T)};
 }
 std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
 FixedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF,
-                                                CanType T) const {
+                                                SILType T) const {
   return std::make_tuple(FixedTypeInfo::getSize(IGF, T),
                          FixedTypeInfo::getAlignmentMask(IGF, T),
                          FixedTypeInfo::getStride(IGF, T));
 }
 
-llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF, CanType T) const {
+llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF, SILType T) const {
   return FixedTypeInfo::getStaticSize(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticSize(IRGenModule &IGM) const {
@@ -395,14 +395,14 @@ llvm::Constant *FixedTypeInfo::getStaticSize(IRGenModule &IGM) const {
 }
 
 llvm::Value *FixedTypeInfo::getAlignmentMask(IRGenFunction &IGF,
-                                             CanType T) const {
+                                             SILType T) const {
   return FixedTypeInfo::getStaticAlignmentMask(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticAlignmentMask(IRGenModule &IGM) const {
   return asSizeConstant(IGM, Size(getFixedAlignment().getValue() - 1));
 }
 
-llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, CanType T) const {
+llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, SILType T) const {
   return FixedTypeInfo::getStaticStride(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
@@ -410,7 +410,7 @@ llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
 }
 
 llvm::Value *FixedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
-                                                      CanType T) const {
+                                                      SILType T) const {
   auto packing = getFixedPacking(IGF.IGM);
   assert(packing == FixedPacking::Allocate ||
          packing == FixedPacking::OffsetZero);
@@ -717,7 +717,7 @@ namespace {
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void consume(IRGenFunction &IGF, Explosion &src) const {}
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const {}
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const {}
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const {}
     llvm::Value *packEnumPayload(IRGenFunction &IGF, Explosion &src,
                                   unsigned bitWidth,
                                   unsigned offset) const override {
@@ -846,10 +846,7 @@ const TypeInfo &IRGenModule::getTypeMetadataPtrTypeInfo() {
 const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   if (TypeMetadataPtrTI) return *TypeMetadataPtrTI;
   TypeMetadataPtrTI =
-    createPrimitiveForAlignedPointer(IGM.TypeMetadataPtrTy,
-                                     IGM.getPointerSize(),
-                                     IGM.getPointerAlignment(),
-                                     IGM.getTypeMetadataAlignment());
+    createUnmanagedStorageType(IGM.TypeMetadataPtrTy);
   TypeMetadataPtrTI->NextConverted = FirstType;
   FirstType = TypeMetadataPtrTI;
   return *TypeMetadataPtrTI;

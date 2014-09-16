@@ -29,20 +29,20 @@ namespace llvm {
 namespace swift {
 namespace irgen {
   class Address;
-
+  
 /// A heap layout is the result of laying out a complete structure for
 /// heap-allocation.
 class HeapLayout : public StructLayout {
-  SmallVector<CanType, 8> ElementTypes;
+  SmallVector<SILType, 8> ElementTypes;
   
 public:
   HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
-             ArrayRef<CanType> elementTypes,
+             ArrayRef<SILType> elementTypes,
              ArrayRef<const TypeInfo *> elementTypeInfos,
              llvm::StructType *typeToFill = 0);
 
   /// Get the types of the elements.
-  ArrayRef<CanType> getElementTypes() const {
+  ArrayRef<SILType> getElementTypes() const {
     return ElementTypes;
   }
   
@@ -56,14 +56,14 @@ public:
 
 /// A class to manage allocating a reference-counted array on the heap.
 class HeapArrayInfo {
-  CanType ElementType;
+  SILType ElementType;
   const TypeInfo &ElementTI;
   NecessaryBindings Bindings;
 
 public:
-  HeapArrayInfo(IRGenFunction &IGF, CanType T);
+  HeapArrayInfo(IRGenFunction &IGF, SILType T);
 
-  CanType getElementType() const { return ElementType; }
+  SILType getElementType() const { return ElementType; }
   const TypeInfo &getElementTypeInfo() const { return ElementTI; }
 
   struct Layout {

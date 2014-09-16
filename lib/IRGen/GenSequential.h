@@ -133,7 +133,7 @@ public:
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest,
-                      Address src, CanType T) const override {
+                      Address src, SILType T) const override {
     auto offsets = asImpl().getNonFixedOffsets(IGF, T);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
@@ -146,7 +146,7 @@ public:
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest,
-                      Address src, CanType T) const override {
+                      Address src, SILType T) const override {
     auto offsets = asImpl().getNonFixedOffsets(IGF, T);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
@@ -160,7 +160,7 @@ public:
 
   void initializeWithCopy(IRGenFunction &IGF,
                           Address dest, Address src,
-                          CanType T) const override {
+                          SILType T) const override {
     // If we're POD, use the generic routine.
     if (this->isPOD(ResilienceScope::Local) && isa<LoadableTypeInfo>(this)) {
       return cast<LoadableTypeInfo>(this)->
@@ -180,7 +180,7 @@ public:
   
   void initializeWithTake(IRGenFunction &IGF,
                           Address dest, Address src,
-                          CanType T) const override {
+                          SILType T) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceScope::Local)) {
       IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
@@ -200,7 +200,7 @@ public:
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
+  void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF, T);
     for (auto &field : getFields()) {
       if (field.isPOD()) continue;

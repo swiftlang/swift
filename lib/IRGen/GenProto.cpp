@@ -538,7 +538,7 @@ namespace {
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
+                        SILType T) const {
       auto objPtrTy = dest.getAddress()->getType();
       auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy, getLayout());
       auto call = IGF.Builder.CreateCall2(fn, dest.getAddress(),
@@ -565,7 +565,7 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF,
                             Address dest, Address src,
-                            CanType T) const {
+                            SILType T) const {
       llvm::Value *metadata = copyType(IGF, dest, src);
 
       auto layout = getLayout();
@@ -580,7 +580,7 @@ namespace {
 
     void initializeWithTake(IRGenFunction &IGF,
                             Address dest, Address src,
-                            CanType T) const {
+                            SILType T) const {
       llvm::Value *metadata = copyType(IGF, dest, src);
 
       auto layout = getLayout();
@@ -593,7 +593,7 @@ namespace {
                                                destBuffer, srcBuffer);
     }
         
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
       emitDestroyExistential(IGF, addr, getLayout());
     }
   };
@@ -646,7 +646,7 @@ namespace {
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
+                        SILType T) const {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakCopyAssign(destValue, srcValue);
@@ -655,7 +655,7 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF,
                             Address dest, Address src,
-                            CanType T) const {
+                            SILType T) const {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakCopyInit(destValue, srcValue);
@@ -664,7 +664,7 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF,
                         Address dest, Address src,
-                        CanType T) const {
+                        SILType T) const {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakTakeAssign(destValue, srcValue);
@@ -673,7 +673,7 @@ namespace {
 
     void initializeWithTake(IRGenFunction &IGF,
                             Address dest, Address src,
-                            CanType T) const {
+                            SILType T) const {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, dest);
       IGF.emitUnknownWeakTakeInit(destValue, srcValue);
@@ -681,7 +681,7 @@ namespace {
     }
 
     void destroy(IRGenFunction &IGF, Address existential,
-                 CanType T) const {
+                 SILType T) const {
       Address valueAddr = projectValue(IGF, existential);
       IGF.emitUnknownWeakDestroy(valueAddr);
     }
@@ -952,7 +952,7 @@ namespace {
       src.claim(NumProtocols);
     }
     
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       llvm::Value *value = IGF.Builder.CreateLoad(projectValue(IGF, addr));
       asDerived().emitPayloadRelease(IGF, value);
     }
@@ -1220,7 +1220,7 @@ namespace {
     }
     
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         CanType T)
+                                         SILType T)
     const override {
       // NB: We assume that the witness table slots are zero if an extra
       // inhabitant is stored in the container.
@@ -1230,7 +1230,7 @@ namespace {
     }
     
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, CanType T) const override {
+                              Address dest, SILType T) const override {
       for (unsigned i = 0; i < NumProtocols; ++i) {
         Address witnessDest = projectWitnessTable(IGF, dest, i);
         IGF.Builder.CreateStore(
@@ -1302,81 +1302,84 @@ namespace {
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
-      emitAssignWithCopyCall(IGF, IGF.emitTypeMetadataRef(T),
+                        SILType T) const {
+      emitAssignWithCopyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
                              dest.getAddress(), src.getAddress());
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                        CanType T) const {
-      emitAssignWithTakeCall(IGF, IGF.emitTypeMetadataRef(T),
+                        SILType T) const {
+      emitAssignWithTakeCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
                              dest.getAddress(), src.getAddress());
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
-                            Address dest, Address src, CanType T) const override {
-      emitInitializeWithCopyCall(IGF, IGF.emitTypeMetadataRef(T),
+                            Address dest, Address src, SILType T) const override {
+      emitInitializeWithCopyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
                                  dest.getAddress(), src.getAddress());
     }
     
     void initializeArrayWithCopy(IRGenFunction &IGF,
                                  Address dest, Address src, llvm::Value *count,
-                                 CanType T) const override {
-      emitInitializeArrayWithCopyCall(IGF, IGF.emitTypeMetadataRef(T),
+                                 SILType T) const override {
+      emitInitializeArrayWithCopyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
                                  dest.getAddress(), src.getAddress(), count);
     }
 
     void initializeWithTake(IRGenFunction &IGF,
-                            Address dest, Address src, CanType T) const override {
-      emitInitializeWithTakeCall(IGF, IGF.emitTypeMetadataRef(T),
+                            Address dest, Address src, SILType T) const override {
+      emitInitializeWithTakeCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
                                  dest.getAddress(), src.getAddress());
     }
 
     void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
                                             Address dest, Address src,
                                             llvm::Value *count,
-                                            CanType T) const override {
-      emitInitializeArrayWithTakeFrontToBackCall(IGF, IGF.emitTypeMetadataRef(T),
+                                            SILType T) const override {
+      emitInitializeArrayWithTakeFrontToBackCall(IGF,
+                                    IGF.emitTypeMetadataRefForLayout(T),
                                     dest.getAddress(), src.getAddress(), count);
     }
     
     void initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
                                             Address dest, Address src,
                                             llvm::Value *count,
-                                            CanType T) const override {
-      emitInitializeArrayWithTakeBackToFrontCall(IGF, IGF.emitTypeMetadataRef(T),
+                                            SILType T) const override {
+      emitInitializeArrayWithTakeBackToFrontCall(IGF,
+                                    IGF.emitTypeMetadataRefForLayout(T),
                                     dest.getAddress(), src.getAddress(), count);
     }
     
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
-      emitDestroyCall(IGF, IGF.emitTypeMetadataRef(T), addr.getAddress());
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+      emitDestroyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
+                      addr.getAddress());
     }
     
     void destroyArray(IRGenFunction &IGF, Address addr, llvm::Value *count,
-                      CanType T) const override {
-      emitDestroyArrayCall(IGF, IGF.emitTypeMetadataRef(T),
+                      SILType T) const override {
+      emitDestroyArrayCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
                            addr.getAddress(), count);
     }
     
     std::pair<llvm::Value*,llvm::Value*>
-    getSizeAndAlignment(IRGenFunction &IGF, CanType T) const {
+    getSizeAndAlignment(IRGenFunction &IGF, SILType T) const {
       llvm::Value *wtable = getValueWitnessTable(IGF, T);
       auto size = emitLoadOfSize(IGF, wtable);
       auto align = emitLoadOfAlignmentMask(IGF, wtable);
       return std::make_pair(size, align);
     }
 
-    llvm::Value *getSize(IRGenFunction &IGF, CanType T) const {
+    llvm::Value *getSize(IRGenFunction &IGF, SILType T) const {
       llvm::Value *wtable = getValueWitnessTable(IGF, T);
       return emitLoadOfSize(IGF, wtable);
     }
 
-    llvm::Value *getAlignment(IRGenFunction &IGF, CanType T) const {
+    llvm::Value *getAlignment(IRGenFunction &IGF, SILType T) const {
       llvm::Value *wtable = getValueWitnessTable(IGF, T);
       return emitLoadOfAlignmentMask(IGF, wtable);
     }
 
-    llvm::Value *getStride(IRGenFunction &IGF, CanType T) const {
+    llvm::Value *getStride(IRGenFunction &IGF, SILType T) const {
       llvm::Value *wtable = getValueWitnessTable(IGF, T);
       return emitLoadOfStride(IGF, wtable);
     }
@@ -1388,7 +1391,7 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            CanType T) const override {
+                            SILType T) const override {
       // Archetypes always refer to an existing type. A witness table should
       // never be independently initialized for one.
       llvm_unreachable("initializing value witness table for archetype?!");
@@ -1399,15 +1402,15 @@ namespace {
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
-                                         CanType T) const override {
-      auto metadata = IGF.emitTypeMetadataRef(T);
+                                         SILType T) const override {
+      auto metadata = IGF.emitTypeMetadataRefForLayout(T);
       return emitGetExtraInhabitantIndexCall(IGF, metadata, src.getAddress());
     }
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address dest,
-                              CanType T) const override {
-      auto metadata = IGF.emitTypeMetadataRef(T);
+                              SILType T) const override {
+      auto metadata = IGF.emitTypeMetadataRefForLayout(T);
       emitStoreExtraInhabitantCall(IGF, metadata, index, dest.getAddress());
     }
   };
@@ -1547,14 +1550,14 @@ namespace {
     /// Immediately after this call, there will be an unconditional
     /// branch to the continuation block.
     virtual void emitForPacking(IRGenFunction &IGF,
-                                CanType T,
+                                SILType T,
                                 const TypeInfo &type,
                                 FixedPacking packing) = 0;
 
     /// Given that we are currently at the beginning of the
     /// continuation block, complete the operation.
     virtual void complete(IRGenFunction &IGF,
-                          CanType T,
+                          SILType T,
                           const TypeInfo &type) = 0;
   };
 
@@ -1565,18 +1568,18 @@ namespace {
   template <> class DynamicPackingPHIMapping<llvm::Value*> {
     llvm::PHINode *PHI = nullptr;
   public:
-    void collect(IRGenFunction &IGF, CanType T,
+    void collect(IRGenFunction &IGF, SILType T,
                  const TypeInfo &type, llvm::Value *value) {
       // Add the result to the phi, creating it (unparented) if necessary.
       if (!PHI) PHI = llvm::PHINode::Create(value->getType(), 2,
                                             "dynamic-packing.result");
       PHI->addIncoming(value, IGF.Builder.GetInsertBlock());
     }
-    void complete(IRGenFunction &IGF, CanType T, const TypeInfo &type) {
+    void complete(IRGenFunction &IGF, SILType T, const TypeInfo &type) {
       assert(PHI);
       IGF.Builder.Insert(PHI);
     }
-    llvm::Value *get(IRGenFunction &IGF, CanType T, const TypeInfo &type) {
+    llvm::Value *get(IRGenFunction &IGF, SILType T, const TypeInfo &type) {
       assert(PHI);
       return PHI;
     }
@@ -1587,15 +1590,15 @@ namespace {
       : private DynamicPackingPHIMapping<llvm::Value*> {
     typedef DynamicPackingPHIMapping<llvm::Value*> super;
   public:
-    void collect(IRGenFunction &IGF, CanType T,
+    void collect(IRGenFunction &IGF, SILType T,
                  const TypeInfo &type, Address value) {
       super::collect(IGF, T, type, value.getAddress());
     }
-    void complete(IRGenFunction &IGF, CanType T,
+    void complete(IRGenFunction &IGF, SILType T,
                   const TypeInfo &type) {
       super::complete(IGF, T, type);
     }
-    Address get(IRGenFunction &IGF, CanType T, const TypeInfo &type) {
+    Address get(IRGenFunction &IGF, SILType T, const TypeInfo &type) {
       return type.getAddressForPointer(super::get(IGF, T, type));
     }
   };
@@ -1607,17 +1610,17 @@ namespace {
     DynamicPackingPHIMapping<ResultTy> Mapping;
   public:
     explicit LambdaDynamicPackingOperation(FnTy &&fn) : Fn(fn) {}
-    void emitForPacking(IRGenFunction &IGF, CanType T, const TypeInfo &type,
+    void emitForPacking(IRGenFunction &IGF, SILType T, const TypeInfo &type,
                         FixedPacking packing) override {
       Mapping.collect(IGF, T, type, Fn(IGF, T, type, packing));
     }
 
-    void complete(IRGenFunction &IGF, CanType T,
+    void complete(IRGenFunction &IGF, SILType T,
                   const TypeInfo &type) override {
       Mapping.complete(IGF, T, type);
     }
 
-    ResultTy get(IRGenFunction &IGF, CanType T, const TypeInfo &type) {
+    ResultTy get(IRGenFunction &IGF, SILType T, const TypeInfo &type) {
       return Mapping.get(IGF, T, type);
     }
   };
@@ -1630,13 +1633,13 @@ namespace {
     FnTy Fn;
   public:
     explicit LambdaDynamicPackingOperation(FnTy &&fn) : Fn(fn) {}
-    void emitForPacking(IRGenFunction &IGF, CanType T, const TypeInfo &type,
+    void emitForPacking(IRGenFunction &IGF, SILType T, const TypeInfo &type,
                         FixedPacking packing) override {
       Fn(IGF, T, type, packing);
     }
-    void complete(IRGenFunction &IGF, CanType T,
+    void complete(IRGenFunction &IGF, SILType T,
                   const TypeInfo &type) override {}
-    void get(IRGenFunction &IGF, CanType T, const TypeInfo &type) {}
+    void get(IRGenFunction &IGF, SILType T, const TypeInfo &type) {}
   };
 }
 
@@ -1644,7 +1647,7 @@ namespace {
 /// packing into a fixed-size buffer, and perform an operation at each
 /// of them.
 static void emitDynamicPackingOperation(IRGenFunction &IGF,
-                                        CanType T,
+                                        SILType T,
                                         const TypeInfo &type,
                                         DynamicPackingOperation &operation) {
   auto indirectBB = IGF.createBasicBlock("dynamic-packing.indirect");
@@ -1681,16 +1684,16 @@ makeLambdaDynamicPackingOperation(FnTy &&fn) {
 template <class ResultTy, class... ArgTys>
 static ResultTy emitForDynamicPacking(IRGenFunction &IGF,
                                       ResultTy (*fn)(IRGenFunction &IGF,
-                                                     CanType T,
+                                                     SILType T,
                                                      const TypeInfo &type,
                                                      FixedPacking packing,
                                                      ArgTys... args),
-                                      CanType T,
+                                      SILType T,
                                       const TypeInfo &type,
                         // using enable_if to block template argument deduction
                         typename std::enable_if<true,ArgTys>::type... args) {
   auto operation = makeLambdaDynamicPackingOperation<ResultTy>(
-    [&](IRGenFunction &IGF, CanType T, const TypeInfo &type, FixedPacking packing) {
+    [&](IRGenFunction &IGF, SILType T, const TypeInfo &type, FixedPacking packing) {
       return fn(IGF, T, type, packing, args...);
     });
   emitDynamicPackingOperation(IGF, T, type, operation);
@@ -1699,7 +1702,7 @@ static ResultTy emitForDynamicPacking(IRGenFunction &IGF,
                                              
 /// Emit a 'projectBuffer' operation.  Always returns a T*.
 static Address emitProjectBuffer(IRGenFunction &IGF,
-                                 CanType T,
+                                 SILType T,
                                  const TypeInfo &type,
                                  FixedPacking packing,
                                  Address buffer) {
@@ -1726,7 +1729,7 @@ static Address emitProjectBuffer(IRGenFunction &IGF,
 
 /// Emit an 'allocateBuffer' operation.  Always returns a T*.
 static Address emitAllocateBuffer(IRGenFunction &IGF,
-                                  CanType T,
+                                  SILType T,
                                   const TypeInfo &type,
                                   FixedPacking packing,
                                   Address buffer) {
@@ -1754,7 +1757,7 @@ static Address emitAllocateBuffer(IRGenFunction &IGF,
 
 /// Emit a 'deallocateBuffer' operation.
 static void emitDeallocateBuffer(IRGenFunction &IGF,
-                                 CanType T,
+                                 SILType T,
                                  const TypeInfo &type,
                                  FixedPacking packing,
                                  Address buffer) {
@@ -1780,7 +1783,7 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
 
 /// Emit a 'destroyBuffer' operation.
 static void emitDestroyBuffer(IRGenFunction &IGF,
-                              CanType T,
+                              SILType T,
                               const TypeInfo &type,
                               FixedPacking packing,
                               Address buffer) {
@@ -1795,7 +1798,7 @@ static void emitDestroyBuffer(IRGenFunction &IGF,
 
 /// Emit an 'initializeWithCopy' operation.
 static void emitInitializeWithCopy(IRGenFunction &IGF,
-                                   CanType T,
+                                   SILType T,
                                    const TypeInfo &type,
                                    Address dest, Address src) {
   type.initializeWithCopy(IGF, dest, src, T);
@@ -1803,7 +1806,7 @@ static void emitInitializeWithCopy(IRGenFunction &IGF,
 
 /// Emit an 'initializeWithTake' operation.
 static void emitInitializeWithTake(IRGenFunction &IGF,
-                                   CanType T,
+                                   SILType T,
                                    const TypeInfo &type,
                                    Address dest, Address src) {
   type.initializeWithTake(IGF, dest, src, T);
@@ -1812,7 +1815,7 @@ static void emitInitializeWithTake(IRGenFunction &IGF,
 /// Emit an 'initializeBufferWithCopyOfBuffer' operation.
 /// Returns the address of the destination object.
 static Address emitInitializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
-                                                    CanType T,
+                                                    SILType T,
                                                     const TypeInfo &type,
                                                     FixedPacking packing,
                                                     Address dest,
@@ -1831,7 +1834,7 @@ static Address emitInitializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
 /// Emit an 'initializeBufferWithTakeOfBuffer' operation.
 /// Returns the address of the destination object.
 static Address emitInitializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                                    CanType T,
+                                                    SILType T,
                                                     const TypeInfo &type,
                                                     FixedPacking packing,
                                                     Address dest,
@@ -1867,7 +1870,7 @@ static Address emitInitializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
 /// Emit an 'initializeBufferWithCopy' operation.
 /// Returns the address of the destination object.
 static Address emitInitializeBufferWithCopy(IRGenFunction &IGF,
-                                            CanType T,
+                                            SILType T,
                                             const TypeInfo &type,
                                             FixedPacking packing,
                                             Address dest,
@@ -1880,7 +1883,7 @@ static Address emitInitializeBufferWithCopy(IRGenFunction &IGF,
 /// Emit an 'initializeBufferWithTake' operation.
 /// Returns the address of the destination object.
 static Address emitInitializeBufferWithTake(IRGenFunction &IGF,
-                                            CanType T,
+                                            SILType T,
                                             const TypeInfo &type,
                                             FixedPacking packing,
                                             Address dest,
@@ -1925,10 +1928,10 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
 static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
                                            llvm::Function::arg_iterator argv,
                                            CanType abstractType,
-                                           CanType concreteType,
+                                           SILType concreteType,
                                            const TypeInfo &type,
                                  void (*emitInitializeElement)(IRGenFunction &,
-                                                               CanType,
+                                                               SILType,
                                                                const TypeInfo &,
                                                                Address,
                                                                Address)) {
@@ -1985,10 +1988,10 @@ static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
 static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
                                            llvm::Function::arg_iterator argv,
                                            CanType abstractType,
-                                           CanType concreteType,
+                                           SILType concreteType,
                                            const TypeInfo &type,
                                  void (*emitInitializeElement)(IRGenFunction &,
-                                                               CanType,
+                                                               SILType,
                                                                const TypeInfo &,
                                                                Address,
                                                                Address))
@@ -2052,7 +2055,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
                                       ValueWitness index,
                                       FixedPacking packing,
                                       CanType abstractType,
-                                      CanType concreteType,
+                                      SILType concreteType,
                                       const TypeInfo &type) {
   assert(isValueWitnessFunction(index));
 
@@ -2715,7 +2718,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
                                        ValueWitness index,
                                        FixedPacking packing,
                                        CanType abstractType,
-                                       CanType concreteType,
+                                       SILType concreteType,
                                        const TypeInfo &concreteTI) {
   // Try to use a standard function.
   switch (index) {
@@ -3073,7 +3076,7 @@ namespace {
 /// Collect the value witnesses for a particular type.
 static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
                               CanType abstractType,
-                              CanType concreteType, const TypeInfo &concreteTI,
+                              SILType concreteType, const TypeInfo &concreteTI,
                               SmallVectorImpl<llvm::Constant*> &table) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
     table.push_back(getValueWitness(IGM, ValueWitness(i),
@@ -3091,7 +3094,7 @@ static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
 }
 
 /// True if a type has a generic-parameter-dependent value witness table.
-/// Currently, This is true if the size and/or alignment of the type is
+/// Currently, this is true if the size and/or alignment of the type is
 /// dependent on its generic parameters.
 bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
   if (auto ugt = dyn_cast<UnboundGenericType>(ty))
@@ -3104,16 +3107,17 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                  CanType abstractType,
                                  SmallVectorImpl<llvm::Constant*> &witnesses) {
   // Instantiate unbound generic types on their context archetypes.
-  CanType concreteType = abstractType;
+  CanType concreteFormalType = abstractType;
   if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
-    concreteType = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
+    concreteFormalType = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
   }
   
-  auto &concreteTI = IGM.getTypeInfoForUnlowered(concreteType);
+  auto concreteLoweredType = IGM.SILMod->Types.getLoweredType(concreteFormalType);
+  auto &concreteTI = IGM.getTypeInfo(concreteLoweredType);
   FixedPacking packing = concreteTI.getFixedPacking(IGM);
   
   addValueWitnesses(IGM, packing, abstractType,
-                    concreteType, concreteTI, witnesses);
+                    concreteLoweredType, concreteTI, witnesses);
 }
 
 /// Emit a value-witness table for the given type, which is assumed to
@@ -4097,8 +4101,8 @@ namespace {
 }
 
 /// Initialize this set of necessary bindings.
-NecessaryBindings::NecessaryBindings(IRGenModule &IGM, CanType type) {
-  FindArchetypesToBind(Types).visit(type);
+NecessaryBindings::NecessaryBindings(IRGenModule &IGM, SILType type) {
+  FindArchetypesToBind(Types).visit(type.getSwiftRValueType());
 }
 
 Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {
@@ -4686,7 +4690,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                    Alignment(1));
   } else {
     // Otherwise, allocate using what we know statically about the type.
-    return emitAllocateBuffer(IGF, loweredSrcType.getSwiftRValueType(),
+    return emitAllocateBuffer(IGF, loweredSrcType,
                               srcTI, packing, buffer);
   }
 }

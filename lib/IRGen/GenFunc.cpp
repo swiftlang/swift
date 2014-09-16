@@ -649,7 +649,7 @@ namespace {
       }
     }
     
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
       switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
@@ -741,14 +741,14 @@ namespace {
     // block storage.
     
     void assignWithCopy(IRGenFunction &IGF, Address dest,
-                        Address src, CanType T) const override {
+                        Address src, SILType T) const override {
       IGF.unimplemented(SourceLoc(), "copying @block_storage");
     }
     void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                            Address src, CanType T) const override {
+                            Address src, SILType T) const override {
       IGF.unimplemented(SourceLoc(), "copying @block_storage");
     }
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       IGF.unimplemented(SourceLoc(), "destroying @block_storage");
     }
   };
@@ -1368,6 +1368,13 @@ static void emitTypeTraitBuiltin(IRGenFunction &IGF,
   out.add(llvm::ConstantInt::get(IGF.IGM.Int8Ty, result));
 }
 
+static std::pair<SILType, const TypeInfo &>
+getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
+  auto lowered = IGM.SILMod->Types.getLoweredType(
+                                            unloweredType->getCanonicalType());
+  return {lowered, IGM.getTypeInfo(lowered)};
+}
+
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                             CanSILFunctionType substFnType,
@@ -1383,27 +1390,28 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
-    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
-    out->add(valueTI.getSize(IGF, valueTy));
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
+    out->add(valueTy.second.getSize(IGF, valueTy.first));
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::Strideof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
-    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
-    out->add(valueTI.getStride(IGF, valueTy));
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
+    out->add(valueTy.second.getStride(IGF, valueTy.first));
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::Alignof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
-    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
     // The alignof value is one greater than the alignment mask.
-    out->add(IGF.Builder.CreateAdd(valueTI.getAlignmentMask(IGF, valueTy),
-                                   IGF.IGM.getSize(Size(1))));
+    out->add(IGF.Builder.CreateAdd(
+                           valueTy.second.getAlignmentMask(IGF, valueTy.first),
+                           IGF.IGM.getSize(Size(1))));
     return;
   }
 
@@ -1411,10 +1419,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     // Note this case must never return 0.
     // It is implemented as max(strideof, 1)
     args.claimAll();
-    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
-    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
     // Strideof should never return 0, so return 1 if the type has a 0 stride.
-    llvm::Value *StrideOf = valueTI.getStride(IGF, valueTy);
+    llvm::Value *StrideOf = valueTy.second.getStride(IGF, valueTy.first);
     llvm::IntegerType *IntTy = cast<llvm::IntegerType>(StrideOf->getType());
     auto *Zero = llvm::ConstantInt::get(IntTy, 0);
     auto *One = llvm::ConstantInt::get(IntTy, 1);
@@ -1809,12 +1817,13 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *ptr = args.claimNext();
     llvm::Value *count = args.claimNext();
     
-    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
-    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
     
-    ptr = IGF.Builder.CreateBitCast(ptr, valueTI.getStorageType()->getPointerTo());
-    Address array = valueTI.getAddressForPointer(ptr);
-    valueTI.destroyArray(IGF, array, count, valueTy);
+    ptr = IGF.Builder.CreateBitCast(ptr,
+                              valueTy.second.getStorageType()->getPointerTo());
+    Address array = valueTy.second.getAddressForPointer(ptr);
+    valueTy.second.destroyArray(IGF, array, count, valueTy.first);
     return;
   }
   
@@ -1827,25 +1836,28 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *src = args.claimNext();
     llvm::Value *count = args.claimNext();
     
-    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
-    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
     
-    dest = IGF.Builder.CreateBitCast(dest, valueTI.getStorageType()->getPointerTo());
-    src = IGF.Builder.CreateBitCast(src, valueTI.getStorageType()->getPointerTo());
-    Address destArray = valueTI.getAddressForPointer(dest);
-    Address srcArray = valueTI.getAddressForPointer(src);
+    dest = IGF.Builder.CreateBitCast(dest,
+                               valueTy.second.getStorageType()->getPointerTo());
+    src = IGF.Builder.CreateBitCast(src,
+                               valueTy.second.getStorageType()->getPointerTo());
+    Address destArray = valueTy.second.getAddressForPointer(dest);
+    Address srcArray = valueTy.second.getAddressForPointer(src);
     
     switch (Builtin.ID) {
     case BuiltinValueKind::CopyArray:
-      valueTI.initializeArrayWithCopy(IGF, destArray, srcArray, count, valueTy);
+      valueTy.second.initializeArrayWithCopy(IGF, destArray, srcArray, count,
+                                             valueTy.first);
       break;
     case BuiltinValueKind::TakeArrayFrontToBack:
-      valueTI.initializeArrayWithTakeFrontToBack(IGF, destArray, srcArray,
-                                                 count, valueTy);
+      valueTy.second.initializeArrayWithTakeFrontToBack(IGF, destArray, srcArray,
+                                                        count, valueTy.first);
       break;
     case BuiltinValueKind::TakeArrayBackToFront:
-      valueTI.initializeArrayWithTakeBackToFront(IGF, destArray, srcArray,
-                                                 count, valueTy);
+      valueTy.second.initializeArrayWithTakeBackToFront(IGF, destArray, srcArray,
+                                                        count, valueTy.first);
       break;
     default:
       llvm_unreachable("out of sync with if condition");
@@ -2032,12 +2044,11 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
 void CallEmission::emitToExplosion(Explosion &out) {
   assert(LastArgWritten <= 1);
 
-  CanType substResultType =
-    getCallee().getSubstFunctionType()->getSemanticResultSILType()
-               .getSwiftRValueType();
+  SILType substResultType =
+    getCallee().getSubstFunctionType()->getSemanticResultSILType();
 
   auto &substResultTI =
-    cast<LoadableTypeInfo>(IGF.getTypeInfoForLowered(substResultType));
+    cast<LoadableTypeInfo>(IGF.getTypeInfo(substResultType));
 
   // If the call is naturally to memory, emit it that way and then
   // explode that temporary.
@@ -2066,7 +2077,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
   // Okay, we're naturally emitting to an explosion.
   // Figure out how the substituted result differs from the original.
   auto resultDiff = computeResultDifference(IGF.IGM, origResultType,
-                                            substResultType);
+                                          substResultType.getSwiftRValueType());
 
   switch (resultDiff) {
   // If they don't differ at all, we're good. 
@@ -2092,12 +2103,12 @@ void CallEmission::emitToExplosion(Explosion &out) {
 
   // If they do differ, we need to remap.
   case ResultDifference::Divergent:
-    if (isa<MetatypeType>(substResultType) &&
+    if (substResultType.is<MetatypeType>() &&
         isa<MetatypeType>(origResultType)) {
       // If we got here, it's because the substituted metatype is trivial.
       // Remapping is easy--the substituted type is empty, so we drop the
       // nontrivial representation of the original type.
-      assert(cast<MetatypeType>(substResultType)->getRepresentation()
+      assert(substResultType.castTo<MetatypeType>()->getRepresentation()
                == MetatypeRepresentation::Thin
              && "remapping to non-thin metatype?!");
       
@@ -2262,9 +2273,9 @@ static void emitDirectExternalArgument(IRGenFunction &IGF,
   // Otherwise, we need to coerce through memory.
 
   // Store to a temporary.
-  Address temporary = argTI.allocateStack(IGF, argType.getSwiftRValueType(),
+  Address temporary = argTI.allocateStack(IGF, argType,
                                           "coerced-arg").getAddress();
-  argTI.initializeFromParams(IGF, in, temporary, argType.getSwiftRValueType());
+  argTI.initializeFromParams(IGF, in, temporary, argType);
 
   // Bitcast the temporary to the expected type.
   Address coercedAddr =
@@ -2284,7 +2295,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF,
     out.add(IGF.Builder.CreateLoad(coercedAddr));
   }
 
-  argTI.deallocateStack(IGF, temporary, argType.getSwiftRValueType());
+  argTI.deallocateStack(IGF, temporary, argType);
 }
 
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
@@ -2362,7 +2373,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       break;
     case clang::CodeGen::ABIArgInfo::Indirect: {
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
-      Address addr = ti.allocateStack(IGF, paramType.getSwiftRValueType(),
+      Address addr = ti.allocateStack(IGF, paramType,
                                       "indirect-temporary").getAddress();
       ti.initialize(IGF, in, addr);
 
@@ -2677,7 +2688,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   }
 
   struct AddressToDeallocate {
-    CanType Type;
+    SILType Type;
     const TypeInfo &TI;
     Address Addr;
   };
@@ -2796,9 +2807,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   
   // Collect the type infos for the context types.
   SmallVector<const TypeInfo *, 4> argTypeInfos;
-  SmallVector<CanType, 4> argValTypes;
+  SmallVector<SILType, 4> argValTypes;
   for (SILType argType : argTypes) {
-    argValTypes.push_back(argType.getSwiftType());
+    argValTypes.push_back(argType);
     auto &ti = IGF.getTypeInfoForLowered(argType.getSwiftType());
     argTypeInfos.push_back(&ti);
 
@@ -2828,7 +2839,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // Include the context pointer, if any, in the function arguments.
   if (fnContext) {
     args.add(fnContext);
-    argValTypes.push_back(IGF.IGM.Context.TheNativeObjectType);
+    argValTypes.push_back(SILType::getNativeObjectType(IGF.IGM.Context));
     argTypeInfos.push_back(
          &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheNativeObjectType));
     // If this is the only context argument we end up with, we can just share
@@ -2850,10 +2861,10 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       // of the TypeInfo operations on type metadata or witness tables
       // depend on context.
       if (arg->getType() == IGF.IGM.TypeMetadataPtrTy) {
-        argValTypes.push_back(CanType());
+        argValTypes.push_back(SILType());
         argTypeInfos.push_back(&metatypeTI);
       } else if (arg->getType() == IGF.IGM.WitnessTablePtrTy) {
-        argValTypes.push_back(CanType());
+        argValTypes.push_back(SILType());
         argTypeInfos.push_back(&witnessTI);
       } else
         llvm_unreachable("unexpected polymorphic argument");
@@ -2881,7 +2892,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   if (!staticFn) {
     llvm::Value *fnRawPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     args.add(fnRawPtr);
-    argValTypes.push_back(IGF.IGM.Context.TheRawPointerType);
+    argValTypes.push_back(SILType::getRawPointerType(IGF.IGM.Context));
     argTypeInfos.push_back(
          &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheRawPointerType));
 
@@ -2959,7 +2970,7 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
   auto srcCapture = blockTL.projectCapture(IGF, src);
   auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
   captureTL.initializeWithCopy(IGF, destCapture, srcCapture,
-                               blockTy->getCaptureType());
+                               blockTy->getCaptureAddressType());
   
   IGF.Builder.CreateRetVoid();
   
@@ -2989,7 +3000,7 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
   auto storage = Address(params.claimNext(), blockTL.getFixedAlignment());
   auto capture = blockTL.projectCapture(IGF, storage);
   auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
-  captureTL.destroy(IGF, capture, blockTy->getCaptureType());
+  captureTL.destroy(IGF, capture, blockTy->getCaptureAddressType());
   IGF.Builder.CreateRetVoid();
   
   return func;

@@ -1792,14 +1792,15 @@ namespace {
       }
 
       ManagedValue result;
-      if (!hasAbstraction && !origTargetTL.isAddressOnly()) {
+      if (!origTargetTL.isAddressOnly()) {
         result = SGF.emitLoad(Loc, buffer, origTargetTL, ctx, IsTake);
       } else {
         result = SGF.emitManagedBufferWithCleanup(buffer, origTargetTL);
-        if (hasAbstraction) {
-          result = SGF.emitOrigToSubstValue(Loc, result, abstraction,
-                                            TargetType, ctx);
-        }
+      }
+      
+      if (hasAbstraction) {
+        result = SGF.emitOrigToSubstValue(Loc, result, abstraction,
+                                          TargetType, ctx);
       }
       return result;
     }
