@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/ClangImporter/ClangModule.h" // FIXME: SDK overlay semantics
 
 using namespace swift;
 
@@ -914,6 +915,38 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
                                 C.getIdentifier("UIApplicationMain"));
 }
 
+/// Determine whether the given context is an extension to an Objective-C class
+/// where the class is defined in the Objective-C module and the extension is
+/// defined within its module.
+static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
+  // Check whether we have an extension.
+  auto ext = dyn_cast<ExtensionDecl>(dc);
+  if (!ext)
+    return nullptr;
+
+  // Find the extended class.
+  auto classDecl = ext->getExtendedType()->getClassOrBoundGenericClass();
+  if (!classDecl)
+    return false;
+
+  // The class must be defined in Objective-C.
+  if (!classDecl->hasClangNode())
+    return false;
+
+  // Find the Clang module unit that stores the class.
+  auto classModule = classDecl->getDeclContext()->getParentModule();
+  if (!classModule || classModule->getFiles().empty())
+    return false;
+
+  auto classModuleUnit = dyn_cast<ClangModuleUnit>(classModule->getFiles()[0]);
+  if (!classModuleUnit)
+    return false;
+
+  // Check whether the extension is in the overlay.
+  auto extModule = ext->getDeclContext()->getParentModule();
+  return extModule == classModuleUnit->getAdapterModule();
+}
+
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
   // The required attribute only applies to constructors.
   auto ctor = cast<ConstructorDecl>(D);
@@ -927,7 +960,10 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
   // Only classes can have required constructors.
   if (parentTy->getClassOrBoundGenericClass()) {
     // The constructor must be declared within the class itself.
-    if (!isa<ClassDecl>(ctor->getDeclContext())) {
+    // FIXME: Allow an SDK overlay to add a required initializer to a class
+    // defined in Objective-C
+    if (!isa<ClassDecl>(ctor->getDeclContext()) &&
+        !isObjCClassExtensionInOverlay(ctor->getDeclContext())) {
       TC.diagnose(ctor, diag::required_initializer_in_extension, parentTy)
         .highlight(attr->getLocation());
       attr->setInvalid();

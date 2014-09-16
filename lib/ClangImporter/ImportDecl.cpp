@@ -2559,17 +2559,6 @@ namespace {
                                        bool &redundant) {
       redundant = false;
 
-      // Map NSNumber's initializers over to their corresponding literal-
-      // conversion initializers.
-      // FIXME: This would go away if we could implement convenience factory
-      // initializers in Swift.
-      if (objcMethod->getSelector() == Impl.initWithBool &&
-          isNSNumberSubclass(objcMethod->getClassInterface())) {
-        name = DeclName(Impl.SwiftContext, Impl.SwiftContext.Id_init,
-                        { Impl.SwiftContext.Id_BooleanLiteral });
-        required = true;
-      }
-
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");

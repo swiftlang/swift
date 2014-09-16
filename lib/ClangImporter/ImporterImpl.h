@@ -486,9 +486,6 @@ public:
   /// \brief Clang's setObject:forKeyedSubscript: selector.
   clang::Selector setObjectForKeyedSubscript;
 
-  /// Clang's initWithBool: selector.
-  clang::Selector initWithBool;
-
 private:
   Optional<Module *> checkedFoundationModule;
 

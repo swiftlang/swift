@@ -427,13 +427,6 @@ ClangImporter::create(ASTContext &ctx,
   importer->Impl.setObjectForKeyedSubscript
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
-  // Create the selectors for literal conformances.
-  clang::IdentifierInfo *initWithBoolIdents[1] = {
-    &clangContext.Idents.get("initWithBool")
-  };
-  importer->Impl.initWithBool
-    = clangContext.Selectors.getSelector(1, initWithBoolIdents);
-
   // Set up the imported header module.
   auto *importedHeaderModule = Module::create(ctx.getIdentifier("__ObjC"), ctx);
   importer->Impl.ImportedHeaderUnit =

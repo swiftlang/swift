@@ -585,8 +585,8 @@ extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
     return self(double: value)
   }
 
-  public convenience init(bool value: Bool) {
-    self.init(booleanLiteral: value)
+  public required convenience init(booleanLiteral value: Bool) {
+    self.init(bool: value)
   }
 }
 
