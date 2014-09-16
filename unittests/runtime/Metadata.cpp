@@ -172,8 +172,7 @@ TEST(MetadataTest, getMetatypeMetadata) {
     [&]() -> const MetatypeMetadata * {
       auto inst = swift_getMetatypeMetadata(&_TMdBi64_.base);
 
-      // This is a trivial metatype.
-      EXPECT_EQ(size_t(0), inst->getValueWitnesses()->size);
+      EXPECT_EQ(sizeof(void*), inst->getValueWitnesses()->size);
       return inst;
     });
 
@@ -181,8 +180,7 @@ TEST(MetadataTest, getMetatypeMetadata) {
     [&]() -> const MetatypeMetadata * {
       auto inst = swift_getMetatypeMetadata(&_TMdBi32_.base);
 
-      // This is a trivial metatype.
-      EXPECT_EQ(size_t(0), inst->getValueWitnesses()->size);
+      EXPECT_EQ(sizeof(void*), inst->getValueWitnesses()->size);
       return inst;
     });
 
@@ -190,13 +188,10 @@ TEST(MetadataTest, getMetatypeMetadata) {
     [&]() -> const MetatypeMetadata * {
       auto inst = swift_getMetatypeMetadata(&MetadataTest2);
 
-      // The representation here should be non-trivial.
       EXPECT_EQ(sizeof(void*), inst->getValueWitnesses()->size);
       return inst;
     });
 
-  // Going out another level of abstraction on the class metatype
-  // should leave us with another non-trivial metatype.
   auto inst4 = RaceTest_ExpectEqual<const MetatypeMetadata *>(
     [&]() -> const MetatypeMetadata * {
       auto inst = swift_getMetatypeMetadata(inst3);
@@ -204,12 +199,10 @@ TEST(MetadataTest, getMetatypeMetadata) {
       return inst;
     });
 
-  // Similarly, going out a level of abstraction on a trivial
-  // metatype should give us a trivial metatype.
   auto inst5 = RaceTest_ExpectEqual<const MetatypeMetadata *>(
     [&]() -> const MetatypeMetadata * {
       auto inst = swift_getMetatypeMetadata(inst1);
-      EXPECT_EQ(size_t(0), inst->getValueWitnesses()->size);
+      EXPECT_EQ(sizeof(void*), inst->getValueWitnesses()->size);
       return inst;
     });
 
