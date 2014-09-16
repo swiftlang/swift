@@ -78,8 +78,16 @@ public func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
 // to break otherwise-cyclic protocol dependencies, which the compiler
 // isn't yet smart enough to handle.
 
+/// This protocol is an implementation detail of `ForwardIndexType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `ForwardIndexType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _Incrementable : Equatable {
-  /// Return the next consecutive value in a discrete sequence
+  /// Return the next consecutive value in a discrete sequence of
+  /// `Self` values
+  ///
+  /// Requires: `self` has a well-defined successor.
   func successor() -> Self
 }
 
@@ -95,14 +103,21 @@ public struct _DisabledRangeIndex_ {
 
 //===----------------------------------------------------------------------===//
 
+/// This protocol is an implementation detail of `ForwardIndexType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `ForwardIndexType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _ForwardIndexType : _Incrementable {
-  /// A type that can represent the number of steps between arbitrary
-  /// pairs of `Self` values where one value is reachable from the
-  /// other.
+  /// A type that can represent the number of steps between pairs of
+  /// `Self` values where one value is reachable from the other.
+  ///
+  /// Reachability is defined by the ability to produce one value from
+  /// the other via zero or more applications of `successor`
   typealias Distance : _SignedIntegerType = Int
 
-  // See the implementation of Range for an explanation of these
-  // associated types.
+  // See the implementation of Range for an explanation of this
+  // associated type
   typealias _DisabledRangeIndex = _DisabledRangeIndex_
 }
 
@@ -119,6 +134,9 @@ public postfix func ++ <T : _Incrementable> (inout x: T) -> T {
   return ret
 }
 
+/// Represents a discrete value in a series, where a value's
+/// successor, if any, is reachable by applying the value's
+/// `successor()` method.
 public protocol ForwardIndexType : _ForwardIndexType {
   // This requirement allows generic distance() to find default
   // implementations.  Only the author of F and the author of a
@@ -191,11 +209,25 @@ func _advanceForward<T: _ForwardIndexType>(
 
 //===----------------------------------------------------------------------===//
 //===--- BidirectionalIndexType -------------------------------------------===//
+/// This protocol is an implementation detail of `BidirectionalIndexType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `BidirectionalIndexType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _BidirectionalIndexType : _ForwardIndexType {
-  /// Return the previous consecutive value in a discrete sequence
+  /// Return the previous consecutive value in a discrete sequence.
+  ///
+  /// If `self` has a well-defined successor,
+  /// `self.successor().predecessor() == self`.  If `self` has a
+  /// well-defined predecessor, `self.predecessor().successor() ==
+  /// self`.
+  ///
+  /// Requires: `self` has a well-defined predecessor.
   func predecessor() -> Self
 }
 
+/// An *index* that can step backwards via application of its
+/// `predecessor()` method.
 public protocol BidirectionalIndexType 
   : ForwardIndexType, _BidirectionalIndexType {}
 
@@ -251,18 +283,30 @@ func ~> <T: _BidirectionalIndexType>(
 
 //===----------------------------------------------------------------------===//
 //===--- RandomAccessIndexType --------------------------------------------===//
+/// This protocol is an implementation detail of `RandomAccessIndexType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `RandomAccessIndexType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _RandomAccessIndexType : _BidirectionalIndexType, Strideable {
   /// Return the minimum number of applications of `successor` or
-  /// `predecessor` required to reach `other` from `self`. O(1).
+  /// `predecessor` required to reach `other` from `self`.
+  ///
+  /// Complexity: O(1).
   func distanceTo(other: Self) -> Distance
 
-  /// If `n > 0` returns the result of `successor` to `self` `n`
-  /// times.  Otherwise, if `n < 0`, returns the result of applying
-  /// `predecessor` to `self` `-n` times. Otherwise, returns
-  /// `self`. O(1)
+  /// Return `self` offset by `n` steps.
+  ///
+  /// :returns: If `n > 0`, the result of applying `successor` to
+  /// `self` `n` times.  If `n < 0`, the result of applying
+  /// `predecessor` to `self` `-n` times. Otherwise, `self`.
+  ///
+  /// Complexity: O(1)
   func advancedBy(n: Distance) -> Self
 }
 
+/// An *index* that can be offset by an arbitrary number of positions,
+/// and can measure the distance to any reachable value, in O(1).
 public protocol RandomAccessIndexType
   : BidirectionalIndexType, _RandomAccessIndexType {
   /* typealias Distance : IntegerArithmeticType*/
