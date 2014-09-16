@@ -356,11 +356,6 @@ static GenericMetadataCache &getCache(GenericMetadata *metadata) {
   return lazyCache->get();
 }
 
-template <class T>
-static const T *adjustAddressPoint(const T *raw, uint32_t offset) {
-  return reinterpret_cast<const T*>(reinterpret_cast<const char*>(raw) + offset);
-}
-
 ClassMetadata *
 swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
                                           const void *arguments,
@@ -463,8 +458,7 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
 #if SWIFT_DEBUG_RUNTIME
     printf("found in cache!\n");
 #endif
-    auto metadata = adjustAddressPoint(entry->getData<Metadata>(),
-                                       pattern->AddressPoint);
+    auto metadata = entry->Value;
 #if SWIFT_DEBUG_RUNTIME
     printf(" -> %p\n", metadata);
 #endif
