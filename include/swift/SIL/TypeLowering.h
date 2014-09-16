@@ -459,6 +459,9 @@ class TypeConverter {
   
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
   
+  /// The set of recursive types we've already diagnosed.
+  llvm::DenseSet<NominalTypeDecl *> RecursiveNominalTypes;
+  
   /// ArchetypeBuilder used for lowering types in generic function contexts.
   Optional<ArchetypeBuilder> GenericArchetypes;
   
