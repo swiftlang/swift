@@ -50,7 +50,6 @@ public protocol _IntegerType
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
     Printable,
-    ArrayBoundType,
     Hashable,
     IntegerArithmeticType,
     BitwiseOperationsType,
@@ -160,23 +159,6 @@ public struct ${Self}
   @transparent public
   init(integerLiteral value: ${Self}) {
     self = value
-  }
-  @transparent public
-  func _getBuiltinArrayBoundValue() -> Builtin.Word {
-%  if bits < word_bits:
-    return Builtin.${ext}OrBitCast_${BuiltinName}_Word(self.value)
-%  elif bits > word_bits:
-    return Builtin.truncOrBitCast_${BuiltinName}_Word(self.value)
-%  elif BuiltinName == 'Word':
-    return self.value
-%  else:
-    return Builtin.${CastToWord}(self.value)
-%  end
-  }
-
-  public typealias ArrayBound = ${Self}
-  public var arrayBoundValue: ${Self} {
-    return self
   }
 
 %  if bits > 8:

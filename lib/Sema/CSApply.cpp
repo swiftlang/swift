@@ -5223,21 +5223,3 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   return call;
 }
 
-Expr *
-Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
-  auto &tc = getConstraintSystem().getTypeChecker();
-  auto result = convertViaBuiltinProtocol(
-                  *this, expr, locator,
-                  tc.getProtocol(expr->getLoc(),
-                                 KnownProtocolKind::ArrayBoundType),
-                  tc.Context.Id_ArrayBoundValue,
-                  tc.Context.Id_GetBuiltinArrayBoundValue,
-                  diag::broken_array_bound_proto,
-                  diag::broken_builtin_array_bound);
-  if (result && !result->getType()->is<BuiltinIntegerType>()) {
-    tc.diagnose(expr->getLoc(), diag::broken_builtin_array_bound);
-    return nullptr;
-  }
-
-  return result;
-}

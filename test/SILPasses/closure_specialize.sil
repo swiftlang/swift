@@ -32,8 +32,8 @@ bb0(%0 : $@callee_owned (Int, Int) -> ()):
   %15 = integer_literal $Builtin.Int2048, 999     // user: %16
   %16 = apply [transparent] %13(%15, %14) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %17
   store %16 to %12#1 : $*Int                      // id: %17
-  %18 = apply [transparent] %5<Int, Int, Int, (Int), Int>(%4#1, %6#1, %12#1) : $@thin <τ_0_0 where τ_0_0 : Comparable, τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Range<τ_0_0>, @in τ_0_0, @in τ_0_0) -> ()
-  %19 = apply %3<Int, Int, Int, (Int), Int>(%2#1, %4#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out RangeGenerator<τ_0_0>, @in Range<τ_0_0>) -> ()
+  %18 = apply [transparent] %5<Int, Int, Int, Int>(%4#1, %6#1, %12#1) : $@thin <τ_0_0 where τ_0_0 : Comparable, τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Range<τ_0_0>, @in τ_0_0, @in τ_0_0) -> ()
+  %19 = apply %3<Int, Int, Int, Int>(%2#1, %4#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out RangeGenerator<τ_0_0>, @in Range<τ_0_0>) -> ()
   dealloc_stack %12#0 : $*@local_storage Int      // id: %20
   dealloc_stack %6#0 : $*@local_storage Int       // id: %21
   dealloc_stack %4#0 : $*@local_storage Range<Int> // id: %22
@@ -43,7 +43,7 @@ bb0(%0 : $@callee_owned (Int, Int) -> ()):
 bb1:                                              // Preds: bb0 bb2
   // function_ref Swift.RangeGenerator.next <A : Swift.ForwardIndexType>(inout Swift.RangeGenerator<A>)() -> Swift.Optional<A>
   %25 = function_ref @external_bad3 : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0>, @inout RangeGenerator<τ_0_0>) -> () // user: %26
-  %26 = apply %25<Int, Int, Int, (Int), Int>(%23#1, %2#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0>, @inout RangeGenerator<τ_0_0>) -> ()
+  %26 = apply %25<Int, Int, Int, Int>(%23#1, %2#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : ForwardIndexType, τ_0_0.Distance : _SignedIntegerType, τ_0_0.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0>, @inout RangeGenerator<τ_0_0>) -> ()
   // function_ref Swift._doesOptionalHaveValue <A>(inout Swift.Optional<A>) -> Builtin.Int1
   %27 = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1 // user: %28
   %28 = apply [transparent] %27<Int>(%23#1) : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1 // user: %29

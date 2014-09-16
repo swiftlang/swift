@@ -1206,8 +1206,8 @@ namespace index_block {
   /// The names should be kept in sync, but the values must \em not be
   /// renumbered or reordered without incrementing VERSION_MAJOR.
   enum KnownProtocolKind : uint8_t {
-    ArrayBoundType = 1,
-    SequenceType,
+    // killed
+    SequenceType = 2,
     // killed
     BooleanType = 4,
 

@@ -786,13 +786,6 @@ public:
                                          Type dynamicType,
                                          Type valueType);
 
-  /// \brief Type check the given expression as an array bound, which converts
-  /// it to a builtin integer value.
-  ///
-  /// \param expr The expression to type-check, which will be modified in
-  /// place to return a builtin integral value (e.g., builtin i64).
-  bool typeCheckArrayBound(Expr *&expr, bool requireConstant, DeclContext *dc);
-
   /// \brief Resolve ambiguous pattern/expr productions inside a pattern using
   /// name lookup information. Must be done before type-checking the pattern.
   Pattern *resolvePattern(Pattern *P, DeclContext *dc);

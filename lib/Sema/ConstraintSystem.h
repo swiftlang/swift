@@ -895,19 +895,6 @@ public:
   /// contains a value.
   Expr *convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const;
 
-  /// \brief Convert the given expression to an array bound.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce. The type of this expression
-  /// must conform to the ArrayBound protocol.
-  ///
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns the expression converted to an array bound (Builtin integral
-  /// type).
-  Expr *convertToArrayBound(Expr *expr, ConstraintLocator *locator) const;
-
   /// Compute the set of substitutions required to map the given type
   /// to the provided "opened" type.
   ///

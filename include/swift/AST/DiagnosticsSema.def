@@ -1189,10 +1189,6 @@ ERROR(new_array_bound_zero,sema_tce,none,
       "array type cannot have zero length", ())
 ERROR(non_constant_array,type_parsing,none,
       "array has non-constant size", ())
-ERROR(broken_array_bound_proto,sema_tce,none,
-      "protocol 'ArrayBound' is broken", ())
-ERROR(broken_builtin_array_bound,sema_tce,none,
-      "builtin 'ArrayBound' type is broken", ())
 
 ERROR(interpolation_missing_proto,sema_tce,none,
       "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",
