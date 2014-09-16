@@ -31,6 +31,90 @@
 #include "ExistentialMetadataImpl.h"
 #include "Debug.h"
 
+
+// FIXME: Can't use llvm's RWMutex because it isn't a header-only implementation
+
+class RWMutex {
+  pthread_rwlock_t rwlock;
+
+public:
+
+  RWMutex() {
+#ifdef __APPLE__
+    // Workaround a bug/mis-feature in Darwin's pthread_rwlock_init.
+    bzero(&rwlock, sizeof(pthread_rwlock_t));
+#endif
+    int errorcode = pthread_rwlock_init(&rwlock, nullptr);
+    (void)errorcode;
+    assert(errorcode == 0);
+  }
+
+  ~RWMutex() {
+    pthread_rwlock_destroy(&rwlock);
+  }
+
+  bool reader_acquire() {
+    int errorcode = pthread_rwlock_rdlock(&rwlock);
+    return errorcode == 0;
+  }
+
+  bool reader_release() {
+    int errorcode = pthread_rwlock_unlock(&rwlock);
+    return errorcode == 0;
+  }
+
+  bool writer_acquire() {
+    int errorcode = pthread_rwlock_wrlock(&rwlock);
+    return errorcode == 0;
+  }
+
+  bool writer_release() {
+    int errorcode = pthread_rwlock_unlock(&rwlock);
+    return errorcode == 0;
+  }
+};
+
+class ScopedReader {
+  RWMutex& mutex;
+  
+public:
+
+  explicit ScopedReader(RWMutex& m) : mutex(m) {
+    bool ok = mutex.reader_acquire();
+    assert(ok);
+    (void)ok;
+  }
+
+  ~ScopedReader() {
+    bool ok = mutex.reader_release();
+    assert(ok);
+    (void)ok;
+  }
+
+  ScopedReader(const ScopedReader& rhs) = delete;
+};
+
+class ScopedWriter {
+  RWMutex& mutex;
+  
+public:
+
+  explicit ScopedWriter(RWMutex& m) : mutex(m) {
+    bool ok = mutex.writer_acquire();
+    assert(ok);
+    (void)ok;
+  }
+
+  ~ScopedWriter() {
+    bool ok = mutex.writer_release();
+    assert(ok);
+    (void)ok;
+  }
+
+  ScopedWriter(const ScopedWriter& rhs) = delete;
+};
+
+
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
 #endif
@@ -173,15 +257,24 @@ namespace llvm {
 }
 
 namespace {
-  struct MetadataCacheLock {
-    std::mutex Mutex;
-    std::condition_variable Queue;
-  };
-
   /// The implementation of a metadata cache.  Note that all-zero must
   /// be a valid state for the cache.
   template <class Entry> class MetadataCache {
-    /// Thread safety
+    /// Synchronization.
+    ///
+    /// Readers: acquire EntriesLock for reading.
+    /// 
+    /// Writers and waiters: Acquire InsertionLock first. 
+    /// Use InsertionWaiters to wait for another thread to complete an entry.
+    /// Acquire EntriesLock for writing second when modifying the Entries table.
+    /// 
+    /// We need a mutex in addition to the rwlock to make the 
+    /// condition variable work.
+    struct MetadataCacheLock {
+      RWMutex EntriesLock;
+      std::mutex InsertionLock;
+      std::condition_variable InsertionWaiters;
+    };
     MetadataCacheLock *Lock;
 
     /// The head of a linked list connecting all the metadata cache entries.
@@ -196,10 +289,12 @@ namespace {
     /// The EntryRef may be to temporary memory lacking a full backing
     /// Entry unless the value is Complete.  However, if there is an
     /// entry with a non-Complete value, there will eventually be a
-    /// notification to the lock's queue.
+    /// notification to the lock's wait list.
     ///
     /// TODO: Consider a more tuned hashtable implementation.
-    llvm::DenseMap<EntryRef<Entry>, EntryState> Entries;
+    typedef llvm::DenseMap<EntryRef<Entry>, EntryState> EntriesMapType;
+    typedef typename EntriesMapType::iterator EntriesIteratorType;
+    EntriesMapType Entries;
 
   public:
     MetadataCache() : Lock(new MetadataCacheLock()) {
@@ -210,83 +305,143 @@ namespace {
     MetadataCache(const MetadataCache &other) = delete;
     MetadataCache &operator=(const MetadataCache &other) = delete;
 
-    /// Try to find an existing entry in this cache.  If this returns
-    /// null, it is the caller's responsibility to eventually call add.
-    const Entry *find(const void * const *arguments, size_t numArguments) {
-      std::unique_lock<std::mutex> lockGuard(Lock->Mutex);
+    /// Look up a cached metadata entry.
+    /// If a cache match exists, return it.
+    /// Otherwise, call entryBuilder() and add that to the cache.
+    const Entry *findOrAdd(const void * const *arguments, 
+                           size_t numArguments, 
+                           std::function<Entry *()> entryBuilder) {
+
+#if SWIFT_DEBUG_RUNTIME
+      printf("%s(%p): looking for entry with %zu arguments:\n", 
+             Entry::getName(), this, numArguments);
+      for (size_t i = 0; i < numArguments; i++) {
+        printf("%s(%p):     %p\n", Entry::getName(), this, arguments[i]);
+      }
+#endif
 
       auto key = EntryRef<Entry>::forArguments(arguments, numArguments);
 
-      // Try to insert 'false' as the map value.  Note that this is
-      // inserting
-      auto found = Entries.insert({key, EntryState::Building});
-
-      // If that succeeded, we're in charge of creating the entry now.
-      if (found.second) return nullptr;
-
-      // If it failed, there's an existing entry.
-      auto it = found.first;
-
-      // Wait until the entry's state goes to Complete.
-      while (it->second != EntryState::Complete) {
-        // Make sure the adder knows to notify us.
-        it->second = EntryState::BuildingWithWaiters;
-
-        // Wait.
-        Lock->Queue.wait(lockGuard);
-
-        // Don't trust the existing iterator.
-        it = Entries.find(key);
-        assert(it != Entries.end());
-
-        // We need to check again because (1) wait() is allowed to
-        // return spuriously and (2) we share one condition variable
-        // for all the entries.
+      // Look for an existing entry.
+      {
+        ScopedReader readGuard(Lock->EntriesLock);
+        auto found = Entries.find(key);
+        if (found != Entries.end()  &&  found->second == EntryState::Complete) {
+#if SWIFT_DEBUG_RUNTIME
+          printf("%s(%p): found %p already in cache\n", 
+                 Entry::getName(), this, found->first.getEntry());
+#endif
+          return found->first.getEntry();
+        }
       }
 
-      return it->first.getEntry();
-    }
+      // No complete entry found. Insert a new entry or wait for the 
+      // existing one to complete.
 
-    /// Add the given entry to the cache, taking responsibility for
-    /// it.  Returns the entry that should be used, which might not be
-    /// the same as the argument if we lost a race to instantiate it.
-    /// Regardless, the argument should be considered potentially
-    /// invalid after this call.
-    const Entry *add(Entry *entry) {
-      // Grab the lock.
-      std::unique_lock<std::mutex> lockGuard(Lock->Mutex);
+      {
+        std::unique_lock<std::mutex> insertionGuard(Lock->InsertionLock);
 
-      // Maintain the linked list.
-      // TODO: Remove this when LLDB is able to understand the final data
-      // structure for the metadata cache.
-      entry->Next = Head;
-      Head = entry;
+        // Try to insert a placeholder so other threads know a new entry 
+        // is under construction.
+        std::pair<typename decltype(Entries)::iterator, bool> found;
+        {
+          ScopedWriter writeGuard(Lock->EntriesLock);
+          found = Entries.insert({key, EntryState::Building});
+        }
+        // We no longer hold EntriesLock but `found` remains valid 
+        // while we still hold InsertionLock.
 
-      // Find the existing entry, which should always exist.
-      auto key = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
-      auto it = Entries.find(key);
-      assert(it != Entries.end());
+        auto it = found.first;
+        bool inserted = found.second;
 
-      // The existing key is a reference to the (probably stack-based)
-      // arguments array, so overwrite it.  Maps don't normally allow
-      // their keys to be overwritten, and doing so isn't officially
-      // allowed, but supposedly it is unofficially guaranteed to
-      // work, at least with the standard containers.
-      const_cast<EntryRef<Entry>&>(it->first) = key;
+        if (it->second == EntryState::Complete) {
+          // Some other thread built the entry already. Return it.
+#if SWIFT_DEBUG_RUNTIME
+          printf("%s(%p): found %p already in cache after losing writer race\n",
+                 Entry::getName(), this, it->first.getEntry());
+#endif
+          return it->first.getEntry();
+        }
+        
+        if (!inserted) {
+          // Some other thread is currently building the entry. 
+          // Wait for it to complete, then return it.
 
-      assert(it->second != EntryState::Complete);
-      bool shouldNotify = (it->second == EntryState::BuildingWithWaiters);
-      it->second = EntryState::Complete;
+          // Tell the builder that we're here.
+          it->second = EntryState::BuildingWithWaiters;
 
-      // Drop the lock before notifying the queue.
-      lockGuard.unlock();
+          // Wait until the entry's state goes to Complete.
+          while (it->second != EntryState::Complete) {          
+            Lock->InsertionWaiters.wait(insertionGuard);
 
-      // Notify anybody who was waiting for us (or really, anybody who
-      // was waiting on the queue at all).
-      if (shouldNotify)
-        Lock->Queue.notify_all();
+            // We dropped InsertionLock so don't trust the existing iterator.
+            it = Entries.find(key);
+            assert(it != Entries.end());
+          }
 
-      return entry;
+#if SWIFT_DEBUG_RUNTIME
+          printf("%s(%p): found %p already in cache after waiting\n", 
+                 Entry::getName(), this, it->first.getEntry());
+#endif
+          return it->first.getEntry();
+        }
+      }
+
+      // Placeholder insertion successful. 
+
+      // Build the new cache entry.
+      // For some cache types this call may re-entrantly perform additional 
+      // cache lookups.
+      Entry *entry = entryBuilder();
+      assert(entry);
+
+      // Insert the new cache entry.
+      bool shouldNotify;
+      const Entry *result;
+      {
+        std::unique_lock<std::mutex> insertionGuard(Lock->InsertionLock);
+
+        // Update the linked list.
+        entry->Next = Head;
+        Head = entry;
+
+        // Find our placeholder.
+        // We hold InsertionLock so nobody can modify the table underneath us.
+        auto it = Entries.find(key);
+        assert(it != Entries.end());
+
+        // Replace the placeholder entry with the real data.
+        {
+          // Acquire EntriesLock to keep readers out while we update.
+          ScopedWriter writeGuard(Lock->EntriesLock);
+
+          // The existing key is a reference to the (probably stack-based)
+          // arguments array, so overwrite it.  Maps don't normally allow
+          // their keys to be overwritten, and doing so isn't officially
+          // allowed, but supposedly it is unofficially guaranteed to
+          // work, at least with the standard containers.
+          key = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
+          assert(it == Entries.find(key));
+          const_cast<EntryRef<Entry>&>(it->first) = key;
+
+          // Mark the entry as Complete.
+          assert(it->second != EntryState::Complete);
+          shouldNotify = (it->second == EntryState::BuildingWithWaiters);
+          it->second = EntryState::Complete;
+          result = it->first.getEntry();
+        }
+      }
+
+      // Notify any threads that might be waiting for the entry we just built.
+      if (shouldNotify) {
+        Lock->InsertionWaiters.notify_all();
+      }
+
+#if SWIFT_DEBUG_RUNTIME
+      printf("%s(%p): created %p %p\n", 
+             Entry::getName(), this, entry, result);
+#endif
+      return result;
     }
   };
 
@@ -320,6 +475,9 @@ namespace {
 
   struct GenericCacheEntry
       : CacheEntry<GenericCacheEntry, GenericCacheEntryHeader> {
+
+    static const char *getName() { return "GenericCache"; }
+
     GenericCacheEntry(unsigned numArguments) {
       NumArguments = numArguments;
     }
@@ -427,19 +585,6 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
   return metadata;
 }
 
-static const Metadata *
-instantiateGenericMetadata(GenericMetadata *pattern, const void *arguments) {
-  // Create the metadata.
-  Metadata *metadata = pattern->CreateFunction(pattern, arguments);
-
-  // The metadata is now valid.  Add to the cache list.
-  auto entry = GenericCacheEntry::getFromMetadata(pattern, metadata);
-  entry->Value = metadata;
-
-  auto canonFullMetadata = getCache(pattern).add(entry)->Value;
-  return canonFullMetadata;
-}
-
 /// The primary entrypoint.
 const Metadata *
 swift::swift_getGenericMetadata(GenericMetadata *pattern,
@@ -447,35 +592,16 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
   auto genericArgs = (const void * const *) arguments;
   size_t numGenericArgs = pattern->NumKeyArguments;
 
-#if SWIFT_DEBUG_RUNTIME
-  printf("swift_getGenericMetadata(%p):\n", pattern);
-  for (unsigned i = 0; i != numGenericArgs; ++i) {
-    printf("  %p\n", genericArgs[i]);
-  }
-#endif
-
-  if (auto entry = getCache(pattern).find(genericArgs, numGenericArgs)) {
-#if SWIFT_DEBUG_RUNTIME
-    printf("found in cache!\n");
-#endif
-    auto metadata = entry->Value;
-#if SWIFT_DEBUG_RUNTIME
-    printf(" -> %p\n", metadata);
-#endif
-    return metadata;
-  }
-
-
-  // Otherwise, instantiate a new one.
-#if SWIFT_DEBUG_RUNTIME
-  printf("not found in cache!\n");
-#endif
-  auto metadata = instantiateGenericMetadata(pattern, arguments);
-#if SWIFT_DEBUG_RUNTIME
-  printf(" -> %p\n", metadata);
-#endif
-
-  return metadata;
+  auto entry = getCache(pattern).findOrAdd(genericArgs, numGenericArgs, 
+    [&]() -> GenericCacheEntry* {
+      // Create new metadata to cache.
+      auto metadata = pattern->CreateFunction(pattern, arguments);
+      auto entry = GenericCacheEntry::getFromMetadata(pattern, metadata);
+      entry->Value = metadata;
+      return entry;
+    });
+  
+  return entry->Value;
 }
 
 /// Fast entry points.
@@ -515,6 +641,8 @@ namespace {
     FullMetadata<ObjCClassWrapperMetadata> Metadata;
 
   public:
+    static const char *getName() { return "ObjCClassCache"; }
+
     ObjCClassCacheEntry(size_t numArguments) {}
 
     static constexpr size_t getNumArguments() {
@@ -540,21 +668,24 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
     return theClass;
   }
 
-  // Look for an existing entry.
+  // Search the cache.
+
   const size_t numGenericArgs = 1;
   const void *args[] = { theClass };
-  if (auto entry = ObjCClassWrappers.find(args, numGenericArgs)) {
-    return entry->getData();
-  }
+  auto entry = ObjCClassWrappers.findOrAdd(args, numGenericArgs, 
+    [&]() -> ObjCClassCacheEntry* {
+      // Create a new entry for the cache.
+      auto entry = ObjCClassCacheEntry::allocate(args, numGenericArgs, 0);
 
-  auto entry = ObjCClassCacheEntry::allocate(args, numGenericArgs, 0);
+      auto metadata = entry->getData();
+      metadata->setKind(MetadataKind::ObjCClassWrapper);
+      metadata->ValueWitnesses = &_TWVBO;
+      metadata->Class = theClass;
+      
+      return entry;
+    });
 
-  auto metadata = entry->getData();
-  metadata->setKind(MetadataKind::ObjCClassWrapper);
-  metadata->ValueWitnesses = &_TWVBO;
-  metadata->Class = theClass;
-
-  return ObjCClassWrappers.add(entry)->getData();
+  return entry->getData();
 }
 
 namespace {
@@ -562,6 +693,8 @@ namespace {
     FullMetadata<FunctionTypeMetadata> Metadata;
 
   public:
+    static const char *getName() { return "FunctionCache"; }
+
     FunctionCacheEntry(size_t numArguments) {}
 
     static constexpr size_t getNumArguments() {
@@ -588,24 +721,25 @@ namespace {
                            MetadataKind Kind,
                            MetadataCache<FunctionCacheEntry> &Cache,
                            const ValueWitnessTable &ValueWitnesses) {
+    // Search the cache.
+
     const size_t numGenericArgs = 2;
-
-    typedef FullMetadata<FunctionTypeMetadata> FullFunctionTypeMetadata;
-
     const void *args[] = { argMetadata, resultMetadata };
-    if (auto entry = Cache.find(args, numGenericArgs)) {
-      return entry->getData();
-    }
+    auto entry = Cache.findOrAdd(args, numGenericArgs, 
+      [&]() -> FunctionCacheEntry* {
+        // Create a new entry for the cache.
+        auto entry = FunctionCacheEntry::allocate(args, numGenericArgs, 0);
 
-    auto entry = FunctionCacheEntry::allocate(args, numGenericArgs, 0);
+        auto metadata = entry->getData();
+        metadata->setKind(Kind);
+        metadata->ValueWitnesses = &ValueWitnesses;
+        metadata->ArgumentType = argMetadata;
+        metadata->ResultType = resultMetadata;
 
-    auto metadata = entry->getData();
-    metadata->setKind(Kind);
-    metadata->ValueWitnesses = &ValueWitnesses;
-    metadata->ArgumentType = argMetadata;
-    metadata->ResultType = resultMetadata;
+        return entry;
+      });
 
-    return Cache.add(entry)->getData();
+    return entry->getData();
   }
 }
 
@@ -641,6 +775,8 @@ namespace {
     // to update tuple_getValueWitnesses().
     ExtraInhabitantsValueWitnessTable Witnesses;
     FullMetadata<TupleTypeMetadata> Metadata;
+
+    static const char *getName() { return "TupleCache"; }
 
     TupleCacheEntry(size_t numArguments) {
       NumArguments = numArguments;
@@ -1122,106 +1258,93 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const Metadata * const *elements,
                                   const char *labels,
                                   const ValueWitnessTable *proposedWitnesses) {
-#if SWIFT_DEBUG_RUNTIME
-  printf("looking up tuple type metadata\n");
-  for (unsigned i = 0; i < numElements; ++i)
-    printf("  %p\n", elements[0]);
-#endif
+  // Bypass the cache for the empty tuple. We might reasonably get called 
+  // by generic code, like a demangler that produces type objects.
+  if (numElements == 0) return &_TMdT_;
+
+  // Search the cache.
 
   // FIXME: include labels when uniquing!
   auto genericArgs = (const void * const *) elements;
-  if (auto entry = TupleTypes.find(genericArgs, numElements)) {
-#if SWIFT_DEBUG_RUNTIME
-    printf("found in cache! %p\n", entry->getData());
-#endif
-    return entry->getData();
-  }
+  auto entry = TupleTypes.findOrAdd(genericArgs, numElements, 
+    [&]() -> TupleCacheEntry* {
+      // Create a new entry for the cache.
+
+      typedef TupleTypeMetadata::Element Element;
+
+      // Allocate the tuple cache entry, which includes space for both the
+      // metadata and a value-witness table.
+      auto entry = TupleCacheEntry::allocate(genericArgs, numElements,
+                                             numElements * sizeof(Element));
+
+      auto witnesses = &entry->Witnesses;
+
+      auto metadata = entry->getData();
+      metadata->setKind(MetadataKind::Tuple);
+      metadata->ValueWitnesses = witnesses;
+      metadata->NumElements = numElements;
+      metadata->Labels = labels;
+
+      // Perform basic layout on the tuple.
+      auto layout = BasicLayout::initialForValueType();
+      performBasicLayout(layout, elements, numElements,
+        [&](size_t i, const Metadata *elt, size_t offset) {
+          metadata->getElements()[i].Type = elt;
+          metadata->getElements()[i].Offset = offset;
+        });
   
-#if SWIFT_DEBUG_RUNTIME
-  printf("not found in cache!\n");
-#endif
+      witnesses->size = layout.size;
+      witnesses->flags = layout.flags;
+      witnesses->stride = layout.stride;
 
-  // We might reasonably get called by generic code, like a demangler
-  // that produces type objects.  As long as we sink this below the
-  // fast-path map lookup, it doesn't really cost us anything.
-  if (numElements == 0) return &_TMdT_;
+      // Copy the function witnesses in, either from the proposed
+      // witnesses or from the standard table.
+      if (!proposedWitnesses) {
+        // For a tuple with a single element, just use the witnesses for
+        // the element type.
+        if (numElements == 1) {
+          proposedWitnesses = elements[0]->getValueWitnesses();
 
-  typedef TupleTypeMetadata::Element Element;
-
-  // Allocate the tuple cache entry, which includes space for both the
-  // metadata and a value-witness table.
-  auto entry = TupleCacheEntry::allocate(genericArgs, numElements,
-                                         numElements * sizeof(Element));
-
-  auto witnesses = &entry->Witnesses;
-
-  auto metadata = entry->getData();
-  metadata->setKind(MetadataKind::Tuple);
-  metadata->ValueWitnesses = witnesses;
-  metadata->NumElements = numElements;
-  metadata->Labels = labels;
-
-  // Perform basic layout on the tuple.
-  auto layout = BasicLayout::initialForValueType();
-  performBasicLayout(layout, elements, numElements,
-    [&](size_t i, const Metadata *elt, size_t offset) {
-      metadata->getElements()[i].Type = elt;
-      metadata->getElements()[i].Offset = offset;
-    });
-  
-  witnesses->size = layout.size;
-  witnesses->flags = layout.flags;
-  witnesses->stride = layout.stride;
-
-  // Copy the function witnesses in, either from the proposed
-  // witnesses or from the standard table.
-  if (!proposedWitnesses) {
-    // For a tuple with a single element, just use the witnesses for
-    // the element type.
-    if (numElements == 1) {
-      proposedWitnesses = elements[0]->getValueWitnesses();
-
-    // Otherwise, use generic witnesses (when we can't pattern-match
-    // into something better).
-    } else if (layout.flags.isInlineStorage()
-               && layout.flags.isPOD()) {
-      if (layout.size == 8) proposedWitnesses = &_TWVBi64_;
-      else if (layout.size == 4) proposedWitnesses = &_TWVBi32_;
-      else if (layout.size == 2) proposedWitnesses = &_TWVBi16_;
-      else if (layout.size == 1) proposedWitnesses = &_TWVBi8_;
-      else proposedWitnesses = &tuple_witnesses_pod_inline;
-    } else if (layout.flags.isInlineStorage()
-               && !layout.flags.isPOD()) {
-      proposedWitnesses = &tuple_witnesses_nonpod_inline;
-    } else if (!layout.flags.isInlineStorage()
-               && layout.flags.isPOD()) {
-      proposedWitnesses = &tuple_witnesses_pod_noninline;
-    } else {
-      assert(!layout.flags.isInlineStorage()
-             && !layout.flags.isPOD());
-      proposedWitnesses = &tuple_witnesses_nonpod_noninline;
-    }
-  }
+          // Otherwise, use generic witnesses (when we can't pattern-match
+          // into something better).
+        } else if (layout.flags.isInlineStorage()
+                   && layout.flags.isPOD()) {
+          if (layout.size == 8) proposedWitnesses = &_TWVBi64_;
+          else if (layout.size == 4) proposedWitnesses = &_TWVBi32_;
+          else if (layout.size == 2) proposedWitnesses = &_TWVBi16_;
+          else if (layout.size == 1) proposedWitnesses = &_TWVBi8_;
+          else proposedWitnesses = &tuple_witnesses_pod_inline;
+        } else if (layout.flags.isInlineStorage()
+                   && !layout.flags.isPOD()) {
+          proposedWitnesses = &tuple_witnesses_nonpod_inline;
+        } else if (!layout.flags.isInlineStorage()
+                   && layout.flags.isPOD()) {
+          proposedWitnesses = &tuple_witnesses_pod_noninline;
+        } else {
+          assert(!layout.flags.isInlineStorage()
+                 && !layout.flags.isPOD());
+          proposedWitnesses = &tuple_witnesses_nonpod_noninline;
+        }
+      }
 #define ASSIGN_TUPLE_WITNESS(NAME) \
-  witnesses->NAME = proposedWitnesses->NAME;
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(ASSIGN_TUPLE_WITNESS)
+      witnesses->NAME = proposedWitnesses->NAME;
+      FOR_ALL_FUNCTION_VALUE_WITNESSES(ASSIGN_TUPLE_WITNESS)
 #undef ASSIGN_TUPLE_WITNESS
 
-  // We have extra inhabitants if the first element does.
-  // FIXME: generalize this.
-  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
-                                          elements[0]->getValueWitnesses())) {
-    witnesses->flags = witnesses->flags.withExtraInhabitants(true);
-    witnesses->extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
-    witnesses->storeExtraInhabitant = tuple_storeExtraInhabitant;
-    witnesses->getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
-  }
+      // We have extra inhabitants if the first element does.
+      // FIXME: generalize this.
+      if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                                 elements[0]->getValueWitnesses())) {
+        witnesses->flags = witnesses->flags.withExtraInhabitants(true);
+        witnesses->extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
+        witnesses->storeExtraInhabitant = tuple_storeExtraInhabitant;
+        witnesses->getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
+      }
 
-  auto finalMetadata = TupleTypes.add(entry)->getData();
-#if SWIFT_DEBUG_RUNTIME
-  printf(" -> %p\n", finalMetadata);
-#endif
-  return finalMetadata;
+      return entry;
+    });
+
+  return entry->getData();
 }
 
 const TupleTypeMetadata *
@@ -1411,6 +1534,8 @@ namespace {
     FullMetadata<MetatypeMetadata> Metadata;
 
   public:
+    static const char *getName() { return "MetatypeCache"; }
+
     MetatypeCacheEntry(size_t numArguments) {}
 
     static constexpr size_t getNumArguments() {
@@ -1440,21 +1565,23 @@ getMetatypeValueWitnesses(const Metadata *instanceType) {
 /// \brief Fetch a uniqued metadata for a metatype type.
 extern "C" const MetatypeMetadata *
 swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
+  // Search the cache.
   const size_t numGenericArgs = 1;
-
   const void *args[] = { instanceMetadata };
-  if (auto entry = MetatypeTypes.find(args, numGenericArgs)) {
-    return entry->getData();
-  }
+  auto entry = MetatypeTypes.findOrAdd(args, numGenericArgs, 
+    [&]() -> MetatypeCacheEntry* {
+      // Create a new entry for the cache.
+      auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
 
-  auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
+      auto metadata = entry->getData();
+      metadata->setKind(MetadataKind::Metatype);
+      metadata->ValueWitnesses = getMetatypeValueWitnesses(instanceMetadata);
+      metadata->InstanceType = instanceMetadata;
 
-  auto metadata = entry->getData();
-  metadata->setKind(MetadataKind::Metatype);
-  metadata->ValueWitnesses = getMetatypeValueWitnesses(instanceMetadata);
-  metadata->InstanceType = instanceMetadata;
+      return entry;
+    });
 
-  return MetatypeTypes.add(entry)->getData();
+  return entry->getData();
 }
 
 /*** Existential Metatypes *************************************************/
@@ -1465,6 +1592,8 @@ namespace {
     FullMetadata<ExistentialMetatypeMetadata> Metadata;
 
   public:
+    static const char *getName() { return "ExistentialMetatypeCache"; }
+
     ExistentialMetatypeCacheEntry(size_t numArguments) {}
 
     static constexpr size_t getNumArguments() {
@@ -1493,33 +1622,37 @@ getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
 /// \brief Fetch a uniqued metadata for a metatype type.
 extern "C" const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
+  // Search the cache.
   const size_t numGenericArgs = 1;
-
   const void *args[] = { instanceMetadata };
-  if (auto entry = ExistentialMetatypeTypes.find(args, numGenericArgs)) {
-    return entry->getData();
-  }
+  auto entry = ExistentialMetatypeTypes.findOrAdd(args, numGenericArgs, 
+    [&]() -> ExistentialMetatypeCacheEntry* {
+      // Create a new entry for the cache.
+      auto entry = 
+        ExistentialMetatypeCacheEntry::allocate(args, numGenericArgs, 0);
 
-  auto entry = ExistentialMetatypeCacheEntry::allocate(args, numGenericArgs, 0);
+      // FIXME: the value witnesses should probably account for room for
+      // protocol witness tables
 
-  // FIXME: the value witnesses should probably account for room for
-  // protocol witness tables
+      ExistentialTypeFlags flags;
+      if (instanceMetadata->getKind() == MetadataKind::Existential) {
+        flags = static_cast<const ExistentialTypeMetadata*>(instanceMetadata)->Flags;
+      } else {
+        assert(instanceMetadata->getKind()==MetadataKind::ExistentialMetatype);
+        flags = static_cast<const ExistentialMetatypeMetadata*>(instanceMetadata)->Flags;
+      }
 
-  ExistentialTypeFlags flags;
-  if (instanceMetadata->getKind() == MetadataKind::Existential) {
-    flags = static_cast<const ExistentialTypeMetadata*>(instanceMetadata)->Flags;
-  } else {
-    assert(instanceMetadata->getKind() == MetadataKind::ExistentialMetatype);
-    flags = static_cast<const ExistentialMetatypeMetadata*>(instanceMetadata)->Flags;
-  }
+      auto metadata = entry->getData();
+      metadata->setKind(MetadataKind::ExistentialMetatype);
+      metadata->ValueWitnesses = 
+        getExistentialMetatypeValueWitnesses(flags.getNumWitnessTables());
+      metadata->InstanceType = instanceMetadata;
+      metadata->Flags = flags;
 
-  auto metadata = entry->getData();
-  metadata->setKind(MetadataKind::ExistentialMetatype);
-  metadata->ValueWitnesses = getExistentialMetatypeValueWitnesses(flags.getNumWitnessTables());
-  metadata->InstanceType = instanceMetadata;
-  metadata->Flags = flags;
+      return entry;
+    });
 
-  return ExistentialMetatypeTypes.add(entry)->getData();
+  return entry->getData();
 }
 
 /*** Existential types ********************************************************/
@@ -1528,6 +1661,8 @@ namespace {
   class ExistentialCacheEntry : public CacheEntry<ExistentialCacheEntry> {
   public:
     FullMetadata<ExistentialTypeMetadata> Metadata;
+
+    static const char *getName() { return "ExistentialCache"; }
 
     ExistentialCacheEntry(size_t numArguments) {
       Metadata.Protocols.NumProtocols = numArguments;
@@ -1735,27 +1870,30 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
     if (p->Flags.getClassConstraint() == ProtocolClassConstraint::Class)
       classConstraint = ProtocolClassConstraint::Class;
   }
+
+  // Search the cache.
   
   auto protocolArgs = reinterpret_cast<const void * const *>(protocols);
   
-  if (auto entry = ExistentialTypes.find(protocolArgs, numProtocols)) {
-    return entry->getData();
-  }
-  
-  auto entry = ExistentialCacheEntry::allocate(protocolArgs, numProtocols,
+  auto entry = ExistentialTypes.findOrAdd(protocolArgs, numProtocols, 
+    [&]() -> ExistentialCacheEntry* {
+      // Create a new entry for the cache.
+      auto entry = ExistentialCacheEntry::allocate(protocolArgs, numProtocols,
                              sizeof(const ProtocolDescriptor *) * numProtocols);
-  auto metadata = entry->getData();
-  metadata->setKind(MetadataKind::Existential);
-  metadata->ValueWitnesses = getExistentialValueWitnesses(classConstraint,
-                                                          numWitnessTables);
-  metadata->Flags = ExistentialTypeFlags()
-    .withNumWitnessTables(numWitnessTables)
-    .withClassConstraint(classConstraint);
-  metadata->Protocols.NumProtocols = numProtocols;
-  for (size_t i = 0; i < numProtocols; ++i)
-    metadata->Protocols[i] = protocols[i];
+      auto metadata = entry->getData();
+      metadata->setKind(MetadataKind::Existential);
+      metadata->ValueWitnesses = getExistentialValueWitnesses(classConstraint,
+                                                              numWitnessTables);
+      metadata->Flags = ExistentialTypeFlags()
+        .withNumWitnessTables(numWitnessTables)
+        .withClassConstraint(classConstraint);
+      metadata->Protocols.NumProtocols = numProtocols;
+      for (size_t i = 0; i < numProtocols; ++i)
+        metadata->Protocols[i] = protocols[i];
   
-  return ExistentialTypes.add(entry)->getData();
+      return entry;
+    });
+  return entry->getData();
 }
 
 /// \brief Perform a copy-assignment from one existential container to another.
