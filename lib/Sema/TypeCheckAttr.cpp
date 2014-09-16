@@ -934,11 +934,8 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
     return false;
 
   // Find the Clang module unit that stores the class.
-  auto classModule = classDecl->getDeclContext()->getParentModule();
-  if (!classModule || classModule->getFiles().empty())
-    return false;
-
-  auto classModuleUnit = dyn_cast<ClangModuleUnit>(classModule->getFiles()[0]);
+  auto classModuleUnit
+    = dyn_cast<ClangModuleUnit>(classDecl->getModuleScopeContext());
   if (!classModuleUnit)
     return false;
 
