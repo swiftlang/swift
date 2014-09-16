@@ -237,12 +237,12 @@ public protocol BooleanLiteralConvertible {
 }
 
 public protocol _BuiltinCharacterLiteralConvertible {
-  class func _convertFromBuiltinCharacterLiteral(value: Builtin.Int32) -> Self
+  init(_builtinCharacterLiteral value: Builtin.Int32)
 }
 
 public protocol CharacterLiteralConvertible {
   typealias CharacterLiteralType : _BuiltinCharacterLiteralConvertible
-  class func convertFromCharacterLiteral(value: CharacterLiteralType) -> Self
+  init(characterLiteral value: CharacterLiteralType)
 }
 
 public protocol _BuiltinUnicodeScalarLiteralConvertible {

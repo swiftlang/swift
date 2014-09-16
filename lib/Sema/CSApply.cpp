@@ -1434,16 +1434,20 @@ namespace {
           type = defaultType;
       }
 
+      DeclName initName(tc.Context, tc.Context.Id_init,
+                        { tc.Context.Id_CharacterLiteral });
+      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+                               { tc.Context.Id_BuiltinCharacterLiteral });
       return convertLiteral(
                expr,
                type,
                expr->getType(),
                protocol,
                tc.Context.Id_CharacterLiteralType,
-               tc.Context.Id_ConvertFromCharacterLiteral,
+               initName,
                builtinProtocol,
                Type(BuiltinIntegerType::get(32, tc.Context)),
-               tc.Context.Id_ConvertFromBuiltinCharacterLiteral,
+               builtinInitName,
                [] (Type type) -> bool {
                  if (auto builtinInt = type->getAs<BuiltinIntegerType>()) {
                    return builtinInt->isFixedWidth(32);

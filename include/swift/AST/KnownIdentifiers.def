@@ -76,10 +76,8 @@ IDENTIFIER_WITH_NAME(BuiltinBooleanLiteral, "_builtinBooleanLiteral")
 IDENTIFIER_WITH_NAME(BooleanLiteral, "booleanLiteral")
 
 IDENTIFIER(CharacterLiteralType)
-IDENTIFIER_WITH_NAME(ConvertFromCharacterLiteral,
-                     "convertFromCharacterLiteral")
-IDENTIFIER_WITH_NAME(ConvertFromBuiltinCharacterLiteral,
-                     "_convertFromBuiltinCharacterLiteral")
+IDENTIFIER_WITH_NAME(CharacterLiteral, "characterLiteral")
+IDENTIFIER_WITH_NAME(BuiltinCharacterLiteral, "_builtinCharacterLiteral")
 
 IDENTIFIER(ExtendedGraphemeClusterLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinExtendedGraphemeClusterLiteral,

@@ -8,15 +8,8 @@ struct MyCharacter :
     _BuiltinCharacterLiteralConvertible, CharacterLiteralConvertible,
     Equatable {
 
-  static func _convertFromBuiltinCharacterLiteral(
-    value: Builtin.Int32
-  ) -> MyCharacter {
-    return MyCharacter()
-  }
-
-  static func convertFromCharacterLiteral(value: MyCharacter) -> MyCharacter {
-    return value
-  }
+  init(_builtinCharacterLiteral value: Builtin.Int32) { }
+  init(characterLiteral value: MyCharacter) { }
 }
 
 func ==(lhs: MyCharacter, rhs: MyCharacter) -> Bool {

@@ -6,15 +6,9 @@ typealias CharacterLiteralType = SillyCharacter
 struct SillyCharacter :
     _BuiltinCharacterLiteralConvertible, CharacterLiteralConvertible {
 
-  static func _convertFromBuiltinCharacterLiteral(
-    value: Builtin.Int32
-  ) -> SillyCharacter {
-    return SillyCharacter()
-  }
+  init(_builtinCharacterLiteral value: Builtin.Int32) { }
 
-  static func convertFromCharacterLiteral(value: SillyCharacter) -> SillyCharacter {
-    return value
-  }
+  init(characterLiteral value: SillyCharacter) { }
 }
 
 struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible {

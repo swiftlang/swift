@@ -7,15 +7,9 @@ typealias CharacterLiteralType = SillyCharacter
 struct SillyCharacter :
     _BuiltinCharacterLiteralConvertible, CharacterLiteralConvertible {
 
-  static func _convertFromBuiltinCharacterLiteral(
-    value: Builtin.Int32
-  ) -> SillyCharacter {
-    return SillyCharacter()
-  }
+  init(_builtinCharacterLiteral value: Builtin.Int32) { }
 
-  static func convertFromCharacterLiteral(value: SillyCharacter) -> SillyCharacter {
-    return value
-  }
+  init(characterLiteral value: SillyCharacter) { }
 }
 
 // CHECK: private unnamed_addr constant [22 x i8] c"this is just a\0A\0A test\00"
@@ -35,8 +29,8 @@ func TestStringLiteral2() -> String {
 
 // CHECK: @_TF11expressions15TestCharLiteral
 func TestCharLiteral(inout a: SillyCharacter) {
-  a = '0'  // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 48)
-  a = 'a'  // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 97)
-  a = '\u{2603}' // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 9731)
-  a = '☃' // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 9731)
+  a = '0'  // CHECK: _TFV11expressions14SillyCharacterCfMS0_FT24_builtinCharacterLiteralBi32__S0_{{.*}}(i32 48)
+  a = 'a'  // CHECK: _TFV11expressions14SillyCharacterCfMS0_FT24_builtinCharacterLiteralBi32__S0_(i32 97)
+  a = '\u{2603}' // CHECK: _TFV11expressions14SillyCharacterCfMS0_FT24_builtinCharacterLiteralBi32__S0_(i32 9731)
+  a = '☃' // CHECK: _TFV11expressions14SillyCharacterCfMS0_FT24_builtinCharacterLiteralBi32__S0_(i32 9731)
 }
