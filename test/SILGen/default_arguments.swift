@@ -6,7 +6,7 @@
 
 // Default argument for first parameter.
 // CHECK-LABEL: sil  @_TIF17default_arguments7defarg1{{.*}} : $@thin () -> Int
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
 // CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 17
 // CHECK: [[RESULT:%[0-9]+]] = apply [transparent] [[CVT]]([[LIT]], [[INT]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
@@ -42,7 +42,7 @@ func defarg2(i: Int, d: Double = 3.125, s: String = "Hello") { }
 // CHECK-LABEL: sil  @_TF17default_arguments15testDefaultArg2
 func testDefaultArg2() {
 // CHECK:  [[FNREF:%[0-9]+]] = function_ref @_TF17default_arguments7defarg2{{.*}} : $@thin (Int, Double, @owned String) -> ()
-// CHECK:  [[LITFN:%[0-9]+]] = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:  [[LITFN:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
 // CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
 // CHECK:  [[I:%[0-9]+]] = apply [transparent] [[LITFN]]([[INTLIT]], [[INT64]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int

@@ -39,8 +39,8 @@ struct meters : IntegerLiteralConvertible {
   }
 
   typealias IntegerLiteralType = Int8
-  static func convertFromIntegerLiteral(value: Int8) -> meters {
-    return meters(value)
+  init(integerLiteral value: Int8) {
+    self.value = value
   }
 }
 
@@ -48,8 +48,8 @@ struct supermeters : IntegerLiteralConvertible { // expected-error{{type 'superm
   var value : meters
   
   typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'IntegerLiteralType' does not conform to '_BuiltinIntegerLiteralConvertible'}}
-  static func convertFromIntegerLiteral(value: meters) -> supermeters {
-    return supermeters(value: value)
+  init(_integerLiteral value: meters) {
+    self.value = value
   }
 }
 

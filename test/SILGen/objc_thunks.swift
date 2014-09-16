@@ -356,12 +356,12 @@ class DesignatedOverrides : Gizmo {
 
   // CHECK-LABEL: sil @_TFC11objc_thunks19DesignatedOverridescfMS0_FT_GSQS0__
   // CHECK-NOT: return
-  // CHECK: function_ref @_TFSi33_convertFromBuiltinIntegerLiteralf
+  // CHECK: function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
   // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> () -> Gizmo! , $@cc(objc_method) @thin (@owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return
 
   // CHECK-LABEL: sil @_TFC11objc_thunks19DesignatedOverridescfMS0_FT7bellsOnSi_GSQS0__
-  // CHECK: function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si
+  // CHECK: function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
   // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return
 }

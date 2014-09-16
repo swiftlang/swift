@@ -153,13 +153,13 @@ public struct ${Self}
 %  end
 
   @transparent public
-  static func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
-    return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0)
+  init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}) {
+    self = ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0)
   }
 
   @transparent public
-  static func convertFromIntegerLiteral(value: ${Self}) -> ${Self} {
-    return value
+  init(integerLiteral value: ${Self}) {
+    self = value
   }
   @transparent public
   func _getBuiltinArrayBoundValue() -> Builtin.Word {

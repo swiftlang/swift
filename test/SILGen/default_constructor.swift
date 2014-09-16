@@ -16,7 +16,7 @@ struct D {
 // CHECK-LABEL: sil  @_TFV19default_constructor1DCfMS0_FT_S0_ : $@thin (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box $D
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
-// CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
 // CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 2
 // CHECK: [[INTVAL:%[0-9]+]] = apply [transparent] [[INTCONV]]([[INTLIT]], [[INTMETA]])

@@ -47,8 +47,8 @@ final class X : ForwardIndexType, Comparable, Printable,
     return self.dynamicType(self.value.successor())
   }
   
-  class func convertFromIntegerLiteral(value: Int) -> Self {
-    return self(value)
+  convenience init(integerLiteral value: Int) {
+    self.init(value)
   }
 
   var value: Int

@@ -87,7 +87,7 @@ func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil  @_TF13sil_locations15useTemplateTestFT_Si
 
-  // CHECK: function_ref @_TFSi33_convertFromBuiltinIntegerLiteral{{.*}} line:87
+  // CHECK: function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si{{.*}} line:87
 }
 
 func foo(x: Int) -> Int {

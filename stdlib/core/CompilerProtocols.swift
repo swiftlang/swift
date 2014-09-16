@@ -208,13 +208,12 @@ public protocol NilLiteralConvertible {
 }
 
 public protocol _BuiltinIntegerLiteralConvertible {
-  class func _convertFromBuiltinIntegerLiteral(
-      value: _MaxBuiltinIntegerType) -> Self
+  init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
 }
 
 public protocol IntegerLiteralConvertible {
   typealias IntegerLiteralType : _BuiltinIntegerLiteralConvertible
-  class func convertFromIntegerLiteral(value: IntegerLiteralType) -> Self
+  init(integerLiteral value: IntegerLiteralType)
 }
 
 public protocol _BuiltinFloatLiteralConvertible {

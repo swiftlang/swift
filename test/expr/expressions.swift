@@ -271,42 +271,14 @@ var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
 
-struct int_test1 {
-  // FIXME: Will be diagnosed when we switch to formal protocols
-  static func convertFromIntegerLiteral() {}
-}
-
-var il_d: int_test1 = 4 // expected-error{{type 'int_test1' does not conform to protocol 'IntegerLiteralConvertible'}}
-
-
-struct int_test2 {
-  static func convertFromIntegerLiteral(_: Int32) {}
-  static func convertFromIntegerLiteral(_: Int8) {}
-}
-
-var il_e: int_test2 = 4 // expected-error {{type 'int_test2' does not conform to protocol 'IntegerLiteralConvertible'}}
-
-struct int_test3 {
-  func convertFromIntegerLiteral() {}
-}
-
-var il_f: int_test3 = 4  // expected-error{{type 'int_test3' does not conform to protocol 'IntegerLiteralConvertible'}}
-
 struct int_test4 : IntegerLiteralConvertible {
   typealias IntegerLiteralType = Int
-  static func convertFromIntegerLiteral(value: Int) -> int_test4 {} // user type.
+  init(integerLiteral value: Int) {} // user type.
 }
 
 var il_g: int_test4 = 4
 
 
-// Defined conversion function's argument isn't compatible with literals.
-struct int_test5 {
-  static func convertFromIntegerLiteral(_: Bool) -> int_test5 {}
-}
-
-var il_h: int_test5 =
-   4 //expected-error {{type 'int_test5' does not conform to protocol 'IntegerLiteralConvertible'}}
 
 // This just barely fits in Int64.
 var il_i: Int64  = 18446744073709551615
@@ -615,10 +587,10 @@ struct Foo {
 }
 
 func test() {
-  var x = int_test3()
+  var x = Foo()
 
   // rdar://15708430
-  (&x).convertFromIntegerLiteral()  // expected-error {{'inout int_test3' is not identical to 'int_test3'}}
+  (&x).method()  // expected-error {{'inout Foo' is not identical to 'Foo'}}
 }
 
 // Unused l-value

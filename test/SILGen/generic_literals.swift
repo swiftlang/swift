@@ -3,10 +3,10 @@
 // CHECK-LABEL: sil  @_TF16generic_literals21genericIntegerLitera
 func genericIntegerLiteral<T : IntegerLiteralConvertible>(var x: T) {
   // CHECK: [[TMETA:%.*]] = metatype $@thick T.Type
-  // CHECK: [[TCONV:%.*]] = witness_method $T, #IntegerLiteralConvertible.convertFromIntegerLiteral!1
+  // CHECK: [[TCONV:%.*]] = witness_method $T, #IntegerLiteralConvertible.init!allocator.1
   // CHECK: [[LITVAR:%.*]] = alloc_stack $T.IntegerLiteralType
   // CHECK: [[LITMETA:%.*]] = metatype $@thick T.IntegerLiteralType.Type
-  // CHECK: [[BUILTINCONV:%.*]] = witness_method $T.IntegerLiteralType, #_BuiltinIntegerLiteralConvertible._convertFromBuiltinIntegerLiteral!1
+  // CHECK: [[BUILTINCONV:%.*]] = witness_method $T.IntegerLiteralType, #_BuiltinIntegerLiteralConvertible.init!allocator.1
   // CHECK: [[INTLIT:%.*]] = integer_literal $Builtin.Int2048, 17
   // CHECK: [[LIT:%.*]] = apply [[BUILTINCONV]]<T.IntegerLiteralType>([[LITVAR]]#1, [[INTLIT]], [[LITMETA]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : _BuiltinIntegerLiteralConvertible> (@out τ_0_0, Builtin.Int2048, @thick τ_0_0.Type) -> ()
   // CHECK: [[ADDR:%.*]] = alloc_stack $T

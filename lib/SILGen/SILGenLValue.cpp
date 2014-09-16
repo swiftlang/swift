@@ -500,14 +500,17 @@ static bool isReadNoneFunction(const Expr *e) {
   // we can "safely" assume it is readnone (btw, yes this is totally gross).
   // This is better to be attribute driven, ala rdar://15587352.
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
-    StringRef name = dre->getDecl()->getName().str();
-    return name == "_convertFromBuiltinIntegerLiteral" ||
-           name == "convertFromIntegerLiteral";
+    DeclName name = dre->getDecl()->getFullName();
+    return (name.getArgumentNames().size() == 1 &&
+            name.getBaseName().str() == "init" &&
+            !name.getArgumentNames()[0].empty() &&
+            (name.getArgumentNames()[0].str() == "integerLiteral" ||
+             name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
   }
   
   // Look through DotSyntaxCallExpr, since the literal functions are curried.
-  if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(e))
-    return isReadNoneFunction(DSCE->getFn());
+  if (auto *CRCE = dyn_cast<ConstructorRefCallExpr>(e))
+    return isReadNoneFunction(CRCE->getFn());
   
   return false;
 }
@@ -557,7 +560,25 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
   if (auto *cl1 = dyn_cast<CharacterLiteralExpr>(e1))
     return cl1->getValue() == cast<CharacterLiteralExpr>(e2)->getValue();
   
-  
+  // Compare tuple expressions.
+  if (auto *te1 = dyn_cast<TupleExpr>(e1)) {
+    auto *te2 = cast<TupleExpr>(e2);
+
+    // Easy checks: # of elements, trailing closures, element names.
+    if (te1->getNumElements() != te2->getNumElements() ||
+        te1->hasTrailingClosure() != te2->hasTrailingClosure() ||
+        te1->getElementNames() != te2->getElementNames()) {
+      return false;
+    }
+
+    for (unsigned i = 0, n = te1->getNumElements(); i != n; ++i) {
+      if (!areCertainlyEqualIndices(te1->getElement(i), te2->getElement(i)))
+        return false;
+    }
+
+    return true;
+  }
+
   // Otherwise, we have no idea if they are identical.
   return false;
 }

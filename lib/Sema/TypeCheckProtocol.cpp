@@ -1155,6 +1155,14 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   auto metaType = MetatypeType::get(Adoptee);
 
+  // Determine whether we can derive this conformance.
+  // FIXME: Hoist this computation out of here.
+  bool canDerive = false;
+  if (auto *nominal = Adoptee->getAnyNominal()) {
+    if (nominal->derivesProtocolConformance(Proto))
+      canDerive = true;
+  }
+
   // Gather the witnesses.
   SmallVector<ValueDecl *, 4> witnesses;
   bool ignoringNames = false;
@@ -1175,7 +1183,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
-    if (candidates.empty()) {
+    if (candidates.empty() && !canDerive) {
       candidates = TC.lookupMember(metaType, requirement->getName(), DC);
       ignoringNames = true;
     }
@@ -1409,12 +1417,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // We have either no matches or an ambiguous match.
 
   // If we can derive a definition for this requirement, just call it missing.
-  // FIXME: Hoist this computation out of here.
-
-  // If we can derive protocol conformance, report
-  if (auto *nominal = Adoptee->getAnyNominal()) {
-    if (nominal->derivesProtocolConformance(Proto))
-      return ResolveWitnessResult::Missing;
+  if (canDerive) {
+    return ResolveWitnessResult::Missing;
   }
 
   // If the requirement is optional, it's okay. We'll satisfy this via

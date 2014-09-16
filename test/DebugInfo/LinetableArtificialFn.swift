@@ -5,7 +5,7 @@
 
 // CHECK: store i64{{.*}}getelementptr
 // CHECK: store i64{{.*}}getelementptr{{.*}}, !dbg ![[DBG:[0-9]+]]
-// CHECK-NEXT: convertFromBuiltinIntegerLiteral{{.*}}(i2048 -2)
+// CHECK-NEXT: _TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si{{.*}}(i2048 -2)
 // CHECK-NOT: ![[DBG]] = metadata !{i32 0, i32 0,
 
 class TurnBasedPolicy {

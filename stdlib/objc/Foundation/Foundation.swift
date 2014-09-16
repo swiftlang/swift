@@ -577,8 +577,8 @@ extension CGFloat : _ObjectiveCBridgeable {
 // Literal support for NSNumber
 extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
                      BooleanLiteralConvertible {
-  public class func convertFromIntegerLiteral(value: Int) -> Self {
-    return self(integer: value)
+  public required convenience init(integerLiteral value: Int) {
+    self.init(integer: value)
   }
 
   public class func convertFromFloatLiteral(value: Double) -> Self {

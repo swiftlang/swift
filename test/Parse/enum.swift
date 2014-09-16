@@ -133,16 +133,16 @@ enum RawTypeNotLiteralConvertible : Array<Int> { // expected-error {{raw type 'A
 enum RawTypeCircularityA : RawTypeCircularityB, IntegerLiteralConvertible { // expected-error {{circular enum raw types 'RawTypeCircularityA' -> 'RawTypeCircularityB' -> 'RawTypeCircularityA'}} FIXME: expected-error{{RawRepresentable}}
   case Morrison, Belmont, Madison, Hawthorne
 
-  static func convertFromIntegerLiteral(value: Int) -> RawTypeCircularityA {
-    return .Morrison
+  init(integerLiteral value: Int) { // expected-error{{initializer 'init(integerLiteral:)' has different argument names from those required by protocol 'RawRepresentable' ('init(rawValue:)')}}
+    self = .Morrison
   }
 }
 
 enum RawTypeCircularityB : RawTypeCircularityA, IntegerLiteralConvertible { // expected-note {{enum 'RawTypeCircularityB' declared here}} 
   case Willamette, Columbia, Sandy, Multnomah
 
-  static func convertFromIntegerLiteral(value: Int) -> RawTypeCircularityB {
-    return .Willamette
+  init(integerLiteral value: Int) { 
+    self = .Willamette
   }
 }
 

@@ -1291,16 +1291,21 @@ namespace {
       }
       auto maxType = MaxIntegerTypeDecl->getUnderlyingType();
 
+      DeclName initName(tc.Context, tc.Context.Id_init,
+                        { tc.Context.Id_IntegerLiteral });
+      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+                               { tc.Context.Id_BuiltinIntegerLiteral });
+
       return convertLiteral(
                expr,
                type,
                expr->getType(),
                protocol,
                tc.Context.Id_IntegerLiteralType,
-               tc.Context.Id_ConvertFromIntegerLiteral,
+               initName,
                builtinProtocol,
                maxType,
-               tc.Context.Id_ConvertFromBuiltinIntegerLiteral,
+               builtinInitName,
                nullptr,
                diag::integer_literal_broken_proto,
                diag::builtin_integer_literal_broken_proto);

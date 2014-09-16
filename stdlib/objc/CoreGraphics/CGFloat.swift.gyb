@@ -168,8 +168,8 @@ extension CGFloat : Reflectable {
 
 @transparent extension CGFloat : IntegerLiteralConvertible {
   public
-  static func convertFromIntegerLiteral(value: Int) -> CGFloat {
-    return CGFloat(value)
+  init(integerLiteral value: Int) {
+    self = CGFloat(value)
   }
 }
 
