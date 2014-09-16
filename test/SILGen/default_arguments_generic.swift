@@ -19,11 +19,11 @@ func bar() {
   // CHECK: apply [[ZIM_DFLT]]<Int, Int>
   Zim.zim()
   // CHECK: [[ZANG_DFLT_0:%.*]] = function_ref @_TIFV25default_arguments_generic3Zim4zangUSs25IntegerLiteralConvertible_USs33_BuiltinIntegerLiteralConvertible__FMGS0_Q__USs23FloatLiteralConvertible_USs31_BuiltinFloatLiteralConvertible__FTQd__1yQ__T_A_
-  // CHECK: apply [[ZANG_DFLT_0]]<Int, Int, Double, (Double)>
+  // CHECK: apply [[ZANG_DFLT_0]]<Int, Int, Double, Double>
   // CHECK: [[ZANG_DFLT_1:%.*]] = function_ref @_TIFV25default_arguments_generic3Zim4zangUSs25IntegerLiteralConvertible_USs33_BuiltinIntegerLiteralConvertible__FMGS0_Q__USs23FloatLiteralConvertible_USs31_BuiltinFloatLiteralConvertible__FTQd__1yQ__T_A0_
-  // CHECK: apply [[ZANG_DFLT_1]]<Int, Int, Double, (Double)>
+  // CHECK: apply [[ZANG_DFLT_1]]<Int, Int, Double, Double>
   Zim.zang()
   // CHECK: [[ZANG_DFLT_1:%.*]] = function_ref @_TIFV25default_arguments_generic3Zim4zangUSs25IntegerLiteralConvertible_USs33_BuiltinIntegerLiteralConvertible__FMGS0_Q__USs23FloatLiteralConvertible_USs31_BuiltinFloatLiteralConvertible__FTQd__1yQ__T_A0_
-  // CHECK: apply [[ZANG_DFLT_1]]<Int, Int, Double, (Double)>
+  // CHECK: apply [[ZANG_DFLT_1]]<Int, Int, Double, Double>
   Zim.zang(22)
 }

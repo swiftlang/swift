@@ -1375,16 +1375,21 @@ namespace {
       }
       auto maxType = MaxFloatTypeDecl->getUnderlyingType();
 
+      DeclName initName(tc.Context, tc.Context.Id_init,
+                        { tc.Context.Id_FloatLiteral });
+      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+                               { tc.Context.Id_BuiltinFloatLiteral });
+
       return convertLiteral(
                expr,
                type,
                expr->getType(),
                protocol,
                tc.Context.Id_FloatLiteralType,
-               tc.Context.Id_ConvertFromFloatLiteral,
+               initName,
                builtinProtocol,
                maxType,
-               tc.Context.Id_ConvertFromBuiltinFloatLiteral,
+               builtinInitName,
                nullptr,
                diag::float_literal_broken_proto,
                diag::builtin_float_literal_broken_proto);

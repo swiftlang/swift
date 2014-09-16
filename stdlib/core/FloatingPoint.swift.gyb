@@ -305,14 +305,14 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
 @transparent
 extension ${Self} : _BuiltinFloatLiteralConvertible {
   public
-  static func _convertFromBuiltinFloatLiteral(value: Builtin.FPIEEE${builtinFloatLiteralBits}) -> ${Self} {
+  init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
-    return ${Self}(value)
+    self = ${Self}(value)
 %   elif bits < builtinFloatLiteralBits:
-    return ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
     // FIXME: This is actually losing precision <rdar://problem/14073102>.
-    return ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   end
   }
 }
@@ -323,14 +323,14 @@ extension ${Self} : _BuiltinFloatLiteralConvertible {
 @transparent
 extension ${Self} : _BuiltinFloatLiteralConvertible {
   public
-  static func _convertFromBuiltinFloatLiteral(value: Builtin.FPIEEE${builtinFloatLiteralBits}) -> ${Self} {
+  init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
-    return ${Self}(value)
+    self = ${Self}(value)
 %   elif bits < builtinFloatLiteralBits:
-    return ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
     // FIXME: This is actually losing precision <rdar://problem/14073102>.
-    return ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   end
   }
 }
@@ -339,8 +339,8 @@ extension ${Self} : _BuiltinFloatLiteralConvertible {
 
 @transparent
 extension ${Self} : FloatLiteralConvertible {
-  public static func convertFromFloatLiteral(value: ${Self}) -> ${Self} {
-    return value
+  public init(floatLiteral value: ${Self}) {
+    self = value
   }
 }
 

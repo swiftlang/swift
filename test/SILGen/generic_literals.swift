@@ -18,10 +18,10 @@ func genericIntegerLiteral<T : IntegerLiteralConvertible>(var x: T) {
 // CHECK-LABEL: sil  @_TF16generic_literals22genericFloatingLiteral
 func genericFloatingLiteral<T : FloatLiteralConvertible>(var x: T) {
   // CHECK: [[TMETA:%.*]] = metatype $@thick T.Type
-  // CHECK: [[CONV:%.*]] = witness_method $T, #FloatLiteralConvertible.convertFromFloatLiteral!1
+  // CHECK: [[CONV:%.*]] = witness_method $T, #FloatLiteralConvertible.init!allocator.1
   // CHECK: [[FLT_VAL:%.*]] = alloc_stack $T.FloatLiteralType
   // CHECK: [[TFLT_META:%.*]] = metatype $@thick T.FloatLiteralType.Type
-  // CHECK: [[BUILTIN_CONV:%.*]] = witness_method $T.FloatLiteralType, #_BuiltinFloatLiteralConvertible._convertFromBuiltinFloatLiteral!1
+  // CHECK: [[BUILTIN_CONV:%.*]] = witness_method $T.FloatLiteralType, #_BuiltinFloatLiteralConvertible.init!allocator.1
   // CHECK: [[LIT_VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x4004000000000000|0x4000A000000000000000}}
   // CHECK: apply [[BUILTIN_CONV]]<T.FloatLiteralType>([[FLT_VAL]]#1, [[LIT_VALUE]], [[TFLT_META]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : _BuiltinFloatLiteralConvertible> (@out τ_0_0, Builtin.FPIEEE{{64|80}}, @thick τ_0_0.Type) -> ()
   // CHECK: [[TVAL:%.*]] = alloc_stack $T

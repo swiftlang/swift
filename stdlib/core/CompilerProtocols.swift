@@ -207,13 +207,12 @@ public protocol IntegerLiteralConvertible {
 }
 
 public protocol _BuiltinFloatLiteralConvertible {
-  class func _convertFromBuiltinFloatLiteral(
-      value: _MaxBuiltinFloatType) -> Self
+  init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
 
 public protocol FloatLiteralConvertible {
   typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
-  class func convertFromFloatLiteral(value: FloatLiteralType) -> Self
+  init(floatLiteral value: FloatLiteralType)
 }
 
 public protocol _BuiltinBooleanLiteralConvertible {

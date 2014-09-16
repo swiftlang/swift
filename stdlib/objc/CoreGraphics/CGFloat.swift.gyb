@@ -161,8 +161,8 @@ extension CGFloat : Reflectable {
 
 @transparent extension CGFloat : FloatLiteralConvertible {
   public 
-  static func convertFromFloatLiteral(value: NativeType) -> CGFloat {
-    return CGFloat(value)
+  init(floatLiteral value: NativeType) {
+    self = CGFloat(value)
   }
 }
 

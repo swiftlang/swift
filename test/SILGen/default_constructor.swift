@@ -20,7 +20,7 @@ struct D {
 // CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 2
 // CHECK: [[INTVAL:%[0-9]+]] = apply [transparent] [[INTCONV]]([[INTLIT]], [[INTMETA]])
-// CHECK: [[FLOATCONV:%[0-9]+]] = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFBf{{64|80}}_Sd : $@thin (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
+// CHECK: [[FLOATCONV:%[0-9]+]] = function_ref @_TFSdCfMSdFT20_builtinFloatLiteralBf80__Sd
 // CHECK: [[FLOATMETA:%[0-9]+]] = metatype $@thin Double.Type
 // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x400C000000000000|0x4000E000000000000000}}
 // CHECK: [[FLOATVAL:%[0-9]+]] = apply [transparent] [[FLOATCONV]]([[FLOATLIT]], [[FLOATMETA]])
