@@ -141,6 +141,7 @@ void AddLowLevelLoopOptPasses(SILPassManager &PM) {
 void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   AddSimplifyCFGSILCombine(PM);
   PM.add(createAllocBoxToStack());
+  PM.add(createCopyForwarding());
   PM.add(createLowerAggregate());
   PM.add(createSILCombine());
   PM.add(createSROA());

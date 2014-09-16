@@ -4,6 +4,7 @@ add_swift_library(swiftSILPasses
   CapturePromotion.cpp
   CapturePropagation.cpp
   ConstantPropagation.cpp
+  CopyForwarding.cpp
   CSE.cpp
   SILCodeMotion.cpp
   DataflowDiagnostics.cpp

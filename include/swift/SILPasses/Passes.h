@@ -51,6 +51,7 @@ namespace swift {
   // Diagnostics transformations.
   SILTransform *createCapturePromotion();
   SILTransform *createInOutDeshadowing();
+  SILTransform *createCopyForwarding();
   SILTransform *createDefiniteInitialization();
   SILTransform *createPredictableMemoryOptimizations();
   SILTransform *createDiagnosticConstantPropagation();
@@ -89,6 +90,7 @@ namespace swift {
   SILTransform *createCOWArrayOpts();
   SILTransform *createABCOpt();
   SILTransform *createCapturePropagation();
+  SILTransform *createCopyForwarding();
 
   // Utilities
   SILTransform *createStripDebug();
