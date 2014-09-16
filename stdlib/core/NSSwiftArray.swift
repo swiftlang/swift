@@ -85,11 +85,13 @@ func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   //
 
   var count: Int {
+    // FIXME: this bitcast is invalid.
     return unsafeBitCast(self, Buffer.self).value.count
   }
 
   /// Returns the object located at the specified `index`.
   func objectAtIndex(index: Int) -> AnyObject {
+    // FIXME: this bitcast is invalid.
     let buffer = unsafeBitCast(self, Buffer.self)
     _precondition(
       _isValidArraySubscript(index, buffer.value.count),
@@ -106,6 +108,7 @@ func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   func getObjects(
     aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
+    // FIXME: this bitcast is invalid.
     let buffer = unsafeBitCast(self, Buffer.self)
     _precondition(
       _isValidArrayIndex(range.location, buffer.value.count),
@@ -142,6 +145,7 @@ func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count bufferSize: Int
   ) -> Int {
+    // FIXME: this bitcast is invalid.
     let buffer = unsafeBitCast(self, Buffer.self)
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
       var enumerationState = state.memory
