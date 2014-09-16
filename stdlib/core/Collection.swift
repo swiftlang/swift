@@ -14,6 +14,7 @@ public struct _CountElements {}
 internal func _countElements<Args>(a: Args) -> (_CountElements, Args) {
   return (_CountElements(), a)
 }
+
 // Default implementation of countElements for Collections
 // Do not use this operator directly; call countElements(x) instead
 public func ~> <T: _CollectionType>(x:T, _:(_CountElements,()))
@@ -22,16 +23,34 @@ public func ~> <T: _CollectionType>(x:T, _:(_CountElements,()))
   return distance(x.startIndex, x.endIndex)
 }
 
-/// Return the number of elements in x.  O(1) if T.Index is
-/// RandomAccessIndexType; O(N) otherwise.
+/// Return the number of elements in x.
+///
+/// O(1) if T.Index is RandomAccessIndexType; O(N) otherwise.
 public func countElements <T: _CollectionType>(x: T) -> T.Index.Distance {
   return x~>_countElements()
 }
 
+/// This protocol is an implementation detail of `CollectionType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `CollectionType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _CollectionType : _SequenceType {
+  /// A type that represents a valid position in the collection.
+  /// Valid indices consist of the position of every element and a
+  /// “past the end” position that's not valid for use as a subscript.
   typealias Index : ForwardIndexType
 
+  /// The position of the first element in a non-empty collection;
+  ///
+  /// Identical to `endIndex` in an empty collection.
   var startIndex: Index {get}
+
+  /// The collection's “past the end” position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   var endIndex: Index {get}
 
   // The declaration of Element and _subscript here is a trick used to
@@ -43,23 +62,41 @@ public protocol _CollectionType : _SequenceType {
   // Element to be the same as CollectionType.Generator.Element (see
   // below), but we have no way of expressing it today.
   typealias _Element
-  subscript(i: Index) -> _Element {get}
+  subscript(_i: Index) -> _Element {get}
 }
 
+/// A multi-pass *sequence* with addressable positions.
+///
+/// Positions are represented by an associated `Index` type.  Whereas
+/// an arbitrary *sequence* may be consumed as it is traversed, a
+/// *collection* is multi-pass: any element may be revisited merely by
+/// saving its index.
+///
+/// The sequence view of the elements is identical to the collection
+/// view.  In other words, the following code binds the same series of
+/// values to `x` as does `for x in self {}`::
+///
+///   for i in startIndex..<endIndex {
+///     let x = self[i]
+///   }
 public protocol CollectionType : _CollectionType, SequenceType {
-  subscript(i: Index) -> Generator.Element {get}
+  /// Access the element indicated by `address`.
+  ///
+  /// Requires: `address` indicates a valid position in `self` and
+  /// `address != endIndex`.
+  subscript(address: Index) -> Generator.Element {get}
   
-  // Do not use this operator directly; call countElements(x) instead
+  // Do not use this operator directly; call `countElements(x)` instead
   func ~> (_:Self, _:(_CountElements, ())) -> Index.Distance
 }
 
-// Default implementation of underestimateCount for Collections.  Do not
-// use this operator directly; call underestimateCount(s) instead
+// Default implementation of underestimateCount for *collections*.  Do not
+// use this operator directly; call `underestimateCount(s)` instead
 public func ~> <T: _CollectionType>(x:T,_:(_UnderestimateCount,())) -> Int {
   return numericCast(x~>_countElements())
 }
 
-// Default implementation of `preprocessingPass` for Collections.  Do not
+// Default implementation of `preprocessingPass` for *collections*.  Do not
 // use this operator directly; call `_preprocessingPass(s)` instead
 public func ~> <T: _CollectionType, R>(
   s: T, args: (_PreprocessingPass, ( (T)->R ))
@@ -84,40 +121,83 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
   return isEmpty(x) ? nil : x[x.endIndex.predecessor()]
 }
 
+/// A *collection* that supports subscript assignment.
+///
+/// For any instance `a` of a type conforming to
+/// `MutableCollectionType`, ::
+///
+///   a[i] = x
+///   let y = a[i]
+///
+/// is equivalent to ::
+///
+///   a[i] = x
+///   let y = x
+///
 public protocol MutableCollectionType : CollectionType {
-  subscript(i: Index) -> Generator.Element {get set}
+  /// Access the element indicated by `address`.
+  ///
+  /// Requires: `address` indicates a valid position in `self` and
+  /// `address != endIndex`.
+  subscript(address: Index) -> Generator.Element {get set}
 }
 
-/// A stream type that could serve for a CollectionType given that
-/// it already had an Index.
+/// A *generator* for an arbitrary *collection*.  Provided `C`
+/// conforms to the other requirements of *CollectionType*,
+/// `IndexingGenerator<C>` can be used as the result of `C`\ 's
+/// `generate()` method.  For example:
+///
+/// .. parsed-literal::
+///
+///    struct MyCollection : CollectionType {
+///      struct Index : ForwardIndexType { *implementation hidden* }
+///      subscript(i: Index) -> MyElement { *implementation hidden* }
+///      func generate() -> **IndexingGenerator<MyCollection>** {
+///        return IndexingGenerator(self)
+///      }
+///    }
 public struct IndexingGenerator<
   C: _CollectionType
 > : GeneratorType, SequenceType {
   // Because of <rdar://problem/14396120> we've had to factor
   // _CollectionType out of CollectionType to make it useful.
 
+  /// Create a *generator* over the given collection
   public init(_ seq: C) {
     self._elements = seq
     self._position = seq.startIndex
   }
-  
+
+  /// Return a generator over the elements of this sequence.  The
+  /// generator's next element is the first element of the sequence.
   public func generate() -> IndexingGenerator {
     return self
   }
-  
+
+  /// Return the next element of the underlying collection, or `nil`
+  /// if no next element exists.
   public mutating func next() -> C._Element? {
     return _position == _elements.endIndex
     ? .None : .Some(_elements[_position++])
   }
+  
   var _elements: C
   var _position: C.Index
 }
 
+/// Return the range of `x` 's valid index values.
+///
+/// The result's `endIndex` is the same as that of `x`.  Because
+/// `Range` is half-open, iterating the values of the result produces
+/// all valid subscript arguments for `x`, omitting its `endIndex`.
 public func indices<
-    Seq : CollectionType>(seq: Seq) -> Range<Seq.Index> {
-  return Range(start: seq.startIndex, end: seq.endIndex)
+    C : CollectionType>(x: C) -> Range<C.Index> {
+  return Range(start: x.startIndex, end: x.endIndex)
 }
 
+/// A *generator* that adapts a *collection* `C` and any *sequence* of
+/// its `Index` type to present the collection's elements in a
+/// permuted order.
 public struct PermutationGenerator<
   C: CollectionType, Indices: SequenceType
   where C.Index == Indices.Generator.Element
@@ -144,32 +224,50 @@ public struct PermutationGenerator<
   }
 }
 
+/// This protocol is an implementation detail of `Sliceable`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `Sliceable` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _Sliceable : CollectionType {}
 
+/// A *collection* from which a sub-range of elements (a “slice”)
+/// can be efficiently extracted.
 public protocol Sliceable : _Sliceable {
   // FIXME: Slice should also be Sliceable but we can't express
   // that constraint (<rdar://problem/14375973> Include associated
   // type information in protocol witness tables) Instead we constrain
   // to _Sliceable; at least error messages will be more informative.
+  
+  /// The *collection* type that represents a sub-range of elements.
+  ///
+  /// Though it can't currently be enforced by the type system, the
+  /// `SubSlice` type in a concrete implementation of `Sliceable`
+  /// should also be `Sliceable`.
   typealias SubSlice: _Sliceable
   
-  /// Returns a `CollectionType` containing the elements delimited by
-  /// the given half-open range of indices.  Should be O(1) unless
-  /// bridging from Objective-C requires an O(N) conversion.
+  /// Access the elements delimited by the given half-open range of
+  /// indices.
+  ///
+  /// Should be O(1) unless bridging from Objective-C requires an O(N)
+  /// conversion.
   subscript(bounds: Range<Index>) -> SubSlice {get}
 }
 
+/// A *sliceable* collection whose slices can be replaced.
 public protocol MutableSliceable : Sliceable, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSlice {get set}
 }
 
 /// Return a slice containing all but the first element of `s`.
+///
 /// Requires: `s` is non-empty.
 public func dropFirst<Seq : Sliceable>(s: Seq) -> Seq.SubSlice {
   return s[s.startIndex.successor()..<s.endIndex]
 }
 
 /// Return a slice containing all but the last element of `s`.
+///
 /// Requires: `s` is non-empty.
 public func dropLast<
   S: Sliceable 
@@ -179,7 +277,12 @@ public func dropLast<
 }
 
 /// Return a slice, up to `maxLength` in length, containing the
-/// initial elements of `s`.  O(1)+K when `S.Index` conforms to
+/// initial elements of `s`.
+///
+/// If `maxLength` exceeds `countElements(s)`, the result contains all
+/// the elements of `s`.
+/// 
+/// Complexity: O(1)+K when `S.Index` conforms to
 /// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 /// of slicing `s`.
 public func prefix<S: Sliceable>(s: S, maxLength: Int) -> S.SubSlice {
@@ -190,7 +293,12 @@ public func prefix<S: Sliceable>(s: S, maxLength: Int) -> S.SubSlice {
 }
 
 /// Return a slice, up to `maxLength` in length, containing the
-/// final elements of `s`. O(1)+K when `S.Index` conforms to
+/// final elements of `s`.
+///
+/// If `maxLength` exceeds `countElements(s)`, the result contains all
+/// the elements of `s`.
+/// 
+/// Complexity: O(1)+K when `S.Index` conforms to
 /// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 /// of slicing `s`.
 public func suffix<
