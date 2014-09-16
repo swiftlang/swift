@@ -46,7 +46,16 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
     Location(Loc),
     Linkage(unsigned(Linkage)), VDecl(Decl) {
   IsDeclaration = isAvailableExternally(Linkage);
+  InitializerF = nullptr;
   Module.silGlobals.push_back(this);
+}
+
+void SILGlobalVariable::setInitializer(SILFunction *InitF) {
+  if (InitializerF)
+    InitializerF->decrementRefCount();
+  // Increment the ref count to make sure it will not be eliminated.
+  InitF->incrementRefCount();
+  InitializerF = InitF;
 }
 
 SILGlobalVariable::~SILGlobalVariable() {

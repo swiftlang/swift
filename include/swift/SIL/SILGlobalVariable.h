@@ -27,6 +27,7 @@
 namespace swift {
 
 class ASTContext;
+class SILFunction;
 class SILModule;
 class VarDecl;
   
@@ -62,6 +63,9 @@ private:
   /// Whether or not this is a declaration.
   bool IsDeclaration;
 
+  /// The static initializer.
+  SILFunction *InitializerF;
+
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
                     StringRef mangledName, SILType loweredType,
                     Optional<SILLocation> loc, VarDecl *decl);
@@ -93,6 +97,9 @@ public:
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
   VarDecl *getDecl() const { return VDecl; }
+
+  SILFunction *getInitializer() const { return InitializerF; }
+  void setInitializer(SILFunction *InitF);
 
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }

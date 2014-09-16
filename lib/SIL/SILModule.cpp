@@ -96,6 +96,11 @@ SILModule::SILModule(Module *SwiftModule, const DeclContext *associatedDC)
 }
 
 SILModule::~SILModule() {
+  // Decrement ref count for each SILGlobalVariable with static initializers.
+  for (SILGlobalVariable &v : silGlobals)
+    if (v.getInitializer())
+      v.getInitializer()->decrementRefCount();
+
   for (SILFunction *F : InlinedFunctions)
     F->decrementRefCount();
 
