@@ -14,37 +14,16 @@
 //  a little bit with Cocoa.  Because we want to keep the core
 //  decoupled from the Foundation module, we can't use NSArray
 //  directly.  We _can_, however, use an @objc protocol with a
-//  compatible API.  That's _CocoaArrayType.
+//  compatible API.  That's _SwiftNSArrayRequiredOverridesType.
 //
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
 
-/// A subset of the NSArray interface with call-compatible selectors
-/// (e.g. _SwiftNSRange is layout-compatible with NSRange in
-/// getObjects:range: below).  Array<T> is backed by one of these, and
-/// when _isBridgedToObjectiveC(T.self), it can be used directly as an
-/// NSArray.  It is safe to convert between NSArray and _CocoaArrayType via
-/// unsafeBitCast.
-@unsafe_no_objc_tagged_pointer @objc
-public protocol _CocoaArrayType {
-  func objectAtIndex(index: Int) -> AnyObject
-  
-  func getObjects(UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
-  
-  func countByEnumeratingWithState(
-         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-         objects buffer: UnsafeMutablePointer<AnyObject>,
-         count len: Int) -> Int
-
-  func copyWithZone(COpaquePointer) -> _CocoaArrayType
-  
-  var count: Int {get}
-}
-
-/// A wrapper around any _CocoaArrayType that gives it CollectionType
-/// conformance.  Why not make _CocoaArrayType conform directly?  It's a
-/// class, and I don't want to pay for the dynamic dispatch overhead.
+/// A wrapper around any `_SwiftNSArrayRequiredOverridesType` that gives it
+/// `CollectionType` conformance.  Why not make
+/// `_SwiftNSArrayRequiredOverridesType` conform directly?  It's a class, and I
+/// don't want to pay for the dynamic dispatch overhead.
 internal struct _CocoaArrayWrapper : CollectionType {
   var startIndex: Int {
     return 0
@@ -91,10 +70,10 @@ internal struct _CocoaArrayWrapper : CollectionType {
   }
 
   @transparent
-  init(_ buffer: _CocoaArrayType) {
+  init(_ buffer: _SwiftNSArrayRequiredOverridesType) {
     self.buffer = buffer
   }
 
-  var buffer: _CocoaArrayType
+  var buffer: _SwiftNSArrayRequiredOverridesType
 }
 

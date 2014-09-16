@@ -31,7 +31,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Convert to an NSArray.
   /// Precondition: _isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  func _asCocoaArray() -> _CocoaArrayType
+  func _asCocoaArray() -> _SwiftNSArrayRequiredOverridesType
 
   /// Get/set the index'th element
   subscript(index: Int) -> Element { get nonmutating set}

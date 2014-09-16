@@ -118,8 +118,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   //===--- Non-essential bits ---------------------------------------------===//
 
-  public
-  func _asCocoaArray() -> _CocoaArrayType {
+  public func _asCocoaArray() -> _SwiftNSArrayRequiredOverridesType {
     _sanityCheck(
       _isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")

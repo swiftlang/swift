@@ -2352,7 +2352,7 @@ public protocol _SwiftNSCopyingType {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 }
 
-@objc
+@unsafe_no_objc_tagged_pointer @objc
 public protocol _SwiftNSArrayRequiredOverridesType :
     _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
 
@@ -2370,7 +2370,6 @@ public protocol _SwiftNSArrayRequiredOverridesType :
   var count: Int { get }
 }
 
-// FIXME: replace _CocoaArrayType with this.
 @unsafe_no_objc_tagged_pointer @objc
 public protocol _SwiftNSArrayType : _SwiftNSArrayRequiredOverridesType {
   func indexOfObject(anObject: AnyObject) -> Int

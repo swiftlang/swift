@@ -299,7 +299,7 @@ extension ${Self} : ArrayLiteralConvertible {
 }
 
 extension ${Self} {
-  public func _asCocoaArray() -> _CocoaArrayType {
+  public func _asCocoaArray() -> _SwiftNSArrayRequiredOverridesType {
     return _buffer._asCocoaArray()
   }
 }
@@ -1106,11 +1106,21 @@ extension Array {
     return nil
   }
 
-  /// Construct from the given `_CocoaArrayType`.  If `noCopy` is `true`,
-  /// either `source` must be known to be immutable, or the resulting
-  /// `Array` must not survive across code that could mutate `source`.
-  public init(_fromCocoaArray source: _CocoaArrayType, noCopy: Bool = false) {
-    self = Array(_ArrayBuffer(noCopy ? source : source.copyWithZone(nil)))
+  /// Construct from the given `_SwiftNSArrayRequiredOverridesType`.
+  ///
+  /// If `noCopy` is `true`, either `source` must be known to be immutable,
+  /// or the resulting / `Array` must not survive across code that could mutate
+  /// `source`.
+  public init(
+    _fromCocoaArray source: _SwiftNSArrayRequiredOverridesType,
+    noCopy: Bool = false) {
+    var selectedSource: _SwiftNSArrayRequiredOverridesType =
+      noCopy ?
+        source :
+        unsafeBitCast(
+          source.copyWithZone(nil),
+          _SwiftNSArrayRequiredOverridesType.self)
+    self = Array(_ArrayBuffer(selectedSource))
   }
 }
 

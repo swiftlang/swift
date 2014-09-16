@@ -33,7 +33,7 @@ class _IndirectArrayBuffer {
     self.needsElementTypeCheck = needsElementTypeCheck
   }
     
-  init(cocoa: _CocoaArrayType, needsElementTypeCheck: Bool) {
+  init(cocoa: _SwiftNSArrayRequiredOverridesType, needsElementTypeCheck: Bool) {
     self.buffer = cocoa
     self.isMutable = false
     self.isCocoa = true
@@ -81,9 +81,9 @@ class _IndirectArrayBuffer {
       buffer != nil ? unsafeBitCast(buffer, _ContiguousArrayStorage<T>.self) : nil)
   }
 
-  func getCocoa() -> _CocoaArrayType {
+  func getCocoa() -> _SwiftNSArrayRequiredOverridesType {
     _sanityCheck(isCocoa)
-    return unsafeBitCast(buffer!, _CocoaArrayType.self)
+    return unsafeBitCast(buffer!, _SwiftNSArrayRequiredOverridesType.self)
   }
 }
 
@@ -109,7 +109,7 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
       ))
   }
 
-  public init(_ cocoa: _CocoaArrayType) {
+  public init(_ cocoa: _SwiftNSArrayRequiredOverridesType) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     storage = Builtin.castToNativeObject(
       _IndirectArrayBuffer(
@@ -157,7 +157,7 @@ extension _ArrayBuffer {
   /// Convert to an NSArray.
   /// Precondition: _isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  public func _asCocoaArray() -> _CocoaArrayType {
+  public func _asCocoaArray() -> _SwiftNSArrayRequiredOverridesType {
     _sanityCheck(
       _isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
@@ -466,7 +466,7 @@ extension _ArrayBuffer {
     }
   }
 
-  var _nonNative: _CocoaArrayType? {
+  var _nonNative: _SwiftNSArrayRequiredOverridesType? {
     if !_isClassOrObjCExistential(T.self) {
       return nil
     }

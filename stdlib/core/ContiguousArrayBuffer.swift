@@ -333,14 +333,15 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Convert to an NSArray.
   /// Precondition: T is bridged to Objective-C
   /// O(1).
-  public func _asCocoaArray() -> _CocoaArrayType {
+  public func _asCocoaArray() -> _SwiftNSArrayRequiredOverridesType {
     _sanityCheck(
         _isBridgedToObjectiveC(T.self),
         "Array element type is not bridged to ObjectiveC")
     if count == 0 {
       return _emptyContiguousArrayStorageBase
     }
-    return unsafeBitCast(_base.storage, _CocoaArrayType.self)
+    return unsafeBitCast(
+      _base.storage, _SwiftNSArrayRequiredOverridesType.self)
   }
 
   /// An object that keeps the elements stored in this buffer alive

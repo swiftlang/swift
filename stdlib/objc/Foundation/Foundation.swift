@@ -635,11 +635,11 @@ extension Array : _ObjectiveCBridgeable {
   /// either `source` must be known to be immutable, or the resulting
   /// `Array` must not survive across code that could mutate `source`.
   init(_fromNSArray source: NSArray, noCopy: Bool = false) {
-    // _CocoaArrayType has selectors compatible with those of NSArray;
-    // we use it to decouple the core stdlib from Foundation.
-    // Bit-cast our NSArray to _CocoaArrayType so it can be adopted by
-    // an _ArrayBuffer.
-    let cocoa = unsafeBitCast(source, _CocoaArrayType.self)
+    // _SwiftNSArrayRequiredOverridesType has selectors compatible with those
+    // of NSArray; we use it to decouple the core stdlib from Foundation.
+    // Bit-cast our NSArray to _SwiftNSArrayRequiredOverridesType so it can be
+    // adopted by an _ArrayBuffer.
+    let cocoa = unsafeBitCast(source, _SwiftNSArrayRequiredOverridesType.self)
     self = Array(_fromCocoaArray: cocoa, noCopy: noCopy)
   }
   
