@@ -44,8 +44,6 @@ class SourceManager {
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {};
 
 public:
-  ~SourceManager();
-
   llvm::SourceMgr &getLLVMSourceMgr() {
     return LLVMSourceMgr;
   }
@@ -209,6 +207,9 @@ public:
                                 const Twine &Msg,
                                 ArrayRef<llvm::SMRange> Ranges,
                                 ArrayRef<llvm::SMFixIt> FixIts) const;
+
+  /// Verifies that all buffers are still valid.
+  void verifyAllBuffers() const;
 
 private:
   const VirtualFile *getVirtualFile(SourceLoc Loc) const;

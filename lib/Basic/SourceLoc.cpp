@@ -18,17 +18,20 @@
 
 using namespace swift;
 
-SourceManager::~SourceManager() {
-#ifndef NDEBUG
+void SourceManager::verifyAllBuffers() const {
   llvm::PrettyStackTraceString backtrace{
     "Checking that all source buffers are still valid"
   };
 
   // FIXME: This depends on the buffer IDs chosen by llvm::SourceMgr.
   __attribute__((used)) static char arbitraryTotal = 0;
-  for (unsigned i = 1, e = LLVMSourceMgr.getNumBuffers(); i <= e; ++i)
-    arbitraryTotal += *LLVMSourceMgr.getMemoryBuffer(i)->getBufferStart();
-#endif
+  for (unsigned i = 1, e = LLVMSourceMgr.getNumBuffers(); i <= e; ++i) {
+    auto *buffer = LLVMSourceMgr.getMemoryBuffer(i);
+    if (buffer->getBufferSize() == 0)
+      continue;
+    arbitraryTotal += buffer->getBufferStart()[0];
+    arbitraryTotal += buffer->getBufferEnd()[-1];
+  }
 }
 
 SourceLoc SourceManager::getCodeCompletionLoc() const {
