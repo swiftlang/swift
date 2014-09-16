@@ -1113,6 +1113,16 @@ public:
     }
 
     if (!baseTy->isExistentialType()) {
+      // If we're calling a non-class-constrained protocol member through a
+      // refinement of the protocol that is class-constrained, then we have to
+      // materialize the value in order to pass it indirectly.
+      if (fd->isInstanceMember()
+          && !proto->requiresClass()
+          && !baseVal.getType().isAddress()) {
+        auto materialized = gen.emitMaterialize(e, baseVal);
+        baseVal = ManagedValue(materialized.address, materialized.valueCleanup);
+      }
+
       setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
                           baseVal), e);
       
