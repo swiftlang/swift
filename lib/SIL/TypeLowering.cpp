@@ -308,6 +308,9 @@ namespace {
     // Tuples depend on their elements.
     RetTy visitTupleType(CanTupleType type) {
       bool hasReference = false;
+      // TODO: We ought to be able to early-exit as soon as we've established
+      // that a type is address-only. However, we also currenty rely on
+      // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       for (auto eltType : type.getElementTypes()) {
         switch (classifyType(eltType, M)) {
@@ -1116,6 +1119,9 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
   // reentrancy, which arises as a result of improper recursion.
   // TODO: We should diagnose nonterminating recursion in Sema, and implement
   // terminating recursive enums, instead of diagnosing here.
+  // When that Sema check is in place, we should reinstate the early-exit
+  // behavior for address-only types (marked by other TODO: items throughout
+  // this file).
   if (!found->second) {
     // Try to complain about a nominal type.
     if (auto nomTy = k.SubstType.getAnyNominal()) {
