@@ -631,7 +631,7 @@ class COWArrayOptPass : public SILFunctionTransform
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  StringRef getName() override { return "SIL Array Optimization"; }
+  StringRef getName() override { return "SIL COW Array Optimization"; }
 };
 } // anonymous
 
