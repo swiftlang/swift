@@ -317,11 +317,13 @@ public:
                                 unsigned startOffset) const override {
     PackEnumPayload pack(IGF, bitWidth);
     for (auto &field : getFields()) {
-      unsigned offset = field.getFixedByteOffset().getValueInBits()
-        + startOffset;
-      llvm::Value *subValue = cast<LoadableTypeInfo>(field.getTypeInfo())
-        .packEnumPayload(IGF, src, bitWidth, offset);
-      pack.combine(subValue);
+      if (field.getKind() != ElementLayout::Kind::Empty) {
+        unsigned offset = field.getFixedByteOffset().getValueInBits()
+          + startOffset;
+        llvm::Value *subValue = cast<LoadableTypeInfo>(field.getTypeInfo())
+          .packEnumPayload(IGF, src, bitWidth, offset);
+        pack.combine(subValue);
+      }
     }
     return pack.get();
   }
@@ -329,10 +331,12 @@ public:
   void unpackEnumPayload(IRGenFunction &IGF, llvm::Value *payload,
                           Explosion &dest, unsigned startOffset) const override{
     for (auto &field : getFields()) {
-      unsigned offset = field.getFixedByteOffset().getValueInBits()
-        + startOffset;
-      cast<LoadableTypeInfo>(field.getTypeInfo())
-        .unpackEnumPayload(IGF, payload, dest, offset);
+      if (field.getKind() != ElementLayout::Kind::Empty) {
+        unsigned offset = field.getFixedByteOffset().getValueInBits()
+          + startOffset;
+        cast<LoadableTypeInfo>(field.getTypeInfo())
+          .unpackEnumPayload(IGF, payload, dest, offset);
+      }
     }
   }
 };
