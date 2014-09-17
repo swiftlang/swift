@@ -194,6 +194,11 @@ PrintStats("print-stats",
            llvm::cl::desc("Print statistics"),
            llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+DebugForbidTypecheckPrefix("debug-forbid-typecheck-prefix",
+  llvm::cl::desc("Triggers llvm fatal_error if typechecker tries to typecheck "
+                 "a decl with the provided prefix name"));
+
 // '-code-completion' options.
 
 static llvm::cl::opt<std::string>
@@ -2244,6 +2249,8 @@ int main(int argc, char *argv[]) {
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
+  InitInvok.getLangOptions().DebugForbidTypecheckPrefix =
+    options::DebugForbidTypecheckPrefix;
 
   // Force these options, which are factored out for staging purposes.
   InitInvok.getLangOptions().UsePrivateDiscriminators = true;
