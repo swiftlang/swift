@@ -2197,6 +2197,9 @@ public:
     if (d->isSettable(d->getDeclContext()))
       emitFuncEntry(d->getSetter(), witnessSD->getSetter(),
                     witness.getSubstitutions());
+    if (auto materializeForSet = d->getMaterializeForSetFunc())
+      emitFuncEntry(materializeForSet, witnessSD->getMaterializeForSetFunc(),
+                    witness.getSubstitutions());
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {

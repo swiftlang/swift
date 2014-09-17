@@ -1838,8 +1838,12 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
   TC.typeCheckDecl(materializeForSet, true);
 }
 
-static void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
-                                      TypeChecker &TC);
+static void addMaterializeForSet(AbstractStorageDecl *storage,
+                                 TypeChecker &TC);
+
+static void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
+                                        AbstractStorageDecl *storage,
+                                        TypeChecker &TC);
 
 /// Given a "Stored" property that needs to be converted to
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
@@ -1861,9 +1865,6 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeStoredWithTrivialAccessors(Get, Set, nullptr);
 
-  // Consider adding materializeForSet.
-  maybeAddMaterializeForSet(VD, TC);
-
   // Type check the body of the getter.
   TC.typeCheckDecl(Get, true);
   TC.typeCheckDecl(Get, false);
@@ -1873,15 +1874,25 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
     TC.typeCheckDecl(Set, false);
   }
 
-  if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
-    TC.typeCheckDecl(materializeForSet, true);
-  }
-
   // We've added some members to our containing type, add them to the
   // members list.
   addMemberToContextIfNeeded(Get, VD->getDeclContext());
   if (Set)
     addMemberToContextIfNeeded(Set, VD->getDeclContext());
+
+  // Always add a materializeForSet when we're creating trivial
+  // accessors for a mutable stored property.  We only do this when we
+  // need to be able to access something polymorphicly, and we always
+  // want a materializeForSet in such situations.
+  if (Set) {
+    addMaterializeForSet(VD, TC);
+  }
+
+  if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
+    synthesizeMaterializeForSet(materializeForSet, VD, TC);
+    TC.typeCheckDecl(materializeForSet, true);
+    TC.typeCheckDecl(materializeForSet, false);
+  }
 }
 
 
@@ -3101,6 +3112,19 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
+/// Add a materializeForSet accessor to the given declaration.
+static void addMaterializeForSet(AbstractStorageDecl *storage,
+                                 TypeChecker &TC) {
+  VarDecl *bufferDecl;
+  auto materializeForSet =
+    createMaterializeForSetPrototype(storage, bufferDecl, TC);
+  addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
+                             storage->getSetter());
+  storage->setMaterializeForSetFunc(materializeForSet);
+
+  computeAccessibility(TC, materializeForSet);
+}
+
 /// Consider add a materializeForSet accessor to the given storage
 /// decl (which has accessors).
 static void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
@@ -3141,14 +3165,7 @@ static void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
     return;
   }
 
-  // Okay, create the materialzieForSet prototype.
-  VarDecl *bufferDecl;
-  auto materializeForSet =
-    createMaterializeForSetPrototype(storage, bufferDecl, TC);
-  addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext());
-  storage->setMaterializeForSetFunc(materializeForSet);
-
-  computeAccessibility(TC, materializeForSet);
+  addMaterializeForSet(storage, TC);
 }
 
 /// Returns true if \p VD should be exposed to Objective-C iff it is
