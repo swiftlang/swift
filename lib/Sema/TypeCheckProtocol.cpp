@@ -926,11 +926,9 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
                               match.WitnessSubstitutions);
   Conformance->setWitness(requirement, witness);
 
-  // If the witness is a stored VarDecl, synthesize a getter and setter for the
-  // protocol witness table to use.
-  if (auto *VD = dyn_cast<VarDecl>(witness.getDecl()))
-    if (!VD->hasAccessorFunctions())
-      TC.synthesizeWitnessAccessorsForStoredVar(VD);
+  // Synthesize accessors for the protocol witness table to use.
+  if (auto storage = dyn_cast<AbstractStorageDecl>(witness.getDecl()))
+    TC.synthesizeWitnessAccessorsForStorage(storage);
 
   // Note that the witness conforms to the requirement.
   if (requirement != match.Witness)

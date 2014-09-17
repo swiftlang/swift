@@ -644,11 +644,10 @@ public:
   /// enum with a raw type.
   void addImplicitEnumConformances(EnumDecl *ED);
   
-  /// The specified VarDecl with "Stored" StorageKind was just found to satisfy
-  /// a protocol property requirement.  Convert it to
-  /// "StoredWithTrivialAccessors" storage by sythesizing accessors for the
-  /// variable, enabling the witness table to use those accessors.
-  void synthesizeWitnessAccessorsForStoredVar(VarDecl *VD);
+  /// The specified AbstractStorageDecl was just found to satisfy a
+  /// protocol property requirement.  Ensure that it has the full
+  /// complement of accessors.
+  void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *storage);
   
   /// \name Name lookup
   ///

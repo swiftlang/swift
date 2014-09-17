@@ -299,6 +299,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // CHECK-LABEL: sil_witness_table ClassWithGetterSetter: PropertyWithGetterSetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetterSetter.b!getter.1: @_TTWC9protocols21ClassWithGetterSetterS_24PropertyWithGetterSetterFS1_g1bSi
 // CHECK-NEXT:  method #PropertyWithGetterSetter.b!setter.1: @_TTWC9protocols21ClassWithGetterSetterS_24PropertyWithGetterSetterFS1_s1bSi
+// CHECK-NEXT:  method #PropertyWithGetterSetter.b!materializeForSet.1: @_TTWC9protocols21ClassWithGetterSetterS_24PropertyWithGetterSetterFS1_m1bSi
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table ClassWithGetterSetter: PropertyWithGetter module protocols {

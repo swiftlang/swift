@@ -1463,11 +1463,13 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   auto bufferPattern = buildLetArgumentPattern(loc, DC, "buffer",
                                                ctx.TheRawPointerType,
                                                &bufferParamDecl, TC);
+
   // If this is a subscript, we need to include the indexes
   // (forwardably).
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
     SmallVector<TuplePatternElt, 4> bufferAndIndexPatterns;
-    bufferAndIndexPatterns.push_back(TuplePatternElt(bufferPattern));
+    bufferAndIndexPatterns.push_back(
+      cast<TuplePattern>(bufferPattern)->getFields()[0]);
 
     // Clone index patterns in a manner that allows them to be
     // perfectly forwarded.
@@ -1766,22 +1768,47 @@ static Expr *buildCallToBuiltin(ASTContext &ctx, StringRef builtinName,
 }
 
 static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
-                                         ArrayRef<TuplePatternElt> patterns) {
+                                         ArrayRef<TuplePatternElt> params,
+                                    ArrayRef<TupleTypeElt> formalIndexTypes) {
+  assert(params.size() == formalIndexTypes.size());
+
   // FIXME: do we need to preserve labels in order to disambiguate
   // subscripts?
-  SmallVector<Expr *, 4> indices;
-  for (auto &pattern : patterns) {
-    indices.push_back(pattern.getPattern()->buildForwardingRefExpr(ctx));
+  SmallVector<Identifier, 4> labels;
+  SmallVector<SourceLoc, 4> labelLocs;
+  SmallVector<Expr *, 4> args;
+
+  for (unsigned i = 0, e = params.size(); i != e; ++i) {
+    const Pattern *param = params[i].getPattern();
+    args.push_back(param->buildForwardingRefExpr(ctx));
+    labels.push_back(formalIndexTypes[i].getName());
+    labelLocs.push_back(SourceLoc());
   }
-  return buildTupleExpr(ctx, indices);
+
+  // A single unlabelled value is not a tuple.
+  if (args.size() == 1 && labels[0].empty())
+    return args[0];
+
+  return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
+                           SourceLoc(), false, IsImplicit);
 }
 
 /// Build a reference to the subscript index variables for this
 /// subscript accessor.
 static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
-  assert(isa<SubscriptDecl>(accessor->getAccessorStorageDecl()));
-  auto params = cast<TuplePattern>(accessor->getBodyParamPatterns().back());
-  return buildTupleForwardingRefExpr(ctx, params->getFields().slice(1));
+  // Pull out the body parameters, which we cloned previously to be
+  // forwardable, and drop the final buffer parameter.
+  auto paramTuple = cast<TuplePattern>(accessor->getBodyParamPatterns().back());
+  auto params = paramTuple->getFields().slice(1);
+
+  // Look for formal subscript labels.
+  auto subscript = cast<SubscriptDecl>(accessor->getAccessorStorageDecl());
+  auto indexType = subscript->getIndicesType();
+  if (auto indexTuple = indexType->getAs<TupleType>()) {
+    return buildTupleForwardingRefExpr(ctx, params, indexTuple->getFields());
+  } else {
+    return buildTupleForwardingRefExpr(ctx, params, TupleTypeElt(indexType));
+  }
 }
 
 /// Build an l-value for the storage of a declaration.
@@ -1838,8 +1865,8 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
   TC.typeCheckDecl(materializeForSet, true);
 }
 
-static void addMaterializeForSet(AbstractStorageDecl *storage,
-                                 TypeChecker &TC);
+static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
+                                      TypeChecker &TC);
 
 static void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
                                         AbstractStorageDecl *storage,
@@ -1885,10 +1912,7 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   // need to be able to access something polymorphicly, and we always
   // want a materializeForSet in such situations.
   if (Set) {
-    addMaterializeForSet(VD, TC);
-  }
-
-  if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
+    FuncDecl *materializeForSet = addMaterializeForSet(VD, TC);
     synthesizeMaterializeForSet(materializeForSet, VD, TC);
     TC.typeCheckDecl(materializeForSet, true);
     TC.typeCheckDecl(materializeForSet, false);
@@ -1896,12 +1920,28 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
 }
 
 
-/// The specified VarDecl with "Stored" StorageKind was just found to satisfy
-/// a protocol property requirement.  Convert it to
-/// "StoredWithTrivialAccessors" storage by sythesizing accessors for the
-/// variable, enabling the witness table to use those accessors.
-void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
-  addAccessorsToStoredVar(VD, *this);
+/// The specified AbstractStorageDecl was just found to satisfy a
+/// protocol property requirement.  Ensure that it has the full
+/// complement of accessors.
+void TypeChecker::synthesizeWitnessAccessorsForStorage(
+                                             AbstractStorageDecl *storage) {
+  // If the decl is stored, convert it to StoredWithTrivialAccessors
+  // by synthesizing the full set of accessors.
+  if (!storage->hasAccessorFunctions()) {
+    assert(isa<VarDecl>(storage) && "stored subscript decl?");
+    auto var = cast<VarDecl>(storage);
+    addAccessorsToStoredVar(var, *this);
+    return;
+  }
+
+  // Otherwise, if it's settable, ensure that there's a
+  // materializeForSet function.
+  if (storage->getSetter() && !storage->getMaterializeForSetFunc()) {
+    FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
+    synthesizeMaterializeForSet(materializeForSet, storage, *this);
+    typeCheckDecl(materializeForSet, true);
+    typeCheckDecl(materializeForSet, false);
+  }
 }
 
 static VarDecl *getFirstParamDecl(FuncDecl *fn) {
@@ -3113,8 +3153,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 }
 
 /// Add a materializeForSet accessor to the given declaration.
-static void addMaterializeForSet(AbstractStorageDecl *storage,
-                                 TypeChecker &TC) {
+static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
+                                      TypeChecker &TC) {
   VarDecl *bufferDecl;
   auto materializeForSet =
     createMaterializeForSetPrototype(storage, bufferDecl, TC);
@@ -3123,6 +3163,8 @@ static void addMaterializeForSet(AbstractStorageDecl *storage,
   storage->setMaterializeForSetFunc(materializeForSet);
 
   computeAccessibility(TC, materializeForSet);
+
+  return materializeForSet;
 }
 
 /// Consider add a materializeForSet accessor to the given storage
@@ -3606,6 +3648,8 @@ public:
 
     validateAttributes(TC, SD);
 
+    maybeAddMaterializeForSet(SD, TC);
+
     // If this variable is marked final and has a getter or setter, mark the
     // getter and setter as final as well.
     if (SD->isFinal()) {
@@ -3653,6 +3697,16 @@ public:
     }
 
     inferDynamic(TC.Context, SD);
+
+    // Synthesize materializeForSet in non-protocol contexts.
+    if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
+      Type containerTy = SD->getDeclContext()->getDeclaredTypeOfContext();
+      if (!containerTy || !containerTy->is<ProtocolType>()) {
+        synthesizeMaterializeForSet(materializeForSet, SD, TC);
+        TC.typeCheckDecl(materializeForSet, true);
+        TC.typeCheckDecl(materializeForSet, false);
+      }
+    }
 
     TC.checkDeclAttributes(SD);
   }
