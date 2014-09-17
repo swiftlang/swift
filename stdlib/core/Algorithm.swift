@@ -180,7 +180,7 @@ public func startsWith<
 /// Return true iff `s` begins with elements equivalent to those of
 /// `prefix`, using `isEquivalent` as the equivalence test.  Requires:
 /// `isEquivalent` is an `equivalence relation
-/// <http://en.wikipedia.org/wiki/Equivalence_relation>`__
+/// <http://en.wikipedia.org/wiki/Equivalence_relation>`_
 public func startsWith<
   S0: SequenceType, S1: SequenceType
   where
@@ -313,7 +313,7 @@ public func equal<
 /// Return true iff `a1` and `a2` contain equivalent elements, using
 /// `isEquivalent` as the equivalence test.  Requires: `isEquivalent`
 /// is an `equivalence relation
-/// <http://en.wikipedia.org/wiki/Equivalence_relation>`__
+/// <http://en.wikipedia.org/wiki/Equivalence_relation>`_
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
