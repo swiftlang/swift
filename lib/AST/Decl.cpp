@@ -931,8 +931,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Func:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
-    return cast<AbstractFunctionDecl>(this)->getBodyKind() !=
-        AbstractFunctionDecl::BodyKind::None;
+    return cast<AbstractFunctionDecl>(this)->hasBody();
 
   case DeclKind::Var:
   case DeclKind::Param:
@@ -2604,6 +2603,7 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
 
   case BodyKind::Parsed:
   case BodyKind::Synthesize:
+  case BodyKind::TypeChecked:
     if (auto body = getBody())
       return body->getSourceRange();
 

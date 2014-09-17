@@ -3719,7 +3719,12 @@ public:
     Skipped,
 
     /// Function body will be synthesized on demand.
-    Synthesize
+    Synthesize,
+
+    /// Function body is present and type-checked.
+    TypeChecked,
+
+    // This enum currently needs to fit in a 3-bit bitfield.
   };
 
   BodyKind getBodyKind() const {
@@ -3732,7 +3737,8 @@ protected:
   // If a function has a body at all, we have either a parsed body AST node or
   // we have saved the end location of the unparsed body.
   union {
-    /// This enum member is active if getBodyKind() == BodyKind::Parsed.
+    /// This enum member is active if getBodyKind() is BodyKind::Parsed or
+    /// BodyKind::TypeChecked.
     BraceStmt *Body;
 
     /// This enum member is active if getBodyKind() == BodyKind::Synthesize.
@@ -3798,7 +3804,8 @@ public:
       const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
       (*Synthesizer)(const_cast<AbstractFunctionDecl *>(this));
     }
-    if (getBodyKind() == BodyKind::Parsed) {
+    if (getBodyKind() == BodyKind::Parsed ||
+        getBodyKind() == BodyKind::TypeChecked) {
       return Body;
     }
     return nullptr;
@@ -3831,6 +3838,18 @@ public:
     assert(getBodyKind() == BodyKind::None);
     Synthesizer = synthesizer;
     setBodyKind(BodyKind::Synthesize);
+  }
+
+  /// If a body has been loaded, flag that it's been type-checked.
+  /// This is kindof a hacky operation, but it avoids some unnecessary
+  /// duplication of work.
+  void setBodyTypeCheckedIfPresent() {
+    if (getBodyKind() == BodyKind::Parsed)
+      setBodyKind(BodyKind::TypeChecked);
+  }
+
+  bool isBodyTypeChecked() const {
+    return getBodyKind() == BodyKind::TypeChecked;
   }
 
   /// Retrieve the source range of the function body.

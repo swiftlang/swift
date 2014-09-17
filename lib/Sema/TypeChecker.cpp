@@ -347,8 +347,16 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
+
+      // HACK: don't type-check the same function body twice.  This is
+      // supposed to be handled by just not enqueuing things twice,
+      // but that gets tricky with synthesized function bodies.
+      if (AFD->isBodyTypeChecked()) continue;
+
       PrettyStackTraceDecl StackEntry("type-checking", AFD);
       TC.typeCheckAbstractFunctionBody(AFD);
+
+      AFD->setBodyTypeCheckedIfPresent();
     }
 
     // Compute captures for functions we visited, in the opposite order of type
