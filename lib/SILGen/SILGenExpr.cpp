@@ -655,12 +655,13 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                           Type propTy, SGFContext C) {
   // If this is a non-direct access to a computed property, call the getter.
   if (FieldDecl->hasAccessorFunctions() && !isDirectPropertyAccess) {
-    // If the base is +0, and this is a non-protocol/archetype base, emit a
-    // retain_value to bring it to +1 since getters always take the base object
+    // If the base is +0, and this is a non-opaque-protocol/archetype base, emit
+    // a retain_value to bring it to +1 since getters always take the base object
     // at +1.
-    if (base.isPlusZeroRValueOrTrivial() &&
-        !base.getType().getSwiftRValueType().isExistentialType() &&
-        !base.getType().getSwiftRValueType()->is<ArchetypeType>())
+    if (base.isPlusZeroRValueOrTrivial()
+        && (base.getType().hasReferenceSemantics()
+            || (!base.getType().getSwiftRValueType().isExistentialType()
+                && !base.getType().getSwiftRValueType()->is<ArchetypeType>())))
       base = base.copyUnmanaged(*this, loc);
     
     RValueSource baseRV = prepareAccessorBaseArg(loc, base,
