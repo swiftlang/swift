@@ -12,72 +12,102 @@
 // Intrinsic protocols shared with the compiler
 //===----------------------------------------------------------------------===//
 
-/// Protocol describing types that can be used as logical values within
-/// a condition.
+/// A type that represents a boolean value.
 ///
 /// Types that conform to the `BooleanType` protocol can be used as
-/// condition in various control statements (`if`, `while`, C-style
-/// `for`) as well as other logical value contexts (e.g., `case`
-/// statement guards).
+/// the condition in control statements (`if`, `while`, C-style `for`)
+/// and other logical value contexts (e.g., `case` statement guards).
+///
+/// Only two types provided by Swift, `Bool` and `ObjCBool`, conform
+/// to `BooleanType`. Expanding this set to include types that
+/// represent more than simple boolean values is discouraged.
 public protocol BooleanType {
   var boolValue: Bool { get }
 }
 
-/// A `GeneratorType` is notionally a `SequenceType` that is consumed
-/// when iterated.
+/// Encapsulates iteration state and interface for iteration over a
+/// *sequence*.
 ///
-/// While it is safe to copy a `GeneratorType`, only one copy should be advanced
-/// with `next()`.
+/// **Note:** While it is safe to copy a *generator*, advancing one
+/// copy may invalidate the others.
 ///
-/// If an algorithm requires two `GeneratorType`\ s for the same
-/// `SequenceType` to be advanced at the same time, and the specific
-/// `SequenceType` type supports that, then those `GeneratorType`
-/// objects should be obtained from `SequenceType` by two distinct
-/// calls to `generate().  However in that case the algorithm should
-/// probably require `CollectionType`, since `CollectionType` implies
-/// multi-pass.
-public protocol GeneratorType /* : SequenceType */ { 
-  // FIXME: Refinement pending <rdar://problem/14396120>
-  
-  /// The type of which `Self` is a generator.
+/// Any code that uses multiple generators (or `for`\ ...\ `in` loops)
+/// over a single *sequence* should have static knowledge that the
+/// specific *sequence* is multi-pass, either because its concrete
+/// type is known or because it is constrained to `CollectionType`.
+/// Also, the generators must be obtained by distinct calls to the
+/// *sequence's* `generate()` method, rather than by copying.
+public protocol GeneratorType { 
+  /// The type of element to be bound to the loop variable.
   typealias Element
 
-  /// If all elements are exhausted, return `nil`.  Otherwise, advance
-  /// to the next element and return it.
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
   ///
-  /// Note: after `next()` on an arbitrary generator has returned
-  /// `nil`, subsequent calls to `next()` have unspecified behavior.
-  /// Specific implementations of this protocol are encouraged to
-  /// respond by calling `preconditionFailure("...")`.
+  /// Requires: `next()` has not been applied to a copy of `self`
+  /// since the copy was made, and no preceding call to `self.next()`
+  /// has returned `nil`.  Specific implementations of this protocol
+  /// are encouraged to respond to violations of this requirement by
+  /// calling `preconditionFailure("...")`.
   mutating func next() -> Element?
 }
 
-/// The `for...in` loop operates on `SequenceType`\ s.  It is
-/// unspecified whether `for...in` consumes the sequence on which it
-/// operates.
+/// This protocol is an implementation detail of `SequenceType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `SequenceType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _SequenceType {
 }
 
+/// This protocol is an implementation detail of `SequenceType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `SequenceType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _Sequence_Type : _SequenceType {
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
   typealias Generator : GeneratorType
 
-  /// Return a generator over the elements of this sequence.  The
-  /// generator's next element is the first element of the sequence.
+  /// Return a *generator* over the elements of this *sequence*.  The
+  /// *generator*\ 's next element is the first element of the
+  /// sequence.
+  ///
+  /// Complexity: O(1)
   func generate() -> Generator
 }
 
+/// A type that can be iterated with a `for`\ ...\ `in` loop.
+///
+/// `SequenceType` makes no requirement on conforming types regarding
+/// whether they will be destructively "consumed" by iteration.  To
+/// ensure non-destructive iteration, constrain your *sequence* to
+/// `CollectionType`.
 public protocol SequenceType : _Sequence_Type {
+  /// A type that provides the *sequence*\ 's iteration interface and
+  /// encapsulates its iteration state.
   typealias Generator : GeneratorType
+
+  /// Return a *generator* over the elements of this *sequence*.  The
+  /// *generator*\ 's next element is the first element of the
+  /// sequence.
+  ///
+  /// Complexity: O(1)
   func generate() -> Generator
 
+  /// Return a value less than or equal to the number of elements in
+  /// self, **nondestructively**.
+  ///
+  /// Complexity: O(N)
   func ~> (_:Self,_:(_UnderestimateCount,())) -> Int
 
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
   /// on `self` and return its result.  Otherwise, return `nil`.
   func ~> <R>(_: Self, _: (_PreprocessingPass, ((Self)->R))) -> R?
 
+  /// Create a native array buffer containing the elements of `self`,
+  /// in the same order.
   func ~>(
     _:Self, _: (_CopyToNativeArrayBuffer, ())
   ) -> _ContiguousArrayBuffer<Self.Generator.Element>
@@ -150,15 +180,35 @@ public struct GeneratorSequence<
   var _base: G
 }
 
+/// A type that can be converted to an associated "raw" type, then
+/// converted back to produce an instance equivalent to the original.
 public protocol RawRepresentable {
+  /// The "raw" type that can be used to represent all values of `Self`.
+  ///
+  /// Every distinct value of `self` has a corresponding unique
+  /// value of `RawValue`, but `RawValue` may have representations
+  /// that do not correspond to an value of `Self`.
   typealias RawValue
+
+  /// Convert from a value of `RawValue`, yielding `nil` iff
+  /// `rawValue` does not correspond to a value of `Self`.
   init?(rawValue: RawValue)
+
+  /// The corresponding value of the "raw" type.
+  ///
+  /// `Self(rawValue: self.rawValue)!` is equivalent to `self`.
   var rawValue: RawValue { get }
 }
 
 // Workaround for our lack of circular conformance checking. Allow == to be
 // defined on _RawOptionSetType in order to satisfy the Equatable requirement of
 // RawOptionSetType without a circularity our type-checker can't yet handle.
+
+/// This protocol is an implementation detail of `RawOptionSetType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `RawOptionSetType` and thus must
+/// be satisifed by concrete instances of that protocol.
 public protocol _RawOptionSetType: RawRepresentable, Equatable {
   typealias RawValue: BitwiseOperationsType, Equatable
   init(rawValue: RawValue)
@@ -181,7 +231,7 @@ public prefix func ~ <T: _RawOptionSetType>(a: T) -> T {
   return T(rawValue: ~a.rawValue)
 }
 
-// TODO: This is an incomplete implementation of our option sets vision.
+/// Protocol for `NS_OPTIONS` imported from Objective-C
 public protocol RawOptionSetType : _RawOptionSetType, BitwiseOperationsType,
     NilLiteralConvertible {
   // FIXME: Disabled pending <rdar://problem/14011860> (Default
@@ -191,9 +241,9 @@ public protocol RawOptionSetType : _RawOptionSetType, BitwiseOperationsType,
   /* init?(rawValue: RawValue) { self.init(rawValue) } */
 }
 
-/// Conforming to this protocol allows a type to be usable with the 'nil'
-/// literal.
+/// Conforming types can be initialized with `nil`.
 public protocol NilLiteralConvertible {
+  /// Create an instance initialized with `nil`.
   init(nilLiteral: ())
 }
 
@@ -201,8 +251,10 @@ public protocol _BuiltinIntegerLiteralConvertible {
   init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
 }
 
+/// Conforming types can be initialized with integer literals
 public protocol IntegerLiteralConvertible {
   typealias IntegerLiteralType : _BuiltinIntegerLiteralConvertible
+  /// Create an instance initialized with `value`.
   init(integerLiteral value: IntegerLiteralType)
 }
 
@@ -210,8 +262,10 @@ public protocol _BuiltinFloatLiteralConvertible {
   init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
 
+/// Conforming types can be initialized with floating point literals
 public protocol FloatLiteralConvertible {
   typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
+  /// Create an instance initialized with `value`.
   init(floatLiteral value: FloatLiteralType)
 }
 
@@ -219,8 +273,11 @@ public protocol _BuiltinBooleanLiteralConvertible {
   init(_builtinBooleanLiteral value: Builtin.Int1)
 }
 
+/// Conforming types can be initialized with the boolean literals
+/// `true` and `false`.
 public protocol BooleanLiteralConvertible {
   typealias BooleanLiteralType : _BuiltinBooleanLiteralConvertible
+  /// Create an instance initialized with `value`.
   init(booleanLiteral value: BooleanLiteralType)
 }
 
@@ -238,8 +295,12 @@ public protocol _BuiltinUnicodeScalarLiteralConvertible {
     value: Builtin.Int32) -> Self
 }
 
+/// Conforming types can be initialized with string literals
+/// containing a single `Unicode scalar value
+/// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
 public protocol UnicodeScalarLiteralConvertible {
   typealias UnicodeScalarLiteralType : _BuiltinUnicodeScalarLiteralConvertible
+  /// Create an instance initialized with `value`.
   class func convertFromUnicodeScalarLiteral(
     value: UnicodeScalarLiteralType) -> Self
 }
@@ -253,45 +314,63 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
       isASCII: Builtin.Int1) -> Self
 }
 
+/// Conforming types can be initialized with string literals
+/// containing a single `Unicode extended grapheme cluster
+/// <http://www.unicode.org/glossary/#extended_grapheme_cluster>`_.
 public protocol ExtendedGraphemeClusterLiteralConvertible
   : UnicodeScalarLiteralConvertible {
 
-  typealias ExtendedGraphemeClusterLiteralType : _BuiltinExtendedGraphemeClusterLiteralConvertible
+  typealias ExtendedGraphemeClusterLiteralType
+    : _BuiltinExtendedGraphemeClusterLiteralConvertible
+  /// Create an instance initialized with `value`.
   class func convertFromExtendedGraphemeClusterLiteral(
       value: ExtendedGraphemeClusterLiteralType) -> Self
 }
 
-public protocol _BuiltinStringLiteralConvertible : _BuiltinExtendedGraphemeClusterLiteralConvertible {
+public protocol _BuiltinStringLiteralConvertible
+  : _BuiltinExtendedGraphemeClusterLiteralConvertible {
+  
   class func _convertFromBuiltinStringLiteral(start: Builtin.RawPointer,
                                               byteSize: Builtin.Word,
                                               isASCII: Builtin.Int1) -> Self
 }
 
-public protocol _BuiltinUTF16StringLiteralConvertible : _BuiltinStringLiteralConvertible {
+public protocol _BuiltinUTF16StringLiteralConvertible
+  : _BuiltinStringLiteralConvertible {
+  
   class func _convertFromBuiltinUTF16StringLiteral(
                 start: Builtin.RawPointer,
                 numberOfCodeUnits: Builtin.Word) -> Self
 }
 
-public protocol StringLiteralConvertible : ExtendedGraphemeClusterLiteralConvertible {
+/// Conforming types can be initialized with arbitrary string literals
+public protocol StringLiteralConvertible
+  : ExtendedGraphemeClusterLiteralConvertible {
   // FIXME: when we have default function implementations in protocols, provide
   // an implementation of convertFromExtendedGraphemeClusterLiteral().
 
   typealias StringLiteralType : _BuiltinStringLiteralConvertible
+  /// Create an instance initialized with `value`.
   class func convertFromStringLiteral(value: StringLiteralType) -> Self
 }
 
+/// Conforming types can be initialized with array literals
 public protocol ArrayLiteralConvertible {
   typealias Element
+  /// Create an instance initialized with `elements`.
   init(arrayLiteral elements: Element...)
 }
 
+/// Conforming types can be initialized with dictionary literals
 public protocol DictionaryLiteralConvertible {
   typealias Key
   typealias Value
+  /// Create an instance initialized with `elements`.
   init(dictionaryLiteral elements: (Key, Value)...)
 }
 
+/// Conforming types can be initialized with string interpolations
+/// containing `\(`\ ...\ `)` clauses.
 public protocol StringInterpolationConvertible {
   class func convertFromStringInterpolation(strings: Self...) -> Self
   class func convertFromStringInterpolationSegment<T>(expr: T) -> Self
