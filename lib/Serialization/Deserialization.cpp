@@ -139,6 +139,9 @@ namespace {
           case Setter:
             os << "(setter)";
             break;
+          case MaterializeForSet:
+            os << "(materializeForSet)";
+            break;
           case WillSet:
             os << "(willSet)";
             break;
@@ -1198,6 +1201,9 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
             break;
           case Setter:
             values.front() = storage->getSetter();
+            break;
+          case MaterializeForSet:
+            values.front() = storage->getMaterializeForSetFunc();
             break;
           case WillSet:
           case DidSet:
@@ -2526,7 +2532,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     bool isImplicit, isObjC;
     TypeID declTypeID, elemTypeID, interfaceTypeID;
-    DeclID getterID, setterID;
+    DeclID getterID, setterID, materializeForSetID;
     DeclID overriddenID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> argNameIDs;
@@ -2535,10 +2541,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                              isObjC, declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
+                                             materializeForSetID,
                                              overriddenID, rawAccessLevel,
                                              argNameIDs);
     auto Getter = cast_or_null<FuncDecl>(getDecl(getterID));
     auto Setter = cast_or_null<FuncDecl>(getDecl(setterID));
+    auto MaterializeForSet = cast_or_null<FuncDecl>(getDecl(materializeForSetID));
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -2567,7 +2575,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    subscript->setAccessors(SourceRange(), Getter, Setter);
+    subscript->setAccessors(SourceRange(), Getter, Setter, MaterializeForSet);
     if (Setter)
       subscript->setSetterAccessibility(Setter->getAccessibility());
 

@@ -829,6 +829,7 @@ namespace decls_block {
     TypeIDField, // interface type
     DeclIDField, // getter
     DeclIDField, // setter
+    DeclIDField, // materializeForSet
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
     BCArray<IdentifierIDField> // name components

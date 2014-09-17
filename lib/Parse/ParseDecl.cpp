@@ -3952,7 +3952,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     Decls.push_back(Get);
   }
 
-  Subscript->setAccessors(DefRange, Get, Set);
+  Subscript->setAccessors(DefRange, Get, Set, /*materializeForSet*/ nullptr);
 
   if (Invalid) {
     Subscript->setType(ErrorType::get(Context));

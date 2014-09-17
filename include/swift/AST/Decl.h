@@ -3657,9 +3657,10 @@ public:
     setIndices(Indices);
   }
   
-  void setAccessors(SourceRange Braces, FuncDecl *Get, FuncDecl *Set) {
+  void setAccessors(SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
+                    FuncDecl *MaterializeForSet) {
     assert(Get && "subscripts should always have at least a getter");
-    makeComputed(Braces.Start, Get, Set, nullptr, Braces.End);
+    makeComputed(Braces.Start, Get, Set, MaterializeForSet, Braces.End);
   }
   
   

@@ -1932,6 +1932,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(subscript->getGetter()),
                                 addDeclRef(subscript->getSetter()),
+                                addDeclRef(subscript->getMaterializeForSetFunc()),
                                 addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 nameComponents);

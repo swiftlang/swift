@@ -3238,7 +3238,8 @@ namespace {
                                       name, decl->getLoc(), bodyPatterns,
                                       decl->getLoc(),
                                       TypeLoc::withoutLoc(elementTy), dc);
-      subscript->setAccessors(SourceRange(), getterThunk, setterThunk);
+      subscript->setAccessors(SourceRange(), getterThunk, setterThunk,
+                              nullptr);
       auto indicesType = bodyPatterns->getType();
       indicesType = indicesType->getRelabeledType(context,
                                                   name.getArgumentNames());
