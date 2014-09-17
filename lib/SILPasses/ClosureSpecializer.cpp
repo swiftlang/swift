@@ -22,6 +22,7 @@
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -366,13 +367,18 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
 
 } // end anonymous namespace.
 
+llvm::cl::opt<bool>
+EnableClosureSpecialization("enable-closure-spec", llvm::cl::init(false));
+
 namespace {
 class SILClosureSpecializerTransform : public SILModuleTransform {
 public:
   SILClosureSpecializerTransform() {}
 
   virtual void run() {
-#if 0
+    if (!EnableClosureSpecialization)
+      return;
+
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
 
@@ -390,8 +396,6 @@ public:
     // Invalidate the call graph.
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
-#endif
-    return;
   }
 
   StringRef getName() override { return "Closure Specialization"; }
