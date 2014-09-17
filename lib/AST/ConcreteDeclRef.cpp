@@ -32,6 +32,11 @@ ConcreteDeclRef::SpecializedDeclRef::create(
 }
 
 void ConcreteDeclRef::dump(raw_ostream &os) {
+  if (!getDecl()) {
+    os << "**NULL**";
+    return;
+  }
+
   getDecl()->dumpRef(os);
 
   // If specialized, dump the substitutions.

@@ -504,29 +504,33 @@ namespace {
       if (VD->getAttrs().hasAttribute<LazyAttr>())
         OS << " lazy";
 
-      if (FuncDecl *Get = VD->getGetter()) {
+      printAccessors(VD);
+      OS << ')';
+    }
+
+    void printAccessors(AbstractStorageDecl *D) {
+      if (FuncDecl *Get = D->getGetter()) {
         OS << "\n";
         printRec(Get);
       }
-      if (FuncDecl *Set = VD->getSetter()) {
+      if (FuncDecl *Set = D->getSetter()) {
         OS << "\n";
         printRec(Set);
       }
-      if (FuncDecl *MaterializeForSet = VD->getMaterializeForSetFunc()) {
+      if (FuncDecl *MaterializeForSet = D->getMaterializeForSetFunc()) {
         OS << "\n";
         printRec(MaterializeForSet);
       }
-      if (VD->getStorageKind() == VarDecl::Observing) {
-        if (FuncDecl *WillSet = VD->getWillSetFunc()) {
+      if (D->getStorageKind() == VarDecl::Observing) {
+        if (FuncDecl *WillSet = D->getWillSetFunc()) {
           OS << "\n";
           printRec(WillSet);
         }
-        if (FuncDecl *DidSet = VD->getDidSetFunc()) {
+        if (FuncDecl *DidSet = D->getDidSetFunc()) {
           OS << "\n";
           printRec(DidSet);
         }
       }
-      OS << ')';
     }
 
     void visitParamDecl(ParamDecl *VD) {
@@ -588,18 +592,7 @@ namespace {
 
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
-      if (FuncDecl *Get = SD->getGetter()) {
-        OS << "\n";
-        OS.indent(Indent + 2);
-        OS << "get = ";
-        printRec(Get);
-      }
-      if (FuncDecl *Set = SD->getSetter()) {
-        OS << "\n";
-        OS.indent(Indent + 2);
-        OS << "set = ";
-        printRec(Set);
-      }
+      printAccessors(SD);
       OS << ')';
     }
     
