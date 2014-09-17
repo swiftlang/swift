@@ -352,7 +352,7 @@ public:
   DeclRange getMembers() const;
 
   /// Add a member to this context. If the hint decl is specified, the new decl
-  /// is inserted next to the hint.
+  /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
 
   /// Retrieve the lazy member loader.

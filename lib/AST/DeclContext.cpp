@@ -486,15 +486,15 @@ void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
 void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
   assert(!member->NextDecl && "Already added to a container");
 
-  // If there is a hint decl that specifies where to add this, just link into
-  // it.
+  // If there is a hint decl that specifies where to add this, just
+  // link into the chain immediately following it.
   if (hint) {
     member->NextDecl = hint->NextDecl;
     hint->NextDecl = member;
 
-    // If we just replaced the first decl, update it.
-    if (FirstDecl == hint)
-      FirstDecl = member;
+    // If the hint was the last in the parent context's chain, update it.
+    if (LastDeclAndKind.getPointer() == hint)
+      LastDeclAndKind.setPointer(member);
     return;
   }
 
