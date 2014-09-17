@@ -368,7 +368,15 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   case DeclContextKind::AbstractClosureExpr:
     Kind = "AbstractClosureExpr";
     break;
-  case DeclContextKind::NominalTypeDecl:  Kind = "NominalTypeDecl"; break;
+  case DeclContextKind::NominalTypeDecl:
+    switch (cast<NominalTypeDecl>(this)->getKind()) {
+#define NOMINAL_TYPE_DECL(ID, PARENT) \
+    case DeclKind::ID: Kind = #ID "Decl"; break;
+#define DECL(ID, PARENT) \
+    case DeclKind::ID: llvm_unreachable("not a nominal type");
+#include "swift/AST/DeclNodes.def"
+    }
+    break;
   case DeclContextKind::ExtensionDecl:    Kind = "ExtensionDecl"; break;
   case DeclContextKind::TopLevelCodeDecl: Kind = "TopLevelCodeDecl"; break;
   case DeclContextKind::Initializer:      Kind = "Initializer"; break;
