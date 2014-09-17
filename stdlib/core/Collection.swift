@@ -38,7 +38,7 @@ public func countElements <T: _CollectionType>(x: T) -> T.Index.Distance {
 public protocol _CollectionType : _SequenceType {
   /// A type that represents a valid position in the collection.
   /// Valid indices consist of the position of every element and a
-  /// “past the end” position that's not valid for use as a subscript.
+  /// "past the end" position that's not valid for use as a subscript.
   typealias Index : ForwardIndexType
 
   /// The position of the first element in a non-empty collection;
@@ -46,7 +46,7 @@ public protocol _CollectionType : _SequenceType {
   /// Identical to `endIndex` in an empty collection.
   var startIndex: Index {get}
 
-  /// The collection's “past the end” position.
+  /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
@@ -231,7 +231,7 @@ public struct PermutationGenerator<
 /// be satisifed by concrete instances of that protocol.
 public protocol _Sliceable : CollectionType {}
 
-/// A *collection* from which a sub-range of elements (a “slice”)
+/// A *collection* from which a sub-range of elements (a "slice")
 /// can be efficiently extracted.
 public protocol Sliceable : _Sliceable {
   // FIXME: Slice should also be Sliceable but we can't express
