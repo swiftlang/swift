@@ -249,6 +249,8 @@ struct ClosureSpecializer {
   }
 
   bool isProfitable(ArgDescriptor &AD);
+  void gatherCallSites(SILFunction *Caller,
+                       llvm::SmallVectorImpl<ArgDescriptor> &CallSites);
   bool specialize(SILFunction *Caller);
 };
 
@@ -311,15 +313,24 @@ static void createName(SILFunction *Callee, SILFunction *Closure,
          << '_' << Callee->getName();
 }
 
-static void
+void
+ClosureSpecializer::
 gatherCallSites(SILFunction *Caller,
                 llvm::SmallVectorImpl<ArgDescriptor> &CallSites) {
+  // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
+    // For each instruction II in BB...
     for (auto &II : BB) {
+      // If II is not a partial apply or is a partial apply with substitutions,
+      // we are not interested in it... Skip it.
       auto *PAI = dyn_cast<PartialApplyInst>(&II);
-      if (!PAI)
+      if (!PAI || PAI->hasSubstitutions())
         continue;
 
+      // If II is a partial apply, make sure that it is a simple partial apply
+      // (i.e. its callee is a function_ref).
+      //
+      // TODO: We can probably handle other partial applies here.
       auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
       if (!FRI)
         continue;
@@ -330,19 +341,45 @@ gatherCallSites(SILFunction *Caller,
       if (!PAI->hasOneUse())
         continue;
 
-      // Grab that use. If it is not an apply inst, skip this ApplyInst.
+      // Grab the use of our partial apply. If that use is not an apply inst or
+      // an apply inst with substitutions, there is nothing interesting for us
+      // to do, so continue...
       auto *AI = dyn_cast<ApplyInst>(PAI->use_begin().getUser());
-      if (!AI)
+      if (!AI || AI->hasSubstitutions())
         continue;
 
+      // If AI does not have a function_ref as its callee, we can not do
+      // anything here... so continue...
+      if (!isa<FunctionRefInst>(AI->getCallee()))
+        continue;
+
+      // Ok, we know that we can perform the optimization but not whether or not
+      // the optimization is profitable. Find the index of the argument
+      // corresponding to our partial apply.
+      Optional<unsigned> PAIIndex;
       for (unsigned i = 0, e = AI->getNumArguments(); i != e; ++i) {
         if (AI->getArgument(i) != SILValue(PAI))
           continue;
-        CallSites.push_back(ArgDescriptor(PAI, AI, i));
+        PAIIndex = i;
         DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
               << i << ": " << *AI);
         break;
       }
+
+      // If we did not find an index, there is nothing further to do, continue.
+      if (!PAIIndex.hasValue())
+        continue;
+
+      // Ok. We now have the data we need to form an ArgSpecDescriptor and
+      // determine if the ArgSpecDescriptor is profitable. If it is not
+      // profitable, continue.
+      ArgDescriptor AD(PAI, AI, PAIIndex.getValue());
+      if (!isProfitable(AD))
+        continue;
+
+      // Now we know that AD is profitable to specialize. Add it to our call
+      // site list.
+      CallSites.push_back(AD);
     }
   }
 }
@@ -358,13 +395,6 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
 
   bool Changed = false;
   for (auto &AD : CallSites) {
-    if (AD.AI->hasSubstitutions() || AD.PAI->hasSubstitutions()) {
-      DEBUG(llvm::dbgs() << "    Callsite has substitutions\n");
-      continue;
-    }
-    if (!isProfitable(AD))
-      continue;
-
     auto *ClosureFRI = cast<FunctionRefInst>(AD.PAI->getCallee());
     auto *CalleeFRI = cast<FunctionRefInst>(AD.AI->getCallee());
     auto *Callee = CalleeFRI->getReferencedFunction();
