@@ -1,5 +1,4 @@
 // RUN: env SWIFTC=%swiftc_driver_plain INPUT_DIR="%S/Inputs/" OUTPUT_BASE="%t" /bin/sh %S/Inputs/parseable_output_unicode_runner.sh 2>&1 | FileCheck %s
-// XFAIL: gmalloc
 
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
