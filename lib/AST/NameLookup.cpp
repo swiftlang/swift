@@ -376,6 +376,49 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   }
 };
 
+static bool matchesDiscriminator(Identifier discriminator,
+                                 const ValueDecl *value) {
+  if (value->getAccessibility() != Accessibility::Private)
+    return false;
+
+  auto containingFile =
+    dyn_cast<FileUnit>(value->getDeclContext()->getModuleScopeContext());
+  if (!containingFile)
+    return false;
+
+  return
+    discriminator == containingFile->getDiscriminatorForPrivateValue(value);
+}
+
+static bool matchesDiscriminator(Identifier discriminator,
+                                 UnqualifiedLookupResult lookupResult) {
+  return matchesDiscriminator(discriminator, lookupResult.getValueDecl());
+}
+
+template <typename Result>
+static void filterForDiscriminator(SmallVectorImpl<Result> &results,
+                                   DebuggerClient *debugClient) {
+  Identifier discriminator = debugClient->getPreferredPrivateDiscriminator();
+  if (discriminator.empty())
+    return;
+
+  auto doesNotMatch = [discriminator](Result next) -> bool {
+    return !matchesDiscriminator(discriminator, next);
+  };
+
+  auto lastMatchIter = std::find_if_not(results.rbegin(), results.rend(),
+                                        doesNotMatch);
+  if (lastMatchIter == results.rend())
+    return;
+
+  Result lastMatch = *lastMatchIter;
+
+  auto newEnd = std::remove_if(results.begin(), lastMatchIter.base()-1,
+                               doesNotMatch);
+  results.erase(newEnd, results.end());
+  results.push_back(lastMatch);
+}
+
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      SourceLoc Loc, bool IsTypeLookup) {
@@ -384,6 +427,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   Module &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
+  DebuggerClient *DebugClient = M.getDebugClient();
 
   // Never perform local lookup for operators.
   if (Name.isOperator())
@@ -538,8 +582,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         Results.push_back(Result::getMemberProperty(BaseDecl, Result));
       }
 
-      if (FoundAny)
+      if (FoundAny) {
+        if (DebugClient)
+          filterForDiscriminator(Results, DebugClient);
         return;
+      }
 
       // Check the generic parameters if our context is a generic type or
       // extension thereof.
@@ -582,7 +629,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   if (auto FU = dyn_cast<FileUnit>(DC))
     FU->getImportedModules(extraImports, Module::ImportFilter::Private);
 
-  DebuggerClient *DebugClient = M.getDebugClient();
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName()
       && DebugClient && DebugClient->lookupOverrides(Name.getBaseName(), DC,
@@ -599,12 +645,15 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   for (auto VD : CurModuleResults)
     Results.push_back(Result::getModuleMember(VD));
 
+  if (DebugClient)
+    filterForDiscriminator(Results, DebugClient);
+
   // Now add any names the DebugClient knows about to the lookup.
   if (Name.isSimpleName() && DebugClient)
       DebugClient->lookupAdditions(Name.getBaseName(), DC, Loc, IsTypeLookup,
                                    Results);
 
-  // If we've found something, we're done. 
+  // If we've found something, we're done.
   if (!Results.empty())
     return;
 
@@ -1002,6 +1051,7 @@ bool DeclContext::lookupQualified(Type type,
                                   LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
+  assert(decls.empty() && "additive lookup not supported");
 
   if (type->is<ErrorType>())
     return false;
@@ -1049,6 +1099,10 @@ bool DeclContext::lookupQualified(Type type,
                                  return !knownDecls.insert(vd);
                                }),
                 decls.end());
+
+    if (auto *debugClient = topLevelScope->getParentModule()->getDebugClient())
+      filterForDiscriminator(decls, debugClient);
+    
     return !decls.empty();
   }
 
@@ -1287,10 +1341,15 @@ bool DeclContext::lookupQualified(Type type,
     }
   }
 
+  Module *M = getParentModule();
+
   // If we're supposed to remove shadowed/hidden declarations, do so now.
   if (options & NL_RemoveNonVisible) {
-    removeShadowedDecls(decls, getParentModule(), typeResolver);
+    removeShadowedDecls(decls, M, typeResolver);
   }
+
+  if (auto *debugClient = M->getDebugClient())
+    filterForDiscriminator(decls, debugClient);
 
   // We're done. Report success/failure.
   return !decls.empty();

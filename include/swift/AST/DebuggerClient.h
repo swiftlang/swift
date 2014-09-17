@@ -52,16 +52,22 @@ public:
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
  
- /// This is the second time DebuggerClient is consulted:
+  /// This is the second time DebuggerClient is consulted:
   /// after all names in external Modules are checked, the client
   /// gets a chance to add names to the list of candidates that
   /// have been found in the external module lookup.  
 
-  virtual bool lookupAdditions (Identifier Name, DeclContext *DC,
+  virtual bool lookupAdditions(Identifier Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 
-   virtual SILDebuggerClient *getAsSILDebuggerClient() = 0;
+  /// When evaluating an expression in the context of an existing source file,
+  /// we may want to prefer declarations from that source file.
+  /// The DebuggerClient can return a private-discriminator to tell lookup to
+  /// prefer these certain decls.
+  virtual Identifier getPreferredPrivateDiscriminator() = 0;
+
+  virtual SILDebuggerClient *getAsSILDebuggerClient() = 0;
 private:
   virtual void anchor();
 };
