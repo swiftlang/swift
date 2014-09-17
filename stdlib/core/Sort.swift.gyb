@@ -314,6 +314,25 @@ public func sort<T : Comparable>(inout array: [T]) {
   }
 }
 
+/// Sort `array` in-place${according}.
+///
+${sortIsUnstable}
+///
+${orderingRequirement}
+% if p:
+public func sort<T>(
+  inout array: ContiguousArray<T>,
+  isOrderedBefore: (T, T) -> Bool
+) {
+% else:
+public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
+% end
+  return array.withUnsafeMutableBufferPointer {
+    a in sort(&a ${", isOrderedBefore" if p else ""})
+    return
+  }
+}
+
 /// Return an `Array` containing the sorted elements of `source`{according}.
 ///
 ${sortIsUnstable}
@@ -326,7 +345,7 @@ public func sorted<
   ${"isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> [C.Generator.Element] {
   var result = ContiguousArray(source)
-  result.sort(${"isOrderedBefore" if p else "{ $0 < $1 }"})  
+  sort(&result ${", isOrderedBefore" if p else ""})
   return Array(result)
 }
 % end
