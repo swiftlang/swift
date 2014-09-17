@@ -249,12 +249,19 @@ public protocol Sliceable : _Sliceable {
   /// Access the elements delimited by the given half-open range of
   /// indices.
   ///
-  /// Should be O(1) unless bridging from Objective-C requires an O(N)
-  /// conversion.
+  /// Complexity: O(1) unless bridging from Objective-C requires an
+  /// O(N) conversion.
   subscript(bounds: Range<Index>) -> SubSlice {get}
 }
 
-/// A *sliceable* collection whose slices can be replaced.
+/// A *collection* with mutable slices.
+///
+/// For example,
+///
+/// .. parsed-literal:
+///
+///      x[i..<j] = *someExpression*
+///      x[i..<j].\ *mutatingMethod*\ ()
 public protocol MutableSliceable : Sliceable, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSlice {get set}
 }
