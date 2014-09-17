@@ -186,3 +186,6 @@
 ; CHECK: _TFCSs13_NSSwiftArray29canStoreElementsOfDynamicTypefS_FPMP_Sb ---> Swift._NSSwiftArray.canStoreElementsOfDynamicType (Swift._NSSwiftArray)(protocol<>.Type) -> Swift.Bool
 ; CHECK: _TFCSs13_NSSwiftArrayg17staticElementTypePMP_ ---> Swift._NSSwiftArray.staticElementType.getter : protocol<>.Type
 ; CHECK: _TFCSs17_DictionaryMirrorg9valueTypePMP_ ---> Swift._DictionaryMirror.valueType.getter : protocol<>.Type
+; CHECK: _TPA__TFFVSs11GeneratorOfcU__FMGS_Q__USs13GeneratorType__FQ_GS_Qd___U_FT_GSqQd___ ---> partial apply forwarder for Swift.GeneratorOf.(init <A>(Swift.GeneratorOf<A>.Type) -> <B : Swift.GeneratorType>(B) -> Swift.GeneratorOf<A>).(closure #1)
+; CHECK: _TPA__TFFVSs10SequenceOfcU__FMGS_Q__USs13GeneratorType__FFT_Q_GS_Qd___U_FT_GVSs11GeneratorOfQd___ ---> partial apply forwarder for Swift.SequenceOf.(init <A>(Swift.SequenceOf<A>.Type) -> <B : Swift.GeneratorType>(() -> B) -> Swift.SequenceOf<A>).(closure #1)
+; CHECK: _TPA__TFFVSs6SinkOfcU__FMGS_Q__USs8SinkType__FQ_GS_Qd___U_FQd__T_ ---> partial apply forwarder for Swift.SinkOf.(init <A>(Swift.SinkOf<A>.Type) -> <B : Swift.SinkType>(B) -> Swift.SinkOf<A>).(closure #1)

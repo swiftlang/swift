@@ -1139,7 +1139,6 @@ private:
     }
     ~GenericContext() {
       D.ArchetypeCount = D.ArchetypeCounts.back();
-      D.ArchetypeCounts.pop_back();
     }
   };
 
