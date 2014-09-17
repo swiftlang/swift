@@ -397,12 +397,11 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 }
 
 void IRGenModule::emitObjCRegistration() {
-  SILFunction *EntryPoint = nullptr;
+  SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
   
-  // In normal and playgrounds mode, insert the initialization into
-  // top_level_code.
-  if (Context.LangOpts.DebuggerSupport && !Context.LangOpts.Playground) {
-    // For debugging and REPL, though, try to find the LLDBDebuggerFunction.
+  // If we're debugging, we probably don't have a top_level_code. Find a
+  // function marked with the LLDBDebuggerFunction attribute instead.
+  if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
     for (SILFunction &SF : *SILMod) {
       if (SF.hasLocation()) {
         if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
@@ -415,15 +414,12 @@ void IRGenModule::emitObjCRegistration() {
         }
       }
     }
-  } else {
-    EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
   }
   
   if (!EntryPoint)
     return;
     
-  llvm::Function *DebuggerFunction
-    = Module.getFunction(EntryPoint->getName());
+  llvm::Function *DebuggerFunction = Module.getFunction(EntryPoint->getName());
   if (!DebuggerFunction)
     return;
   
