@@ -2227,7 +2227,6 @@ namespace {
       // FIXME: callWitness() may end up re-doing some work we already did
       // to convert the array literal elements to the element type. It would
       // be nicer to re-use them.
-      // FIXME: Cache the name.
 
       // FIXME: This location info is bogus.
       Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
@@ -2235,7 +2234,8 @@ namespace {
       DeclName name(tc.Context, tc.Context.Id_init,
                     { tc.Context.Id_ArrayLiteral });
 
-      // Restructure the argument to provide 
+      // Restructure the argument to provide the appropriate labels in the
+      // tuple.
       SmallVector<TupleTypeElt, 4> typeElements;
       SmallVector<Identifier, 4> names;
       bool first = true;
@@ -2294,8 +2294,39 @@ namespace {
       // FIXME: This location info is bogus.
       Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
                                                    dictionaryTy, tc.Context);
-      auto name = tc.Context.Id_ConvertFromDictionaryLiteral;
-      auto arg = expr->getSubExpr();
+
+      DeclName name(tc.Context, tc.Context.Id_init,
+                    { tc.Context.Id_DictionaryLiteral });
+
+      // Restructure the argument to provide the appropriate labels in the
+      // tuple.
+      SmallVector<TupleTypeElt, 4> typeElements;
+      SmallVector<Identifier, 4> names;
+      bool first = true;
+      for (auto elt : expr->getElements()) {
+        if (first) {
+          typeElements.push_back(TupleTypeElt(elt->getType(),
+                                              tc.Context.Id_DictionaryLiteral));
+          names.push_back(tc.Context.Id_DictionaryLiteral);
+
+          first = false;
+          continue;
+        } 
+
+        typeElements.push_back(elt->getType());
+        names.push_back(Identifier());
+      }
+
+      Type argType = TupleType::get(typeElements, tc.Context);
+      Expr *arg = TupleExpr::create(tc.Context, expr->getLBracketLoc(),
+                                    expr->getElements(),
+                                    names,
+                                    { },
+                                    expr->getRBracketLoc(),
+                                    /*HasTrailingClosure=*/false,
+                                    /*Implicit=*/false,
+                                    argType);
+
       Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
                                     conformance, name, arg,
                                     diag::dictionary_protocol_broken);

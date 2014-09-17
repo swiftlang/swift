@@ -289,7 +289,7 @@ public protocol ArrayLiteralConvertible {
 public protocol DictionaryLiteralConvertible {
   typealias Key
   typealias Value
-  class func convertFromDictionaryLiteral(elements: (Key, Value)...) -> Self
+  init(dictionaryLiteral elements: (Key, Value)...)
 }
 
 public protocol StringInterpolationConvertible {

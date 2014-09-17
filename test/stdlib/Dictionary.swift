@@ -994,20 +994,20 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   }
 }
 
-DictionaryTestSuite.test("convertFromDictionaryLiteral") {
+DictionaryTestSuite.test("init(dictionaryLiteral:)") {
   if true {
-    var empty = Dictionary<Int, Int>.convertFromDictionaryLiteral()
+    var empty = Dictionary<Int, Int>()
     assert(empty.count == 0)
     assert(empty[1111] == nil)
   }
   if true {
-    var d = Dictionary.convertFromDictionaryLiteral((10, 1010))
+    var d = Dictionary(dictionaryLiteral: (10, 1010))
     assert(d.count == 1)
     assert(d[10]! == 1010)
     assert(d[1111] == nil)
   }
   if true {
-    var d = Dictionary.convertFromDictionaryLiteral(
+    var d = Dictionary(dictionaryLiteral: 
         (10, 1010), (20, 1020))
     assert(d.count == 2)
     assert(d[10]! == 1010)
@@ -1015,7 +1015,7 @@ DictionaryTestSuite.test("convertFromDictionaryLiteral") {
     assert(d[1111] == nil)
   }
   if true {
-    var d = Dictionary.convertFromDictionaryLiteral(
+    var d = Dictionary(dictionaryLiteral: 
         (10, 1010), (20, 1020), (30, 1030))
     assert(d.count == 3)
     assert(d[10]! == 1010)
@@ -1024,7 +1024,7 @@ DictionaryTestSuite.test("convertFromDictionaryLiteral") {
     assert(d[1111] == nil)
   }
   if true {
-    var d = Dictionary.convertFromDictionaryLiteral(
+    var d = Dictionary(dictionaryLiteral: 
         (10, 1010), (20, 1020), (30, 1030), (40, 1040))
     assert(d.count == 4)
     assert(d[10]! == 1010)
@@ -1158,6 +1158,13 @@ class ParallelArrayDictionary : NSDictionary {
 
   override init() {
     super.init()
+  }
+
+  override init(
+    objects: UnsafePointer<AnyObject?>,
+    forKeys keys: UnsafePointer<NSCopying?>,
+    count: Int) {
+    super.init(objects: objects, forKeys: keys, count: count)
   }
 
   required init(coder aDecoder: NSCoder) {

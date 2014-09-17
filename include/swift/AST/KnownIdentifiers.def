@@ -100,8 +100,7 @@ IDENTIFIER_WITH_NAME(ConvertFromStringInterpolation,
 IDENTIFIER_WITH_NAME(ConvertFromStringInterpolationSegment,
                      "convertFromStringInterpolationSegment")
 IDENTIFIER_WITH_NAME(ArrayLiteral, "arrayLiteral")
-IDENTIFIER_WITH_NAME(ConvertFromDictionaryLiteral,
-                     "convertFromDictionaryLiteral")
+IDENTIFIER_WITH_NAME(DictionaryLiteral, "dictionaryLiteral")
 IDENTIFIER_WITH_NAME(GetBuiltinLogicValue, "_getBuiltinLogicValue")
 
 IDENTIFIER_WITH_NAME(CVarArgType, "CVarArgType")

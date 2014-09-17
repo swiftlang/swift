@@ -72,13 +72,13 @@ if true {
 
 if arg == "DuplicateKeys1" {
   println("OK")
-  Dictionary.convertFromDictionaryLiteral(
+  Dictionary(dictionaryLiteral: 
     (10, 1010), (20, 1020), (30, 1030), (10, 0))
 }
 
 if arg == "DuplicateKeys2" {
   println("OK")
-  Dictionary.convertFromDictionaryLiteral(
+  Dictionary(dictionaryLiteral: 
     (10, 1010), (20, 1020), (30, 1030), (10, 1010))
 }
 

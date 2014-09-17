@@ -3,13 +3,13 @@
 final class DictStringInt : DictionaryLiteralConvertible {
   typealias Key = String
   typealias Value = Int
-  class func convertFromDictionaryLiteral(elements: (String, Int)...) -> DictStringInt {}
+  init(dictionaryLiteral elements: (String, Int)...) { }
 }
 
 final class Dictionary<K, V> : DictionaryLiteralConvertible {
   typealias Key = K
   typealias Value = V
-  class func convertFromDictionaryLiteral(elements: (K, V)...) -> Dictionary<K, V> {}
+  init(dictionaryLiteral elements: (K, V)...) { }
 }
 
 func useDictStringInt(d: DictStringInt) {}

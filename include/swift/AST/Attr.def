@@ -184,7 +184,7 @@ DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl | NotSerialized,
 DECL_ATTR(weak,    Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
           /* Not serialized */49)
 
-DECL_ATTR(effects, Effects, OnFunc, 50)
+DECL_ATTR(effects, Effects, OnFunc | OnConstructor | OnDestructor, 50)
 
 DECL_ATTR_ALIAS(unowned, Ownership)
 

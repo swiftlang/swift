@@ -1918,7 +1918,15 @@ public struct Dictionary<
   /// Create a dictionary with at least the given number of
   /// elements worth of storage.  The actual capacity will be the
   /// smallest power of 2 that's >= `minimumCapacity`.
-  public init(minimumCapacity: Int = 2) {
+  public init() {
+    _variantStorage =
+        .Native(_NativeStorage.Owner(minimumCapacity: 2))
+  }
+
+  /// Create a dictionary with at least the given number of
+  /// elements worth of storage.  The actual capacity will be the
+  /// smallest power of 2 that's >= `minimumCapacity`.
+  public init(minimumCapacity: Int) {
     _variantStorage =
         .Native(_NativeStorage.Owner(minimumCapacity: minimumCapacity))
   }
@@ -2048,11 +2056,9 @@ public struct Dictionary<
   //
   // DictionaryLiteralConvertible conformance
   //
-  @effects(readonly)
-  public static func convertFromDictionaryLiteral(elements: (Key, Value)...)
-                -> Dictionary<Key, Value> {
-    return Dictionary<Key, Value>(
-        _nativeStorage: _NativeDictionaryStorage.fromArray(elements))
+  @effects(readnone)
+  public init(dictionaryLiteral elements: (Key, Value)...) {
+    self.init(_nativeStorage: _NativeDictionaryStorage.fromArray(elements))
   }
 
   //
