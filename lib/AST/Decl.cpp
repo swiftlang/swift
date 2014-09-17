@@ -149,6 +149,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
 
      case AccessorKind::IsDidSet:
        return DescriptiveDeclKind::DidSet;
+
+     case AccessorKind::IsMaterializeForSet:
+       return DescriptiveDeclKind::MaterializeForSet;
      }
 
      if (!func->getName().empty() && func->getName().isOperator())
@@ -216,6 +219,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Setter, "setter");
   ENTRY(WillSet, "willSet observer");
   ENTRY(DidSet, "didSet observer");
+  ENTRY(MaterializeForSet, "materializeForSet accessor");
   ENTRY(EnumElement, "enum element");
   }
 #undef ENTRY
@@ -1915,28 +1919,60 @@ StringRef ProtocolDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
+FuncDecl *AbstractStorageDecl::getAccessorFunction(AccessorKind kind) const {
+  switch (kind) {
+  case AccessorKind::IsGetter: return getGetter();
+  case AccessorKind::IsSetter: return getSetter();
+  case AccessorKind::IsMaterializeForSet: return getMaterializeForSetFunc();
+  case AccessorKind::IsDidSet: return getDidSetFunc();
+  case AccessorKind::IsWillSet: return getWillSetFunc();
+  case AccessorKind::NotAccessor: llvm_unreachable("called with NotAccessor");
+  }
+  llvm_unreachable("bad accessor kind!");
+}
+
+void AbstractStorageDecl::configureGetSetRecord(FuncDecl *getter,
+                                                FuncDecl *setter,
+                                                FuncDecl *materializeForSet) {
+  auto getSetInfo = GetSetInfo.getPointer();
+  getSetInfo->Get = getter;
+  getSetInfo->Set = setter;
+  getSetInfo->MaterializeForSet = materializeForSet;
+
+  auto setSetterAccess = [&](FuncDecl *fn) {
+    if (auto setterAccess = GetSetInfo.getInt()) {
+      assert(!fn->hasAccessibility() ||
+             fn->getAccessibility() == setterAccess.getValue());
+      fn->overwriteAccessibility(setterAccess.getValue());
+    }    
+  };
+
+  if (getter) {
+    getter->makeAccessor(this, AccessorKind::IsGetter);
+  }
+
+  if (setter) {
+    setter->makeAccessor(this, AccessorKind::IsSetter);
+    setSetterAccess(setter);
+  }
+
+  if (materializeForSet) {
+    materializeForSet->makeAccessor(this, AccessorKind::IsMaterializeForSet);
+    setSetterAccess(materializeForSet);
+  }
+}
+
 void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
                                        FuncDecl *Get, FuncDecl *Set,
+                                       FuncDecl *MaterializeForSet,
                                        SourceLoc RBraceLoc) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   auto *getSetInfo = new (Mem) GetSetRecord();
   getSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
-  getSetInfo->Get = Get;
-  getSetInfo->Set = Set;
   GetSetInfo.setPointer(getSetInfo);
-
-  if (Get)
-    Get->makeAccessor(this, AccessorKind::IsGetter);
-  if (Set) {
-    Set->makeAccessor(this, AccessorKind::IsSetter);
-    if (auto setterAccess = GetSetInfo.getInt()) {
-      assert(!Set->hasAccessibility() ||
-             Set->getAccessibility() == setterAccess.getValue());
-      Set->overwriteAccessibility(setterAccess.getValue());
-    }
-  }
+  configureGetSetRecord(Get, Set, MaterializeForSet);
 
   // Mark that this is a computed property.
   setStorageKind(Computed);
@@ -1957,37 +1993,39 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
   }
 }
 
+void AbstractStorageDecl::setMaterializeForSetFunc(FuncDecl *accessor) {
+  assert(hasAccessorFunctions() && "No accessors for declaration!");
+  assert(getSetter() && "declaration is not settable");
+  assert(!getMaterializeForSetFunc() && "already has a materializeForSet");
+  GetSetInfo.getPointer()->MaterializeForSet = accessor;
+  accessor->makeAccessor(this, AccessorKind::IsMaterializeForSet);
+  if (auto setterAccess = GetSetInfo.getInt()) {
+    assert(!accessor->hasAccessibility() ||
+           accessor->getAccessibility() == setterAccess.getValue());
+    accessor->overwriteAccessibility(setterAccess.getValue());
+  }
+}
+
 /// \brief Turn this into a StoredWithTrivialAccessors var, specifying the
 /// accessors (getter and setter) that go with it.
 void AbstractStorageDecl::makeStoredWithTrivialAccessors(FuncDecl *Get,
-                                                         FuncDecl *Set) {
+                                 FuncDecl *Set, FuncDecl *MaterializeForSet) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   assert(Get);
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   auto *getSetInfo = new (Mem) GetSetRecord();
   getSetInfo->Braces = SourceRange();
-  getSetInfo->Get = Get;
-  getSetInfo->Set = Set;
   GetSetInfo.setPointer(getSetInfo);
-  
-  Get->makeAccessor(this, AccessorKind::IsGetter);
-  if (Set) {
-    Set->makeAccessor(this, AccessorKind::IsSetter);
-    if (auto setterAccess = GetSetInfo.getInt()) {
-      assert(!Set->hasAccessibility() ||
-             Set->getAccessibility() == setterAccess.getValue());
-      Set->overwriteAccessibility(setterAccess.getValue());
-    }
-  }
+  configureGetSetRecord(Get, Set, MaterializeForSet);
   
   // Mark that this is a StoredWithTrivialAccessors property.
   setStorageKind(StoredWithTrivialAccessors);
 }
 
 void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
-                                            FuncDecl *WillSet, FuncDecl *DidSet,
-                                            SourceLoc RBraceLoc) {
+                                        FuncDecl *WillSet, FuncDecl *DidSet,
+                                        SourceLoc RBraceLoc) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   assert((WillSet || DidSet) &&
          "Can't be Observing without one or the other");
@@ -2011,21 +2049,12 @@ void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
 /// \brief Specify the synthesized get/set functions for a Observing var.
 /// This is used by Sema.
 void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
-                                                FuncDecl *Set) {
+                                                FuncDecl *Set,
+                                                FuncDecl *MaterializeForSet) {
   assert(getStorageKind() == Observing && "VarDecl is wrong type");
   assert(!getGetter() && !getSetter() && "getter and setter already set");
   assert(Get && Set && "Must specify getter and setter");
-
-  GetSetInfo.getPointer()->Get = Get;
-  GetSetInfo.getPointer()->Set = Set;
-
-  Get->makeAccessor(this, AccessorKind::IsGetter);
-  Set->makeAccessor(this, AccessorKind::IsSetter);
-  if (auto setterAccess = GetSetInfo.getInt()) {
-    assert(!Set->hasAccessibility() ||
-           Set->getAccessibility() == setterAccess.getValue());
-    Set->overwriteAccessibility(setterAccess.getValue());
-  }
+  configureGetSetRecord(Get, Set, MaterializeForSet);
 }
 
 void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
@@ -2037,6 +2066,7 @@ void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
   getSetInfo->Braces = BracesRange;
   getSetInfo->Get = nullptr;
   getSetInfo->Set = nullptr;
+  getSetInfo->MaterializeForSet = nullptr;
   GetSetInfo.setPointer(getSetInfo);
 }
 
@@ -2448,6 +2478,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
                            : DeclName(ctx, afd->getName(), { });
 
         case AccessorKind::IsSetter:
+        case AccessorKind::IsMaterializeForSet:
         case AccessorKind::IsDidSet:
         case AccessorKind::IsWillSet: {
           SmallVector<Identifier, 4> argNames;

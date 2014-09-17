@@ -175,9 +175,9 @@ public:
           valueReq->isInvalid())
         continue;
       
-      // If this is a getter/setter for a funcdecl, ignore it.
+      // Ignore accessors.
       if (auto *FD = dyn_cast<FuncDecl>(valueReq))
-        if (FD->isGetterOrSetter())
+        if (FD->isAccessor())
           continue;
 
       f(valueReq, getWitness(valueReq, resolver));

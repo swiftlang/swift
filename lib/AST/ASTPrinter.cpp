@@ -1260,11 +1260,13 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer << " {";
       break;
     case AccessorKind::IsDidSet:
+    case AccessorKind::IsMaterializeForSet:
       recordDeclLoc(decl,
         [&]{
           if (decl->isExplicitNonMutating())
             Printer << "nonmutating ";
-          Printer << "didSet";
+          Printer << (decl->getAccessorKind() == AccessorKind::IsDidSet
+                        ? "didSet" : "materializeForSet");
         });
       Printer << " {";
       break;

@@ -1855,7 +1855,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   // If this is a getter/setter for a funcdecl, ignore it.
   if (auto *FD = dyn_cast<FuncDecl>(requirement))
-    if (FD->isGetterOrSetter())
+    if (FD->isAccessor())
       return;
 
   // Try to resolve each of the associated types referenced within the
@@ -1998,7 +1998,7 @@ void ConformanceChecker::checkConformance() {
 
     // If this is a getter/setter for a funcdecl, ignore it.
     if (auto *FD = dyn_cast<FuncDecl>(requirement))
-      if (FD->isGetterOrSetter())
+      if (FD->isAccessor())
         continue;
     
     // Try to resolve the witness via explicit definitions.
@@ -2094,9 +2094,9 @@ void ConformanceChecker::checkConformance() {
     // For a non-type witness.
     if (auto value = dyn_cast<ValueDecl>(member)) {
       (void)value;
-      // If this is a getter/setter for a funcdecl, ignore it.
+      // If this is an accessor for something, ignore it.
       if (auto *FD = dyn_cast<FuncDecl>(member))
-        if (FD->isGetterOrSetter())
+        if (FD->isAccessor())
           continue;
 
       assert((AlreadyComplained || Conformance->hasWitness(value)) &&

@@ -792,6 +792,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
     case AccessorKind::IsSetter:
     case AccessorKind::IsWillSet:
     case AccessorKind::IsDidSet:
+    case AccessorKind::IsMaterializeForSet:
       return SelectorFamily::None;
     }
   }

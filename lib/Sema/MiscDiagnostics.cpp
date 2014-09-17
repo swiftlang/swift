@@ -314,7 +314,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
       if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
         // Handle local and top-level computed variables.
         if (DRE->getDecl() == Var &&
-            !DRE->isDirectPropertyAccess()) {
+            !DRE->isDirectPropertyAccess() &&
+            Accessor->getAccessorKind() != AccessorKind::IsMaterializeForSet) {
           bool shouldDiagnose = true;
           if (auto *ParentExpr = Parent.getAsExpr()) {
             if (isa<DotSyntaxBaseIgnoredExpr>(ParentExpr))

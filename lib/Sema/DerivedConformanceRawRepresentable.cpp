@@ -221,7 +221,8 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
                                       SourceLoc(), C.Id_rawValue,
                                       rawType, enumDecl);
   propDecl->setImplicit();
-  propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
+  propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
+                         SourceLoc());
   propDecl->setAccessibility(enumDecl->getAccessibility());
   propDecl->setInterfaceType(rawInterfaceType);
   

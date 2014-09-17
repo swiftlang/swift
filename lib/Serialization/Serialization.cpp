@@ -1054,6 +1054,7 @@ static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
   CASE(Setter)
   CASE(WillSet)
   CASE(DidSet)
+  CASE(MaterializeForSet)
 #undef CASE
   }
 }
@@ -1825,6 +1826,7 @@ void Serializer::writeDecl(const Decl *D) {
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
+                          addDeclRef(var->getMaterializeForSetFunc()),
                           addDeclRef(willSet),
                           addDeclRef(didSet),
                           addDeclRef(var->getOverriddenDecl()),

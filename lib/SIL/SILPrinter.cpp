@@ -236,6 +236,10 @@ void SILDeclRef::print(raw_ostream &OS) const {
       Suffix = "!setter";
       decl = FD->getAccessorStorageDecl();
       break;
+    case AccessorKind::IsMaterializeForSet:
+      Suffix = "!materializeForSet";
+      decl = FD->getAccessorStorageDecl();
+      break;
     }
 
     printFullContext(decl->getDeclContext(), OS);

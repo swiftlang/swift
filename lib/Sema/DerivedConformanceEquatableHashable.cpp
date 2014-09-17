@@ -481,7 +481,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
                                            SourceLoc(), C.Id_hashValue,
                                            intType, enumDecl);
   hashValueDecl->setImplicit();
-  hashValueDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
+  hashValueDecl->makeComputed(SourceLoc(), getterDecl,
+                              nullptr, nullptr, SourceLoc());
   hashValueDecl->setAccessibility(enumDecl->getAccessibility());
 
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);

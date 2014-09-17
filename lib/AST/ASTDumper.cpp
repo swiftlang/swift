@@ -512,6 +512,10 @@ namespace {
         OS << "\n";
         printRec(Set);
       }
+      if (FuncDecl *MaterializeForSet = VD->getMaterializeForSetFunc()) {
+        OS << "\n";
+        printRec(MaterializeForSet);
+      }
       if (VD->getStorageKind() == VarDecl::Observing) {
         if (FuncDecl *WillSet = VD->getWillSetFunc()) {
           OS << "\n";
@@ -655,6 +659,7 @@ namespace {
         case AccessorKind::IsSetter: OS << " setter"; break;
         case AccessorKind::IsWillSet: OS << " willset"; break;
         case AccessorKind::IsDidSet: OS << " didset"; break;
+        case AccessorKind::IsMaterializeForSet: OS << " materializeForSet"; break;
         }
 
         OS << "_for=" << ASD->getFullName();

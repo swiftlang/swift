@@ -1951,13 +1951,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit, isObjC, isStatic, isLet;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID typeID, interfaceTypeID;
-    DeclID getterID, setterID, willSetID, didSetID;
+    DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                        isObjC, isStatic,
                                        isLet, storageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
+                                       materializeForSetID,
                                        willSetID, didSetID, overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel);
 
@@ -1985,12 +1986,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     case VarDeclStorageKind::StoredWithTrivialAccessors:
       var->makeStoredWithTrivialAccessors(
                                     cast_or_null<FuncDecl>(getDecl(getterID)),
-                                    cast_or_null<FuncDecl>(getDecl(setterID)));
+                                    cast_or_null<FuncDecl>(getDecl(setterID)),
+                         cast_or_null<FuncDecl>(getDecl(materializeForSetID)));
       break;
     case VarDeclStorageKind::Computed:
       var->makeComputed(SourceLoc(),
                         cast_or_null<FuncDecl>(getDecl(getterID)),
                         cast_or_null<FuncDecl>(getDecl(setterID)),
+                        cast_or_null<FuncDecl>(getDecl(materializeForSetID)),
                         SourceLoc());
       break;
     case VarDeclStorageKind::Observing:
@@ -1999,7 +2002,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                          cast_or_null<FuncDecl>(getDecl(didSetID)),
                          SourceLoc());
       var->setObservingAccessors(cast_or_null<FuncDecl>(getDecl(getterID)),
-                                 cast_or_null<FuncDecl>(getDecl(setterID)));
+                                 cast_or_null<FuncDecl>(getDecl(setterID)),
+                         cast_or_null<FuncDecl>(getDecl(materializeForSetID)));
       break;
     }
 

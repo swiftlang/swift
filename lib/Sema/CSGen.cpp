@@ -144,6 +144,13 @@ namespace {
     }
 
     Type visitLiteralExpr(LiteralExpr *expr) {
+      // If the expression has already been assigned a builtin type,
+      // this is synthesized code; just use that type.
+      if (!expr->getType().isNull()) {
+        if (expr->getType()->is<BuiltinType>())
+          return expr->getType();
+      }
+
       auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
       if (!protocol) {
         return nullptr;

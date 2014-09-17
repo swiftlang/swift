@@ -2011,7 +2011,7 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
   }
   
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    if (!FD->isGetterOrSetter()) {
+    if (!FD->isAccessor()) {
       unsigned ExpectedParamPatterns = 1;
       if (FD->getImplicitSelfDecl())
         ExpectedParamPatterns++;

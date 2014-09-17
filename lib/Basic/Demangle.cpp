@@ -1085,6 +1085,10 @@ private:
       entityKind = Node::Kind::Setter;
       name = demangleDeclName();
       if (!name) return nullptr;
+    } else if (Mangled.nextIf('m')) {
+      entityKind = Node::Kind::MaterializeForSet;
+      name = demangleDeclName();
+      if (!name) return nullptr;
     } else if (Mangled.nextIf('w')) {
       entityKind = Node::Kind::WillSet;
       name = demangleDeclName();
@@ -2025,6 +2029,7 @@ private:
     case Node::Kind::LazyProtocolWitnessTableTemplate:
     case Node::Kind::LocalDeclName:
     case Node::Kind::PrivateDeclName:
+    case Node::Kind::MaterializeForSet:
     case Node::Kind::Metaclass:
     case Node::Kind::NominalTypeDescriptor:
     case Node::Kind::NonObjCAttribute:
@@ -2643,6 +2648,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::Setter:
     printEntity(true, true, ".setter");
+    return;
+  case Node::Kind::MaterializeForSet:
+    printEntity(true, true, ".materializeForSet");
     return;
   case Node::Kind::WillSet:
     printEntity(true, true, ".willset");

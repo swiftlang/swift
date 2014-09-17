@@ -542,6 +542,7 @@ StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
       case AccessorKind::IsSetter: Kind = ".set"; break;
       case AccessorKind::IsWillSet: Kind = ".willset"; break;
       case AccessorKind::IsDidSet: Kind = ".didset"; break;
+      case AccessorKind::IsMaterializeForSet: Kind = ".materialize"; break;
       }
 
       SmallVector<char, 64> Buf;

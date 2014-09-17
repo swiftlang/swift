@@ -744,6 +744,7 @@ Globals
   entity-name ::= 'd'                    // non-deallocating destructor; untyped
   entity-name ::= 'g' decl-name type     // getter
   entity-name ::= 'i'                    // non-local variable initializer
+  entity-name ::= 'm' decl-name type     // materializeForSet
   entity-name ::= 's' decl-name type     // setter
   entity-name ::= 'U' index type         // explicit anonymous closure expression
   entity-name ::= 'u' index type         // implicit anonymous closure

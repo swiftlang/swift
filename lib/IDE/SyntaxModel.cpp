@@ -410,6 +410,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
           case AccessorKind::IsSetter: TokLen = 3; break;
           case AccessorKind::IsWillSet: TokLen = 7; break;
           case AccessorKind::IsDidSet: TokLen = 6; break;
+          case AccessorKind::IsMaterializeForSet: llvm_unreachable("always implicit");
         }
         if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
                                 CharSourceRange(SL, TokLen)}))

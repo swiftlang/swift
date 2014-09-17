@@ -1424,6 +1424,9 @@ public:
         case AccessorKind::IsDidSet:
           OS << "<didSet for ";
           break;
+        case AccessorKind::IsMaterializeForSet:
+          OS << "<materializeForSet for ";
+          break;
         }
         printDeclName(ASD);
         OS << ">";

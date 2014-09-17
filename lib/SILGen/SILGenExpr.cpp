@@ -275,7 +275,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       FuncDecl *fd = cast<FuncDecl>(constant.getDecl());
       
       // Getters and setters can't be referenced uncurried.
-      assert(!fd->isGetterOrSetter());
+      assert(!fd->isAccessor());
       
       // FIXME: Thunks for instance methods of generics.
       assert(!(fd->isInstanceMember() && isa<ProtocolDecl>(fd->getDeclContext()))

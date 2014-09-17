@@ -1251,6 +1251,11 @@ namespace {
     }
 
     Expr *handleIntegerLiteralExpr(LiteralExpr *expr) {
+      // If the literal has been assigned a builtin integer type,
+      // don't mess with it.
+      if (expr->getType()->is<BuiltinIntegerType>())
+        return expr;
+
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
@@ -1343,6 +1348,11 @@ namespace {
     }
 
     Expr *visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+      // If the literal has been assigned a builtin float type,
+      // don't mess with it.
+      if (expr->getType()->is<BuiltinFloatType>())
+        return expr;
+
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),

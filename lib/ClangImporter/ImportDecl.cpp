@@ -543,7 +543,8 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
                       C.Id_AllZeros, optionSetType, optionSetDecl);
   PropertyDecl->setInterfaceType(optionSetDecl->getDeclaredInterfaceType());
   PropertyDecl->setImplicit();
-  PropertyDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
+  PropertyDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
+                             SourceLoc());
   PropertyDecl->setAccessibility(optionSetDecl->getAccessibility());
   NewDecls.push_back(PropertyDecl);
 
@@ -1502,7 +1503,7 @@ namespace {
             NewDecls.push_back(makeNilLiteralConformance(structDecl, var));
             auto rawGetter = makeOptionSetRawTrivialGetter(structDecl, var);
             NewDecls.push_back(rawGetter);
-            var->makeStoredWithTrivialAccessors(rawGetter, nullptr);
+            var->makeStoredWithTrivialAccessors(rawGetter, nullptr, nullptr);
           }
         };
         
@@ -3551,7 +3552,7 @@ namespace {
       
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
-      result->makeComputed(SourceLoc(), getter, setter, SourceLoc());
+      result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
       addObjCAttribute(result, Nothing);
 
       if (overridden)
@@ -4409,7 +4410,7 @@ namespace {
       
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
-      result->makeComputed(SourceLoc(), getter, setter, SourceLoc());
+      result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
       addObjCAttribute(result, Nothing);
       applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
 
@@ -5148,7 +5149,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                   SourceLoc()));
 
   // Set the function up as the getter.
-  var->makeComputed(SourceLoc(), func, nullptr, SourceLoc());
+  var->makeComputed(SourceLoc(), func, nullptr, nullptr, SourceLoc());
 
   // Register this thunk as an external definition.
   registerExternalDecl(func);

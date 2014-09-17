@@ -2130,7 +2130,7 @@ public:
   void visitFuncDecl(FuncDecl *fd) {
     // FIXME: Emit getter and setter (if settable) witnesses.
     // For now we ignore them, like the IRGen witness table builder did.
-    if (fd->isGetterOrSetter())
+    if (fd->isAccessor())
       return;
     
     // Find the witness in the conformance.

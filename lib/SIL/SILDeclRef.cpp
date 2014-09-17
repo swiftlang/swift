@@ -194,7 +194,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return ClangLinkage;
 
     if (auto *FD = dyn_cast<FuncDecl>(d))
-      if (FD->isGetterOrSetter() ||
+      if (FD->isAccessor() ||
           isa<NominalTypeDecl>(d->getDeclContext()))
         return ClangLinkage;
   }

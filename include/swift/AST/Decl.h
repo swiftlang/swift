@@ -182,6 +182,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Setter,
   WillSet,
   DidSet,
+  MaterializeForSet,
   EnumElement,
 };
 
@@ -3232,6 +3233,23 @@ public:
   }
 };
 
+// Note that the values of these enums line up with %select values in
+// diagnostics.
+enum class AccessorKind {
+  /// \brief This is not a property accessor.
+  NotAccessor = -1,
+  /// \brief This is a getter for a property or subscript.
+  IsGetter = 0,
+  /// \brief This is a setter for a property or subscript.
+  IsSetter = 1,
+  /// \brief This is a willSet specifier for a property.
+  IsWillSet = 2,
+  /// \brief This is a didSet specifier for a property.
+  IsDidSet = 3,
+  /// \brief This is a materializeForSet accessor for a property.
+  IsMaterializeForSet = 4,
+};
+
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
@@ -3271,7 +3289,10 @@ private:
     SourceRange Braces;
     FuncDecl *Get = nullptr;       // User-defined getter
     FuncDecl *Set = nullptr;       // User-defined setter
+    FuncDecl *MaterializeForSet = nullptr; // optional materializeForSet accessor
   };
+  void configureGetSetRecord(FuncDecl *getter, FuncDecl *setter,
+                             FuncDecl *materializeForSet);
 
   struct ObservingRecord : GetSetRecord {
     FuncDecl *WillSet = nullptr;   // willSet(value):
@@ -3329,13 +3350,16 @@ public:
     }
   }
 
+  FuncDecl *getAccessorFunction(AccessorKind accessor) const;
+
   /// \brief Turn this into a computed variable, providing a getter and setter.
   void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
-                    SourceLoc RBraceLoc);
+                    FuncDecl *MaterializeForSet, SourceLoc RBraceLoc);
 
   /// \brief Turn this into a StoredWithTrivialAccessors var, specifying the
   /// accessors (getter and setter) that go with it.
-  void makeStoredWithTrivialAccessors(FuncDecl *Get, FuncDecl *Set);
+  void makeStoredWithTrivialAccessors(FuncDecl *Get, FuncDecl *Set,
+                                      FuncDecl *MaterializeForSet);
 
   /// \brief Turn this into a Observing var, providing the didSet/willSet
   /// specifiers.
@@ -3344,12 +3368,18 @@ public:
 
   /// \brief Specify the synthesized get/set functions for a Observing var.
   /// This is used by Sema.
-  void setObservingAccessors(FuncDecl *Get, FuncDecl *Set);
+  void setObservingAccessors(FuncDecl *Get, FuncDecl *Set,
+                             FuncDecl *MaterializeForSet);
 
   /// \brief Add a setter to an existing Computed var.
   ///
   /// This should only be used by the ClangImporter.
   void setComputedSetter(FuncDecl *Set);
+
+  /// \brief Set a materializeForSet accessor for this declaration.
+  ///
+  /// This should only be used by Sema.
+  void setMaterializeForSetFunc(FuncDecl *materializeForSet);
 
   /// \brief Specify the braces range without adding accessors.
   ///
@@ -3388,6 +3418,14 @@ public:
   }
 
   void overwriteSetterAccessibility(Accessibility accessLevel);
+
+  /// \brief Retrieve the materializeForSet function, if this
+  /// declaration has one.
+  FuncDecl *getMaterializeForSetFunc() const {
+    if (auto info = GetSetInfo.getPointer())
+      return info->MaterializeForSet;
+    return nullptr;
+  }
   
   /// \brief Return the funcdecl for the willSet specifier if it exists, this is
   /// only valid on a VarDecl with Observing storage.
@@ -3621,7 +3659,7 @@ public:
   
   void setAccessors(SourceRange Braces, FuncDecl *Get, FuncDecl *Set) {
     assert(Get && "subscripts should always have at least a getter");
-    makeComputed(Braces.Start, Get, Set, Braces.End);
+    makeComputed(Braces.Start, Get, Set, nullptr, Braces.End);
   }
   
   
@@ -3926,21 +3964,6 @@ public:
 class OperatorDecl;
 
 
-// Note that the values of these enums line up with %select values in
-// diagnostics.
-enum class AccessorKind {
-  /// \brief This is not a property accessor.
-  NotAccessor = -1,
-  /// \brief This is a getter for a property or subscript.
-  IsGetter = 0,
-  /// \brief This is a setter for a property or subscript.
-  IsSetter = 1,
-  /// \brief This is a willSet specifier for a property.
-  IsWillSet = 2,
-  /// \brief This is a didSet specifier for a property.
-  IsDidSet = 3
-};
-
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
@@ -3957,7 +3980,7 @@ class FuncDecl : public AbstractFunctionDecl {
 
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
-  llvm::PointerIntPair<AbstractStorageDecl*, 2, AccessorKind> AccessorDecl;
+  llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
   llvm::PointerUnion<FuncDecl *, NominalTypeDecl*> OverriddenOrDerivedForDecl;
   OperatorDecl *Operator;
 
@@ -4806,6 +4829,8 @@ AbstractStorageDecl::overwriteSetterAccessibility(Accessibility accessLevel) {
   GetSetInfo.setInt(accessLevel);
   if (auto setter = getSetter())
     setter->overwriteAccessibility(accessLevel);
+  if (auto materializeForSet = getMaterializeForSetFunc())
+    materializeForSet->overwriteAccessibility(accessLevel);
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {

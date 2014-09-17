@@ -923,6 +923,14 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
   return false;
 }
 
+static AccessorKind getAccessorKind(StringRef ident) {
+  return llvm::StringSwitch<AccessorKind>(ident)
+           .Case("getter", AccessorKind::IsGetter)
+           .Case("setter", AccessorKind::IsSetter)
+           .Case("materializeForSet", AccessorKind::IsMaterializeForSet)
+           .Default(AccessorKind::NotAccessor);
+}
+
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
 ///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
 ///                      ('.' sil-decl-lang)?
@@ -930,6 +938,7 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
 ///  sil-decl-subref ::= '!' sil-decl-lang
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
+///  sil-decl-subref-part ::= 'materializeForSet'
 ///  sil-decl-subref-part ::= 'allocator'
 ///  sil-decl-subref-part ::= 'initializer'
 ///  sil-decl-subref-part ::= 'enumelt'
@@ -968,36 +977,28 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       auto IdLoc = P.Tok.getLoc();
       if (parseSILIdentifier(Id, diag::expected_sil_constant))
         return true;
+      AccessorKind accessorKind;
       if (!ParseState && Id.str() == "func") {
         Kind = SILDeclRef::Kind::Func;
         ParseState = 1;
-      } else if (!ParseState && Id.str() == "getter") {
-        if (!isa<AbstractStorageDecl>(VD) ||
-            !cast<AbstractStorageDecl>(VD)->getGetter()) {
+      } else if (!ParseState &&
+                 (accessorKind = getAccessorKind(Id.str()))
+                    != AccessorKind::NotAccessor) {
+        auto storageDecl = dyn_cast<AbstractStorageDecl>(VD);
+        auto accessor = (storageDecl
+                           ? storageDecl->getAccessorFunction(accessorKind)
+                           : nullptr);
+        if (!accessor) {
           P.diagnose(IdLoc, diag::referenced_value_no_accessor, 0);
           return true;
         }
         Kind = SILDeclRef::Kind::Func;
-        VD = cast<AbstractStorageDecl>(VD)->getGetter();
-        // Update values for getter.
+        VD = accessor;
+        // Update values for this accessor kind.
         for (unsigned I = 0, E = values.size(); I < E; I++)
-          if (isa<AbstractStorageDecl>(values[I]) &&
-              cast<AbstractStorageDecl>(values[I])->getGetter())
-            values[I] = cast<AbstractStorageDecl>(values[I])->getGetter();
-        ParseState = 1;
-      } else if (!ParseState && Id.str() == "setter") {
-        if (!isa<AbstractStorageDecl>(VD) ||
-            !cast<AbstractStorageDecl>(VD)->getSetter()) {
-          P.diagnose(IdLoc, diag::referenced_value_no_accessor, 1);
-          return true;
-        }
-        Kind = SILDeclRef::Kind::Func;
-        VD = cast<AbstractStorageDecl>(VD)->getSetter();
-        // Update values for setter.
-        for (unsigned I = 0, E = values.size(); I < E; I++)
-          if (isa<AbstractStorageDecl>(values[I]) &&
-              cast<AbstractStorageDecl>(values[I])->getSetter())
-            values[I] = cast<AbstractStorageDecl>(values[I])->getSetter();
+          if (auto otherDecl = dyn_cast<AbstractStorageDecl>(values[I]))
+            if (auto otherAccessor = otherDecl->getAccessorFunction(accessorKind))
+              values[I] = otherAccessor;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "allocator") {
         Kind = SILDeclRef::Kind::Allocator;

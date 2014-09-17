@@ -1326,6 +1326,8 @@ done:
   binding->setIsBeingTypeChecked(false);
 }
 
+const bool IsImplicit = true;
+
 /// \brief Build an implicit 'self' parameter for the specified DeclContext.
 static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC) {
   ASTContext &Ctx = DC->getASTContext();
@@ -1336,30 +1338,42 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC) {
   return new (Ctx) TypedPattern(P, TypeLoc());
 }
 
+static Pattern *buildLetArgumentPattern(SourceLoc loc, DeclContext *DC,
+                                        StringRef name, Type type,
+                                        VarDecl **paramDecl,
+                                        TypeChecker &TC) {
+  auto &Context = TC.Context;
+  auto *param = new (Context) ParamDecl(/*IsLet*/true,
+                                        SourceLoc(), Identifier(),
+                                        loc, Context.getIdentifier(name),
+                                        Type(), DC);
+  if (paramDecl) *paramDecl = param;
+  param->setImplicit();
+
+  Pattern *valuePattern
+    = new (Context) TypedPattern(new (Context) NamedPattern(param),
+                                 TypeLoc::withoutLoc(type));
+  valuePattern->setImplicit();
+  
+  TuplePatternElt valueElt(valuePattern);
+  Pattern *valueParamsPattern
+    = TuplePattern::create(Context, loc, valueElt, loc);
+  valueParamsPattern->setImplicit();
+  return valueParamsPattern;
+}
+
+static void makeFinal(ASTContext &ctx, ValueDecl *D) {
+  if (D && !D->isFinal()) {
+    D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
+  }
+}
+
 static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
                                                 VarDecl **ValueDecl,
                                                 TypeChecker &TC) {
-  auto &Context = VD->getASTContext();
-  auto *Arg = new (Context) ParamDecl(/*IsLet*/true,
-                                      SourceLoc(), Identifier(),
-                                      VD->getLoc(),
-                                      Context.getIdentifier("value"),
-                                      Type(), VD->getDeclContext());
-  *ValueDecl = Arg;
-  Arg->setImplicit();
-
   auto VDTy = TC.getTypeOfRValue(VD, /*want interface type*/false);
-
-  Pattern *ValuePattern
-    = new (Context) TypedPattern(new (Context) NamedPattern(Arg),
-                                 TypeLoc::withoutLoc(VDTy));
-  ValuePattern->setImplicit();
-  
-  TuplePatternElt ValueElt(ValuePattern);
-  Pattern *ValueParamsPattern
-    = TuplePattern::create(Context, VD->getLoc(), ValueElt, VD->getLoc());
-  ValueParamsPattern->setImplicit();
-  return ValueParamsPattern;
+  return buildLetArgumentPattern(VD->getLoc(), VD->getDeclContext(),
+                                 "value", VDTy, ValueDecl, TC);
 }
 
 static FuncDecl *createGetterPrototype(VarDecl *VD, TypeChecker &TC) {
@@ -1393,7 +1407,7 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, TypeChecker &TC) {
 
   // If the var is marked final, then so is the getter.
   if (VD->isFinal())
-    Get->getAttrs().add(new (Context) FinalAttr(/*IsImplicit=*/true));
+    makeFinal(Context, Get);
 
   return Get;
 }
@@ -1426,17 +1440,89 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl,
 
   // If the var is marked final, then so is the getter.
   if (VD->isFinal())
-    Set->getAttrs().add(new (Context) FinalAttr(/*IsImplicit=*/true));
+    makeFinal(Context, Set);
 
   return Set;
 }
 
+static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
+                                                  VarDecl *&bufferParamDecl,
+                                                  TypeChecker &TC) {
+  auto &ctx = storage->getASTContext();
+  SourceLoc loc = storage->getLoc();
+
+  // Create the parameter list:
+  SmallVector<Pattern *, 2> params;
+
+  //  - The implicit 'self' argument if in a type context.
+  auto DC = storage->getDeclContext();
+  if (DC->isTypeContext())
+    params.push_back(buildImplicitSelfParameter(loc, DC));
+
+  //  - The buffer parameter, (buffer: Builtin.RawPointer).
+  auto bufferPattern = buildLetArgumentPattern(loc, DC, "buffer",
+                                               ctx.TheRawPointerType,
+                                               &bufferParamDecl, TC);
+  // If this is a subscript, we need to include the indexes
+  // (forwardably).
+  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+    SmallVector<TuplePatternElt, 4> bufferAndIndexPatterns;
+    bufferAndIndexPatterns.push_back(TuplePatternElt(bufferPattern));
+
+    // Clone index patterns in a manner that allows them to be
+    // perfectly forwarded.
+    auto addVarPatternFor = [&](Pattern *P) {
+      Pattern *vp = P->cloneForwardable(ctx, DC, Pattern::Implicit);
+      bufferAndIndexPatterns.push_back(TuplePatternElt(vp));
+    };
+
+    // This is the same breakdown the parser does.
+    auto indices = subscript->getIndices();
+    if (auto pp = dyn_cast<ParenPattern>(indices)) {
+      addVarPatternFor(pp);
+    } else {
+      auto tp = cast<TuplePattern>(indices);
+      for (auto &field : tp->getFields()) {
+        addVarPatternFor(field.getPattern());
+      }
+    }
+
+    params.push_back(TuplePattern::createSimple(ctx, SourceLoc(),
+                                                bufferAndIndexPatterns,
+                                                SourceLoc()));
+  } else {
+    params.push_back(bufferPattern);
+  }
+
+  // The accessor returns (Builtin.RawPointer, Builtin.Int1)
+  TupleTypeElt retElts[] = {
+    { ctx.TheRawPointerType },
+    { BuiltinIntegerType::get(1, ctx) },
+  };
+  Type retTy = TupleType::get(retElts, ctx);
+
+  auto *materializeForSet = FuncDecl::create(
+      ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
+      Identifier(), loc, /*generic=*/nullptr, Type(), params,
+      TypeLoc::withoutLoc(retTy), DC);
+  materializeForSet->setImplicit();
+  
+  // materializeForSet is mutating and static if the setter is.
+  auto setter = storage->getSetter();
+  materializeForSet->setMutating(setter->isMutating());
+  materializeForSet->setStatic(setter->isStatic());
+
+  if (storage->isFinal())
+    makeFinal(ctx, materializeForSet);
+  
+  return materializeForSet;
+}
 
 static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Get = createGetterPrototype(VD, TC);
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(VD->getLoc(), Get, nullptr, VD->getLoc());
+  VD->makeComputed(VD->getLoc(), Get, nullptr, nullptr, VD->getLoc());
   
   // We've added some members to our containing class, add them to the members
   // list.
@@ -1639,6 +1725,121 @@ static void synthesizeTrivialSetter(FuncDecl *Set, VarDecl *VD,
   Set->getAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
 }
 
+/// Build the result expression of a materializeForSet accessor.
+///
+/// \param address an expression yielding the address to return
+/// \param usingBuffer true if the value was written into the
+///   parameter buffer (and hence must be destroyed there by the caller)
+static Expr *buildMaterializeForSetResult(ASTContext &ctx, Expr *address,
+                                          bool usingBuffer) {
+  // To form 0 or 1 as a Builtin.Int1, we have to do this, which is dumb.
+  auto usingBufferExpr =
+    new (ctx) IntegerLiteralExpr(usingBuffer ? "1" : "0",
+                                 SourceLoc(), IsImplicit);
+  
+  usingBufferExpr->setType(BuiltinIntegerType::get(1, ctx));
+
+  return TupleExpr::create(ctx, SourceLoc(), { address, usingBufferExpr },
+                           { Identifier(), Identifier() },
+                           { SourceLoc(), SourceLoc() },
+                           SourceLoc(), false, IsImplicit);
+}
+
+/// Build a tuple around the given arguments.
+static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
+  if (args.size() == 1) {
+    return args[0];
+  }
+  SmallVector<Identifier, 4> labels(args.size());
+  SmallVector<SourceLoc, 4> labelLocs(args.size());
+  return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
+                           SourceLoc(), false, IsImplicit);
+}
+
+/// Create a call to the builtin function with the given name.
+static Expr *buildCallToBuiltin(ASTContext &ctx, StringRef builtinName,
+                                ArrayRef<Expr*> args) {
+  auto builtin = getBuiltinValueDecl(ctx, ctx.getIdentifier(builtinName));
+  Expr *builtinDRE = new (ctx) DeclRefExpr(builtin, SourceLoc(), IsImplicit);
+  Expr *arg = buildTupleExpr(ctx, args);
+  return new (ctx) CallExpr(builtinDRE, arg, IsImplicit);
+}
+
+static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
+                                         ArrayRef<TuplePatternElt> patterns) {
+  // FIXME: do we need to preserve labels in order to disambiguate
+  // subscripts?
+  SmallVector<Expr *, 4> indices;
+  for (auto &pattern : patterns) {
+    indices.push_back(pattern.getPattern()->buildForwardingRefExpr(ctx));
+  }
+  return buildTupleExpr(ctx, indices);
+}
+
+/// Build a reference to the subscript index variables for this
+/// subscript accessor.
+static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
+  assert(isa<SubscriptDecl>(accessor->getAccessorStorageDecl()));
+  auto params = cast<TuplePattern>(accessor->getBodyParamPatterns().back());
+  return buildTupleForwardingRefExpr(ctx, params->getFields().slice(1));
+}
+
+/// Build an l-value for the storage of a declaration.
+static Expr *buildStorageReference(FuncDecl *accessor,
+                                   AbstractStorageDecl *storage,
+                                   bool isDirectAccess,
+                                   TypeChecker &TC) {
+  ASTContext &ctx = TC.Context;
+
+  VarDecl *selfDecl = accessor->getImplicitSelfDecl();
+  if (!selfDecl) {
+    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit,
+                                 isDirectAccess);
+  }
+
+  Expr *selfDRE = new (ctx) DeclRefExpr(selfDecl, SourceLoc(), IsImplicit);
+  if (isa<SubscriptDecl>(storage)) {
+    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
+    Expr *subscript = new (ctx) SubscriptExpr(selfDRE, indices);
+    subscript->setImplicit();
+    return subscript;
+  }
+
+  // This is a potentially polymorphic access, which is unnecessary;
+  // however, it shouldn't be problematic because any overrides
+  // should also redefine materializeForSet.
+  return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
+                                 SourceLoc(), IsImplicit, isDirectAccess);
+}
+
+/// Synthesize the body of a materializeForSet accessor for a stored
+/// property.
+static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
+                                              AbstractStorageDecl *storage,
+                                              VarDecl *bufferDecl,
+                                              TypeChecker &TC) {
+  ASTContext &ctx = TC.Context;
+
+  // return (Builtin.addressof(&self.property), false)
+  Expr *result = buildStorageReference(materializeForSet, storage,
+                                       /*direct access*/ true, TC);
+  result = new (ctx) InOutExpr(SourceLoc(), result, Type(), IsImplicit);
+  result = buildCallToBuiltin(ctx, "addressof", result);
+  result = buildMaterializeForSetResult(ctx, result, /*using buffer*/ false);
+
+  ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
+
+  SourceLoc loc = storage->getLoc();
+  materializeForSet->setBody(BraceStmt::create(ctx, loc, returnStmt, loc));
+
+  // Mark it transparent, there is no user benefit to this actually existing.
+  materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
+
+  TC.typeCheckDecl(materializeForSet, true);
+}
+
+static void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
+                                      TypeChecker &TC);
 
 /// Given a "Stored" property that needs to be converted to
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
@@ -1658,7 +1859,10 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeStoredWithTrivialAccessors(Get, Set);
+  VD->makeStoredWithTrivialAccessors(Get, Set, nullptr);
+
+  // Consider adding materializeForSet.
+  maybeAddMaterializeForSet(VD, TC);
 
   // Type check the body of the getter.
   TC.typeCheckDecl(Get, true);
@@ -1667,6 +1871,10 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   if (Set) {
     TC.typeCheckDecl(Set, true);
     TC.typeCheckDecl(Set, false);
+  }
+
+  if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
+    TC.typeCheckDecl(materializeForSet, true);
   }
 
   // We've added some members to our containing type, add them to the
@@ -1685,6 +1893,65 @@ void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
   addAccessorsToStoredVar(VD, *this);
 }
 
+static VarDecl *getFirstParamDecl(FuncDecl *fn) {
+  auto params = cast<TuplePattern>(fn->getBodyParamPatterns().back());
+  auto firstParamPattern = params->getFields().front().getPattern();
+  return firstParamPattern->getSingleVar();    
+};
+
+/// Synthesize the body of a materializeForSet accessor for a
+/// computed property.
+static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
+                                                AbstractStorageDecl *storage,
+                                                VarDecl *bufferDecl,
+                                                TypeChecker &TC) {
+  ASTContext &ctx = TC.Context;
+
+  // Builtin.initialize(self.property, buffer)
+  Expr *curValue = buildStorageReference(materializeForSet, storage,
+                                         /*direct*/ false, TC);
+  Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
+  ASTNode assignment = buildCallToBuiltin(ctx, "initialize",
+                                          { curValue, bufferRef });
+
+  // return (buffer, true)
+  Expr *result = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
+
+  result = buildMaterializeForSetResult(ctx, result, true);
+  ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
+
+  SourceLoc loc = storage->getLoc();
+  materializeForSet->setBody(
+      BraceStmt::create(ctx, loc, { assignment, returnStmt }, loc));
+
+  // Mark it transparent, there is no user benefit to this actually existing.
+  materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
+
+  TC.typeCheckDecl(materializeForSet, true);
+}
+
+static void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
+                                        AbstractStorageDecl *storage,
+                                        TypeChecker &TC) {
+  VarDecl *bufferDecl = getFirstParamDecl(materializeForSet);
+
+  switch (storage->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+    llvm_unreachable("no accessors");
+
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    synthesizeStoredMaterializeForSet(materializeForSet, storage,
+                                      bufferDecl, TC);
+    return;
+
+  case AbstractStorageDecl::Computed:
+  case AbstractStorageDecl::Observing:
+    synthesizeComputedMaterializeForSet(materializeForSet, storage,
+                                        bufferDecl, TC);
+    return;
+  }
+  llvm_unreachable("bad abstract storage kind");
+}
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
 /// (trivial) getter and the setter, which calls these.
@@ -1759,7 +2026,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!willSet->isFinal() &&
         VD->getDeclContext()->isClassOrClassExtensionContext())
-      willSet->getAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
+      makeFinal(Ctx, willSet);
   }
   
   // Create an assignment into the storage or call to superclass setter.
@@ -1786,7 +2053,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!didSet->isFinal() &&
         VD->getDeclContext()->isClassOrClassExtensionContext())
-      didSet->getAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
+      makeFinal(Ctx, didSet);
   }
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
@@ -1808,7 +2075,7 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
 
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(VD->getLoc(), Get, Set, VD->getLoc());
+  VD->makeComputed(VD->getLoc(), Get, Set, nullptr, VD->getLoc());
 
   // We've added some members to our containing class/extension, add them to
   // the members list.
@@ -2000,14 +2267,11 @@ static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
   // Now that we've got the storage squared away, synthesize the getter.
   auto *Get = completeLazyPropertyGetter(VD, Storage, TC);
 
-
   // The setter just forwards on to storage without materializing the initial
   // value.
   auto *Set = VD->getSetter();
   TC.validateDecl(Set);
-  auto params = cast<TuplePattern>(Set->getBodyParamPatterns().back());
-  auto firstParamPattern = params->getFields().front().getPattern();
-  VarDecl *SetValueDecl = firstParamPattern->getSingleVar();
+  VarDecl *SetValueDecl = getFirstParamDecl(Set);
   // FIXME: This is wrong for observed properties.
   synthesizeTrivialSetter(Set, Storage, SetValueDecl, TC);
 
@@ -2016,7 +2280,7 @@ static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
   // the accessors are set up, because we don't want the setter for the lazy
   // property to inherit these properties from the storage.
   if (VD->getDeclContext()->isClassOrClassExtensionContext())
-    Storage->getAttrs().add(new (Ctx) FinalAttr(true));
+    makeFinal(Ctx, Storage);
   Storage->setImplicit();
   Storage->setAccessibility(Accessibility::Private);
   Storage->setSetterAccessibility(Accessibility::Private);
@@ -2164,7 +2428,8 @@ static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
     // decl. A setter attribute can also override this.
     if (AbstractStorageDecl *storage = fn->getAccessorStorageDecl()) {
       if (storage->hasAccessibility()) {
-        if (storage->isSettable(nullptr) && storage->getSetter() == fn)
+        if (fn->getAccessorKind() == AccessorKind::IsSetter ||
+            fn->getAccessorKind() == AccessorKind::IsMaterializeForSet)
           fn->setAccessibility(storage->getSetterAccessibility());
         else
           fn->setAccessibility(storage->getAccessibility());
@@ -2836,6 +3101,56 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
+/// Consider add a materializeForSet accessor to the given storage
+/// decl (which has accessors).
+static void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
+                                      TypeChecker &TC) {
+  assert(storage->hasAccessorFunctions());
+
+  // Be idempotent.  There are a bunch of places where we want to
+  // ensure that there's a materializeForSet accessor.
+  if (storage->getMaterializeForSetFunc()) return;
+
+  // Never add materializeForSet to readonly declarations.
+  if (!storage->getSetter()) return;
+
+  // We only need materializeForSet in polymorphic contexts:
+  auto containerTy =
+    storage->getDeclContext()->getDeclaredTypeOfContext();
+  if (!containerTy) return;
+
+  NominalTypeDecl *container = containerTy->getAnyNominal();
+  assert(container && "extension of non-nominal type?");
+
+  //   - in non-ObjC protocols
+  if (auto protocol = dyn_cast<ProtocolDecl>(container)) {
+    if (protocol->isObjC()) return;
+
+  //   - in classes when the storage decl is not final and does
+  //     not override a decl that requires a materializeForSet
+  } else if (isa<ClassDecl>(container)) {
+    if (storage->isFinal()) {
+      auto overridden = storage->getOverriddenDecl();
+      if (!overridden || !overridden->getMaterializeForSetFunc())
+        return;
+    }
+
+  // Structs and enums don't need this.
+  } else {
+    assert(isa<StructDecl>(container) || isa<EnumDecl>(container));
+    return;
+  }
+
+  // Okay, create the materialzieForSet prototype.
+  VarDecl *bufferDecl;
+  auto materializeForSet =
+    createMaterializeForSetPrototype(storage, bufferDecl, TC);
+  addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext());
+  storage->setMaterializeForSetFunc(materializeForSet);
+
+  computeAccessibility(TC, materializeForSet);
+}
+
 /// Returns true if \p VD should be exposed to Objective-C iff it is
 /// representable in Objective-C.
 static bool isImplicitlyObjC(const ValueDecl *VD, bool allowImplicit = false) {
@@ -3041,7 +3356,7 @@ public:
       // it cannot be overridden.
       if (VD->isLet() && !VD->isFinal() && !VD->isDynamic() &&
           VD->getDeclContext()->isClassOrClassExtensionContext())
-        VD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
+        makeFinal(TC.Context, VD);
     }
 
 
@@ -3075,6 +3390,16 @@ public:
     if (VD->getStorageKind() == VarDecl::Observing &&
         !VD->getGetter()->getBody())
       synthesizeObservingAccessors(VD, TC);
+
+    // Synthesize materializeForSet in non-protocol contexts.
+    if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
+      Type containerTy = VD->getDeclContext()->getDeclaredTypeOfContext();
+      if (!containerTy || !containerTy->is<ProtocolType>()) {
+        synthesizeMaterializeForSet(materializeForSet, VD, TC);
+        TC.typeCheckDecl(materializeForSet, true);
+        TC.typeCheckDecl(materializeForSet, false);
+      }
+    }
 
     TC.checkDeclAttributes(VD);
   }
@@ -3267,12 +3592,9 @@ public:
     // If this variable is marked final and has a getter or setter, mark the
     // getter and setter as final as well.
     if (SD->isFinal()) {
-      if (SD->getGetter() && !SD->getGetter()->isFinal())
-        SD->getGetter()->getAttrs().add(
-            new (TC.Context) FinalAttr(/*IsImplicit=*/true));
-      if (SD->getSetter() && !SD->getSetter()->isFinal())
-        SD->getSetter()->getAttrs().add(
-            new (TC.Context) FinalAttr(/*IsImplicit=*/true));
+      makeFinal(TC.Context, SD->getGetter());
+      makeFinal(TC.Context, SD->getSetter());
+      makeFinal(TC.Context, SD->getMaterializeForSetFunc());
     }
 
     // A subscript is ObjC-compatible if it's explicitly @objc, or a
@@ -3919,10 +4241,9 @@ public:
     // Mark all members of final classes as final.
     if (CD->isFinal())
       for (Decl *Member : CD->getMembers())
-        if ((isa<FuncDecl>(Member) || isa<VarDecl>(Member) ||
-             isa<SubscriptDecl>(Member)) &&
-            !Member->getAttrs().hasAttribute<FinalAttr>())
-          Member->getAttrs().add(new (TC.Context) FinalAttr(true));
+        if (isa<FuncDecl>(Member) || isa<VarDecl>(Member) ||
+            isa<SubscriptDecl>(Member))
+          makeFinal(TC.Context, cast<ValueDecl>(Member));
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
@@ -4564,7 +4885,7 @@ public:
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
                     isImplicitlyObjC(FD);
       
-      if (protocolContext && FD->isGetterOrSetter()) {
+      if (protocolContext && FD->isAccessor()) {
         // Don't complain about accessors in protocols.  We will emit a
         // diagnostic about the property itself.
         reason = ObjCReason::DontDiagnose;
@@ -5413,33 +5734,35 @@ public:
       // Make sure we get consistent overrides for the accessors as well.
       if (!baseASD->hasAccessorFunctions())
         addAccessorsToStoredVar(cast<VarDecl>(baseASD), TC);
-      
-      // If there is a getter and/or setter, set their overrides as well.  This
-      // is not done for observing accessors, since they are never dynamicly
-      // dispatched (they are a local implementation detail of a property).
-      if (baseASD->getGetter() && overridingASD->getGetter()) {
-        auto overridingGetter = overridingASD->getGetter();
-        if (!overridingGetter->getAttrs().hasAttribute<OverrideAttr>()) {
-          // FIXME: Egregious hack to set 'override'.
+      maybeAddMaterializeForSet(overridingASD, TC);
+
+      auto recordAccessorOverride = [&](AccessorKind kind) {
+        // We need the same accessor on both.
+        auto baseAccessor = baseASD->getAccessorFunction(kind);
+        if (!baseAccessor) return;
+        auto overridingAccessor = overridingASD->getAccessorFunction(kind);
+        if (!overridingAccessor) return;
+
+        // For setter accessors, we need the base's setter to be
+        // accessible from the overriding context, or it's not an override.
+        if ((kind == AccessorKind::IsSetter ||
+             kind == AccessorKind::IsMaterializeForSet) &&
+            !baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
+          return;
+
+        // FIXME: Egregious hack to set an 'override' attribute.
+        if (!overridingAccessor->getAttrs().hasAttribute<OverrideAttr>()) {
           auto loc = overridingASD->getOverrideLoc();
-          overridingGetter->getAttrs().add(
+          overridingAccessor->getAttrs().add(
               new (TC.Context) OverrideAttr(loc));
         }
-          
-        recordOverride(TC, overridingGetter, baseASD->getGetter());
-      }
-      if (baseASD->getSetter() && overridingASD->getSetter() &&
-          baseASD->isSetterAccessibleFrom(override->getDeclContext())) {
-        auto overridingSetter = overridingASD->getSetter();
-        if (!overridingSetter->getAttrs().hasAttribute<OverrideAttr>()) {
-          // FIXME: Egregious hack to set 'override'.
-          auto loc = overridingASD->getOverrideLoc();
-          overridingSetter->getAttrs().add(
-              new (TC.Context) OverrideAttr(loc));
-        }
-        recordOverride(TC, overridingASD->getSetter(), baseASD->getSetter());
-      }
-      
+
+        recordOverride(TC, overridingAccessor, baseAccessor);
+      };
+
+      recordAccessorOverride(AccessorKind::IsGetter);
+      recordAccessorOverride(AccessorKind::IsSetter);
+      recordAccessorOverride(AccessorKind::IsMaterializeForSet);
     } else {
       llvm_unreachable("Unexpected decl");
     }
@@ -6154,20 +6477,21 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       VD->setIsBeingTypeChecked();
 
       auto *getter = createGetterPrototype(VD, *this);
-      // If the var is marked final, then so is the getter.
-      if (VD->isFinal()) {
-        ASTContext &ctx = VD->getASTContext();
-        getter->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
-      }
       // lazy getters are mutating on an enclosing struct.
       getter->setMutating();
       getter->setAccessibility(VD->getAccessibility());
 
       VarDecl *newValueParam = nullptr;
       auto *setter = createSetterPrototype(VD, newValueParam, *this);
-      VD->makeComputed(VD->getLoc(), getter, setter, VD->getLoc());
+      VD->makeComputed(VD->getLoc(), getter, setter, nullptr, VD->getLoc());
       VD->setIsBeingTypeChecked(false);
       computeAccessibility(*this, setter);
+
+      // If the var is marked final, then so is the getter.
+      if (VD->isFinal()) {
+        makeFinal(Context, getter);
+        makeFinal(Context, setter);
+      }
 
       addMemberToContextIfNeeded(getter, VD->getDeclContext());
       addMemberToContextIfNeeded(setter, VD->getDeclContext());
@@ -6217,15 +6541,16 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         }
       }
 
+      if (VD->hasAccessorFunctions()) {
+        maybeAddMaterializeForSet(VD, *this);
+      }
+
       // If this variable is marked final and has a getter or setter, mark the
       // getter and setter as final as well.
       if (VD->isFinal()) {
-        if (VD->getGetter() && !VD->getGetter()->isFinal())
-          VD->getGetter()->getAttrs().add(
-              new (Context) FinalAttr(/*IsImplicit=*/true));
-        if (VD->getSetter() && !VD->getSetter()->isFinal())
-          VD->getSetter()->getAttrs().add(
-              new (Context) FinalAttr(/*IsImplicit=*/true));
+        makeFinal(Context, VD->getGetter());
+        makeFinal(Context, VD->getSetter());
+        makeFinal(Context, VD->getMaterializeForSetFunc());
       }
     }
 
@@ -7124,6 +7449,7 @@ void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
   // Type-check the raw values of the enum.
   for (auto elt : ED->getAllElements()) {
     assert(elt->hasRawValueExpr());
+    if (elt->getTypeCheckedRawValueExpr()) continue;
     Expr *typeChecked = elt->getRawValueExpr();
     Type rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
     bool error = typeCheckExpression(typeChecked, ED, rawTy, Type(), false);

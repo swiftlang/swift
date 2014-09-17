@@ -2232,16 +2232,36 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
       ValueArgElements.push_back(TuplePatternElt(NamePattern));
       StartLoc = NamePattern->getStartLoc();
       EndLoc = NamePattern->getEndLoc();
+    } else if (Kind == AccessorKind::IsMaterializeForSet) {
+      auto type = TypeLoc::withoutLoc(P->Context.TheRawPointerType);
+      auto buffer = Pattern::buildImplicitLetParameter(DeclLoc, "buffer",
+                                                       type, P->CurDeclContext);
+      ValueArgElements.push_back(TuplePatternElt(buffer));
     }
 
     bool isVararg = false;
     if (Indices) {
-      Indices = Indices->clone(P->Context, Pattern::Implicit);
+      auto clonePattern = [&](const Pattern *p) -> Pattern* {
+        // For materializeForSet accessors, we need to clone the
+        // pattern in a way which allows us to always forward the
+        // arguments.
+        if (Kind == AccessorKind::IsMaterializeForSet) {
+          return p->cloneForwardable(P->Context, P->CurDeclContext,
+                                     Pattern::Implicit);
+        } else {
+          return p->clone(P->Context, Pattern::Implicit);
+        }
+      };
+
       if (auto *PP = dyn_cast<ParenPattern>(Indices)) {
-        ValueArgElements.push_back(TuplePatternElt(PP->getSubPattern()));
+        ValueArgElements.push_back(
+          TuplePatternElt(clonePattern(PP->getSubPattern())));
       } else {
         auto *TP = cast<TuplePattern>(Indices);
-        ValueArgElements.append(TP->getFields().begin(), TP->getFields().end());
+        for (const auto &elt : TP->getFields()) {
+          ValueArgElements.push_back(
+            TuplePatternElt(clonePattern(elt.getPattern())));
+        }
         isVararg = TP->hasVararg();
       }
 
@@ -2272,10 +2292,23 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   Params.push_back(ValueArg);
 
   TypeLoc ReturnType;
-  if (Kind == AccessorKind::IsGetter) // Getters return something
+
+  // Getters return the value type.
+  if (Kind == AccessorKind::IsGetter) {
     ReturnType = ElementTy.clone(P->Context);
-  else  // Nothing else does.
+
+  // MaterializeForSet accessors return (Builtin.RawPointer, Builtin.Int1).
+  } else if (Kind == AccessorKind::IsMaterializeForSet) {
+    TupleTypeElt retElts[] = {
+      { P->Context.TheRawPointerType },
+      { BuiltinIntegerType::get(1, P->Context) },
+    };
+    ReturnType = TypeLoc::withoutLoc(TupleType::get(retElts, P->Context));
+
+  // Everything else returns ().
+  } else {
     ReturnType = TypeLoc::withoutLoc(TupleType::getEmpty(P->Context));
+  }
 
   // Start the function.
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
@@ -2283,7 +2316,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                              DeclLoc, /*GenericParams=*/nullptr, Type(), Params,
                              ReturnType, P->CurDeclContext);
 
-  // non-static set/willSet/didSet default to mutating.
+  // non-static set/willSet/didSet/materializeForSet default to mutating.
   if (!D->isStatic() && Kind != AccessorKind::IsGetter)
     D->setMutating();
 
@@ -2776,7 +2809,8 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                              StaticLoc, Flags, AccessorKind::IsSetter, this);
     Set->setImplicit();
     Decls.push_back(Set);
-    PrimaryVar->setObservingAccessors(Get, Set);
+
+    PrimaryVar->setObservingAccessors(Get, Set, nullptr);
     return PrimaryVar;
   }
 
@@ -2802,10 +2836,10 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   if (Set || Get) {
     if (Attributes.hasAttribute<SILStoredAttr>())
       // Turn this into a stored property with trivial accessors.
-      PrimaryVar->makeStoredWithTrivialAccessors(Get, Set);
+      PrimaryVar->makeStoredWithTrivialAccessors(Get, Set, nullptr);
     else
       // Turn this into a computed variable.
-      PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
+      PrimaryVar->makeComputed(LBLoc, Get, Set, nullptr, RBLoc);
   } else {
     // Otherwise this decl is invalid and the accessors have been rejected above.
     // Make sure to at least record the braces range in the AST.

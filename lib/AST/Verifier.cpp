@@ -1546,9 +1546,9 @@ struct ASTNodeBase {};
           continue;
         }
         
-        // If this is a getter/setter for a funcdecl, ignore it.
+        // If this is an accessor for something, ignore it.
         if (auto *FD = dyn_cast<FuncDecl>(member))
-          if (FD->isGetterOrSetter())
+          if (FD->isAccessor())
             continue;
         
         if (auto req = dyn_cast<ValueDecl>(member)) {

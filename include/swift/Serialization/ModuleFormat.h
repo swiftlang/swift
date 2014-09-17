@@ -100,7 +100,8 @@ enum OperatorKind : uint8_t {
   Prefix,
   Postfix
 };
-using OperatorKindField = BCFixed<2>;
+// This is currently required to have the same width as AccessorKindField.
+using OperatorKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -108,9 +109,10 @@ enum AccessorKind : uint8_t {
   Getter = 0,
   Setter,
   WillSet,
-  DidSet
+  DidSet,
+  MaterializeForSet,
 };
-using AccessorKindField = BCFixed<2>;
+using AccessorKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -734,6 +736,7 @@ namespace decls_block {
     TypeIDField,  // interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
+    DeclIDField,  // materializeForSet
     DeclIDField,  // willset
     DeclIDField,  // didset
     DeclIDField,  // overridden decl
