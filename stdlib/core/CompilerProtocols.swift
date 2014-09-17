@@ -56,7 +56,7 @@ public protocol GeneratorType {
 /// not use it directly.
 ///
 /// Its requirements are inherited by `SequenceType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _SequenceType {
 }
 
@@ -64,7 +64,7 @@ public protocol _SequenceType {
 /// not use it directly.
 ///
 /// Its requirements are inherited by `SequenceType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _Sequence_Type : _SequenceType {
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
@@ -208,7 +208,7 @@ public protocol RawRepresentable {
 /// not use it directly.
 ///
 /// Its requirements are inherited by `RawOptionSetType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _RawOptionSetType: RawRepresentable, Equatable {
   typealias RawValue: BitwiseOperationsType, Equatable
   init(rawValue: RawValue)

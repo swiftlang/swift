@@ -82,7 +82,7 @@ public func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
 /// not use it directly.
 ///
 /// Its requirements are inherited by `ForwardIndexType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _Incrementable : Equatable {
   /// Return the next consecutive value in a discrete sequence of
   /// `Self` values
@@ -107,7 +107,7 @@ public struct _DisabledRangeIndex_ {
 /// not use it directly.
 ///
 /// Its requirements are inherited by `ForwardIndexType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _ForwardIndexType : _Incrementable {
   /// A type that can represent the number of steps between pairs of
   /// `Self` values where one value is reachable from the other.
@@ -213,7 +213,7 @@ func _advanceForward<T: _ForwardIndexType>(
 /// not use it directly.
 ///
 /// Its requirements are inherited by `BidirectionalIndexType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _BidirectionalIndexType : _ForwardIndexType {
   /// Return the previous consecutive value in a discrete sequence.
   ///
@@ -287,7 +287,7 @@ func ~> <T: _BidirectionalIndexType>(
 /// not use it directly.
 ///
 /// Its requirements are inherited by `RandomAccessIndexType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _RandomAccessIndexType : _BidirectionalIndexType, Strideable {
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.

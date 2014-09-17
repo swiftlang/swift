@@ -34,7 +34,7 @@ public func countElements <T: _CollectionType>(x: T) -> T.Index.Distance {
 /// not use it directly.
 ///
 /// Its requirements are inherited by `CollectionType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _CollectionType : _SequenceType {
   /// A type that represents a valid position in the collection.
   /// Valid indices consist of the position of every element and a
@@ -228,7 +228,7 @@ public struct PermutationGenerator<
 /// not use it directly.
 ///
 /// Its requirements are inherited by `Sliceable` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _Sliceable : CollectionType {}
 
 /// A *collection* from which a sub-range of elements (a "slice")

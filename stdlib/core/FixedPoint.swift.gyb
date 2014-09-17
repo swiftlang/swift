@@ -50,7 +50,7 @@ public typealias UIntMax = UInt${int_max_bits}
 /// not use it directly.
 ///
 /// Its requirements are inherited by `IntegerType` and thus must
-/// be satisifed by concrete instances of that protocol.
+/// be satisfied by types conforming to that protocol.
 public protocol _IntegerType
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
@@ -70,7 +70,7 @@ public protocol IntegerType : _IntegerType, RandomAccessIndexType {
 /// do not use it directly.
 ///
 /// Its requirements are inherited by `SignedIntegerType` and thus
-/// must be satisifed by concrete instances of that protocol.
+/// must be satisfied by types conforming to that protocol.
 public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
   /// Represent this number using Swift's widest native integer type.
   func toIntMax() -> IntMax
@@ -88,7 +88,7 @@ public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
 /// do not use it directly.
 ///
 /// Its requirements are inherited by `SignedIntegerType` and thus
-/// must be satisifed by concrete instances of that protocol.
+/// must be satisfied by types conforming to that protocol.
 public protocol _UnsignedIntegerType : _IntegerType {
   func toUIntMax() -> UIntMax
 
