@@ -243,8 +243,10 @@ namespace {
       case DeclKind::Var: {
         auto *SD = cast<AbstractStorageDecl>(member);
         emitFunc(SD->getGetter());
-        if (SD->isSettable(member->getDeclContext()))
+        if (SD->isSettable(member->getDeclContext())) {
           emitFunc(SD->getSetter());
+          emitFunc(SD->getMaterializeForSetFunc());
+        }
         return;
       }
           

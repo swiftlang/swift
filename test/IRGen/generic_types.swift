@@ -10,7 +10,7 @@ import Swift
 
 // CHECK: @_TMPdC13generic_types1A = global [[A_METADATA_T:{.*\* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[A_METADATA_CREATE:@[a-z0-9_]+]],
-// CHECK:   i32 328,
+// CHECK:   i32 336,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
 // CHECK:   [8 x i8*] zeroinitializer,
@@ -26,7 +26,7 @@ import Swift
 // CHECK:   i32 24,
 // CHECK:   i16 7,
 // CHECK:   i16 0,
-// CHECK:   i32 136,
+// CHECK:   i32 144,
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
@@ -34,7 +34,7 @@ import Swift
 // CHECK: }
 // CHECK: @_TMPdC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_]+]],
-// CHECK:   i32 320,
+// CHECK:   i32 328,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
 // CHECK:   [8 x i8*] zeroinitializer,
@@ -50,7 +50,7 @@ import Swift
 // CHECK:   i32 24,
 // CHECK:   i16 7,
 // CHECK:   i16 0,
-// CHECK:   i32 128,
+// CHECK:   i32 136,
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null
 // CHECK: }

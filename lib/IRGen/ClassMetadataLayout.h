@@ -146,6 +146,8 @@ private:
         addMethodEntries(asd->getGetter());
         if (auto *setter = asd->getSetter())
           addMethodEntries(setter);
+        if (auto *materializeForSet = asd->getMaterializeForSetFunc())
+          addMethodEntries(materializeForSet);
       }
     }
     
