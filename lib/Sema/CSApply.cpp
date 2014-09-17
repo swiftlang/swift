@@ -951,8 +951,10 @@ namespace {
     /// \param base The base of the subscript.
     /// \param index The index of the subscript.
     /// \param locator The locator used to refer to the subscript.
+    /// \param isImplicit Whether this is an implicit subscript.
     Expr *buildSubscript(Expr *base, Expr *index,
-                         ConstraintLocatorBuilder locator) {
+                         ConstraintLocatorBuilder locator,
+                         bool isImplicit) {
       // Determine the declaration selected for this subscript operation.
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(
@@ -1013,6 +1015,7 @@ namespace {
                                                                    index,
                                                                    subscript);
         subscriptExpr->setType(resultTy);
+        subscriptExpr->setImplicit(isImplicit);
         return subscriptExpr;
       }
 
@@ -1045,6 +1048,7 @@ namespace {
                                                            substitutions));
         subscriptExpr->setType(resultTy);
         subscriptExpr->setIsSuper(isSuper);
+        subscriptExpr->setImplicit(isImplicit);
         return subscriptExpr;
       }
 
@@ -1064,6 +1068,7 @@ namespace {
         = new (tc.Context) SubscriptExpr(base, index, subscript);
       subscriptExpr->setType(resultTy);
       subscriptExpr->setIsSuper(isSuper);
+      subscriptExpr->setImplicit(isImplicit);
       return subscriptExpr;
     }
 
@@ -2198,7 +2203,8 @@ namespace {
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr));
+                            cs.getConstraintLocator(expr),
+                            expr->isImplicit());
     }
 
     Expr *visitArrayExpr(ArrayExpr *expr) {
@@ -2276,7 +2282,8 @@ namespace {
 
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr));
+                            cs.getConstraintLocator(expr),
+                            expr->isImplicit());
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
