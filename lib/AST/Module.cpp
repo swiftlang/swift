@@ -1484,9 +1484,7 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
       return isa<SourceFile>(FU) && cast<SourceFile>(FU)->getFilename().empty();
     }) && "can't promise uniqueness if multiple source files are nameless");
 
-    // We still need a discriminator.
-    PrivateDiscriminator = getASTContext().Id_Underscore;
-    return PrivateDiscriminator;
+    // We still need a discriminator, so keep going.
   }
 
   // Use a hash of the basename of the source file as our discriminator.
@@ -1495,6 +1493,7 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   // discriminator invariant across source checkout locations.
   // FIXME: Use a faster hash here? We don't need security, just uniqueness.
   llvm::MD5 hash;
+  hash.update(getParentModule()->Name.str());
   hash.update(llvm::sys::path::filename(name));
   llvm::MD5::MD5Result result;
   hash.final(result);
