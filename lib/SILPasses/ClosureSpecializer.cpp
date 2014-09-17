@@ -19,6 +19,7 @@
 #include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Debug.h"
@@ -230,24 +231,23 @@ struct ClosureSpecializer {
   bool specialize(SILFunction *Caller);
 };
 
-static unsigned getInstCount(SILFunction *F) {
-  unsigned Cost = 0;
-  for (auto &BB : *F)
-    Cost += BB.getInstList().size();
-  return Cost;
-}
-
 bool ClosureSpecializer::isProfitable(ArgSpecDescriptor &AD) {
-  // Check the relative size of the callee and the closure.
-  auto *ClosureFRI = cast<FunctionRefInst>(AD.PAI->getCallee());
-  // We only handle the case where callee is FunctionRefInst.
-  if (!isa<FunctionRefInst>(AD.AI->getCallee()))
+  // First check if our callee is a function_ref. We currently only handle such
+  // cases.
+  auto *CalleeFRI = dyn_cast<FunctionRefInst>(AD.AI->getCallee());
+  if (!CalleeFRI)
     return false;
-  auto *CalleeFRI = cast<FunctionRefInst>(AD.AI->getCallee());
   auto *Callee = CalleeFRI->getReferencedFunction();
 
-  unsigned ClosureCount = getInstCount(ClosureFRI->getReferencedFunction());
-  unsigned CalleeCount = getInstCount(Callee);
+  // Check the relative size of the callee and the closure.
+  auto *ClosureFRI = cast<FunctionRefInst>(AD.PAI->getCallee());
+
+  // We pass in nullptr for the caller since passing in the caller is only
+  // interesting if we are actually going to inline. If we are deciding whether
+  // or not to specialize a partial apply is a different issue.
+  unsigned ClosureCount = getFunctionCost(ClosureFRI->getReferencedFunction(),
+                                          nullptr, UINT_MAX);
+  unsigned CalleeCount = getFunctionCost(Callee, nullptr, UINT_MAX);
   if (CalleeCount < 2 * ClosureCount) {
     DEBUG(llvm::dbgs() << "    Callsite is not profitable: " << ClosureCount
                        << ", " << CalleeCount << "\n");
