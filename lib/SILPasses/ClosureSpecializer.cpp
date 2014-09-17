@@ -30,6 +30,10 @@ using namespace swift;
 STATISTIC(NumClosureSpecialized,
           "Number of functions with closures specialized");
 
+//===----------------------------------------------------------------------===//
+//                            Closure Spec Cloner
+//===----------------------------------------------------------------------===//
+
 namespace {
 
 /// \brief A SILCloner subclass which clones a function that takes a closure
@@ -68,6 +72,8 @@ private:
   unsigned ClosureIndex;
   PartialApplyInst *PAI;
 };
+
+} // end anonymous namespace
 
 SILFunction *ClosureSpecCloner::initCloned(SILFunction *Orig,
                                             PartialApplyInst *PAI,
@@ -179,18 +185,26 @@ void ClosureSpecCloner::populateCloned() {
   }
 }
 
-struct ArgSpecDescriptor {
+//===----------------------------------------------------------------------===//
+//                            Arg Spec Descriptor
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct ArgDescriptor {
   PartialApplyInst *PAI;
   ApplyInst *AI;
   unsigned ClosureIndex;
-  ArgSpecDescriptor(PartialApplyInst *PAI, ApplyInst *AI,
+  ArgDescriptor(PartialApplyInst *PAI, ApplyInst *AI,
                     unsigned ClosureIndex) :
     PAI(PAI), AI(AI), ClosureIndex(ClosureIndex) {
   }
 };
 
+} // end anonymous namespace
+
 /// Update the callsite to pass in the correct arguments.
-static void rewriteApplyInst(ArgSpecDescriptor &AD, SILFunction *NewF) {
+static void rewriteApplyInst(ArgDescriptor &AD, SILFunction *NewF) {
   SILBuilder Builder(AD.AI);
   FunctionRefInst *FRI = Builder.createFunctionRef(AD.AI->getLoc(), NewF);
 
@@ -221,6 +235,12 @@ static void rewriteApplyInst(ArgSpecDescriptor &AD, SILFunction *NewF) {
     AD.PAI->eraseFromParent();
 }
 
+//===----------------------------------------------------------------------===//
+//                            Closure Specializer
+//===----------------------------------------------------------------------===//
+
+namespace {
+
 struct ClosureSpecializer {
   SILLoopAnalysis *LA;
 
@@ -228,11 +248,13 @@ struct ClosureSpecializer {
     : LA(LA) {
   }
 
-  bool isProfitable(ArgSpecDescriptor &AD);
+  bool isProfitable(ArgDescriptor &AD);
   bool specialize(SILFunction *Caller);
 };
 
-bool ClosureSpecializer::isProfitable(ArgSpecDescriptor &AD) {
+} // end anonymous namespace
+
+bool ClosureSpecializer::isProfitable(ArgDescriptor &AD) {
   // First check if our callee is a function_ref. We currently only handle such
   // cases.
   auto *CalleeFRI = dyn_cast<FunctionRefInst>(AD.AI->getCallee());
@@ -291,7 +313,7 @@ static void createName(SILFunction *Callee, SILFunction *Closure,
 
 static void
 gatherCallSites(SILFunction *Caller,
-                llvm::SmallVectorImpl<ArgSpecDescriptor> &CallSites) {
+                llvm::SmallVectorImpl<ArgDescriptor> &CallSites) {
   for (auto &BB : *Caller) {
     for (auto &II : BB) {
       auto *PAI = dyn_cast<PartialApplyInst>(&II);
@@ -316,7 +338,7 @@ gatherCallSites(SILFunction *Caller,
       for (unsigned i = 0, e = AI->getNumArguments(); i != e; ++i) {
         if (AI->getArgument(i) != SILValue(PAI))
           continue;
-        CallSites.push_back(ArgSpecDescriptor(PAI, AI, i));
+        CallSites.push_back(ArgDescriptor(PAI, AI, i));
         DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
               << i << ": " << *AI);
         break;
@@ -331,7 +353,7 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
 
   // Collect all of the PartialApplyInsts that are used as arguments to
   // ApplyInsts. Check the profitability of specializing the closure argument.
-  llvm::SmallVector<ArgSpecDescriptor, 8> CallSites;
+  llvm::SmallVector<ArgDescriptor, 8> CallSites;
   gatherCallSites(Caller, CallSites);
 
   bool Changed = false;
@@ -365,7 +387,9 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
   return Changed;
 }
 
-} // end anonymous namespace.
+//===----------------------------------------------------------------------===//
+//                               Top Level Code
+//===----------------------------------------------------------------------===//
 
 llvm::cl::opt<bool>
 EnableClosureSpecialization("enable-closure-spec", llvm::cl::init(false));
@@ -379,14 +403,15 @@ public:
     if (!EnableClosureSpecialization)
       return;
 
-    CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
-    SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    auto *CGA = getAnalysis<CallGraphAnalysis>();
+    auto *LA = getAnalysis<SILLoopAnalysis>();
 
     bool Changed = false;
     // Specialize going bottom-up in the call graph.
     for (auto *F : CGA->getCallGraph().getBottomUpFunctionOrder()) {
-      // If F is empty, attempt to link it. Skip it if we fail to do so.
-      if (F->empty() &&
+      // If F is an external declaration, attempt to link in its definition. If
+      // we fail to do so, there is nothing further that we can do.
+      if (F->isExternalDeclaration() &&
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
