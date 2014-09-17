@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify -parse-stdlib -enable-character-literals
+// RUN: %swift -parse %s -verify -parse-stdlib -disable-access-control -enable-character-literals
 
 import Swift
 

@@ -224,11 +224,11 @@ public protocol BooleanLiteralConvertible {
   init(booleanLiteral value: BooleanLiteralType)
 }
 
-public protocol _BuiltinCharacterLiteralConvertible {
+internal protocol _BuiltinCharacterLiteralConvertible {
   init(_builtinCharacterLiteral value: Builtin.Int32)
 }
 
-public protocol CharacterLiteralConvertible {
+internal protocol CharacterLiteralConvertible {
   typealias CharacterLiteralType : _BuiltinCharacterLiteralConvertible
   init(characterLiteral value: CharacterLiteralType)
 }
