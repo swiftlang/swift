@@ -5901,6 +5901,9 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
 
 
 void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
+  if (hasEnabledForbiddenTypecheckPrefix())
+    checkForForbiddenPrefix(D);
+
   // Validate the context. We don't do this for generic parameters, because
   // those are validated as part of their context.
   if (D->getKind() != DeclKind::GenericTypeParam) {

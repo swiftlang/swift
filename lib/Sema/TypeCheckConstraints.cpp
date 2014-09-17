@@ -1076,11 +1076,6 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 }
 
 bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
-  if (hasEnabledForbiddenTypecheckPrefix()) {
-    binding->getPattern()->forEachVariable([this](VarDecl *V) {
-      checkForForbiddenPrefix(V);
-    });
-  }
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
