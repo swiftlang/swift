@@ -1019,15 +1019,7 @@ private:
     return proto_conformance;
   }
 
-  /// Demangle an <entity> and add it to the given node.
-  bool demangleEntity(NodePointer parent) {
-    NodePointer entity = demangleEntity();
-    if (!entity) return failure();
-    parent->addChild(entity);
-    return true;
-  }
-
-  // entity ::= entity-kind context entity-name  
+  // entity ::= entity-kind context entity-name
   // entity ::= nominal-type
   NodePointer demangleEntity() {
     // entity-kind
