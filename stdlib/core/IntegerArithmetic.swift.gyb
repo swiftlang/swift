@@ -18,34 +18,50 @@
 %    (x[:-1], x[-1]) for x in 
 %     'add+ subtract- multiply* divide/ remainder%'.split()]
 
+/// This protocol is an implementation detail of `IntegerArithmeticType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `IntegerArithmeticType` and thus must
+/// be satisfied by types conforming to that protocol.
 public protocol _IntegerArithmeticType {
 % for name,_ in integerBinaryOps:
+  /// ${name} `lhs` and `rhs`, returning a result and a `Bool` that is
+  /// true iff the operation caused an arithmetic overflow.
   class func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
 % end
 }
 
+/// The common requirements for types that support integer arithmetic.
 public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
   // Checked arithmetic functions.  Specific implementations in
   // FixedPoint.swift.gyb support static checking for integer types.
-% for _,op in integerBinaryOps:
+% for name,op in integerBinaryOps:
+  /// ${name} `lhs` and `rhs`, trapping in case of arithmetic overflow
+  /// (except in -Ounchecked builds).
   func ${op} (lhs: Self, rhs: Self) -> Self
 % end
   
-  // Explicitly convert to IntMax, trapping on overflow
+  /// Explicitly convert to `IntMax`, trapping on overflow (except in
+  /// -Ounchecked builds).
   func toIntMax() -> IntMax
 }
 
 % for name,op in integerBinaryOps:
+/// ${name} `lhs` and `rhs`, trapping in case of arithmetic overflow
+/// (except in -Ounchecked builds).
 @transparent public
 func ${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return _overflowChecked(T.${name}WithOverflow(lhs, rhs))
 }
 
+/// ${name} `lhs` and `rhs`, silently discarding any overflow.
 @transparent public
 func &${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return T.${name}WithOverflow(lhs, rhs).0
 }
 
+/// ${name} `lhs` and `rhs` and store the result in `lhs`, trapping in
+/// case of arithmetic overflow (except in -Ounchecked builds).
 @transparent public
 func ${op}= <T: _IntegerArithmeticType>(inout lhs: T, rhs: T) {
   lhs = lhs ${op} rhs
@@ -56,8 +72,11 @@ func ${op}= <T: _IntegerArithmeticType>(inout lhs: T, rhs: T) {
 // A numeric type that supports abs(x), +x and -x
 //===----------------------------------------------------------------------===//
 
-// Base protocol containing all the non-defaulted implentations.  This
-// protocol should be presented to users as part of SignedNumberType.
+/// This protocol is an implementation detail of `SignedNumberType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `SignedNumberType` and thus must
+/// be satisfied by types conforming to that protocol.
 public protocol _SignedNumberType : Comparable, IntegerLiteralConvertible {
   // Subtraction is a requirement for SignedNumberType
   func - (lhs: Self, rhs: Self) -> Self
@@ -98,6 +117,7 @@ func ~> <T : _SignedNumberType>(x:T,_:(_Abs, ())) -> T {
   return x < 0 ? -x : x
 }
 
+/// A type that supports an "absolute value" function.
 public protocol AbsoluteValuable : SignedNumberType {
   class func abs(_:Self) -> Self
 }
