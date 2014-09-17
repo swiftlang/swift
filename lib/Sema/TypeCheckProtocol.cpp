@@ -2263,8 +2263,16 @@ existentialConformsToItself(TypeChecker &tc,
   // Check whether this protocol conforms to itself.
   auto selfType = proto->getSelf()->getArchetype();
   for (auto member : proto->getMembers()) {
-    if (auto vd = dyn_cast<ValueDecl>(member))
-      tc.validateDecl(vd, true);
+    
+    // If the protocol in question is already being type-checked, we've entered
+    // this conformance check recursively. Should that be the case, don't
+    // attempt to re-validate any value declarations. The declaration will be
+    // properly validated later on, and we want to avoid an infinite loop.
+    if (!proto->isBeingTypeChecked()) {
+      if (auto vd = dyn_cast<ValueDecl>(member))
+        tc.validateDecl(vd, true);
+    }
+    
     if (member->isInvalid())
       continue;
 
@@ -2283,7 +2291,7 @@ existentialConformsToItself(TypeChecker &tc,
 
     // For value members, look at their type signatures.
     auto valueMember = dyn_cast<ValueDecl>(member);
-    if (!valueMember)
+    if (!valueMember || !valueMember->hasType())
       continue;
 
     // Extract the type of the member, ignoring the 'self' parameter and return
@@ -2362,7 +2370,6 @@ static bool existentialConformsToProtocol(TypeChecker &tc, Type type,
   SmallVector<ProtocolDecl *, 4> protocols;
   bool isExistential = type->isExistentialType(protocols);
   assert(isExistential && "Not existential?");
-  (void)isExistential;
 
   // An existential that must be a class trivially conforms to AnyObject.
   if (type->isClassExistentialType() &&

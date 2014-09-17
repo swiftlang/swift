@@ -4450,6 +4450,8 @@ public:
       return;
     }
 
+    PD->setIsBeingTypeChecked();
+    
     TC.validateDecl(PD);
 
     {
@@ -4467,6 +4469,8 @@ public:
       visit(Member);
 
     TC.checkDeclAttributes(PD);
+    
+    PD->setIsBeingTypeChecked(false);
   }
 
   void visitVarDecl(VarDecl *VD) {

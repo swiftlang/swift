@@ -892,8 +892,9 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
             continue;
         // We can't check if the protocol conforms to itself while still
         // checking the protocol declaration.
-        } else if (DC == proto || DC->isChildContextOf(proto)
-                 || conformsToProtocol(proto->getDeclaredType(), proto, DC)) {
+        } else if (DC == proto ||
+                   DC->isChildContextOf(proto) ||
+                   conformsToProtocol(proto->getDeclaredType(), proto, DC)) {
           continue;
         }
         
