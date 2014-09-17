@@ -100,6 +100,7 @@ bb0(%0 : $Int):
   // function_ref specgen.(caller (Swift.Int) -> ()).(closure #1)
   %3 = function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_ : $@thin (Int, Int, Int) -> () // user: %4
   %4 = partial_apply %3(%0) : $@thin (Int, Int, Int) -> () // user: %5
+  %7 = tuple()
   %5 = apply %2(%4) : $@thin (@owned @callee_owned (Int, Int) -> ()) -> ()
   %6 = tuple ()                                   // user: %7
   return %6 : $()                                 // id: %7

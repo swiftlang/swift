@@ -288,6 +288,42 @@ static void createName(SILFunction *Callee, SILFunction *Closure,
          << '_' << Callee->getName();
 }
 
+static void
+gatherCallSites(SILFunction *Caller,
+                llvm::SmallVectorImpl<ArgSpecDescriptor> &CallSites) {
+  for (auto &BB : *Caller) {
+    for (auto &II : BB) {
+      auto *PAI = dyn_cast<PartialApplyInst>(&II);
+      if (!PAI)
+        continue;
+
+      auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+      if (!FRI)
+        continue;
+
+      // If our partial apply has more than one use, bail.
+      //
+      // TODO: Handle multiple apply insts.
+      if (!PAI->hasOneUse())
+        continue;
+
+      // Grab that use. If it is not an apply inst, skip this ApplyInst.
+      auto *AI = dyn_cast<ApplyInst>(PAI->use_begin().getUser());
+      if (!AI)
+        continue;
+
+      for (unsigned i = 0, e = AI->getNumArguments(); i != e; ++i) {
+        if (AI->getArgument(i) != SILValue(PAI))
+          continue;
+        CallSites.push_back(ArgSpecDescriptor(PAI, AI, i));
+        DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
+              << i << ": " << *AI);
+        break;
+      }
+    }
+  }
+}
+
 bool ClosureSpecializer::specialize(SILFunction *Caller) {
   DEBUG(llvm::dbgs() << "Optimizing callsites that take closure argument in "
                      << Caller->getName() << '\n');
@@ -295,33 +331,7 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
   // Collect all of the PartialApplyInsts that are used as arguments to
   // ApplyInsts. Check the profitability of specializing the closure argument.
   llvm::SmallVector<ArgSpecDescriptor, 8> CallSites;
-  for (auto &BB : *Caller) {
-    auto I = BB.begin(), E = BB.end();
-    while (I != E) {
-      PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(I++);
-      if (!PAI || I == E)
-        continue;
-      auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-      if (!FRI)
-        continue;
-
-      // Make sure the next instruction is ApplyInst and PAI feeds into one
-      // operand.
-      auto *AI = dyn_cast<ApplyInst>(I);
-      if (!AI)
-        continue;
-      unsigned Idx = 0;
-      for (auto Arg : AI->getArguments()) {
-        if (Arg == SILValue(PAI, 0)) {
-          CallSites.push_back(ArgSpecDescriptor(PAI, AI, Idx));
-          DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
-                             << Idx << ": " << *AI);
-          break;
-        }
-        Idx++;
-      }
-    }
-  }
+  gatherCallSites(Caller, CallSites);
 
   bool Changed = false;
   for (auto &AD : CallSites) {
