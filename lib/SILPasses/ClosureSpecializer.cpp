@@ -372,6 +372,7 @@ public:
   SILClosureSpecializerTransform() {}
 
   virtual void run() {
+#if 0
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
 
@@ -389,6 +390,8 @@ public:
     // Invalidate the call graph.
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+#endif
+    return;
   }
 
   StringRef getName() override { return "Closure Specialization"; }
