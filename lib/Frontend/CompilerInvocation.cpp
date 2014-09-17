@@ -624,6 +624,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugConstraintSolverAttempt = attempt;
   }
   
+  if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
+    Opts.DebugForbidTypecheckPrefix = A->getValue();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {

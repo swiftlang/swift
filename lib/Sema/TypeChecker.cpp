@@ -638,3 +638,37 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
              member.second);
   }
 }
+
+// checkForForbiddenPrefix is for testing purposes.
+
+void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
+  if (!hasEnabledForbiddenTypecheckPrefix())
+    return;
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    checkForForbiddenPrefix(VD->getNameStr());
+  }
+}
+
+void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
+  if (!hasEnabledForbiddenTypecheckPrefix())
+    return;
+  checkForForbiddenPrefix(E->getName());
+}
+
+void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {
+  if (!hasEnabledForbiddenTypecheckPrefix())
+    return;
+  checkForForbiddenPrefix(Ident.empty() ? StringRef() : Ident.str());
+}
+
+void TypeChecker::checkForForbiddenPrefix(StringRef Name) {
+  if (!hasEnabledForbiddenTypecheckPrefix())
+    return;
+  if (Name.empty())
+    return;
+  if (Name.startswith(Context.LangOpts.DebugForbidTypecheckPrefix)) {
+    std::string Msg = "forbidden typecheck occurred: ";
+    Msg += Name;
+    llvm::report_fatal_error(Msg);
+  }
+}

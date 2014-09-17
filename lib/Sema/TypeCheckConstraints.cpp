@@ -443,8 +443,10 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr))
         return { walkToClosureExprPre(closure), expr };
 
-      if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
+      if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+        TC.checkForForbiddenPrefix(unresolved);
         return { true, BindName(unresolved, DC, TC) };
+      }
 
       return { true, expr };
     }
@@ -1074,6 +1076,11 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 }
 
 bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
+  if (hasEnabledForbiddenTypecheckPrefix()) {
+    binding->getPattern()->forEachVariable([this](VarDecl *V) {
+      checkForForbiddenPrefix(V);
+    });
+  }
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {

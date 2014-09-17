@@ -1103,6 +1103,18 @@ public:
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
   
   ArchetypeBuilder createArchetypeBuilder(Module *mod);
+
+  /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
+  /// has a name with that prefix, an llvm fatal_error is triggered.
+  /// This is for testing purposes.
+  void checkForForbiddenPrefix(const Decl *D);
+  void checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E);
+  void checkForForbiddenPrefix(Identifier Ident);
+  void checkForForbiddenPrefix(StringRef Name);
+
+  bool hasEnabledForbiddenTypecheckPrefix() const {
+    return !Context.LangOpts.DebugForbidTypecheckPrefix.empty();
+  }
 };
 
 } // end namespace swift

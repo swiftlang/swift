@@ -80,6 +80,10 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 
+def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
+  HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
+           "with the provided prefix name">;
+
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
 def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,

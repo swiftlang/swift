@@ -4118,6 +4118,8 @@ public:
     if (FD->hasType())
       return;
 
+    TC.checkForForbiddenPrefix(FD);
+
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD->getDeclContext(),
@@ -5891,6 +5893,7 @@ public:
 
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   PrettyStackTraceDecl StackTrace("type-checking", D);
+  checkForForbiddenPrefix(D);
   bool isSecondPass =
     !isFirstPass && D->getDeclContext()->isModuleScopeContext();
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);

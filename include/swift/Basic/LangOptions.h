@@ -44,6 +44,11 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
     
+    /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
+    /// identifier reference with the provided prefix name.
+    /// This is for testing purposes.
+    std::string DebugForbidTypecheckPrefix;
+
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 15000000;
