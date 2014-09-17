@@ -19,6 +19,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 }%
 
+/// The set of possible IEEE 754 "classes"
 public enum FloatingPointClassification {
   case SignalingNaN
   case QuietNaN
@@ -32,8 +33,8 @@ public enum FloatingPointClassification {
   case PositiveInfinity
 }
 
-
 extension FloatingPointClassification : Equatable {}
+
 public 
 func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> Bool {
   switch (lhs, rhs) {
@@ -54,6 +55,7 @@ func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> B
   }
 }
 
+/// A set of common requirements for Swift's floating point types.
 public protocol FloatingPointType : Strideable {
   typealias _BitsType
   class func _fromBitPattern(bits: _BitsType) -> Self
@@ -61,6 +63,7 @@ public protocol FloatingPointType : Strideable {
 
 % for src_ty in all_integer_types(word_bits):
 
+  /// Create an instance initialized with `value`.
   init(_ value: ${src_ty.stdlib_name})
 
 % end
@@ -77,34 +80,33 @@ public protocol FloatingPointType : Strideable {
   /// @{
   /// IEEE 754-2008 Non-computational operations.
 
-  // IEEE 754 calls this 'class', but this name is a keyword, and is too
-  // general.
+  /// The IEEE 754 "class" of this type.
   var floatingPointClass: FloatingPointClassification { get }
 
-  /// Returns true if this number has a negative sign.
+  /// `true` iff `self` is negative
   var isSignMinus: Bool { get }
 
-  /// Returns true if this number is normal (not zero, subnormal, infinity, or
+  /// `true` iff `self` is normal (not zero, subnormal, infinity, or
   /// NaN).
   var isNormal: Bool { get }
 
-  /// Returns true if this number is zero, subnormal, or normal (not infinity
+  /// `true` iff `self` is zero, subnormal, or normal (not infinity
   /// or NaN).
   var isFinite: Bool { get }
 
-  /// Returns true if this number is +0.0 or -0.0.
+  /// `true` iff `self` is +0.0 or -0.0.
   var isZero: Bool { get }
 
-  /// Returns true if this number is subnormal.
+  /// `true` iff `self` is subnormal.
   var isSubnormal: Bool { get }
 
-  /// Returns true if this number is infinity.
+  /// `true` iff `self` is infinity.
   var isInfinite: Bool { get }
 
-  /// Returns true if this number is NaN.
+  /// `true` iff `self` is NaN.
   var isNaN: Bool { get }
 
-  /// Returns true if this number is a signaling NaN.
+  /// `true` iff `self` is a signaling NaN.
   var isSignaling: Bool { get }
 
   // Not implemented, because it only makes sense for decimal floating point.
