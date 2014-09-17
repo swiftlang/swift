@@ -136,12 +136,12 @@ struct InProcessHashtableHasher : HasherType {
   mutating func squeezeHashValue<I : SignedIntegerType>(
     resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
-    return I.from(IntMax(_state)) // Should actually clamp the value
+    return I(IntMax(_state)) // Should actually clamp the value
   }
   mutating func squeezeHashValue<I : UnsignedIntegerType>(
     resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
-    return I.from(UIntMax(_state)) // Should actually clamp the value
+    return I(UIntMax(_state)) // Should actually clamp the value
   }
 }
 
