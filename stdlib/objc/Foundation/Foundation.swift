@@ -597,13 +597,12 @@ public let NSNotFound: Int = .max
 //===----------------------------------------------------------------------===//
 
 extension NSArray : ArrayLiteralConvertible {
-  public class func convertFromArrayLiteral(elements: AnyObject...) -> Self {
+  public required convenience init(arrayLiteral elements: AnyObject...) {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
-    let result = self(
+    self.init(
       objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
-    return result
   }
 }
 

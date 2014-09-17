@@ -283,7 +283,7 @@ public protocol StringLiteralConvertible : ExtendedGraphemeClusterLiteralConvert
 
 public protocol ArrayLiteralConvertible {
   typealias Element
-  class func convertFromArrayLiteral(elements: Element...) -> Self
+  init(arrayLiteral elements: Element...)
 }
 
 public protocol DictionaryLiteralConvertible {

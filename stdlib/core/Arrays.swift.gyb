@@ -287,13 +287,12 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
 extension ${Self} : ArrayLiteralConvertible {
 %if Self == 'Array':
   // Optimized implementation for Array
-  public static func convertFromArrayLiteral(elements: Element...) -> ${Self} {
-    return elements
+  public init(arrayLiteral elements: Element...) {
+    self = elements
   }
 %else:
-  @effects(readonly)
-  public static func convertFromArrayLiteral(elements: Element...) -> ${Self} {
-    return ${Self}(_extractOrCopyToNativeArrayBuffer(elements._buffer))
+  public init(arrayLiteral elements: Element...) {
+    self.init(_extractOrCopyToNativeArrayBuffer(elements._buffer))
   }
 %end
 }

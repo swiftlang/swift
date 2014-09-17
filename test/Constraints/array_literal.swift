@@ -2,33 +2,33 @@
 
 struct IntList : ArrayLiteralConvertible {
   typealias Element = Int
-  static func convertFromArrayLiteral(elements: Int...) -> IntList {}
+  init(arrayLiteral elements: Int...) {}
 }
 
 struct DoubleList : ArrayLiteralConvertible {
   typealias Element = Double
-  static func convertFromArrayLiteral(elements: Double...) -> DoubleList {}
+  init(arrayLiteral elements: Double...) {}
 }
 
 struct  IntDict : ArrayLiteralConvertible {
   typealias Element = (String, Int)
-  static func convertFromArrayLiteral(elements: Element...) -> IntDict {}
+  init(arrayLiteral elements: Element...) {}
 }
 
 final class DoubleDict : ArrayLiteralConvertible {
   typealias Element = (String, Double)
-  class func convertFromArrayLiteral(elements: Element...) -> DoubleDict {}
+  init(arrayLiteral elements: Element...) {}
 }
 
 final class List<T> : ArrayLiteralConvertible {
   typealias Element = T
-  class func convertFromArrayLiteral(elements: T...) -> List<T> {}
+  init(arrayLiteral elements: T...) {}
 }
 
 final class Dict<K,V> : ArrayLiteralConvertible {
   typealias Element = (K,V)
 
-  class func convertFromArrayLiteral(elements: (K,V)...) -> Dict<K,V> {}
+  init(arrayLiteral elements: (K,V)...) {}
 }
 
 infix operator => {}
@@ -73,7 +73,8 @@ var arrayOfStreams = [1..<2, 3..<4]
 struct MyArray : ArrayLiteralConvertible {
   typealias Element = Double
 
-  static func convertFromArrayLiteral(elements: Double...) -> MyArray {
+  init(arrayLiteral elements: Double...) {
+    
   }
 }
 

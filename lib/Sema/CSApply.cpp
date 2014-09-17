@@ -2232,8 +2232,35 @@ namespace {
       // FIXME: This location info is bogus.
       Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
                                                    arrayTy, tc.Context);
-      auto name = tc.Context.Id_ConvertFromArrayLiteral;
-      auto arg = expr->getSubExpr();
+      DeclName name(tc.Context, tc.Context.Id_init,
+                    { tc.Context.Id_ArrayLiteral });
+
+      // Restructure the argument to provide 
+      SmallVector<TupleTypeElt, 4> typeElements;
+      SmallVector<Identifier, 4> names;
+      bool first = true;
+      for (auto elt : expr->getElements()) {
+        if (first) {
+          typeElements.push_back(TupleTypeElt(elt->getType(),
+                                              tc.Context.Id_ArrayLiteral));
+          names.push_back(tc.Context.Id_ArrayLiteral);
+
+          first = false;
+          continue;
+        } 
+
+        typeElements.push_back(elt->getType());
+        names.push_back(Identifier());
+      }
+
+      Type argType = TupleType::get(typeElements, tc.Context);
+      Expr *arg = TupleExpr::create(tc.Context, SourceLoc(), 
+                                    expr->getElements(),
+                                    names,
+                                    { },
+                                    SourceLoc(), /*HasTrailingClosure=*/false,
+                                    /*Implicit=*/true,
+                                    argType);
       Expr *result = tc.callWitness(typeRef, dc, arrayProto, conformance,
                                     name, arg, diag::array_protocol_broken);
       if (!result)
@@ -4982,6 +5009,20 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   return result;
 }
 
+// Determine whether this is a variadic witness.
+static bool isVariadicWitness(AbstractFunctionDecl *afd) {
+  unsigned index = 0;
+  if (afd->getExtensionType())
+    ++index;
+
+  auto params = afd->getBodyParamPatterns()[index];
+  if (auto *tuple = dyn_cast<TuplePattern>(params)) {
+    return tuple->hasVararg();
+  }
+
+  return false;
+}
+
 Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                ProtocolDecl *protocol,
                                ProtocolConformance *conformance,
@@ -5012,8 +5053,11 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                   locator);
 
   // Form the call argument.
+  // FIXME: Standardize all callers to always provide all argument names,
+  // rather than hack around this.
   Expr *arg;
-  if (arguments.size() == 1 && name.isSimpleName()) {
+  if (arguments.size() == 1 && 
+      (name.isSimpleName() || isVariadicWitness(witness))) {
     arg = arguments[0];
   } else {
     SmallVector<TupleTypeElt, 4> elementTypes;

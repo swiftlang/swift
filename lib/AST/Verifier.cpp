@@ -2021,8 +2021,8 @@ struct ASTNodeBase {};
       if (TP->hasVararg()) {
         auto *LastPattern = TP->getFields().back().getPattern();
         if (!isa<TypedPattern>(LastPattern)) {
-          Out << "a vararg subpattern of a TuplePattern should be"
-                 "a TypedPattern";
+          Out << "a vararg subpattern of a TuplePattern should be "
+                 "a TypedPattern\n";
           abort();
         }
       }
