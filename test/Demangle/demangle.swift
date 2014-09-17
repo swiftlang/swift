@@ -182,3 +182,7 @@
 ; CHECK: _TFE11ext_structAV11def_structA1A4testfRS1_FT_T_ ---> ext.ext_structA.def_structA.A.test (inout def_structA.A)() -> ()
 ; CHECK: _TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> devirt_access.(getPrivateClass in _DISC) () -> devirt_access.(PrivateClass in _DISC)
 ; CHECK: _TF4mainP5_mainX3wxaFT_T_ ---> main.(λ in _main) () -> ()
+; CHECK: _TtPMP_ ---> protocol<>.Type
+; CHECK: _TFCSs13_NSSwiftArray29canStoreElementsOfDynamicTypefS_FPMP_Sb ---> Swift._NSSwiftArray.canStoreElementsOfDynamicType (Swift._NSSwiftArray)(protocol<>.Type) -> Swift.Bool
+; CHECK: _TFCSs13_NSSwiftArrayg17staticElementTypePMP_ ---> Swift._NSSwiftArray.staticElementType.getter : protocol<>.Type
+; CHECK: _TFCSs17_DictionaryMirrorg9valueTypePMP_ ---> Swift._DictionaryMirror.valueType.getter : protocol<>.Type

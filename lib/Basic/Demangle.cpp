@@ -1574,7 +1574,7 @@ private:
       return metatype;
     }
     if (c == 'P') {
-      if (c == 'M') {
+      if (Mangled.nextIf('M')) {
         NodePointer type = demangleType();
         if (!type) return nullptr;
         auto metatype = NodeFactory::create(Node::Kind::ExistentialMetatype);
