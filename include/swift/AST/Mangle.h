@@ -124,7 +124,10 @@ public:
   void mangleTypeForDebugger(Type decl, DeclContext *DC);
   void mangleGenericSignature(GenericSignature *sig,
                               ResilienceExpansion expansion);
-  
+
+  void mangleFieldOffsetFull(ValueDecl *decl, bool isIndirect);
+  void mangleTypeMetadataFull(CanType ty, bool isPattern, bool isIndirect);
+
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ResilienceExpansion expansion,
                           unsigned uncurryingLevel);

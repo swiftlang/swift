@@ -1425,3 +1425,19 @@ void Mangler::mangleProtocolConformance(ProtocolConformance *conformance) {
   mangleModule(conformance->getDeclContext()->getParentModule());
 #endif
 }
+
+void Mangler::mangleFieldOffsetFull(ValueDecl *decl, bool isIndirect) {
+  Buffer << "_TWv";
+  mangleDirectness(isIndirect);
+  mangleEntity(decl, ResilienceExpansion::Minimal, 0);
+}
+
+void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern,
+                                     bool isIndirect) {
+  Buffer << "_TM";
+  if (isPattern)
+    Buffer << 'P';
+  mangleDirectness(isIndirect);
+  mangleType(ty, ResilienceExpansion::Minimal, 0);
+}
+

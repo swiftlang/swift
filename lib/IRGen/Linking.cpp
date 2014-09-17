@@ -110,20 +110,15 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   global ::= 'M' directness type             // type metadata
   //   global ::= 'MP' directness type            // type metadata pattern
-  case Kind::TypeMetadata: {
-    buffer << "_TM";
-    bool isPattern = isMetadataPattern();
-    if (isPattern) buffer << 'P';
-    mangler.mangleDirectness(isMetadataIndirect());
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+  case Kind::TypeMetadata:
+    mangler.mangleTypeMetadataFull(getType(), isMetadataPattern(),
+                                   isMetadataIndirect());
     return;
-  }
 
   //   global ::= 'M' directness type             // type metadata
   case Kind::ForeignTypeMetadataCandidate:
-    buffer << "_TM";
-    mangler.mangleDirectness(false);
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleTypeMetadataFull(getType(), /*isPattern=*/false,
+                                   /*indirect=*/false);
     return;
 
   //   global ::= 'Mm' type                       // class metaclass
@@ -164,9 +159,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   global ::= 'Wv' directness entity
   case Kind::FieldOffset:
-    buffer << "_TWv";
-    mangler.mangleDirectness(isOffsetIndirect());
-    mangler.mangleEntity(getDecl(), ResilienceExpansion::Minimal, 0);
+    mangler.mangleFieldOffsetFull(getDecl(), isOffsetIndirect());
     return;
       
   //   global ::= 'WP' protocol-conformance
