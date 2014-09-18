@@ -22,7 +22,7 @@ public protocol IntervalType {
   /// if it is empty, are always within the bounds of `self`
   func clamp(intervalToClamp: Self) -> Self
   
-  /// True iff the `Interval` is empty
+  /// True iff `self` is empty
   var isEmpty: Bool {get}
   
   

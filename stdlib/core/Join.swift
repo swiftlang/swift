@@ -10,16 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// This protocol is an implementation detail of `ExtensibleCollectionType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `ExtensibleCollectionType` and thus must
+/// be satisfied by types conforming to that protocol.
 public protocol _ExtensibleCollectionType : CollectionType {
-  /// Create an empty collection
+  /// Create an empty instance
   init()
 
   /// A non-binding request to ensure `n` elements of available storage.
   ///
   /// This works as an optimization to avoid multiple reallocations of
-  /// linear data structures like Array.  Concrete implementations of
-  /// `ExtensibleCollectionType` may reserve more than `n`, exactly `n`, less
-  /// than `n` elements of storage, or even ignore the request completely.
+  /// linear data structures like `Array`.  Conforming types may
+  /// reserve more than `n`, exactly `n`, less than `n` elements of
+  /// storage, or even ignore the request completely.
   mutating func reserveCapacity(n: Index.Distance)
 
   /*
@@ -34,20 +39,31 @@ public protocol _ExtensibleCollectionType : CollectionType {
   >(inout _: Self, _: S)
   */
 
-  mutating func append(_: Self.Generator.Element)
+  /// Append `x` to `self`.
+  ///
+  /// Applying `successor()` to the index of the new element yields
+  /// `self.endIndex`.
+  ///
+  /// Complexity: amortized O(1).
+  mutating func append(_ x: Self.Generator.Element)
   
+  /// Append the elements of `newElements` to `self`.
+  ///
+  /// Complexity: O(*length of result*) 
+  /// 
+  /// A possible implementation::
+  ///
+  ///   reserveCapacity(countElements(self) + underestimateCount(newElements))
+  ///   for x in newElements {
+  ///     newElements.append(x)
+  ///   }
   mutating func extend<
       S : SequenceType
       where S.Generator.Element == Self.Generator.Element
-  >(seq: S) /* {
-    reserveCapacity(countElements(self) + underestimateCount(seq))
-    for x in seq {
-      seq.append(x)
-    }
-  }
-  */
+  >(newElements: S)
 }
 
+/// A collection type that can be efficiently appended-to.
 public protocol ExtensibleCollectionType : _ExtensibleCollectionType {
 /*
   We could have these operators with default implementations, but the compiler

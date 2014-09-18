@@ -16,31 +16,38 @@ import SwiftShims // for putchar
 // Input/Output interfaces
 //===----------------------------------------------------------------------===//
 
-/// Models an object into into which we can stream text.
+/// A target of text streaming operations.
 public protocol OutputStreamType {
-  mutating
-  func write(string: String)
+  /// Append the given `string` to this stream.
+  mutating func write(string: String)
 }
 
-/// Models an object that can be written to an `OutputStreamType` in a single,
-/// immediately obvious, way.
+/// A source of text streaming operations.  `Streamable` instances can
+/// be written to any *output stream*.
 ///
 /// For example: `String`, `Character`, `UnicodeScalar`.
 public protocol Streamable {
   func writeTo<Target : OutputStreamType>(inout target: Target)
 }
 
-/// This protocol should be adopted by types that wish to customize their
-/// textual representation.  This textual representation is used when objects
-/// are written to an `OutputStreamType`.
+/// A type with a customized textual representation.
+///
+/// This textual representation is used when objects are written to an
+/// *output stream*, for example, by `print` and `println`.
 public protocol Printable {
+  /// A textual representation of `self`
   var description: String { get }
 }
 
-/// This protocol should be adopted by types that wish to customize their
-/// textual representation used for debugging purposes.  This textual
-/// representation is used when objects are written to an `OutputStreamType`.
+/// A type with a customized textual representation for debugging
+/// purposes.
+///
+/// This textual representation is used when objects are written to an
+/// *output stream* by `debugPrint` and `debugPrintln`, and is
+/// typically more verbose than the text provided by a `Printable`\ 's
+/// `description` property.
 public protocol DebugPrintable {
+  /// A textual representation of `self` suitable for debugging.
   var debugDescription: String { get }
 }
 
