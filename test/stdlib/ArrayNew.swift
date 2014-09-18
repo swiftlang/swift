@@ -120,6 +120,8 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
     expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
     expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
   }
+
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 for indexRange in [
@@ -181,6 +183,8 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
 
   buffer.dealloc(3)
   _fixLifetime(a)
+
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/copyWithZone") {
@@ -297,6 +301,8 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
   expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
   expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
   expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
+
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
@@ -375,6 +381,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/objectAtIndex") {
   }
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 for indexRange in [
@@ -438,6 +445,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   _fixLifetime(a)
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/copyWithZone") {
@@ -577,7 +585,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
 
   // FIXME: there should be no autoreleased objects.
-  expectAutoreleasedKeysAndValues(opt: (0, 1), unopt: (0, 1))
+  expectAutoreleasedKeysAndValues(opt: (0, 1), unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
@@ -610,6 +618,8 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
   expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
   expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
   expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
+
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
