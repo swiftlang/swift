@@ -58,9 +58,64 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 // Standard protocols
 //===----------------------------------------------------------------------===//
 
+/// The protocol to which all types implicitly conform
 public typealias Any = protocol<>
+
+/// The protocol to which all classes implicitly conform.
+///
+/// When used as a concrete type, all known `@objc` methods and
+/// properties are available, as implicitly-unwrapped-optional methods
+/// and properties respectively, on each instance of `AnyObject`.  For
+/// example:
+///
+/// .. parsed-literal:
+///
+///   class C {
+///     @objc func getCValue() -> Int { return 42 }
+///   }
+///
+///   // If x has a method @objc getValue()->Int, call it and
+///   // return the result.  Otherwise, return nil.
+///   func getCValue1(x: AnyObject) -> Int? {
+///     if let f: ()->Int = **x.getCValue** {
+///       return f()
+///     }
+///     return nil
+///   }
+///
+///   // A more idiomatic implementation using "optional chaining"
+///   func getCValue2(x: AnyObject) -> Int? {
+///     return **x.getCValue?()**
+///   }
+///
+///   // An implementation that assumes the required method is present
+///   func getCValue3(x: AnyObject) -> **Int** {
+///     return **x.getCValue()** // x.getCValue is implicitly unwrapped.
+///   }
+///
+/// See also: `AnyClass`
 @objc public protocol AnyObject {}
 
+/// The protocol to which all class types implicitly conform.
+///
+/// When used as a concrete type, all known `@objc` `class` methods and
+/// properties are available, as implicitly-unwrapped-optional methods
+/// and properties respectively, on each instance of `AnyClass`. For
+/// example:
+///
+/// .. parsed-literal:
+///
+///   class C {
+///     @objc class var cValue: Int { return 42 }
+///   }
+///
+///   // If x has an @objc cValue: Int, return its value.  
+///   // Otherwise, return nil.
+///   func getCValue(x: AnyClass) -> Int? {
+///     return **x.cValue**
+///   }
+///
+/// See also: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
@@ -85,14 +140,32 @@ public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 // Equatable
 //
 
-/// Types implementing the `Equatable` protocol can be compared for value
-/// equality using operators `==` and `!=`.
+/// Instances of conforming types can be compared for value equality
+/// using operators `==` and `!=`.
 ///
 /// When adopting `Equatable`, only the `==` operator is required to be
 /// implemented.  The standard library provides an implementation for `!=`.
-///
-/// The `==` operator must define an equivalence relation.
 public protocol Equatable {
+  /// Return true if `lhs` is equal to `rhs`.
+  ///
+  /// **Equality implies substitutability**.  When `x == y`, `x` and
+  /// `y` are interchangeable in any code that only depends on their
+  /// values.
+  ///
+  /// Class instance identity as distinguished by triple-equals `===`
+  /// is notably not part of an instance's value.  Exposing other
+  /// non-value aspects of `Equatable` types is discouraged, and any
+  /// that *are* exposed should be explicitly pointed out in
+  /// documentation.
+  /// 
+  /// **Equality is an equivalence relation**
+  ///
+  /// - `x == x` is `true`
+  /// - `x == y` implies `y == x`
+  /// - `x == y` and `y == z` implies `x == z`
+  ///
+  /// **Inequality is the inverse of equality**, i.e. `!(x == y)` iff
+  /// `x != y`
   func == (lhs: Self, rhs: Self) -> Bool
 }
 
@@ -103,7 +176,16 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 //
 // Comparable
 //
+
+/// This protocol is an implementation detail of `Comparable`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `Comparable` and thus must
+/// be satisfied by types conforming to that protocol.
 public protocol _Comparable {
+  /// A `strict total order
+  /// <http://en.wikipedia.org/wiki/Total_order#Strict_total_order>`_
+  /// over instances of `Self`
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
@@ -117,20 +199,32 @@ public func >= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
   return !(lhs < rhs)
 }
 
-/// Types implementing the `Comparable` protocol can be compared using
-/// relational operators `<`, `<=`, `>=`, `>`.
+/// Instances of conforming types can be compared using relational
+/// operators, which define a `strict total order
+/// <http://en.wikipedia.org/wiki/Total_order#Strict_total_order>`_.
 ///
-/// When adopting `Comparable`, only the `<` operator is required to be
-/// implemented.  The standard library provides implementations for `<=`,
-/// `>=`, `>`.
+/// A type conforming to `Comparable` need only supply the `<` and
+/// `==` operators; default implementations of `<=`, `>`, `>=`, and
+/// `!=` are supplied by the standard library::
 ///
-/// The `<` operator must define a total order.
+///   struct Singular : Comparable {}
+///   func ==(x: Singular, y: Singular) -> Bool { return true }
+///   func <(x: Singular, y: Singular) -> Bool { return false }
+///
+/// **Axioms**, in addition to those of `Equatable`:
+///
+/// - `x == y` implies `x <= y`, `x >= y`, `!(x < y)`, and `!(x > y)`
+/// - `x < y` implies `x <= y` and `y > x`
+/// - `x > y` implies `x >= y` and `y < x`
+/// - `x <= y` implies `y >= x`
+/// - `x >= y` implies `y <= x`
 public protocol Comparable : _Comparable, Equatable {
   func <=(lhs: Self, rhs: Self) -> Bool
   func >=(lhs: Self, rhs: Self) -> Bool
   func >(lhs: Self, rhs: Self) -> Bool
 }
 
+///
 public protocol BitwiseOperationsType {
   func & (_: Self, _: Self) -> Self
   func |(_: Self, _: Self) -> Self
