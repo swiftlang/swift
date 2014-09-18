@@ -1468,6 +1468,22 @@ void ClangImporter::Implementation::mergePropInfoIntoAccessor(
   }
 }
 
+static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>> lookupObjCContext(api_notes::APINotesReader *reader,
+                    StringRef contextName,
+                    const clang::ObjCContainerDecl *contextDecl) {
+  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
+    contextInfo;
+
+  // Look for context information in the primary source.
+  if (isa<clang::ObjCProtocolDecl>(contextDecl))
+    contextInfo = reader->lookupObjCProtocol(contextName);
+  else
+    contextInfo = reader->lookupObjCClass(contextName);
+
+  return contextInfo;
+}
+
+
 Optional<api_notes::ObjCMethodInfo>
 ClangImporter::Implementation::getKnownObjCMethod(
     const clang::ObjCMethodDecl *method) {
@@ -1495,10 +1511,7 @@ ClangImporter::Implementation::getKnownObjCMethod(
 
   if (primary) {
     // Look for context information in the primary source.
-    if (isa<clang::ObjCProtocolDecl>(container))
-      contextInfo = primary->lookupObjCProtocol(contextName);
-    else
-      contextInfo = primary->lookupObjCClass(contextName);
+    contextInfo = lookupObjCContext(primary, contextName, container);
 
     // Look for method information in the primary source.
     if (contextInfo) {
@@ -1525,10 +1538,7 @@ ClangImporter::Implementation::getKnownObjCMethod(
   // Look for method information in the secondary source.
   if (secondary) {
     // Look for the context information in the secondary source.
-    if (isa<clang::ObjCProtocolDecl>(container))
-      contextInfo = secondary->lookupObjCProtocol(contextName);
-    else
-      contextInfo = secondary->lookupObjCClass(contextName);
+    contextInfo = lookupObjCContext(secondary, contextName, container);
 
     // Look for the method in the secondary source. We don't merge context
     // information from the secondary source.
@@ -1561,12 +1571,12 @@ ClangImporter::Implementation::getKnownObjCContext(
   Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
     primaryInfo;
   if (primary)
-    primaryInfo = primary->lookupObjCClass(name);
+    primaryInfo = lookupObjCContext(primary, name, container);
 
   Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
     secondaryInfo;
   if (secondary)
-    secondaryInfo = secondary->lookupObjCClass(name);
+    secondaryInfo = lookupObjCContext(secondary, name, container);
 
   // If neither place had information about this class, we're done.
   if (!primaryInfo && !secondaryInfo)
@@ -1607,10 +1617,7 @@ ClangImporter::Implementation::getKnownObjCProperty(
 
   if (primary) {
     // Look for context information in the primary source.
-    if (isa<clang::ObjCProtocolDecl>(container))
-      contextInfo = primary->lookupObjCProtocol(contextName);
-    else
-      contextInfo = primary->lookupObjCClass(contextName);
+    contextInfo = lookupObjCContext(primary, contextName, container);
 
     // Look for property information in the primary source.
     if (contextInfo) {
@@ -1634,10 +1641,7 @@ ClangImporter::Implementation::getKnownObjCProperty(
   // Look for property information in the secondary source.
   if (secondary) {
     // Look for the context information in the secondary source.
-    if (isa<clang::ObjCProtocolDecl>(container))
-      contextInfo = secondary->lookupObjCProtocol(contextName);
-    else
-      contextInfo = secondary->lookupObjCClass(contextName);
+    contextInfo = lookupObjCContext(secondary, contextName, container);
 
     // Look for the property in the secondary source. We don't merge context
     // information from the secondary source.

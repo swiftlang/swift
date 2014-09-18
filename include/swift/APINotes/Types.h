@@ -86,6 +86,21 @@ public:
                          const CommonEntityInfo &rhs) {
     return !(lhs == rhs);
   }
+
+  friend CommonEntityInfo &operator|=(CommonEntityInfo &lhs,
+                                      const CommonEntityInfo &rhs) {
+    // Merge unavailability.
+    if (rhs.Unavailable) {
+      lhs.Unavailable = true;
+      if (rhs.UnavailableMsg.length() != 0 &&
+          lhs.UnavailableMsg.length() == 0) {
+        lhs.UnavailableMsg = rhs.UnavailableMsg;
+      }
+    }
+
+    return lhs;
+  }
+
 };
 
 /// Describes API notes data for an Objective-C class or protocol.
@@ -147,6 +162,9 @@ public:
 
   friend ObjCContextInfo &operator|=(ObjCContextInfo &lhs,
                                    const ObjCContextInfo &rhs) {
+    // Merge inherited info.
+    static_cast<CommonEntityInfo &>(lhs) |= rhs;
+
     // Merge nullability.
     if (!lhs.getDefaultNullability()) {
       if (auto nullable = rhs.getDefaultNullability()) {
@@ -198,6 +216,7 @@ public:
   friend bool operator!=(const VariableInfo &lhs, const VariableInfo &rhs) {
     return !(lhs == rhs);
   }
+
 };
 
 /// Describes API notes data for an Objective-C property.

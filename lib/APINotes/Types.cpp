@@ -33,6 +33,8 @@ void swift::api_notes::ObjCMethodInfo::mergePropInfoIntoSetter(
   // value we have is consistent with the property.
   // TODO: Can we provide proper error handling here?
   if (auto pNullability = pInfo.getNullability()) {
+    if (*pNullability == NullableKind::Absent)
+      return;
     if (!NullabilityAudited) {
       addParamTypeInfo(0, *pNullability);
       assert(NumAdjustedNullable == 2);
@@ -48,6 +50,8 @@ void swift::api_notes::ObjCMethodInfo::mergePropInfoIntoGetter(
   // consistent with the property.
   // TODO: Can we provide proper error handling here?
   if (auto pNullability = pInfo.getNullability()) {
+    if (*pNullability == NullableKind::Absent)
+      return;
     if (!NullabilityAudited) {
       addReturnTypeInfo(*pNullability);
       assert(NumAdjustedNullable == 1);
