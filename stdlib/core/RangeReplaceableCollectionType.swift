@@ -14,12 +14,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A *collection* that supports replacement of an arbitrary subRange
+/// of elements with the elements of another collection.
 public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Replace the given `subRange` of elements with `newValues`.
-  /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newValues)`\ , O(N) otherwise.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(subRange)`\ ) if
+  /// `subRange.endIndex == self.endIndex` and `isEmpty(newValues)`\ ,
+  /// O(\ `countElements(self)`\ + \`countElements(newValues)`\ ) otherwise.
   mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Self.Generator.Element
   >(
@@ -27,27 +33,66 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   )
 
   //===--- Derivable Requirements (see free functions below) --------------===//
-  mutating func insert(newElement: Generator.Element, atIndex i: Index) /* {
-    Swift.insert(&self, newElement, atIndex: i)
-  } */
-  
+  /// Insert `newElement` at index `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self)`\ ).
+  ///
+  /// Can be implemented as::
+  ///
+  ///   Swift.insert(&self, newElement, atIndex: i)
+  mutating func insert(newElement: Generator.Element, atIndex i: Index)
+
+  /// Insert `newValues` at index `i`
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self) + countElements(newValues)`\ ).
+  ///
+  /// Can be implemented as::
+  ///
+  ///   Swift.splice(&self, newValues, atIndex: i)
   mutating func splice<
     S : CollectionType where S.Generator.Element == Generator.Element
-  >(newValues: S, atIndex i: Index) /* {
-    Swift.splice(&self, newValues, atIndex: i)
-  } */
+  >(newValues: S, atIndex i: Index)
 
-  mutating func removeAtIndex(i: Index) -> Generator.Element /* {
-    return Swift.removeAtIndex(&self, i)
-  } */
+  /// Remove the element at index `i`
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self)`\ ).
+  ///
+  /// Can be implemented as::
+  ///
+  ///   Swift.removeAtIndex(&self, i)
+  mutating func removeAtIndex(i: Index) -> Generator.Element
   
-  mutating func removeRange(subRange: Range<Index>) /* {
-    Swift.removeRange(&self, subRange)
-  } */
+  /// Remove the indicated `subRange` of elements
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self)`\ ).
+  ///
+  /// Can be implemented as::
+  ///
+  ///   Swift.removeRange(&self, subRange)
+  mutating func removeRange(subRange: Range<Index>)
 
-  mutating func removeAll(#keepCapacity: Bool /*= false*/) /* {
-    Swift.removeAll(&self, keepCapacity: keepCapacity)
-  } */
+  /// Remove all elements
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// :param: `keepCapacity`, if `true`, is a non-binding request to
+  ///    avoid releasing storage, which can be a useful optimization
+  ///    when `self` is going to be grown again.
+  ///
+  /// Complexity: O(\ `countElements(self)`\ ).
+  ///
+  /// Can be implemented as::
+  ///
+  ///   Swift.removeAll(&self, keepCapacity: keepCapacity)
+  mutating func removeAll(#keepCapacity: Bool /*= false*/)
 }
 
 /// Insert an element at index `i` in O(N).
