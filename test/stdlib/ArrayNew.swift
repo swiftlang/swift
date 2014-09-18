@@ -293,8 +293,8 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
   native[2] = TestObjCValueTy(130)
   native.append(TestObjCValueTy(140))
 
-  // FIXME: replace with a black hole.
-  _fixLifetime(native)
+  // Ensure that the compiler does not elide mutation of the native array.
+  _blackHole(native)
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
@@ -575,8 +575,8 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   native[2] = TestObjCValueTy(130)
   native.append(TestObjCValueTy(140))
 
-  // FIXME: replace with a black hole.
-  _fixLifetime(native)
+  // Ensure that the compiler does not elide mutation of the native array.
+  _blackHole(native)
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
@@ -610,8 +610,8 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
   native[2] = TestBridgedValueTy(130)
   native.append(TestBridgedValueTy(140))
 
-  // FIXME: replace with a black hole.
-  _fixLifetime(native)
+  // Ensure that the compiler does not elide mutation of the native array.
+  _blackHole(native)
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
