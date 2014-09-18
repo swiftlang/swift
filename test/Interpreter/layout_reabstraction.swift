@@ -70,14 +70,14 @@ struct ContainsTupleOfFunctions<T> {
   }
 }
 
-// CHECK-NEXT: 16
-println(sizeof(ContainsTupleOfFunctions<()>.self))
-// CHECK-NEXT: 16
-println(unspecializedSizeOf(ContainsTupleOfFunctions<()>.self))
-// CHECK-NEXT: 24
-println(sizeof(ContainsTupleOfFunctions<Int64>.self))
-// CHECK-NEXT: 24
-println(unspecializedSizeOf(ContainsTupleOfFunctions<Int64>.self))
+// CHECK-NEXT: 2
+println(sizeof(ContainsTupleOfFunctions<()>.self) / sizeof(Int.self))
+// CHECK-NEXT: 2
+println(unspecializedSizeOf(ContainsTupleOfFunctions<()>.self) / sizeof(Int.self))
+// CHECK-NEXT: 3
+println(sizeof(ContainsTupleOfFunctions<Int64>.self) / sizeof(Int.self))
+// CHECK-NEXT: 3
+println(unspecializedSizeOf(ContainsTupleOfFunctions<Int64>.self) / sizeof(Int.self))
 
 let x = ContainsTupleOfFunctions(x: (1, { $0 + 1 }))
 let y = ContainsTupleOfFunctions(x: ("foo", { $0 + "bar" }))
