@@ -33,7 +33,7 @@ void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
   if (D->getASTContext().LangOpts.EnableAccessControl) {
     if (TypeResolver)
-      TypeResolver->resolveDeclSignature(D);
+      TypeResolver->resolveAccessibility(D);
     if (D->isInvalid() && !D->hasAccessibility())
       return;
     if (!D->isAccessibleFrom(DC))

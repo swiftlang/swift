@@ -80,6 +80,11 @@ public:
   virtual Type resolveMemberType(DeclContext *dc, Type type,
                                  Identifier name) = 0;
 
+  /// Resolve the accessibility of a value.
+  ///
+  /// It does no type-checking.
+  virtual void resolveAccessibility(ValueDecl *VD) = 0;
+
   /// Resolve the type and declaration attributes of a value.
   ///
   /// This can be called when the type or signature of a value is needed.

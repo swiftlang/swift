@@ -414,6 +414,9 @@ public:
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
 
+  /// Resolves the accessibility of the given declaration.
+  void validateAccessibility(ValueDecl *D);
+
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
@@ -539,6 +542,10 @@ public:
   void checkOwnershipAttr(VarDecl *D, OwnershipAttr *attr);
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
+
+  virtual void resolveAccessibility(ValueDecl *VD) override {
+    validateAccessibility(VD);
+  }
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD, true);

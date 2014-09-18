@@ -2505,7 +2505,7 @@ static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
       break;
     case DeclContextKind::NominalTypeDecl: {
       auto nominal = cast<NominalTypeDecl>(DC);
-      TC.validateDecl(nominal);
+      TC.validateAccessibility(nominal);
       Accessibility access = nominal->getAccessibility();
       if (!isa<ProtocolDecl>(nominal))
         access = std::min(access, Accessibility::Internal);
@@ -6302,6 +6302,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);
 
+  validateAccessibility(D);
+
   // Validate the context. We don't do this for generic parameters, because
   // those are validated as part of their context.
   if (D->getKind() != DeclKind::GenericTypeParam) {
@@ -6325,8 +6327,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     llvm_unreachable("not a value decl");
 
   case DeclKind::TypeAlias: {
-    computeAccessibility(*this, D);
-
     // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
     if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
@@ -6411,7 +6411,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Compute the declared type.
     nominal->computeType();
 
-    computeAccessibility(*this, D);
     validateAttributes(*this, D);
     checkInheritanceClause(D);
 
@@ -6451,7 +6450,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                           proto->getDeclContext());
     finalizeGenericParamList(builder, proto->getGenericParams(), proto, *this);
 
-    computeAccessibility(*this, D);
     checkInheritanceClause(D);
     validateAttributes(*this, D);
 
@@ -6494,8 +6492,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       
   case DeclKind::Var:
   case DeclKind::Param: {
-    computeAccessibility(*this, D);
-
     auto VD = cast<VarDecl>(D);
     if (!VD->hasType()) {
       // Make sure the getter and setter have valid types, since they will be
@@ -6633,7 +6629,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   }
       
   case DeclKind::Func: {
-    computeAccessibility(*this, D);
     if (D->hasType())
       return;
     typeCheckDecl(D, true);
@@ -6644,7 +6639,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Constructor:
     if (D->hasType())
       return;
-    computeAccessibility(*this, D);
     typeCheckDecl(D, true);
     break;
 
@@ -6654,13 +6648,74 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
     auto container = cast<NominalTypeDecl>(D->getDeclContext());
     validateDecl(container);
-    D->setAccessibility(container->getAccessibility());
     typeCheckDecl(D, true);
     break;
   }
   }
 
   assert(D->hasType());
+}
+
+void TypeChecker::validateAccessibility(ValueDecl *D) {
+  if (D->hasAccessibility())
+    return;
+
+  // FIXME: Encapsulated the following in computeAccessibility() ?
+
+  switch (D->getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+  case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
+  case DeclKind::TopLevelCode:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+  case DeclKind::IfConfig:
+    llvm_unreachable("not a value decl");
+
+  case DeclKind::TypeAlias:
+    computeAccessibility(*this, D);
+    break;
+
+  case DeclKind::GenericTypeParam:
+    // Ultimately handled in validateDecl() with resolveTypeParams=true.
+    return;
+
+  case DeclKind::AssociatedType: {
+      auto assocType = cast<AssociatedTypeDecl>(D);
+      auto prot = assocType->getProtocol();
+      validateAccessibility(prot);
+      assocType->setAccessibility(prot->getAccessibility());
+      break;
+    }
+
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::Var:
+  case DeclKind::Param:
+  case DeclKind::Func:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+    computeAccessibility(*this, D);
+    break;
+
+  case DeclKind::Destructor:
+  case DeclKind::EnumElement: {
+    if (D->isInvalid()) {
+      D->setAccessibility(Accessibility::Private);
+    } else {
+      auto container = cast<NominalTypeDecl>(D->getDeclContext());
+      validateAccessibility(container);
+      D->setAccessibility(container->getAccessibility());
+    }
+    break;
+  }
+  }
+
+  assert(D->hasAccessibility());
 }
 
 static Type checkExtensionGenericParams(
