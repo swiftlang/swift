@@ -10,13 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A protocol that produces a reflection interface for a value.
+/// Customizes the result of `reflect(x)`, where `x` is a conforming
+/// type.
 public protocol Reflectable {
   // The runtime has inappropriate knowledge of this protocol and how its
   // witness tables are laid out. Changing this protocol requires a
   // corresponding change to Reflection.cpp.
     
-  /// Get the mirror that reflects this object.
+  /// Get a mirror that reflects `self`.
   func getMirror() -> MirrorType
 }
 
@@ -147,34 +148,32 @@ public enum MirrorDisposition {
   case ObjCObject
 }
 
-/// A protocol that provides a reflection interface to an underlying value.
+/// The type returned by `reflect(x)`; supplies an API for runtime
+/// reflection on `x`
 public protocol MirrorType {
-  /// Copy the value out as an Any.
+  /// The instance being reflected
   var value: Any { get }
 
-  /// Get the type of the value.
+  /// Identical to `value.dynamicType`
   var valueType: Any.Type { get }
 
-  /// Get the unique identifier for this value, if it has one.
-  /// Always returns Some value for class instances, and always returns None
-  /// for value types.
+  /// A unique identifier for `value` if it is a class instance; `nil`
+  /// otherwise.
   var objectIdentifier: ObjectIdentifier? { get }
 
-  /// Get the number of logical children this value has.
+  /// The count of `value`\ 's logical children 
   var count: Int { get }
 
-  /// Get a mirror for one of this value's children.
-  ///
-  /// Returns a pair of the child's name and its mirror.
+  /// Get a name and mirror for the `i`\ th logical child.
   subscript(i: Int) -> (String, MirrorType) { get }
 
-  /// Get a string description of this value.
+  /// A string description of `value`.
   var summary: String { get }
 
-  /// Get a rich representation of this value for the IDE, if it has one.
+  /// A rich representation of `value` for an IDE, or `nil` if none is supplied.
   var quickLookObject: QuickLookObject? { get }
 
-  /// Get the disposition of the value.
+  /// How `value` should be presented in an IDE.
   var disposition: MirrorDisposition { get }
 }
 
