@@ -101,6 +101,19 @@ enum class CheckedCastKind : unsigned {
 
   Last_CheckedCastKind = BridgeFromObjectiveC,
 };
+
+enum class AccessKind : unsigned char {
+  /// This is a direct access to the underlying storage of a stored
+  /// property or subscript.
+  DirectToStorage,
+
+  /// This is a direct, non-polymorphic access to the getter/setter
+  /// accessors of a property or subscript.
+  DirectToAccessor,
+
+  /// This is an ordinary access to a member.
+  Ordinary,
+};
   
 /// Expr - Base class for all expressions in swift.
 class alignas(8) Expr {
@@ -148,18 +161,18 @@ class alignas(8) Expr {
   class DeclRefExprBitfields {
     friend class DeclRefExpr;
     unsigned : NumExprBits;
-    unsigned IsDirectPropertyAccess : 1;
+    unsigned Access : 2; // an AccessKind
   };
-  enum { NumDeclRefExprBits = NumExprBits + 1 };
+  enum { NumDeclRefExprBits = NumExprBits + 2 };
   static_assert(NumDeclRefExprBits <= 32, "fits in an unsigned");
 
   class MemberRefExprBitfields {
     friend class MemberRefExpr;
     unsigned : NumExprBits;
-    unsigned IsDirectPropertyAccess : 1;
+    unsigned Access : 2; // an AccessKind
     unsigned IsSuper : 1;
   };
-  enum { NumMemberRefExprBits = NumExprBits + 2 };
+  enum { NumMemberRefExprBits = NumExprBits + 3 };
   static_assert(NumMemberRefExprBits <= 32, "fits in an unsigned");
 
   class TupleExprBitfields {
@@ -181,9 +194,10 @@ class alignas(8) Expr {
   class SubscriptExprBitfields {
     friend class SubscriptExpr;
     unsigned : NumExprBits;
+    unsigned Access : 2; // an AccessKind
     unsigned IsSuper : 1;
   };
-  enum { NumSubscriptExprBits = NumExprBits + 1 };
+  enum { NumSubscriptExprBits = NumExprBits + 3 };
   static_assert(NumSubscriptExprBits <= 32, "fits in an unsigned");
 
   class BooleanLiteralExprBitfields {
@@ -728,11 +742,9 @@ class DeclRefExpr : public Expr {
 
 public:
   DeclRefExpr(ConcreteDeclRef D, SourceLoc Loc, bool Implicit,
-              // If True, access to computed properties with storage goes to
-              // the storage, instead of through the accessors.
-              bool UsesDirectPropertyAccess = false, Type Ty = Type())
+              AccessKind access = AccessKind::Ordinary, Type Ty = Type())
     : Expr(ExprKind::DeclRef, Implicit, Ty), DOrSpecialized(D), Loc(Loc) {
-    DeclRefExprBits.IsDirectPropertyAccess = UsesDirectPropertyAccess;
+    DeclRefExprBits.Access = (unsigned) access;
   }
 
   /// Retrieve the declaration to which this expression refers.
@@ -742,8 +754,8 @@ public:
 
   /// Return true if this access is direct, meaning that it does not call the
   /// getter or setter.
-  bool isDirectPropertyAccess() const {
-    return DeclRefExprBits.IsDirectPropertyAccess;
+  AccessKind getAccessKind() const {
+    return (AccessKind) DeclRefExprBits.Access;
   }
 
   /// Retrieve the concrete declaration reference.
@@ -1044,12 +1056,10 @@ class MemberRefExpr : public Expr {
   SourceLoc DotLoc;
   SourceRange NameRange;
   
-public:  
+public:
   MemberRefExpr(Expr *base, SourceLoc dotLoc, ConcreteDeclRef member,
                 SourceRange nameRange, bool Implicit,
-                // If True, access to computed properties with storage goes to
-                // the storage, instead of through the accessors.
-                bool UsesDirectPropertyAccess = false);
+                AccessKind access = AccessKind::Ordinary);
   Expr *getBase() const { return Base; }
   ConcreteDeclRef getMember() const { return Member; }
   SourceLoc getNameLoc() const { return NameRange.Start; }
@@ -1059,8 +1069,8 @@ public:
   
   /// Return true if this member access is direct, meaning that it
   /// does not call the getter or setter.
-  bool isDirectPropertyAccess() const {
-    return MemberRefExprBits.IsDirectPropertyAccess;
+  AccessKind getAccessKind() const {
+    return (AccessKind) MemberRefExprBits.Access;
   }
 
   /// Determine whether this member reference refers to the
@@ -1543,9 +1553,12 @@ class SubscriptExpr : public Expr {
   
 public:
   SubscriptExpr(Expr *base, Expr *index,
-                ConcreteDeclRef decl = ConcreteDeclRef())
-    : Expr(ExprKind::Subscript, /*Implicit=*/false, Type()),
+                ConcreteDeclRef decl = ConcreteDeclRef(),
+                bool implicit = false,
+                AccessKind access = AccessKind::Ordinary)
+    : Expr(ExprKind::Subscript, implicit, Type()),
       TheDecl(decl), Base(base), Index(index) {
+    SubscriptExprBits.Access = (unsigned) access;
     SubscriptExprBits.IsSuper = false;
   }
   
@@ -1558,6 +1571,12 @@ public:
   /// "offset" into the base value.
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
+
+  /// Determine whether this subscript reference should bypass the
+  /// ordinary accessors.
+  AccessKind getAccessKind() const {
+    return (AccessKind) SubscriptExprBits.Access;
+  }
   
   /// Determine whether this member reference refers to the
   /// superclass's property.

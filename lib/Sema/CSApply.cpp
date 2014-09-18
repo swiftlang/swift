@@ -218,7 +218,7 @@ static VarDecl *findNamedPropertyWitness(TypeChecker &tc, DeclContext *dc,
 /// Adjust the given type to become the self type when referring to
 /// the given member.
 static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
-                                    bool IsDirectPropertyAccess,
+                                    AccessKind accessKind,
                                     DeclContext *UseDC) {
   auto baseObjectTy = baseTy->getLValueOrInOutObjectType();
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
@@ -254,7 +254,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
       return baseObjectTy;
 
     if (VD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
-        !IsDirectPropertyAccess)
+        accessKind != AccessKind::DirectToStorage)
       return InOutType::get(baseObjectTy);
   }
   
@@ -275,11 +275,11 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
   return baseTy;
 }
 
-/// Return true if a MemberReferenceExpr with the specified base and member in
-/// the specified DeclContext should be implicitly marked as
-/// "isDirectPropertyAccess".
-static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
-                                            DeclContext *DC) {
+/// Return the implicit access kind for a MemberReferenceExpr with the
+/// specified base and member in the specified DeclContext.
+static AccessKind
+getImplicitMemberReferenceAccessKind(Expr *base, VarDecl *member,
+                                     DeclContext *DC) {
   // Properties that have storage and accessors are frequently accessed through
   // accessors.  However, in the init and destructor methods for the type
   // immediately containing the property, accesses are done direct.
@@ -297,11 +297,11 @@ static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
         AFD_DC->getImplicitSelfDecl() == cast<DeclRefExpr>(base)->getDecl()) {
       // Access this directly instead of going through (e.g.) observing or
       // trivial accessors.
-      return true;
+      return AccessKind::DirectToStorage;
     }
 
   // If the value is always directly accessed from this context, do it.
-  return member->isUseFromContextDirect(DC);
+  return member->getAccessKindFromContext(DC);
 }
 
 namespace {
@@ -388,7 +388,7 @@ namespace {
     Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
                        ConstraintLocatorBuilder locator,
                        bool specialized, bool implicit,
-                       bool isDirectPropertyAccess) {
+                       AccessKind accessKind) {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
 
@@ -402,7 +402,7 @@ namespace {
         Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx);
         auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
                                      loc, openedFnType->getResult(),
-                                     locator, implicit, isDirectPropertyAccess);
+                                     locator, implicit, accessKind);
         if (!result)
           return nullptr;;
 
@@ -432,13 +432,11 @@ namespace {
         auto type = solution.computeSubstitutions(genericFn, dc, openedType,
                                                   substitutions);
         return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
-                                     loc, implicit, isDirectPropertyAccess,
-                                     type);
+                                     loc, implicit, accessKind, type);
       }
 
       auto type = simplifyType(openedType);
-      return new (ctx) DeclRefExpr(decl, loc, implicit, isDirectPropertyAccess,
-                                   type);
+      return new (ctx) DeclRefExpr(decl, loc, implicit, accessKind, type);
     }
 
     /// Describes an opened existential that has not yet been closed.
@@ -521,7 +519,7 @@ namespace {
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          ValueDecl *member, SourceLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
-                         bool Implicit, bool IsDirectPropertyAccess) {
+                         bool Implicit, AccessKind accessKind) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -640,7 +638,7 @@ namespace {
       // If we're referring to the member of a module, it's just a simple
       // reference.
       if (baseTy->is<ModuleType>()) {
-        assert(!IsDirectPropertyAccess &&
+        assert(accessKind == AccessKind::Ordinary &&
                "Direct property access doesn't make sense for this");
         assert(!dynamicSelfFnType && "No reference type to convert to");
         Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
@@ -664,8 +662,10 @@ namespace {
 
       // References to properties with accessors and storage usually go
       // through the accessors, but sometimes are direct.
-      if (auto *VD = dyn_cast<VarDecl>(member))
-        IsDirectPropertyAccess |= isImplicitDirectMemberReference(base, VD, dc);
+      if (auto *VD = dyn_cast<VarDecl>(member)) {
+        if (accessKind == AccessKind::Ordinary)
+          accessKind = getImplicitMemberReferenceAccessKind(base, VD, dc);
+      }
 
       if (baseIsInstance) {
         // Convert the base to the appropriate container type, turning it
@@ -682,7 +682,7 @@ namespace {
           if (base->getType()->is<LValueType>())
             selfTy = InOutType::get(selfTy);
         base = coerceObjectArgumentToType(
-                 base,  selfTy, member, IsDirectPropertyAccess,
+                 base,  selfTy, member, accessKind,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
@@ -701,7 +701,7 @@ namespace {
 
       // Handle archetype and existential references.
       if (isArchetypeOrExistentialRef) {
-        assert(!IsDirectPropertyAccess &&
+        assert(accessKind == AccessKind::Ordinary &&
                "Direct property access doesn't make sense for this");
         assert(!dynamicSelfFnType && 
                "Archetype/existential DynamicSelf with extra conversion");
@@ -716,8 +716,7 @@ namespace {
         } else {
           assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
           ref = new (context) MemberRefExpr(base, dotLoc, memberRef,
-                                            memberLoc, Implicit,
-                                            IsDirectPropertyAccess);
+                                            memberLoc, Implicit, accessKind);
           cast<MemberRefExpr>(ref)->setIsSuper(isSuper);
         }
         
@@ -732,8 +731,7 @@ namespace {
         assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
         auto result
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
-                                        memberLoc, Implicit,
-                                        IsDirectPropertyAccess);
+                                        memberLoc, Implicit, accessKind);
         result->setIsSuper(isSuper);
 
         // Skip the synthesized 'self' input type of the opened type.
@@ -741,7 +739,7 @@ namespace {
         return result;
       }
       
-      assert(!IsDirectPropertyAccess &&
+      assert(accessKind == AccessKind::Ordinary &&
              "Direct property access doesn't make sense for this");
       
       // Handle all other references.
@@ -936,13 +934,12 @@ namespace {
     ///
     /// \param member The member being accessed.
     ///
-    /// \param IsDirectPropertyAccess True if this is a direct access to
-    ///        computed properties that have storage.
+    /// \param accessKind The kind of access we've been asked to perform.
     ///
     /// \param locator Locator used to describe where in this expression we are.
     Expr *coerceObjectArgumentToType(Expr *expr,
                                      Type baseTy, ValueDecl *member,
-                                     bool IsDirectPropertyAccess,
+                                     AccessKind accessKind,
                                      ConstraintLocatorBuilder locator);
 
   private:
@@ -954,7 +951,7 @@ namespace {
     /// \param isImplicit Whether this is an implicit subscript.
     Expr *buildSubscript(Expr *base, Expr *index,
                          ConstraintLocatorBuilder locator,
-                         bool isImplicit) {
+                         bool isImplicit, AccessKind accessKind) {
       // Determine the declaration selected for this subscript operation.
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(
@@ -1006,11 +1003,12 @@ namespace {
           baseTy = proto->getDeclaredType();
         }
 
-        base = coerceObjectArgumentToType(base, baseTy, subscript, false,
-                                          locator);
+        base = coerceObjectArgumentToType(base, baseTy, subscript,
+                                          AccessKind::Ordinary, locator);
         if (!base)
           return nullptr;
 
+        // TODO: diagnose if accessKind != AccessKind::Ordinary?
         auto subscriptExpr = new (tc.Context) DynamicSubscriptExpr(base,
                                                                    index,
                                                                    subscript);
@@ -1034,8 +1032,8 @@ namespace {
         auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput();
         containerTy = solution.simplifyType(tc, openedBaseType);
-        base = coerceObjectArgumentToType(base, containerTy, subscript, false,
-                                          locator);
+        base = coerceObjectArgumentToType(base, containerTy, subscript,
+                                          AccessKind::Ordinary, locator);
                  locator.withPathElement(ConstraintLocator::MemberRefBase);
         if (!base)
           return nullptr;
@@ -1045,10 +1043,11 @@ namespace {
           = new (tc.Context) SubscriptExpr(base, index,
                                            ConcreteDeclRef(tc.Context,
                                                            subscript,
-                                                           substitutions));
+                                                           substitutions),
+                                           isImplicit,
+                                           accessKind);
         subscriptExpr->setType(resultTy);
         subscriptExpr->setIsSuper(isSuper);
-        subscriptExpr->setImplicit(isImplicit);
         return subscriptExpr;
       }
 
@@ -1058,17 +1057,17 @@ namespace {
           selfTy = InOutType::get(selfTy);
 
       // Coerce the base to the container type.
-      base = coerceObjectArgumentToType(base, selfTy, subscript, false,
-                                        locator);
+      base = coerceObjectArgumentToType(base, selfTy, subscript,
+                                        AccessKind::Ordinary, locator);
       if (!base)
         return nullptr;
 
       // Form a normal subscript.
       auto *subscriptExpr
-        = new (tc.Context) SubscriptExpr(base, index, subscript);
+        = new (tc.Context) SubscriptExpr(base, index, subscript,
+                                         isImplicit, accessKind);
       subscriptExpr->setType(resultTy);
       subscriptExpr->setIsSuper(isSuper);
-      subscriptExpr->setImplicit(isImplicit);
       return subscriptExpr;
     }
 
@@ -1704,7 +1703,7 @@ namespace {
             typeRef, choice.openedFullType,
             segment->getStartLoc(), choice.choice.getDecl(),
             segment->getStartLoc(), choice.openedType,
-            locatorBuilder, /*Implicit=*/true, /*directPropertyAccess=*/false);
+            locatorBuilder, /*Implicit=*/true, AccessKind::Ordinary);
         ApplyExpr *apply =
             new (tc.Context) CallExpr(memberRef, segment, /*Implicit=*/true);
         segment = finishApply(apply, openedType, locatorBuilder);
@@ -1780,7 +1779,7 @@ namespace {
       // new one?
       return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
                           locator, expr->isSpecialized(), expr->isImplicit(),
-                          expr->isDirectPropertyAccess());
+                          expr->getAccessKind());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -1824,7 +1823,7 @@ namespace {
                               ConstraintLocatorBuilder(
                                 cs.getConstraintLocator(expr)),
                               expr->isImplicit(),
-                              /*IsDirectPropertyAccess=*/false);
+                              AccessKind::Ordinary);
       }
 
       // The subexpression must be either 'self' or 'super'.
@@ -1891,7 +1890,7 @@ namespace {
 
       return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
                           locator, expr->isSpecialized(), expr->isImplicit(),
-                          /*isDirectPropertyAccess*/false);
+                          AccessKind::Ordinary);
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
@@ -1904,7 +1903,7 @@ namespace {
                             selected.choice.getDecl(), expr->getMemberLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr),
-                            expr->isImplicit(), /*direct ivar*/false);
+                            expr->isImplicit(), AccessKind::Ordinary);
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -1939,7 +1938,7 @@ namespace {
                             selected.openedType,
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(),
-                            expr->isDirectPropertyAccess());
+                            expr->getAccessKind());
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -1986,7 +1985,7 @@ namespace {
                                    expr->getNameLoc(),
                                    selected.openedType,
                                    cs.getConstraintLocator(expr),
-                                   expr->isImplicit(), /*direct ivar*/false);
+                                   expr->isImplicit(), AccessKind::Ordinary);
       if (!result)
         return nullptr;
 
@@ -2079,7 +2078,7 @@ namespace {
                                      nameLoc,
                                      selected.openedType,
                                      cs.getConstraintLocator(expr),
-                                     implicit, /*direct ivar*/false);
+                                     implicit, AccessKind::Ordinary);
         
         // If this is an application of a value type method or enum constructor,
         // arrange for us to check that it gets fully applied.
@@ -2204,7 +2203,8 @@ namespace {
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             cs.getConstraintLocator(expr),
-                            expr->isImplicit());
+                            expr->isImplicit(),
+                            expr->getAccessKind());
     }
 
     Expr *visitArrayExpr(ArrayExpr *expr) {
@@ -2341,7 +2341,7 @@ namespace {
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             cs.getConstraintLocator(expr),
-                            expr->isImplicit());
+                            expr->isImplicit(), AccessKind::Ordinary);
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
@@ -4253,10 +4253,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 Expr *
 ExprRewriter::coerceObjectArgumentToType(Expr *expr,
                                          Type baseTy, ValueDecl *member,
-                                         bool IsDirectPropertyAccess,
+                                         AccessKind accessKind,
                                          ConstraintLocatorBuilder locator) {
-  Type toType = adjustSelfTypeForMember(baseTy, member, IsDirectPropertyAccess,
-                                        dc);
+  Type toType = adjustSelfTypeForMember(baseTy, member, accessKind, dc);
 
   // If our expression already has the right type, we're done.
   Type fromType = expr->getType();
@@ -4543,7 +4542,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                  /*DotLoc=*/SourceLoc(),
                                  decl, fn->getEndLoc(),
                                  selected->openedType, locator,
-                                 /*Implicit=*/true, /*direct ivar*/false);
+                                 /*Implicit=*/true, AccessKind::Ordinary);
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
 
@@ -5137,7 +5136,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                            witness, base->getEndLoc(),
                                            openedType, locator,
                                            /*Implicit=*/true,
-                                           /*direct ivar*/false);
+                                           AccessKind::Ordinary);
 
   // Call the witness.
   ApplyExpr *apply = new (Context) CallExpr(memberRef, arg, /*Implicit=*/true);

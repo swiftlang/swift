@@ -1077,6 +1077,15 @@ void Stmt::print(raw_ostream &OS, unsigned Indent) const {
 // Printing for Expr and all subclasses.
 //===----------------------------------------------------------------------===//
 
+static raw_ostream &operator<<(raw_ostream &os, AccessKind accessKind) {
+  switch (accessKind) {
+  case AccessKind::Ordinary: return os;
+  case AccessKind::DirectToStorage: return os << " direct_to_storage";
+  case AccessKind::DirectToAccessor: return os << " direct_to_accessor";
+  }
+  llvm_unreachable("bad access kind");
+}
+
 namespace {
 /// PrintExpr - Visitor implementation of Expr::print.
 class PrintExpr : public ExprVisitor<PrintExpr> {
@@ -1214,8 +1223,7 @@ public:
     printCommon(E, "declref_expr")
       << " decl=";
     E->getDeclRef().dump(OS);
-    if (E->isDirectPropertyAccess())
-      OS << " direct_property_access";
+    OS << E->getAccessKind();
     OS << " specialized=" << (E->isSpecialized()? "yes" : "no");
 
     for (auto TR : E->getGenericArgs()) {
@@ -1291,8 +1299,7 @@ public:
       << " decl=";
     E->getMember().dump(OS);
     
-    if (E->isDirectPropertyAccess())
-      OS << " direct_property_access";
+    OS << E->getAccessKind();
     if (E->isSuper())
       OS << " super";
             
@@ -1365,6 +1372,7 @@ public:
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
+    OS << E->getAccessKind();
     if (E->isSuper())
       OS << " super";
     OS << '\n';

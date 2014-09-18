@@ -678,20 +678,20 @@ public:
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
   ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
-                                 bool isDirectPropertyAccess = false);
+                                 AccessKind accessKind = AccessKind::Ordinary);
   
   /// Produce a singular RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified epxression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
   ManagedValue emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty,
-                                 bool isDirectPropertyAccess,
+                                 AccessKind accessKind,
                                  SGFContext C = SGFContext());
 
   /// Produce a singular RValue for a load from the specified property.
   ManagedValue emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                                          bool isSuper, VarDecl *property,
                                          ArrayRef<Substitution> substitutions,
-                                         bool isDirectPropertyAccess,
+                                         AccessKind accessKind,
                                          Type propTy, SGFContext C);
 
 
@@ -708,12 +708,12 @@ public:
   ManagedValue emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                ArrayRef<Substitution> substitutions,
                                RValueSource &&optionalSelfValue,
-                               bool isSuper,
+                               bool isSuper, bool isDirectAccessorUse,
                                RValue &&optionalSubscripts, SGFContext C);
   void emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                        ArrayRef<Substitution> substitutions,
                        RValueSource &&optionalSelfValue,
-                       bool isSuper,
+                       bool isSuper, bool isDirectAccessorUse,
                        RValue &&optionalSubscripts, RValue &&value);
   ManagedValue emitApplyConversionFunction(SILLocation loc,
                                            Expr *funcExpr,

@@ -270,11 +270,11 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              ConcreteDeclRef member, SourceRange nameRange,
-                             bool Implicit, bool UsesDirectPropertyAccess)
+                             bool Implicit, AccessKind accessKind)
   : Expr(ExprKind::MemberRef, Implicit), Base(base),
     Member(member), DotLoc(dotLoc), NameRange(nameRange) {
    
-  MemberRefExprBits.IsDirectPropertyAccess = UsesDirectPropertyAccess;
+  MemberRefExprBits.Access = (unsigned) accessKind;
   MemberRefExprBits.IsSuper = false;
 }
 

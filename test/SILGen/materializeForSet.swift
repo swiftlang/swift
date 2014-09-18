@@ -1,4 +1,5 @@
 // RUN: %swift -emit-sil %s | FileCheck %s
+// RUN: %swift -emit-silgen %s | FileCheck %s -check-prefix=SILGEN
 
 class Base {
   var stored: Int = 0
@@ -8,7 +9,7 @@ class Base {
 
 // CHECK: sil [transparent] @_TFC17materializeForSet4Basem8computedSi : $@cc(method) @thin (Builtin.RawPointer, @owned Base) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $Base):
-// CHECK:   [[T0:%.*]] = class_method [[SELF]] : $Base, #Base.computed!getter.1 : Base -> () -> Int
+// CHECK:   [[T0:%.*]] = function_ref @_TFC17materializeForSet4Baseg8computedSi
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // CHECK:   store [[T1]] to [[T2]] : $*Int
@@ -38,16 +39,19 @@ class HasDidSet : Base {
     didSet {}
   }
 
-// CHECK: sil [transparent] @_TFC17materializeForSet9HasDidSetm6storedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasDidSet):
-// CHECK:   [[T0:%.*]] = class_method [[SELF]] : $HasDidSet, #HasDidSet.stored!getter.1 : HasDidSet -> () -> Int
-// CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
-// CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
-// CHECK:   store [[T1]] to [[T2]] : $*Int
-// CHECK:   [[T3:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T3]] : $Builtin.Int1)
-// CHECK:   return [[T4]] : $(Builtin.RawPointer, Builtin.Int1)
-// CHECK: }
+// Checking this after silgen, but before mandatory inlining, lets us
+// test the intent much better.
+
+// SILGEN: sil [transparent] @_TFC17materializeForSet9HasDidSetm6storedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
+// SILGEN: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasDidSet):
+// SILGEN:   [[T0:%.*]] = function_ref @_TFC17materializeForSet9HasDidSetg6storedSi
+// SILGEN:   [[T1:%.*]] = apply [[T0]]([[SELF]])
+// SILGEN:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
+// SILGEN:   store [[T1]] to [[T2]] : $*Int
+// SILGEN:   [[T3:%.*]] = integer_literal $Builtin.Int1, -1
+// SILGEN:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T3]] : $Builtin.Int1)
+// SILGEN:   return [[T4]] : $(Builtin.RawPointer, Builtin.Int1)
+// SILGEN: }
 
   override var computed: Int {
     get { return 0 }
@@ -56,7 +60,7 @@ class HasDidSet : Base {
 
 // CHECK: sil [transparent] @_TFC17materializeForSet9HasDidSetm8computedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasDidSet):
-// CHECK:   [[T0:%.*]] = class_method [[SELF]] : $HasDidSet, #HasDidSet.computed!getter.1 : HasDidSet -> () -> Int
+// CHECK:   [[T0:%.*]] = function_ref @_TFC17materializeForSet9HasDidSetg8computedSi
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to $*Int
 // CHECK:   store [[T1]] to [[T2]] : $*Int

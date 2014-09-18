@@ -1013,7 +1013,7 @@ public:
     if (gen.LocalFunctions.count(constant)) {
       ManagedValue localFn =
         gen.emitRValueForDecl(e, e->getDeclRef(), e->getType(),
-                              /*direct access*/ false);
+                              AccessKind::Ordinary);
       auto type = cast<AnyFunctionType>(e->getType()->getCanonicalType());
       setCallee(Callee::forIndirect(localFn, type, type, false, e));
 
@@ -2841,12 +2841,14 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          SILDeclRef constant,
                                          RValueSource &selfValue,
                                          bool isSuper,
+                                         bool isDirectUse,
                                          CanAnyFunctionType substAccessorType,
                                          ArrayRef<Substitution> &substitutions){
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+    assert(!isDirectUse && "direct use of protocol accessor?");
     
     // Method calls through ObjC protocols require ObjC dispatch.
     constant = constant.asForeign(protoDecl->isObjC());
@@ -2901,13 +2903,15 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   }
 
   bool isClassDispatch = false;
-  switch (gen.getMethodDispatch(decl)) {
-  case MethodDispatch::Class:
-    isClassDispatch = true;
-    break;
-  case MethodDispatch::Static:
-    isClassDispatch = false;
-    break;
+  if (!isDirectUse) {
+    switch (gen.getMethodDispatch(decl)) {
+    case MethodDispatch::Class:
+      isClassDispatch = true;
+      break;
+    case MethodDispatch::Static:
+      isClassDispatch = false;
+      break;
+    }
   }
 
   // Dispatch in a struct/enum or to an final method is always direct.
@@ -2938,7 +2942,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    SILDeclRef constant,
                                    ArrayRef<Substitution> substitutions,
                                    RValueSource &selfValue,
-                                   bool isSuper)
+                                   bool isSuper,
+                                   bool isDirectUse)
 {
   // If the accessor is a local constant, use it.
   // FIXME: Can local properties ever be generic?
@@ -2963,8 +2968,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
-                                             isSuper, substAccessorType,
-                                             substitutions);
+                                             isSuper, isDirectUse,
+                                             substAccessorType, substitutions);
   
   // If there are substitutions, specialize the generic accessor.
   // FIXME: Generic subscript operator could add another layer of
@@ -3004,16 +3009,17 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 ManagedValue SILGenFunction::
 emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                 ArrayRef<Substitution> substitutions, RValueSource &&selfValue,
-                bool isSuper, RValue &&subscripts, SGFContext c) {
+                bool isSuper, bool isDirectUse,
+                RValue &&subscripts, SGFContext c) {
  
   SILDeclRef get(decl->getGetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtBestResilienceExpansion,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                 decl->requiresObjCGetterAndSetter());
+                 !isDirectUse && decl->requiresObjCGetterAndSetter());
 
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
-                                                     isSuper);
+                                                     isSuper, isDirectUse);
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(getter));
@@ -3036,16 +3042,16 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
 void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                      ArrayRef<Substitution> substitutions,
                                      RValueSource &&selfValue,
-                                     bool isSuper,
+                                     bool isSuper, bool isDirectUse,
                                      RValue &&subscripts, RValue &&setValue) {
   SILDeclRef set(decl->getSetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtBestResilienceExpansion,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                 decl->requiresObjCGetterAndSetter());
+                 !isDirectUse && decl->requiresObjCGetterAndSetter());
 
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
-                                                     isSuper);
+                                                     isSuper, isDirectUse);
   CanAnyFunctionType accessType = setter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(setter));

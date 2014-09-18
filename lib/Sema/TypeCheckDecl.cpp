@@ -1545,7 +1545,7 @@ static Expr *createPropertyLoadOrCallSuperclassGetter(VarDecl *VD,
     // Non-member observing accessors just directly load the variable.
     // Create (return (decl_ref_expr(VD)))
     return new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
-                                 /*direct ivar*/true);
+                                 AccessKind::DirectToStorage);
   }
   
   if (!VD->getOverriddenDecl()) {
@@ -1553,7 +1553,8 @@ static Expr *createPropertyLoadOrCallSuperclassGetter(VarDecl *VD,
     // (return (member_ref_expr(decl_ref_expr(self), VD)))
     auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
     return new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
-                                   /*implicit*/true,/*direct ivar*/true);
+                                   /*implicit*/true,
+                                   AccessKind::DirectToStorage);
   }
 
   // For an override, chain up to super.  Create:
@@ -1672,11 +1673,12 @@ static void createPropertyStoreOrCallSuperclassSetter(Expr *Val, VarDecl *VD,
   Expr *Dest;
   if (!SelfDecl) {
     Dest = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
-                                 /*direct ivar*/true);
+                                 AccessKind::DirectToStorage);
   } else if (VD->getOverriddenDecl() == nullptr) {
     auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
     Dest = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
-                                   /*implicit*/true, /*direct ivar*/true);
+                                   /*implicit*/true,
+                                   AccessKind::DirectToStorage);
   } else {
     auto *SRE = new (Ctx) SuperRefExpr(SelfDecl, SourceLoc(), /*implicit*/true);
     Dest = new (Ctx) UnresolvedDotExpr(SRE, SourceLoc(), VD->getName(),
@@ -1814,29 +1816,27 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
 /// Build an l-value for the storage of a declaration.
 static Expr *buildStorageReference(FuncDecl *accessor,
                                    AbstractStorageDecl *storage,
-                                   bool isDirectAccess,
+                                   AccessKind accessKind,
                                    TypeChecker &TC) {
   ASTContext &ctx = TC.Context;
 
   VarDecl *selfDecl = accessor->getImplicitSelfDecl();
   if (!selfDecl) {
-    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit,
-                                 isDirectAccess);
+    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit, accessKind);
   }
 
   Expr *selfDRE = new (ctx) DeclRefExpr(selfDecl, SourceLoc(), IsImplicit);
   if (isa<SubscriptDecl>(storage)) {
     Expr *indices = buildSubscriptIndexReference(ctx, accessor);
-    Expr *subscript = new (ctx) SubscriptExpr(selfDRE, indices);
-    subscript->setImplicit();
-    return subscript;
+    return new (ctx) SubscriptExpr(selfDRE, indices, ConcreteDeclRef(),
+                                   IsImplicit, accessKind);
   }
 
   // This is a potentially polymorphic access, which is unnecessary;
   // however, it shouldn't be problematic because any overrides
   // should also redefine materializeForSet.
   return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
-                                 SourceLoc(), IsImplicit, isDirectAccess);
+                                 SourceLoc(), IsImplicit, accessKind);
 }
 
 /// Synthesize the body of a materializeForSet accessor for a stored
@@ -1849,7 +1849,7 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
 
   // return (Builtin.addressof(&self.property), false)
   Expr *result = buildStorageReference(materializeForSet, storage,
-                                       /*direct access*/ true, TC);
+                                       AccessKind::DirectToStorage, TC);
   result = new (ctx) InOutExpr(SourceLoc(), result, Type(), IsImplicit);
   result = buildCallToBuiltin(ctx, "addressof", result);
   result = buildMaterializeForSetResult(ctx, result, /*using buffer*/ false);
@@ -1960,7 +1960,7 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
 
   // Builtin.initialize(self.property, buffer)
   Expr *curValue = buildStorageReference(materializeForSet, storage,
-                                         /*direct*/ false, TC);
+                                         AccessKind::DirectToAccessor, TC);
   Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
   ASTNode assignment = buildCallToBuiltin(ctx, "initialize",
                                           { curValue, bufferRef });
@@ -2210,14 +2210,14 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 
   // Build the early return inside the if.
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
-                                        /*directpropertyaccess*/true);
+                                        AccessKind::DirectToStorage);
   auto *EarlyReturnVal = new (Ctx) ForceValueExpr(Tmp1DRE, SourceLoc());
   auto *Return = new (Ctx) ReturnStmt(SourceLoc(), EarlyReturnVal,
                                       /*implicit*/true);
 
   // Build the "if" around the early return.
   Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
-                                  /*directpropertyaccess*/true);
+                                  AccessKind::DirectToStorage);
   
   // Call through "hasValue" on the decl ref.
   Tmp1DRE->setType(OptionalType::get(VD->getType()));
@@ -2266,13 +2266,13 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 
   // Assign tmp2 into storage.
   auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
-                                       /*directpropertyaccess*/true);
+                                       AccessKind::DirectToStorage);
   createPropertyStoreOrCallSuperclassSetter(Tmp2DRE, Storage, SelfDecl,
                                             Body, TC);
 
   // Return tmp2.
   Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
-                                  /*directpropertyaccess*/true);
+                                  AccessKind::DirectToStorage);
 
   Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
 

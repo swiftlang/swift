@@ -72,7 +72,7 @@ static Expr *getBooleanLiteral(ASTContext &C, bool value) {
          "init(_builtinBooleanLiteral:) has unexpected type");
   auto initRef = new (C) DeclRefExpr(convertInit, SourceLoc(),
                                      /*implicit*/ true,
-                                     /*direct access*/false,
+                                     AccessKind::Ordinary,
                                      convertFuncTy);
 
   // Form Bool.init(_builtinBooleanLiteral:).

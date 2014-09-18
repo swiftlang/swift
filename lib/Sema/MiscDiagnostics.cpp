@@ -314,7 +314,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
       if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
         // Handle local and top-level computed variables.
         if (DRE->getDecl() == Var &&
-            !DRE->isDirectPropertyAccess() &&
+            DRE->getAccessKind() != AccessKind::DirectToStorage &&
             Accessor->getAccessorKind() != AccessorKind::IsMaterializeForSet) {
           bool shouldDiagnose = true;
           if (auto *ParentExpr = Parent.getAsExpr()) {
@@ -331,7 +331,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
         
         // If this is a direct store in a "willSet", we reject this because
         // it is about to get overwritten.
-        if (DRE->getDecl() == Var && DRE->isDirectPropertyAccess() &&
+        if (DRE->getDecl() == Var &&
+            DRE->getAccessKind() == AccessKind::DirectToStorage &&
             !dyn_cast_or_null<LoadExpr>(Parent.getAsExpr()) &&
             Accessor->getAccessorKind() == AccessorKind::IsWillSet) {
           TC.diagnose(E->getLoc(), diag::store_in_willset, Var->getName());
@@ -345,7 +346,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
             isa<DeclRefExpr>(MRE->getBase()) &&
             MRE->getBase()->isImplicit()) {
           
-          if (!MRE->isDirectPropertyAccess()) {
+          if (MRE->getAccessKind() != AccessKind::DirectToStorage) {
             bool shouldDiagnose = false;
             // Warn about any property access in the getter.
             if (Accessor->isGetter())

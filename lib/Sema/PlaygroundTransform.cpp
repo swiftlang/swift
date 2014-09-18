@@ -378,7 +378,7 @@ public:
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
-                                        false, // uses direct property access
+                                        AccessKind::Ordinary,
                                         AE->getSrc()->getType());
             AssignExpr *NAE = new (Context) AssignExpr(AE->getDest(),
                                                        SourceLoc(),
@@ -392,7 +392,7 @@ public:
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
-                                        false, // uses direct property access
+                                        AccessKind::Ordinary,
                                         AE->getSrc()->getType()),
               AE->getSrc()->getSourceRange(), Name.c_str());
             Elements[EI] = PV.first;
@@ -470,7 +470,7 @@ public:
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
-                                        false, // uses direct property access
+                                        AccessKind::Ordinary,
                                         E->getType()),
               E->getSourceRange(), "");
             Elements[EI] = PV.first;
@@ -488,7 +488,7 @@ public:
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
-                                        false, // uses direct property access
+                                        AccessKind::Ordinary,
                                         E->getType()),
               E->getSourceRange(), "");
             Elements[EI] = PV.first;
@@ -507,7 +507,7 @@ public:
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
-                                        false, // uses direct property access
+                                        AccessKind::Ordinary,
                                         RS->getResult()->getType());
             ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(),
                                                        DRE,
@@ -516,7 +516,7 @@ public:
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
-                                        false, // uses direct property access
+                                        AccessKind::Ordinary,
                                         RS->getResult()->getType()),
               RS->getResult()->getSourceRange(), "");
             Elements[EI] = PV.first;
@@ -590,7 +590,7 @@ public:
       new (Context) DeclRefExpr(ConcreteDeclRef(VD),
                                 SourceLoc(),
                                 true, // implicit
-                                false, // uses direct property access
+                                AccessKind::Ordinary,
                                 Type()),
       VD->getSourceRange(), VD->getName().str().str().c_str());
   }
@@ -609,7 +609,7 @@ public:
         new (Context) DeclRefExpr(ConcreteDeclRef(VD),
                                   SourceLoc(),
                                   true, // implicit
-                                  false, // uses direct property access
+                                  AccessKind::Ordinary,
                                   Type()),
         DRE->getSourceRange(), VD->getName().str().str().c_str());
     } else if (MemberRefExpr *MRE = llvm::dyn_cast<MemberRefExpr>(_RE)) {
@@ -628,7 +628,7 @@ public:
                                     M,
                                     SourceRange(),
                                     true, // implicit
-                                    false), // uses direct property access
+                                    AccessKind::Ordinary),
         MRE->getSourceRange(), M.getDecl()->getName().str().str().c_str());
     } else {
       return nullptr;
@@ -641,7 +641,7 @@ public:
       new (Context) DeclRefExpr(ConcreteDeclRef(VD),
                                 SourceLoc(),
                                 true, // implicit
-                                false, // uses direct property access
+                                AccessKind::Ordinary,
                                 Type());
     Expr *Args[] = { DRE };
     return buildLoggerCallWithArgs(LoggerName, Args, SR);

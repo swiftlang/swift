@@ -1382,7 +1382,7 @@ void SwitchEmission::emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
     auto val = SGF.emitRValueForPropertyLoad(loc, aggMV, false,
                                              property,
                                              // FIXME: No generic substitions.
-                                             {}, false,
+                                             {}, AccessKind::Ordinary,
                                              firstMatcher->getType(),
                                              // TODO: Avoid copies on
                                              // address-only types.

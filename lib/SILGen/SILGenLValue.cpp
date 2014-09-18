@@ -588,6 +588,7 @@ namespace {
     // The VarDecl or SubscriptDecl being get/set.
     AbstractStorageDecl *decl;
     bool IsSuper;
+    bool IsDirectAccessorUse;
     std::vector<Substitution> substitutions;
     Expr *subscriptIndexExpr;
     mutable RValue origSubscripts;
@@ -621,13 +622,13 @@ namespace {
   public:
 
      GetterSetterComponent(AbstractStorageDecl *decl,
-                          bool isSuper,
+                           bool isSuper, bool isDirectAccessorUse,
                           ArrayRef<Substitution> substitutions,
                           LValueTypeData typeData,
                           Expr *subscriptIndexExpr = nullptr)
       : LogicalPathComponent(typeData, GetterSetterKind),
         decl(decl),
-        IsSuper(isSuper),
+        IsSuper(isSuper), IsDirectAccessorUse(isDirectAccessorUse),
         substitutions(substitutions.begin(), substitutions.end()),
         subscriptIndexExpr(subscriptIndexExpr)
     {
@@ -639,6 +640,7 @@ namespace {
       : LogicalPathComponent(copied.getTypeData(), GetterSetterKind),
         decl(copied.decl),
         IsSuper(copied.IsSuper),
+        IsDirectAccessorUse(copied.IsDirectAccessorUse),
         substitutions(copied.substitutions),
         subscriptIndexExpr(copied.subscriptIndexExpr),
         origSubscripts(copied.origSubscripts.copy(gen, loc))
@@ -652,6 +654,7 @@ namespace {
       
       return gen.emitSetAccessor(loc, decl, substitutions,
                                  std::move(args.base), IsSuper,
+                                 IsDirectAccessorUse,
                                  std::move(args.subscripts),
                                  std::move(value));
     }
@@ -662,6 +665,7 @@ namespace {
       
       return gen.emitGetAccessor(loc, decl, substitutions,
                                  std::move(args.base), IsSuper,
+                                 IsDirectAccessorUse,
                                  std::move(args.subscripts), c);
     }
     
@@ -674,6 +678,7 @@ namespace {
     void print(raw_ostream &OS) const override {
       OS << "GetterSetterComponent(" << decl->getName() << ")";
       if (IsSuper) OS << " isSuper";
+      if (IsDirectAccessorUse) OS << " isDirectAccessorUse";
       if (subscriptIndexExpr) {
         OS << " subscript_index:\n";
         subscriptIndexExpr->print(OS, 2);
@@ -894,24 +899,26 @@ LValue SILGenLValue::visitExpr(Expr *e) {
 static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
                                             SILLocation loc, VarDecl *var,
                                             CanType formalRValueType,
-                                            bool isDirectPropertyAccess) {
+                                            AccessKind accessKind) {
   LValue lv;
   auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
 
   // If it's a computed variable, push a reference to the getter and setter.
-  if (var->hasAccessorFunctions() && !isDirectPropertyAccess) {
+  if (var->hasAccessorFunctions() &&
+      accessKind != AccessKind::DirectToStorage) {
     ArrayRef<Substitution> substitutions;
     if (auto genericParams
         = gen.SGM.Types.getEffectiveGenericParamsForContext(
                                                       var->getDeclContext()))
       substitutions = gen.buildForwardingSubstitutions(genericParams);
 
-    lv.add(new GetterSetterComponent(var, /*isSuper=*/false, substitutions,
-                                     typeData));
+    lv.add(new GetterSetterComponent(var, /*isSuper=*/false,
+                                     accessKind == AccessKind::DirectToAccessor,
+                                     substitutions, typeData));
   } else {
     // If it's a physical value (e.g. a local variable in memory), push its
     // address.
-    auto address = gen.emitLValueForDecl(loc, var, isDirectPropertyAccess);
+    auto address = gen.emitLValueForDecl(loc, var, accessKind);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
     lv.add(new ValueComponent(address, typeData));
@@ -938,7 +945,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   // The only non-member decl that can be an lvalue is VarDecl.
   return emitLValueForNonMemberVarDecl(gen, e, cast<VarDecl>(e->getDecl()),
                                        getSubstFormalRValueType(e),
-                                       e->isDirectPropertyAccess());
+                                       e->getAccessKind());
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
@@ -954,7 +961,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
     // retain/release traffic that breaks brittle custom r/r implementations in
     // ObjC.
     if (gen.EmittingClassInitializer
-        && e->isDirectPropertyAccess()) {
+        && e->getAccessKind() == AccessKind::DirectToStorage) {
       if (auto baseDeclRef = dyn_cast<DeclRefExpr>(e->getBase())) {
         if (baseDeclRef->getDecl()->getName() == gen.getASTContext().Id_self) {
           ManagedValue self = gen.emitSelfForDirectPropertyInConstructor(
@@ -978,8 +985,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 
   // Use the property accessors if the variable has accessors and this isn't a
   // direct access to underlying storage.
-  if (var->hasAccessorFunctions() && !e->isDirectPropertyAccess()) {
+  if (var->hasAccessorFunctions() &&
+      e->getAccessKind() != AccessKind::DirectToStorage) {
     lv.add(new GetterSetterComponent(var, e->isSuper(),
+                            e->getAccessKind() == AccessKind::DirectToAccessor,
                                      e->getMember().getSubstitutions(),
                                      typeData));
     return std::move(lv);
@@ -1006,7 +1015,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
     
     return emitLValueForNonMemberVarDecl(gen, e, var,
                                          getSubstFormalRValueType(e),
-                                         e->isDirectPropertyAccess());
+                                         e->getAccessKind());
   }
 
   // For member variables, this access is done w.r.t. a base computation that
@@ -1027,11 +1036,15 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
+  auto accessKind = e->getAccessKind();
+  assert(accessKind != AccessKind::DirectToStorage &&
+         "direct storage access for subscripts not yet implemented");
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
   
   LValue lv = visitRec(e->getBase());
   lv.add(new GetterSetterComponent(decl, e->isSuper(),
+                                   accessKind == AccessKind::DirectToAccessor,
                                    e->getDecl().getSubstitutions(),
                                    typeData, e->getIndex()));
   return lv;
