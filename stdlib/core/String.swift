@@ -268,15 +268,17 @@ extension String : Hashable {
 extension String : StringInterpolationConvertible {
   @effects(readonly)
   public
-  static func convertFromStringInterpolation(strings: String...) -> String {
-    var result = String()
+  init(stringInterpolation strings: String...) {
+    self.init()
     for str in strings {
-      result += str
+      self += str
     }
-    return result
   }
 
-  public static func convertFromStringInterpolationSegment<T>(expr: T)   -> String { return toString(expr) }
+  public
+  init<T>(stringInterpolationSegment expr: T) {
+    self = toString(expr)
+  }
 }
 
 @effects(readonly)
