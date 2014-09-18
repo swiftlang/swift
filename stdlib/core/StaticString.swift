@@ -10,24 +10,33 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Instances of conforming types can be created from string literals
+/// and are used in assertions and precondition checks.
+///
+/// This protocol exists only for directing overload resolution and
+/// string literal type deduction in assertions.
+///
+/// See also: `StaticStringType`, `StaticString`, `AssertString`
 public protocol AssertStringType
   : UnicodeScalarLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
     StringLiteralConvertible {
+  /// The textual value, as a `String`
   var stringValue: String { get }
 }
 
-/// `StaticStringType` refines `AssertStringType` to make it more specific for
-/// overload resolution.
+/// This protocol exists only for directing overload resolution and
+/// string literal type deduction in assertions.
+///
+/// See also: `AssertStringType`, `StaticString`, `AssertString`
 public protocol StaticStringType : AssertStringType {}
 
 // Implementation Note: Because StaticString is used in the
 // implementation of assert() and fatal(), we keep it extremely close
-// to the bare metal.  In particular, because we use only Builtin
+// to the bare metal.  In particular, because we store only Builtin
 // types, we are guaranteed that no assertions are involved in its
 // construction.  This feature is crucial for preventing infinite
 // recursion even in non-asserting cases.
-
 
 /// An extremely simple string designed to represent something
 /// "statically knowable".
