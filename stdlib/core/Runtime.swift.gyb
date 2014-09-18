@@ -221,7 +221,7 @@ public func _swift_stdlib_atomicFetchAddInt(
 #endif
 }
 
-public class _stdlib_AtomicInt {
+public final class _stdlib_AtomicInt {
   var _value: Int
 
   var _valuePtr: UnsafeMutablePointer<Int> {
