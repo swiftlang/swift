@@ -6660,7 +6660,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
   if (D->hasAccessibility())
     return;
 
-  // FIXME: Encapsulated the following in computeAccessibility() ?
+  // FIXME: Encapsulate the following in computeAccessibility() ?
 
   switch (D->getKind()) {
   case DeclKind::Import:
