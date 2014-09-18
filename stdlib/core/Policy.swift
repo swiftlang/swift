@@ -224,21 +224,39 @@ public protocol Comparable : _Comparable, Equatable {
   func >(lhs: Self, rhs: Self) -> Bool
 }
 
+/// A set type with O(1) standard bitwise operators.
 ///
+/// Each instance is a subset of `~Self.allZeros`
 public protocol BitwiseOperationsType {
-  func & (_: Self, _: Self) -> Self
-  func |(_: Self, _: Self) -> Self
-  func ^(_: Self, _: Self) -> Self
-  prefix func ~(_: Self) -> Self
+  /// Returns the intersection of bits set in `lhs` and `rhs`.
+  ///
+  /// Complexity: O(1)
+  func & (lhs: Self, rhs: Self) -> Self
+  
+  /// Returns the union of bits set in `lhs` and `rhs`
+  ///
+  /// Complexity: O(1)
+  func |(lhs: Self, rhs: Self) -> Self
+
+  /// Returns the bits that are set in exactly one of `lhs` and `rhs`
+  ///
+  /// Complexity: O(1)
+  func ^(lhs: Self, rhs: Self) -> Self
+
+  /// Returns `x ^ ~Self.allZeros`
+  ///
+  /// Complexity: O(1)
+  prefix func ~(x: Self) -> Self
 
   /// The identity value for "|" and "^", and the fixed point for "&".
   ///
   /// ::
   ///
-  ///   x | allZeros == x
-  ///   x ^ allZeros == x
-  ///   x & allZeros == allZeros
-  ///   x & ~allZeros == x
+  ///   x | Self.allZeros == x
+  ///   x ^ Self.allZeros == x
+  ///   x & Self.allZeros == .allZeros
+  ///   x & ~Self.allZeros == x
+  ///   ~x == x ^ ~Self.allZeros
   ///
   class var allZeros: Self { get }
 }
