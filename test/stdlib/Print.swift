@@ -808,19 +808,16 @@ struct MyString : StringLiteralConvertible, StringInterpolationConvertible {
 
   var value: String
 
-  static func convertFromUnicodeScalarLiteral(
-    value: String
-  ) -> MyString {
-    return MyString(str: value)
+  init(unicodeScalarLiteral value: String) {
+    self.init(str: value)
   }
 
-  static func convertFromExtendedGraphemeClusterLiteral(
-      value: String) -> MyString {
-    return MyString(str: value)
+  init(extendedGraphemeClusterLiteral value: String) {
+    self.init(str: value)
   }
 
-  static func convertFromStringLiteral(value: String) -> MyString {
-    return MyString(str: value)
+  init(stringLiteral value: String) {
+    self.init(str: value)
   }
 
   static func convertFromStringInterpolation(strings: MyString...) -> MyString {

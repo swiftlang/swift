@@ -14,7 +14,7 @@
 
 // Default argument for third parameter.
 // CHECK-LABEL: sil  @_TIF17default_arguments7defarg1{{.*}} : $@thin () -> @owned String
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSS32_convertFromBuiltinStringLiteral
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSSCfMSSFT21_builtinStringLiteralBp8byteSizeBw7isASCIIBi1__SS
 // CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
 // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "Hello"
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5

@@ -95,18 +95,17 @@ internal func _convertNSStringToString(nsstring: NSString) -> String {
 }
 
 extension NSString : StringLiteralConvertible {
-  public class func convertFromUnicodeScalarLiteral(
-    value: StaticString
-  ) -> Self {
-    return convertFromStringLiteral(value)
+  public required convenience init(unicodeScalarLiteral value: StaticString) {
+    self.init(stringLiteral: value)
   }
 
-  public class func convertFromExtendedGraphemeClusterLiteral(
-    value: StaticString) -> Self {
-    return convertFromStringLiteral(value)
+  public required convenience init(
+    extendedGraphemeClusterLiteral value: StaticString
+  ) {
+    self.init(stringLiteral: value)
   }
 
-  public class func convertFromStringLiteral(value: StaticString) -> Self {
+  public required convenience init(stringLiteral value: StaticString) {
     var immutableResult: NSString
     if value.hasPointerRepresentation {
       immutableResult = NSString(
@@ -121,7 +120,7 @@ extension NSString : StringLiteralConvertible {
         length: 4,
         encoding: NSUTF32StringEncoding)!
     }
-    return self(string: immutableResult)
+    self.init(string: immutableResult)
   }
 }
 
@@ -261,6 +260,10 @@ final class _NSOpaqueString : NSString {
              owner: owner, 
              subRange: NSRange(location: aRange.location + subRange.location, 
                                length: aRange.length))
+  }
+
+  override init() {
+    _sanityCheckFailure("init() not implemented for _NSOpaqueString")
   }
 
   init(owner: String, subRange: NSRange) {

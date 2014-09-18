@@ -25,17 +25,13 @@ public struct UnicodeScalar :
   }
 
   @transparent
-  public static func _convertFromBuiltinUnicodeScalarLiteral(
-    value: Builtin.Int32
-  ) -> UnicodeScalar {
-    return UnicodeScalar(value)
+  public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
+    self._value = value
   }
 
   @transparent
-  public static func convertFromUnicodeScalarLiteral(
-    value: UnicodeScalar
-  ) -> UnicodeScalar {
-    return value
+  public init(unicodeScalarLiteral value: UnicodeScalar) {
+    self = value
   }
 
   public init() {

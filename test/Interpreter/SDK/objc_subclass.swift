@@ -4,6 +4,9 @@ import Foundation
 
 class SuperString : NSString {
   var len = Int()
+
+  override init() { super.init() }
+
   init(_ len:Int) {
     super.init()
     self.len = len

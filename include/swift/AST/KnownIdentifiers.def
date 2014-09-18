@@ -78,22 +78,19 @@ IDENTIFIER_WITH_NAME(CharacterLiteral, "characterLiteral")
 IDENTIFIER_WITH_NAME(BuiltinCharacterLiteral, "_builtinCharacterLiteral")
 
 IDENTIFIER(ExtendedGraphemeClusterLiteralType)
-IDENTIFIER_WITH_NAME(ConvertFromBuiltinExtendedGraphemeClusterLiteral,
-                     "_convertFromBuiltinExtendedGraphemeClusterLiteral")
-IDENTIFIER_WITH_NAME(ConvertFromExtendedGraphemeClusterLiteral,
-                     "convertFromExtendedGraphemeClusterLiteral")
+IDENTIFIER_WITH_NAME(BuiltinExtendedGraphemeClusterLiteral,
+                     "_builtinExtendedGraphemeClusterLiteral")
+IDENTIFIER_WITH_NAME(ExtendedGraphemeClusterLiteral,
+                     "extendedGraphemeClusterLiteral")
 
 IDENTIFIER(UnicodeScalarLiteralType)
-IDENTIFIER_WITH_NAME(ConvertFromBuiltinUnicodeScalarLiteral,
-                     "_convertFromBuiltinUnicodeScalarLiteral")
-IDENTIFIER_WITH_NAME(ConvertFromUnicodeScalarLiteral,
-                     "convertFromUnicodeScalarLiteral")
+IDENTIFIER_WITH_NAME(BuiltinUnicodeScalarLiteral,
+                     "_builtinUnicodeScalarLiteral")
+IDENTIFIER_WITH_NAME(UnicodeScalarLiteral, "unicodeScalarLiteral")
 
-IDENTIFIER_WITH_NAME(ConvertFromStringLiteral, "convertFromStringLiteral")
-IDENTIFIER_WITH_NAME(ConvertFromBuiltinUTF16StringLiteral,
-                     "_convertFromBuiltinUTF16StringLiteral")
-IDENTIFIER_WITH_NAME(ConvertFromBuiltinStringLiteral,
-                     "_convertFromBuiltinStringLiteral")
+IDENTIFIER_WITH_NAME(StringLiteral, "stringLiteral")
+IDENTIFIER_WITH_NAME(BuiltinUTF16StringLiteral, "_builtinUTF16StringLiteral")
+IDENTIFIER_WITH_NAME(BuiltinStringLiteral, "_builtinStringLiteral")
 IDENTIFIER(StringLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromStringInterpolation,
                      "convertFromStringInterpolation")

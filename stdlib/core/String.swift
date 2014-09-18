@@ -63,16 +63,15 @@ extension String {
 
 extension String : _BuiltinUnicodeScalarLiteralConvertible {
   @effects(readonly)
-  public static func _convertFromBuiltinUnicodeScalarLiteral(
-    value: Builtin.Int32) -> String {
-    return String._fromWellFormedCodeUnitSequence(
+  public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
+    self = String._fromWellFormedCodeUnitSequence(
       UTF32.self, input: CollectionOfOne(UInt32(value)))
   }
 }
 
 extension String : UnicodeScalarLiteralConvertible {
-  public static func convertFromUnicodeScalarLiteral(value: String) -> String {
-    return value
+  public init(unicodeScalarLiteral value: String) {
+    self = value
   }
 }
 
@@ -80,12 +79,11 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   @effects(readonly)
   @semantics("string.makeUTF8")
   public
-  static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
-    start: Builtin.RawPointer,
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
-    isASCII: Builtin.Int1) -> String {
-
-    return String._fromWellFormedCodeUnitSequence(
+    isASCII: Builtin.Int1) {
+    self = String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(
             start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
@@ -94,10 +92,8 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension String : ExtendedGraphemeClusterLiteralConvertible {
-  public static func convertFromExtendedGraphemeClusterLiteral(
-    value: String
-  ) -> String {
-    return value
+  public init(extendedGraphemeClusterLiteral value: String) {
+    self = value
   }
 }
 
@@ -105,11 +101,11 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   @effects(readonly)
   @semantics("string.makeUTF16")
   public
-  static func _convertFromBuiltinUTF16StringLiteral(
-    start: Builtin.RawPointer, numberOfCodeUnits: Builtin.Word
-  ) -> String {
-
-    return String(
+  init(
+    _builtinUTF16StringLiteral start: Builtin.RawPointer, 
+    numberOfCodeUnits: Builtin.Word
+  )  {
+    self = String(
       _StringCore(
         baseAddress: COpaquePointer(start),
         count: Int(numberOfCodeUnits),
@@ -123,13 +119,12 @@ extension String : _BuiltinStringLiteralConvertible {
   @effects(readonly)
   @semantics("string.makeUTF8")
   public
-  static func _convertFromBuiltinStringLiteral(
-    start: Builtin.RawPointer,
+  init(
+    _builtinStringLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
-    isASCII: Builtin.Int1) -> String {
-
+    isASCII: Builtin.Int1) {
     if isASCII {
-      return String(
+      self = String(
         _StringCore(
           baseAddress: COpaquePointer(start),
           count: Int(byteSize),
@@ -138,7 +133,7 @@ extension String : _BuiltinStringLiteralConvertible {
           owner: nil))
     }
     else {
-      return String._fromWellFormedCodeUnitSequence(
+      self = String._fromWellFormedCodeUnitSequence(
           UTF8.self,
           input: UnsafeBufferPointer(
               start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
@@ -148,8 +143,8 @@ extension String : _BuiltinStringLiteralConvertible {
 }
 
 extension String : StringLiteralConvertible {
-  public static func convertFromStringLiteral(value: String) -> String {
-    return value
+  public init(stringLiteral value: String) {
+     self = value
   }
 }
 

@@ -1527,8 +1527,8 @@ namespace {
 
       ProtocolDecl *builtinProtocol;
       Identifier literalType;
-      Identifier literalFuncName;
-      Identifier builtinLiteralFuncName;
+      DeclName literalFuncName;
+      DeclName builtinLiteralFuncName;
       Diag<> brokenProtocolDiag;
       Diag<> brokenBuiltinProtocolDiag;
 
@@ -1545,7 +1545,9 @@ namespace {
         }
         
         literalType = tc.Context.Id_StringLiteralType;
-        literalFuncName = tc.Context.Id_ConvertFromStringLiteral;
+
+        literalFuncName = DeclName(tc.Context, tc.Context.Id_init,
+                                   { tc.Context.Id_StringLiteral });
 
         // If the string contains non-ASCII and the type can handle
         // UTF-16 string literals, prefer them.
@@ -1554,9 +1556,14 @@ namespace {
             KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible);
         if (!forceASCII &&
             tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
-          builtinLiteralFuncName =
-              tc.Context.Id_ConvertFromBuiltinUTF16StringLiteral;
-          elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));
+          builtinLiteralFuncName 
+            = DeclName(tc.Context, tc.Context.Id_init,
+                       { tc.Context.Id_BuiltinUTF16StringLiteral,
+                         tc.Context.getIdentifier("numberOfCodeUnits") });
+
+          elements.push_back(
+            TupleTypeElt(tc.Context.TheRawPointerType,
+                         tc.Context.Id_BuiltinUTF16StringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                          tc.Context.getIdentifier("numberOfCodeUnits")));
@@ -1569,9 +1576,13 @@ namespace {
           builtinProtocol = tc.getProtocol(
               expr->getLoc(),
               KnownProtocolKind::_BuiltinStringLiteralConvertible);
-          builtinLiteralFuncName =
-              tc.Context.Id_ConvertFromBuiltinStringLiteral;
-          elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));
+          builtinLiteralFuncName 
+            = DeclName(tc.Context, tc.Context.Id_init,
+                       { tc.Context.Id_BuiltinStringLiteral,
+                         tc.Context.getIdentifier("byteSize"),
+                         tc.Context.getIdentifier("isASCII") });
+          elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType,
+                                         tc.Context.Id_BuiltinStringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                          tc.Context.getIdentifier("byteSize")));
@@ -1587,14 +1598,21 @@ namespace {
         brokenBuiltinProtocolDiag = diag::builtin_string_literal_broken_proto;
       } else if (isGraphemeClusterLiteral) {
         literalType = tc.Context.Id_ExtendedGraphemeClusterLiteralType;
-        literalFuncName =
-            tc.Context.Id_ConvertFromExtendedGraphemeClusterLiteral;
-        builtinLiteralFuncName =
-            tc.Context.Id_ConvertFromBuiltinExtendedGraphemeClusterLiteral;
+        literalFuncName
+          = DeclName(tc.Context, tc.Context.Id_init,
+                     {tc.Context.Id_ExtendedGraphemeClusterLiteral});
+        builtinLiteralFuncName
+          = DeclName(tc.Context, tc.Context.Id_init,
+                     { tc.Context.Id_BuiltinExtendedGraphemeClusterLiteral,
+                       tc.Context.getIdentifier("byteSize"),
+                       tc.Context.getIdentifier("isASCII") });
+
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible);
-        elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));
+        elements.push_back(
+          TupleTypeElt(tc.Context.TheRawPointerType,
+                       tc.Context.Id_BuiltinExtendedGraphemeClusterLiteral));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                        tc.Context.getIdentifier("byteSize")));
@@ -1608,18 +1626,22 @@ namespace {
       } else {
         // Otherwise, we should have just one Unicode scalar.
         literalType = tc.Context.Id_UnicodeScalarLiteralType;
-        literalFuncName = tc.Context.Id_ConvertFromUnicodeScalarLiteral;
+
+        literalFuncName
+          = DeclName(tc.Context, tc.Context.Id_init,
+                     {tc.Context.Id_UnicodeScalarLiteral});
+        builtinLiteralFuncName
+          = DeclName(tc.Context, tc.Context.Id_init,
+                     {tc.Context.Id_BuiltinUnicodeScalarLiteral});
+
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible);
-        builtinLiteralFuncName =
-            tc.Context.Id_ConvertFromBuiltinUnicodeScalarLiteral;
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible);
 
-        elements.push_back(
-            TupleTypeElt(BuiltinIntegerType::get(32, tc.Context)));
+        elements.push_back(BuiltinIntegerType::get(32, tc.Context));
 
         brokenProtocolDiag = diag::unicode_scalar_literal_broken_proto;
         brokenBuiltinProtocolDiag =
@@ -5053,6 +5075,22 @@ static bool isVariadicWitness(AbstractFunctionDecl *afd) {
   return false;
 }
 
+static bool argumentNamesMatch(Expr *arg, ArrayRef<Identifier> names) {
+  auto tupleType = arg->getType()->getAs<TupleType>();
+  if (!tupleType)
+    return names.size() == 1 && names[0].empty();
+
+  if (tupleType->getNumElements() != names.size())
+    return false;
+
+  for (unsigned i = 0, n = tupleType->getNumElements(); i != n; ++i) {
+    if (tupleType->getFields()[i].getName() != names[i])
+      return false;
+  }
+
+  return true;
+}
+
 Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                ProtocolDecl *protocol,
                                ProtocolConformance *conformance,
@@ -5086,8 +5124,10 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // FIXME: Standardize all callers to always provide all argument names,
   // rather than hack around this.
   Expr *arg;
-  if (arguments.size() == 1 && 
-      (name.isSimpleName() || isVariadicWitness(witness))) {
+  if (arguments.size() == 1 &&
+      (isVariadicWitness(witness) ||
+       argumentNamesMatch(arguments[0], 
+                          witness->getFullName().getArgumentNames()))) {
     arg = arguments[0];
   } else {
     SmallVector<TupleTypeElt, 4> elementTypes;

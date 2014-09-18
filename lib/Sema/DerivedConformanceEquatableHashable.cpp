@@ -52,7 +52,7 @@ static Expr *getBooleanLiteral(ASTContext &C, bool value) {
   auto lit = new (C) BooleanLiteralExpr(value, SourceLoc(), /*implicit*/ true);
   lit->setType(i1Ty);
 
-  // Find Bool._convertFromBuiltinBooleanLiteral.
+  // Find Bool's init(_builtinBooleanLiteral:).
   // Note that we synthesize the type of this method so that we don't
   // need to rely on it already having been type-checked. This only
   // matters when building the standard library.

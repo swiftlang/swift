@@ -139,53 +139,50 @@ public struct StaticString
 
   @effects(readonly)
   @transparent
-  public static func _convertFromBuiltinUnicodeScalarLiteral(
-    value: Builtin.Int32
-  ) -> StaticString {
-    return StaticString(unicodeScalar: value)
+  public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
+    self = StaticString(unicodeScalar: value)
   }
 
   @effects(readonly)
   @transparent
-  public static func convertFromUnicodeScalarLiteral(
-    value: StaticString
-  ) -> StaticString {
-    return value
+  public init(unicodeScalarLiteral value: StaticString) {
+    self = value
   }
 
   @effects(readonly)
   @transparent
-  public static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
-    start: Builtin.RawPointer,
+  public init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1
-  ) -> StaticString {
-    return _convertFromBuiltinStringLiteral(
-      start, byteSize: byteSize, isASCII: isASCII)
+  ) {
+    self = StaticString(
+      _builtinStringLiteral: start, 
+      byteSize: byteSize, 
+      isASCII: isASCII
+    )
   }
 
   @effects(readonly)
   @transparent
-  public static func convertFromExtendedGraphemeClusterLiteral(
-    value: StaticString
-  ) -> StaticString {
-    return value
+  public init(extendedGraphemeClusterLiteral value: StaticString) {
+    self = value
   }
 
   @effects(readonly)
   @transparent
-  public static func _convertFromBuiltinStringLiteral(
-    start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
-  ) -> StaticString {
-    return StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
+  public init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    byteSize: Builtin.Word, 
+    isASCII: Builtin.Int1
+  ) {
+    self = StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
   }
 
   @effects(readonly)
   @transparent
-  public static func convertFromStringLiteral(
-    value: StaticString
-  ) -> StaticString {
-    return value
+  public init(stringLiteral value: StaticString) {
+    self = value
   }
 
   public var description: String {
@@ -216,26 +213,20 @@ public struct AssertString
 
   @effects(readonly)
   @transparent
-  public static func convertFromUnicodeScalarLiteral(
-    value: String
-  ) -> AssertString {
-    return AssertString(value)
+  public init(unicodeScalarLiteral value: String) {
+    self.stringValue = value
   }
 
   @effects(readonly)
   @transparent
-  public static func convertFromExtendedGraphemeClusterLiteral(
-    value: String
-  ) -> AssertString {
-    return AssertString(value)
+  public init(extendedGraphemeClusterLiteral value: String) {
+    self.stringValue = value
   }
 
   @effects(readonly)
   @transparent
-  public static func convertFromStringLiteral(
-    value: String
-  ) -> AssertString {
-    return AssertString(value)
+  public init(stringLiteral value: String) {
+    self.stringValue = value
   }
 
   public static func convertFromStringInterpolation(

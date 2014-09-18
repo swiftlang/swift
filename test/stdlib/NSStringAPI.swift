@@ -17,6 +17,11 @@ class NonContiguousNSString : NSString {
     fatalError("don't call this initializer")
   }
 
+  override init() { 
+    _value = []
+    super.init() 
+  }
+
   init(_ value: [UInt16]) {
     _value = value
     super.init()

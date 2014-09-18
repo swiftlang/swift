@@ -95,25 +95,21 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
     ptr = str.withCString { sel_registerName($0).ptr }
   }
 
-  public static func convertFromUnicodeScalarLiteral(
-    value: String
-  ) -> Selector {
-    return convertFromStringLiteral(value)
+  public init(unicodeScalarLiteral value: String) {
+    self.init(value)
   }
 
   /// Construct a selector from a string literal.
-  public static func convertFromExtendedGraphemeClusterLiteral(
-    value: String) -> Selector {
-
-    return convertFromStringLiteral(value)
+  public init(extendedGraphemeClusterLiteral value: String) {
+    self.init(value)
   }
 
   /// Construct a selector from a string literal.
   ///
   /// FIXME: Fast-path this in the compiler, so we don't end up with
   /// the sel_registerName call at compile time.
-  public static func convertFromStringLiteral(value: String) -> Selector {
-    return sel_registerName(value)
+  public init(stringLiteral value: String) {
+    self = sel_registerName(value)
   }
 
   public init() {

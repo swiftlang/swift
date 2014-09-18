@@ -291,8 +291,7 @@ internal protocol CharacterLiteralConvertible {
 }
 
 public protocol _BuiltinUnicodeScalarLiteralConvertible {
-  class func _convertFromBuiltinUnicodeScalarLiteral(
-    value: Builtin.Int32) -> Self
+  init(_builtinUnicodeScalarLiteral value: Builtin.Int32)
 }
 
 /// Conforming types can be initialized with string literals
@@ -301,17 +300,16 @@ public protocol _BuiltinUnicodeScalarLiteralConvertible {
 public protocol UnicodeScalarLiteralConvertible {
   typealias UnicodeScalarLiteralType : _BuiltinUnicodeScalarLiteralConvertible
   /// Create an instance initialized with `value`.
-  class func convertFromUnicodeScalarLiteral(
-    value: UnicodeScalarLiteralType) -> Self
+  init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
 public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
   : _BuiltinUnicodeScalarLiteralConvertible {
 
-  class func _convertFromBuiltinExtendedGraphemeClusterLiteral(
-      start: Builtin.RawPointer,
-      byteSize: Builtin.Word,
-      isASCII: Builtin.Int1) -> Self
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    byteSize: Builtin.Word,
+    isASCII: Builtin.Int1)
 }
 
 /// Conforming types can be initialized with string literals
@@ -323,35 +321,35 @@ public protocol ExtendedGraphemeClusterLiteralConvertible
   typealias ExtendedGraphemeClusterLiteralType
     : _BuiltinExtendedGraphemeClusterLiteralConvertible
   /// Create an instance initialized with `value`.
-  class func convertFromExtendedGraphemeClusterLiteral(
-      value: ExtendedGraphemeClusterLiteralType) -> Self
+  init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
 public protocol _BuiltinStringLiteralConvertible
   : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   
-  class func _convertFromBuiltinStringLiteral(start: Builtin.RawPointer,
-                                              byteSize: Builtin.Word,
-                                              isASCII: Builtin.Int1) -> Self
+  init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    byteSize: Builtin.Word,
+    isASCII: Builtin.Int1)
 }
 
 public protocol _BuiltinUTF16StringLiteralConvertible
   : _BuiltinStringLiteralConvertible {
   
-  class func _convertFromBuiltinUTF16StringLiteral(
-                start: Builtin.RawPointer,
-                numberOfCodeUnits: Builtin.Word) -> Self
+  init(
+    _builtinUTF16StringLiteral start: Builtin.RawPointer,
+    numberOfCodeUnits: Builtin.Word)
 }
 
 /// Conforming types can be initialized with arbitrary string literals
 public protocol StringLiteralConvertible
   : ExtendedGraphemeClusterLiteralConvertible {
   // FIXME: when we have default function implementations in protocols, provide
-  // an implementation of convertFromExtendedGraphemeClusterLiteral().
+  // an implementation of init(extendedGraphemeClusterLiteral:).
 
   typealias StringLiteralType : _BuiltinStringLiteralConvertible
   /// Create an instance initialized with `value`.
-  class func convertFromStringLiteral(value: StringLiteralType) -> Self
+  init(stringLiteral value: StringLiteralType)
 }
 
 /// Conforming types can be initialized with array literals

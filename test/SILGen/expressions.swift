@@ -12,52 +12,55 @@ struct SillyCharacter :
 }
 
 struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible {
-  static func _convertFromBuiltinUnicodeScalarLiteral(
-    value: Builtin.Int32
-  ) -> SillyString { }
+  init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {}
 
-  static func convertFromUnicodeScalarLiteral(
-    value: SillyString
-  ) -> SillyString { }
+  init(unicodeScalarLiteral value: SillyString) { }
 
-  static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
-    start: Builtin.RawPointer,
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
-    isASCII: Builtin.Int1) -> SillyString { }
+    isASCII: Builtin.Int1
+  ) { 
+  }
 
-  static func convertFromExtendedGraphemeClusterLiteral(
-    value: SillyString) -> SillyString { }
+  init(extendedGraphemeClusterLiteral value: SillyString) { }
 
-  static func _convertFromBuiltinStringLiteral(start: Builtin.RawPointer,
-                                               byteSize: Builtin.Word,
-                                               isASCII: Builtin.Int1) -> SillyString { }
-  static func convertFromStringLiteral(value: SillyString) -> SillyString { }
+  init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    byteSize: Builtin.Word,
+    isASCII: Builtin.Int1) { 
+  }
+
+  init(stringLiteral value: SillyString) { }
 }
 
 struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralConvertible {
-  static func _convertFromBuiltinUnicodeScalarLiteral(
-    value: Builtin.Int32
-  ) -> SillyUTF16String { }
+  init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
 
-  static func convertFromUnicodeScalarLiteral(
-    value: SillyString
-  ) -> SillyUTF16String { }
+  init(unicodeScalarLiteral value: SillyString) { }
 
-  static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
-    start: Builtin.RawPointer,
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
-    isASCII: Builtin.Int1) -> SillyUTF16String { }
+    isASCII: Builtin.Int1
+  ) { 
+  }
 
-  static func convertFromExtendedGraphemeClusterLiteral(
-    value: SillyString) -> SillyUTF16String { }
+  init(extendedGraphemeClusterLiteral value: SillyString) { }
 
-  static func _convertFromBuiltinStringLiteral(start: Builtin.RawPointer,
-                                               byteSize: Builtin.Word,
-                                               isASCII: Builtin.Int1) -> SillyUTF16String { }
+  init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    byteSize: Builtin.Word,
+    isASCII: Builtin.Int1
+  ) { }
 
-  static func _convertFromBuiltinUTF16StringLiteral(start: Builtin.RawPointer,
-                                                    numberOfCodeUnits: Builtin.Word) -> SillyUTF16String { }
-  static func convertFromStringLiteral(value: SillyUTF16String) -> SillyUTF16String { }
+  init(
+    _builtinUTF16StringLiteral start: Builtin.RawPointer,
+    numberOfCodeUnits: Builtin.Word
+  ) { 
+  }
+
+  init(stringLiteral value: SillyUTF16String) { }
 }
 
 func literals() {
