@@ -2534,7 +2534,7 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
     { ($0 as TestObjCKeyTy).value },
     { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt: (3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
@@ -2546,7 +2546,7 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
     { ($0 as TestObjCKeyTy).value },
     { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt: (3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
