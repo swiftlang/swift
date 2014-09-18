@@ -137,6 +137,9 @@ public struct ${Self}
    : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'} {
   public var value: Builtin.${BuiltinName}
 
+  // FIXME: this declaration should be inferred.
+  public typealias Distance = Int
+
   @transparent public
   init() {
     var maxWidthZero: IntMax = 0

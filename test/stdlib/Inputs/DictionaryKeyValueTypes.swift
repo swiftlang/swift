@@ -33,6 +33,11 @@ func isCocoaNSDictionary(d: NSDictionary) -> Bool {
     className.rangeOfString("NSCFDictionary").length > 0
 }
 
+func isNativeNSArray(d: NSArray) -> Bool {
+  var className: NSString = NSStringFromClass(d.dynamicType)
+  return className.rangeOfString("_NSSwiftArrayImpl").length > 0
+}
+
 // Compare two arrays as sets.
 func equalsUnordered<T : Comparable>(
   lhs: Array<(T, T)>, rhs: Array<(T, T)>
@@ -1026,5 +1031,45 @@ func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
         maxFastEnumerationItems: maxFastEnumerationItems)
     },
     convertKey, convertValue)
+}
+
+func getBridgedNSArrayOfRefTypeVerbatimBridged(
+  numElements: Int = 3,
+  capacity: Int? = nil
+) -> NSArray {
+  assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
+
+  var a = [TestObjCValueTy]()
+  if let requestedCapacity = capacity {
+    a.reserveCapacity(requestedCapacity)
+  }
+  for i in 1..<(numElements + 1) {
+    a.append(TestObjCValueTy(i * 10))
+  }
+
+  let bridged = _convertArrayToNSArray(a)
+  assert(isNativeNSArray(bridged))
+
+  return bridged
+}
+
+func getBridgedNSArrayOfValueTypeCustomBridged(
+  numElements: Int = 3,
+  capacity: Int? = nil
+) -> NSArray {
+  assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
+
+  var a = [TestBridgedValueTy]()
+  if let requestedCapacity = capacity {
+    a.reserveCapacity(requestedCapacity)
+  }
+  for i in 1..<(numElements + 1) {
+    a.append(TestBridgedValueTy(i * 10))
+  }
+
+  let bridged = _convertArrayToNSArray(a)
+  assert(isNativeNSArray(bridged))
+
+  return bridged
 }
 

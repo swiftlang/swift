@@ -13,11 +13,6 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
-func isNativeNSArray(d: NSArray) -> Bool {
-  var className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("_ContiguousArrayStorage").length > 0
-}
-
 var ArrayTestSuite = TestSuite("Array")
 
 ArrayTestSuite.test("sizeof") {
@@ -74,26 +69,6 @@ ArrayTestSuite.test("Native/isEmpty") {
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func getBridgedNSArrayOfRefTypeVerbatimBridged(
-  numElements: Int = 3,
-  capacity: Int? = nil
-) -> NSArray {
-  assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
-
-  var a = [TestObjCValueTy]()
-  if let requestedCapacity = capacity {
-    a.reserveCapacity(requestedCapacity)
-  }
-  for i in 1..<(numElements + 1) {
-    a.append(TestObjCValueTy(i * 10))
-  }
-
-  let bridged = _convertArrayToNSArray(a)
-  assert(isNativeNSArray(bridged))
-
-  return bridged
-}
-
 ArrayTestSuite.test("BridgedToObjC/Verbatim/count/empty") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 0)
   expectEqual(0, a.count)
@@ -106,7 +81,9 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/count") {
 
 for index in [ -100, -1, 0, 1, 100 ] {
   ArrayTestSuite.test(
-    "BridgedToObjC/Verbatim/objectAtIndex/empty/trap/\(index)") {
+    "BridgedToObjC/Verbatim/objectAtIndex/empty/trap/\(index)")
+    .crashOutputMatches("Array index out of range")
+    .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 0)
     expectCrashLater()
     a.objectAtIndex(index)
@@ -114,7 +91,9 @@ for index in [ -100, -1, 0, 1, 100 ] {
 }
 
 for index in [ -100, -1, 3, 4, 100 ] {
-  ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex/trap/\(index)") {
+  ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex/trap/\(index)")
+    .crashOutputMatches("Array index out of range")
+    .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
     expectCrashLater()
     a.objectAtIndex(index)
@@ -136,17 +115,32 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
   expectEqual(30, (v as TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
-  /*
-  FIXME: delayed bridging for Swift.Array
   for i in 0..<3 {
     expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
     expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
     expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
   }
-  */
 }
 
-for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] {
+for indexRange in [
+  -2..<(-2), 1..<1,
+  0..<4, -2..<(-1), -1..<2, 0..<1, 2..<4, 4..<5
+] as [Range<Int>] {
+  ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects/empty/trap/\(indexRange)")
+    .crashOutputMatches("Array index out of range")
+    .code {
+    let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
+      numElements: 0, capacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
+    a.getObjects(
+      AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
+    expectCrashLater()
+    a.getObjects(
+      AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
+  }
+}
+
+for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
   ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects/trap/\(indexRange)")
     .crashOutputMatches("Array index out of range")
     .code {
@@ -281,34 +275,18 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/Use
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func getBridgedNSArrayOfValueTypeCustomBridged(
-  numElements: Int = 3,
-  capacity: Int? = nil
-) -> NSArray {
-  assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
-
-  var a = [TestBridgedValueTy]()
-  if let requestedCapacity = capacity {
-    a.reserveCapacity(requestedCapacity)
-  }
-  for i in 1..<(numElements + 1) {
-    a.append(TestBridgedValueTy(i * 10))
-  }
-
-  let bridged = _convertArrayToNSArray(a)
-  assert(isNativeNSArray(bridged))
-
-  return bridged
-}
-
 ArrayTestSuite.test("BridgedToObjC/Custom/count/empty") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 0)
   expectEqual(0, a.count)
+
+  expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/count") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged()
   expectEqual(3, a.count)
+
+  expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
 
 for index in [ -100, -1, 0, 1, 100 ] {
@@ -343,17 +321,34 @@ ArrayTestSuite.test("BridgedToObjC/Custom/objectAtIndex") {
   expectEqual(30, (v as TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
-  /*
-  FIXME: delayed bridging for Swift.Array
   for i in 0..<3 {
     expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
     expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
     expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
   }
-  */
+
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
 
-for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] {
+for indexRange in [
+  -2..<(-2), 1..<1,
+  0..<4, -2..<(-1), -1..<2, 0..<1, 2..<4, 4..<5
+] as [Range<Int>] {
+  ArrayTestSuite.test("BridgedToObjC/Custom/getObjects/empty/trap/\(indexRange)")
+    .crashOutputMatches("Array index out of range")
+    .code {
+    let a = getBridgedNSArrayOfValueTypeCustomBridged(
+      numElements: 0, capacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
+    a.getObjects(
+      AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
+    expectCrashLater()
+    a.getObjects(
+      AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
+  }
+}
+
+for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
   ArrayTestSuite.test("BridgedToObjC/Custom/getObjects/trap/\(indexRange)")
     .crashOutputMatches("Array index out of range")
     .code {
@@ -386,19 +381,16 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   expectEqual(30, (v as TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, UWord.self)
 
-  /*
-  FIXME: delayed bridging for Swift.Array
   for i in 0..<3 {
     expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
     expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
     expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
   }
-  */
 
   buffer.dealloc(3)
   _fixLifetime(a)
 
-  expectAutoreleasedValues(opt: 3, unopt: 3)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/copyWithZone") {
@@ -413,6 +405,8 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/Empty") {
   checkArrayFastEnumerationFromSwift(
     [], a, { a },
     { ($0 as TestObjCValueTy).value })
+
+  expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/3") {
@@ -423,7 +417,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/3") {
     a, { a },
     { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedValues(opt: 9, unopt: 9)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/7") {
@@ -434,7 +428,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/7") {
     a, { a },
     { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedValues(opt: 21, unopt: 21)
+  expectEqual(7, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromObjC/Empty") {
@@ -443,6 +437,8 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromObjC/Empty") {
   checkArrayFastEnumerationFromObjC(
     [], a, { a },
     { ($0 as TestObjCValueTy).value })
+
+  expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromObjC") {
@@ -453,7 +449,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromObjC") {
     a, { a },
     { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedValues(opt: 9, unopt: 9)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFromSwift/Empty") {
@@ -462,6 +458,8 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
   checkArrayFastEnumerationFromSwift(
     [], a, { a.objectEnumerator() },
     { ($0 as TestObjCValueTy).value })
+
+  expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFromSwift") {
@@ -472,7 +470,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
     a, { a.objectEnumerator() },
     { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedValues(opt: 9, unopt: 9)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFromSwift/Partial") {
@@ -483,7 +481,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
     a, maxFastEnumerationItems: 5,
     { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedValues(opt: 27, unopt: 27)
+  expectEqual(9, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFromObjC") {
@@ -494,11 +492,12 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
     a, { a.objectEnumerator() },
     { ($0 as TestObjCValueTy).value })
 
-  expectAutoreleasedValues(opt: 9, unopt: 9)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
 
 ArrayTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
+  TestBridgedValueTy.bridgeOperations = 0
 }
 
 ArrayTestSuite.tearDown {

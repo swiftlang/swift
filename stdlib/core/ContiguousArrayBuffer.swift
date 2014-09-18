@@ -33,6 +33,50 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
     return Buffer(self)._base._allocatedSizeAndAlignMask()
   }
 
+  /// If `T` is bridged verbatim, returns a pointer to the array data buffer.
+  /// Otherwise, returns a null pointer.
+  override internal func _tryGetVerbatimBridgedUnsafeBuffer(
+    dummy: Void
+  ) -> UnsafeBufferPointer<AnyObject> {
+    if _isBridgedVerbatimToObjectiveC(T.self) {
+      let nativeBuffer = Buffer(self)
+      return UnsafeBufferPointer(
+        start: UnsafePointer(nativeBuffer.baseAddress),
+        count: nativeBuffer.count)
+    }
+    return UnsafeBufferPointer(start: .null(), count: 0)
+  }
+
+  /// Returns the number of elements in the array.
+  ///
+  /// Precondition: `T` is bridged non-verbatim.
+  override internal func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
+    _sanityCheck(
+      !_isBridgedVerbatimToObjectiveC(T.self),
+      "Verbatim bridging for should be handled separately")
+    return Buffer(self).count
+  }
+
+  /// Bridge array elements and return a new buffer that owns them.
+  ///
+  /// Precondition: `T` is bridged non-verbatim.
+  override internal func _getNonVerbatimBridgedHeapBuffer(dummy: Void) ->
+    HeapBuffer<Int, AnyObject> {
+    _sanityCheck(
+      !_isBridgedVerbatimToObjectiveC(T.self),
+      "Verbatim bridging for should be handled separately")
+    let nativeBuffer = Buffer(self)
+    let count = nativeBuffer.count
+    let result = HeapBuffer<Int, AnyObject>(
+      HeapBufferStorage<Int, AnyObject>.self, count, count)
+    let resultPtr = result.baseAddress
+    for i in 0..<count {
+      (resultPtr + i).initialize(
+        _bridgeToObjectiveCUnconditional(nativeBuffer[i]))
+    }
+    return result
+  }
+
   /// Return true if the `proposedElementType` is `T` or a subclass of
   /// `T`.  We can't store anything else without violating type
   /// safety; for example, the destructor has static knowledge that
@@ -46,65 +90,6 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
   /// A type that every element in the array is.
   override var staticElementType: Any.Type {
     return T.self
-  }
-
-  /// Returns the object located at the specified index.
-  override func bridgingObjectAtIndex(index: Int, dummy: Void) -> AnyObject {
-    _sanityCheck(
-      !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for objectAtIndex should be handled by _ContiguousArrayStorageBase")
-    let b = Buffer(self)
-    return _bridgeToObjectiveCUnconditional(b[index])
-  }
-
-  override func bridgingGetObjects(
-    aBuffer: UnsafeMutablePointer<AnyObject>,
-    range: _SwiftNSRange, dummy: Void
-  ) {
-    _sanityCheck(
-      !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for getObjects:range: should be handled by _ContiguousArrayStorageBase")
-
-    let b = Buffer(self)
-    let unmanagedObjects = _UnmanagedAnyObjectArray(aBuffer)
-    for i in range.location..<range.location + range.length {
-      let bridgedElement: AnyObject = _bridgeToObjectiveCUnconditional(b[i])
-      _autorelease(bridgedElement)
-      unmanagedObjects[i - range.location] = bridgedElement
-    }
-  }
-
-  override func bridgingCountByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>,
-    count bufferSize: Int, dummy: Void
-  ) -> Int {
-    _sanityCheck(
-      !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for countByEnumeratingWithState:objects:count: should be handled by _ContiguousArrayStorageBase")
-
-    var enumerationState = state.memory
-
-    enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-    enumerationState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
-
-    let location = Int(enumerationState.state)
-    if _fastPath(location < count) {
-      let batchCount = min(bufferSize, count - location)
-
-      bridgingGetObjects(
-        objects, range: _SwiftNSRange(location: location, length: batchCount),
-        dummy: ())
-
-      enumerationState.state = UInt(location + batchCount)
-      state.memory = enumerationState
-      return batchCount
-    }
-    else {
-      enumerationState.state = UInt(max(count, 1))
-      state.memory = enumerationState
-      return 0
-    }
   }
 }
 
@@ -338,10 +323,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
         _isBridgedToObjectiveC(T.self),
         "Array element type is not bridged to ObjectiveC")
     if count == 0 {
-      return _emptyContiguousArrayStorageBase
+      return _NSSwiftArrayImpl(
+        _nativeStorage: _emptyContiguousArrayStorageBase)
     }
-    return unsafeBitCast(
-      _base.storage, _SwiftNSArrayRequiredOverridesType.self)
+    return _NSSwiftArrayImpl(_nativeStorage: _storage!)
   }
 
   /// An object that keeps the elements stored in this buffer alive
