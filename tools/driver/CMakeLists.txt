@@ -9,9 +9,8 @@ add_swift_executable(swift
                     selectiondag ${LLVM_TARGETS_TO_BUILD})
 
 find_library(CORE_FOUNDATION NAMES CoreFoundation)
-find_library(CRASH_REPORTER_CLIENT NAMES CrashReporterClient)
 
-target_link_libraries(swift edit ${CRASH_REPORTER_CLIENT} ${CORE_FOUNDATION})
+target_link_libraries(swift edit ${CORE_FOUNDATION})
 
 # If building as part of clang, make sure the headers are installed.
 if(SWIFT_PATH_TO_CLANG_BUILD STREQUAL ${CMAKE_BINARY_DIR})
