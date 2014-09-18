@@ -1944,6 +1944,27 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(FuncDecl *FD) {
+      PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
+
+      if (FD->isAccessor()) {
+        auto *storageDecl = FD->getAccessorStorageDecl();
+        if (!storageDecl) {
+          Out << "Missing storage decl\n";
+          abort();
+        }
+
+        if (FD->isGetterOrSetter()) {
+          if (FD->isFinal() != storageDecl->isFinal()) {
+            Out << "Property and accessor do not match for 'final'\n";
+            abort();
+          }
+          if (FD->isDynamic() != storageDecl->isDynamic()) {
+            Out << "Property and accessor do not match for 'dynamic'\n";
+            abort();
+          }
+        }
+      }
+
       verifyCheckedBase(FD);
     }
 

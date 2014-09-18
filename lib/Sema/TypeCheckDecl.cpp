@@ -1405,6 +1405,12 @@ static void makeFinal(ASTContext &ctx, ValueDecl *D) {
   }
 }
 
+static void makeDynamic(ASTContext &ctx, ValueDecl *D) {
+  if (D && !D->isDynamic()) {
+    D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
+  }
+}
+
 static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
                                                 VarDecl **ValueDecl,
                                                 TypeChecker &TC) {
@@ -1929,11 +1935,17 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeStoredWithTrivialAccessors(Get, Set, nullptr);
 
+  bool IsDynamic = (VD->isDynamic() && VD->isObjC());
+  if (IsDynamic)
+    Get->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit=*/true));
+
   // Type check the body of the getter.
   TC.typeCheckDecl(Get, true);
   TC.typeCheckDecl(Get, false);
 
   if (Set) {
+    if (IsDynamic)
+      Set->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit=*/true));
     TC.typeCheckDecl(Set, true);
     TC.typeCheckDecl(Set, false);
   }
@@ -3391,6 +3403,9 @@ public:
     
     if (isObjC) {
       checkBridgedFunctions();
+    } else {
+      if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
+        attr->setInvalid();
     }
   }
 
@@ -5016,15 +5031,12 @@ public:
         else if (auto pat = cast<VarDecl>(prop)->getParentPattern())
           validatePatternBindingDecl(TC, pat);
 
-        isObjC = prop->isObjC() ||
-                 prop->getAttrs().hasAttribute<IBOutletAttr>() ||
-                 prop->getAttrs().hasAttribute<DynamicAttr>();
+        isObjC = prop->isObjC() || prop->isDynamic() ||
+                 prop->getAttrs().hasAttribute<IBOutletAttr>();
         
         // If the property is dynamic, propagate to this accessor.
-        if (prop->getAttrs().hasAttribute<DynamicAttr>()
-            && !FD->getAttrs().hasAttribute<DynamicAttr>())
-          FD->getAttrs().add(
-                               new (TC.Context) DynamicAttr(/*implicit*/ true));
+        if (prop->isDynamic() && !FD->isDynamic())
+          FD->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit*/ true));
       }
 
       if (isObjC &&
@@ -6605,19 +6617,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       VD->setIsBeingTypeChecked(false);
       computeAccessibility(*this, setter);
 
-      // If the var is marked final, then so is the getter.
-      if (VD->isFinal()) {
-        makeFinal(Context, getter);
-        makeFinal(Context, setter);
-      }
-
       addMemberToContextIfNeeded(getter, VD->getDeclContext());
       addMemberToContextIfNeeded(setter, VD->getDeclContext());
     }
 
-    validateAttributes(*this, VD);
     if (!VD->didEarlyAttrValidation()) {
       checkDeclAttributesEarly(VD);
+      validateAttributes(*this, VD);
 
       // FIXME: Guarding the rest of these things together with early attribute
       // validation is a hack. It's necessary because properties can get types
@@ -6644,9 +6650,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           isObjC = isRepresentableInObjC(VD, reason);
 
         VD->setIsObjC(isObjC);
+        if (!isObjC)
+          if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
+            attr->setInvalid();
       }
 
       inferDynamic(Context, VD);
+
       if (!DeclChecker::checkOverrides(*this, VD)) {
         // If a property has an override attribute but does not override
         // anything, complain.
@@ -6669,6 +6679,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         makeFinal(Context, VD->getGetter());
         makeFinal(Context, VD->getSetter());
         makeFinal(Context, VD->getMaterializeForSetFunc());
+      } else if (VD->isDynamic()) {
+        makeDynamic(Context, VD->getGetter());
+        makeDynamic(Context, VD->getSetter());
+        // Skip materializeForSet -- it won't be used with a dynamic property.
       }
     }
 

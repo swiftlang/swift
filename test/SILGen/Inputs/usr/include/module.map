@@ -26,3 +26,8 @@ module AppKit {
   header "AppKit.h" 
   export *
 }
+
+module objc_extensions_helper {
+  header "objc_extensions_helper.h"
+}
+
