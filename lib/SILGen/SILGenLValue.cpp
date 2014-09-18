@@ -870,10 +870,10 @@ LValue SILGenLValue::visitRec(Expr *e) {
   // Non-lvalue types (references, values, metatypes, etc) form the root of a
   // logical l-value.
   if (!e->getType()->is<LValueType>() && !e->getType()->is<InOutType>()) {
-    // Calls through protocols can be done with +0 rvalues.  This allows us to
-    // avoid materializing copies of existentials.
+    // Calls through opaque protocols can be done with +0 rvalues.  This allows
+    // us to avoid materializing copies of existentials.
     SGFContext Ctx;
-    if (e->getType()->isExistentialType() || e->getType()->is<ArchetypeType>())
+    if (gen.SGM.Types.isPlusZeroSelfParameter(e->getType()))
       Ctx = SGFContext::AllowPlusZero;
     
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);

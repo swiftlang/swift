@@ -659,9 +659,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     // a retain_value to bring it to +1 since getters always take the base object
     // at +1.
     if (base.isPlusZeroRValueOrTrivial()
-        && (base.getType().hasReferenceSemantics()
-            || (!base.getType().getSwiftRValueType().isExistentialType()
-                && !base.getType().getSwiftRValueType()->is<ArchetypeType>())))
+        && !SGM.Types.isPlusZeroSelfParameter(base.getType()))
       base = base.copyUnmanaged(*this, loc);
     
     RValueSource baseRV = prepareAccessorBaseArg(loc, base,
