@@ -545,6 +545,9 @@ void IRGenModule::emitGlobalTopLevel() {
     emitSILFunction(&f);
   }
 
+  // Emit static initializers.
+  emitSILStaticInitializer();
+
   // Emit witness tables.
   for (SILWitnessTable &wt : SILMod->getWitnessTableList()) {
     // Try to be lazy about it.

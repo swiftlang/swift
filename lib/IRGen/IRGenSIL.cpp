@@ -3431,3 +3431,44 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   e.add(fnValue);
   setLoweredExplosion(SILValue(i, 0), e);
 }
+
+/// Generate ConstantStruct for StructInst.
+static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
+                                        StructInst *SI) {
+  SmallVector<llvm::Constant*, 32> Elts;
+  assert(SI->getNumOperands() == STy->getNumElements() &&
+         "mismatch StructInst with its lowered StructType!");
+  for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+    if (auto *Elem = dyn_cast<StructInst>(SI->getOperand(i)))
+      Elts.push_back(getConstantValue(IGM,
+                     cast<llvm::StructType>(STy->getElementType(i)), Elem));
+    else if (auto *ILI = dyn_cast<IntegerLiteralInst>(SI->getOperand(i)))
+      Elts.push_back(getConstantInt(IGM, ILI));
+    else if (auto *FLI = dyn_cast<FloatLiteralInst>(SI->getOperand(i)))
+      Elts.push_back(getConstantFP(IGM, FLI));
+    else if (auto *SLI = dyn_cast<StringLiteralInst>(SI->getOperand(i)))
+      Elts.push_back(getAddrOfString(IGM, SLI->getValue(), SLI->getEncoding()));
+    else
+      llvm_unreachable("Unexpected SILInstruction in static initializer!");
+  }
+  return llvm::ConstantStruct::get(STy, Elts);
+}
+
+
+void IRGenModule::emitSILStaticInitializer() {
+  SmallVector<SILFunction*, 8> StaticInitializers;
+  for (SILGlobalVariable &v : SILMod->getSILGlobals()) {
+    auto *staticInit = v.getInitializer();
+    if (!staticInit)
+      continue;
+
+    auto *gvar = Module.getGlobalVariable(v.getName(),
+                                          /*allowInternal*/true);
+    auto *STy = dyn_cast<llvm::StructType>(gvar->getInitializer()->getType());
+    assert(STy && "We only handle StructType for now!");
+
+    // Get the StructInst that we write to the SILGlobalVariable.
+    auto *SI = cast<StructInst>(v.getValueOfStaticInitializer());
+    gvar->setInitializer(getConstantValue(*this, STy, SI));
+  }
+}

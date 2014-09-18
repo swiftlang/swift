@@ -421,6 +421,7 @@ public:
   Address emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
+  void emitSILStaticInitializer();
   
   /// Generate local decls in the given function body. This skips VarDecls and
   /// other locals that are consumed by SIL.
