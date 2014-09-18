@@ -85,7 +85,6 @@
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
 // FOUNDATION-NEXT: @availability(*, unavailable)
 // FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, name: String)
-// FOUNDATION-NEXT: NSZoneName(zone: NSZone) -> String
 
 // APPKIT-LABEL: {{^}}extension NSString {{{$}}
 

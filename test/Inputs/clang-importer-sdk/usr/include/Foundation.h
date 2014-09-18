@@ -441,6 +441,38 @@ extern CFTypeRef CFAutorelease(CFTypeRef __attribute__((cf_consumed)) arg) __att
 extern CGColorRef CGColorRetain(CGColorRef color) __attribute__((availability(macosx,introduced=10.3)));
 extern void CGColorRelease(CGColorRef color) __attribute__((availability(macosx,introduced=10.3)));
 
+@interface NSObject (NSDistributedObjects)
+@property (readonly) Class classForPortCoder;
+@end
+
+extern NSString * const NSConnectionReplyMode;
+extern NSString * const NSConnectionDidDieNotification;
+@interface NSConnection : NSObject {
+}
+@end
+@interface NSPortCoder : NSCoder
+@end
+@protocol NSConnectionDelegate <NSObject>
+@end
+@interface NSDistantObjectRequest : NSObject
+@end
+@interface NSDistantObject
+@end
+@interface NSPortNameServer : NSObject
+@end
+@interface NSMachBootstrapServer : NSPortNameServer
+@end
+@interface NSMessagePortNameServer : NSPortNameServer
+@end
+@interface NSSocketPortNameServer : NSPortNameServer
+@end
+@interface NSCalendarDate : NSDate
+@end
+@interface NSInvocationOperation
+@end
+@interface NSMethodSignature : NSObject
+@end
 /// Unavailable Global Functions
 extern void NSSetZoneName(NSZone *zone, NSString *name);
 extern NSString *NSZoneName(NSZone *zone);
+extern NSZone *NSCreateZone(NSUInteger startSize, NSUInteger granularity, BOOL canFree);

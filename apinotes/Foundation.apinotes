@@ -1311,6 +1311,8 @@ Classes:
   - Name: weekdaySymbols
     Nullability: N
 - Name: NSCalendarDate
+  Availability: none
+  AvailabilityMsg: "use NSCalendar, NSDateComponents, and NSDateFormatter instead"
   Methods:
   - Selector: calendarDate
     MethodKind: Class
@@ -1857,6 +1859,8 @@ Classes:
   - Name: name
     Nullability: O
 - Name: NSConnection
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'addRequestMode:'
     MethodKind: Instance
@@ -2824,6 +2828,8 @@ Classes:
   - Name: fileAttributes
     Nullability: O
 - Name: NSDistantObject
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'initWithCoder:'
     MethodKind: Instance
@@ -2863,6 +2869,8 @@ Classes:
   - Name: connectionForProxy
     Nullability: N
 - Name: NSDistantObjectRequest
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'replyWithException:'
     MethodKind: Instance
@@ -4418,25 +4426,7 @@ Classes:
 - Name: NSInvocation
   Availability: none
 - Name: NSInvocationOperation
-  Methods:
-  - Selector: 'initWithInvocation:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: U
-    DesignatedInit: true
-  - Selector: 'initWithTarget:selector:object:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - S
-    - O
-    NullabilityOfRet: O
-  Properties:
-  - Name: invocation
-    Nullability: N
-  - Name: result
-    Nullability: O
+  Availability: none
 - Name: NSItemProvider
   Methods:
   - Selector: 'hasItemConformingToTypeIdentifier:'
@@ -4910,6 +4900,8 @@ Classes:
     - U
     NullabilityOfRet: N
 - Name: NSMachBootstrapServer
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'portForName:'
     MethodKind: Instance
@@ -5078,6 +5070,8 @@ Classes:
     - S
     NullabilityOfRet: N
 - Name: NSMessagePortNameServer
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'portForName:'
     MethodKind: Instance
@@ -5182,6 +5176,7 @@ Classes:
   - Name: value
     Nullability: N
 - Name: NSMethodSignature
+  Availability: none
   Methods:
   - Selector: 'signatureWithObjCTypes:'
     MethodKind: Class
@@ -6901,6 +6896,8 @@ Classes:
     - O
     NullabilityOfRet: S
 - Name: NSPortCoder
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: decodePortObject
     MethodKind: Instance
@@ -6933,6 +6930,8 @@ Classes:
   - Name: sendPort
     Nullability: O
 - Name: NSPortNameServer
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'portForName:'
     MethodKind: Instance
@@ -8045,6 +8044,8 @@ Classes:
   - Name: address
     Nullability: N
 - Name: NSSocketPortNameServer
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'portForName:'
     MethodKind: Instance
@@ -11391,6 +11392,20 @@ Classes:
     Nullability: O
   - Name: endpoint
     Nullability: N
+- Name: NSObject
+  Availability: none
+  Methods:
+  - Selector: 'replacementObjectForPortCoder:'
+    MethodKind: Instance
+    Availability: none
+    AvailabilityMsg: "you may be able to use XPC instead"
+  - Selector: 'instanceMethodSignatureForSelector:'
+    MethodKind: Class
+    Availability: none
+  Properties:
+  - Name: 'classForPortCoder'
+    Availability: none
+    AvailabilityMsg: "you may be able to use XPC instead"
 Protocols:
 - Name: NSCacheDelegate
   Methods:
@@ -11413,6 +11428,8 @@ Protocols:
     - N
     NullabilityOfRet: N
 - Name: NSConnectionDelegate
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'authenticateComponents:withData:'
     MethodKind: Instance
@@ -12525,14 +12542,43 @@ Protocols:
     Nullability:
     - N
     NullabilityOfRet: N
+Globals:
+- Name: NSConnectionDidDieNotification
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
+- Name: NSConnectionDidInitializeNotification
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
+- Name: NSConnectionReplyMode
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
+- Name: NSFailedAuthenticationException
+  Availability: none
+  AvailabilityMsg: "you may be able to use XPC instead"
 Functions:
 - Name: NSZoneName
   Nullability:
   - N
   NullabilityOfRet: N
+  Availability: none
 - Name: NSSetZoneName
   Nullability:
   - N
   - N
   Availability: none
   AvailabilityMsg: ''
+- Name: NSCreateZone
+  Availability: none
+- Name: NSRecycleZone
+  Availability: none
+- Name: NSZoneCalloc
+  Availability: none
+- Name: NSZoneFree
+  Availability: none
+- Name: NSZoneFromPointer
+  Availability: none
+- Name: NSZoneMalloc
+  Availability: none
+- Name: NSZoneRealloc
+  Availability: none
+

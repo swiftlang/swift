@@ -26,7 +26,9 @@ func test_deprecated_imported_as_unavailable(s:UnsafeMutablePointer<CChar>) {
   let x = tmpnam(s) // expected-error {{'tmpnam' is unavailable: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
 }
 
-func test_NSInvocation(x:NSInvocation) {} // expected-error {{'NSInvocation' is unavailable}}
+func test_NSInvocation(x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}
+                       y: NSInvocationOperation,// expected-error {{'NSInvocationOperation' is unavailable}}
+                       z: NSMethodSignature) {} // expected-error {{'NSMethodSignature' is unavailable}}
 
 func test_class_avail(x:NSObject, obj: AnyObject) {
   x.`class`() // expected-error {{'class()' is unavailable: use 'dynamicType' instead}}
@@ -75,3 +77,27 @@ func testRedeclarations() {
   let _: UnavailProto2 // expected-error {{is unavailable: middle}}
   let _: UnavailProto3 // expected-error {{is unavailable: last}}
 }
+
+func test_NSZone(z : NSZone) { 
+  NSCreateZone(1, 1, true)  // expected-error {{'NSCreateZone' is unavailable}}
+  NSSetZoneName(z, "name")  // expected-error {{'NSSetZoneName' is unavailable}}
+  NSZoneName(z)             // expected-error {{'NSZoneName' is unavailable}}
+}
+
+func test_DistributedObjects(o: NSObject,
+                             a: NSConnection,           // expected-error {{'NSConnection' is unavailable: you may be able to use XPC instead}}
+                             b: NSConnectionDelegate,   // expected-error {{'NSConnectionDelegate' is unavailable: you may be able to use XPC instead}}
+                             c: NSDistantObjectRequest, // expected-error {{'NSDistantObjectRequest' is unavailable: you may be able to use XPC instead}}
+                             d: NSDistantObject,        // expected-error {{'NSDistantObject' is unavailable: you may be able to use XPC instead}}
+                             e: NSPortNameServer,       // expected-error {{'NSPortNameServer' is unavailable: you may be able to use XPC instead}}
+                             f: NSMachBootstrapServer,  // expected-error {{'NSMachBootstrapServer' is unavailable: you may be able to use XPC instead}}
+                             g: NSMessagePortNameServer, // expected-error {{'NSMessagePortNameServer' is unavailable: you may be able to use XPC instead}}
+                             h: NSSocketPortNameServer, // expected-error {{'NSSocketPortNameServer' is unavailable: you may be able to use XPC instead}}
+                             i: NSPortCoder) {          // expected-error {{'NSPortCoder' is unavailable: you may be able to use XPC instead}}
+
+  let ca = NSConnectionDidDieNotification // expected-error {{'NSConnectionDidDieNotification' is unavailable: you may be able to use XPC instead}}
+  let cc = NSConnectionReplyMode // expected-error {{'NSConnectionReplyMode' is unavailable: you may be able to use XPC instead}}
+  o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable: you may be able to use XPC instead}}
+}
+
+func test_NSCalendarDate(o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable: use NSCalendar, NSDateComponents, and NSDateFormatter instead}}
