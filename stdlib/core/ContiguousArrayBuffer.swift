@@ -381,7 +381,6 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
     // Check the elements
     for x in self {
-      // FIXME: unsafeBitCast works around <rdar://problem/16953026>
       if !(x is U) {
         return false
       }
