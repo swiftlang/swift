@@ -1946,11 +1946,13 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   setLoweredExplosion(v, function);
 }
 
-void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
+/// Construct a ConstantInt from an IntegerLiteralInst.
+static llvm::Constant *getConstantInt(IRGenModule &IGM,
+                                      swift::IntegerLiteralInst *i) {
   APInt value = i->getValue();
   BuiltinIntegerWidth width
     = i->getType().castTo<BuiltinIntegerType>()->getWidth();
-  
+
   // The value may need truncation if its type had an abstract size.
   if (width.isFixedWidth()) {
     // nothing to do
@@ -1963,17 +1965,26 @@ void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
   } else {
     llvm_unreachable("impossible width value");
   }
-  
-  llvm::Value *constant = llvm::ConstantInt::get(IGM.LLVMContext, value);
+
+  return llvm::ConstantInt::get(IGM.LLVMContext, value);
+}
+
+void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
+  llvm::Value *constant = getConstantInt(IGM, i);
   
   Explosion e;
   e.add(constant);
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
+/// Construct a ConstantFP from a FloatLiteralInst.
+static llvm::Constant *getConstantFP(IRGenModule &IGM,
+                                     swift::FloatLiteralInst *i) {
+  return llvm::ConstantFP::get(IGM.LLVMContext, i->getValue());
+}
+
 void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
-  llvm::Value *constant = llvm::ConstantFP::get(IGM.LLVMContext,
-                                                i->getValue());
+  llvm::Value *constant = getConstantFP(IGM, i);
   Explosion e;
   e.add(constant);
   setLoweredExplosion(SILValue(i, 0), e);
