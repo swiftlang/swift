@@ -75,8 +75,8 @@ func _stdlib_atomicInitializeARCRef(
     expected: &expected,
     desired: desiredPtr)
   if !wonRace {
-    // Some other thread initialized the value.  Balance the retain on the
-    // argument that we did.
+    // Some other thread initialized the value.  Balance the retain that we
+    // performed on 'desired'.
     Unmanaged.passUnretained(desired).release()
   }
   return wonRace
