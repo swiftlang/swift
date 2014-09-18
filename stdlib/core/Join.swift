@@ -45,8 +45,8 @@ public protocol _ExtensibleCollectionType : CollectionType {
   /// `self.endIndex`.
   ///
   /// Complexity: amortized O(1).
-  mutating func append(_ x: Self.Generator.Element)
-  
+  mutating func append(x: Self.Generator.Element)
+
   /// Append the elements of `newElements` to `self`.
   ///
   /// Complexity: O(*length of result*) 
