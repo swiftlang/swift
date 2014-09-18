@@ -38,6 +38,9 @@
 using namespace swift;
 using namespace swift::driver;
 
+#endif
+
+
 std::string getExecutablePath(const char *FirstArg) {
   void *P = (void *)(intptr_t)getExecutablePath;
   return llvm::sys::fs::getMainExecutable(FirstArg, P);
@@ -55,6 +58,12 @@ int main(int argc_, const char **argv_) {
 
   // Set up an object which will call llvm::llvm_shutdown() on exit.
   llvm::llvm_shutdown_obj Y;
+
+#ifndef __OPEN_SOURCE__
+  // If this is a non-production build, tell the crash log analyzer 
+  // to ignore any crash logs.
+  suppressCrashTracerForDevelopment();
+#endif
 
   llvm::SmallVector<const char *, 256> argv;
   llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
