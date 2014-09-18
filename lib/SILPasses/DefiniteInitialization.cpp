@@ -848,7 +848,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 /// handleSuperInitUse - When processing a 'self' argument on a class, this is
 /// a call to super.init.
 void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
-  UpcastInst *Inst = cast<UpcastInst>(InstInfo.Inst);
+  auto *Inst = cast<ApplyInst>(InstInfo.Inst);
 
   // Determine the liveness states of the memory object, including the
   // super.init state.

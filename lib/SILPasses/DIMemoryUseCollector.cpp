@@ -848,9 +848,9 @@ void ElementUseCollector::collectClassSelfUses() {
   }
 }
 
-/// isSuperInitUse - Return true if this "upcast" is part of a call to
-/// super.init.
-static bool isSuperInitUse(UpcastInst *Inst) {
+/// isSuperInitUse - If this "upcast" is part of a call to super.init, return
+/// the Apply instruction for the call, otherwise return null.
+static ApplyInst *isSuperInitUse(UpcastInst *Inst) {
 
   // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
   // that came from a call to super.init.
@@ -858,8 +858,8 @@ static bool isSuperInitUse(UpcastInst *Inst) {
     // If this used by another upcast instruction, recursively handle it, we may
     // have a multiple upcast chain.
     if (auto *UCIU = dyn_cast<UpcastInst>(UI->getUser()))
-      if (isSuperInitUse(UCIU))
-        return true;
+      if (auto *subAI = isSuperInitUse(UCIU))
+        return subAI;
     
     auto *AI = dyn_cast<ApplyInst>(UI->getUser());
     if (!AI) continue;
@@ -871,7 +871,7 @@ static bool isSuperInitUse(UpcastInst *Inst) {
       if (AI->getLoc().is<SILFileLocation>())
         if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
           if (FRI->getReferencedFunction()->getName() == "superinit")
-            return true;
+            return AI;
       continue;
     }
 
@@ -886,7 +886,7 @@ static bool isSuperInitUse(UpcastInst *Inst) {
       continue;
 
     if (LocExpr->getArg()->isSuperExpr())
-      return true;
+      return AI;
 
     // Instead of super_ref_expr, we can also get this for inherited delegating
     // initializers:
@@ -895,11 +895,12 @@ static bool isSuperInitUse(UpcastInst *Inst) {
     //   (declref_expr type='D' decl='self'))
     if (auto *DTB = dyn_cast<DerivedToBaseExpr>(LocExpr->getArg()))
       if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr()))
-        return DRE->getDecl()->isImplicit() &&
-               DRE->getDecl()->getName().str() == "self";
+        if (DRE->getDecl()->isImplicit() &&
+            DRE->getDecl()->getName().str() == "self")
+          return AI;
   }
 
-  return false;
+  return nullptr;
 }
 
 /// isSelfInitUse - Return true if this apply_inst is a call to self.init.
@@ -985,6 +986,11 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
   for (auto UI : ClassPointer.getUses()) {
     auto *User = UI->getUser();
 
+    // super_method always looks at the metatype for the class, not at any of
+    // its stored properties, so it doesn't have any DI requirements.
+    if (isa<SuperMethodInst>(User)) continue;
+
+
     // ref_element_addr P, #field lookups up a field.
     if (auto *REAI = dyn_cast<RefElementAddrInst>(User)) {
       assert(EltNumbering.count(REAI->getField()) &&
@@ -1008,13 +1014,17 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // If this is an upcast instruction, it is a conversion of self to the base.
     // This is either part of a super.init sequence, or a general superclass
     // access.
-    DIUseKind Kind = DIUseKind::Load;
     if (auto *UCI = dyn_cast<UpcastInst>(User))
-      if (isSuperInitUse(UCI))
-        Kind = DIUseKind::SuperInit;
+      if (auto *AI = isSuperInitUse(UCI)) {
+        // We remember the applyinst as the super.init site, not the upcast.
+        Uses.push_back(DIMemoryUse(AI, DIUseKind::SuperInit,
+                                   0, TheMemory.NumElements));
+        continue;
+      }
 
     // If this is an ApplyInst, check to see if this is part of a self.init
     // call in a delegating initializer.
+    DIUseKind Kind = DIUseKind::Load;
     if (isa<ApplyInst>(User) && isSelfInitUse(cast<ApplyInst>(User)))
       Kind = DIUseKind::SelfInit;
 
@@ -1080,7 +1090,17 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
           if (Method->getMember().kind == SILDeclRef::Kind::Initializer)
             continue;
         }
-        
+
+        // If this is an upcast instruction, it is a conversion of self to the
+        // base.  This is either part of a super.init sequence, or a general
+        // superclass access.  We special case super.init calls since they are
+        // part of the object lifecycle.
+        if (auto *UCI = dyn_cast<UpcastInst>(User))
+          if (auto *subAI = isSuperInitUse(UCI)) {
+            Uses.push_back(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
+            continue;
+          }
+
         // We only track two kinds of uses for delegating initializers:
         // calls to self.init, and "other", which we choose to model as escapes.
         // This intentionally ignores all stores, which (if they got emitted as
@@ -1099,13 +1119,6 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         if (auto *VMI = dyn_cast<ValueMetatypeInst>(User))
           if (isSelfInitUse(VMI))
             Kind = DIUseKind::SelfInit;
-
-        // If this is an upcast instruction, it is a conversion of self to the
-        // base.  This is either part of a super.init sequence, or a general
-        // superclass access.
-        if (auto *UCI = dyn_cast<UpcastInst>(User))
-          if (isSuperInitUse(UCI))
-            Kind = DIUseKind::SuperInit;
 
         Uses.push_back(DIMemoryUse(User, Kind, 0, 1));
       }

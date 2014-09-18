@@ -673,4 +673,17 @@ class r17686667Test : r17686667Base {
   }
 }
 
+// <rdar://problem/18199087> DI doesn't catch use of super properties lexically inside super.init call
+class r18199087BaseClass {
+  let data: Int
+  init(val: Int) {
+    data = val
+  }
+}
+class r18199087SubClassA: r18199087BaseClass {
+  init() {
+    super.init(val: self.data)  // expected-error {{use of property 'data' in base object before super.init initializes it}}
+  }
+}
+
 
