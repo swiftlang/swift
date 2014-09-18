@@ -1,0 +1,6 @@
+Name:            Dispatch
+Functions:
+- Name: dispatch_release
+  Availability: none
+- Name: dispatch_retain
+  Availability: none

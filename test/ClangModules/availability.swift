@@ -1,6 +1,7 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s
 
+import Dispatch
 import Foundation
 import stdio
 import AvailabilityExtras
@@ -101,3 +102,8 @@ func test_DistributedObjects(o: NSObject,
 }
 
 func test_NSCalendarDate(o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable: use NSCalendar, NSDateComponents, and NSDateFormatter instead}}
+
+func test_dispatch(object: dispatch_object_t) {
+  dispatch_retain(object);  // expected-error {{'dispatch_retain' is unavailable}}
+  dispatch_release(object); // expected-error {{'dispatch_release' is unavailable}}
+}

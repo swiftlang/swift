@@ -7,7 +7,15 @@ module ctypes {
 }
 module stdio { header "stdio.h" }
 module cvars { header "cvars.h" }
-module blocks { header "blocks.h" }
+module blocks {
+  header "blocks.h"
+  export *
+}
+
+module Dispatch {
+  header "dispatch.h"
+  export *
+}
 
 module AVFoundation {
   header "AVFoundation.h"
