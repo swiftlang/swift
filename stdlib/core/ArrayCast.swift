@@ -122,8 +122,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
 }
 
 /// Try to convert the source array of objects to an array of values
-/// produced by bridging the objects from Objective-C to \c
-/// TargetElement.
+/// produced by bridging the objects from Objective-C to `TargetElement`.
 ///
 /// Precondition: SourceElement is a class type.
 /// Precondition: TargetElement is bridged non-verbatim to Objective-C.
