@@ -2040,6 +2040,11 @@ UTF8Encoder.test("SmokeTest") {
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
 class NonContiguousNSString : NSString {
+  override init() {
+    _value = []
+    super.init()
+  }
+
   required init(coder aDecoder: NSCoder) {
     fatalError("don't call this initializer")
   }
