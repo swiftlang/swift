@@ -4038,7 +4038,7 @@ public:
     for (Decl *global : SD->getDerivedGlobalDecls())
       visit(global);
 
-    if (!IsFirstPass) {
+    if (!(IsFirstPass || SD->isInvalid())) {
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
     }
     TC.checkDeclAttributes(SD);
@@ -4300,7 +4300,7 @@ public:
                          diag::class_here, path);
       }
     }
-
+    
     // If this class needs an implicit constructor, add it.
     if (!IsFirstPass) {
       SmallVector<Decl*, 2> ImplicitInits;
@@ -4409,7 +4409,7 @@ public:
         }
       }
     }
-    if (!IsFirstPass) {
+    if (!(IsFirstPass || CD->isInvalid())) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
       checkObjCConformances(CD->getProtocols(), CD->getConformances());
     }
@@ -6398,7 +6398,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         nominal->getDeclContext()->getGenericParamsOfContext());
 
       // Validate the generic type parameters.
-      validateGenericTypeSignature(nominal);
+      if (validateGenericTypeSignature(nominal)) {
+        nominal->setInvalid();
+        nominal->overwriteType(ErrorType::get(Context));
+        return;
+      }
 
       revertGenericParamList(gp);
 
@@ -7427,6 +7431,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
   // If we already added implicit initializers, we're done.
   if (decl->addedImplicitInitializers())
     return;
+  
+  // Don't add implicit constructors for an invalid declaration
+  if (decl->isInvalid())
+    return;
 
   // Local function that produces the canonical parameter type of the given
   // initializer.
@@ -7555,7 +7563,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
 }
 
 void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
-  if (CD->hasDestructor())
+  if (CD->hasDestructor() || CD->isInvalid())
     return;
 
   Pattern *selfPat = buildImplicitSelfParameter(CD->getLoc(), CD);
