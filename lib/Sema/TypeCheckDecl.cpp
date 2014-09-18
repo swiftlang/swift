@@ -1201,6 +1201,25 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   }
 }
 
+/// Does the context allow pattern bindings that don't bind any variables?
+static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
+  
+  // Property decls in type context must bind variables.
+  if (dc->isTypeContext())
+    return false;
+  
+  // Global variable decls must bind variables, except in scripts.
+  if (dc->isModuleScopeContext()) {
+    if (dc->getParentSourceFile()
+        && dc->getParentSourceFile()->isScriptMode())
+      return true;
+    
+    return false;
+  }
+  
+  return true;
+}
+
 /// Validate the given pattern binding declaration.
 static void validatePatternBindingDecl(TypeChecker &tc,
                                        PatternBindingDecl *binding) {
@@ -1255,6 +1274,24 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       binding->setInvalid();
       binding->getPattern()->setType(ErrorType::get(tc.Context));
       goto done;
+    }
+  }
+  
+  // If the pattern binding appears in a type or library file context, then
+  // it must bind at least one variable.
+  if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
+    llvm::SmallVector<VarDecl*, 2> vars;
+    binding->getPattern()->collectVariables(vars);
+    if (vars.empty()) {
+      // Selector for error message.
+      enum : unsigned {
+        Property,
+        GlobalVariable,
+      };
+      tc.diagnose(binding->getPattern()->getLoc(),
+                  diag::pattern_binds_no_variables,
+                  binding->getDeclContext()->isTypeContext()
+                                                   ? Property : GlobalVariable);
     }
   }
 
