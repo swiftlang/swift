@@ -9,20 +9,35 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-//  
-//
-//===----------------------------------------------------------------------===//
 
-/// Base protocol for Strideable; allows the definition of < to be
-/// inferred for Comparable conformance
+/// This protocol is an implementation detail of `Strideable`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `Strideable` and thus must
+/// be satisfied by types conforming to that protocol.
 public protocol _Strideable {
   // FIXME: We'd like to name this type "Distance" but for
   // <rdar://problem/17619038>
+  /// A type that can represent the distance between two values of `Self`
   typealias Stride : SignedNumberType
-  
-  func distanceTo(Self) -> Stride
-  func advancedBy(Stride) -> Self
+
+  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
+  /// `other`.
+  ///
+  /// Complexity: O(1).
+  ///
+  /// See also: `RandomAccessIndexType`\ 's `distanceTo`, which provides a
+  /// stronger semantic guarantee.
+  func distanceTo(other: Self) -> Stride
+
+  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
+  /// `n`.
+  ///
+  /// Complexity: O(1).
+  ///
+  /// See also: `RandomAccessIndexType`\ 's `advancedBy`, which
+  /// provides a stronger semantic guarantee.
+  func advancedBy(n: Stride) -> Self
 }
 
 /// Compare two Strideables
@@ -34,7 +49,10 @@ public func == <T: _Strideable>(x: T, y: T) -> Bool {
   return x.distanceTo(y) == 0
 }
 
-/// A protocol for types that can be stride()d over.
+/// Conforming types are notionally continuous, one-dimensional
+/// values that can be offset and measured.
+///
+/// See also: `stride(from: to: by:)` and `stride(from: through: by:)`
 public protocol Strideable : Comparable, _Strideable {}
 
 public func + <T: Strideable> (lhs: T, rhs: T.Stride) -> T {
