@@ -159,3 +159,35 @@ bb2:
   cond_fail %5 : $Builtin.Int1
   unreachable
 }
+
+public enum Ternary {
+case First
+case Second
+case Third
+
+  public subscript(_: Builtin.Word) -> Ternary {get}
+}
+
+// CHECK-LABEL: sil @do_not_use_switch_enum_operand
+sil @do_not_use_switch_enum_operand : $@cc(method) @thin (Builtin.Word, Ternary) -> Ternary {
+bb0(%0 : $Builtin.Word, %1 : $Ternary):
+// CHECK: bb0
+// CHECK-NEXT: switch_enum %1 : $Ternary, case #Ternary.Second!enumelt: [[FIRST:bb[0-9a-zA-Z]+]], default [[SECOND:bb[0-9a-zA-Z]+]]
+  switch_enum %1 : $Ternary, case #Ternary.Second!enumelt: bb1, default bb2
+
+bb1:
+// CHECK: [[FIRST]]
+// CHECK: enum $Ternary, #Ternary.Third!enumelt
+  %5 = enum $Ternary, #Ternary.Third!enumelt
+  br bb3(%5 : $Ternary)
+
+bb2:
+// CHECK: [[SECOND]]
+// CHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $Ternary, #Ternary.First!enumelt
+  %9 = enum $Ternary, #Ternary.First!enumelt
+// CHECK: br bb3([[RESULT]] : $Ternary)
+  br bb3(%9 : $Ternary)
+
+bb3(%11 : $Ternary):
+  return %11 : $Ternary
+}

@@ -197,7 +197,7 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
     if (EI->getType() != SEI->getOperand().getType())
       return SILValue();
 
-    if (BB == SEI->getCaseDestination(EI->getElement()))
+    if (EI->getElement() == SEI->getUniqueCaseForDestination(BB))
       return SEI->getOperand();
   }
 
