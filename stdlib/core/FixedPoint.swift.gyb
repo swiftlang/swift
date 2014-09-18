@@ -138,6 +138,8 @@ public struct ${Self}
   public var value: Builtin.${BuiltinName}
 
   // FIXME: this declaration should be inferred.
+  // <rdar://problem/18379938> Type checker refuses to use the default for
+  // Int.Distance associated type
   public typealias Distance = Int
 
   @transparent public
