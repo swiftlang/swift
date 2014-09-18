@@ -267,6 +267,53 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/Use
     { ($0 as TestObjCValueTy).value })
 }
 
+ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
+  let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
+
+  var v: AnyObject = a[0]
+  expectEqual(10, (v as TestObjCValueTy).value)
+  let idValue0 = unsafeBitCast(v, UWord.self)
+
+  v = a[1]
+  expectEqual(20, (v as TestObjCValueTy).value)
+  let idValue1 = unsafeBitCast(v, UWord.self)
+
+  v = a[2]
+  expectEqual(30, (v as TestObjCValueTy).value)
+  let idValue2 = unsafeBitCast(v, UWord.self)
+
+  // Bridge back to native array.
+  var native: [TestObjCValueTy] = _convertNSArrayToArray(a)
+  native[0] = TestObjCValueTy(110)
+  native[1] = TestObjCValueTy(120)
+  native[2] = TestObjCValueTy(130)
+  native.append(TestObjCValueTy(140))
+
+  // FIXME: replace with a black hole.
+  _fixLifetime(native)
+
+  // Check that mutating the native array did not affect the bridged array.
+  expectEqual(3, a.count)
+  expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
+  expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
+  expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
+}
+
+ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
+  // Bridge back to native array.
+  var native: [TestObjCValueTy] = _convertNSArrayToArray(
+    getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3))
+  let identity1 = unsafeBitCast(native, UWord.self)
+
+  // Mutate elements, but don't change length.
+  native[0] = TestObjCValueTy(110)
+  native[1] = TestObjCValueTy(120)
+  native[2] = TestObjCValueTy(130)
+
+  // Expect no reallocations.
+  expectEqual(identity1, unsafeBitCast(native, UWord.self))
+}
+
 //===----------------------------------------------------------------------===//
 // Array -> NSArray bridging tests
 //
@@ -493,6 +540,91 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
     { ($0 as TestObjCValueTy).value })
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
+}
+
+@asmname("_CFAutoreleasePoolPrintPools")
+func _CFAutoreleasePoolPrintPools()
+
+ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
+  let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
+
+  var v: AnyObject = a[0]
+  expectEqual(10, (v as TestObjCValueTy).value)
+  let idValue0 = unsafeBitCast(v, UWord.self)
+
+  v = a[1]
+  expectEqual(20, (v as TestObjCValueTy).value)
+  let idValue1 = unsafeBitCast(v, UWord.self)
+
+  v = a[2]
+  expectEqual(30, (v as TestObjCValueTy).value)
+  let idValue2 = unsafeBitCast(v, UWord.self)
+
+  // Bridge back to native array with a cast.
+  var native: [TestObjCValueTy] = _convertNSArrayToArray(a)
+  native[0] = TestObjCValueTy(110)
+  native[1] = TestObjCValueTy(120)
+  native[2] = TestObjCValueTy(130)
+  native.append(TestObjCValueTy(140))
+
+  // FIXME: replace with a black hole.
+  _fixLifetime(native)
+
+  // Check that mutating the native array did not affect the bridged array.
+  expectEqual(3, a.count)
+  expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
+  expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
+  expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
+
+  // FIXME: there should be no autoreleased objects.
+  expectAutoreleasedKeysAndValues(opt: (0, 1), unopt: (0, 1))
+}
+
+ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
+  let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
+
+  var v: AnyObject = a[0]
+  expectEqual(10, (v as TestObjCValueTy).value)
+  let idValue0 = unsafeBitCast(v, UWord.self)
+
+  v = a[1]
+  expectEqual(20, (v as TestObjCValueTy).value)
+  let idValue1 = unsafeBitCast(v, UWord.self)
+
+  v = a[2]
+  expectEqual(30, (v as TestObjCValueTy).value)
+  let idValue2 = unsafeBitCast(v, UWord.self)
+
+  // Bridge back to native array.
+  var native: [TestBridgedValueTy] = _convertNSArrayToArray(a)
+  native[0] = TestBridgedValueTy(110)
+  native[1] = TestBridgedValueTy(120)
+  native[2] = TestBridgedValueTy(130)
+  native.append(TestBridgedValueTy(140))
+
+  // FIXME: replace with a black hole.
+  _fixLifetime(native)
+
+  // Check that mutating the native array did not affect the bridged array.
+  expectEqual(3, a.count)
+  expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
+  expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
+  expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
+}
+
+ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
+  // Bridge back to native array.
+  var native: [TestBridgedValueTy] = _convertNSArrayToArray(
+    getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3))
+  let identity1 = unsafeBitCast(native, UWord.self)
+
+  // Mutate elements, but don't change length.
+  native[0] = TestBridgedValueTy(110)
+  native[1] = TestBridgedValueTy(120)
+  native[2] = TestBridgedValueTy(130)
+
+  // Expect no reallocations.
+  expectEqual(identity1, unsafeBitCast(native, UWord.self))
 }
 
 ArrayTestSuite.setUp {
