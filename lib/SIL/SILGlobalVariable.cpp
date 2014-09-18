@@ -61,3 +61,75 @@ void SILGlobalVariable::setInitializer(SILFunction *InitF) {
 SILGlobalVariable::~SILGlobalVariable() {
   getModule().GlobalVariableTable.erase(Name);
 }
+
+static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
+                                     SILGlobalVariable *&GVar) {
+  Val = nullptr;
+  GVar = nullptr;
+  // We only handle a single SILBasicBlock for now.
+  if (F->size() != 1)
+    return false;
+
+  SILBasicBlock *BB = &F->front();
+  SILGlobalAddrInst *SGA = nullptr;
+  bool HasStore = false;
+  for (auto &I : *BB) {
+    // Make sure we have a single SILGlobalAddrInst and a single StoreInst.
+    // And the StoreInst writes to the SILGlobalAddrInst.
+    if (auto *sga = dyn_cast<SILGlobalAddrInst>(&I)) {
+      if (SGA)
+        return false;
+      SGA = sga;
+      GVar = SGA->getReferencedGlobal();
+    } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+      if (HasStore || SI->getDest().getDef() != SGA)
+        return false;
+      HasStore = true;
+      Val = dyn_cast<SILInstruction>(SI->getSrc().getDef());
+
+      // We only handle StructInst being stored to a global variable for now.
+      if (!isa<StructInst>(Val))
+        return false;
+    } else if (auto *ti = dyn_cast<TupleInst>(&I)) {
+      if (ti->getNumOperands())
+        return false;
+    } else {
+      if (I.getKind() != ValueKind::ReturnInst &&
+          I.getKind() != ValueKind::StructInst &&
+          I.getKind() != ValueKind::IntegerLiteralInst &&
+          I.getKind() != ValueKind::FloatLiteralInst &&
+          I.getKind() != ValueKind::StringLiteralInst)
+        return false;
+    }
+  }
+  return true;
+}
+
+bool SILGlobalVariable::canBeStaticInitializer(SILFunction *F) {
+  SILInstruction *dummySI;
+  SILGlobalVariable *dummyGV;
+  return analyzeStaticInitializer(F, dummySI, dummyGV);
+}
+
+/// Check if a given SILFunction can be a static initializer. If yes, return
+/// the SILGlobalVariable that it writes to.
+SILGlobalVariable *SILGlobalVariable::getVariableOfStaticInitializer(
+                     SILFunction *F) {
+  SILInstruction *dummySI;
+  SILGlobalVariable *GV;
+  if(analyzeStaticInitializer(F, dummySI, GV))
+    return GV;
+  return nullptr;
+}
+
+/// Return the value that is written into the global variable.
+SILInstruction *SILGlobalVariable::getValueOfStaticInitializer() {
+  if (!InitializerF)
+    return nullptr;
+
+  SILInstruction *SI;
+  SILGlobalVariable *dummyGV;
+  if(analyzeStaticInitializer(InitializerF, SI, dummyGV))
+    return SI;
+  return nullptr;
+}

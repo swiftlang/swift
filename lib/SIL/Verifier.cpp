@@ -2301,6 +2301,11 @@ void SILGlobalVariable::verify() const {
 #ifndef NDEBUG
   assert(getLoweredType().isObject()
          && "global variable cannot have address type");
+
+  // Verify the static initializer.
+  if (InitializerF)
+    assert(SILGlobalVariable::canBeStaticInitializer(InitializerF) &&
+           "illegal static initializer");
 #endif
 }
 

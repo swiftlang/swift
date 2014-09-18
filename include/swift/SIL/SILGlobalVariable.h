@@ -28,6 +28,7 @@ namespace swift {
 
 class ASTContext;
 class SILFunction;
+class SILInstruction;
 class SILModule;
 class VarDecl;
   
@@ -116,6 +117,14 @@ public:
     assert(Location.hasValue());
     return Location.getValue();
   }
+
+  // Helper functions to analyze the static initializer.
+  static bool canBeStaticInitializer(SILFunction *F);
+  /// Check if a given SILFunction can be a static initializer. If yes, return
+  /// the SILGlobalVariable that it writes to.
+  static SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *F);
+  /// Return the value that is written into the global variable.
+  SILInstruction *getValueOfStaticInitializer();
 
   //===--------------------------------------------------------------------===//
   // Miscellaneous
