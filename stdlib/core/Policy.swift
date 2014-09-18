@@ -273,18 +273,31 @@ public func ^= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs ^ rhs
 }
 
+/// Instances of conforming types provide an integer `hashValue` and
+/// can be used as `Dictionary` keys.
 public protocol Hashable : Equatable {
-  /// Returns the hash value.  The hash value is not guaranteed to be stable
-  /// across different invocations of the same program.  Do not persist the hash
-  /// value across program runs.
+  /// The hash value.
   ///
-  /// The value of `hashValue` property must be consistent with the equality
-  /// comparison: if two values compare equal, they must have equal hash
-  /// values.
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  ///
+  /// **Note:** the hash value is not guaranteed to be stable across
+  /// different invocations of the same program.  Do not persist the
+  /// hash value across program runs.
   var hashValue: Int { get }
 }
 
-// The opposite of a GeneratorType (like an Output Iterator)
+/// Instances of conforming types are effectively functions with the
+/// signature `(Element) -> Void`.
+///
+/// Useful mainly when the optimizer's ability to specialize generics
+/// outstrips its ability to specialize ordinary closures.  For
+/// example, you may find that instead of::
+///
+///   func f(g: (X)->Void) { ... g(a) ...}
+///
+/// the following generates better code::
+///
+///   func f<T: Sink where T.Element == X>(g: T) { ... g.put(a) ...}
 public protocol SinkType {
   typealias Element
   mutating func put(x: Element)
