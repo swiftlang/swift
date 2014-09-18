@@ -34,18 +34,19 @@
 % for (Self, a_Self) in arrayTypes:
 
 %{
+if True:
     O1 = ("O(1) unless `self`'s storage is"
        + ' shared with another live array; O(`count`) '
        + ('if `self` does not wrap a bridged `NSArray`; '
        + 'otherwise the efficiency is unspecified.'
          if Self == 'Array' else 'otherwise.'))
- 
+
     contiguousCaveat = (
       ' If no such storage exists, it is first created.' if Self == 'Array'
       else '')
-}%
 
-%   if Self == 'ContiguousArray':
+    if Self == 'ContiguousArray':
+      SelfDocComment = """\
 /// A fast, contiguously-stored array of `T`.
 ///
 /// Efficiency is equivalent to that of `Array`, unless `T` is a
@@ -53,8 +54,9 @@
 /// `ContiguousArray` may be more efficient.  Note, however, that
 /// `ContiguousArray` does not bridge to Objective-C.  See `Array`,
 /// with which `ContiguousArray` shares most properties, for more
-/// detail.
-%   elif Self == 'Slice':
+/// detail."""
+    elif Self == 'Slice':
+      SelfDocComment = """\
 /// The `Array`-like type that represents a sub-sequence of any
 /// `Array`, `ContiguousArray`, or other `Slice`.
 ///
@@ -68,8 +70,9 @@
 ///    storing the slice may prolong the lifetime of elements that are
 ///    no longer accessible, which can manifest as apparent memory and
 ///    object leakage.  To prevent this effect, use `Slice` only for
-///    transient computation.
-%   elif Self == 'Array':
+///    transient computation."""
+    elif Self == 'Array':
+      SelfDocComment = """\
 /// Conceptually_, `Array` is an efficient, tail-growable random-access
 /// collection of arbitrary elements.
 ///
@@ -156,14 +159,13 @@
 /// `NSArray`, to ensure it won't be modified, and stores the result
 /// in the `Array`.  Type-checking, to ensure the `NSArray`\ 's
 /// elements match or can be bridged to `T`, is deferred until the
-/// first element access.
-//
-// FIXME: Write about up/down-casting.
-%   else:
+/// first element access."""
+# FIXME: Write about Array up/down-casting.
+    else:
+      raise AssertionError('Unhandled case: ' + Self)
+}%
 
-%     raise AssertionError('Unhandled case: ' + Self)
-
-%   end
+${SelfDocComment}
 public struct ${Self}<T> : MutableCollectionType, Sliceable {
   /// The type of element stored by this `${Self}`
   public typealias Element = T
