@@ -851,7 +851,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
   os << ".";
 
   // Print name.
-  printName(os, getName());
+  getFullName().printPretty(os);
 
   // Print location.
   auto &srcMgr = getASTContext().SourceMgr;
