@@ -2225,31 +2225,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 /// This routine does not attempt to check whether the cast can actually
 /// succeed; that's the caller's responsibility.
 static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
-                                          Type fromType,
-                                          Type toType) {
-  // Peel off optionals metatypes from the types, because we might cast through
-  // them.
-  toType = toType->lookThroughAllAnyOptionalTypes();
-  fromType = fromType->lookThroughAllAnyOptionalTypes();
-
-  // Peel off metatypes, since if we can cast two types, we can cast their
-  // metatypes.
-  while (auto toMetatype = toType->getAs<MetatypeType>()) {
-    auto fromMetatype = fromType->getAs<MetatypeType>();
-    if (!fromMetatype)
-      break;
-    toType = toMetatype->getInstanceType();
-    fromType = fromMetatype->getInstanceType();
-  }
-  
-  // Peel off a potential layer of existential<->concrete metatype conversion.
-  if (auto toMetatype = toType->getAs<AnyMetatypeType>()) {
-    if (auto fromMetatype = fromType->getAs<MetatypeType>()) {
-      toType = toMetatype->getInstanceType();
-      fromType = fromMetatype->getInstanceType();
-    }
-  }
-  
+                                                    Type fromType,
+                                                    Type toType) {
   // Classify the from/to types.
   bool toArchetype = toType->is<ArchetypeType>();
   bool fromArchetype = fromType->is<ArchetypeType>();
@@ -2325,23 +2302,56 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyCheckedCastConstraint(
                     Type fromType, Type toType,
                     ConstraintLocatorBuilder locator) {
-  // Dig out the fixed type to which this type refers.
-  TypeVariableType *typeVar1;
-  fromType = getFixedTypeRecursive(fromType, typeVar1, /*wantRValue=*/true);
+  do {
+    // Dig out the fixed type to which this type refers.
+    TypeVariableType *typeVar1;
+    fromType = getFixedTypeRecursive(fromType, typeVar1, /*wantRValue=*/true);
 
-  // If we hit a type variable without a fixed type, we can't
-  // solve this yet.
-  if (typeVar1)
-    return SolutionKind::Unsolved;
+    // If we hit a type variable without a fixed type, we can't
+    // solve this yet.
+    if (typeVar1)
+      return SolutionKind::Unsolved;
 
-  // Dig out the fixed type to which this type refers.
-  TypeVariableType *typeVar2;
-  toType = getFixedTypeRecursive(toType, typeVar2, /*wantRValue=*/true);
+    // Dig out the fixed type to which this type refers.
+    TypeVariableType *typeVar2;
+    toType = getFixedTypeRecursive(toType, typeVar2, /*wantRValue=*/true);
 
-  // If we hit a type variable without a fixed type, we can't
-  // solve this yet.
-  if (typeVar2)
-    return SolutionKind::Unsolved;
+    // If we hit a type variable without a fixed type, we can't
+    // solve this yet.
+    if (typeVar2)
+      return SolutionKind::Unsolved;
+
+    Type origFromType = fromType;
+    Type origToType = toType;
+
+    // Peel off optionals metatypes from the types, because we might cast through
+    // them.
+    toType = toType->lookThroughAllAnyOptionalTypes();
+    fromType = fromType->lookThroughAllAnyOptionalTypes();
+
+    // Peel off metatypes, since if we can cast two types, we can cast their
+    // metatypes.
+    while (auto toMetatype = toType->getAs<MetatypeType>()) {
+      auto fromMetatype = fromType->getAs<MetatypeType>();
+      if (!fromMetatype)
+        break;
+      toType = toMetatype->getInstanceType();
+      fromType = fromMetatype->getInstanceType();
+    }
+
+    // Peel off a potential layer of existential<->concrete metatype conversion.
+    if (auto toMetatype = toType->getAs<AnyMetatypeType>()) {
+      if (auto fromMetatype = fromType->getAs<MetatypeType>()) {
+        toType = toMetatype->getInstanceType();
+        fromType = fromMetatype->getInstanceType();
+      }
+    }
+
+    // If nothing changed, we're done.
+    if (fromType.getPointer() == origFromType.getPointer() &&
+        toType.getPointer() == origToType.getPointer())
+      break;
+  } while (true);
 
   auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
@@ -2369,12 +2379,10 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   case CheckedCastKind::DictionaryDowncast:
   case CheckedCastKind::DictionaryDowncastBridged: {
     Type fromKeyType, fromValueType;
-    std::tie(fromKeyType, fromValueType) 
-      = *isDictionaryType(fromType->lookThroughAllAnyOptionalTypes());
+    std::tie(fromKeyType, fromValueType) = *isDictionaryType(fromType);
 
     Type toKeyType, toValueType;
-    std::tie(toKeyType, toValueType) 
-      = *isDictionaryType(toType->lookThroughAllAnyOptionalTypes());
+    std::tie(toKeyType, toValueType) = *isDictionaryType(toType);
     
     // FIXME: Deal with from/to base types that haven't been solved
     // down to type variables yet.
@@ -2425,37 +2433,27 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
   case CheckedCastKind::Downcast:
   case CheckedCastKind::ExistentialToConcrete: {
-    // Peel off optionals from the types, because we might cast
-    // through them.
-    auto toValueType = toType->lookThroughAllAnyOptionalTypes();
-    auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
-
-    addConstraint(ConstraintKind::Subtype, toValueType, fromValueType,
+    addConstraint(ConstraintKind::Subtype, toType, fromType,
                   getConstraintLocator(locator));
     return SolutionKind::Solved;
   }
 
   case CheckedCastKind::BridgeFromObjectiveC: {
-    // Peel off optionals from the types, because we might cast
-    // through them.
-    auto toValueType = toType->lookThroughAllAnyOptionalTypes();
-    auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
-
     // This existential-to-concrete cast might bridge through an Objective-C
     // class type.
-    if (auto classType = TC.getDynamicBridgedThroughObjCClass(DC, fromValueType,
-                                                              toValueType)) {
+    if (auto classType = TC.getDynamicBridgedThroughObjCClass(DC, fromType,
+                                                              toType)) {
       // The class we're bridging through must be a subtype of the type we're
       // coming from.
-      addConstraint(ConstraintKind::Subtype, classType, fromValueType,
+      addConstraint(ConstraintKind::Subtype, classType, fromType,
                     getConstraintLocator(locator));
       return SolutionKind::Solved;
     }
 
-    Type objCClass = TC.getDynamicBridgedThroughObjCClass(DC, fromValueType, 
-                                                          toValueType);
+    Type objCClass = TC.getDynamicBridgedThroughObjCClass(DC, fromType,
+                                                          toType);
     assert(objCClass && "Type must be bridged");
-    addConstraint(ConstraintKind::Subtype, objCClass, fromValueType,
+    addConstraint(ConstraintKind::Subtype, objCClass, fromType,
                   getConstraintLocator(locator));
     return SolutionKind::Solved;
   }

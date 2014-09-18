@@ -140,3 +140,8 @@ inferDouble2 = d2
 
 // rdar://problem/18269449
 var i1: Int = 1.5 * 3.5 // expected-error{{cannot invoke '*' with an argument list of type '(FloatLiteralConvertible, FloatLiteralConvertible)'}}
+
+// rdar://problem/18330319
+func rdar18330319(s: String, d: [String : AnyObject]) {
+  let t = d[s] as String?
+}
