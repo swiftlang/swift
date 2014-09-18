@@ -2581,7 +2581,12 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   ExtensionDecl *LastExtension = nullptr;
 
   /// \brief The generation at which we last loaded extensions.
-  unsigned ExtensionGeneration = 0;
+  unsigned ExtensionGeneration: 31;
+                          
+  /// \brief Whether or not the generic signature of the type declaration is
+  /// currently being validated.
+  unsigned ValidatingGenericSignature: 1;
+                    
 
   /// \brief A lookup table containing all of the members of this type and
   /// its extensions.
@@ -2624,6 +2629,8 @@ protected:
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
+    ExtensionGeneration = 0;
+    ValidatingGenericSignature = false;
   }
 
   friend class ProtocolType;
@@ -2639,6 +2646,14 @@ public:
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
     return IterableDeclContext::isLazy();
+  }
+  
+  void setIsValidatingGenericSignature(bool ivgs = true) {
+    ValidatingGenericSignature = ivgs;
+  }
+  
+  bool IsValidatingGenericSignature() {
+    return ValidatingGenericSignature;
   }
   
   /// \brief Returns true if this this decl contains delayed value or protocol

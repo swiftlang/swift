@@ -6402,14 +6402,20 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       revertGenericParamList(gp);
 
-      ArchetypeBuilder builder =
-        createArchetypeBuilder(nominal->getModuleContext());
-      checkGenericParamList(builder, gp, *this, nominal->getDeclContext());
-      finalizeGenericParamList(builder, gp, nominal, *this);
+      // If we're already validating the type declaration's generic signature,
+      // avoid a potential infinite loop by not re-validating the generic
+      // parameter list.
+      if (!nominal->IsValidatingGenericSignature()) {
+        ArchetypeBuilder builder =
+          createArchetypeBuilder(nominal->getModuleContext());
+        checkGenericParamList(builder, gp, *this, nominal->getDeclContext());
+        finalizeGenericParamList(builder, gp, nominal, *this);
+      }
     }
 
     // Compute the declared type.
-    nominal->computeType();
+    if (!nominal->hasType())
+      nominal->computeType();
 
     validateAttributes(*this, D);
     checkInheritanceClause(D);

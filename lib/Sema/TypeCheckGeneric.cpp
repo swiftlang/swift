@@ -815,10 +815,14 @@ GenericSignature *TypeChecker::validateGenericSignature(
 
 bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   bool invalid = false;
-  auto sig = validateGenericSignature(nominal->getGenericParams(),
-                                      nominal->getDeclContext(),
-                                      nullptr, invalid);
-  nominal->setGenericSignature(sig);
+  if (!nominal->IsValidatingGenericSignature()) {
+    nominal->setIsValidatingGenericSignature();
+    auto sig = validateGenericSignature(nominal->getGenericParams(),
+                                        nominal->getDeclContext(),
+                                        nullptr, invalid);
+    nominal->setGenericSignature(sig);
+    nominal->setIsValidatingGenericSignature(false);
+  }
   return invalid;
 }
 
