@@ -471,6 +471,13 @@ namespace {
     Subtypes
   };
 
+  /// The kind of literal binding found.
+  enum class LiteralBindingKind : unsigned char {
+    None,
+    Collection,
+    Atom,
+  };
+
   /// A potential binding from the type variable to a particular type,
   /// along with information that can be used to construct related
   /// bindings, e.g., the supertypes of a given type.
@@ -496,7 +503,7 @@ namespace {
     bool InvolvesTypeVariables = false;
 
     /// Whether this type variable has literal bindings.
-    bool HasLiteralBindings = false;
+    LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const {
@@ -507,10 +514,29 @@ namespace {
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x, 
                           const PotentialBindings &y) {
-      return std::make_tuple(x.FullyBound, x.InvolvesTypeVariables, 
-                             x.HasLiteralBindings, -x.Bindings.size())
-        < std::make_tuple(y.FullyBound, y.InvolvesTypeVariables, 
-                          y.HasLiteralBindings, -y.Bindings.size());
+      return std::make_tuple(x.FullyBound,
+                             static_cast<unsigned char>(x.LiteralBinding),
+                             x.InvolvesTypeVariables,
+                             -x.Bindings.size())
+        < std::make_tuple(y.FullyBound,
+                          static_cast<unsigned char>(y.LiteralBinding),
+                          y.InvolvesTypeVariables,
+                          -y.Bindings.size());
+    }
+
+    void foundLiteralBinding(ProtocolDecl *proto) {
+      switch (*proto->getKnownProtocolKind()) {
+      case KnownProtocolKind::DictionaryLiteralConvertible:
+      case KnownProtocolKind::ArrayLiteralConvertible:
+      case KnownProtocolKind::StringInterpolationConvertible:
+        LiteralBinding = LiteralBindingKind::Collection;
+        break;
+
+      default:
+        if (LiteralBinding != LiteralBindingKind::Collection)
+          LiteralBinding = LiteralBindingKind::Atom;
+        break;
+      }
     }
   };
 }
@@ -639,7 +665,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
         if (!exactTypes.insert(defaultType->getCanonicalType()))
           continue;
 
-        result.HasLiteralBindings = true;
+        result.foundLiteralBinding(constraint->getProtocol());
         result.Bindings.push_back({defaultType, AllowedBindingKind::Subtypes,
                                    constraint->getProtocol()});
         continue;
@@ -665,7 +691,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       }
 
       if (!matched) {
-        result.HasLiteralBindings = true;
+        result.foundLiteralBinding(constraint->getProtocol());
         exactTypes.insert(defaultType->getCanonicalType());
         result.Bindings.push_back({defaultType, AllowedBindingKind::Subtypes,
                                    constraint->getProtocol()});
@@ -1428,7 +1454,8 @@ bool ConstraintSystem::solveSimplified(
   // no other option, go ahead and try the bindings for this type variable.
   if (bestBindings && 
       (disjunctions.empty() ||
-       (!bestBindings.InvolvesTypeVariables && !bestBindings.FullyBound))) {
+       (!bestBindings.InvolvesTypeVariables && !bestBindings.FullyBound &&
+        bestBindings.LiteralBinding == LiteralBindingKind::None))) {
     return tryTypeVariableBindings(*this, solverState->depth, bestTypeVar,
                                    bestBindings.Bindings, solutions,
                                    allowFreeTypeVariables);

@@ -624,8 +624,8 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: #] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
 }
 
-[1].join([4]) // expected-error {{'Array<Int>' is not identical to 'Int'}}
-[1].join([[[4]]]) // expected-error {{'Int' is not identical to 'Array<Int>'}}
+[1].join([4]) // expected-error {{'Array<$T2>' does not conform to protocol 'IntegerLiteralConvertible'}}
+[1].join([[[4]]]) // expected-error {{type 'Array<$T6>' does not conform to protocol 'IntegerLiteralConvertible'}}
 
 //===----------------------------------------------------------------------===//
 // nil/.None comparisons
