@@ -189,7 +189,7 @@ namespace {
                        locator);
 
       // Each of the segments is passed as an argument to
-      // init(stringInterpolationSegment:).
+      // convertFromStringInterpolationSegment().
       unsigned index = 0;
       auto tvMeta = MetatypeType::get(tv);
       for (auto segment : expr->getSegments()) {
@@ -206,11 +206,10 @@ namespace {
                                             Identifier(),
                                             locator));
 
-        DeclName segmentName(C, C.Id_init, { C.Id_StringInterpolationSegment });
         CS.addConstraint(Constraint::create(CS, ConstraintKind::ValueMember,
                                             tvMeta,
                                             methodTy,
-                                            segmentName,
+                                            C.Id_ConvertFromStringInterpolationSegment,
                                             locator));
 
       }

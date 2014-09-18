@@ -370,7 +370,7 @@ public protocol DictionaryLiteralConvertible {
 /// Conforming types can be initialized with string interpolations
 /// containing `\(`\ ...\ `)` clauses.
 public protocol StringInterpolationConvertible {
-  init(stringInterpolation strings: Self...)
-  init<T>(stringInterpolationSegment expr: T)
+  class func convertFromStringInterpolation(strings: Self...) -> Self
+  class func convertFromStringInterpolationSegment<T>(expr: T) -> Self
 }
 

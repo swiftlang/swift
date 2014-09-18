@@ -820,16 +820,16 @@ struct MyString : StringLiteralConvertible, StringInterpolationConvertible {
     self.init(str: value)
   }
 
-  init(stringInterpolation strings: MyString...) {
+  static func convertFromStringInterpolation(strings: MyString...) -> MyString {
     var result = ""
     for s in strings {
       result += s.value
     }
-    self.init(str: result)
+    return MyString(str: result)
   }
 
-  init<T>(stringInterpolationSegment expr: T) {
-    self.init(str: "<segment " + toString(expr) + ">")
+  static func convertFromStringInterpolationSegment<T>(expr: T) -> MyString {
+    return MyString(str: "<segment " + toString(expr) + ">")
   }
 }
 

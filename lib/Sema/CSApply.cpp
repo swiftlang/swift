@@ -203,6 +203,12 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
   return cast<DeclTy>(conformance->getWitness(requirement, &tc).getDecl());
 }
 
+static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc, Type type,
+                                  ProtocolDecl *proto, Identifier name,
+                                  Diag<> diag) {
+  return findNamedWitnessImpl<FuncDecl>(tc, dc, type, proto, name, diag);
+}
+
 static VarDecl *findNamedPropertyWitness(TypeChecker &tc, DeclContext *dc,
                                          Type type, ProtocolDecl *proto,
                                          Identifier name, Diag<> diag) {
@@ -1671,29 +1677,25 @@ namespace {
 
       // Find the string interpolation protocol we need.
       auto &tc = cs.getTypeChecker();
+      auto &C = tc.Context;
       auto interpolationProto
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::StringInterpolationConvertible);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
-      DeclName name(tc.Context, tc.Context.Id_init,
-                    { tc.Context.Id_StringInterpolation });
-      auto member
-        = findNamedWitnessImpl<ConstructorDecl>(
-            tc, dc, type,
-            interpolationProto, name,
-            diag::interpolation_broken_proto);
-
-      DeclName segmentName(tc.Context, tc.Context.Id_init,
-                           { tc.Context.Id_StringInterpolationSegment });
-      auto segmentMember
-        = findNamedWitnessImpl<ConstructorDecl>(
-            tc, dc, type, interpolationProto, segmentName,
-            diag::interpolation_broken_proto);
+      // FIXME: Cache name,
+      auto member =
+          findNamedWitness(tc, dc, type, interpolationProto,
+                           C.Id_ConvertFromStringInterpolation,
+                           diag::interpolation_broken_proto);
+      auto segmentMember =
+         findNamedWitness(tc, dc, type, interpolationProto,
+                          C.Id_ConvertFromStringInterpolationSegment,
+                          diag::interpolation_broken_proto);
       if (!member || !segmentMember)
         return nullptr;
 
-      // Build a reference to the init(stringInterpolation:) initializer.
+      // Build a reference to the convertFromStringInterpolation member.
       // FIXME: This location info is bogus.
       auto typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
                                                   type, tc.Context);
@@ -1708,8 +1710,7 @@ namespace {
 
       // Create a tuple containing all of the segments.
       SmallVector<Expr *, 4> segments;
-      SmallVector<TupleTypeElt, 4> typeElements;
-      SmallVector<Identifier, 4> names;
+
       unsigned index = 0;
       ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
       for (auto segment : expr->getSegments()) {
@@ -1717,19 +1718,8 @@ namespace {
                       locatorBuilder.withPathElement(
                           LocatorPathElt::getInterpolationArgument(index++)));
 
-        // Find the initializer we chose.
+        // Find the conversion method we chose.
         auto choice = getOverloadChoice(locator);
-
-        auto arg = TupleExpr::create(
-                     tc.Context, SourceLoc(), { segment },
-                     { tc.Context.Id_StringInterpolationSegment },
-                     { }, SourceLoc(), /*HasTrailingClosure=*/false,
-                     /*Implicit=*/true,
-                     TupleType::get(
-                       { TupleTypeElt(
-                           segment->getType(),
-                           tc.Context.Id_StringInterpolationSegment) },
-                       tc.Context));
 
         auto memberRef = buildMemberRef(
             typeRef, choice.openedFullType,
@@ -1737,37 +1727,29 @@ namespace {
             segment->getStartLoc(), choice.openedType,
             locatorBuilder, /*Implicit=*/true, AccessKind::Ordinary);
         ApplyExpr *apply =
-            new (tc.Context) CallExpr(memberRef, arg, /*Implicit=*/true);
-
-        auto converted = finishApply(apply, openedType, locatorBuilder);
-        if (!converted)
-          return nullptr;
-
-        segments.push_back(converted);
-
-        if (index == 1) {
-          typeElements.push_back(
-            TupleTypeElt(converted->getType(),
-                         tc.Context.Id_StringInterpolation));
-          names.push_back(tc.Context.Id_StringInterpolation);
-        } else {
-          typeElements.push_back(converted->getType());
-          names.push_back(Identifier());
-        }
+            new (tc.Context) CallExpr(memberRef, segment, /*Implicit=*/true);
+        segment = finishApply(apply, openedType, locatorBuilder);
+        segments.push_back(segment);
       }
 
-      Expr *argument = TupleExpr::create(tc.Context,
-                                         expr->getStartLoc(),
-                                         segments,
-                                         names,
-                                         { },
-                                         expr->getStartLoc(),
-                                         /*hasTrailingClosure=*/false,
-                                         /*Implicit=*/true,
-                                         TupleType::get(typeElements,
-                                                        tc.Context));
+      Expr *argument = nullptr;
+      if (segments.size() == 1)
+        argument = segments.front();
+      else {
+        SmallVector<TupleTypeElt, 4> tupleElements(segments.size(),
+                                                   TupleTypeElt(type));
+        argument = TupleExpr::create(tc.Context,
+                                     expr->getStartLoc(),
+                                     segments,
+                                     { }, 
+                                     { },
+                                     expr->getStartLoc(),
+                                     /*hasTrailingClosure=*/false,
+                                     /*Implicit=*/true,
+                                     TupleType::get(tupleElements,tc.Context));
+      }
 
-      // Call the init(stringInterpolation:) initializer with the arguments.
+      // Call the convertFromStringInterpolation member with the arguments.
       ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, argument,
                                                    /*Implicit=*/true);
       expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));

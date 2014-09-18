@@ -229,18 +229,21 @@ public struct AssertString
     self.stringValue = value
   }
 
-  public init(stringInterpolation strings: AssertString...) {
+  public static func convertFromStringInterpolation(
+    strings: AssertString...
+  ) -> AssertString {
     var result = String()
     for str in strings {
       result += str.stringValue
     }
-
-    self.init(result)
+    return AssertString(result)
   }
 
   @transparent
-  public init<T>(stringInterpolationSegment expr: T) {
-    self.init(String(stringInterpolationSegment: expr))
+  public static func convertFromStringInterpolationSegment<T>(
+    expr: T
+  ) -> AssertString {
+    return AssertString(String.convertFromStringInterpolationSegment(expr))
   }
 
   public var description: String {
