@@ -63,8 +63,9 @@
 /// Darwin reserves the low 4GB of address space.
 #define SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER (4ULL*1024*1024*1024)
 
-// Only the bottom 47 bits are used, and heap objects are eight-byte-aligned.
-#define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK 0xFFFF800000000007ULL
+// Only the bottom 56 bits are used, and heap objects are eight-byte-aligned.
+// 
+#define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
 
 // Objective-C reserves the high and low bits for tagged pointers.
 // Systems exist which use either bit.
