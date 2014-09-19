@@ -454,6 +454,7 @@ public:
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
+    verifySILFunctionType(resultInfo);
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
 
@@ -565,6 +566,7 @@ public:
               "function_ref inside transparent function cannot "
               "reference a private or hidden symbol");
     }
+    verifySILFunctionType(fnType);
   }
 
   void checkGlobalAddrInst(GlobalAddrInst *GAI) {
@@ -2128,6 +2130,16 @@ public:
     }
   }
 
+  void verifySILFunctionType(CanSILFunctionType FTy) {
+    // Make sure that FTy does not have any out parameters except for the first
+    // parameter.
+    for (SILParameterInfo PInfo : FTy->getParameters().slice(1)) {
+      require(!PInfo.isIndirectResult(),
+              "Indirect results can only be the first argument of a "
+              "SILFunction.");
+    }
+  }
+
   void verifyStackHeight(SILFunction *F) {
     llvm::DenseMap<SILBasicBlock*, std::vector<AllocStackInst*>> visitedBBs;
     SmallVector<SILBasicBlock*, 16> Worklist;
@@ -2207,10 +2219,15 @@ public:
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
-    if (F->getLoweredFunctionType()->isPolymorphic()) {
+    CanSILFunctionType FTy = F->getLoweredFunctionType();
+    if (FTy->isPolymorphic()) {
       require(F->getContextGenericParams(),
               "generic function definition must have context archetypes");
     }
+
+    // Make sure that FTy does not have any out parameters except for the first
+    // parameter.
+    verifySILFunctionType(FTy);
 
     verifyEntryPointArguments(F->getBlocks().begin());
     verifyEpilogBlock(F);
