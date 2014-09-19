@@ -3206,7 +3206,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     SILDeclRef dtorConstant =
       SILDeclRef(superclassDtorDecl, SILDeclRef::Kind::Destroyer);
     SILType baseSILTy = getLoweredLoadableType(superclassTy);
-    SILValue baseSelf = B.createUpcast(Loc, selfValue, baseSILTy);
+    SILValue baseSelf = B.createUpcast(cleanupLoc, selfValue, baseSILTy);
     ManagedValue dtorValue;
     SILType dtorTy;
     ArrayRef<Substitution> subs
@@ -3221,7 +3221,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   }
 
   // Release our members.
-  emitClassMemberDestruction(selfValue, cd, Loc, cleanupLoc);
+  emitClassMemberDestruction(selfValue, cd, cleanupLoc);
 
   B.createReturn(returnLoc, resultSelfValue);
 }
@@ -4177,19 +4177,18 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
 
   auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
   prepareEpilog(TupleType::getEmpty(getASTContext()), cleanupLoc);
-  emitClassMemberDestruction(selfValue, cd, loc, cleanupLoc);
+  emitClassMemberDestruction(selfValue, cd, cleanupLoc);
   B.createReturn(loc, emitEmptyTuple(loc));
   emitEpilog(loc);
 }
 
 void SILGenFunction::emitClassMemberDestruction(SILValue selfValue,
                                                 ClassDecl *cd,
-                                                RegularLocation loc,
                                                 CleanupLocation cleanupLoc) {
   for (VarDecl *vd : cd->getStoredProperties()) {
     const TypeLowering &ti = getTypeLowering(vd->getType());
     if (!ti.isTrivial()) {
-      SILValue addr = B.createRefElementAddr(loc, selfValue, vd,
+      SILValue addr = B.createRefElementAddr(cleanupLoc, selfValue, vd,
                                          ti.getLoweredType().getAddressType());
       B.emitDestroyAddr(cleanupLoc, addr);
     }

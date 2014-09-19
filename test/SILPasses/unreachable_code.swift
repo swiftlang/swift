@@ -191,3 +191,17 @@ func test_single_statement_closure(fn:() -> ()) {}
 test_single_statement_closure() {
     exit() // no-warning
 }
+
+class C { }
+class Super { 
+  var s = C()
+  deinit { // no-warning
+  }
+}
+class D : Super { 
+  var c = C()
+  deinit { // no-warning
+    exit()
+  }
+}
+
