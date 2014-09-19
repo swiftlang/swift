@@ -8,5 +8,5 @@ add_swift_library(swiftFoundation INSTALL TARGET_LIBRARY
   MixedStringNSStringOperations.swift.gyb
   NSStringAPI.swift
   NSValue.swift
-  DEPENDS swiftCore swiftObjectiveC swiftCoreGraphics swiftDispatch
+  DEPENDS swiftCore swiftObjectiveC swiftCoreGraphics swiftDispatch swiftSecurity
   FRAMEWORK_DEPENDS Foundation)
