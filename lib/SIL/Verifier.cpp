@@ -2133,6 +2133,9 @@ public:
   void verifySILFunctionType(CanSILFunctionType FTy) {
     // Make sure that FTy does not have any out parameters except for the first
     // parameter.
+    if (FTy->getParameters().size() < 2)
+      return;
+
     for (SILParameterInfo PInfo : FTy->getParameters().slice(1)) {
       require(!PInfo.isIndirectResult(),
               "Indirect results can only be the first argument of a "
