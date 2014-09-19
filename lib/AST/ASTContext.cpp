@@ -235,12 +235,6 @@ struct ASTContext::Implementation {
   /// \brief The permanent arena.
   Arena Permanent;
 
-  using ConformanceListPair = std::pair<unsigned, SmallVector<Decl *, 8>>;
-
-  /// \brief The set of nominal types and extensions thereof known to conform
-  /// to compiler-known protocols.
-  ConformanceListPair KnownProtocolConformances[NumKnownProtocols];
-
   /// Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
     /// The allocator used for all allocations within this arena.
@@ -1206,28 +1200,6 @@ void ASTContext::setConformsTo(CanType type, ProtocolDecl *proto,
   auto arena = getArena(type->getRecursiveProperties());
   auto &conformsTo = Impl.getArena(arena).ConformsTo;
   conformsTo[{type, proto}] = entry;
-}
-
-void ASTContext::recordConformance(KnownProtocolKind protocolKind, Decl *decl) {
-  assert(isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl));
-  auto index = static_cast<unsigned>(protocolKind);
-  assert(index < NumKnownProtocols);
-  Impl.KnownProtocolConformances[index].second.push_back(decl);
-}
-
-/// \brief Retrieve the set of nominal types and extensions thereof that
-/// conform to the given protocol.
-ArrayRef<Decl *> ASTContext::getTypesThatConformTo(KnownProtocolKind kind) {
-  auto index = static_cast<unsigned>(kind);
-  assert(index < NumKnownProtocols);
-
-  for (auto &loader : Impl.ModuleLoaders) {
-    loader->loadDeclsConformingTo(kind,
-                                  Impl.KnownProtocolConformances[index].first);
-  }
-  Impl.KnownProtocolConformances[index].first = CurrentGeneration;
-
-  return Impl.KnownProtocolConformances[index].second;
 }
 
 NormalProtocolConformance *

@@ -263,58 +263,6 @@ ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
                                                 base + sizeof(uint32_t), base));
 }
 
-static Optional<KnownProtocolKind> getActualKnownProtocol(unsigned rawKind) {
-  auto stableKind = static_cast<index_block::KnownProtocolKind>(rawKind);
-  if (stableKind != rawKind)
-    return Nothing;
-
-  switch (stableKind) {
-#define PROTOCOL(Id) \
-  case index_block::Id: return KnownProtocolKind::Id;
-#include "swift/AST/KnownProtocols.def"
-  }
-
-  // If there's a new case value in the module file, ignore it.
-  return Nothing;
-}
-
-bool ModuleFile::readKnownProtocolsBlock(llvm::BitstreamCursor &cursor) {
-  cursor.EnterSubBlock(KNOWN_PROTOCOL_BLOCK_ID);
-
-  SmallVector<uint64_t, 8> scratch;
-
-  while (true) {
-    auto next = cursor.advanceSkippingSubblocks();
-    switch (next.Kind) {
-    case llvm::BitstreamEntry::EndBlock:
-      return true;
-
-    case llvm::BitstreamEntry::Error:
-      return false;
-
-    case llvm::BitstreamEntry::SubBlock:
-      llvm_unreachable("subblocks skipped");
-
-    case llvm::BitstreamEntry::Record: {
-      scratch.clear();
-      unsigned rawKind = cursor.readRecord(next.ID, scratch);
-
-      DeclIDVector *list;
-      if (auto actualKind = getActualKnownProtocol(rawKind)) {
-        auto index = static_cast<unsigned>(actualKind.getValue());
-        list = &KnownProtocolAdopters[index];
-      } else {
-        // Ignore this record.
-        break;
-      }
-
-      list->append(scratch.begin(), scratch.end());
-      break;
-    }
-    }
-  }
-}
-
 bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
   cursor.EnterSubBlock(INDEX_BLOCK_ID);
 
@@ -331,17 +279,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       return false;
 
     case llvm::BitstreamEntry::SubBlock:
-      switch (next.ID) {
-      case KNOWN_PROTOCOL_BLOCK_ID:
-        if (!readKnownProtocolsBlock(cursor))
-          return false;
-        break;
-      default:
-        // Unknown sub-block, which this version of the compiler won't use.
-        if (cursor.SkipBlock())
-          return false;
-        break;
-      }
+      // Unknown sub-block, which this version of the compiler won't use.
+      if (cursor.SkipBlock())
+        return false;
       break;
 
     case llvm::BitstreamEntry::Record:
@@ -1062,16 +1002,6 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   for (auto item : *iter) {
     if (item.first == getKindForTable(nominal))
       (void)getDecl(item.second);
-  }
-}
-
-void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
-  PrettyModuleFileDeserialization stackEntry(*this);
-
-  auto index = static_cast<unsigned>(kind);
-  for (DeclID DID : KnownProtocolAdopters[index]) {
-    Decl *D = getDecl(DID);
-    getContext().recordConformance(kind, D);
   }
 }
 

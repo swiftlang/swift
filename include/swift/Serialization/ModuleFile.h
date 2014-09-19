@@ -15,7 +15,6 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
@@ -256,8 +255,6 @@ private:
 
   using DeclIDVector = SmallVector<serialization::DeclID, 4>;
 
-  /// All adopters of compiler-known protocols in this module.
-  DeclIDVector KnownProtocolAdopters[NumKnownProtocols];
   DeclIDVector EagerDeserializationDecls;
 
   class DeclCommentTableInfo;
@@ -322,9 +319,6 @@ private:
   /// format.
   std::unique_ptr<SerializedDeclTable>
   readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Reads the known protocols block.
-  bool readKnownProtocolsBlock(llvm::BitstreamCursor &cursor);
 
   /// Reads the index block, which contains global tables.
   ///
@@ -454,11 +448,6 @@ public:
   ///
   /// Note that this may cause other decls to load as well.
   void loadExtensions(NominalTypeDecl *nominal);
-
-  /// Loads decls that conform to the given protocol.
-  ///
-  /// Note that this may cause other decls to load as well.
-  void loadDeclsConformingTo(KnownProtocolKind kind);
 
   /// Reports all class members in the module to the given consumer.
   ///

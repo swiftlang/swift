@@ -583,14 +583,6 @@ public:
   /// Set the conformance entry for the given type and protocol.
   void setConformsTo(CanType type, ProtocolDecl *proto, ConformanceEntry entry);
 
-  /// \brief Record that the given nominal type or extension thereof conforms
-  /// to the given compiler-known protocol.
-  void recordConformance(KnownProtocolKind kind, Decl *decl);
-
-  /// \brief Retrieve the set of nominal types and extensions thereof that
-  /// conform to the given compiler-known protocol.
-  ArrayRef<Decl *> getTypesThatConformTo(KnownProtocolKind kind);
-
   /// \brief Produce a "normal" conformance for a nominal type.
   NormalProtocolConformance *
   getConformance(Type conformingType,

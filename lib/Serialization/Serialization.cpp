@@ -15,7 +15,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -325,10 +324,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_WITNESSTABLE_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_WITNESSTABLE_OFFSETS);
-
-  BLOCK(KNOWN_PROTOCOL_BLOCK);
-#define PROTOCOL(Id) BLOCK_RECORD(index_block, Id);
-#include "swift/AST/KnownProtocols.def"
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -776,13 +771,6 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     addDeclRef(protocol));
     return;
-  }
-
-  if (associatedDecl) {
-    if (auto protoKind = protocol->getKnownProtocolKind()) {
-      auto index = static_cast<unsigned>(protoKind.getValue());
-      KnownProtocolAdopters[index].push_back(addDeclRef(associatedDecl));
-    }
   }
 
   switch (conformance->getKind()) {
@@ -2841,28 +2829,6 @@ static void writeDeclCommentTable(
   DeclCommentList.emit(scratch, tableOffset, hashTableBlob);
 }
 
-/// Translate from the AST known protocol enum to the Serialization enum
-/// values, which are guaranteed to be stable.
-static uint8_t getRawStableKnownProtocolKind(KnownProtocolKind kind) {
-  switch (kind) {
-#define PROTOCOL(Id) \
-  case KnownProtocolKind::Id: return index_block::Id;
-#include "swift/AST/KnownProtocols.def"
-  }
-}
-
-/// Writes a list of decls known to conform to the given compiler-known
-/// protocol.
-static void
-writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
-                       KnownProtocolKind kind, ArrayRef<DeclID> adopters) {
-  if (adopters.empty())
-    return;
-
-  SmallVector<uint32_t, 32> scratch;
-  AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
-}
-
 /// Add operator methods from the given declaration type.
 ///
 /// Recursively walks the members and derived global decls of any nested
@@ -2960,16 +2926,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
     writeDeclTable(DeclList, index_block::CLASS_MEMBERS, ClassMembersByName);
     writeDeclTable(DeclList, index_block::OPERATOR_METHODS, operatorMethodDecls);
-
-    {
-      BCBlockRAII subBlock(Out, KNOWN_PROTOCOL_BLOCK_ID, 3);
-      index_block::KnownProtocolLayout AdopterList(Out);
-
-      for (unsigned i = 0; i < NumKnownProtocols; ++i) {
-        writeKnownProtocolList(AdopterList, static_cast<KnownProtocolKind>(i),
-                               KnownProtocolAdopters[i]);
-      }
-    }
   }
 }
 

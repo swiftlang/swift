@@ -110,10 +110,6 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 
-  virtual void loadDeclsConformingTo(KnownProtocolKind kind,
-                                     unsigned previousGeneration) override;
-
-
   /// Returns true if the data looks like it contains a serialized AST.
   static bool isSerializedAST(StringRef data);
 

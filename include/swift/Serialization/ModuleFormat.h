@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 138;
+const uint16_t VERSION_MINOR = 139;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -304,12 +304,6 @@ enum BlockID {
   ///
   /// \sa sil_index_block
   SIL_INDEX_BLOCK_ID,
-
-  /// The known protocol block, which is a sub-block of the index block.
-  ///
-  /// This contains lists of decls known to conform to each compiler-known
-  /// protocol.
-  KNOWN_PROTOCOL_BLOCK_ID = 64,
 
   /// The module documentation container block, which contains all other
   /// documentation blocks.
@@ -1203,53 +1197,6 @@ namespace index_block {
     BCFixed<4>,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from identifier strings to decl kinds / decl IDs
-  >;
-
-  /// A stable version of swift::KnownProtocolKind.
-  ///
-  /// The names should be kept in sync, but the values must \em not be
-  /// renumbered or reordered without incrementing VERSION_MAJOR.
-  enum KnownProtocolKind : uint8_t {
-    // killed
-    SequenceType = 2,
-    // killed
-    BooleanType = 4,
-
-    ArrayLiteralConvertible,
-    BooleanLiteralConvertible,
-    CharacterLiteralConvertible,
-    DictionaryLiteralConvertible,
-    ExtendedGraphemeClusterLiteralConvertible,
-    FloatLiteralConvertible,
-    IntegerLiteralConvertible,
-    StringInterpolationConvertible,
-    StringLiteralConvertible,
-    NilLiteralConvertible,
-    UnicodeScalarLiteralConvertible,
-
-    _BuiltinBooleanLiteralConvertible,
-    _BuiltinCharacterLiteralConvertible,
-    _BuiltinExtendedGraphemeClusterLiteralConvertible,
-    _BuiltinFloatLiteralConvertible,
-    _BuiltinIntegerLiteralConvertible,
-    _BuiltinStringLiteralConvertible,
-    _BuiltinUTF16StringLiteralConvertible,
-    _BuiltinUnicodeScalarLiteralConvertible,
-
-    AnyObject,
-    RawRepresentable,
-    GeneratorType,
-    RawOptionSetType,
-    Equatable,
-    Hashable,
-    Comparable,
-
-    _ObjectiveCBridgeable
-  };
-
-  using KnownProtocolLayout = BCGenericRecordLayout<
-    BCFixed<5>,  // known protocol ID
-    BCArray<DeclIDField> // list of conforming decls
   >;
 }
 

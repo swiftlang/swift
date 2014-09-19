@@ -76,17 +76,6 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) { }
 
-  /// \brief Load decls that provide conformances to the given compiler-known
-  /// protocol.
-  ///
-  /// \param kind The known protocol whose decls should be loaded.
-  ///
-  /// \param previousGeneration The previous generation number. The AST already
-  /// contains decls conforming to this protocol loaded from any generation up
-  /// to and including this one.
-  virtual void loadDeclsConformingTo(KnownProtocolKind kind,
-                                     unsigned previousGeneration) { }
-
   /// \brief Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }
 };

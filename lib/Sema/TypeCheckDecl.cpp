@@ -3352,13 +3352,8 @@ public:
     for (auto proto : D->getProtocols(false)) {
       ProtocolConformance *conformance = nullptr;
       // FIXME: Better location info
-      if (TC.conformsToProtocol(T, proto, D, &conformance,
-                                D->getStartLoc(), D)) {
-        // For nominal types and extensions thereof, record conformance
-        // to known protocols.
-        if (auto kind = proto->getKnownProtocolKind())
-            TC.Context.recordConformance(kind.getValue(), D);
-      }
+      (void)TC.conformsToProtocol(T, proto, D, &conformance,
+                                  D->getStartLoc(), D);
       conformances.push_back(conformance);
     }
 
