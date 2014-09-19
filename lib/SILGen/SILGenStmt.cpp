@@ -267,7 +267,9 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
   CurrentSILLoc = S;
-  ReturnLocation Loc(S);
+  SILLocation Loc = S->isImplicit() ?
+                      (SILLocation)ImplicitReturnLocation(S) :
+                      (SILLocation)ReturnLocation(S);
 
   SILValue ArgV;
   if (!S->hasResult())

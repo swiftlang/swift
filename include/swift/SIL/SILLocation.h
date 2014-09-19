@@ -364,6 +364,9 @@ public:
   ImplicitReturnLocation(AbstractClosureExpr *E)
     : SILLocation(E, ImplicitReturnKind) { }
 
+  ImplicitReturnLocation(ReturnStmt *S)
+  : SILLocation(S, ImplicitReturnKind) { }
+
   ImplicitReturnLocation(AbstractFunctionDecl *AFD)
     : SILLocation(AFD, ImplicitReturnKind) { }
 

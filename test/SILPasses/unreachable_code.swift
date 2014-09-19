@@ -187,3 +187,7 @@ func intConstantTest2() -> Int{
   return 3
 }
 
+func test_single_statement_closure(fn:() -> ()) {}
+test_single_statement_closure() {
+    exit() // no-warning
+}
