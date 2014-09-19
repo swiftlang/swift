@@ -267,7 +267,8 @@ struct ClosureSpecializer {
 
   bool isProfitable(ArgDescriptor &AD);
   void gatherCallSites(SILFunction *Caller,
-                       llvm::SmallVectorImpl<ArgDescriptor> &CallSites);
+                       llvm::SmallVectorImpl<ArgDescriptor> &CallSites,
+                       llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI);
   bool specialize(SILFunction *Caller);
 };
 
@@ -333,7 +334,13 @@ static void createName(SILFunction *Callee, SILFunction *Closure,
 void
 ClosureSpecializer::
 gatherCallSites(SILFunction *Caller,
-                llvm::SmallVectorImpl<ArgDescriptor> &CallSites) {
+                llvm::SmallVectorImpl<ArgDescriptor> &CallSites,
+                llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI) {
+
+  // A set of apply inst that we have associated with a closure. We use this to
+  // make sure that we do not handle call sites with multiple closure arguments.
+  llvm::SmallPtrSet<ApplyInst *, 4> VisitedAI;
+
   // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
     // For each instruction II in BB...
@@ -366,6 +373,14 @@ gatherCallSites(SILFunction *Caller,
       auto *AI = dyn_cast<ApplyInst>(PAI->use_begin().getUser());
       if (!AI || AI->hasSubstitutions())
         continue;
+
+      // Check if we have already associated this apply inst with a closure to
+      // be specialized. We do not handle applies that take in multiple
+      // closures at this time.
+      if (!VisitedAI.insert(AI)) {
+        MultipleClosureAI.insert(AI);
+        continue;
+      }
 
       // If AI does not have a function_ref defintion as its callee, we can not
       // do anything here... so continue...
@@ -412,10 +427,16 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
   // Collect all of the PartialApplyInsts that are used as arguments to
   // ApplyInsts. Check the profitability of specializing the closure argument.
   llvm::SmallVector<ArgDescriptor, 8> CallSites;
-  gatherCallSites(Caller, CallSites);
+  llvm::SmallPtrSet<ApplyInst *, 4> MultipleClosureAI;
+  gatherCallSites(Caller, CallSites, MultipleClosureAI);
 
   bool Changed = false;
   for (auto &AD : CallSites) {
+    // Do not specialize apply insts that take in multiple closures. This pass
+    // does not know how to do this yet.
+    if (MultipleClosureAI.count(AD.AI))
+      continue;
+
     auto *ClosureFRI = cast<FunctionRefInst>(AD.PAI->getCallee());
     auto *CalleeFRI = cast<FunctionRefInst>(AD.AI->getCallee());
     auto *Callee = CalleeFRI->getReferencedFunction();

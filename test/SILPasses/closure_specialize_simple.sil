@@ -28,6 +28,25 @@ bb2:
 
 sil @simple_partial_apply_caller_decl : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
 
+sil @simple_multiple_partial_apply_caller : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1, @owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1, %1 : $@callee_owned (Builtin.Int1) -> Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = integer_literal $Builtin.Int1, 0
+  // We can not do anything here for now but in the future I think we should try
+  // to handle this in closure specialization potentially.
+  apply %0(%2) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  strong_release %0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  apply %1(%2) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  strong_release %1 : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %2 : $Builtin.Int1
+}
+
+
 sil @indirect_parameter_partial_apply_fun : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
 
 sil @indirect_parameter_partial_apply_caller1 : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()) -> () {
@@ -131,7 +150,6 @@ bb2:
   return %9999 : $()
 }
 
-
 // CHECK-LABEL: sil @loop_driver : $@thin (Builtin.Int1, Builtin.Int1) -> () {
 // CHECK: [[SPECIALIZED_FUN:%.*]] = function_ref @_TTSsimple_partial_apply_fun_as0_simple_partial_apply_caller : $@thin (Builtin.Int1) -> Builtin.Int1
 // CHECK: apply [[SPECIALIZED_FUN]]
@@ -145,6 +163,7 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %3 = partial_apply %2(%0) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %4 = function_ref @simple_partial_apply_caller : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
   %5 = apply %4(%3) : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
   %6 = partial_apply %2(%0) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %7 = function_ref @simple_partial_apply_caller_decl : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
   %8 = apply %7(%6) : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
@@ -182,6 +201,12 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   dealloc_stack %21#0 : $*@local_storage (Builtin.Int1, Builtin.Int1)
   dealloc_stack %9#0 : $*@local_storage Builtin.Int1
 
+  %26 = partial_apply %2(%0) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %27 = partial_apply %2(%0) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %28 = function_ref @simple_multiple_partial_apply_caller : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1, @owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+  %29 = apply %28(%26, %27) : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1, @owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
   %9999 = tuple()
   return %9999 : $()
 }
+
