@@ -512,7 +512,7 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{type '(target: String, dependencies: String)' does not conform to protocol 'UnicodeScalarLiteralConvertible'}}
+ruleVar = Rule("a") // expected-error {{missing argument for parameter 'dependencies' in call}}
 
 
 class C {

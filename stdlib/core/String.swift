@@ -458,7 +458,12 @@ extension String : CollectionType {
 
   @availability(*, unavailable, message="cannot subscript String with an Int")
   public subscript(i: Int) -> Character {
-    fatalError("cannot subscript String with an Int")
+    _fatalErrorMessage(
+      "fatal error", 
+      "cannot subscript String with an Int",
+      __FILE__, 
+      __LINE__
+    )
   }
 
   public func generate() -> IndexingGenerator<String> {

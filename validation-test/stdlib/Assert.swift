@@ -14,15 +14,6 @@ import StdlibUnittest
 // Utilities.
 //===---
 
-struct Truthiness : BooleanType {
-  init(_ value: Bool) { self.value = value }
-  var boolValue: Bool { return value }
-
-  var value: Bool
-}
-var falsie = Truthiness(false)
-var truthie = Truthiness(true)
-
 func isDebugOrRelease() -> Bool {
   return !_isFastAssertConfiguration()
 }
@@ -80,31 +71,6 @@ Assert.test("assert/StringInterpolation")
   assert(x == 42, "this \(should) fail")
 }
 
-Assert.test("assert/BooleanType")
-  .xfail(.Custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "assertions are disabled in Release and Unchecked mode"))
-  .crashOutputMatches("this should fail")
-  .code {
-  assert(truthie, "should not fail")
-
-  expectCrashLater()
-  assert(falsie, "this should fail")
-}
-
-Assert.test("assert/BooleanType/StringInterpolation")
-  .xfail(.Custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "assertions are disabled in Release and Unchecked mode"))
-  .crashOutputMatches("this should fail")
-  .code {
-  var should = "should"
-  assert(truthie, "\(should) not fail")
-
-  expectCrashLater()
-  assert(falsie, "this \(should) fail")
-}
-
 Assert.test("assertionFailure")
   .skip(.Custom(
     { !_isDebugAssertConfiguration() },
@@ -149,29 +115,6 @@ Assert.test("precondition/StringInterpolation")
   precondition(x * 21 == 42, "\(should) not fail")
   expectCrashLater()
   precondition(x == 42, "this \(should) fail")
-}
-
-Assert.test("precondition/BooleanType")
-  .xfail(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "preconditions are disabled in Unchecked mode"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
-  .code {
-  precondition(truthie, "should not fail")
-  expectCrashLater()
-  precondition(falsie, "this should fail")
-}
-
-Assert.test("precondition/BooleanType/StringInterpolation")
-  .xfail(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "preconditions are disabled in Unchecked mode"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
-  .code {
-  var should = "should"
-  precondition(truthie, "\(should) not fail")
-  expectCrashLater()
-  precondition(falsie, "this \(should) fail")
 }
 
 Assert.test("preconditionFailure")
@@ -222,17 +165,6 @@ Assert.test("_precondition")
   _precondition(x == 42, "this should fail")
 }
 
-Assert.test("_precondition/BooleanType")
-  .xfail(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "preconditions are disabled in Unchecked mode"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
-  .code {
-  _precondition(truthie, "should not fail")
-  expectCrashLater()
-  _precondition(falsie, "this should fail")
-}
-
 Assert.test("_preconditionFailure")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
@@ -255,17 +187,6 @@ Assert.test("_debugPrecondition")
   _debugPrecondition(x == 42, "this should fail")
 }
 
-Assert.test("_debugPrecondition/BooleanType")
-  .xfail(.Custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "debug preconditions are disabled in Release and Unchecked mode"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
-  .code {
-  _debugPrecondition(truthie, "should not fail")
-  expectCrashLater()
-  _debugPrecondition(falsie, "this should fail")
-}
-
 Assert.test("_debugPreconditionFailure")
   .skip(.Custom(
     { !_isDebugAssertConfiguration() },
@@ -286,17 +207,6 @@ Assert.test("_sanityCheck")
   _sanityCheck(x * 21 == 42, "should not fail")
   expectCrashLater()
   _sanityCheck(x == 42, "this should fail")
-}
-
-Assert.test("_sanityCheck/BooleanType")
-  .xfail(.Custom(
-    { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
-  .crashOutputMatches("this should fail")
-  .code {
-  _sanityCheck(truthie, "should not fail")
-  expectCrashLater()
-  _sanityCheck(falsie, "this should fail")
 }
 
 Assert.test("_sanityCheckFailure")

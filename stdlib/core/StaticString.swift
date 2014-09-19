@@ -10,41 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Instances of conforming types can be created from string literals
-/// and are used in assertions and precondition checks.
-///
-/// This protocol exists only for directing overload resolution and
-/// string literal type deduction in assertions.
-///
-/// See also: `StaticStringType`, `StaticString`, `AssertString`
-public protocol AssertStringType
-  : UnicodeScalarLiteralConvertible,
-    ExtendedGraphemeClusterLiteralConvertible,
-    StringLiteralConvertible {
-  /// The textual value, as a `String`
-  var stringValue: String { get }
-}
-
-/// This protocol exists only for directing overload resolution and
-/// string literal type deduction in assertions.
-///
-/// See also: `AssertStringType`, `StaticString`, `AssertString`
-public protocol StaticStringType : AssertStringType {}
-
 // Implementation Note: Because StaticString is used in the
-// implementation of assert() and fatal(), we keep it extremely close
-// to the bare metal.  In particular, because we store only Builtin
-// types, we are guaranteed that no assertions are involved in its
-// construction.  This feature is crucial for preventing infinite
-// recursion even in non-asserting cases.
+// implementation of _precondition(), _fatalErrorMessage(), etc., we
+// keep it extremely close to the bare metal.  In particular, because
+// we store only Builtin types, we are guaranteed that no assertions
+// are involved in its construction.  This feature is crucial for
+// preventing infinite recursion even in non-asserting cases.
 
 /// An extremely simple string designed to represent something
 /// "statically knowable".
 public struct StaticString
-  : StaticStringType,
-    _BuiltinUnicodeScalarLiteralConvertible,
+  : _BuiltinUnicodeScalarLiteralConvertible,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible,
+    UnicodeScalarLiteralConvertible,
+    ExtendedGraphemeClusterLiteralConvertible,
+    StringLiteralConvertible,
     Printable,
     DebugPrintable {
 
@@ -202,65 +183,3 @@ public struct StaticString
     return self.stringValue.debugDescription
   }
 }
-
-/// A String-like type that can be constructed from string interpolation, and
-/// is considered less specific than `StaticString` in overload resolution.
-public struct AssertString
-  : AssertStringType, StringInterpolationConvertible, Printable,
-    DebugPrintable {
-  public var stringValue: String
-
-  @transparent
-  public init() {
-    self.stringValue = ""
-  }
-
-  @transparent
-  public init(_ value: String) {
-    self.stringValue = value
-  }
-
-  @effects(readonly)
-  @transparent
-  public init(unicodeScalarLiteral value: String) {
-    self.stringValue = value
-  }
-
-  @effects(readonly)
-  @transparent
-  public init(extendedGraphemeClusterLiteral value: String) {
-    self.stringValue = value
-  }
-
-  @effects(readonly)
-  @transparent
-  public init(stringLiteral value: String) {
-    self.stringValue = value
-  }
-
-  public static func convertFromStringInterpolation(
-    strings: AssertString...
-  ) -> AssertString {
-    var result = String()
-    for str in strings {
-      result += str.stringValue
-    }
-    return AssertString(result)
-  }
-
-  @transparent
-  public static func convertFromStringInterpolationSegment<T>(
-    expr: T
-  ) -> AssertString {
-    return AssertString(String.convertFromStringInterpolationSegment(expr))
-  }
-
-  public var description: String {
-    return self.stringValue
-  }
-
-  public var debugDescription: String {
-    return self.stringValue.debugDescription
-  }
-}
-

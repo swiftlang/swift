@@ -8,17 +8,17 @@ func testTypeInference() {
   var singleQuoted1 = 'a' // expected-error {{expression does not conform to type 'CharacterLiteralConvertible'}}
   var singleQuoted2 = 'あ' // expected-error {{expression does not conform to type 'CharacterLiteralConvertible'}}
 
-  var us1: UnicodeScalar = "" // expected-error {{type 'UnicodeScalar' does not conform to protocol 'StringLiteralConvertible'}}
+  var us1: UnicodeScalar = "" // expected-error {{'String' is not convertible to 'UnicodeScalar'}}
   var us2: UnicodeScalar = "a"
   isUnicodeScalar(&us2)
   var us3: UnicodeScalar = "あ"
   isUnicodeScalar(&us3)
   var us4: UnicodeScalar = "例"
   isUnicodeScalar(&us4)
-  var us5: UnicodeScalar = "\u{304b}\u{3099}" // expected-error {{type 'UnicodeScalar' does not conform to protocol 'ExtendedGraphemeClusterLiteralConvertible'}}
-  var us6: UnicodeScalar = "ab" // expected-error {{type 'UnicodeScalar' does not conform to protocol 'StringLiteralConvertible'}}
+  var us5: UnicodeScalar = "\u{304b}\u{3099}" // expected-error {{'String' is not convertible to 'UnicodeScalar'}}
+  var us6: UnicodeScalar = "ab" // expected-error {{'String' is not convertible to 'UnicodeScalar'}}
 
-  var ch1: Character = "" // expected-error {{type 'Character' does not conform to protocol 'StringLiteralConvertible'}}
+  var ch1: Character = "" // expected-error {{'String' is not convertible to 'Character'}}
   var ch2: Character = "a"
   isCharacter(&ch2)
   var ch3: Character = "あ"
@@ -27,7 +27,7 @@ func testTypeInference() {
   isCharacter(&ch4)
   var ch5: Character = "\u{304b}\u{3099}"
   isCharacter(&ch5)
-  var ch6: Character = "ab" // expected-error {{type 'Character' does not conform to protocol 'StringLiteralConvertible'}}
+  var ch6: Character = "ab" // expected-error {{'String' is not convertible to 'Character'}}
 
   var s1 = ""
   isString(&s1)

@@ -16,25 +16,6 @@
 /// release or fast mode these checks are disabled. This means they may have no
 /// effect on program semantics, depending on the assert configuration.
 
-% for (generic_params, closure_type, message_param, message_eval) in [
-%     ( '',
-%       'Bool',
-%       '_ message: StaticString = StaticString()',
-%       'message' ),
-%     ( '<Str : AssertStringType>',
-%       'Bool',
-%       'message: @autoclosure () -> Str',
-%       'message().stringValue' ),
-%     ( '<T : BooleanType, Str : StaticStringType>',
-%       'T',
-%       'message: @autoclosure () -> Str',
-%       'message().stringValue' ),
-%     ( '<T : BooleanType, Str : AssertStringType>',
-%       'T',
-%       'message: @autoclosure () -> Str',
-%       'message().stringValue' ),
-%   ]:
-
 /// Traditional C-style assert with an optional message.
 ///
 /// When assertions are enabled and `condition` is false, stop program
@@ -45,14 +26,15 @@
 /// When assertions are turned off, the optimizer can assume that the
 /// `condition` is true.
 @transparent
-public func assert${generic_params}(
-  condition: @autoclosure () -> ${closure_type}, ${message_param},
+public func assert(
+  condition: @autoclosure () -> Bool, 
+  _ message: @autoclosure () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFailed("assertion failed", ${message_eval}, file, line)
+      _assertionFailed("assertion failed", message(), file, line)
     }
   }
 }
@@ -63,14 +45,15 @@ public func assert${generic_params}(
 ///
 /// In unchecked mode the optimizer can assume that the `condition` is true.
 @transparent
-public func precondition${generic_params}(
-  condition: @autoclosure () -> ${closure_type}, ${message_param},
+public func precondition(
+  condition: @autoclosure () -> Bool, 
+  _ message: @autoclosure () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFailed("precondition failed", ${message_eval}, file, line)
+      _assertionFailed("precondition failed", message(), file, line)
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
@@ -78,25 +61,15 @@ public func precondition${generic_params}(
   }
 }
 
-% end
-
-% for (generic_params, message_param, message_eval) in [
-%     ( '',
-%       'message: StaticString',
-%       'message' ),
-%     ( '<Str : AssertStringType>',
-%       'message: Str',
-%       'message.stringValue' ),
-%   ]:
-
 /// A fatal error occurred and program execution should stop in debug mode.  In
 /// optimized builds this is a noop.
 @transparent @noreturn
-public func assertionFailure${generic_params}(
-  ${message_param}, file: StaticString = __FILE__, line: UWord = __LINE__
+public func assertionFailure(
+  _ message: @autoclosure () -> String = String(),
+  file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", ${message_eval}, file, line)
+    _assertionFailed("fatal error", message(), file, line)
   }
   _conditionallyUnreachable()
 }
@@ -105,12 +78,13 @@ public func assertionFailure${generic_params}(
 /// in optimized mode.  In unchecked builds this is a noop, but the
 /// optimizer can still assume that the call is unreachable.
 @transparent @noreturn
-public func preconditionFailure${generic_params}(
-  ${message_param}, file: StaticString = __FILE__, line: UWord = __LINE__
+public func preconditionFailure(
+  _ message: @autoclosure () -> String = String(),
+  file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", ${message_eval}, file, line)
+    _assertionFailed("fatal error", message(), file, line)
   } else if _isReleaseAssertConfiguration() {
     Builtin.int_trap()
   }
@@ -120,13 +94,12 @@ public func preconditionFailure${generic_params}(
 /// A fatal error occurred and program execution should stop in debug,
 /// optimized and unchecked modes.
 @transparent @noreturn
-public func fatalError${generic_params}(
-  ${message_param}, file: StaticString = __FILE__, line: UWord = __LINE__
+public func fatalError(
+  _ message: @autoclosure () -> String = String(), 
+  file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  _assertionFailed("fatal error", ${message_eval}, file, line)
+  _assertionFailed("fatal error", message(), file, line)
 }
-
-% end
 
 /// Library precondition checks
 ///
@@ -146,21 +119,6 @@ public func _precondition(
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error.value)
-  }
-}
-@transparent
-public func _precondition<T : BooleanType>(
-  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-  // Only check in debug and release mode. In release mode just trap.
-  if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
-      _fatalErrorMessage("fatal error", message, file, line)
-    }
-  } else if _isReleaseAssertConfiguration() {
-    let error = !condition().boolValue
     Builtin.condfail(error.value)
   }
 }
@@ -215,19 +173,6 @@ public func _debugPrecondition(
   }
 }
 
-@transparent
-public func _debugPrecondition<T : BooleanType>(
-  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-  // Only check in debug mode.
-  if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
-      _fatalErrorMessage("fatal error", message, file, line)
-    }
-  }
-}
-
 @transparent @noreturn
 public func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
@@ -247,18 +192,6 @@ public func _debugPreconditionFailure(
 @transparent
 public func _sanityCheck(
   condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-#if INTERNAL_CHECKS_ENABLED
-  if !_branchHint(condition(), true) {
-    _fatalErrorMessage("fatal error", message, file, line)
-  }
-#endif
-}
-
-@transparent
-public func _sanityCheck<T : BooleanType>(
-  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
 #if INTERNAL_CHECKS_ENABLED

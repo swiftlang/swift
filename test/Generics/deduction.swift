@@ -275,4 +275,4 @@ postfix func <*> (_: Test<True>) -> String? { return .None }
 class Test<C: Bool_> : MetaFunction {} // picks first <*>
 typealias Inty = Test<True>.Result 
 var iy : Inty = 5 // okay, because we picked the first <*>
-var iy2 : Inty = "hello" // expected-error{{type 'Inty' does not conform to protocol 'StringLiteralConvertible'}}
+var iy2 : Inty = "hello" // expected-error{{'String' is not convertible to 'Inty'}}

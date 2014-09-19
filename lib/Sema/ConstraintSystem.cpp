@@ -284,14 +284,6 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::StringInterpolationConvertible:
   case KnownProtocolKind::StringLiteralConvertible:
   case KnownProtocolKind::UnicodeScalarLiteralConvertible:
-    {
-      UnqualifiedLookup lookup(TC.Context.getIdentifier("AssertString"),
-                               DC->getModuleScopeContext(),
-                               nullptr);
-      if (auto typeDecl = lookup.getSingleTypeResult()) {
-        types.push_back(typeDecl->getDeclaredInterfaceType());
-      }
-    }
     break;
 
   case KnownProtocolKind::IntegerLiteralConvertible:
