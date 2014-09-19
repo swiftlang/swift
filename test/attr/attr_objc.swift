@@ -271,19 +271,19 @@ class ConcreteContext2 {
 
 func genericContext1<T>() {
   @objc
-  class subject_inGenericContext {}
+  class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
 
-  class subject_constructor_inGenericContext {
+  class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
     @objc
     init() {} // expected-error{{initializer in a generic class cannot be represented in Objective-C}}
   }
 
-  class subject_var_inGenericContext {
+  class subject_var_inGenericContext { // expected-error{{type 'subject_var_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
     @objc
     var subject_instanceVar: Int = 0 // expected-error{{variable in a generic class cannot be represented in Objective-C}}
   }
 
-  class subject_func_inGenericContext {
+  class subject_func_inGenericContext { // expected-error{{type 'subject_func_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
     @objc
     func f() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
   }

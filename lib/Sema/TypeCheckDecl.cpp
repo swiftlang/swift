@@ -3877,17 +3877,29 @@ public:
   
   bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
     // We don't support nested types in generics yet.
-    if (NTD->getDeclContext()->isTypeContext()
-        && NTD->isGenericContext()) {
-      if (NTD->getGenericParams())
-        TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
-              NTD->getName(),
-              cast<NominalTypeDecl>(NTD->getDeclContext())->getName());
-      else
-        TC.diagnose(NTD->getLoc(), diag::unsupported_type_nested_in_generic_type,
-              NTD->getName(),
-              cast<NominalTypeDecl>(NTD->getDeclContext())->getName());
-      return true;
+    if (NTD->isGenericContext()) {
+      auto DC = NTD->getDeclContext();
+      if (DC->isTypeContext()) {
+        if (NTD->getGenericParams())
+          TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
+                NTD->getName(),
+                cast<NominalTypeDecl>(DC)->getName());
+        else
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_generic_type,
+                      NTD->getName(),
+                      cast<NominalTypeDecl>(DC)->getName());
+        return true;
+      } else if (DC->isLocalContext()) {
+        // A local generic context is a generic function.
+        if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_generic_function,
+                      NTD->getName(),
+                      AFD->getName());
+          return true;
+        }
+      }
     }
     return false;
   }

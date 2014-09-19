@@ -12,7 +12,7 @@ func f4<T>(x: T, y: T) { }
 
 // Name lookup within local classes.
 func f5<T, U>(x: T, y: U) {
-  struct Local {
+  struct Local { // expected-error {{type 'Local' nested in generic function 'f5' is not allowed}}
     func f() {
       var t : T = 17 // expected-error{{type 'T' does not conform to protocol 'IntegerLiteralConvertible'}}
       var u : U = 17 // okay: refers to 'U' declared within the local class
