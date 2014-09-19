@@ -1,4 +1,4 @@
-// RUN: not --crash %swift %s -emit-ir
+// RUN: %swift %s -parse -verify
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // rdar://17242441
 class a<f : b, g : b where f.d == g> {
@@ -9,5 +9,5 @@ protocol b {
 }
 struct c<h : b> : b {
     typealias d = h
-    typealias e = a<c<h>, d>
+    typealias e = a<c<h>, d> // expected-error {{type alias 'e' circularly references itself}}
 }

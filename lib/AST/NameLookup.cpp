@@ -82,6 +82,12 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       if (!decl->hasType())
         continue;
     }
+    
+    // If the decl is currently being validated, this is likely a recursive
+    // reference and we'll want to skip ahead so as to avoid having its type
+    // attempt to desugar itself.
+    if (decl->isBeingTypeChecked())
+      continue;
 
     signature = decl->getType()->getCanonicalType();
 
