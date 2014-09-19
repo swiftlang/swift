@@ -345,11 +345,13 @@ gatherCallSites(SILFunction *Caller,
         continue;
 
       // If II is a partial apply, make sure that it is a simple partial apply
-      // (i.e. its callee is a function_ref).
+      // (i.e. its callee is a function_ref). We also do not handle indirect
+      // results currently in the closure so make sure that does not happen at
+      // this point.
       //
       // TODO: We can probably handle other partial applies here.
       auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-      if (!FRI)
+      if (!FRI || FRI->getFunctionType()->hasIndirectResult())
         continue;
 
       // If our partial apply has more than one use, bail.
@@ -440,18 +442,12 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
 //                               Top Level Code
 //===----------------------------------------------------------------------===//
 
-llvm::cl::opt<bool>
-EnableClosureSpecialization("enable-closure-spec", llvm::cl::init(false));
-
 namespace {
 class SILClosureSpecializerTransform : public SILModuleTransform {
 public:
   SILClosureSpecializerTransform() {}
 
   virtual void run() {
-    if (!EnableClosureSpecialization)
-      return;
-
     auto *CGA = getAnalysis<CallGraphAnalysis>();
     auto *LA = getAnalysis<SILLoopAnalysis>();
 

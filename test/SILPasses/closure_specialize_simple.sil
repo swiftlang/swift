@@ -1,4 +1,4 @@
-// RUN: %sil-opt -enable-closure-spec -closure-specialize %s | FileCheck %s
+// RUN: %sil-opt -closure-specialize %s | FileCheck %s
 
 import Builtin
 import Swift
@@ -28,6 +28,110 @@ bb2:
 
 sil @simple_partial_apply_caller_decl : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
 
+sil @indirect_parameter_partial_apply_fun : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+
+sil @indirect_parameter_partial_apply_caller1 : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()) -> () {
+bb0(%0 : $@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()):
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Builtin.Int1
+  %2 = integer_literal $Builtin.Int1, 0
+  apply %0(%1#1, %1#1, %2, %1#1) : $@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+  dealloc_stack %1#0 : $*@local_storage Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller2 : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1) -> ()) -> () {
+bb0(%0 : $@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1) -> ()):
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Builtin.Int1
+  %2 = integer_literal $Builtin.Int1, 0
+  apply %0(%1#1, %1#1, %2) : $@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1) -> ()
+  dealloc_stack %1#0 : $*@local_storage Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller3 : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1) -> ()) -> () {
+bb0(%0 : $@callee_owned (@out Builtin.Int1, @in Builtin.Int1) -> ()):
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Builtin.Int1
+  apply %0(%1#1, %1#1) : $@callee_owned (@out Builtin.Int1, @in Builtin.Int1) -> ()
+  dealloc_stack %1#0 : $*@local_storage Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller4 : $@thin (@callee_owned (@out Builtin.Int1) -> ()) -> () {
+bb0(%0 : $@callee_owned (@out Builtin.Int1) -> ()):
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Builtin.Int1
+  apply %0(%1#1) : $@callee_owned (@out Builtin.Int1) -> ()
+  dealloc_stack %1#0 : $*@local_storage Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller5 : $@thin (@callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> ()):
+  br bb1
+
+bb1:
+  apply %0() : $@callee_owned () -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller6 : $@thin (@out Builtin.Int1, @callee_owned () -> ()) -> () {
+bb0(%1 : $*Builtin.Int1, %0 : $@callee_owned () -> ()):
+  br bb1
+
+bb1:
+  apply %0() : $@callee_owned () -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller7 : $@thin (@out (Builtin.Int1, Builtin.Int1), @callee_owned () -> ()) -> () {
+bb0(%1 : $*(Builtin.Int1, Builtin.Int1), %0 : $@callee_owned () -> ()):
+  br bb1
+
+bb1:
+  apply %0() : $@callee_owned () -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
 // CHECK-LABEL: sil @loop_driver : $@thin (Builtin.Int1, Builtin.Int1) -> () {
 // CHECK: [[SPECIALIZED_FUN:%.*]] = function_ref @_TTSsimple_partial_apply_fun_as0_simple_partial_apply_caller : $@thin (Builtin.Int1) -> Builtin.Int1
 // CHECK: apply [[SPECIALIZED_FUN]]
@@ -44,6 +148,40 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %6 = partial_apply %2(%0) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %7 = function_ref @simple_partial_apply_caller_decl : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
   %8 = apply %7(%6) : $@thin (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
+  %9 = alloc_stack $Builtin.Int1
+
+  %10 = function_ref @indirect_parameter_partial_apply_fun : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+  %11 = partial_apply %10() : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+  %12 = partial_apply %10(%9#1) : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+  %13 = partial_apply %10(%1, %9#1) : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+  %14 = partial_apply %10(%9#1, %1, %9#1) : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+  %15 = partial_apply %10(%9#1, %9#1, %1, %9#1) : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+
+  %16 = function_ref @indirect_parameter_partial_apply_caller1 : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()) -> ()
+  %17 = function_ref @indirect_parameter_partial_apply_caller2 : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1) -> ()) -> ()
+  %18 = function_ref @indirect_parameter_partial_apply_caller3 : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1) -> ()) -> ()
+  %19 = function_ref @indirect_parameter_partial_apply_caller4 : $@thin (@callee_owned (@out Builtin.Int1) -> ()) -> ()
+  %20 = function_ref @indirect_parameter_partial_apply_caller5 : $@thin (@callee_owned () -> ()) -> ()
+
+  apply %16(%11) : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()) -> ()
+  apply %17(%12) : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1) -> ()) -> ()
+  apply %18(%13) : $@thin (@callee_owned (@out Builtin.Int1, @in Builtin.Int1) -> ()) -> ()
+  apply %19(%14) : $@thin (@callee_owned (@out Builtin.Int1) -> ()) -> ()
+  apply %20(%15) : $@thin (@callee_owned () -> ()) -> ()
+
+  // Make sure we handle when we already have an out parameter correctly.
+  %21 = alloc_stack $(Builtin.Int1, Builtin.Int1)
+  %22 = function_ref @indirect_parameter_partial_apply_caller6 : $@thin (@out Builtin.Int1, @callee_owned () -> ()) -> ()
+  %23 = function_ref @indirect_parameter_partial_apply_caller7 : $@thin (@out (Builtin.Int1, Builtin.Int1), @callee_owned () -> ()) -> ()
+  %24 = partial_apply %10(%9#1, %9#1, %1, %9#1) : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+  %25 = partial_apply %10(%9#1, %9#1, %1, %9#1) : $@thin (@out Builtin.Int1, @in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> ()
+  apply %22(%9#1, %24) : $@thin (@out Builtin.Int1, @callee_owned () -> ()) -> ()
+  apply %23(%21#1, %25) : $@thin (@out (Builtin.Int1, Builtin.Int1), @callee_owned () -> ()) -> ()
+
+  dealloc_stack %21#0 : $*@local_storage (Builtin.Int1, Builtin.Int1)
+  dealloc_stack %9#0 : $*@local_storage Builtin.Int1
+
   %9999 = tuple()
   return %9999 : $()
 }
