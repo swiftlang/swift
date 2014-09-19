@@ -169,4 +169,4 @@ var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not material
 func takeArrayRef(inout x:Array<String>) { }
 
 // FIXME: Poor diagnostic.
-takeArrayRef(["asdf", "1234"]) // expected-error{{'inout Array<String>' is not identical to 'Array<T>'}}
+takeArrayRef(["asdf", "1234"]) // expected-error{{expression does not conform to type '$T3'}}

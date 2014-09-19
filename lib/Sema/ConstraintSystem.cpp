@@ -255,16 +255,61 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   if (AlternativeLiteralTypes[index])
     return *AlternativeLiteralTypes[index];
 
-  // Collect all of the types that conform to the given literal protocol.
   SmallVector<Type, 4> types;
-  for (auto decl : TC.Context.getTypesThatConformTo(kind)) {
-    Type type;
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
-      type = nominal->getDeclaredTypeOfContext();
-    else
-      type = cast<ExtensionDecl>(decl)->getDeclaredTypeOfContext();
 
-    types.push_back(type);
+  // If the default literal type is bridged to a class type, add the class type.
+  if (auto proto = TC.Context.getProtocol(kind)) {
+    if (auto defaultType = TC.getDefaultType(proto, DC)) {
+      if (auto bridgedClassType = TC.getBridgedToObjC(DC, defaultType)) {
+        types.push_back(bridgedClassType);
+      }
+    }
+  }
+
+  // Some literal kinds are related.
+  switch (kind) {
+#define PROTOCOL(Protocol) \
+  case KnownProtocolKind::Protocol: llvm_unreachable("Not a literal protocol");
+#define LITERAL_CONVERTIBLE_PROTOCOL(Protocol)
+#include "swift/AST/KnownProtocols.def"
+
+  case KnownProtocolKind::ArrayLiteralConvertible:
+  case KnownProtocolKind::DictionaryLiteralConvertible:
+    break;
+
+  case KnownProtocolKind::CharacterLiteralConvertible:
+    break;
+
+  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible:
+  case KnownProtocolKind::StringInterpolationConvertible:
+  case KnownProtocolKind::StringLiteralConvertible:
+  case KnownProtocolKind::UnicodeScalarLiteralConvertible:
+    {
+      UnqualifiedLookup lookup(TC.Context.getIdentifier("AssertString"),
+                               DC->getModuleScopeContext(),
+                               nullptr);
+      if (auto typeDecl = lookup.getSingleTypeResult()) {
+        types.push_back(typeDecl->getDeclaredInterfaceType());
+      }
+    }
+    break;
+
+  case KnownProtocolKind::IntegerLiteralConvertible:
+    // Integer literals can be treated as floating point literals.
+    if (auto floatProto = TC.Context.getProtocol(
+                            KnownProtocolKind::FloatLiteralConvertible)) {
+      if (auto defaultType = TC.getDefaultType(floatProto, DC)) {
+        types.push_back(defaultType);
+      }
+    }
+    break;
+
+  case KnownProtocolKind::FloatLiteralConvertible:
+    break;
+
+  case KnownProtocolKind::NilLiteralConvertible:
+  case KnownProtocolKind::BooleanLiteralConvertible:
+    break;
   }
 
   AlternativeLiteralTypes[index] = allocateCopy(types);

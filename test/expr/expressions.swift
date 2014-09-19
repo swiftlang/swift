@@ -520,7 +520,7 @@ class C {
   init(other: C?) { x = other }
 }
 
-var c = C(3) // expected-error {{cannot convert the expression's type 'UInt8' to type 'IntegerLiteralConvertible'}}
+var c = C(3) // expected-error {{cannot convert the expression's type 'Double' to type 'IntegerLiteralConvertible'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators

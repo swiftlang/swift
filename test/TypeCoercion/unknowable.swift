@@ -39,10 +39,10 @@ extension Int : CanWibble {
   func wibble() {}
 }
 
-func doWibble(_: CanWibble) {}
+func doWibble(_: CanWibble) {} // expected-note{{in call to function 'doWibble'}}
 
 func testWibble() {
   doWibble(1)
-  doWibble(3.14) // expected-error{{type 'CanWibble' does not conform to protocol 'FloatLiteralConvertible'}}
+  doWibble(3.14) // expected-error{{type 'Double' does not conform to protocol 'CanWibble'}}
 }
 

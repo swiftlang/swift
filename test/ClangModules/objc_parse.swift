@@ -46,7 +46,7 @@ func instanceMethods(b: B) {
   // Both class and instance methods exist.
   b.description
   b.instanceTakesObjectClassTakesFloat(b)
-  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{type 'AnyObject!' does not conform to protocol 'FloatLiteralConvertible'}}
+  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{type 'Double' does not conform to protocol 'AnyObject'}}
 
 }
 

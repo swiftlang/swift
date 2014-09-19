@@ -600,8 +600,8 @@ func asciiString<
 }
 
 StringTests.test("stringCoreExtensibility") {
-  let ascii = UTF16.CodeUnit("X".value)
-  let nonAscii = UTF16.CodeUnit("é".value)
+  let ascii = UTF16.CodeUnit(UnicodeScalar("X").value)
+  let nonAscii = UTF16.CodeUnit(UnicodeScalar("é").value)
 
   for k in 0..<3 {
     for length in 1..<16 {
@@ -623,7 +623,7 @@ StringTests.test("stringCoreExtensibility") {
         x.extend(Repeat(count: 2, repeatedValue: ascii))
         
         expectEqualSequence(
-          [UTF16.CodeUnit("b".value)]
+          [UTF16.CodeUnit(UnicodeScalar("b").value)]
           + Array(Repeat(count: 3*boundary, repeatedValue: ascii))
           + Repeat(count: 3*(length - boundary), repeatedValue: nonAscii)
           + Repeat(count: 2, repeatedValue: ascii),

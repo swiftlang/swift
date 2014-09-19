@@ -1,8 +1,8 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/../../SILGen/Inputs %s -I %S/../../SILGen/Inputs -enable-source-import -parse -verify
 
-import gizmo
 import Foundation
+import gizmo
 
 @objc class X {
   func foo() -> X { return self }

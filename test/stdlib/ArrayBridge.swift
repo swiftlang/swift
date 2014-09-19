@@ -21,11 +21,11 @@
 // RUN: %target-run %t/ArrayBridge > %t.txt
 // RUN: FileCheck %s < %t.txt
 
-// CHECK: testing...
-println("testing...")
-
 import Foundation
 import ArrayBridgeObjC
+
+// CHECK: testing...
+println("testing...")
 
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
