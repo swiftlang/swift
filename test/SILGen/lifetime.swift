@@ -355,16 +355,13 @@ func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
   r.aleph_prop.b = v
   // CHECK: [[R2:%[0-9]+]] = load [[RADDR]]
   // CHECK: retain [[R2]]
+  // CHECK: [[ALEPH_PROP_TEMP:%[0-9]+]] = alloc_stack $Aleph
   // CHECK: retain [[R2]]
-  // CHECK: [[GETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!getter.1 : RefWithProp -> () -> Aleph
-  // CHECK: apply [[GETTER_METHOD]]([[R2]])
-  // CHECK: [[ALEPH_PROP_MAT:%[0-9]+]] = alloc_stack $Aleph
+  // CHECK: [[T0:%.*]] = address_to_pointer [[ALEPH_PROP_TEMP]]#1
+  // CHECK: [[MATERIALIZE_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!materializeForSet.1 :
+  // CHECK: apply [[MATERIALIZE_METHOD]]([[T0]], [[R2]])
   // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!setter.1 : RefWithProp -> (Aleph) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R2]])
-
-  // -- Written-back materializes are consumed by the writeback operation
-  // -- so they don't need to be loaded and released.
-  // CHECK-NOT: load [[ALEPH_PROP_MAT]]
 }
 
 func bar() -> Int {}

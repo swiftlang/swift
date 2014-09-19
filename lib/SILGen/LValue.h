@@ -194,8 +194,13 @@ public:
   /// Get the property, materialize a temporary lvalue for it, and if
   /// we're in a writeback scope, register a writeback.  This returns the
   /// address of the buffer.
-  SILValue getMaterialized(SILGenFunction &gen, SILLocation loc,
-                           ManagedValue base) const;
+  virtual SILValue getMaterialized(SILGenFunction &gen, SILLocation loc,
+                                   ManagedValue base) const;
+
+  /// Perform a writeback on the property.
+  virtual void writeback(SILGenFunction &gen, SILLocation loc,
+                         ManagedValue base, Materialize temporary,
+                         SILValue otherInfo) const;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {

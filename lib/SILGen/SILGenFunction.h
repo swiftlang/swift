@@ -714,6 +714,14 @@ public:
                        RValueSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
                        RValue &&optionalSubscripts, RValue &&value);
+  std::pair<SILValue, SILValue>
+  emitMaterializeForSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
+                                ArrayRef<Substitution> substitutions,
+                                RValueSource &&optionalSelfValue,
+                                bool isSuper, bool isDirectAccessorUse,
+                                RValue &&optionalSubscripts,
+                                SILValue buffer);
+
   ManagedValue emitApplyConversionFunction(SILLocation loc,
                                            Expr *funcExpr,
                                            Type resultType,

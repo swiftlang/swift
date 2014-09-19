@@ -190,12 +190,14 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[VAL_REF:%[0-9]+]] = load [[VAL_REF_ADDR]]
   // -- getters and setters
   // -- val.ref.val_prop
-  // CHECK: [[GET_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!getter.1 : Ref -> () -> Val
-  // CHECK: [[VAL_REF_VAL_PROP:%[0-9]+]] = apply [[GET_VAL_PROP_METHOD]]([[VAL_REF]])
-  // CHECK: [[VAL_REF_VAL_PROP_MAT:%[0-9]+]] = alloc_stack $Val
-  // CHECK: store [[VAL_REF_VAL_PROP]] to [[VAL_REF_VAL_PROP_MAT]]#1
-  
-  // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]#1
+  // CHECK: [[VAL_REF_VAL_PROP_TEMP:%.*]] = alloc_stack $Val
+  // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]]#1 : $*Val to $Builtin.RawPointer
+  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : Ref -> (Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.Int1)
+  // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[VAL_REF]])
+  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Builtin.Int1), 0
+  // CHECK: [[VAL_REF_VAL_PROP_MAT:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
+  // CHECK: [[NEEDS_WRITEBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Builtin.Int1), 1  
+  // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: retain_value [[LD]]
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
@@ -208,14 +210,18 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // -- writeback to val.ref.val_prop.z_tuple
   // CHECK: [[WB_V_R_VP_Z_TUPLE:%[0-9]+]] = load [[V_R_VP_Z_TUPLE_MAT]]#1
   // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
-  // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]]#1)
+  // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
-  // CHECK: [[WB_VAL_REF_VAL_PROP:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]#1
+  // CHECK: cond_br [[NEEDS_WRITEBACK]], [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
+  // CHECK: [[TRUE]]:
+  // CHECK: [[WB_VAL_REF_VAL_PROP:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: [[SET_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!setter.1 : Ref -> (Val) -> ()
   // CHECK: apply [[SET_VAL_PROP_METHOD]]([[WB_VAL_REF_VAL_PROP]], [[VAL_REF]])
+  // CHECK: br [[FALSE]]
+  // CHECK: [[FALSE]]:
   // -- cleanup
   // CHECK: dealloc_stack [[V_R_VP_Z_TUPLE_MAT]]#0
-  // CHECK: dealloc_stack [[VAL_REF_VAL_PROP_MAT]]#0
+  // CHECK: dealloc_stack [[VAL_REF_VAL_PROP_TEMP]]#0
   // -- don't need to write back to val.ref because it's a ref type
 }
 

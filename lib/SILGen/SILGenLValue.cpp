@@ -42,6 +42,7 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   std::unique_ptr<LogicalPathComponent> component;
   ManagedValue base;
   Materialize temp;
+  SILValue ExtraInfo;
 
   ~LValueWriteback() {}
   LValueWriteback(LValueWriteback&&) = default;
@@ -50,8 +51,9 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   LValueWriteback() = default;
   LValueWriteback(SILLocation loc,
                   std::unique_ptr<LogicalPathComponent> &&comp,
-                  ManagedValue base, Materialize temp)
-    : loc(loc), component(std::move(comp)), base(base), temp(temp) {
+                  ManagedValue base, Materialize temp, SILValue extraInfo)
+    : loc(loc), component(std::move(comp)), base(base), temp(temp),
+      ExtraInfo(extraInfo) {
   }
 
   void diagnoseConflict(const LValueWriteback &rhs, SILGenFunction &SGF) const {
@@ -71,9 +73,7 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   }
 
   void performWriteback(SILGenFunction &gen) {
-    ManagedValue mv = temp.claim(gen, loc);
-    auto formalTy = component->getSubstFormalType();
-    component->set(gen, loc, RValue(gen, loc, formalTy, mv), base);
+    component->writeback(gen, loc, base, temp, ExtraInfo);
   }
 };
 }
@@ -198,8 +198,15 @@ SILValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   Materialize temp = gen.emitMaterialize(loc, value);
   
   gen.getWritebackStack().emplace_back(loc,
-                                       clone(gen, loc), base, temp);
+                                       clone(gen, loc), base, temp, SILValue());
   return temp.address;
+}
+
+void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
+                                     ManagedValue base, Materialize temporary,
+                                     SILValue otherInfo) const {
+  ManagedValue mv = temporary.claim(gen, loc);
+  set(gen, loc, RValue(gen, loc, getSubstFormalType(), mv), base);
 }
 
 ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
@@ -214,6 +221,19 @@ ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
 
   if (valueCleanup.isValid())
     gen.Cleanups.forwardCleanup(valueCleanup);
+  return gen.emitLoad(loc, address, addressTL, SGFContext(), IsTake);
+}
+
+static ManagedValue claimValueInMemory(SILGenFunction &gen, SILLocation loc,
+                                       SILValue address) {
+  auto &addressTL = gen.getTypeLowering(address.getType());
+  if (addressTL.isAddressOnly()) {
+    // We can use the temporary as an address-only rvalue directly.
+    return gen.emitManagedBufferWithCleanup(address, addressTL);
+  }
+
+  // A materialized temporary is always its own type-of-rvalue because
+  // we did a semantic load to produce it in the first place.
   return gen.emitLoad(loc, address, addressTL, SGFContext(), IsTake);
 }
 
@@ -657,6 +677,85 @@ namespace {
                                  IsDirectAccessorUse,
                                  std::move(args.subscripts),
                                  std::move(value));
+    }
+
+    SILValue getMaterialized(SILGenFunction &gen,
+                             SILLocation loc,
+                             ManagedValue base) const override {
+      // If the property is dynamic, or if it doesn't have a
+      // materializeForSet, or if we're not in a writeback scope, we
+      // should just use the normal logic.
+      FuncDecl *materializeForSet;
+      if (!gen.InWritebackScope ||
+          decl->getAttrs().hasAttribute<DynamicAttr>() ||
+          !(materializeForSet = decl->getMaterializeForSetFunc())) {
+        return LogicalPathComponent::getMaterialized(gen, loc, base);
+      }
+
+      // Allocate a temporary.
+      SILValue buffer =
+        gen.emitTemporaryAllocation(loc, getTypeOfRValue().getObjectType());
+
+      // The materializeForSet operation will consume
+      // the base's +1, so copy the base for the setter.
+      ManagedValue copiedBase = base;
+      if (base && base.hasCleanup())
+        copiedBase = base.copy(gen, loc);
+
+      auto args = prepareAccessorArgs(gen, loc, copiedBase, materializeForSet);
+      auto addressAndNeedsWriteback =
+        gen.emitMaterializeForSetAccessor(loc, decl, substitutions,
+                                          std::move(args.base), IsSuper,
+                                          IsDirectAccessorUse,
+                                          std::move(args.subscripts),
+                                          buffer);
+
+      SILValue address = addressAndNeedsWriteback.first;
+
+      // TODO: maybe needsWriteback should be a thin function pointer
+      // to which we pass the base?  That would let us use direct
+      // access for stored properties with didSet.
+      gen.getWritebackStack().emplace_back(loc, clone(gen, loc), base,
+                                           Materialize{address,
+                                                       CleanupHandle::invalid()},
+                                           addressAndNeedsWriteback.second);
+
+      return address;
+    }
+
+    void writeback(SILGenFunction &gen, SILLocation loc,
+                   ManagedValue base, Materialize temporary,
+                   SILValue otherInfo) const {
+      // If we don't have otherInfo, we don't have to conditionalize
+      // the writeback.
+      if (!otherInfo) {
+        LogicalPathComponent::writeback(gen, loc, base, temporary, otherInfo);
+        return;
+      }
+
+      // Otherwise, otherInfo is a flag indicating whether we need to
+      // write back.
+      SILValue needsWriteback = otherInfo;
+
+      SILBasicBlock *writebackBB = gen.createBasicBlock(gen.B.getInsertionBB());
+      SILBasicBlock *contBB = gen.createBasicBlock();
+      gen.B.createCondBranch(loc, needsWriteback, writebackBB, contBB);
+
+      // The writeback block.
+      gen.B.setInsertionPoint(writebackBB); {
+        FullExpr scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+
+        // We need to clone the base here.  We can't just consume it
+        // because we're in conditionally-executed code.
+        if (base && base.hasCleanup())
+          base = base.copy(gen, loc);
+
+        ManagedValue mv = claimValueInMemory(gen, loc, temporary.address);
+        set(gen, loc, RValue(gen, loc, getSubstFormalType(), mv), base);
+      }
+
+      // Continue.
+      gen.B.emitBlock(contBB, loc);
     }
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,

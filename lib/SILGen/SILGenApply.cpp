@@ -3078,6 +3078,65 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   emission.apply();
 }
 
+std::pair<SILValue, SILValue> SILGenFunction::
+emitMaterializeForSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
+                              ArrayRef<Substitution> substitutions,
+                              RValueSource &&selfValue,
+                              bool isSuper, bool isDirectUse,
+                              RValue &&subscripts, SILValue buffer) {
+  SILDeclRef materializeForSet(decl->getMaterializeForSetFunc(),
+                               SILDeclRef::Kind::Func,
+                               SILDeclRef::ConstructAtBestResilienceExpansion,
+                               SILDeclRef::ConstructAtNaturalUncurryLevel,
+                               /*foreign*/ false);
+
+  Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
+                                                     materializeForSet,
+                                                     substitutions, selfValue,
+                                                     isSuper, isDirectUse);
+  CanAnyFunctionType accessType = callee.getSubstFormalType();
+
+  CallEmission emission(*this, std::move(callee));
+  // Self ->
+  if (selfValue) {
+    emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
+    accessType = cast<AnyFunctionType>(accessType.getResult());
+  }
+
+  ManagedValue mbuffer = {
+    B.createAddressToPointer(loc, buffer,
+                             SILType::getRawPointerType(getASTContext())),
+    CleanupHandle::invalid()
+  };
+
+  // (buffer)  or (buffer, indices) ->
+  RValue args = [&] {
+    if (subscripts) {
+      SmallVector<ManagedValue, 4> elts;
+      elts.push_back(mbuffer);
+      std::move(subscripts).getAll(elts);
+      return RValue(elts, accessType.getInput());
+    } else {
+      return RValue(mbuffer, accessType.getInput());
+    }
+  }();
+  emission.addCallSite(loc, RValueSource(loc, std::move(args)),
+                       accessType.getResult());
+  // (buffer, i1)
+  SILValue pointerAndNeedsWriteback = emission.apply().getUnmanagedValue();
+
+  // Project out the materialized address.
+  SILValue address = B.createTupleExtract(loc, pointerAndNeedsWriteback, 0);
+  address = B.createPointerToAddress(loc, address, buffer.getType());
+
+  // Project out the needsWriteback flag.
+  SILValue needsWriteback =
+    B.createTupleExtract(loc, pointerAndNeedsWriteback, 1);
+
+  return { address, needsWriteback };
+}
+
+
 ManagedValue SILGenFunction::emitApplyConversionFunction(SILLocation loc,
                                                          Expr *funcExpr,
                                                          Type resultType,
