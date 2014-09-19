@@ -246,6 +246,51 @@ namespace {
         return nullptr;
 
       auto locator = CS.getConstraintLocator(E);
+      
+      ASTContext &astContext = CS.getASTContext();
+      LangOptions &langOpts = astContext.LangOpts;
+      SourceFile *SF;
+      // We only check availability if this reference is in a source file.
+      // We will not check in other kinds of FileUnits.
+      if (langOpts.EnableExperimentalAvailabilityChecking &&
+          (SF = CS.DC->getParentSourceFile()) != nullptr) {
+        TypeRefinementContext *rootTRC = SF->getTypeRefinementContext();
+        
+        TypeRefinementContext *TRC;
+        if (E->getLoc().isValid()) {
+            TRC = rootTRC->findMostRefinedSubContext(E->getLoc(),
+                                               astContext.SourceMgr);
+        } else {
+          // For expressions without a valid location (these may be synthesized
+          // code) we conservatively use the root refinement context. In
+          // the future, we can be more precise here by climbing DeclContexts
+          // until we find a DeclContext with a valid location and looking up
+          // the TRC for that.
+          TRC = rootTRC;
+        }
+
+        VersionRange safeRangeUnderApprox =
+            TypeChecker::availableRange(E->getDecl(), astContext);
+
+        VersionRange runningOSOverApprox = TRC->getPotentialVersions();
+
+        // The reference is safe if an over-approximation of the running OS
+        // versions is fully contained within an under-approximation
+        // of the versions on which the declaration is available. If this
+        // containment cannot be guaranteed, we emit a diagnostic.
+        //
+        // In the future, rather than emitting a diagnostic, we will
+        // report the type of the reference as optional and allow the programmer
+        // to interact with this optional to determine if the declaration
+        // is available.
+        if (!(runningOSOverApprox.isContainedIn(safeRangeUnderApprox))) {
+          CS.TC.diagnose(E->getLoc(),
+                         diag::availability_decl_only_version_greater,
+                         E->getDecl()->getFullName(),
+                         prettyPlatformString(targetPlatform(langOpts)),
+                         safeRangeUnderApprox.getLowerEndpoint());
+        }
+      }
 
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.

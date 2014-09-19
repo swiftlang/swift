@@ -73,3 +73,16 @@ bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
       llvm_unreachable("handled above");
   }
 }
+
+PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
+  StringRef OSTargetConfig = LangOpts.getTargetConfigOption("os");
+
+  return llvm::StringSwitch<PlatformKind>(OSTargetConfig)
+  .Case("OSX", (LangOpts.EnableAppExtensionRestrictions
+                ? PlatformKind::OSXApplicationExtension
+                : PlatformKind::OSX))
+  .Case("iOS", (LangOpts.EnableAppExtensionRestrictions
+                ? PlatformKind::iOSApplicationExtension
+                : PlatformKind::iOS))
+  .Default(PlatformKind::none);
+}

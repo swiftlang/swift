@@ -25,6 +25,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -480,6 +481,11 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // FIXME: Check for cycles in class inheritance here?
 
+  if (Ctx.LangOpts.EnableExperimentalAvailabilityChecking ) {
+    // Build the type refinement hierarchy for the file before type checking.
+    TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
+  }
+  
   // Type check the top-level elements of the source file.
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     if (isa<TopLevelCodeDecl>(D))
@@ -644,6 +650,113 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
   for (const auto &member : lookup) {
     diagnose(member.first, diag::found_candidate_type,
              member.second);
+  }
+}
+
+VersionRange TypeChecker::availableRange(Decl *D, ASTContext &Ctx) {
+  VersionRange Avail = VersionRange::all();
+
+  for (auto Attr : D->getAttrs()) {
+    AvailabilityAttr *AvailAttr = dyn_cast<AvailabilityAttr>(Attr);
+    if (AvailAttr == NULL || !AvailAttr->Introduced.hasValue() ||
+        !AvailAttr->isActivePlatform(Ctx)) {
+      continue;
+    }
+
+    VersionRange AttrRange =
+        VersionRange::allGTE(AvailAttr->Introduced.getValue());
+
+    // If we have multiple introduction versions, we will conservatively
+    // assume the worst case scenario. We may want to be more precise here
+    // in the future or emit a diagnostic.
+    Avail.meetWith(AttrRange);
+  }
+
+  return Avail;
+}
+
+namespace {
+
+/// A class to walk the AST to build the type refinement context hierarchy.
+class TypeRefinementContextBuilder : private ASTWalker {
+  TypeRefinementContext *CurTRC;
+  ASTContext &AC;
+
+public:
+  TypeRefinementContextBuilder(TypeRefinementContext *TRC, ASTContext &AC)
+      : CurTRC(TRC), AC(AC) {
+    assert(TRC);
+  }
+
+  void build(Decl *D) { D->walk(*this); }
+
+private:
+  virtual bool walkToDeclPre(Decl *D) {
+    auto FD = dyn_cast<AbstractFunctionDecl>(D);
+    if (!FD) return true;
+
+    buildFunctionRefinementContext(FD);
+
+    return false;
+  }
+
+  /// Builds the type refinement hierarchy for the body of the function.
+  void buildFunctionRefinementContext(AbstractFunctionDecl *D) {
+    if (D->getBodyKind() == AbstractFunctionDecl::BodyKind::None) {
+      return;
+    }
+
+    // We only introduce a nested refinement context for the body if the
+    // function has an availability attribute.
+    if (!hasActiveAvailabilityAttribute(D)) {
+      return;
+    }
+
+    // We require a valid range in order to be able to query for the TRC
+    // corresponding to a given SourceLoc.
+    assert(D->getSourceRange().isValid());
+    
+    // The potential versions in the body are constrained by both
+    // the declared availability of the function and potential versions
+    // of its lexical context.
+    VersionRange bodyVersionRange = TypeChecker::availableRange(D, AC);
+    bodyVersionRange.meetWith(CurTRC->getPotentialVersions());
+    
+    TypeRefinementContext *newTRC =
+        new (AC) TypeRefinementContext(CurTRC, D->getSourceRange(),
+                                       bodyVersionRange);
+
+    Stmt *Body = D->getBody();
+    // If there is no body it may be because we will synthesize it and
+    // type check it later.
+    if (Body) {
+      Body->walk(TypeRefinementContextBuilder(newTRC, AC));
+    }
+  }
+
+  bool hasActiveAvailabilityAttribute(Decl *D) {
+    for (auto Attr : D->getAttrs())
+      if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
+        if (!AvAttr->isInvalid() && AvAttr->isActivePlatform(AC)) {
+          return true;
+        }
+      }
+    return false;
+  }
+};
+  
+}
+
+void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
+                                                      unsigned StartElem) {
+  ASTContext &AC = SF.getASTContext();
+
+  TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
+  // Build refinement contexts, if necessary, for all declarations starting
+  // with StartElem.
+  TypeRefinementContextBuilder Builder(RootTRC, AC);
+  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
+    Builder.build(D);
   }
 }
 

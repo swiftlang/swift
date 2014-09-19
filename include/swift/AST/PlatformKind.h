@@ -53,6 +53,9 @@ StringRef prettyPlatformString(PlatformKind platform);
 /// disabled. PlatformKind::none is always considered active.
 bool isPlatformActive(PlatformKind Platform, LangOptions &LangOpts);
   
+/// Returns the target platform for the given language options.
+PlatformKind targetPlatform(LangOptions &LangOpts);
+  
 } // end namespace swift
 
 #endif

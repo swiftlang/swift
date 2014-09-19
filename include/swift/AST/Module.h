@@ -63,6 +63,7 @@ namespace swift {
   struct PrintOptions;
   class TupleType;
   class Type;
+  class TypeRefinementContext;
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
@@ -715,6 +716,9 @@ private:
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
 
+  /// The root TypeRefinementContext for this SourceFile.
+  TypeRefinementContext *TRC = nullptr;
+  
   friend ASTContext;
   ~SourceFile();
 public:
@@ -868,6 +872,10 @@ public:
     return isScriptMode()
       || getArtificialMainKind() != ArtificialMainKind::None;
   }
+  
+  /// Get the root refinement context for the file.
+  TypeRefinementContext *getTypeRefinementContext();
+
 };
 
 

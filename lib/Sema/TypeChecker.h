@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -1109,6 +1110,25 @@ public:
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
   
   ArchetypeBuilder createArchetypeBuilder(Module *mod);
+
+  /// \name Availability checking
+  ///
+  /// Routines that perform API availability checking and type checking of
+  /// potentially unavailable API elements
+  /// @{
+
+  /// \brief Returns the version range on which a declaration is available
+  ///  We assume a declaration without an annotation is always available.
+  static VersionRange availableRange(Decl *D, ASTContext &C);
+
+  /// Walk the AST to build the hierarchy of TypeRefinementContexts
+  ///
+  /// \param StartElem Where to start for incremental building of refinement
+  /// contexts
+  static void buildTypeRefinementContextHierarchy(SourceFile &SF,
+                                                  unsigned StartElem);
+
+  /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
   /// has a name with that prefix, an llvm fatal_error is triggered.

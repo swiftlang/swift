@@ -1694,6 +1694,9 @@ NOTE(availability_obsoleted, sema_avail, none,
      "%0 was obsoleted in %1 version %2",
     (DeclName, StringRef, clang::VersionTuple))
 
+ERROR(availability_decl_only_version_greater, sema_avail, none,
+      "%0 is only available on %1 version %2 or greater",
+      (DeclName, StringRef, clang::VersionTuple))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
