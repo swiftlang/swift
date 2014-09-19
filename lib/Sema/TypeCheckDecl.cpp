@@ -2030,27 +2030,40 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
   TC.typeCheckDecl(materializeForSet, true);
 }
 
+static bool isLValueDirectAccess(AbstractStorageDecl *storage) {
+  switch (storage->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+    llvm_unreachable("no accessors");
+
+  // We can't use direct access to weak or unowned variables.
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    if (isa<SubscriptDecl>(storage)) {
+      // Subscripts can't be weak/unowned.
+      return true;
+    } else {
+      return !cast<VarDecl>(storage)->getType()->is<ReferenceStorageType>();
+    }
+
+  // Computed or observing accessors can't provide direct access.
+  case AbstractStorageDecl::Computed:
+  case AbstractStorageDecl::Observing:
+    return false;
+  }
+  llvm_unreachable("bad abstract storage kind");
+}
+
 static void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
                                         AbstractStorageDecl *storage,
                                         TypeChecker &TC) {
   VarDecl *bufferDecl = getFirstParamDecl(materializeForSet);
 
-  switch (storage->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-    llvm_unreachable("no accessors");
-
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  if (isLValueDirectAccess(storage)) {
     synthesizeStoredMaterializeForSet(materializeForSet, storage,
                                       bufferDecl, TC);
-    return;
-
-  case AbstractStorageDecl::Computed:
-  case AbstractStorageDecl::Observing:
+  } else {
     synthesizeComputedMaterializeForSet(materializeForSet, storage,
                                         bufferDecl, TC);
-    return;
   }
-  llvm_unreachable("bad abstract storage kind");
 }
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
