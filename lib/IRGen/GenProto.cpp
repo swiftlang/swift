@@ -4046,14 +4046,7 @@ namespace {
 
     // We're collecting archetypes.
     void visitArchetypeType(CanArchetypeType type) {
-      if (Types.insert(type)) {
-        // Collect the associated archetypes.
-        for (auto nested : type->getNestedTypes()) {
-          if (auto assocArchetype = nested.second.dyn_cast<ArchetypeType*>()) {
-            visitArchetypeType(CanArchetypeType(assocArchetype));
-          }
-        }
-      }
+      Types.insert(type);
     }
 
     // We need to walk into tuples.
@@ -4125,35 +4118,18 @@ void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer) const {
   auto metatypePtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
   buffer = IGF.Builder.CreateBitCast(buffer, metatypePtrPtrTy);
 
-  for (unsigned archetypeI = 0, e = Types.size(), metadataI = 0;
-       archetypeI != e; ++archetypeI) {
-    auto archetype = Types[archetypeI];
+  for (unsigned i = 0, e = Types.size(); i != e; ++i) {
+    auto archetype = Types[i];
 
     // GEP to the appropriate slot.
     Address slot = buffer;
-    if (metadataI) slot = IGF.Builder.CreateConstArrayGEP(slot, metadataI,
+    if (i) slot = IGF.Builder.CreateConstArrayGEP(slot, i,
                                                   IGF.IGM.getPointerSize());
-    ++metadataI;
 
     // Load the archetype's metatype.
     llvm::Value *metatype = IGF.Builder.CreateLoad(slot);
     metatype->setName(archetype->getFullName());
     setMetadataRef(IGF, archetype, metatype);
-    
-    // Load the witness tables for the archetype's protocol constraints.
-    for (unsigned protocolI : indices(archetype->getConformsTo())) {
-      auto protocol = archetype->getConformsTo()[protocolI];
-      if (!requiresProtocolWitnessTable(protocol))
-        continue;
-      Address witnessSlot = IGF.Builder.CreateConstArrayGEP(buffer, metadataI,
-                                                      IGF.IGM.getPointerSize());
-      witnessSlot = IGF.Builder.CreateBitCast(witnessSlot,
-                                    IGF.IGM.WitnessTablePtrTy->getPointerTo());
-      ++metadataI;
-      llvm::Value *witness = IGF.Builder.CreateLoad(witnessSlot);
-      
-      setWitnessTable(IGF, archetype, protocolI, witness);
-    }
   }
 }
 
@@ -4164,37 +4140,19 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
   auto metatypePtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
   buffer = IGF.Builder.CreateBitCast(buffer, metatypePtrPtrTy);
 
-  for (unsigned typeI = 0, typeE = Types.size(),
-                metadataI = 0; typeI != typeE; ++typeI) {
-    auto archetype = Types[typeI];
+  for (unsigned i = 0, e = Types.size(); i != e; ++i) {
+    auto archetype = Types[i];
 
     // GEP to the appropriate slot.
     Address slot = buffer;
-    if (metadataI) slot = IGF.Builder.CreateConstArrayGEP(slot, metadataI,
+    if (i) slot = IGF.Builder.CreateConstArrayGEP(slot, i,
                                                   IGF.IGM.getPointerSize());
-    ++metadataI;
 
     // Find the metatype for the appropriate archetype and store it in
     // the slot.
     llvm::Value *metatype =
       IGF.getLocalTypeData(CanType(archetype), LocalTypeData::Metatype);
     IGF.Builder.CreateStore(metatype, slot);
-    
-    // Find the witness tables for the archetype's protocol constraints and
-    // store them in the slot.
-    for (unsigned protocolI : indices(archetype->getConformsTo())) {
-      auto protocol = archetype->getConformsTo()[protocolI];
-      if (!requiresProtocolWitnessTable(protocol))
-        continue;
-      Address witnessSlot = IGF.Builder.CreateConstArrayGEP(buffer, metadataI,
-                                                      IGF.IGM.getPointerSize());
-      witnessSlot = IGF.Builder.CreateBitCast(witnessSlot,
-                                    IGF.IGM.WitnessTablePtrTy->getPointerTo());
-      ++metadataI;
-      llvm::Value *witness =
-        IGF.getLocalTypeData(CanType(archetype), LocalTypeData(protocolI));
-      IGF.Builder.CreateStore(witness, witnessSlot);
-    }
   }
 }
 

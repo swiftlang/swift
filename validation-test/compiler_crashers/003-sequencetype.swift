@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-ir -verify
+// RUN: %swift %s -parse -verify
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 
 struct c<d : SequenceType> {
