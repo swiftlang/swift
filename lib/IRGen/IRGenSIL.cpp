@@ -1895,7 +1895,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     // Lower the parameters in the callee's generic context.
     GenericContextScope scope(IGM, i->getOrigCalleeType()->getGenericSignature());
     for (auto index : indices(args)) {
-      assert(args[index].getType() = params[index].getSILType());
+      assert(args[index].getType() == params[index].getSILType());
       emitApplyArgument(*this, args[index], params[index], {}, llArgs);
       // FIXME: Need to carry the address-ness of each argument alongside
       // the object type's TypeInfo.
