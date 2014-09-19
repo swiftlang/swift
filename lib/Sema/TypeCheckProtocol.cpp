@@ -2086,7 +2086,7 @@ void ConformanceChecker::checkConformance() {
 
       TC.diagnose(assocType, diag::no_witnesses_type,
                   assocType->getName());
-      continue;
+      break;
     }
 
     // For a non-type witness.
