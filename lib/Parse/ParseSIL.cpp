@@ -3378,9 +3378,22 @@ bool SILParser::parseSpecConformanceSubstitutions(
     SourceLoc Loc = P.Tok.getLoc();
     Substitution Sub;
     Identifier ArcheId;
+    std::string ArcheStr;
+    bool FirstToken = true;
 
-    if (parseSILIdentifier(ArcheId, diag::expected_sil_type) ||
-        P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "="))
+    // It is possible to have Base.Element as the Archetype name.
+    do {
+      Identifier TmpId;
+      if (parseSILIdentifier(TmpId, diag::expected_sil_type))
+        return true;
+      if (!FirstToken)
+        ArcheStr += ".";
+      ArcheStr += TmpId.str();
+      FirstToken = false;
+    } while (P.consumeIf(tok::period));
+    ArcheId = P.Context.getIdentifier(ArcheStr);
+
+    if (P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "="))
       return true;
 
     // Parse substitution as AST type.
@@ -3414,7 +3427,7 @@ static bool getSpecConformanceSubstitutionsFromParsed(
     Type subReplacement;
     // Find the corresponding ArchetypeType.
     for (auto archetype : gp->getAllNestedArchetypes())
-      if (archetype->getName() == parsed.name) {
+      if (archetype->getFullName() == parsed.name.str()) {
         subArchetype = archetype;
         break;
       }
@@ -3458,12 +3471,13 @@ ProtocolConformance *SILParser::parseProtocolConformance(
 
 ///  protocol-conformance ::= normal-protocol-conformance
 ///  protocol-conformance ::=
-///    generic-parameter-list? 'inherit' '(' protocol-conformance ')'
+///    generic-parameter-list? type: 'inherit' '(' protocol-conformance ')'
 ///  protocol-conformance ::=
-///    generic-parameter-list? 'specialize' '<' substitution* '>'
+///    generic-parameter-list? type: 'specialize' '<' substitution* '>'
 ///    '(' protocol-conformance ')'
 ///  normal-protocol-conformance ::=
 ///    generic-parameter-list? type: protocolName module ModuleName
+/// Note that generic-parameter-list is already parsed before calling this.
 ProtocolConformance *SILParser::parseProtocolConformanceHelper(
                                     ProtocolDecl *&proto,
                                     bool localScope) {
