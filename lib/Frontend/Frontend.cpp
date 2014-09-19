@@ -379,6 +379,8 @@ void CompilerInstance::performSema() {
     
     if (mainIsPrimary && Invocation.getLangOptions().Playground)
       performPlaygroundTransform(MainFile);
+    if (!mainIsPrimary)
+      performNameBinding(MainFile);
   }
 
   // Type-check each top-level input besides the main source file.
