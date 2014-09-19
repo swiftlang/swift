@@ -583,11 +583,6 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   expectEqual(idValue0, unsafeBitCast(a.objectAtIndex(0), UWord.self))
   expectEqual(idValue1, unsafeBitCast(a.objectAtIndex(1), UWord.self))
   expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UWord.self))
-
-#if !arch(arm64) && !arch(arm)
-  // FIXME: there should be no autoreleased objects.
-  expectAutoreleasedKeysAndValues(opt: (0, 1), unopt: (0, 3))
-#endif
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {

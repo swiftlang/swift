@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Darwin
+import ObjectiveC
 
 public struct SourceLoc {
   let file: String
@@ -670,6 +671,9 @@ struct _ParentProcess {
 }
 
 public func runAllTests() {
+  autoreleasepool {
+    _stdlib_initializeReturnAutoreleased()
+  }
   if _isChildProcess {
     _childProcess()
   } else {

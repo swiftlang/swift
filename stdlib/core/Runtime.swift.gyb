@@ -14,6 +14,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 //===----------------------------------------------------------------------===//
 // Atomics
 //===----------------------------------------------------------------------===//
@@ -398,4 +400,42 @@ func _rawPointerToString(value: Builtin.RawPointer) -> String {
 @objc class _NSSwiftArray {}
 @objc class _NSSwiftDictionary {}
 @objc class _NSSwiftEnumerator {}
+
+//===----------------------------------------------------------------------===//
+// Support for reliable testing of the return-autoreleased optimization
+//===----------------------------------------------------------------------===//
+
+@objc internal class _stdlib_ReturnAutoreleasedDummy {
+  // Use 'dynamic' to force Objective-C dispatch, which uses the
+  // return-autoreleased call sequence.
+  @objc dynamic func returnsAutoreleased(x: AnyObject) -> AnyObject {
+    return x
+  }
+
+  // Use 'dynamic' to prevent this call to be duplicated into other modules.
+  @objc dynamic func initializeReturnAutoreleased() {
+    // On x86_64 it is sufficient to perform one cycle of return-autorelesed
+    // call sequence in order to initialize all required PLT entries.
+    self.returnsAutoreleased(self)
+  }
+}
+
+/// This function ensures that the return-autoreleased optimization works.
+///
+/// On some platforms (for example, x86_64), the first call to
+/// `objc_autoreleaseReturnValue` will always autorelease because it would fail
+/// to verify the instruction sequence in the caller.  On x86_64 certain PLT
+/// entries would be still pointing to the resolver function, and sniffing
+/// the call sequence would fail.
+///
+/// This code should live in the core stdlib dylib because PLT tables are
+/// separate for each dylib.
+///
+/// Call this function in a fresh autorelease pool.
+public func _stdlib_initializeReturnAutoreleased() {
+//  _stdlib_initializeReturnAutoreleasedImpl()
+#if arch(x86_64)
+  _stdlib_ReturnAutoreleasedDummy().initializeReturnAutoreleased()
+#endif
+}
 
