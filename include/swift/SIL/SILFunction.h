@@ -30,11 +30,11 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
-  
+
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
-  
+
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
@@ -49,14 +49,14 @@ private:
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
-  
+
   /// The mangled name of the SIL function, which will be propagated
   /// to the binary.  A pointer into the module's lookup table.
   StringRef Name;
 
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
-  
+
   /// The context archetypes of the function.
   GenericParamList *ContextGenericParams;
 
@@ -88,7 +88,7 @@ private:
 
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
-  
+
   /// This is the number of uses of this SILFunction.
   unsigned RefCount = 0;
 
@@ -131,7 +131,7 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
-    
+
   /// Return the number of entities referring to this function (other
   /// than the SILModule).
   unsigned getRefCount() const { return RefCount; }
@@ -155,18 +155,18 @@ public:
     for (SILBasicBlock &BB : *this)
       BB.dropAllReferences();
   }
-  
+
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
     return getLoweredFunctionType()->getAbstractCC();
   }
 
   StringRef getName() const { return Name; }
-  
+
   /// True if this is a declaration of a function defined in another module.
   bool isExternalDeclaration() const { return BlockList.empty(); }
   bool isDefinition() const { return !isExternalDeclaration(); }
-  
+
   /// Get this function's linkage attribute.
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
@@ -221,7 +221,7 @@ public:
 
   /// Get the source location of the function.
   SILDebugScope *getDebugScope() const { return DebugScope; }
-  
+
   /// Get this function's bare attribute.
   IsBare_t isBare() const { return IsBare_t(Bare); }
   void setBare(IsBare_t isB) { Bare = isB; }
@@ -274,12 +274,12 @@ public:
   void setContextGenericParams(GenericParamList *params) {
     ContextGenericParams = params;
   }
-    
+
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
   Type mapTypeIntoContext(Type type) const;
-    
+
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
@@ -319,7 +319,7 @@ public:
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
   void verify() const;
-  
+
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;
   void dump() const;
@@ -329,11 +329,11 @@ public:
   ///
   /// \param Verbose In verbose mode, print the SIL locations.
   void print(raw_ostream &OS, bool Verbose = false) const;
-  
+
   /// Pretty-print the SILFunction's name using SIL syntax,
   /// '@function_mangled_name'.
   void printName(raw_ostream &OS) const;
-  
+
   ASTContext &getASTContext() const;
 
   /// This function is meant for use from the debugger.  You can just say 'call
@@ -344,7 +344,7 @@ public:
   void viewCFG() const;
 
 };
-  
+
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                                      const SILFunction &F) {
   F.print(OS);
@@ -358,7 +358,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
-  
+
 template <>
 struct ilist_traits<::swift::SILFunction> :
 public ilist_default_traits<::swift::SILFunction> {
@@ -377,7 +377,7 @@ public:
   SILFunction *ensureHead(SILFunction*) const { return createSentinel(); }
   static void noteHead(SILFunction*, SILFunction*) {}
   static void deleteNode(SILFunction *V) { V->~SILFunction(); }
-  
+
 private:
   void createNode(const SILFunction &);
 };
