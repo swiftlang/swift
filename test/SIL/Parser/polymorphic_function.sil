@@ -1,0 +1,22 @@
+// RUN: sil-opt %s -verify | FileCheck %s
+import Swift
+
+public protocol mmOutputStreamType {
+  /// Append the given `string` to this stream.
+  mutating func write(string: String)
+}
+
+public protocol mmStreamable {
+  func writeTo<Target : mmOutputStreamType>(inout target: Target)
+}
+
+// CHECK-LABEL: sil @test : $() -> () {
+sil @test : $() -> () {
+bb0:
+  %281 = alloc_stack $mmStreamable
+  // CHECK: protocol_method %{{[0-9]+}}#1 : $*mmStreamable, #mmStreamable.writeTo!1 : <`Self` : mmStreamable> inout Self -> <Target : mmOutputStreamType> (inout Target) -> ()
+  %293 = protocol_method %281#1 : $*mmStreamable, #mmStreamable.writeTo!1 : <`Self` : mmStreamable> inout Self -> <Target : mmOutputStreamType> (inout Target) -> (), $@cc(witness_method) @callee_owned <τ_1_0 where τ_1_0 : mmOutputStreamType> (@inout τ_1_0, @inout @sil_self mmStreamable) -> ()
+  dealloc_stack %281#0 : $*@local_storage mmStreamable
+  %1 = tuple ()
+  return %1 : $()
+}

@@ -1390,6 +1390,24 @@ static GenericSignature *canonicalPolymorphicFunctionType(
 static bool checkPolymorphicFunctionType(PolymorphicFunctionType *Ty,
                                          PolymorphicFunctionType *Ty2,
                                          ASTContext &Context) {
+  bool InputIsPoly = isa<PolymorphicFunctionType>(Ty->getInput().getPointer());
+  bool OutputIsPoly =
+    isa<PolymorphicFunctionType>(Ty->getResult().getPointer());
+  bool Input2IsPoly =
+    isa<PolymorphicFunctionType>(Ty2->getInput().getPointer());
+  bool Output2IsPoly =
+    isa<PolymorphicFunctionType>(Ty2->getResult().getPointer());
+
+  if ((InputIsPoly && !Input2IsPoly) || (!InputIsPoly && Input2IsPoly) ||
+      (OutputIsPoly && !Output2IsPoly) || (!OutputIsPoly && Output2IsPoly))
+    return false;
+
+  // FIXME: We currently have issues canonicalizing PolymorphicFunctionType
+  // whose input type or result type is also a PolymorphicFunctionType.
+  if (InputIsPoly || OutputIsPoly)
+    return true;
+
+  // Try to canonicalize PolymorphicFunctionType and compare.
   CanType inTy, outTy, inTy2, outTy2;
   auto sig = canonicalPolymorphicFunctionType(Ty, Context, inTy, outTy);
   auto sig2 = canonicalPolymorphicFunctionType(Ty2, Context, inTy2, outTy2);
