@@ -1329,6 +1329,16 @@ bool getApplySubstitutionsFromParsed(
             if (conformance.getPointer() &&
                 req.getSubject().getPointer() == subArchetype)
               conformances.push_back(conformance.getPointer());
+
+            // Handle self conformance.
+            if (!conformance.getPointer() &&
+                conformance.getInt() != ConformanceKind::DoesNotConform &&
+                parsed.replacement->is<ProtocolType>() &&
+                req.getSubject().getPointer() == subArchetype)
+              conformances.push_back(
+                SP.P.Context.getConformance(parsed.replacement, proto,
+                                      SourceLoc(), nullptr,
+                                      ProtocolConformanceState::Incomplete));
           }
 
     if (subArchetype && !parsed.replacement->is<ArchetypeType>() &&
