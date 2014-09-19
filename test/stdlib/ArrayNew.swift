@@ -550,9 +550,6 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
 
-@asmname("_CFAutoreleasePoolPrintPools")
-func _CFAutoreleasePoolPrintPools()
-
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
 
