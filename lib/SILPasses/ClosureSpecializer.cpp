@@ -48,10 +48,10 @@ public:
   friend class SILVisitor<ClosureSpecCloner>;
   friend class SILCloner<ClosureSpecCloner>;
 
-  ClosureSpecCloner(SILFunction *Orig, PartialApplyInst *PAI,
+  ClosureSpecCloner(SILFunction *PAIUser, PartialApplyInst *PAI,
                      unsigned ClosureIndex, StringRef ClonedName)
-    : SuperTy(*initCloned(Orig, PAI, ClosureIndex, ClonedName)),
-      Orig(Orig), ClosureIndex(ClosureIndex), PAI(PAI) {
+    : SuperTy(*initCloned(PAIUser, PAI, ClosureIndex, ClonedName)),
+      PAIUser(PAIUser), ClosureIndex(ClosureIndex), PAI(PAI) {
   }
 
   void populateCloned();
@@ -66,76 +66,88 @@ public:
   };
 
 private:
-  static SILFunction *initCloned(SILFunction *Orig, PartialApplyInst *PAI,
+  static SILFunction *initCloned(SILFunction *PAIUser, PartialApplyInst *PAI,
                                  unsigned ClosureIndex, StringRef ClonedName);
-  SILFunction *Orig;
+  SILFunction *PAIUser;
   unsigned ClosureIndex;
   PartialApplyInst *PAI;
 };
 
 } // end anonymous namespace
 
-SILFunction *ClosureSpecCloner::initCloned(SILFunction *Orig,
-                                            PartialApplyInst *PAI,
-                                            unsigned ClosureIndex,
-                                            StringRef ClonedName) {
-  SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
+/// In this function we create the actual cloned function and its proper cloned
+/// type. But we do not create any body. This implies that the creation of the
+/// actual arguments in the function is in populateCloned.
+///
+/// \arg PAUser The function that is being passed the partial apply.
+/// \arg PAI The partial apply that is being passed to PAUser.
+/// \arg ClosureIndex The index of the partial apply in PAUser's function
+///                   signature.
+/// \arg ClonedName The name of the cloned function that we will create.
+SILFunction *ClosureSpecCloner::initCloned(SILFunction *PAIUser,
+                                           PartialApplyInst *PAI,
+                                           unsigned ClosureIndex,
+                                           StringRef ClonedName) {
+  // This is the list of new interface parameters of the cloned function.
+  llvm::SmallVector<SILParameterInfo, 4> NewParameterInfoList;
 
-  SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
+  // First add to NewParameterInfoList all of the SILParameterInfo in the
+  // original function except for the closure.
+  CanSILFunctionType PAIUserFunTy = PAIUser->getLoweredFunctionType();
   unsigned Index = 0;
-  // Remove the parameter for the closure argument.
-  for (auto &param : OrigFTI->getParameters()) {
+  for (auto &param : PAIUserFunTy->getParameters()) {
     if (Index != ClosureIndex)
-      ClonedInterfaceArgTys.push_back(param);
+      NewParameterInfoList.push_back(param);
     ++Index;
   }
 
-  // Append the variables captured in the closure.
-  auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
-  SILFunction *ClosureWithCaptured = FRI->getReferencedFunction();
-  SILFunctionType *ClosureWithCapturedFTI =
-    ClosureWithCaptured->getLoweredFunctionType();
-  auto ClosureType = PAI->getType().castTo<SILFunctionType>();
-  // Add the parameters of ClosureWithCapturedFTI starting from
-  // ClosureType->getParameters().size().
-  for (auto I = ClosureWithCapturedFTI->getParameters().begin() +
-                ClosureType->getParameters().size(),
-       E = ClosureWithCapturedFTI->getParameters().end(); I != E; I++)
-    ClonedInterfaceArgTys.push_back(*I);
+  // Then add any arguments that are captured in the closure to the function's
+  // argument type. Since they are captured, we need to pass them directly into
+  // the new specialized function.
+  auto *ClosedOverFunFRI = cast<FunctionRefInst>(PAI->getCallee());
+  auto ClosedOverFunTy = ClosedOverFunFRI->getFunctionType();
 
-  SILModule &M = Orig->getModule();
+  // Captured parameters are always appended to the function signature. So grab the 
+  unsigned NumTotalParams = ClosedOverFunTy->getParameters().size();
+  unsigned NumNotCaptured = NumTotalParams - PAI->getNumArguments();
+  for (auto &PInfo : ClosedOverFunTy->getParameters().slice(NumNotCaptured))
+    NewParameterInfoList.push_back(PInfo);
+
+  SILModule &M = PAIUser->getModule();
   auto ClonedTy =
-    SILFunctionType::get(OrigFTI->getGenericSignature(),
-                         OrigFTI->getExtInfo(),
-                         OrigFTI->getCalleeConvention(),
-                         ClonedInterfaceArgTys,
-                         OrigFTI->getResult(),
+    SILFunctionType::get(PAIUserFunTy->getGenericSignature(),
+                         PAIUserFunTy->getExtInfo(),
+                         PAIUserFunTy->getCalleeConvention(),
+                         NewParameterInfoList,
+                         PAIUserFunTy->getResult(),
                          M.getASTContext());
 
-  auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
-                                Orig->getContextGenericParams(),
-                                Orig->getLocation(), Orig->isBare(),
-                                Orig->isTransparent(), Orig->getInlineStrategy(),
-                                Orig->getEffectsInfo(),
-                                Orig, Orig->getDebugScope());
-  Fn->setSemanticsAttr(Orig->getSemanticsAttr());
+  // We make this function bare so we don't have to worry about decls in the
+  // SILArgument.
+  auto Fn = SILFunction::create(M, PAIUser->getLinkage(), ClonedName, ClonedTy,
+                                PAIUser->getContextGenericParams(),
+                                PAIUser->getLocation(), IsBare,
+                                PAIUser->isTransparent(), PAIUser->getInlineStrategy(),
+                                PAIUser->getEffectsInfo(),
+                                PAIUser, PAIUser->getDebugScope());
+  Fn->setSemanticsAttr(PAIUser->getSemanticsAttr());
   return Fn;
 }
 
 /// \brief Populate the body of the cloned closure, modifying instructions as
-/// necessary.
+/// necessary. This is where we create the actual specialized BB Arguments.
 void ClosureSpecCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
   SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block.
-  SILBasicBlock *OrigEntryBB = Orig->begin();
+  SILBasicBlock *PAIUserEntryBB = PAIUser->begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
 
   // Remove the closure argument.
   SILArgument *ClosureArg = nullptr;
-  for (size_t i = 0, e = OrigEntryBB->bbarg_size(); i != e; ++i) {
-    SILArgument *Arg = OrigEntryBB->getBBArg(i);
+  for (size_t i = 0, e = PAIUserEntryBB->bbarg_size(); i != e; ++i) {
+    SILArgument *Arg = PAIUserEntryBB->getBBArg(i);
     if (i == ClosureIndex) {
       ClosureArg = Arg;
       continue;
@@ -144,39 +156,44 @@ void ClosureSpecCloner::populateCloned() {
     // Otherwise, create a new argument which copies the original argument
     SILValue MappedValue =
       new (M) SILArgument(Arg->getType(), ClonedEntryBB, Arg->getDecl());
+
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }
 
-  auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
-  SILFunction *ClosureWithCaptured = FRI->getReferencedFunction();
-  SILBasicBlock *ClosureEntryBB = ClosureWithCaptured->begin();
-  auto ClosureType = PAI->getType().castTo<SILFunctionType>();
-  // Add the parameters of ClosureWithCapturedFTI starting from
-  // ClosureType->getParameters().size().
-  SmallVector<SILValue, 16> NewPAIArgs;
-  for (auto I = ClosureEntryBB->bbarg_begin() +
-                ClosureType->getParameters().size(),
-       E = ClosureEntryBB->bbarg_end(); I != E; I++) {
+  // Next we need to add in any arguments that are not captured as arguments to
+  // the cloned function.
+  //
+  // We do not insert the new mapped arugments into the value map since there by
+  // definition is nothing in the partial apply user function that references
+  // such arguments. After this pass is done the only thing that will reference
+  // the arguments is the partial apply that we will create.
+
+  auto *ClosedOverFunFRI = cast<FunctionRefInst>(PAI->getCallee());
+  auto *ClosedOverFun = ClosedOverFunFRI->getReferencedFunction();
+  auto ClosedOverFunTy = ClosedOverFunFRI->getFunctionType();
+  unsigned NumTotalParams = ClosedOverFunTy->getParameters().size();
+  unsigned NumNotCaptured = NumTotalParams - PAI->getNumArguments();
+  llvm::SmallVector<SILValue, 4> NewPAIArgs;
+  for (auto &PInfo : ClosedOverFunTy->getParameters().slice(NumNotCaptured)) {
     SILValue MappedValue =
-      new (M) SILArgument((*I)->getType(), ClonedEntryBB, (*I)->getDecl());
+      new (M) SILArgument(PInfo.getSILType(), ClonedEntryBB, nullptr);
     NewPAIArgs.push_back(MappedValue);
-    ValueMap.insert(std::make_pair(*I, MappedValue));
   }
 
   getBuilder().setInsertionPoint(ClonedEntryBB);
   // Clone FRI and PAI, and replace usage of the removed closure argument
   // with result of cloned PAI.
-  SILValue FnVal = getBuilder().createFunctionRef(FRI->getLoc(),
-                                                  ClosureWithCaptured);
+  SILValue FnVal = getBuilder().createFunctionRef(ClosedOverFunFRI->getLoc(),
+                                                  ClosedOverFun);
   auto *NewPAI = getBuilder().createPartialApply(PAI->getLoc(), FnVal,
                                                  FnVal.getType(), {},
                                                  NewPAIArgs, PAI->getType());
   ValueMap.insert(std::make_pair(ClosureArg, SILValue(NewPAI, 0)));
 
-  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
+  BBMap.insert(std::make_pair(PAIUserEntryBB, ClonedEntryBB));
   // Recursively visit original BBs in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(OrigEntryBB);
+  visitSILBasicBlock(PAIUserEntryBB);
 
   // Now iterate over the BBs and fix up the terminators.
   for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
@@ -348,9 +365,11 @@ gatherCallSites(SILFunction *Caller,
       if (!AI || AI->hasSubstitutions())
         continue;
 
-      // If AI does not have a function_ref as its callee, we can not do
-      // anything here... so continue...
-      if (!isa<FunctionRefInst>(AI->getCallee()))
+      // If AI does not have a function_ref defintion as its callee, we can not
+      // do anything here... so continue...
+      auto *CalleeFRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+      if (!CalleeFRI ||
+          CalleeFRI->getReferencedFunction()->isExternalDeclaration())
         continue;
 
       // Ok, we know that we can perform the optimization but not whether or not
@@ -408,7 +427,7 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
     SILFunction *NewF = Callee->getModule().lookUpFunction(NewFName);
     if (!NewF)
       NewF = ClosureSpecCloner::cloneFunction(Callee, AD.PAI, AD.ClosureIndex,
-                                               NewFName);
+                                              NewFName);
 
     rewriteApplyInst(AD, NewF);
     Changed = true;
