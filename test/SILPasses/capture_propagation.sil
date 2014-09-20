@@ -7,6 +7,8 @@ sil_stage raw
 import Builtin
 import Swift
 
+sil @capture_helper_2 : $@thin (Int) -> ()
+
 // CHECK-LABEL: test_capture_propagation
 // CHECK: %[[FR:[0-9]+]] = function_ref @_TTRXFo_dSi_dT__XFo_iSi_dT___constprop0 : $@thin (@in Int) -> ()
 // CHECK: partial_apply %[[FR]]() : $@thin (@in Int) -> ()
@@ -25,9 +27,15 @@ bb0:
   // function_ref specialization <Swift.Int> of capturep.generic <A>(A, (A) -> ()) -> ()
   %8 = function_ref @_TTSSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@thin (@in Int, @owned @callee_owned (@in Int) -> ()) -> () // user: %9
   %9 = apply %8(%0#1, %7) : $@thin (@in Int, @owned @callee_owned (@in Int) -> ()) -> ()
+
+  %11 = thin_to_thick_function %4 : $@thin (Int) -> () to $@callee_owned (Int) -> () // user: %7
+  %12 = function_ref @bad_thunk : $@thin (@in Int, @owned @callee_owned (Int) -> ()) -> ()
+  %13 = partial_apply %12(%11) : $@thin (@in Int, @owned @callee_owned (Int) -> ()) -> () // user: %9
+  %14 = apply %8(%0#1, %13) : $@thin (@in Int, @owned @callee_owned (@in Int) -> ()) -> ()
+
   dealloc_stack %0#0 : $*@local_storage Int       // id: %10
-  %11 = tuple ()                                  // user: %12
-  return %11 : $()                                // id: %12
+  %15 = tuple ()                                  // user: %12
+  return %15 : $()                                // id: %12
 }
 
 // capturep.helper (Swift.Int) -> ()
@@ -36,6 +44,8 @@ bb0(%0 : $Int):
   %1 = tuple ()                                   // user: %2
   return %1 : $()                                 // id: %2
 }
+
+sil @bad_thunk : $@thin (@in Int, @owned @callee_owned (Int) -> ()) -> ()
 
 // reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned ()) to @callee_owned (@in Swift.Int) -> (@unowned ())
 sil shared [transparent] @_TTRXFo_dSi_dT__XFo_iSi_dT__ : $@thin (@in Int, @owned @callee_owned (Int) -> ()) -> () {
@@ -56,3 +66,4 @@ bb0(%0 : $*Int, %1 : $@callee_owned (@in Int) -> ()):
   %7 = tuple ()                                   // user: %8
   return %7 : $()                                 // id: %8
 }
+

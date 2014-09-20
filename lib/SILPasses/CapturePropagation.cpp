@@ -282,7 +282,7 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
       return false;
   }
   SILFunction *SubstF = FRI->getReferencedFunction();
-  if (!isProfitable(SubstF))
+  if (SubstF->isExternalDeclaration() || !isProfitable(SubstF))
     return false;
 
   DEBUG(llvm::dbgs() << "Specializing closure for constant arguments:\n"

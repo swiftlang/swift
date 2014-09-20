@@ -107,7 +107,7 @@ SILFunction *ClosureSpecCloner::initCloned(SILFunction *PAIUser,
   auto *ClosedOverFunFRI = cast<FunctionRefInst>(PAI->getCallee());
   auto ClosedOverFunTy = ClosedOverFunFRI->getFunctionType();
 
-  // Captured parameters are always appended to the function signature. So grab the 
+  // Captured parameters are always appended to the function signature. So grab the
   unsigned NumTotalParams = ClosedOverFunTy->getParameters().size();
   unsigned NumNotCaptured = NumTotalParams - PAI->getNumArguments();
   for (auto &PInfo : ClosedOverFunTy->getParameters().slice(NumNotCaptured))
@@ -406,16 +406,9 @@ gatherCallSites(SILFunction *Caller,
       if (!PAIIndex.hasValue())
         continue;
 
-      // Ok. We now have the data we need to form an ArgSpecDescriptor and
-      // determine if the ArgSpecDescriptor is profitable. If it is not
-      // profitable, continue.
-      ArgDescriptor AD(PAI, AI, PAIIndex.getValue());
-      if (!isProfitable(AD))
-        continue;
-
       // Now we know that AD is profitable to specialize. Add it to our call
       // site list.
-      CallSites.push_back(AD);
+      CallSites.push_back(ArgDescriptor(PAI, AI, PAIIndex.getValue()));
     }
   }
 }
