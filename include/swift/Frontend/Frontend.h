@@ -196,6 +196,7 @@ public:
 
   void setModuleName(StringRef Name) {
     FrontendOpts.ModuleName = Name.str();
+    IRGenOpts.ModuleName = Name.str();
   }
 
   StringRef getModuleName() const {
