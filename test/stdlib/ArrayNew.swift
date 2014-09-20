@@ -3,17 +3,17 @@
 //
 // FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
 //
-// RUN: cp %s %t/main.swift
+// RUN: ln -s  %s %t/main.swift
 // RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 // RUN: %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
-//
 // RUN: %target-run %t/Array
+
 
 import Darwin
 import StdlibUnittest
 import Foundation
 
-var ArrayTestSuite = TestSuite("Array")
+var ArrayTestSuite = StdlibUnittest.TestSuite("Array")
 
 ArrayTestSuite.test("sizeof") {
   var a = [ 10, 20, 30 ]
@@ -631,6 +631,98 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
 
   // Expect no reallocations.
   expectEqual(identity1, unsafeBitCast(native, UWord.self))
+}
+
+let evilBoundsError = "EvilCollection: index out of range"
+
+final class EvilCollection : CollectionType {
+  init(_ growth: Int, boundsChecked: Bool) {
+    self.growth = growth
+    self.boundsChecked = boundsChecked
+  }
+  
+  var growth: Int
+  var count: Int = 20
+  var boundsChecked: Bool
+  
+  var startIndex : Int {
+    count += growth
+    return 0
+  }
+  
+  var endIndex : Int {
+    return count
+  }
+  
+  subscript(i: Int) -> TestValueTy {
+    if boundsChecked {
+      precondition(i >= 0 && i < count, evilBoundsError)
+    }
+    return TestValueTy(i)
+  }
+
+  func generate() -> IndexingGenerator<EvilCollection> {
+    return IndexingGenerator(self)
+  }
+}
+
+for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
+  
+  let message = step < 0 && evilBoundsCheck
+    ? evilBoundsError
+    : "invalid CollectionType: count differed in successive traversals"
+
+  let natureOfEvil = step > 0 ? "Growth" : "Shrinkage"
+  let boundsChecked = evilBoundsCheck ? "BoundsChecked" : "NoBoundsCheck"
+  let testPrefix = "MemorySafety/\(boundsChecked)/Evil\(natureOfEvil)"
+  
+  let t = ArrayTestSuite.test("\(testPrefix)/Infrastructure")
+  (evilBoundsCheck ? t.crashOutputMatches(evilBoundsError) : t).code {
+    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+    let count0 = countElements(evil)
+    let count1 = countElements(evil)
+    expectNotEqual(count0, count1)
+    if step > 0 {
+      expectLE(count0, count1)
+    }
+    else {
+      expectGE(count0, count1)
+    }
+    if evilBoundsCheck {
+      expectCrashLater()
+    }
+    let x = evil[-1]
+  }
+  
+  
+  ArrayTestSuite.test("\(testPrefix)/Construction")
+  .crashOutputMatches(message)
+  .code {
+    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+    expectCrashLater()
+    let a = Array(evil)
+  }
+
+  for (op, rangeMax) in ["Grow":0, "Shrink":200] {
+    ArrayTestSuite.test("\(testPrefix)/replaceRange/\(op)Unique")
+    .crashOutputMatches(message)
+    .code {
+      let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+      var a = Array(lazy(0..<200).map { TestValueTy($0) })
+      expectCrashLater()
+      a.replaceRange(0..<rangeMax, with: evil)
+    }
+
+    ArrayTestSuite.test("\(testPrefix)/replaceRange/\(op)NonUnique")
+    .crashOutputMatches(message)
+    .code {
+      let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+      var a = Array(lazy(0..<200).map { TestValueTy($0) })
+      var b = a
+      expectCrashLater()
+      a.replaceRange(0..<rangeMax, with: evil)
+    }
+  }
 }
 
 ArrayTestSuite.setUp {

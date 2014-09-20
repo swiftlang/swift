@@ -649,11 +649,13 @@ extension Array {
 struct _InitializeMemoryFromCollection<
   C: CollectionType
 > : _PointerFunctionType {
-  func call(rawMemory: UnsafeMutablePointer<C.Generator.Element>) {
+  func call(rawMemory: UnsafeMutablePointer<C.Generator.Element>, count: Int) {
     var p = rawMemory
-    for x in newValues {
-      p++.initialize(x)
-    }    
+    var q = newValues.startIndex
+    for _ in 0..<count {
+      p++.initialize(newValues[q++])
+    }
+    _expectEnd(q, newValues)
   }
 
   init(_ newValues: C) {
@@ -680,6 +682,18 @@ func _arrayOutOfPlaceReplace<
     subRange.startIndex, insertCount,
     _InitializeMemoryFromCollection(newValues)
   )
+}
+
+/// A _debugPrecondition check that `i` has exactly reached the end of
+/// `s`.  This test is never used to ensure memory safety; that is
+/// always guaranteed by measuring `s` once and re-using that value.
+internal func _expectEnd<C: CollectionType>(
+  i: C.Index, s: C
+) {
+  _debugPrecondition(
+    i == s.endIndex,
+      "invalid CollectionType: count differed in successive traversals"
+    )
 }
 
 func _arrayNonSliceInPlaceReplace<
@@ -715,13 +729,16 @@ func _arrayNonSliceInPlaceReplace<
     for j in oldTailIndex..<newTailIndex {
       (elements + j).initialize(newValues[i++])
     }
+    _expectEnd(i, newValues)
   }
   else { // We're not growing the buffer
     // Assign all the new elements into the start of the subRange
     var i = subRange.startIndex
-    for j in indices(newValues) {
-      elements[i++] = newValues[j]
+    var j = newValues.startIndex
+    for _ in 0..<insertCount {
+      elements[i++] = newValues[j++]
     }
+    _expectEnd(j, newValues)
 
     // If the size didn't change, we're done.
     if growth == 0 {
@@ -887,7 +904,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
 
 protocol _PointerFunctionType {
   typealias Element
-  func call(UnsafeMutablePointer<Element>)
+  func call(UnsafeMutablePointer<Element>, count: Int)
 }
 
 /// initialize the elements of dest by copying the first headCount
@@ -937,7 +954,7 @@ func _arrayOutOfPlaceUpdate<
     // Destroy unused source items
     oldStart.destroy(oldCount)
 
-    initializeNewElements.call(newStart)
+    initializeNewElements.call(newStart, count: newCount)
 
     // Move the tail items
     newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
@@ -951,7 +968,7 @@ func _arrayOutOfPlaceUpdate<
   }
   else {
     let newStart = source._uninitializedCopy(0..<headCount, target: destStart)
-    initializeNewElements.call(newStart)
+    initializeNewElements.call(newStart, count: newCount)
     source._uninitializedCopy(headCount + oldCount..<sourceCount, 
                               target: newEnd)
   }
@@ -959,8 +976,9 @@ func _arrayOutOfPlaceUpdate<
 }
 
 struct _InitializePointer<T> : _PointerFunctionType {
-  func call(rawMemory: UnsafeMutablePointer<T>) {
-    // FIXME: maybe we should move here instead of copying?
+  func call(rawMemory: UnsafeMutablePointer<T>, count: Int) {
+    _sanityCheck(count == 1)
+    // FIXME: it would be better if we could find a way to move, here
     rawMemory.initialize(newValue)
   }
 
@@ -987,7 +1005,9 @@ func _arrayAppend<_Buffer: _ArrayBufferType>(
 }
 
 struct _IgnorePointer<T> : _PointerFunctionType {
-  func call(_:UnsafeMutablePointer<T>) {}
+  func call(_:UnsafeMutablePointer<T>, count: Int) {
+    _sanityCheck(count == 0)
+  }
 }
 
 func _arrayReserve<_Buffer: _ArrayBufferType>(
@@ -1003,7 +1023,8 @@ func _arrayReserve<_Buffer: _ArrayBufferType>(
 
 public func _extractOrCopyToNativeArrayBuffer<
   _Buffer: _ArrayBufferType
-    where _Buffer.Generator.Element == _Buffer.Element
+where _Buffer.Generator.Element == _Buffer.Element,
+      _Buffer.Element == _Buffer._Element
 >(source: _Buffer) 
   -> _ContiguousArrayBuffer<_Buffer.Element> 
 {

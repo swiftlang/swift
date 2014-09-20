@@ -458,7 +458,8 @@ public func ~> <
 }
 
 public func ~> <
-  C: protocol<_CollectionType,_Sequence_Type>
+  C: CollectionType
+    where C.Generator.Element == C._Element
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
 ) -> _ContiguousArrayBuffer<C.Generator.Element>
@@ -467,10 +468,11 @@ public func ~> <
 }
 
 func _copyCollectionToNativeArrayBuffer<
-  C: protocol<_CollectionType,_Sequence_Type>
+  C: CollectionType
+    where C.Generator.Element == C._Element
 >(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
 {
-  let count = countElements(source)
+  let count = Int(countElements(source).toIntMax())
   if count == 0 {
     return _ContiguousArrayBuffer()
   }
@@ -481,10 +483,11 @@ func _copyCollectionToNativeArrayBuffer<
   )
 
   var p = result.baseAddress
-  for x in GeneratorSequence(source.generate()) {
-    (p++).initialize(x)
+  var i = source.startIndex
+  for _ in 0..<count {
+    (p++).initialize(source[i++])
   }
-
+  _expectEnd(i, source)
   return result
 }
 
