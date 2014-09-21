@@ -24,6 +24,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILUndef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -160,10 +161,17 @@ int main(int argc, char **argv) {
   // UnreachableInst.
   performSILDiagnoseUnreachable(M);
 
-  // Now clear those functions.
+  // Now mark all of these functions as public and remove their bodies.
   for (auto &F : DeadFunctions) {
+    F->setLinkage(SILLinkage::PublicExternal);
     F->getBlocks().clear();
   }
+
+  // Remove dead functions.
+  SILPassManager PM(M, SILOptions());
+  PM.registerAnalysis(createCallGraphAnalysis(M));
+  PM.add(createDeadFunctionElimination());
+  PM.run();
 
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);

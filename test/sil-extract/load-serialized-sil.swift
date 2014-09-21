@@ -10,8 +10,7 @@
 
 // CHECK: func unknown()
 
-// CHECK: sil public @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X
-// CHECK-NOT: bb0
+// CHECK-NOT: sil public @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X
 
 // CHECK: sil @unknown : $@thin () -> ()
 

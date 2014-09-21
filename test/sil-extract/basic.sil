@@ -5,10 +5,10 @@ import Swift
 
 // For now we do not remove dead functions so update this when that functionality is added.
 
-// CHECK-LABEL: sil @takes_Int_inout : $@thin (@inout Int64) -> ()
+// CHECK-NOT: sil @takes_Int_inout : $@thin (@inout Int64) -> ()
 sil @takes_Int_inout : $@thin (@inout Int64) -> ()
 
-// CHECK-LABEL: sil @makesInt : $@thin () -> Int64
+// CHECK-NOT: sil @makesInt : $@thin () -> Int64
 sil @makesInt : $@thin () -> Int64
 
 // CHECK-LABEL: sil @use_before_init : $@thin () -> Int64 {
