@@ -595,6 +595,24 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   return type->castTo<ArchetypeType>();
 }
 
+AvailabilityQueryExpr *AvailabilityQueryExpr::create(
+    ASTContext &ctx, SourceLoc PoundLoc,
+    ArrayRef<VersionConstraintAvailabilitySpec *> queries,
+    SourceLoc RParenLoc) {
+  unsigned size = sizeof(AvailabilityQueryExpr) +
+                  queries.size() * sizeof(VersionConstraintAvailabilitySpec *);
+
+  void *Buffer = ctx.Allocate(size, alignof(AvailabilityQueryExpr));
+  return ::new (Buffer) AvailabilityQueryExpr(PoundLoc, queries, RParenLoc);
+}
+
 SourceRange AvailabilityQueryExpr::getSourceRange() const {
-  return SourceRange(PoundLoc, Query->getSourceRange().End);
+  if (RParenLoc.isInvalid()) {
+    if (NumQueries == 0) {
+      return SourceRange(PoundLoc, PoundLoc);
+    }
+    return SourceRange(PoundLoc,
+                       getQueries()[NumQueries - 1]->getSourceRange().End);
+  }
+  return SourceRange(PoundLoc, RParenLoc);
 }

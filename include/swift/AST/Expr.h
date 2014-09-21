@@ -3361,25 +3361,47 @@ public:
 };
 
 /// \brief An expression that guards execution based on whether the run-time
-/// configuration supports a given API, e.g., #os(iOS >= 7.0).
+/// configuration supports a given API, e.g., #os(OSX >= 10.9, iOS >= 7.0).
 class AvailabilityQueryExpr : public Expr {
   SourceLoc PoundLoc;
-  VersionConstraintAvailabilitySpec *Query;
+  SourceLoc RParenLoc;
+
+  unsigned NumQueries;
+
+  AvailabilityQueryExpr(SourceLoc PoundLoc,
+                        ArrayRef<VersionConstraintAvailabilitySpec *> queries,
+                        SourceLoc RParenLoc, Type Ty = Type())
+      : Expr(ExprKind::AvailabilityQuery, /*Implicit=*/false, Ty),
+        PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()) {
+    memcpy(getQueriesBuf(), queries.data(),
+           queries.size() * sizeof(VersionConstraintAvailabilitySpec *));
+  }
 
 public:
-  AvailabilityQueryExpr(SourceLoc PoundLoc,
-                        VersionConstraintAvailabilitySpec *Query,
-                        Type Ty = Type())
-      : Expr(ExprKind::AvailabilityQuery, /*Implicit=*/false, Ty),
-        PoundLoc(PoundLoc), Query(Query) {}
+  static AvailabilityQueryExpr *
+  create(ASTContext &ctx, SourceLoc PoundLoc,
+         ArrayRef<VersionConstraintAvailabilitySpec *> queries,
+         SourceLoc RParenLoc);
 
-  VersionConstraintAvailabilitySpec *getQuery() const { return Query; }
+  ArrayRef<VersionConstraintAvailabilitySpec *> getQueries() const {
+    return ArrayRef<VersionConstraintAvailabilitySpec *>(getQueriesBuf(),
+                                                         NumQueries);
+  }
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return PoundLoc; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::AvailabilityQuery;
+  }
+
+private:
+  VersionConstraintAvailabilitySpec **getQueriesBuf() {
+    return reinterpret_cast<VersionConstraintAvailabilitySpec **>(this + 1);
+  }
+
+  VersionConstraintAvailabilitySpec *const *getQueriesBuf() const {
+    return const_cast<AvailabilityQueryExpr *>(this)->getQueriesBuf();
   }
 };
   

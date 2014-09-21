@@ -1054,6 +1054,9 @@ ERROR(avail_query_expected_rparen,parsing,PointsToFirstBadToken,
 ERROR(avail_query_unrecognized_platform_name,parsing,
       PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
 
+ERROR(avail_query_disallowed_operator,parsing, PointsToFirstBadToken,
+      "'%0' cannot be used in an availability condition", (StringRef))
+
 //------------------------------------------------------------------------------
 // Code Migration.
 //------------------------------------------------------------------------------

@@ -1726,8 +1726,11 @@ public:
     OS << ')';
   }
   void visitAvailabilityQueryExpr(AvailabilityQueryExpr *E) {
-    printCommon(E, "availability_query_expr") << '\n';
-    E->getQuery()->print(OS, Indent + 2);
+    printCommon(E, "availability_query_expr");
+    for (auto *Query : E->getQueries()) {
+      OS << '\n';
+      Query->print(OS, Indent + 2);
+    }
     OS << ')';
   }
 };

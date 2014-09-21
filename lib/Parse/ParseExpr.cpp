@@ -901,22 +901,41 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     
     consumeToken();
     
-    // For the moment, we only support a single specification. In the future,
-    // we will extend this to allow multiple specifications.
-    auto SpecResult = parseVersionConstraintSpec();
-    VersionConstraintAvailabilitySpec *Spec = SpecResult.getPtrOrNull();
-    if (!Spec) return nullptr;
+    SmallVector<VersionConstraintAvailabilitySpec *, 2> Specs;
+    ParserStatus Status = makeParserSuccess();
     
-    Expr *QueryExpr = new (Context) AvailabilityQueryExpr(PoundLoc,
-                                                  Spec);
+    // Parse a comma-separated list of availability specifications. We don't
+    // use parseList() because we want to provide more specific diagnostics
+    // disallowing operators in version specs.
+    while (true) {
+      auto SpecResult = parseVersionConstraintSpec();
+      if (auto *Spec = SpecResult.getPtrOrNull()) {
+        Specs.push_back(Spec);
+      } else {
+        Status.setIsParseError();
+      }
+      
+      // We don't allow binary operators to combine specs.
+      if (Tok.is(tok::oper_binary)) {
+        diagnose(Tok, diag::avail_query_disallowed_operator, Tok.getText());
+        consumeToken();
+        continue;
+      }
+      
+      if (!Tok.is(tok::comma)) break;
+      
+      consumeToken();
+    }
     
     SourceLoc RParenLoc;
     if (parseMatchingToken(tok::r_paren, RParenLoc,
                            diag::avail_query_expected_rparen, LParenLoc)) {
-      Result = makeParserErrorResult(QueryExpr);
-    } else {
-      Result = makeParserResult(QueryExpr);
+      Status.setIsParseError();
     }
+    
+    auto *QueryExpr = AvailabilityQueryExpr::create(Context, PoundLoc, Specs,
+                                                    RParenLoc);
+    Result = makeParserResult(Status, QueryExpr);
     
     break;
   }
@@ -2192,15 +2211,6 @@ Parser::parseVersionConstraintSpec() {
     return nullptr;
   }
 
-  Optional<PlatformKind> Platform =
-      platformFromString(PlatformIdentifier.str());
-
-  if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
-    diagnose(Tok, diag::avail_query_unrecognized_platform_name,
-             PlatformIdentifier);
-    return nullptr;
-  }
-
   VersionComparison Comparison;
   SourceLoc ComparisonLoc;
 
@@ -2213,6 +2223,15 @@ Parser::parseVersionConstraintSpec() {
 
   if (parseVersionTuple(Version, VersionRange,
                         diag::avail_query_expected_version_number)) {
+    return nullptr;
+  }
+
+  Optional<PlatformKind> Platform =
+      platformFromString(PlatformIdentifier.str());
+
+  if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
+    diagnose(Tok, diag::avail_query_unrecognized_platform_name,
+             PlatformIdentifier);
     return nullptr;
   }
 
