@@ -7,7 +7,7 @@ import AppKit
 import UIKit
 #endif
 
-let foo: [CGColor] = [CGColorGetConstantColor(kCGColorBlack)]
+let foo: [CGColor] = [CGColorCreate(CGColorSpaceCreateDeviceRGB(), [1.0, 0.0, 0.0, 1.0])]
 
 let bar: NSArray = foo
 
