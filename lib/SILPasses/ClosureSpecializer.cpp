@@ -265,7 +265,6 @@ struct ClosureSpecializer {
     : LA(LA) {
   }
 
-  bool isProfitable(ArgDescriptor &AD);
   void gatherCallSites(SILFunction *Caller,
                        llvm::SmallVectorImpl<ArgDescriptor> &CallSites,
                        llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI);
@@ -273,54 +272,6 @@ struct ClosureSpecializer {
 };
 
 } // end anonymous namespace
-
-bool ClosureSpecializer::isProfitable(ArgDescriptor &AD) {
-  // First check if our callee is a function_ref. We currently only handle such
-  // cases.
-  auto *CalleeFRI = dyn_cast<FunctionRefInst>(AD.AI->getCallee());
-  if (!CalleeFRI)
-    return false;
-  auto *Callee = CalleeFRI->getReferencedFunction();
-
-  // Check the relative size of the callee and the closure.
-  auto *ClosureFRI = cast<FunctionRefInst>(AD.PAI->getCallee());
-
-  // We pass in nullptr for the caller since passing in the caller is only
-  // interesting if we are actually going to inline. If we are deciding whether
-  // or not to specialize a partial apply is a different issue.
-  unsigned ClosureCount = getFunctionCost(ClosureFRI->getReferencedFunction(),
-                                          nullptr, UINT_MAX);
-  unsigned CalleeCount = getFunctionCost(Callee, nullptr, UINT_MAX);
-  if (CalleeCount < 2 * ClosureCount) {
-    DEBUG(llvm::dbgs() << "    Callsite is not profitable: " << ClosureCount
-                       << ", " << CalleeCount << "\n");
-    return false;
-  }
-  DEBUG(llvm::dbgs() << "    Callsite is profitable: " << ClosureCount
-                     << ", " << CalleeCount << "\n");
-
-  // Collect callsites to the closure.
-  SmallVector<ApplyInst*, 8> CallSites;
-  SILArgument *ClosureArg = Callee->begin()->getBBArg(AD.ClosureIndex);
-  for (auto U : ClosureArg->getUses())
-    if (auto CS = dyn_cast<ApplyInst>(U->getUser()))
-      CallSites.push_back(CS);
-
-  if (CallSites.empty())
-    return false;
-
-  // Check hotness of the callsite (AI) and callsites to closure inside callee.
-  // For now, if closure is called inside a loop, we think it is profitable.
-  SILLoopInfo *LI = LA->getLoopInfo(Callee);
-  for (auto AI : CallSites) {
-    if (LI->getLoopFor(AI->getParent()))
-      return true;
-  }
-
-  DEBUG(llvm::dbgs() << "    Callsite is not profitable: closure not called "
-                        "inside a loop\n");
-  return false;
-}
 
 static void createName(SILFunction *Callee, SILFunction *Closure,
                        unsigned ClosureIndex,
