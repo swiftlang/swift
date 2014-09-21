@@ -2587,6 +2587,25 @@ ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
   return SolutionKind::Solved;
 }
 
+/// If the given type conforms to the RawRepresentable protocol,
+/// return its underlying raw type.
+static Type getRawRepresentableValueType(TypeChecker &tc, DeclContext *dc, 
+                                         Type type) {
+  auto proto = tc.Context.getProtocol(KnownProtocolKind::RawRepresentable);
+  if (!proto)
+    return nullptr;
+
+  if (type->hasTypeVariable())
+    return nullptr;
+
+  ProtocolConformance *conformance = nullptr;
+  if (!tc.conformsToProtocol(type, proto, dc, &conformance))
+    return nullptr;
+
+  return tc.getWitnessType(type, proto, conformance, tc.Context.Id_RawValue,
+                           diag::broken_raw_representable_requirement);
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
@@ -2768,6 +2787,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (!lookup) {
     // Check whether we actually performed a lookup with an integer value.
     unsigned index;
+    Type rawValueType;
     if (name.isSimpleName()
         && !name.getBaseName().str().getAsInteger(10, index)) {
       // ".0" on a scalar just refers to the underlying scalar value.
@@ -2782,6 +2802,49 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                     baseObjTy, name);
 
       return SolutionKind::Error;
+    } else if (shouldAttemptFixes() && name == TC.Context.Id_fromRaw && 
+               (rawValueType = getRawRepresentableValueType(TC, DC,
+                                                            instanceTy))) {
+      // Replace a reference to ".fromRaw" with a reference to init(rawValue:).
+      // FIXME: This is temporary.
+
+      // Record this fix.
+      increaseScore(SK_Fix);
+      if (worseThanBestSolution())
+        return SolutionKind::Error;
+
+      auto locator = constraint.getLocator();
+      Fixes.push_back({FixKind::FromRawToInit,getConstraintLocator(locator)});
+
+      // Form the type that "fromRaw" would have had and bind the
+      // member type to it.
+      Type fromRawType = FunctionType::get(ParenType::get(TC.Context, 
+                                                          rawValueType),
+                                           OptionalType::get(instanceTy));
+      addConstraint(ConstraintKind::Bind, memberTy, fromRawType, locator);
+      
+      return SolutionKind::Solved;
+    } else if (shouldAttemptFixes() && name == TC.Context.Id_toRaw && 
+               (rawValueType = getRawRepresentableValueType(TC, DC,
+                                                            instanceTy))) {
+      // Replace a call to "toRaw" with a reference to rawValue.
+      // FIXME: This is temporary.
+
+      // Record this fix.
+      increaseScore(SK_Fix);
+      if (worseThanBestSolution())
+        return SolutionKind::Error;
+
+      auto locator = constraint.getLocator();
+      Fixes.push_back({FixKind::ToRawToRawValue,getConstraintLocator(locator)});
+
+      // Form the type that "toRaw" would have had and bind the member
+      // type to it.
+      Type toRawType = FunctionType::get(TupleType::getEmpty(TC.Context),
+                                         rawValueType);
+      addConstraint(ConstraintKind::Bind, memberTy, toRawType, locator);
+
+      return SolutionKind::Solved;
     }
   }
 
@@ -3909,6 +3972,10 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
   case FixKind::OptionalToBoolean:
     // The actual semantics are handled elsewhere.
     return SolutionKind::Solved;
+
+  case FixKind::FromRawToInit:
+  case FixKind::ToRawToRawValue:
+    llvm_unreachable("handled elsewhere");
   }
 }
 

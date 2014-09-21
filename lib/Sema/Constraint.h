@@ -250,6 +250,12 @@ enum class FixKind : uint8_t {
   
   /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
   OptionalToBoolean,
+
+  /// Replace a use of 'fromRaw' with an initializer requirement.
+  FromRawToInit,
+
+  /// Replace a call of 'toRaw' with a reference to 'rawValue'.
+  ToRawToRawValue,
 };
 
 /// Desribes a fix that can be applied to a constraint before visiting it.
