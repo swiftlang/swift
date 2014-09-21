@@ -2686,15 +2686,24 @@ public:
   SILBasicBlock *getFalseBB() { return DestBBs[1]; }
   const SILBasicBlock *getFalseBB() const { return DestBBs[1]; }
 
-
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const;
   /// Get the arguments to the false BB.
   OperandValueArrayRef getFalseArgs() const;
 
+  /// Get the operands to the true BB.
+  ArrayRef<Operand> getTrueOperands() const;
+  MutableArrayRef<Operand> getTrueOperands();
+
+  /// Get the operands to the false BB.
+  ArrayRef<Operand> getFalseOperands() const;
+  MutableArrayRef<Operand> getFalseOperands();
+
   /// Returns the argument on the cond_br terminator that will be passed to
   /// DestBB in A.
   SILValue getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A);
+
+  void swapSuccessors();
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }

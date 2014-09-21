@@ -1124,6 +1124,51 @@ CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
   return Operands[1 + NumTrueArgs + i].get();
 }
 
+ArrayRef<Operand> CondBranchInst::getTrueOperands() const {
+  return ArrayRef<Operand>(&Operands[1], NumTrueArgs);
+}
+
+MutableArrayRef<Operand> CondBranchInst::getTrueOperands() {
+  return MutableArrayRef<Operand>(&Operands[1], NumTrueArgs);
+}
+
+ArrayRef<Operand> CondBranchInst::getFalseOperands() const {
+  return ArrayRef<Operand>(&Operands[1+NumTrueArgs], NumFalseArgs);
+}
+
+MutableArrayRef<Operand> CondBranchInst::getFalseOperands() {
+  return MutableArrayRef<Operand>(&Operands[1+NumTrueArgs], NumFalseArgs);
+}
+
+void CondBranchInst::swapSuccessors() {
+  // Swap our destinations.
+  SILBasicBlock *First = DestBBs[0].getBB();
+  DestBBs[0] = DestBBs[1].getBB();
+  DestBBs[1] = First;
+
+  // If we don't have any arguments return.
+  if (!NumTrueArgs && !NumFalseArgs)
+    return;
+
+  // Otherwise swap our true and false arguments.
+  MutableArrayRef<Operand> Ops = getAllOperands();
+  llvm::SmallVector<SILValue, 4> TrueOps;
+  for (SILValue V : getTrueArgs())
+    TrueOps.push_back(V);
+
+  auto FalseArgs = getFalseArgs();
+  for (unsigned i = 0, e = NumFalseArgs; i < e; ++i) {
+    Ops[1+i].set(FalseArgs[i]);
+  }
+
+  for (unsigned i = 0, e = NumTrueArgs; i < e; ++i) {
+    Ops[1+i+NumFalseArgs].set(TrueOps[i]);
+  }
+
+  // Finally swap the number of arguments that we have.
+  std::swap(NumTrueArgs, NumFalseArgs);
+}
+
 SwitchIntInst::SwitchIntInst(SILLocation Loc, SILValue Operand,
                              SILBasicBlock *DefaultBB,
                              ArrayRef<std::pair<APInt, SILBasicBlock*>> CaseBBs)
