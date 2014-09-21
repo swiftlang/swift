@@ -946,3 +946,105 @@ bb8(%40 : $Builtin.Word):
   %41 = struct $Int (%40 : $Builtin.Word)
   return %41 : $Int
 }
+
+enum OneCase {
+  case First
+}
+
+enum TwoCase {
+  case First
+  case Second
+}
+
+enum ThreeCase {
+  case First
+  case Second
+  case Third
+}
+
+sil @unknown : $@thin () -> ()
+sil @int1_user : $@thin (Builtin.Int1) -> ()
+
+// CHECK-LABEL: sil @enum_is_tag_case_canonicalization : $@thin (OneCase, TwoCase, TwoCase, ThreeCase, ThreeCase, ThreeCase) -> () {
+// CHECK: bb0([[ONE_1:%.*]] : $OneCase, [[TWO_1:%.*]] : $TwoCase, [[TWO_2:%.*]] : $TwoCase, [[THREE_1:%.*]] : $ThreeCase, [[THREE_2:%.*]] : $ThreeCase, [[THREE_3:%.*]] : $ThreeCase):
+// CHECK: [[TAG1:%.*]] = enum_is_tag $Builtin.Int1, [[ONE_1]] : $OneCase, #OneCase.First!enumelt
+// CHECK: [[TAG2:%.*]] = enum_is_tag $Builtin.Int1, [[TWO_1]] : $TwoCase, #TwoCase.First!enumelt
+// CHECK: [[TAG3:%.*]] = enum_is_tag $Builtin.Int1, [[TWO_2]] : $TwoCase, #TwoCase.First!enumelt
+// CHECK: [[TAG3_OLD:%.*]] = enum_is_tag $Builtin.Int1, [[TWO_2]] : $TwoCase, #TwoCase.Second!enumelt
+// CHECK: [[TAG4:%.*]] = enum_is_tag $Builtin.Int1, [[THREE_1]] : $ThreeCase, #ThreeCase.First!enumelt
+// CHECK: [[TAG5:%.*]] = enum_is_tag $Builtin.Int1, [[THREE_2]] : $ThreeCase, #ThreeCase.Second!enumelt
+// CHECK: [[TAG6:%.*]] = enum_is_tag $Builtin.Int1, [[THREE_3]] : $ThreeCase, #ThreeCase.Third!enumelt
+// CHECK: cond_br [[TAG1]], bb1, bb6
+// CHECK: cond_br [[TAG2]], bb2, bb3
+// CHECK: [[INT1_USER_FUN:%.*]] = function_ref @int1_user : $@thin (Builtin.Int1) -> ()
+// CHECK: apply [[INT1_USER_FUN]]([[TAG3_OLD]])
+// CHECK: cond_br [[TAG3]], bb5, bb4
+// CHECK: cond_br [[TAG4]], bb7, bb8
+// CHECK: cond_br [[TAG5]], bb9, bb10
+// CHECK: cond_br [[TAG6]], bb11, bb12
+sil @enum_is_tag_case_canonicalization : $@thin (OneCase, TwoCase, TwoCase, ThreeCase, ThreeCase, ThreeCase) -> () {
+bb0(%0 : $OneCase, %1 : $TwoCase, %2 : $TwoCase, %3 : $ThreeCase, %4 : $ThreeCase, %5 : $ThreeCase):
+  %6 = enum_is_tag $Builtin.Int1, %0 : $OneCase, #OneCase.First!enumelt
+  %7 = enum_is_tag $Builtin.Int1, %1 : $TwoCase, #TwoCase.First!enumelt
+  %8 = enum_is_tag $Builtin.Int1, %2 : $TwoCase, #TwoCase.Second!enumelt
+  %9 = enum_is_tag $Builtin.Int1, %3 : $ThreeCase, #ThreeCase.First!enumelt
+  %10 = enum_is_tag $Builtin.Int1, %4 : $ThreeCase, #ThreeCase.Second!enumelt
+  %11 = enum_is_tag $Builtin.Int1, %5 : $ThreeCase, #ThreeCase.Third!enumelt
+  %12 = function_ref @unknown : $@thin () -> ()
+  cond_br %6, bb1a, bb1b
+
+bb1a:
+  apply %12() : $@thin () -> ()
+  cond_br %7, bb2a, bb3a
+
+bb2a:
+  apply %12() : $@thin () -> ()
+  %13 = function_ref @int1_user : $@thin (Builtin.Int1) -> ()
+  apply %13(%8) : $@thin (Builtin.Int1) -> ()
+  cond_br %8, bb4a, bb5a
+
+bb3a:
+  apply %12() : $@thin () -> ()
+  br exit
+
+bb4a:
+  apply %12() : $@thin () -> ()
+  br exit
+
+bb5a:
+  apply %12() : $@thin () -> ()
+  br exit
+
+bb1b:
+  apply %12() : $@thin () -> ()
+  cond_br %9, bb2b, bb3b
+
+bb2b:
+  apply %12() : $@thin () -> ()
+  cond_br %10, bb4b, bb5b
+
+bb3b:
+  apply %12() : $@thin () -> ()
+  cond_br %11, bb6b, bb7b
+
+bb4b:
+  apply %12() : $@thin () -> ()
+  br exit
+
+bb5b:
+  apply %12() : $@thin () -> ()
+  br exit
+
+bb6b:
+  apply %12() : $@thin () -> ()
+  br exit
+
+bb7b:
+  apply %12() : $@thin () -> ()
+  br exit
+
+exit:
+  apply %12() : $@thin () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

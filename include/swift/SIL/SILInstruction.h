@@ -2676,6 +2676,9 @@ public:
                                 SILFunction &F);
 
   SILValue getCondition() const { return Operands[Condition].get(); }
+  void setCondition(SILValue newCondition) {
+    Operands[Condition].set(newCondition);
+  }
 
   SuccessorListTy getSuccessors() {
     return DestBBs;

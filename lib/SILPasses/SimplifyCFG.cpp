@@ -102,7 +102,7 @@ namespace {
     /// \brief Remove the basic block if it has no predecessors. Returns true
     /// If the block was removed.
     bool removeIfDead(SILBasicBlock *BB);
-    
+
     bool tryJumpThreading(BranchInst *BI);
     bool simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
 
@@ -185,6 +185,8 @@ static void simplifyCheckedCastBranchInst(CheckedCastBranchInst *CCBI,
   CCBI->eraseFromParent();
 }
 
+/// Returns true if BB is the basic block jumped to when CondBr's condition
+/// evaluates to true.
 static bool getBranchTaken(CondBranchInst *CondBr, SILBasicBlock *BB) {
   if (CondBr->getTrueBB() == BB)
     return true;
@@ -904,6 +906,39 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
       return true;
     }
   }
+
+  // If we have an (cond (enum_is_tag)) on a two element enum, always have the
+  // first case as our checked tag. If we have the second, create a new
+  // enum_is_tag with the first case and swap our operands. This simplifies
+  // later dominance based processing.
+  if (auto *EITI = dyn_cast<EnumIsTagInst>(BI->getCondition())) {
+    EnumDecl *E = EITI->getOperand().getType().getEnumOrBoundGenericEnum();
+
+    auto AllElts = E->getAllElements();
+    auto Iter = AllElts.begin();
+    EnumElementDecl *FirstElt = *Iter;
+
+    if (EITI->getElement() != FirstElt) {
+      ++Iter;
+      if (Iter != AllElts.end() &&
+          std::next(Iter) == AllElts.end() &&
+          *Iter == EITI->getElement()) {
+        auto *NewEITI = SILBuilder(EITI).createEnumIsTag(EITI->getLoc(),
+                                                         EITI->getOperand(),
+                                                         FirstElt,
+                                                         EITI->getType());
+        // We only change the condition to be NewEITI instead of all uses since
+        // EITI may have other uses besides this one that need to be updated.
+        BI->setCondition(NewEITI);
+        BI->swapSuccessors();
+        addToWorklist(BI->getParent());
+        addToWorklist(TrueSide);
+        addToWorklist(FalseSide);
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
@@ -1006,7 +1041,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
     }
     Dests.push_back(S);
   }
-    
+
   if (EI->hasOperand() && !LiveBlock->bbarg_empty())
     SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock,
                                  EI->getOperand());
@@ -1014,9 +1049,9 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
     SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock);
   SEI->eraseFromParent();
   if (EI->use_empty()) EI->eraseFromParent();
-    
+
   addToWorklist(ThisBB);
-    
+
   for (auto B : Dests)
     simplifyAfterDroppingPredecessor(B);
   addToWorklist(LiveBlock);
