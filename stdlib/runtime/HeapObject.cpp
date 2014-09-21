@@ -307,7 +307,7 @@ void swift::swift_weakRelease(HeapObject *object) {
   if (newCount == 0) {
     // Only class objects can be weak-retained and weak-released.
     auto metadata = object->metadata;
-    assert(metadata->isClassType());
+    assert(metadata->isClassObject());
     auto classMetadata = static_cast<const ClassMetadata*>(metadata);
     assert(classMetadata->isTypeMetadata());
     swift_slowDealloc(object, classMetadata->getInstanceSize(),
@@ -351,7 +351,7 @@ void _swift_release_slow(HeapObject *object) {
 /// Perform the root -dealloc operation for a class instance.
 void swift::_swift_deallocClassInstance(HeapObject *self) {
   auto metadata = self->metadata;
-  assert(metadata->isClassType());
+  assert(metadata->isClassObject());
   auto classMetadata = static_cast<const ClassMetadata*>(metadata);
   assert(classMetadata->isTypeMetadata());
   swift_deallocObject(self, classMetadata->getInstanceSize(),

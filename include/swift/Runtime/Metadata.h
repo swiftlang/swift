@@ -806,10 +806,42 @@ public:
     Kind = kind;
   }
 
-  /// Is this metadata for a class type?
-  bool isClassType() const {
+  /// Is this a class object--the metadata record for a Swift class (which also
+  /// serves as the class object), or the class object for an ObjC class (which
+  /// is not metadata)?
+  bool isClassObject() const {
     return Kind > MetadataKind::MetadataKind_Last
       || Kind == MetadataKind::Class;
+  }
+  
+  /// Does the given metadata kind represent metadata for some kind of class?
+  static bool isAnyKindOfClass(MetadataKind k) {
+    switch (k) {
+    case MetadataKind::Class:
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass:
+    case MetadataKind::Block:
+      return true;
+        
+    case MetadataKind::Struct:
+    case MetadataKind::Enum:
+    case MetadataKind::Opaque:
+    case MetadataKind::Tuple:
+    case MetadataKind::Function:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::Existential:
+    case MetadataKind::Metatype:
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::HeapArray:
+      return false;
+    }
+    assert(false && "not a metadata kind");
+  }
+  
+  /// Is this either type metadata or a class object for any kind of class?
+  bool isAnyClass() const {
+    return isAnyKindOfClass(getKind());
   }
 
   const ValueWitnessTable *getValueWitnesses() const {
