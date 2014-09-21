@@ -381,6 +381,11 @@ public:
   /// a base class.
   bool isSuperExpr() const;
 
+  /// Produce a mapping from each subexpression to its parent
+  /// expression, with the provided expression serving as the root of
+  /// the parent map.
+  llvm::DenseMap<Expr *, Expr *> getParentMap();
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");

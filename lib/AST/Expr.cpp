@@ -181,6 +181,28 @@ bool Expr::isSuperExpr() const {
   } while (true);
 }
 
+llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
+  class RecordingTraversal : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, Expr *> &ParentMap;
+
+    explicit RecordingTraversal(llvm::DenseMap<Expr *, Expr *> &parentMap)
+      : ParentMap(parentMap) { }
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+      if (auto parent = Parent.getAsExpr())
+        ParentMap[E] = parent;
+
+      return { true, E };
+    }
+  };
+
+  llvm::DenseMap<Expr *, Expr *> parentMap;
+  RecordingTraversal traversal(parentMap);
+  walk(traversal);
+  return parentMap;
+}
+
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
