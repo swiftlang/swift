@@ -999,6 +999,165 @@ namespace {
       newConstraints.push_back(overload);
     }
 
+    /// Favor binary operator constraints where we have exact matches
+    /// for the operands.
+    void favorMatchingBinaryOperators(ApplyExpr *expr) {
+      // FIXME: Not technically needed here.
+      auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
+      if (!declRef)
+        return;
+
+      // Find the type variable associated with the function, if any.
+      auto fnType = expr->getFn()->getType();
+      auto tyvarType = fnType->getAs<TypeVariableType>();
+      if (!tyvarType)
+        return;
+      
+      // This type variable is only currently associated with the function
+      // being applied, and the only constraint attached to it should
+      // be the disjunction constraint for the overload group.
+      auto &CG = CS.getConstraintGraph();
+      SmallVector<Constraint *, 4> constraints;
+      CG.gatherConstraints(tyvarType, constraints);
+      if (constraints.empty())
+        return;
+
+      // Look for the disjunction that binds the overload set.
+      for (auto constraint : constraints) {
+        if (constraint->getKind() != ConstraintKind::Disjunction)
+          continue;
+        
+        auto oldConstraints = constraint->getNestedConstraints();
+        auto csLoc = CS.getConstraintLocator(expr->getFn());
+        
+        // Only replace the disjunctive overload constraint.
+        if (oldConstraints[0]->getKind() != ConstraintKind::BindOverload) {
+          continue;
+        }
+
+        SmallVector<Constraint *, 4> favoredConstraints;
+
+        // Find the argument types.
+        auto argTy = expr->getArg()->getType();
+        auto argTupleTy = argTy->castTo<TupleType>();
+        Type firstArgTy = argTupleTy->getFields()[0].getType();
+        Type secondArgTy = argTupleTy->getFields()[1].getType();
+
+        // Copy over the existing bindings, dividing the constraints up
+        // into "favored" and non-favored lists, should all of the
+        // parameter/argument comparisons be favored.
+        for (auto oldConstraint : oldConstraints) {
+          auto overloadChoice = oldConstraint->getOverloadChoice();
+          auto overloadDecl = overloadChoice.getDecl();
+          auto overloadTy = overloadDecl->getType();
+          
+          if (auto fnTy = overloadTy->getAs<AnyFunctionType>()) {
+            // Figure out the parameter type.
+            if (overloadDecl->getDeclContext()->isTypeContext()) {
+              fnTy = fnTy->castTo<AnyFunctionType>()->getResult()
+                ->castTo<AnyFunctionType>();
+            }
+
+            Type paramTy = fnTy->getInput();
+            auto paramTupleTy = paramTy->castTo<TupleType>();
+            auto firstParamTy = paramTupleTy->getFields()[0].getType();
+            auto secondParamTy = paramTupleTy->getFields()[1].getType();
+
+            auto resultTy = fnTy->getResult();
+            auto contextualTy = CS.getContextualType(expr);
+
+            if ((isFavoredParamAndArg(firstParamTy, firstArgTy) ||
+                 isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
+                firstParamTy->isEqual(secondParamTy) &&
+                (!contextualTy || (*contextualTy)->isEqual(resultTy))) {
+              favoredConstraints.push_back(oldConstraint);
+            }
+          }
+        }
+
+        // Add a hack for lazily-generated global operators.
+        // For now, that's just ==.
+        SmallVector<Constraint *, 4> replacementConstraints;
+        if (declRef->isPotentiallyDelayedGlobalOperator()) {
+          Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
+          if (declRef->getDecls()[0]->getName() == eqOperator) {
+            if (!declRef->isSpecialized()) {
+              replacementConstraints.append(oldConstraints.begin(),
+                                            oldConstraints.end());
+
+              addNewEqualsOperatorOverloads(replacementConstraints, firstArgTy,
+                                            tyvarType, csLoc);
+              if (!firstArgTy->isEqual(secondArgTy)) {
+                addNewEqualsOperatorOverloads(replacementConstraints,
+                                              secondArgTy,
+                                              tyvarType, csLoc);
+              }
+            }
+
+          } else {
+            assert("unknown delayed global operator");
+          }
+        }
+
+        // If we did not find any favored constraints, just introduce
+        // the new constraints (if they differ).
+        if (favoredConstraints.empty()) {
+          if (replacementConstraints.size() > oldConstraints.size()) {
+            // Remove the old constraint.
+            CS.removeInactiveConstraint(constraint);
+
+            CS.addConstraint(
+              Constraint::createDisjunction(CS,
+                                            replacementConstraints,
+                                            csLoc));
+          }
+          break;
+        }
+
+        // Remove the original constraint from the inactive constraint
+        // list and add the new one.
+        CS.removeInactiveConstraint(constraint);
+        
+        // Create the disjunction of favored constraints.
+        auto favoredConstraintsDisjunction =
+          Constraint::createDisjunction(CS,
+                                        favoredConstraints,
+                                        csLoc);
+
+        // If we didn't actually build a disjunction, clone
+        // the underlying constraint so we can mark it as
+        // favored.
+        if (favoredConstraints.size() == 1) {
+          favoredConstraintsDisjunction
+            = favoredConstraintsDisjunction->clone(CS);
+        }
+
+        favoredConstraintsDisjunction->setFavored();
+        
+        // Find the disjunction of fallback constraints. If any
+        // constraints were added here, create a new disjunction.
+        Constraint *fallbackConstraintsDisjunction = constraint;
+        if (replacementConstraints.size() > oldConstraints.size()) {
+          fallbackConstraintsDisjunction =
+            Constraint::createDisjunction(CS,
+                                          replacementConstraints,
+                                          csLoc);
+        }
+
+        // Form the (favored, fallback) disjunction.
+        auto aggregateConstraints = {
+          favoredConstraintsDisjunction,
+          fallbackConstraintsDisjunction
+        };
+
+        CS.addConstraint(
+          Constraint::createDisjunction(CS,
+                                        aggregateConstraints,
+                                        csLoc));
+        break;
+      }
+    }
+
     Type visitApplyExpr(ApplyExpr *expr) {
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
@@ -1008,8 +1167,6 @@ namespace {
             /*options=*/0);
 
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
-      
-      auto isBinaryExpr = isa<BinaryExpr>(expr);
       
       // If we're generating constraints for a binary operator application,
       // there are two special situations to consider:
@@ -1021,146 +1178,9 @@ namespace {
       //     literals, we can favor operator overloads whose argument types are
       //     identical to the literal type, or whose return types are identical
       //     to any contextual type associated with the application expression.
-      if (isBinaryExpr) {
-        if (auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn())) {
-        SmallVector<Constraint *, 4> constraints;
-        
-        auto fnType = expr->getFn()->getType().getPointer();
-        
-        if (auto tyvarType = dyn_cast<TypeVariableType>(fnType)) {
-          auto &CG = CS.getConstraintGraph();
-          
-          // This type variable is only currently associated with the function
-          // being applied, and the only constraint attached to it should
-          // be the disjunction constraint for the overload group.
-          CG.gatherConstraints(tyvarType, constraints);
-          
-          if (constraints.size()) {
-            for (auto constraint : constraints) {
-              if (constraint->getKind() == ConstraintKind::Disjunction) {
-                SmallVector<Constraint *, 4> newConstraints;
-                SmallVector<Constraint *, 4> favoredConstraints;
-                
-                auto oldConstraints = constraint->getNestedConstraints();
-                auto csLoc = CS.getConstraintLocator(expr->getFn());
-                
-                // Only replace the disjunctive overload constraint.
-                if (oldConstraints[0]->getKind() !=
-                        ConstraintKind::BindOverload) {
-                  continue;
-                }
-
-                // Find the argument types.
-                auto argTy = expr->getArg()->getType();
-                auto argTupleTy = argTy->castTo<TupleType>();
-                Type firstArgTy = argTupleTy->getFields()[0].getType();
-                Type secondArgTy = argTupleTy->getFields()[1].getType();
-
-                // Copy over the existing bindings, dividing the constraints up
-                // into "favored" and non-favored lists, should all of the
-                // parameter/argument comparisons be favored.
-                for (auto oldConstraint : oldConstraints) {
-                  auto overloadChoice = oldConstraint->getOverloadChoice();
-                  auto overloadDecl = overloadChoice.getDecl();
-                  auto overloadTy = overloadDecl->getType();
-                  
-                  if (auto fnTy = overloadTy->getAs<AnyFunctionType>()) {
-                    // Figure out the parameter type.
-                    if (overloadDecl->getDeclContext()->isTypeContext()) {
-                      fnTy = fnTy->castTo<AnyFunctionType>()->getResult()
-                               ->castTo<AnyFunctionType>();
-                    }
-
-                    Type paramTy = fnTy->getInput();
-                    auto paramTupleTy = paramTy->castTo<TupleType>();
-                    auto firstParamTy = paramTupleTy->getFields()[0].getType();
-                    auto secondParamTy = paramTupleTy->getFields()[1].getType();
-
-                    auto resultTy = fnTy->getResult();
-                    auto contextualTy = CS.getContextualType(expr);
-
-                    if ((isFavoredParamAndArg(firstParamTy, firstArgTy) ||
-                         isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
-                        firstParamTy->isEqual(secondParamTy) &&
-                        (!contextualTy || (*contextualTy)->isEqual(resultTy))) {
-                      favoredConstraints.push_back(oldConstraint);
-                    }
-                  }
-                  
-                  newConstraints.push_back(oldConstraint);
-                }
-
-                // Add a hack for lazily-generated global operators.
-                // For now, that's just ==.
-                if (declRef->isPotentiallyDelayedGlobalOperator()) {
-                  Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
-                  if (declRef->getDecls()[0]->getName() == eqOperator) {
-                    if (!declRef->isSpecialized()) {
-                      addNewEqualsOperatorOverloads(newConstraints, firstArgTy,
-                                                    tyvarType, csLoc);
-                      if (!firstArgTy->isEqual(secondArgTy)) {
-                        addNewEqualsOperatorOverloads(newConstraints,
-                                                      secondArgTy,
-                                                      tyvarType, csLoc);
-                      }
-                    }
-
-                  } else {
-                    assert("unknown delayed global operator");
-                  }
-                }
-
-                // Remove the original constraint from the inactive constraint
-                // list and add the new one.
-                CS.removeInactiveConstraint(constraint);
-                
-                if (favoredConstraints.size()) {
-                  auto favoredConstraintsDisjunction =
-                          Constraint::createDisjunction(CS,
-                                                        favoredConstraints,
-                                                        csLoc);
-
-                  // If we didn't actually build a disjunction, clone
-                  // the underlying constraint so we can mark it as
-                  // favored.
-                  if (favoredConstraints.size() == 1) {
-                    favoredConstraintsDisjunction
-                      = favoredConstraintsDisjunction->clone(CS);
-                  }
-
-                  favoredConstraintsDisjunction->setFavored();
-                  
-                  if (newConstraints.size()) {
-                    auto newConstraintsDisjunction =
-                            Constraint::createDisjunction(CS,
-                                                          newConstraints,
-                                                          csLoc);
-                    auto aggregateConstraints = {
-                                                  favoredConstraintsDisjunction,
-                                                  newConstraintsDisjunction
-                                                };
-                    CS.addConstraint(
-                        Constraint::createDisjunction(CS,
-                                                      aggregateConstraints,
-                                                      csLoc));
-                  } else {
-                    CS.addConstraint(
-                        Constraint::createDisjunction(CS,
-                                                      favoredConstraints,
-                                                      csLoc));
-                  }
-                } else {
-                  CS.addConstraint(Constraint::createDisjunction(CS,
-                                                                 newConstraints,
-                                                                 csLoc));
-                }
-                break;
-              }
-            }
-          }
-        }
+      if (isa<BinaryExpr>(expr)) {
+        favorMatchingBinaryOperators(expr);
       }
-    }
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
         expr->getFn()->getType(),
