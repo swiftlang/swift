@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A *generator* that produces one or fewer instances of `T`.
 public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
   public init(_ elements: T?) {
     self.elements = elements

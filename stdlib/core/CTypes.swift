@@ -117,6 +117,8 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
     self.value = value.value
   }
 
+  // FIXME: should this API be internalized or retired?
+  /// Returns `nil`
   @transparent
   public static func null() -> COpaquePointer {
     return COpaquePointer()
@@ -148,6 +150,14 @@ public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
+/// The family of C function pointer types.
+///
+/// In imported APIs, `T` is a Swift function type such as
+/// `(Int)->String`.
+/// 
+/// Though not directly useful in Swift, `CFunctionPointer<T>` can be
+/// used to safely pass a C function pointer, received from one C or
+/// Objective-C API, to another C or Objective-C API.
 public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   var value: COpaquePointer
 
@@ -159,6 +169,8 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
     self.value = value
   }
 
+  // FIXME: should this API be internalized or retired?
+  /// Returns `nil`
   public static func null() -> CFunctionPointer {
     return CFunctionPointer()
   }
