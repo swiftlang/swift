@@ -242,6 +242,21 @@ Runtime.test("_isClassOrObjCExistential") {
   expectTrue(_isClassOrObjCExistential_Opaque(CFArray.self))
 }
 
+Runtime.test("_canBeClass") {
+  expectEqual(1, _canBeClass(NSObjectCanary.self))
+  expectEqual(0, _canBeClass(NSObjectCanaryStruct.self))
+  expectEqual(1, _canBeClass(SwiftObjectCanary.self))
+  expectEqual(0, _canBeClass(SwiftObjectCanaryStruct.self))
+
+  typealias SwiftClosure = ()->()
+  expectEqual(0, _canBeClass(SwiftClosure.self))
+
+  typealias ObjCClosure = @objc_block ()->()
+  expectEqual(1, _canBeClass(ObjCClosure.self))
+
+  expectEqual(1, _canBeClass(CFArray.self))
+}
+
 Runtime.test("bridgeToObjectiveC") {
   expectEmpty(_bridgeToObjectiveC(NotBridgedValueType()))
 
