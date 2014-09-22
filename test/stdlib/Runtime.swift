@@ -213,6 +213,35 @@ func withSwiftObjectCanary<T>(
 
 var Runtime = TestSuite("Runtime")
 
+func _isClassOrObjCExistential_Opaque<T>(x: T.Type) -> Bool {
+  return _isClassOrObjCExistential(_opaqueIdentity(x))
+}
+
+Runtime.test("_isClassOrObjCExistential") {
+  expectTrue(_isClassOrObjCExistential(NSObjectCanary.self))
+  expectTrue(_isClassOrObjCExistential_Opaque(NSObjectCanary.self))
+
+  expectFalse(_isClassOrObjCExistential(NSObjectCanaryStruct.self))
+  expectFalse(_isClassOrObjCExistential_Opaque(NSObjectCanaryStruct.self))
+
+  expectTrue(_isClassOrObjCExistential(SwiftObjectCanary.self))
+  expectTrue(_isClassOrObjCExistential_Opaque(SwiftObjectCanary.self))
+
+  expectFalse(_isClassOrObjCExistential(SwiftObjectCanaryStruct.self))
+  expectFalse(_isClassOrObjCExistential_Opaque(SwiftObjectCanaryStruct.self))
+
+  typealias SwiftClosure = ()->()
+  expectTrue(_isClassOrObjCExistential(Swift.self))
+  expectTrue(_isClassOrObjCExistential_Opaque(SwiftClosure.self))
+
+  typealias ObjCClosure = @objc_block ()->()
+  expectTrue(_isClassOrObjCExistential(ObjCClosure.self))
+  expectTrue(_isClassOrObjCExistential_Opaque(ObjCClosure.self))
+
+  expectTrue(_isClassOrObjCExistential(CFArray.self))
+  expectTrue(_isClassOrObjCExistential_Opaque(CFArray.self))
+}
+
 Runtime.test("bridgeToObjectiveC") {
   expectEmpty(_bridgeToObjectiveC(NotBridgedValueType()))
 
