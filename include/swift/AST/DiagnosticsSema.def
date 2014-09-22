@@ -358,6 +358,9 @@ ERROR(invalid_iboutlet,sema_tcd,none,
 ERROR(iboutlet_nonobjc_class,sema_tcd,none,
       "'IBOutlet' property cannot %select{have|be an array of}0 "
       "non-'@objc' class type %1", (bool, Type))
+ERROR(iboutlet_nonobjc_protocol,sema_tcd,none,
+      "'IBOutlet' property cannot %select{have|be an array of}0 "
+      "non-'@objc' protocol type %1", (bool, Type))
 ERROR(iboutlet_nonobject_type,sema_tcd,none,
       "'IBOutlet' property cannot %select{have|be an array of}0 "
       "non-object type %1", (bool, Type))

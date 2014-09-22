@@ -62,13 +62,13 @@ class NonObjC {}
   @IBOutlet var outlet6: AnyObject!
 
   // Protocol types
-  @IBOutlet var outlet7: P1 // expected-error{{'IBOutlet' property cannot have non-object type 'P1'}}
-  @IBOutlet var outlet8: CP1 // expected-error{{'IBOutlet' property cannot have non-object type 'CP1'}}
-  @IBOutlet var outlet10: P1? // expected-error{{'IBOutlet' property cannot have non-object type}}
-  @IBOutlet var outlet11: CP1? // expected-error{{'IBOutlet' property cannot have non-object type}}
+  @IBOutlet var outlet7: P1 // expected-error{{'IBOutlet' property cannot have non-'@objc' protocol type 'P1'}}
+  @IBOutlet var outlet8: CP1 // expected-error{{'IBOutlet' property cannot have non-'@objc' protocol type 'CP1'}}
+  @IBOutlet var outlet10: P1? // expected-error{{'IBOutlet' property cannot have non-'@objc' protocol type}}
+  @IBOutlet var outlet11: CP1? // expected-error{{'IBOutlet' property cannot have non-'@objc' protocol type}}
   @IBOutlet var outlet12: OP1?
-  @IBOutlet var outlet13: P1! // expected-error{{'IBOutlet' property cannot have non-object type}}
-  @IBOutlet var outlet14: CP1! // expected-error{{'IBOutlet' property cannot have non-object type}}
+  @IBOutlet var outlet13: P1! // expected-error{{'IBOutlet' property cannot have non-'@objc' protocol type}}
+  @IBOutlet var outlet14: CP1! // expected-error{{'IBOutlet' property cannot have non-'@objc' protocol type}}
   @IBOutlet var outlet15: OP1!
 
   // Class metatype
@@ -115,9 +115,9 @@ class NonObjC {}
   @IBOutlet var collection3b: [OP1]?
   @IBOutlet var collection3c: [OP1]!
 
-  @IBOutlet var collection4a: [CP1] // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
-  @IBOutlet var collection4b: ([CP1])? // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
-  @IBOutlet var collection4c: ([CP1])! // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
+  @IBOutlet var collection4a: [CP1] // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' protocol type}}
+  @IBOutlet var collection4b: ([CP1])? // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' protocol type}}
+  @IBOutlet var collection4c: ([CP1])! // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' protocol type}}
 
   @IBOutlet var collection5b: ([String])?  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
   @IBOutlet var collection5c: ([String])!  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}

@@ -220,6 +220,9 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
     return isAcceptableOutletType(elementTy, isArray, TC);
   }
 
+  if (type->isExistentialType())
+    return diag::iboutlet_nonobjc_protocol;
+  
   // No other types are permitted.
   return diag::iboutlet_nonobject_type;
 }
