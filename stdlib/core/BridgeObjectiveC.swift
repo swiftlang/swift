@@ -404,7 +404,9 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   init(nilLiteral: ()) {
     value = _nilRawPointer
   }
-  
+
+  // FIXME: should this API be retired or internalized?
+  /// Returns `nil`
   @transparent public
   static func null() -> AutoreleasingUnsafeMutablePointer {
     return AutoreleasingUnsafeMutablePointer(_nilRawPointer)

@@ -10,36 +10,50 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Definitions that make elements of Builtin usable in real
-// code without gobs of boilerplate.  These APIs will probably *not*
-// be exposed outside the stdlib.
+// Definitions that make elements of Builtin usable in real code
+// without gobs of boilerplate.
 
+/// Returns the contiguous memory footprint of `T`.
+///
+/// Does not include any dynamically-allocated or "remote" storage.
+/// In particular, `sizeof(X.self)`, when `X` is a class type, is the
+/// same regardless of how many stored properties `X` has.
 @transparent public
 func sizeof<T>(_:T.Type) -> Int {
   return Int(Builtin.sizeof(T.self))
 }
 
+/// Returns the contiguous memory footprint of  `T`.
+///
+/// Does not include any dynamically-allocated or "remote" storage.
+/// In particular, `sizeof(a)`, when `a` is a class instance, is the
+/// same regardless of how many stored properties `a` has.
 @transparent public
 func sizeofValue<T>(_:T) -> Int {
   return sizeof(T.self)
 }
 
+/// Returns the minimum memory alignment of `T`.
 @transparent public
 func alignof<T>(_:T.Type) -> Int {
   return Int(Builtin.alignof(T.self))
 }
 
+/// Returns the minimum memory alignment of `T`.
 @transparent public
 func alignofValue<T>(_:T) -> Int {
   return alignof(T.self)
 }
 
-// Like the builtin strideof, but never returns zero
+/// Returns the least possible interval between distinct instances of
+/// `T` in memory.  The result is always positive.
 @transparent public
 func strideof<T>(_:T.Type) -> Int {
   return Int(Builtin.strideof_nonzero(T.self))
 }
 
+/// Returns the least possible interval between distinct instances of
+/// `T` in memory.  The result is always positive.
 @transparent public
 func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
@@ -71,7 +85,12 @@ func reinterpretCast<T, U>(var x: T) -> U {
   return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
 }
 
-/// A brutal bit-cast of something to anything of the same size
+/// Returns the the bits of `x`, interpreted as having type `U`.
+///
+/// .. Caution:: Breaks the guarantees of Swift's type system; use
+///    with extreme care.  There's almost always a better way to do
+///    anything.
+///
 @transparent public
 func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
@@ -152,10 +171,16 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
 }
 
-/// Equivalent to `x as T`, except that no check that `x` actually has
-/// dynamic type `T` is performed in -O builds.  Better than an
-/// `unsafeBitCast` because it's more restrictive, and checking is
-/// still performed in debug builds.
+/// Returns: `x as T`
+///
+/// Requires: `x is T`.  In particular, in -O builds, no test is
+/// performed to ensure that `x` actually has dynamic type `T`.
+///
+/// .. Danger:: trades safety for performance.  Use `unsafeDowncast`
+/// only when `x as T` has proven to be a performance problem and you
+/// are confident that, always, `x is T`.  It is better than an
+/// `unsafeBitCast` because it's more restrictive, and because
+/// checking is still performed in debug builds.
 @transparent
 public func unsafeDowncast<T: AnyObject>(x: AnyObject) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
@@ -183,11 +208,13 @@ func _branchHint<C: BooleanType>(actual: C, expected: Bool) -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue.value, expected.value))
 }
 
+/// Optimizer hint that `x` is expected to be `true`
 @transparent @semantics("fastpath") public
 func _fastPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.boolValue, true)
 }
 
+/// Optimizer hint that `x` is expected to be `false`
 @transparent @semantics("slowpath") public
 func _slowPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.boolValue, false)
