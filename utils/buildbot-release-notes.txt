@@ -25,8 +25,9 @@ Latest
   will never be printed in the generated header, even if they extend an
   Objective-C class.
 
-* All of the *LiteralConvertible protocols now use initializers for
-  their requirements rather than static methods starting with
+* All of the *LiteralConvertible protocols, as well as
+  StringInterpolationConvertible, now use initializers for their
+  requirements rather than static methods starting with
   "convertFrom". For example, IntegerLiteralConvertible now as the
   following initializer requirement:
 

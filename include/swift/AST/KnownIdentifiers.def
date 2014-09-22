@@ -94,10 +94,8 @@ IDENTIFIER_WITH_NAME(StringLiteral, "stringLiteral")
 IDENTIFIER_WITH_NAME(BuiltinUTF16StringLiteral, "_builtinUTF16StringLiteral")
 IDENTIFIER_WITH_NAME(BuiltinStringLiteral, "_builtinStringLiteral")
 IDENTIFIER(StringLiteralType)
-IDENTIFIER_WITH_NAME(ConvertFromStringInterpolation,
-                     "convertFromStringInterpolation")
-IDENTIFIER_WITH_NAME(ConvertFromStringInterpolationSegment,
-                     "convertFromStringInterpolationSegment")
+IDENTIFIER_WITH_NAME(StringInterpolation, "stringInterpolation")
+IDENTIFIER_WITH_NAME(StringInterpolationSegment, "stringInterpolationSegment")
 IDENTIFIER_WITH_NAME(ArrayLiteral, "arrayLiteral")
 IDENTIFIER_WITH_NAME(DictionaryLiteral, "dictionaryLiteral")
 IDENTIFIER_WITH_NAME(GetBuiltinLogicValue, "_getBuiltinLogicValue")

@@ -36,18 +36,14 @@ for int_ty in all_integer_types(word_bits):
 
 extension String : StringInterpolationConvertible {
 % for Type in StreamableTypes:
-  public static func convertFromStringInterpolationSegment(
-    expr: ${Type}
-  ) -> String {
-    return _toStringReadOnlyStreamable(expr)
+  public init(stringInterpolationSegment expr: ${Type}) {
+    self = _toStringReadOnlyStreamable(expr)
   }
 % end
 
 % for Type in PrintableTypes:
-  public static func convertFromStringInterpolationSegment(
-    expr: ${Type}
-  ) -> String {
-    return _toStringReadOnlyPrintable(expr)
+  public init(stringInterpolationSegment expr: ${Type}) {
+    self = _toStringReadOnlyPrintable(expr)
   }
 % end
 }
