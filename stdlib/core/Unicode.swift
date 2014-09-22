@@ -771,7 +771,7 @@ extension UTF16 {
 
   public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return (UTF16.CodeUnit(x.value - 0x1_0000) & ((1 << 10) - 1)) + 0xDC00
+    return (UTF16.CodeUnit(x.value - 0x1_0000) & (((1 as UTF16.CodeUnit) << 10) - 1)) + 0xDC00
   }
 
   public static func copy<T : StringElementType, U : StringElementType>(
