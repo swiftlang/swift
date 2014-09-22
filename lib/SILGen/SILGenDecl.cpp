@@ -2525,9 +2525,9 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
     
     // Substitute context parameters out of the "from" and "to" types.
     auto fromInterfaceType
-      = Types.getInterfaceTypeInContext(fromType, thunkContextParams);
+      = Types.getInterfaceTypeOutOfContext(fromType, thunkContextParams);
     auto toInterfaceType
-      = Types.getInterfaceTypeInContext(toType, thunkContextParams);
+      = Types.getInterfaceTypeOutOfContext(toType, thunkContextParams);
     
     mangler.mangleType(fromInterfaceType,
                        ResilienceExpansion::Minimal, /*uncurry*/ 0);

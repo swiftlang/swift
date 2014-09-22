@@ -1505,14 +1505,14 @@ mapArchetypeToInterfaceType(const PrimaryArchetypeMap &primaryArchetypes,
 
 /// Map a contextual type out of its context into a dependent generic type.
 CanType
-TypeConverter::getInterfaceTypeInContext(CanType contextTy,
+TypeConverter::getInterfaceTypeOutOfContext(CanType contextTy,
                                          DeclContext *context) const {
-  return getInterfaceTypeInContext(contextTy,
+  return getInterfaceTypeOutOfContext(contextTy,
                                    context->getGenericParamsOfContext());
 }
 
 CanType
-TypeConverter::getInterfaceTypeInContext(CanType contextTy,
+TypeConverter::getInterfaceTypeOutOfContext(CanType contextTy,
                                         GenericParamList *contextParams) const {
   // If the context is non-generic, we're done.
   if (!contextParams)
@@ -1582,7 +1582,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   CanGenericSignature sig;
   if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>()) {
     sig = genTy->getGenericSignature()->getCanonicalSignature();
-    resultTy = TC.getInterfaceTypeInContext(resultTy,
+    resultTy = TC.getInterfaceTypeOutOfContext(resultTy,
                                             funcInfo.ContextGenericParams);
   }
   
@@ -1891,7 +1891,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
     TupleType::get(inputFields, Context)->getCanonicalType();
   
   // Map context archetypes out of the captures.
-  capturedInputs = getInterfaceTypeInContext(capturedInputs, context);
+  capturedInputs = getInterfaceTypeOutOfContext(capturedInputs, context);
 
   auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                           FunctionType::Representation::Thin,
@@ -1936,7 +1936,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
       // parameters.
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
-                           getInterfaceTypeInContext(funcTy, ACE->getParent()));
+                           getInterfaceTypeOutOfContext(funcTy, ACE->getParent()));
       if (!withCaptures) return funcTy;
       ACE->getCaptureInfo().getLocalCaptures(nullptr, captures);
       return getFunctionInterfaceTypeWithCaptures(funcTy, captures,
@@ -1948,7 +1948,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
                                   func->getInterfaceType()->getCanonicalType());
     if (func->getParent() && func->getParent()->isLocalContext())
       funcTy = cast<AnyFunctionType>(
-                         getInterfaceTypeInContext(funcTy, func->getParent()));
+                         getInterfaceTypeOutOfContext(funcTy, func->getParent()));
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
     func->getLocalCaptures(captures);

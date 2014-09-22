@@ -699,12 +699,12 @@ public:
   
   // Map a type involving context archetypes out of its context into a
   // dependent type.
-  CanType getInterfaceTypeInContext(CanType contextTy,
+  CanType getInterfaceTypeOutOfContext(CanType contextTy,
                                     DeclContext *context) const;
   
   // Map a type involving context archetypes out of its context into a
   // dependent type.
-  CanType getInterfaceTypeInContext(CanType contextTy,
+  CanType getInterfaceTypeOutOfContext(CanType contextTy,
                                     GenericParamList *contextParams) const;
 
   /// Known types for bridging.

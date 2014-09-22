@@ -990,12 +990,12 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto &Types = SGM.M.Types;
   for (auto &param : params) {
     interfaceParams.push_back(
-      SILParameterInfo(Types.getInterfaceTypeInContext(param.getType(), generics),
+      SILParameterInfo(Types.getInterfaceTypeOutOfContext(param.getType(), generics),
                        param.getConvention()));
   }
   
   auto interfaceResult = SILResultInfo(
-    Types.getInterfaceTypeInContext(expectedType->getResult().getType(), generics),
+    Types.getInterfaceTypeOutOfContext(expectedType->getResult().getType(), generics),
     expectedType->getResult().getConvention());
   
   // The type of the thunk function.
