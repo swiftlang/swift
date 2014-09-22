@@ -39,3 +39,30 @@ func functionAvailableOn10_10() {
  	
  	let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X version 10.11 or greater}}
 }
+
+if #os(OSX >= 10.10) {
+  let _: Int = globalAvailableOn10_10
+  let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X version 10.11 or greater}}
+}
+
+if #os(OSX >= 10.10) {
+  let _: Int = globalAvailableOn10_10
+  let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X version 10.11 or greater}}
+} else {
+  let _: Int = globalAvailableOn10_9
+  let _: Int = globalAvailableOn10_10 // expected-error {{'globalAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+}
+
+@availability(OSX, introduced=10.10)
+var globalAvailableOnOSX10_10AndiOS8_0: Int = 10
+
+if #os(OSX >= 10.10, iOS >= 8.0) {
+  let _: Int = globalAvailableOnOSX10_10AndiOS8_0
+}
+
+if #os(OSX >= 10.10, OSX >= 10.11) {  // expected-error {{conditions for 'OSX' already specified for this query}}
+}
+
+if #os(iOS >= 9.0) {  // expected-error {{condition required for target platform 'OSX'}}
+  let _: Int = globalAvailableOnOSX10_10AndiOS8_0 // expected-error {{'globalAvailableOnOSX10_10AndiOS8_0' is only available on OS X version 10.10 or greater}}
+}

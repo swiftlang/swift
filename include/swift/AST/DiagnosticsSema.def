@@ -1703,6 +1703,12 @@ ERROR(availability_decl_only_version_greater, sema_avail, none,
       "%0 is only available on %1 version %2 or greater",
       (DeclName, StringRef, clang::VersionTuple))
 
+ERROR(availability_query_repeated_platform, sema_avail, none,
+      "conditions for '%0' already specified for this query", (StringRef))
+
+ERROR(availability_query_required_for_platform, sema_avail, none,
+      "condition required for target platform '%0'", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

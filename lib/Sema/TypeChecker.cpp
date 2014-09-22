@@ -31,6 +31,7 @@
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -689,9 +690,11 @@ public:
   }
 
   void build(Decl *D) { D->walk(*this); }
+  void build(Stmt *S) { S->walk(*this); }
+  void build(Expr *E) { E->walk(*this); }
 
 private:
-  virtual bool walkToDeclPre(Decl *D) {
+  virtual bool walkToDeclPre(Decl *D) override {
     auto FD = dyn_cast<AbstractFunctionDecl>(D);
     if (!FD) return true;
 
@@ -742,6 +745,119 @@ private:
         }
       }
     return false;
+  }
+
+  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    auto IS = dyn_cast<IfStmt>(S);
+    if (!IS)
+      return std::make_pair(true, S);
+
+    bool BuiltTRC = buildIfStmtRefinementContext(IS);
+    return std::make_pair(!BuiltTRC, S);
+  }
+
+  /// Builds the type refinement hierarchy for the IfStmt if the guard
+  /// introduces a new refinement context for either the Then or the Else
+  /// branch. Returns true if the statement introduced a new hierarchy. In this
+  /// case, there is no need for the caller to explicitly traverse the children
+  /// of this node.
+  bool buildIfStmtRefinementContext(IfStmt *IS) {
+    // We don't refine for if let.
+    auto CondExpr = IS->getCond().dyn_cast<Expr *>();
+    if (!CondExpr)
+      return false;
+
+    // For now, we only refine if the guard is an availability query expression.
+    auto QueryExpr =
+        dyn_cast<AvailabilityQueryExpr>(CondExpr->getSemanticsProvidingExpr());
+    if (!QueryExpr)
+      return false;
+
+    // If this query expression has no queries, we will not introduce a new
+    // refinement context. We do not diagnose here: a diagnostic will already
+    // have been emitted by the parser.
+    if (QueryExpr->getQueries().size() == 0)
+      return false;
+    
+    validateAvailabilityQuery(QueryExpr);
+
+    // Traverse the guard in the current context.
+    build(CondExpr);
+
+    // Create a new context for the Then branch and traverse it in that new
+    // context.
+    auto *ThenTRC = refinedThenContextForQuery(QueryExpr, IS->getThenStmt());
+    TypeRefinementContextBuilder(ThenTRC, AC).build(IS->getThenStmt());
+
+    if (IS->getElseStmt()) {
+      // For now, we imprecisely do not refine the context for the Else branch
+      // and instead traverse it in the current context.
+      // Once we add a more precise version range lattice (i.e., one that can
+      // support "<") we should create a TRC for the Else branch.
+      build(IS->getElseStmt());
+    }
+
+    return true;
+  }
+
+  /// Validate the availability query, emitting diagnostics if necessary.
+  void validateAvailabilityQuery(AvailabilityQueryExpr *E) {
+    // Rule out multiple version specs referring to the same platform.
+    // For example, we emit an error for #os(OSX >= 10.10, OSX >= 10.11)
+    llvm::SmallSet<PlatformKind, 2> Platforms;
+    for (auto *Spec : E->getQueries()) {
+      bool Inserted = Platforms.insert(Spec->getPlatform());
+      if (!Inserted) {
+        PlatformKind Platform = Spec->getPlatform();
+        AC.Diags.diagnose(Spec->getPlatformLoc(),
+                          diag::availability_query_repeated_platform,
+                          platformString(Platform));
+      }
+    }
+  }
+
+  /// Return the type refinement context for the Then branch of an
+  /// availability query.
+  TypeRefinementContext *refinedThenContextForQuery(AvailabilityQueryExpr *E,
+                                                    Stmt *ThenStmt) {
+    VersionConstraintAvailabilitySpec *Spec = bestActiveSpecForQuery(E);
+    if (!Spec) {
+      // We couldn't find an appropriate spec for the current platform,
+      // so rather than refining, emit a diagnostic and just use the current
+      // TRC.
+      AC.Diags.diagnose(E->getLoc(),
+                        diag::availability_query_required_for_platform,
+                        platformString(targetPlatform(AC.LangOpts)));
+      return CurTRC;
+    }
+
+    return new (AC) TypeRefinementContext(CurTRC, ThenStmt->getSourceRange(),
+                                          rangeForSpec(Spec));
+  }
+
+  /// Return the best active spec for the target platform or nullptr if no
+  /// such spec exists.
+  VersionConstraintAvailabilitySpec *
+  bestActiveSpecForQuery(AvailabilityQueryExpr *E) {
+    for (auto *Spec : E->getQueries()) {
+      // FIXME: This is not quite right: we want to handle AppExtensions
+      // properly. For example, on the OSXApplicationExtension platform
+      // we want to chose the OSX spec unless there is an explicit
+      // OSXApplicationExtension spec.
+      if (isPlatformActive(Spec->getPlatform(), AC.LangOpts)) {
+        return Spec;
+      }
+    }
+
+    return nullptr;
+  }
+
+  /// Return the version range for the given availability spec.
+  VersionRange rangeForSpec(VersionConstraintAvailabilitySpec *Spec) {
+    switch (Spec->getComparison()) {
+    case VersionComparison::GreaterThanEqual:
+      return VersionRange::allGTE(Spec->getVersion());
+    }
   }
 };
   
