@@ -17,33 +17,6 @@ UTF16APIs.test("leadSurrogate,trailSurrogate") {
   expectEqual(0xDD1E, UTF16.trailSurrogate("𝄞"))
 }
 
-UTF16APIs.test("copy") {
-  var u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
-  var u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
-
-  u16.withUnsafeMutableBufferPointer {
-    (u16)->() in
-    let p16 = u16.baseAddress
-
-    u8.withUnsafeMutableBufferPointer {
-      (u8)->() in
-      let p8 = u8.baseAddress
-
-      UTF16.copy(p8, destination: p16, count: 3)
-      expectEqual([ 0, 1, 2, 9, 10, 11 ], Array(u16))
-
-      UTF16.copy(p16 + 3, destination: p8, count: 3)
-      expectEqual([ 9, 10, 11, 3, 4, 5 ], Array(u8))
-
-      UTF16.copy(p16, destination: p16 + 3, count: 3)
-      expectEqual([ 0, 1, 2, 0, 1, 2 ], Array(u16))
-
-      UTF16.copy(p8, destination: p8 + 3, count: 3)
-      expectEqual([ 9, 10, 11, 9, 10, 11 ], Array(u8))
-    }
-  }
-}
-
 class EOFCountingGenerator<T> : GeneratorType {
   var array: [T]
   var index: Int = 0
