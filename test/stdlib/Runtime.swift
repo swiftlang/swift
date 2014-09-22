@@ -231,8 +231,8 @@ Runtime.test("_isClassOrObjCExistential") {
   expectFalse(_isClassOrObjCExistential_Opaque(SwiftObjectCanaryStruct.self))
 
   typealias SwiftClosure = ()->()
-  expectTrue(_isClassOrObjCExistential(Swift.self))
-  expectTrue(_isClassOrObjCExistential_Opaque(SwiftClosure.self))
+  expectFalse(_isClassOrObjCExistential(SwiftClosure.self))
+  expectFalse(_isClassOrObjCExistential_Opaque(SwiftClosure.self))
 
   typealias ObjCClosure = @objc_block ()->()
   expectTrue(_isClassOrObjCExistential(ObjCClosure.self))
