@@ -1187,6 +1187,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
           ->getCanonicalType();    
   } else if (isa<VarDecl>(this)) {
     signature.IsProperty = true;
+    signature.IsInstanceMember = isInstanceMember();
   }
 
   return signature;

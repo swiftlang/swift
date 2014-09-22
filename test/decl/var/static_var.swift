@@ -198,3 +198,17 @@ class C1 {
       // expected-error@-1 {{class variables not yet supported}}
 }
 
+class C2 {
+  var x: Int = 19
+  class var x: Int = 17 // expected-error{{class variables not yet supported}}
+
+  func xx() -> Int { return self.x + C2.x }
+}
+
+struct S2 {
+  var x: Int = 19
+  static var x: Int = 17
+
+  func xx() -> Int { return self.x + C2.x }
+}
+
