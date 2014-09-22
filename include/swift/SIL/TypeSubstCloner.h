@@ -420,24 +420,6 @@ protected:
     }
   }
 
-  static SILLinkage getSpecializedLinkage(SILLinkage orig) {
-    switch (orig) {
-    case SILLinkage::Public:
-    case SILLinkage::PublicExternal:
-    case SILLinkage::Shared:
-    case SILLinkage::SharedExternal:
-    case SILLinkage::Hidden:
-    case SILLinkage::HiddenExternal:
-      // Specializations of public or hidden symbols can be shared by all TUs
-      // that specialize the definition.
-      return SILLinkage::Shared;
-
-    case SILLinkage::Private:
-      // Specializations of private symbols should remain so.
-      return SILLinkage::Private;
-    }
-  }
-
   /// The Swift module that the cloned function belongs to.
   Module *SwiftMod;
   /// The substitutions list for the specialization.
