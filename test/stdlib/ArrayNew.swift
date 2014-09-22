@@ -13,7 +13,7 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
-var ArrayTestSuite = StdlibUnittest.TestSuite("Array")
+var ArrayTestSuite = TestSuite("Array")
 
 ArrayTestSuite.test("sizeof") {
   var a = [ 10, 20, 30 ]
@@ -721,6 +721,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
       var b = a
       expectCrashLater()
       a.replaceRange(0..<rangeMax, with: evil)
+      _fixLifetime(b)
     }
   }
 }
