@@ -1116,9 +1116,50 @@ namespace {
 
     }
 
+    /// Favor unary operator constraints where we have exact matches
+    /// for the operand and contextual type.
+    void favorMatchingUnaryOperators(ApplyExpr *expr) {
+      // Find the argument type.
+      auto argTy = expr->getArg()->getType();
+
+      // Determine whether the given declaration is favored.
+      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+        auto valueTy = value->getType();
+          
+        auto fnTy = valueTy->getAs<AnyFunctionType>();
+        if (!fnTy)
+          return false;
+
+        // Figure out the parameter type.
+        if (value->getDeclContext()->isTypeContext()) {
+          fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+        }
+        
+        Type paramTy = fnTy->getInput();        
+        auto resultTy = fnTy->getResult();
+        auto contextualTy = CS.getContextualType(expr);
+        
+        return isFavoredParamAndArg(paramTy, argTy) &&
+               (!contextualTy || (*contextualTy)->isEqual(resultTy));
+      };
+
+      favorCallOverloads(expr, isFavoredDecl);
+    }
+
     /// Favor binary operator constraints where we have exact matches
-    /// for the operands.
+    /// for the operands and contextual type.
     void favorMatchingBinaryOperators(ApplyExpr *expr) {
+      // If we're generating constraints for a binary operator application,
+      // there are two special situations to consider:
+      //  1. If the type checker has any newly created functions with the
+      //     operator's name. If it does, the overloads were created after the
+      //     associated overloaded id expression was created, and we'll need to
+      //     add a new disjunction constraint for the new set of overloads.
+      //  2. If any component argument expressions (nested or otherwise) are
+      //     literals, we can favor operator overloads whose argument types are
+      //     identical to the literal type, or whose return types are identical
+      //     to any contextual type associated with the application expression.
+
       // Find the argument types.
       auto argTy = expr->getArg()->getType();
       auto argTupleTy = argTy->castTo<TupleType>();
@@ -1196,17 +1237,9 @@ namespace {
 
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
       
-      // If we're generating constraints for a binary operator application,
-      // there are two special situations to consider:
-      //  1. If the type checker has any newly created functions with the
-      //     operator's name. If it does, the overloads were created after the
-      //     associated overloaded id expression was created, and we'll need to
-      //     add a new disjunction constraint for the new set of overloads.
-      //  2. If any component argument expressions (nested or otherwise) are
-      //     literals, we can favor operator overloads whose argument types are
-      //     identical to the literal type, or whose return types are identical
-      //     to any contextual type associated with the application expression.
-      if (isa<BinaryExpr>(expr)) {
+      if (isa<PrefixUnaryExpr>(expr) || isa<PostfixUnaryExpr>(expr)) {
+        favorMatchingUnaryOperators(expr);
+      } else if (isa<BinaryExpr>(expr)) {
         favorMatchingBinaryOperators(expr);
       }
 
