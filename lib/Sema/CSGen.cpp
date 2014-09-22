@@ -999,14 +999,19 @@ namespace {
       newConstraints.push_back(overload);
     }
 
-    /// Favor binary operator constraints where we have exact matches
-    /// for the operands.
-    void favorMatchingBinaryOperators(ApplyExpr *expr) {
-      // FIXME: Not technically needed here.
-      auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
-      if (!declRef)
-        return;
-
+    /// Favor certain overloads in a call based on some basic analysis
+    /// of the overload set and call arguments.
+    ///
+    /// \param expr The application.
+    /// \param isFavored Determine wheth the given overload is favored.
+    /// \param createReplacements If provided, a function that creates a set of
+    /// replacement fallback constraints.
+    void favorCallOverloads(ApplyExpr *expr,
+                            std::function<bool(ValueDecl *)> isFavored,
+                            std::function<void(TypeVariableType *tyvarType,
+                                               ArrayRef<Constraint *>,
+                                               SmallVectorImpl<Constraint *>&)>
+                              createReplacements = nullptr) {
       // Find the type variable associated with the function, if any.
       auto fnType = expr->getFn()->getType();
       auto tyvarType = fnType->getAs<TypeVariableType>();
@@ -1037,70 +1042,22 @@ namespace {
 
         SmallVector<Constraint *, 4> favoredConstraints;
 
-        // Find the argument types.
-        auto argTy = expr->getArg()->getType();
-        auto argTupleTy = argTy->castTo<TupleType>();
-        Type firstArgTy = argTupleTy->getFields()[0].getType();
-        Type secondArgTy = argTupleTy->getFields()[1].getType();
-
         // Copy over the existing bindings, dividing the constraints up
-        // into "favored" and non-favored lists, should all of the
-        // parameter/argument comparisons be favored.
+        // into "favored" and non-favored lists.
         for (auto oldConstraint : oldConstraints) {
           auto overloadChoice = oldConstraint->getOverloadChoice();
-          auto overloadDecl = overloadChoice.getDecl();
-          auto overloadTy = overloadDecl->getType();
-          
-          if (auto fnTy = overloadTy->getAs<AnyFunctionType>()) {
-            // Figure out the parameter type.
-            if (overloadDecl->getDeclContext()->isTypeContext()) {
-              fnTy = fnTy->castTo<AnyFunctionType>()->getResult()
-                ->castTo<AnyFunctionType>();
-            }
-
-            Type paramTy = fnTy->getInput();
-            auto paramTupleTy = paramTy->castTo<TupleType>();
-            auto firstParamTy = paramTupleTy->getFields()[0].getType();
-            auto secondParamTy = paramTupleTy->getFields()[1].getType();
-
-            auto resultTy = fnTy->getResult();
-            auto contextualTy = CS.getContextualType(expr);
-
-            if ((isFavoredParamAndArg(firstParamTy, firstArgTy) ||
-                 isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
-                firstParamTy->isEqual(secondParamTy) &&
-                (!contextualTy || (*contextualTy)->isEqual(resultTy))) {
-              favoredConstraints.push_back(oldConstraint);
-            }
+          if (isFavored(overloadChoice.getDecl())) {
+            favoredConstraints.push_back(oldConstraint);
           }
         }
 
-        // Add a hack for lazily-generated global operators.
-        // For now, that's just ==.
+        // If there might be replacement constraints, get them now.
         SmallVector<Constraint *, 4> replacementConstraints;
-        if (declRef->isPotentiallyDelayedGlobalOperator()) {
-          Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
-          if (declRef->getDecls()[0]->getName() == eqOperator) {
-            if (!declRef->isSpecialized()) {
-              replacementConstraints.append(oldConstraints.begin(),
-                                            oldConstraints.end());
-
-              addNewEqualsOperatorOverloads(replacementConstraints, firstArgTy,
-                                            tyvarType, csLoc);
-              if (!firstArgTy->isEqual(secondArgTy)) {
-                addNewEqualsOperatorOverloads(replacementConstraints,
-                                              secondArgTy,
-                                              tyvarType, csLoc);
-              }
-            }
-
-          } else {
-            assert("unknown delayed global operator");
-          }
-        }
+        if (createReplacements)
+          createReplacements(tyvarType, oldConstraints, replacementConstraints);
 
         // If we did not find any favored constraints, just introduce
-        // the new constraints (if they differ).
+        // the replacement constraints (if they differ).
         if (favoredConstraints.empty()) {
           if (replacementConstraints.size() > oldConstraints.size()) {
             // Remove the old constraint.
@@ -1156,6 +1113,77 @@ namespace {
                                         csLoc));
         break;
       }
+
+    }
+
+    /// Favor binary operator constraints where we have exact matches
+    /// for the operands.
+    void favorMatchingBinaryOperators(ApplyExpr *expr) {
+      // Find the argument types.
+      auto argTy = expr->getArg()->getType();
+      auto argTupleTy = argTy->castTo<TupleType>();
+      Type firstArgTy = argTupleTy->getFields()[0].getType();
+      Type secondArgTy = argTupleTy->getFields()[1].getType();
+
+      // Determine whether the given declaration is favored.
+      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
+        auto valueTy = value->getType();
+          
+        auto fnTy = valueTy->getAs<AnyFunctionType>();
+        if (!fnTy)
+          return false;
+
+        // Figure out the parameter type.
+        if (value->getDeclContext()->isTypeContext()) {
+          fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+        }
+        
+        Type paramTy = fnTy->getInput();
+        auto paramTupleTy = paramTy->castTo<TupleType>();
+        auto firstParamTy = paramTupleTy->getFields()[0].getType();
+        auto secondParamTy = paramTupleTy->getFields()[1].getType();
+        
+        auto resultTy = fnTy->getResult();
+        auto contextualTy = CS.getContextualType(expr);
+        
+        return (isFavoredParamAndArg(firstParamTy, firstArgTy) ||
+                isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
+               firstParamTy->isEqual(secondParamTy) &&
+               (!contextualTy || (*contextualTy)->isEqual(resultTy));
+      };
+
+      auto createReplacements
+        = [&](TypeVariableType *tyvarType,
+              ArrayRef<Constraint *> oldConstraints,
+              SmallVectorImpl<Constraint *>& replacementConstraints) {
+        auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
+        if (!declRef)
+          return;
+
+        if (!declRef->isPotentiallyDelayedGlobalOperator())
+          return;
+
+        Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
+        if (declRef->getDecls()[0]->getName() != eqOperator)
+          return;
+
+        if (declRef->isSpecialized())
+          return;
+
+        replacementConstraints.append(oldConstraints.begin(),
+                                      oldConstraints.end());
+
+        auto csLoc = CS.getConstraintLocator(expr->getFn());
+        addNewEqualsOperatorOverloads(replacementConstraints, firstArgTy,
+                                      tyvarType, csLoc);
+        if (!firstArgTy->isEqual(secondArgTy)) {
+          addNewEqualsOperatorOverloads(replacementConstraints,
+                                        secondArgTy,
+                                        tyvarType, csLoc);
+        }
+      };
+
+      favorCallOverloads(expr, isFavoredDecl, createReplacements);
     }
 
     Type visitApplyExpr(ApplyExpr *expr) {
