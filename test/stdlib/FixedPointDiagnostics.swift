@@ -33,44 +33,44 @@ func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   UInt16(truncatingBitPattern: UInt(0))
   UInt32(truncatingBitPattern: UInt(0))
   UInt64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: UInt(0))   // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  UInt(truncatingBitPattern: UInt(0))   // expected-error {{cannot invoke 'init' with an argument list of type}}
 
   Int8(truncatingBitPattern: UInt(0))
   Int16(truncatingBitPattern: UInt(0))
   Int32(truncatingBitPattern: UInt(0))
   Int64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: UInt(0))   // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  Int(truncatingBitPattern: UInt(0))   // expected-error {{cannot invoke 'init' with an argument list of type}}
 
   UInt8(truncatingBitPattern: Int(0))
   UInt16(truncatingBitPattern: Int(0))
   UInt32(truncatingBitPattern: Int(0))
   UInt64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: Int(0))   // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  UInt(truncatingBitPattern: Int(0))   // expected-error {{cannot invoke 'init' with an argument list of type}}
 
   Int8(truncatingBitPattern: Int(0))
   Int16(truncatingBitPattern: Int(0))
   Int32(truncatingBitPattern: Int(0))
   Int64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: Int(0))   // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  Int(truncatingBitPattern: Int(0))   // expected-error {{cannot invoke 'init' with an argument list of type}}
 
-  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: UInt16(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: UInt32(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{cannot invoke 'init' with an argument list of type}}
+  UInt(truncatingBitPattern: UInt16(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
+  UInt(truncatingBitPattern: UInt32(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
   UInt(truncatingBitPattern: UInt64(0))
 
-  Int(truncatingBitPattern: UInt8(0))  // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: UInt16(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: UInt32(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  Int(truncatingBitPattern: UInt8(0))  // expected-error {{cannot invoke 'init' with an argument list of type}}
+  Int(truncatingBitPattern: UInt16(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
+  Int(truncatingBitPattern: UInt32(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
   Int(truncatingBitPattern: UInt64(0))
 
-  UInt(truncatingBitPattern: Int8(0))  // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: Int16(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: Int32(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  UInt(truncatingBitPattern: Int8(0))  // expected-error {{cannot invoke 'init' with an argument list of type}}
+  UInt(truncatingBitPattern: Int16(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
+  UInt(truncatingBitPattern: Int32(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
   UInt(truncatingBitPattern: Int64(0))
 
-  Int(truncatingBitPattern: Int8(0))  // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: Int16(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: Int32(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  Int(truncatingBitPattern: Int8(0))  // expected-error {{cannot invoke 'init' with an argument list of type}}
+  Int(truncatingBitPattern: Int16(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
+  Int(truncatingBitPattern: Int32(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
   Int(truncatingBitPattern: Int64(0))
 }
 

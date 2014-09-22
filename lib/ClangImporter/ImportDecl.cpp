@@ -5126,6 +5126,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   case ConstantConvertKind::Construction: {
     auto typeRef = TypeExpr::createImplicit(type, context);
+    expr = new (context) ParenExpr(SourceLoc(), expr, SourceLoc(), /*Implicit=*/true);
     expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
     break;
    }

@@ -1143,8 +1143,6 @@ private:
   SmallVector<TypeVariableType *, 16> TypeVariables;
   llvm::DenseMap<Expr *, Type *> ContextualTypes;
 
-  llvm::DenseMap<UnresolvedDotExpr *, ApplyExpr *> PossibleDynamicLookupCalls;
-
   /// \brief The set of constraint restrictions used to reach the
   /// current constraint system.
   ///
@@ -1233,6 +1231,12 @@ public:
   /// system, and carries temporary state related to the current path
   /// we're exploring. 
   SolverState *solverState = nullptr;
+
+  /// A mapping from the constraint locators for references to various
+  /// names (e.g., member references, normal name references, possible
+  /// constructions) to the argument labels provided in the call to
+  /// that locator.
+  llvm::DenseMap<ConstraintLocator *, ArrayRef<Identifier>> ArgumentLabels;
 
 private:
   unsigned assignTypeVariableID() {
@@ -1605,10 +1609,6 @@ public:
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
     InactiveConstraints.erase(constraint);
-  }
-
-  void recordPossibleDynamicCall(UnresolvedDotExpr *UDE, ApplyExpr *AE) {
-    PossibleDynamicLookupCalls[UDE] = AE;
   }
 
   /// Retrieve the type that corresponds to the given member of the

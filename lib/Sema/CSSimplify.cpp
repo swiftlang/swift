@@ -2517,45 +2517,6 @@ static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
   return containsProtocolSelf(type);
 }
 
-static DeclName
-getNameForValueLookup(
-    ASTContext &ctx,
-    const Constraint &constraint,
-    Type baseObjTy,
-    const llvm::DenseMap<UnresolvedDotExpr *, ApplyExpr *> &callMap) {
-  auto origName = constraint.getMember();
-  if (origName.isCompoundName())
-    return origName;
-
-  auto protoTy = baseObjTy->getAs<ProtocolType>();
-  if (!protoTy ||
-      !protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject))
-    return origName;
-
-  // FIXME: Pulling out the expr from the locator is pretty hacky.
-  const ConstraintLocator *loc = constraint.getLocator();
-  if (!loc)
-    return origName;
-
-  auto UDE = dyn_cast_or_null<UnresolvedDotExpr>(loc->getAnchor());
-  if (!UDE)
-    return origName;
-
-  const ApplyExpr *call = callMap.lookup(UDE);
-  if (!call)
-    return origName;
-
-  // Handle the one-argument, no-argument-name case.
-  if (isa<ParenExpr>(call->getArg()))
-    return DeclName(ctx, origName.getBaseName(), Identifier());
-
-  auto args = dyn_cast<TupleExpr>(call->getArg());
-  if (!args)
-    return origName;
-
-  return DeclName(ctx, origName.getBaseName(), args->getElementNames());
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
 {
@@ -2604,6 +2565,50 @@ static Type getRawRepresentableValueType(TypeChecker &tc, DeclContext *dc,
 
   return tc.getWitnessType(type, proto, conformance, tc.Context.Id_RawValue,
                            diag::broken_raw_representable_requirement);
+}
+
+/// Retrieve the argument labels that are provided for a member
+/// reference at the given locator.
+static Optional<ArrayRef<Identifier>> 
+getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 2> parts;
+  Expr *anchor = locator.getLocatorParts(parts);
+  if (!anchor)
+    return Nothing;
+
+  while (!parts.empty()) {
+    if (parts.back().getKind() == ConstraintLocator::Member ||
+        parts.back().getKind() == ConstraintLocator::SubscriptMember) {
+      parts.pop_back();
+      continue;
+    }
+
+    if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
+      // FIXME: Workaround for strange anchor on ConstructorMember locators.
+      if (auto call = dyn_cast<CallExpr>(anchor)) {
+        anchor = call->getFn()->getSemanticsProvidingExpr();
+
+        if (auto optionalWrapper = dyn_cast<BindOptionalExpr>(anchor))
+          anchor = optionalWrapper->getSubExpr();
+        else if (auto forceWrapper = dyn_cast<ForceValueExpr>(anchor))
+          anchor = forceWrapper->getSubExpr();
+      }
+
+      parts.pop_back();
+      continue;
+    }
+    
+    break;
+  }
+  
+  if (!parts.empty())
+    return Nothing;
+
+  auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
+  if (known == cs.ArgumentLabels.end())
+    return Nothing;
+
+  return known->second;
 }
 
 ConstraintSystem::SolutionKind
@@ -2688,6 +2693,48 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // constraint to be unsolved. This effectively requires us to solve the
   // left-hand side of a dot expression before we look for members.
 
+  // If we have a simple name, determine whether there are argument
+  // labels we can use to restrict the set of lookup results.
+  Optional<ArrayRef<Identifier>> argumentLabels;
+  if (name.isSimpleName()) {
+    argumentLabels = getArgumentLabels(
+                       *this, 
+                       ConstraintLocatorBuilder(constraint.getLocator()));
+
+    // If we're referencing AnyObject and we have argument labels, put
+    // the argument labels into the name: we don't want to look for
+    // anything else, because the cost of the general search is so
+    // high.
+    if (baseObjTy->isAnyObject() && argumentLabels) {
+      name = DeclName(TC.Context, name.getBaseName(), *argumentLabels);
+      argumentLabels = Nothing;
+    }
+  }
+
+  /// Determine whether the given declaration has compatible argument
+  /// labels.
+  auto hasCompatibleArgumentLabels = [&](ValueDecl *decl) -> bool {
+    if (!argumentLabels)
+      return true;
+
+    auto name = decl->getFullName();
+    if (name.isSimpleName())
+      return true;
+
+    for (auto argLabel : *argumentLabels) {
+      if (argLabel.empty())
+        continue;
+
+      if (std::find(name.getArgumentNames().begin(),
+                    name.getArgumentNames().end(),
+                    argLabel) == name.getArgumentNames().end()) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   bool isExistential = instanceTy->isExistentialType();
   if (name.isSimpleName(TC.Context.Id_init)) {
     // Constructors have their own approach to name lookup.
@@ -2700,6 +2747,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     }
 
     // Introduce a new overload set.
+    retry_ctors_after_fail:
+    bool labelMismatch = false;
     SmallVector<OverloadChoice, 4> choices;
     for (auto constructor : ctors) {
       // If the constructor is invalid, skip it.
@@ -2708,6 +2757,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       TC.validateDecl(constructor, true);
       if (constructor->isInvalid())
         continue;
+
+      // If the argument labels for this result are incompatible with
+      // the call site, skip it.
+      if (!hasCompatibleArgumentLabels(constructor)) {
+        labelMismatch = true;
+        continue;
+      }
 
       // If our base is an existential type, we can't make use of any
       // constructor whose signature involves associated types.
@@ -2718,6 +2774,15 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
       choices.push_back(OverloadChoice(baseTy, constructor,
                                        /*isSpecialized=*/false));
+    }
+
+
+    // If we rejected some possibilities due to an argument-label
+    // mismatch and ended up with nothing, try again ignoring the
+    // labels. This allows us to perform typo correction on the labels.
+    if (choices.empty() && labelMismatch && shouldAttemptFixes()) {
+      argumentLabels = Nothing;
+      goto retry_ctors_after_fail;
     }
 
     // FIXME: Should we look for constructors in bridged types?
@@ -2776,11 +2841,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     addOverloadSet(memberTy, choices, locator);
     return SolutionKind::Solved;
   }
-
-  // If we're doing dynamic lookup, and this is a call, use the full name of
-  // the member.
-  name = getNameForValueLookup(getASTContext(), constraint, baseObjTy,
-                               PossibleDynamicLookupCalls);
 
   // Look for members within the base.
   LookupResult &lookup = lookupMember(baseObjTy, name);
@@ -2972,7 +3032,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   };
 
   // Add all results from this lookup.
+retry_after_fail:
+  bool labelMismatch = false;
   for (auto result : lookup) {
+    // If the argument labels for this result are incompatible with
+    // the call site, skip it.
+    if (!hasCompatibleArgumentLabels(result)) {
+      labelMismatch = true;
+      continue;
+    }
+
     addChoice(result, /*isBridged=*/false, /*isUnwrappedOptional=*/false);
   }
 
@@ -2997,6 +3066,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         continue;
       }
 
+      // If the argument labels for this result are incompatible with
+      // the call site, skip it.
+      if (!hasCompatibleArgumentLabels(result)) {
+        labelMismatch = true;
+        continue;
+      }
+      
       addChoice(result, /*isBridged=*/true, /*isUnwrappedOptional=*/false);
     }
   }
@@ -3009,9 +3085,25 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     if (auto objectType = instanceTy->getAnyOptionalObjectType()) {
       LookupResult &optionalLookup = lookupMember(MetatypeType::get(objectType),
                                                   name);
-      for (auto result : optionalLookup)
+      for (auto result : optionalLookup) {
+        // If the argument labels for this result are incompatible with
+        // the call site, skip it.
+        if (!hasCompatibleArgumentLabels(result)) {
+          labelMismatch = true;
+          continue;
+        }
+        
         addChoice(result, /*bridged*/ false, /*isUnwrappedOptional=*/true);
+      }
     }
+  }
+
+  // If we rejected some possibilities due to an argument-label
+  // mismatch and ended up with nothing, try again ignoring the
+  // labels. This allows us to perform typo correction on the labels.
+  if (choices.empty() && labelMismatch && shouldAttemptFixes()) {
+    argumentLabels = Nothing;
+    goto retry_after_fail;
   }
 
   if (choices.empty()) {

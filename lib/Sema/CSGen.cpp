@@ -1597,22 +1597,6 @@ namespace {
         return { false, expr };
       }
 
-      // FIXME: This is a bit of a hack, recording the CallExpr that consumes
-      // an UnresolvedDotExpr so that we can do dynamic lookups more
-      // efficiently. Really we should just have the arguments be part of the
-      // UnresolvedDotExpr from the start.
-      if (auto call = dyn_cast<CallExpr>(expr)) {
-        if (Expr *fn = call->getFn()) {
-          if (auto optionalWrapper = dyn_cast<BindOptionalExpr>(fn))
-            fn = optionalWrapper->getSubExpr();
-          else if (auto forceWrapper = dyn_cast<ForceValueExpr>(fn))
-            fn = forceWrapper->getSubExpr();
-
-          if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn))
-            CG.getConstraintSystem().recordPossibleDynamicCall(UDE, call);
-        }
-      }
-      
       return { true, expr };
     }
 
@@ -1652,11 +1636,77 @@ namespace {
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
+
+  /// AST walker that records the keyword arguments provided at each
+  /// call site.
+  class ArgumentLabelWalker : public ASTWalker {
+    ConstraintSystem &CS;
+    llvm::DenseMap<Expr *, Expr *> ParentMap;
+
+  public:
+    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr) 
+      : CS(cs), ParentMap(expr->getParentMap()) { }
+
+    void associateArgumentLabels(Expr *arg, ArrayRef<Identifier> labels,
+                                 bool labelsArePermanent) {
+      // Our parent must be a call.
+      auto call = dyn_cast_or_null<CallExpr>(ParentMap[arg]);
+      if (!call) 
+        return;
+
+      // We must have originated at the call argument.
+      if (arg != call->getArg())
+        return;
+
+      // Dig out the function, looking through, parenthses, ?, and !.
+      auto fn = call->getFn();
+      do {
+        fn = fn->getSemanticsProvidingExpr();
+
+        if (auto force = dyn_cast<ForceValueExpr>(fn)) {
+          fn = force->getSubExpr();
+          continue;
+        }
+
+        if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
+          fn = bind->getSubExpr();
+          continue;
+        }
+
+        break;
+      } while (true);
+
+      // Record the labels.
+      if (!labelsArePermanent)
+        labels = CS.allocateCopy(labels);
+      CS.ArgumentLabels[CS.getConstraintLocator(fn)] = labels;
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto tuple = dyn_cast<TupleExpr>(expr)) {
+        if (tuple->hasElementNames())
+          associateArgumentLabels(expr, tuple->getElementNames(), true);
+        else {
+          llvm::SmallVector<Identifier, 4> names(tuple->getNumElements(),
+                                                 Identifier()); 
+          associateArgumentLabels(expr, names, false);
+        }
+      } else if (auto paren = dyn_cast<ParenExpr>(expr)) {
+        associateArgumentLabels(paren, { Identifier() }, false);
+      }
+
+      return { true, expr };
+    }
+  };
+
 } // end anonymous namespace
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
+
+  // Wall the expression to associate labeled argumets.
+  expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(*this);
