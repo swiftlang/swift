@@ -25,38 +25,12 @@ Classes:
     Nullability: O
   - Name: texture
     Nullability: O
-- Name: MTLRenderPassColorAttachmentDescriptorArray
-  Methods:
-  - Selector: 'objectAtIndexedSubscript:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: N
-  - Selector: 'setObject:atIndexedSubscript:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    - S
-    NullabilityOfRet: S
 - Name: MTLRenderPassDescriptor
   Properties:
   - Name: colorAttachments
     Nullability: N
   - Name: visibilityResultBuffer
     Nullability: O
-- Name: MTLRenderPipelineColorAttachmentDescriptorArray
-  Methods:
-  - Selector: 'objectAtIndexedSubscript:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: N
-  - Selector: 'setObject:atIndexedSubscript:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    - S
-    NullabilityOfRet: S
 - Name: MTLRenderPipelineDescriptor
   Properties:
   - Name: colorAttachments
@@ -84,26 +58,6 @@ Classes:
     Nullability:
     - S
     - S
-    - S
-    NullabilityOfRet: N
-- Name: MTLVertexAttributeDescriptorArray
-  Methods:
-  - Selector: 'objectAtIndexedSubscript:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: N
-  - Selector: 'setObject:atIndexedSubscript:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    - S
-    NullabilityOfRet: S
-- Name: MTLVertexBufferLayoutDescriptorArray
-  Methods:
-  - Selector: 'objectAtIndexedSubscript:'
-    MethodKind: Instance
-    Nullability:
     - S
     NullabilityOfRet: N
 - Name: MTLVertexDescriptor

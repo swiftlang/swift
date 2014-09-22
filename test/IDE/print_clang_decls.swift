@@ -102,10 +102,10 @@
 // APPKIT-NEXT:   unowned(unsafe) var nextKeyView: @sil_unmanaged NSView?
 
 // APPKIT-LABEL: {{^}}class NSMenuItem : NSObject, NSCopying, NSCoding {
-// APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu!
-// APPKIT-NEXT: var title: String!
-// APPKIT-NEXT: @NSCopying var attributedTitle: NSAttributedString!
-// APPKIT-NEXT: weak var target: @sil_weak AnyObject!
+// APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu?
+// APPKIT-NEXT: var title: String
+// APPKIT-NEXT: @NSCopying var attributedTitle: NSAttributedString?
+// APPKIT-NEXT: weak var target: @sil_weak AnyObject
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
 // APPKIT: var NSViewFrameDidChangeNotification: NSString

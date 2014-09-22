@@ -14,7 +14,7 @@
 // CHECK-LABEL: protocol NSObjectProtocol {
 // CHECK-DAG: var superclass: AnyClass? { get }
 // CHECK-DAG: func zone() -> NSZone
-// CHECK-WITH-FORWARD-DECLS-DAG: var description: String! { get }
+// CHECK-WITH-FORWARD-DECLS-DAG: var description: String { get }
 // CHECK: {{^[}]$}}
 
 // CHECK-LABEL: class NSObject : NSObjectProtocol {

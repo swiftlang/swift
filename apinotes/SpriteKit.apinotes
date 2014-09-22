@@ -3,6 +3,11 @@ Name: SpriteKit
 Classes:
 - Name: SK3DNode
   Methods:
+  - Selector: 'initWithCoder:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'initWithViewportSize:'
     MethodKind: Instance
     Nullability:
@@ -504,6 +509,11 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: N
+  - Selector: 'initWithCoder:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'initWithKeyframeValues:times:'
     MethodKind: Instance
     Nullability:
@@ -607,6 +617,11 @@ Classes:
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
+  - Selector: 'initWithCoder:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'inParentHierarchy:'
     MethodKind: Instance
     Nullability:
@@ -687,7 +702,7 @@ Classes:
   - Selector: 'bodyWithEdgeChainFromPath:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'bodyWithEdgeFromPoint:toPoint:'
     MethodKind: Class
@@ -698,7 +713,7 @@ Classes:
   - Selector: 'bodyWithEdgeLoopFromPath:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'bodyWithEdgeLoopFromRect:'
     MethodKind: Class
@@ -792,7 +807,7 @@ Classes:
   - Selector: 'initWithPath:'
     MethodKind: Instance
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'initWithRadius:'
     MethodKind: Instance
@@ -913,12 +928,12 @@ Classes:
   - Selector: 'shapeNodeWithPath:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'shapeNodeWithPath:centered:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     - S
     NullabilityOfRet: N
   - Selector: 'shapeNodeWithPoints:count:'
@@ -970,6 +985,11 @@ Classes:
     Nullability: O
 - Name: SKSpriteNode
   Methods:
+  - Selector: 'initWithCoder:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'initWithColor:size:'
     MethodKind: Instance
     Nullability:
@@ -1035,7 +1055,7 @@ Classes:
   - Selector: 'textureWithCGImage:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'textureWithImage:'
     MethodKind: Class
@@ -1161,6 +1181,11 @@ Classes:
     Nullability: N
 - Name: SKVideoNode
   Methods:
+  - Selector: 'initWithCoder:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'initWithVideoFileNamed:'
     MethodKind: Instance
     Nullability:

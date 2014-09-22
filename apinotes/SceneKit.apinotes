@@ -165,7 +165,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - S
-    - S
+    - U
     NullabilityOfRet: N
 - Name: SCNBox
   Methods:

@@ -68,10 +68,7 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
-// This is a workaround for:
-// <rdar://problem/16883288> Property of type 'String!' does not satisfy
-// protocol requirement of type 'String'
-extension NSObject : _PrintableNSObjectType {}
+extension NSObject : Printable {}
 
 //===----------------------------------------------------------------------===//
 // Strings
@@ -112,7 +109,7 @@ extension NSString : StringLiteralConvertible {
         bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
         length: Int(value.byteSize),
         encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
-        freeWhenDone: false)
+        freeWhenDone: false)!
     } else {
       var uintValue = value.unicodeScalar
       immutableResult = NSString(

@@ -51,15 +51,6 @@ public protocol DebugPrintable {
   var debugDescription: String { get }
 }
 
-// This protocol is adopted only by NSObject.  This is a workaround for:
-// <rdar://problem/16883288> Property of type 'String!' does not satisfy
-// protocol requirement of type 'String'
-public protocol _PrintableNSObjectType {
-  var description: String! { get }
-  var debugDescription: String! { get }
-}
-// end workaround
-
 //===----------------------------------------------------------------------===//
 // `print`
 //===----------------------------------------------------------------------===//
@@ -120,12 +111,6 @@ public func print<T, TargetStream : OutputStreamType>(
   if let debugPrintableObject =
       _stdlib_dynamicCastToExistential1(object, DebugPrintable.self) {
     debugPrintableObject.debugDescription.writeTo(&target)
-    return
-  }
-
-  if let anNSObject =
-      _stdlib_dynamicCastToExistential1(object, _PrintableNSObjectType.self) {
-    anNSObject.description.writeTo(&target)
     return
   }
 
@@ -231,12 +216,6 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
   if var printableObject =
       _stdlib_dynamicCastToExistential1(object, Printable.self) {
     printableObject.description.writeTo(&target)
-    return
-  }
-
-  if let anNSObject =
-      _stdlib_dynamicCastToExistential1(object, _PrintableNSObjectType.self) {
-    anNSObject.debugDescription.writeTo(&target)
     return
   }
 

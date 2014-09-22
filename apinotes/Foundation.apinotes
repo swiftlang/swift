@@ -161,6 +161,11 @@ Classes:
     Nullability: O
 - Name: NSAppleEventManager
   Methods:
+  - Selector: 'appleEventForSuspensionID:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
   - Selector: 'replyAppleEventForSuspensionID:'
     MethodKind: Instance
     Nullability:
@@ -241,7 +246,7 @@ Classes:
   - Selector: 'encodeConditionalObject:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     NullabilityOfRet: S
   - Selector: 'encodeRootObject:'
     MethodKind: Instance
@@ -716,7 +721,7 @@ Classes:
   - Selector: 'bundleForClass:'
     MethodKind: Class
     Nullability:
-    - S
+    - N
     NullabilityOfRet: N
   - Selector: 'bundleWithIdentifier:'
     MethodKind: Class
@@ -912,11 +917,11 @@ Classes:
   - Name: executableURL
     Nullability: O
   - Name: infoDictionary
-    Nullability: N
+    Nullability: O
   - Name: localizations
-    Nullability: N
+    Nullability: O
   - Name: localizedInfoDictionary
-    Nullability: N
+    Nullability: O
   - Name: preferredLocalizations
     Nullability: N
   - Name: principalClass
@@ -1212,7 +1217,7 @@ Classes:
     - S
     - S
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'nextDateAfterDate:matchingUnit:value:options:'
     MethodKind: Instance
     Nullability:
@@ -1311,8 +1316,6 @@ Classes:
   - Name: weekdaySymbols
     Nullability: N
 - Name: NSCalendarDate
-  Availability: none
-  AvailabilityMsg: "use NSCalendar, NSDateComponents, and NSDateFormatter instead"
   Methods:
   - Selector: calendarDate
     MethodKind: Class
@@ -1423,6 +1426,8 @@ Classes:
     - S
     - N
     NullabilityOfRet: S
+  Availability: none
+  AvailabilityMsg: use NSCalendar, NSDateComponents, and NSDateFormatter instead
 - Name: NSCharacterSet
   Methods:
   - Selector: alphanumericCharacterSet
@@ -1528,7 +1533,7 @@ Classes:
   - Selector: 'classDescriptionForClass:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     NullabilityOfRet: O
   - Selector: 'inverseForRelationshipKey:'
     MethodKind: Instance
@@ -1675,12 +1680,12 @@ Classes:
   - Selector: 'encodeConditionalObject:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     NullabilityOfRet: S
   - Selector: 'encodeConditionalObject:forKey:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'encodeDataObject:'
@@ -1727,12 +1732,12 @@ Classes:
   - Selector: 'encodeObject:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     NullabilityOfRet: S
   - Selector: 'encodeObject:forKey:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'encodePoint:forKey:'
@@ -1815,6 +1820,12 @@ Classes:
   - Selector: 'andPredicateWithSubpredicates:'
     MethodKind: Class
     Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'initWithType:subpredicates:'
+    MethodKind: Instance
+    Nullability:
+    - S
     - U
     NullabilityOfRet: N
   - Selector: 'notPredicateWithSubpredicate:'
@@ -1825,8 +1836,11 @@ Classes:
   - Selector: 'orPredicateWithSubpredicates:'
     MethodKind: Class
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
+  Properties:
+  - Name: subpredicates
+    Nullability: N
 - Name: NSCondition
   Methods:
   - Selector: 'waitUntilDate:'
@@ -1859,8 +1873,6 @@ Classes:
   - Name: name
     Nullability: O
 - Name: NSConnection
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'addRequestMode:'
     MethodKind: Instance
@@ -1977,6 +1989,8 @@ Classes:
     Nullability: N
   - Name: statistics
     Nullability: N
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
 - Name: NSCountedSet
   Methods:
   - Selector: 'addObject:'
@@ -2377,6 +2391,9 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: O
+  Properties:
+  - Name: calendar
+    Nullability: O
 - Name: NSDateFormatter
   Methods:
   - Selector: 'dateFormatFromTemplate:options:locale:'
@@ -2828,8 +2845,6 @@ Classes:
   - Name: fileAttributes
     Nullability: O
 - Name: NSDistantObject
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'initWithCoder:'
     MethodKind: Instance
@@ -2868,9 +2883,9 @@ Classes:
   Properties:
   - Name: connectionForProxy
     Nullability: N
-- Name: NSDistantObjectRequest
   Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
+  AvailabilityMsg: you may be able to use XPC instead
+- Name: NSDistantObjectRequest
   Methods:
   - Selector: 'replyWithException:'
     MethodKind: Instance
@@ -2884,6 +2899,8 @@ Classes:
     Nullability: N
   - Name: invocation
     Nullability: N
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
 - Name: NSDistributedLock
   Methods:
   - Selector: 'initWithPath:'
@@ -3213,16 +3230,16 @@ Classes:
     - O
     - O
     NullabilityOfRet: S
-  - Selector: 'openURL:completion:'
-    MethodKind: Instance
-    Availability: none
-    AvailabilityMsg: 'call openURL:completionHandler:'
   - Selector: 'openURL:completionHandler:'
     MethodKind: Instance
     Nullability:
     - N
     - O
     NullabilityOfRet: S
+  - Selector: 'openURL:completion:'
+    MethodKind: Instance
+    Availability: none
+    AvailabilityMsg: 'call openURL:completionHandler:'
   Properties:
   - Name: inputItems
     Nullability: N
@@ -4012,14 +4029,14 @@ Classes:
   - Selector: 'isPartialStringValid:newEditingString:errorDescription:'
     MethodKind: Instance
     Nullability:
-    - O
+    - N
     - O
     - O
     NullabilityOfRet: S
   - Selector: 'isPartialStringValid:proposedSelectedRange:originalString:originalSelectedRange:errorDescription:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     - S
     - N
     - S
@@ -4423,9 +4440,26 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: O
-- Name: NSInvocation
-  Availability: none
 - Name: NSInvocationOperation
+  Methods:
+  - Selector: 'initWithInvocation:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: U
+    DesignatedInit: true
+  - Selector: 'initWithTarget:selector:object:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - O
+    NullabilityOfRet: O
+  Properties:
+  - Name: invocation
+    Nullability: N
+  - Name: result
+    Nullability: O
   Availability: none
 - Name: NSItemProvider
   Methods:
@@ -4538,7 +4572,7 @@ Classes:
   - Selector: 'encodeConditionalObject:forKey:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'encodeDouble:forKey:'
@@ -4585,13 +4619,13 @@ Classes:
   - Selector: 'setClassName:forClass:'
     MethodKind: Class
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'setClassName:forClass:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   Properties:
@@ -4663,13 +4697,13 @@ Classes:
   - Selector: 'setClass:forClassName:'
     MethodKind: Class
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'setClass:forClassName:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'unarchiveObjectWithData:'
@@ -4706,6 +4740,12 @@ Classes:
     - S
     NullabilityOfRet: N
   - Selector: 'unitStringFromMeters:usedUnit:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: 'unitStringFromValue:unit:'
     MethodKind: Instance
     Nullability:
     - S
@@ -4768,7 +4808,7 @@ Classes:
     - N
     - S
     - O
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   Properties:
   - Name: string
     Nullability: O
@@ -4791,7 +4831,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'characterDirectionForLanguage:'
     MethodKind: Class
     Nullability:
@@ -4842,7 +4882,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'localeIdentifierFromWindowsLocaleCode:'
     MethodKind: Class
     Nullability:
@@ -4900,8 +4940,6 @@ Classes:
     - U
     NullabilityOfRet: N
 - Name: NSMachBootstrapServer
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'portForName:'
     MethodKind: Instance
@@ -4928,6 +4966,8 @@ Classes:
   - Selector: sharedInstance
     MethodKind: Class
     NullabilityOfRet: N
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
 - Name: NSMachPort
   Methods:
   - Selector: delegate
@@ -5070,8 +5110,6 @@ Classes:
     - S
     NullabilityOfRet: N
 - Name: NSMessagePortNameServer
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'portForName:'
     MethodKind: Instance
@@ -5087,6 +5125,8 @@ Classes:
   - Selector: sharedInstance
     MethodKind: Class
     NullabilityOfRet: N
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
 - Name: NSMetadataItem
   Methods:
   - Selector: 'initWithURL:'
@@ -5176,13 +5216,13 @@ Classes:
   - Name: value
     Nullability: N
 - Name: NSMethodSignature
-  Availability: none
   Methods:
   - Selector: 'signatureWithObjCTypes:'
     MethodKind: Class
     Nullability:
     - S
     NullabilityOfRet: O
+  Availability: none
 - Name: NSMoveCommand
   Methods:
   - Selector: 'setReceiversSpecifier:'
@@ -5499,6 +5539,16 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: 'initWithCapacity:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'initWithLength:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
   - Selector: 'setData:'
     MethodKind: Instance
     Nullability:
@@ -5842,7 +5892,7 @@ Classes:
   - Selector: 'addValue:forHTTPHeaderField:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'setValue:forHTTPHeaderField:'
@@ -6288,6 +6338,8 @@ Classes:
   Properties:
   - Name: attributedStringForNil
     Nullability: O
+  - Name: attributedStringForNotANumber
+    Nullability: O
   - Name: attributedStringForZero
     Nullability: N
   - Name: currencyCode
@@ -6356,8 +6408,305 @@ Classes:
     Nullability: O
   - Name: textAttributesForZero
     Nullability: O
+  - Name: thousandSeparator
+    Nullability: O
   - Name: zeroSymbol
     Nullability: O
+- Name: NSObject
+  Methods:
+  - Selector: 'addObserver:forKeyPath:options:context:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - S
+    - S
+    NullabilityOfRet: S
+  - Selector: 'automaticallyNotifiesObserversForKey:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'awakeAfterUsingCoder:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'cancelPreviousPerformRequestsWithTarget:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'cancelPreviousPerformRequestsWithTarget:selector:object:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - S
+    - O
+    NullabilityOfRet: S
+  - Selector: classFallbacksForKeyedArchiver
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: classForKeyedUnarchiver
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: 'copyScriptingValue:forKey:withProperties:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - N
+    - U
+    NullabilityOfRet: O
+  - Selector: 'dictionaryWithValuesForKeys:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'didChange:valuesAtIndexes:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'didChangeValueForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'didChangeValueForKey:withSetMutation:usingObjects:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'doesContain:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'indicesOfObjectsByEvaluatingObjectSpecifier:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'insertValue:atIndex:inPropertyWithKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'isEqualTo:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'keyPathsForValuesAffectingValueForKey:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'mutableArrayValueForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'mutableArrayValueForKeyPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'mutableOrderedSetValueForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'mutableOrderedSetValueForKeyPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'mutableSetValueForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'mutableSetValueForKeyPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'newScriptingObjectOfClass:forValueForKey:withContentsValue:properties:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - N
+    - O
+    - U
+    NullabilityOfRet: O
+  - Selector: 'observeValueForKeyPath:ofObject:change:context:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - N
+    - S
+    NullabilityOfRet: S
+  - Selector: 'removeObserver:forKeyPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'removeObserver:forKeyPath:context:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - S
+    NullabilityOfRet: S
+  - Selector: 'removeValueAtIndex:fromPropertyWithKey:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'replacementObjectForArchiver:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'replacementObjectForCoder:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'replacementObjectForKeyedArchiver:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'replacementObjectForPortCoder:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+    Availability: none
+    AvailabilityMsg: you may be able to use XPC instead
+  - Selector: 'replaceValueAtIndex:inPropertyWithKey:withValue:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'setNilValueForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setValue:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setValue:forKeyPath:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setValue:forUndefinedKey:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setValuesForKeysWithDictionary:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'validateValue:forKey:error:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'validateValue:forKeyPath:error:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'valueAtIndex:inPropertyWithKey:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: O
+  - Selector: 'valueForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'valueForKeyPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'valueForUndefinedKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'willChange:valuesAtIndexes:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'willChangeValueForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'willChangeValueForKey:withSetMutation:usingObjects:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - N
+    NullabilityOfRet: S
+  Properties:
+  - Name: attributeKeys
+    Nullability: N
+  - Name: autoContentAccessingProxy
+    Nullability: N
+  - Name: classDescription
+    Nullability: N
+  - Name: classForArchiver
+    Nullability: O
+  - Name: classForCoder
+    Nullability: N
+  - Name: classForKeyedArchiver
+    Nullability: O
+  - Name: classForPortCoder
+    Nullability: N
+    Availability: none
+    AvailabilityMsg: you may be able to use XPC instead
+  - Name: className
+    Nullability: N
+  - Name: toManyRelationshipKeys
+    Nullability: N
+  - Name: toOneRelationshipKeys
+    Nullability: N
 - Name: NSOperation
   Methods:
   - Selector: 'addDependency:'
@@ -6837,6 +7186,12 @@ Classes:
   - Name: pointerFunctions
     Nullability: N
 - Name: NSPointerFunctions
+  Methods:
+  - Selector: 'initWithOptions:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
   Properties:
   - Name: acquireFunction
     Nullability: O
@@ -6855,12 +7210,14 @@ Classes:
   - Selector: 'addConnection:toRunLoop:forMode:'
     MethodKind: Instance
     Availability: none
+    AvailabilityMsg: you may be able to use XPC instead
   - Selector: delegate
     MethodKind: Instance
     NullabilityOfRet: O
   - Selector: 'removeConnection:fromRunLoop:forMode:'
     MethodKind: Instance
     Availability: none
+    AvailabilityMsg: you may be able to use XPC instead
   - Selector: 'removeFromRunLoop:forMode:'
     MethodKind: Instance
     Nullability:
@@ -6896,8 +7253,6 @@ Classes:
     - O
     NullabilityOfRet: S
 - Name: NSPortCoder
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: decodePortObject
     MethodKind: Instance
@@ -6907,6 +7262,8 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: S
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
 - Name: NSPortMessage
   Methods:
   - Selector: 'initWithSendPort:receivePort:components:'
@@ -6930,8 +7287,6 @@ Classes:
   - Name: sendPort
     Nullability: O
 - Name: NSPortNameServer
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'portForName:'
     MethodKind: Instance
@@ -6958,6 +7313,8 @@ Classes:
   - Selector: systemDefaultPortNameServer
     MethodKind: Class
     NullabilityOfRet: N
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
 - Name: NSPositionalSpecifier
   Methods:
   - Selector: 'initWithPosition:objectSpecifier:'
@@ -7011,13 +7368,13 @@ Classes:
     Nullability:
     - N
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'predicateWithFormat:arguments:'
     MethodKind: Class
     Nullability:
     - N
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'predicateWithSubstitutionVariables:'
     MethodKind: Instance
     Nullability:
@@ -7217,9 +7574,7 @@ Classes:
     NullabilityOfRet: S
   - Selector: 'methodSignatureForSelector:'
     MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: O
+    Availability: none
   Properties:
   - Name: debugDescription
     Nullability: N
@@ -7488,7 +7843,7 @@ Classes:
   - Selector: 'classDescriptionForClass:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     NullabilityOfRet: O
   - Selector: 'classDescriptionForKey:'
     MethodKind: Instance
@@ -8044,8 +8399,6 @@ Classes:
   - Name: address
     Nullability: N
 - Name: NSSocketPortNameServer
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'portForName:'
     MethodKind: Instance
@@ -8086,6 +8439,8 @@ Classes:
   - Selector: sharedInstance
     MethodKind: Class
     NullabilityOfRet: N
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
 - Name: NSSortDescriptor
   Methods:
   - Selector: 'compareObject:toObject:'
@@ -8313,7 +8668,7 @@ Classes:
     - N
     - S
     - O
-    - U
+    - N
     NullabilityOfRet: S
   - Selector: 'enumerateSubstringsInRange:options:usingBlock:'
     MethodKind: Instance
@@ -8339,6 +8694,14 @@ Classes:
   - Selector: 'initWithBytes:length:encoding:'
     MethodKind: Instance
     Nullability:
+    - S
+    - S
+    - S
+    NullabilityOfRet: O
+  - Selector: 'initWithBytesNoCopy:length:encoding:freeWhenDone:'
+    MethodKind: Instance
+    Nullability:
+    - S
     - S
     - S
     - S
@@ -9321,7 +9684,7 @@ Classes:
     Nullability:
     - S
     - S
-    - U
+    - O
     NullabilityOfRet: O
   - Selector: 'fileURLWithPath:'
     MethodKind: Class
@@ -9338,7 +9701,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'getPromisedItemResourceValue:forKey:error:'
     MethodKind: Instance
     Nullability:
@@ -9379,7 +9742,7 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initWithScheme:host:path:'
     MethodKind: Instance
     Nullability:
@@ -9729,7 +10092,7 @@ Classes:
     Nullability:
     - N
     - U
-    - U
+    - N
     NullabilityOfRet: S
   - Selector: 'sendSynchronousRequest:returningResponse:error:'
     MethodKind: Class
@@ -9754,7 +10117,7 @@ Classes:
   - Selector: 'credentialForTrust:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'credentialWithIdentity:certificates:persistence:'
     MethodKind: Class
@@ -9773,14 +10136,14 @@ Classes:
   - Selector: 'initWithIdentity:certificates:persistence:'
     MethodKind: Instance
     Nullability:
-    - S
+    - U
     - N
     - S
     NullabilityOfRet: N
   - Selector: 'initWithTrust:'
     MethodKind: Instance
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'initWithUser:password:persistence:'
     MethodKind: Instance
@@ -10321,7 +10684,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - S
+    - U
     NullabilityOfRet: S
 - Name: NSUserAutomatorTask
   Methods:
@@ -10329,7 +10692,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - O
-    - S
+    - U
     NullabilityOfRet: S
   Properties:
   - Name: variables
@@ -10521,6 +10884,8 @@ Classes:
     Nullability: O
   - Name: additionalActivationAction
     Nullability: O
+  - Name: contentImage
+    Nullability: O
   - Name: deliveryDate
     Nullability: O
   - Name: deliveryRepeatInterval
@@ -10592,6 +10957,11 @@ Classes:
     Nullability: N
 - Name: NSUserScriptTask
   Methods:
+  - Selector: 'executeWithCompletionHandler:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
   - Selector: 'initWithURL:error:'
     MethodKind: Instance
     Nullability:
@@ -10607,7 +10977,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - O
-    - S
+    - O
     NullabilityOfRet: S
   Properties:
   - Name: standardError
@@ -11392,20 +11762,8 @@ Classes:
     Nullability: O
   - Name: endpoint
     Nullability: N
-- Name: NSObject
+- Name: NSInvocation
   Availability: none
-  Methods:
-  - Selector: 'replacementObjectForPortCoder:'
-    MethodKind: Instance
-    Availability: none
-    AvailabilityMsg: "you may be able to use XPC instead"
-  - Selector: 'instanceMethodSignatureForSelector:'
-    MethodKind: Class
-    Availability: none
-  Properties:
-  - Name: 'classForPortCoder'
-    Availability: none
-    AvailabilityMsg: "you may be able to use XPC instead"
 Protocols:
 - Name: NSCacheDelegate
   Methods:
@@ -11428,8 +11786,6 @@ Protocols:
     - N
     NullabilityOfRet: N
 - Name: NSConnectionDelegate
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
   Methods:
   - Selector: 'authenticateComponents:withData:'
     MethodKind: Instance
@@ -11465,6 +11821,8 @@ Protocols:
     - N
     - N
     NullabilityOfRet: S
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
 - Name: NSCopying
   Methods:
   - Selector: 'copyWithZone:'
@@ -12542,35 +12900,17 @@ Protocols:
     Nullability:
     - N
     NullabilityOfRet: N
-Globals:
-- Name: NSConnectionDidDieNotification
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
-- Name: NSConnectionDidInitializeNotification
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
-- Name: NSConnectionReplyMode
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
-- Name: NSFailedAuthenticationException
-  Availability: none
-  AvailabilityMsg: "you may be able to use XPC instead"
 Functions:
-- Name: NSZoneName
-  Nullability:
-  - N
-  NullabilityOfRet: N
-  Availability: none
-- Name: NSSetZoneName
-  Nullability:
-  - N
-  - N
-  Availability: none
-  AvailabilityMsg: ''
 - Name: NSCreateZone
   Availability: none
 - Name: NSRecycleZone
   Availability: none
+- Name: NSSetZoneName
+  Availability: none
+  AvailabilityMsg: ''
+  Nullability:
+  - N
+  - N
 - Name: NSZoneCalloc
   Availability: none
 - Name: NSZoneFree
@@ -12579,6 +12919,23 @@ Functions:
   Availability: none
 - Name: NSZoneMalloc
   Availability: none
+- Name: NSZoneName
+  Availability: none
+  Nullability:
+  - N
+  NullabilityOfRet: N
 - Name: NSZoneRealloc
   Availability: none
-
+Globals:
+- Name: NSConnectionDidDieNotification
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
+- Name: NSConnectionDidInitializeNotification
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
+- Name: NSConnectionReplyMode
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead
+- Name: NSFailedAuthenticationException
+  Availability: none
+  AvailabilityMsg: you may be able to use XPC instead

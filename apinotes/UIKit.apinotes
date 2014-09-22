@@ -1,6 +1,64 @@
 ---
 Name: UIKit
 Classes:
+- Name: CIColor
+  Methods:
+  - Selector: 'initWithColor:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+- Name: NSAttributedString
+  Methods:
+  - Selector: 'attributedStringWithAttachment:'
+    MethodKind: Class
+    Nullability:
+    - U
+    NullabilityOfRet: N
+  - Selector: 'boundingRectWithSize:options:context:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - O
+    NullabilityOfRet: S
+  - Selector: 'dataFromRange:documentAttributes:error:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - U
+    - O
+    NullabilityOfRet: O
+  - Selector: 'drawWithRect:options:context:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - O
+    NullabilityOfRet: S
+  - Selector: 'fileWrapperFromRange:documentAttributes:error:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - U
+    - O
+    NullabilityOfRet: O
+  - Selector: 'initWithData:options:documentAttributes:error:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    - O
+    - O
+    NullabilityOfRet: O
+  - Selector: 'initWithFileURL:options:documentAttributes:error:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - U
+    - U
+    - O
+    NullabilityOfRet: O
 - Name: NSFileProviderExtension
   Methods:
   - Selector: documentStorageURL
@@ -214,7 +272,7 @@ Classes:
   - Selector: 'setTextContainer:forGlyphRange:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     - S
     NullabilityOfRet: S
   - Selector: 'showCGGlyphs:positions:count:font:matrix:attributes:inContext:'
@@ -253,10 +311,95 @@ Classes:
     Nullability: N
   - Name: textStorage
     Nullability: O
+- Name: NSMutableAttributedString
+  Methods:
+  - Selector: 'readFromData:options:documentAttributes:error:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'readFromFileURL:options:documentAttributes:error:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - U
+    - U
+    - O
+    NullabilityOfRet: S
 - Name: NSMutableParagraphStyle
   Properties:
   - Name: tabStops
     Nullability: O
+- Name: NSObject
+  Methods:
+  - Selector: 'copy:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'cut:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'decreaseSize:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'delete:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'increaseSize:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'makeTextWritingDirectionLeftToRight:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'makeTextWritingDirectionRightToLeft:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'paste:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'select:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'selectAll:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'toggleBoldface:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'toggleItalics:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'toggleUnderline:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
 - Name: NSParagraphStyle
   Methods:
   - Selector: defaultParagraphStyle
@@ -274,6 +417,25 @@ Classes:
   Properties:
   - Name: shadowColor
     Nullability: O
+- Name: NSString
+  Methods:
+  - Selector: 'drawAtPoint:withAttributes:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - O
+    NullabilityOfRet: S
+  - Selector: 'drawInRect:withAttributes:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - O
+    NullabilityOfRet: S
+  - Selector: 'sizeWithAttributes:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
 - Name: NSTextAttachment
   Methods:
   - Selector: 'initWithData:ofType:'
@@ -594,7 +756,7 @@ Classes:
   - Name: delegate
     Nullability: O
   - Name: keyWindow
-    Nullability: N
+    Nullability: O
   - Name: preferredContentSizeCategory
     Nullability: N
   - Name: windows
@@ -749,7 +911,7 @@ Classes:
   - Selector: 'bezierPathWithCGPath:'
     MethodKind: Class
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'bezierPathWithOvalInRect:'
     MethodKind: Class
@@ -1364,7 +1526,7 @@ Classes:
   - Selector: 'initWithCGColor:'
     MethodKind: Instance
     Nullability:
-    - S
+    - U
     NullabilityOfRet: N
   - Selector: 'initWithCIColor:'
     MethodKind: Instance
@@ -2146,12 +2308,12 @@ Classes:
   - Selector: 'initWithCGImage:'
     MethodKind: Instance
     Nullability:
-    - S
+    - U
     NullabilityOfRet: O
   - Selector: 'initWithCGImage:scale:orientation:'
     MethodKind: Instance
     Nullability:
-    - S
+    - U
     - S
     - S
     NullabilityOfRet: O
@@ -2480,8 +2642,8 @@ Classes:
   - Selector: 'initWithNavigationBarClass:toolbarClass:'
     MethodKind: Instance
     Nullability:
-    - S
-    - S
+    - U
+    - U
     NullabilityOfRet: O
   - Selector: 'initWithRootViewController:'
     MethodKind: Instance
@@ -4365,7 +4527,7 @@ Classes:
   - Selector: 'performSegueWithIdentifier:sender:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     - O
     NullabilityOfRet: S
   - Selector: 'prepareForSegue:sender:'
@@ -4414,7 +4576,7 @@ Classes:
   - Selector: 'shouldPerformSegueWithIdentifier:sender:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     - O
     NullabilityOfRet: S
   - Selector: 'showDetailViewController:sender:'
@@ -6816,7 +6978,7 @@ Protocols:
   - Selector: 'traitCollectionDidChange:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     NullabilityOfRet: S
   Properties:
   - Name: traitCollection

@@ -13,9 +13,9 @@
 import AppKit
 
 class A: NSView, NSAccessibilityButton {
-  override func accessibilityLabel() -> String!  {return "Anna's button"}
+  override func accessibilityLabel() -> String?  {return "Anna's button"}
   override func accessibilityPerformPress() -> Bool {return true}
-  override func accessibilityParent() -> AnyObject! {return nil}
+  override func accessibilityParent() -> AnyObject? {return nil}
   override func isAccessibilityFocused() -> Bool {return false}
 }
 

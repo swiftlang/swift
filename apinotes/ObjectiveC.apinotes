@@ -27,6 +27,9 @@ Classes:
     MethodKind: Instance
     Availability: none
     AvailabilityMsg: use 'deinit' to define a de-initializer
+  - Selector: debugDescription
+    MethodKind: Class
+    NullabilityOfRet: N
   - Selector: description
     MethodKind: Class
     NullabilityOfRet: N
@@ -35,15 +38,24 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: O
+  - Selector: 'forwardInvocation:'
+    MethodKind: Instance
+    Availability: none
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
     DesignatedInit: true
+  - Selector: 'instanceMethodSignatureForSelector:'
+    MethodKind: Class
+    Availability: none
   - Selector: 'isSubclassOfClass:'
     MethodKind: Class
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: 'methodSignatureForSelector:'
+    MethodKind: Instance
+    Availability: none
   - Selector: mutableCopy
     MethodKind: Instance
     NullabilityOfRet: N
@@ -84,5 +96,9 @@ Protocols:
     MethodKind: Instance
     NullabilityOfRet: N
   Properties:
+  - Name: debugDescription
+    Nullability: N
+  - Name: description
+    Nullability: N
   - Name: superclass
     Nullability: O
