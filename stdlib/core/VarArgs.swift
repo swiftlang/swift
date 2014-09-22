@@ -10,6 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Instances of conforming types can be encoded, and appropriately
+/// passed, as elements of a C `va_list`.
+///
+/// This protocol is useful in presenting C "varargs" APIs natively in
+/// Swift.  It only works for APIs that have a `va_list` variant, so
+/// for example, it isn't much use if all you have is::
+///
+///   int f(int n, ...)
+///
+/// Given a version like this, though, ::
+///
+///   int f(int, va_list arguments)
+///
+/// you can write::
+///
+///   func swiftF(x: Int, arguments: CVarArgType...) -> Int {
+///     return withVaList(arguments) { f(x, $0) }
+///   }
 public protocol CVarArgType {
   func encode() -> [Word]
 }
