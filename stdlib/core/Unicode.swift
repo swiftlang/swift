@@ -14,8 +14,11 @@
 // Conversions between different Unicode encodings.  Note that UTF-16 and
 // UTF-32 decoding are *not* currently resilient to erroneous data.
 
-public
-enum UnicodeDecodingResult {
+/// The result of one Unicode decoding step
+///
+/// A unicode scalar value, an indication that no more unicode scalars
+/// are available, or an indication of a decoding error.
+public enum UnicodeDecodingResult {
   case Result(UnicodeScalar)
   case EmptyInput
   case Error
@@ -31,7 +34,17 @@ enum UnicodeDecodingResult {
   }
 }
 
+/// A Unicode `encoding scheme
+/// <http://www.unicode.org/glossary/#character_encoding_scheme>`_
+///
+/// Consists of an underlying `code unit
+/// <http://www.unicode.org/glossary/#code_unit>`_ and functions to
+/// translate between sequences of these code units and `unicode
+/// scalar values
+/// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
 public protocol UnicodeCodecType {
+
+  /// A type that can hold code unit values for this encoding.
   typealias CodeUnit
 
   init()
@@ -46,10 +59,14 @@ public protocol UnicodeCodecType {
   ///
   /// Because of buffering, it is impossible to find the corresponing position
   /// in the generator for a given returned `UnicodeScalar` or an error.
+  ///
+  /// :param: `next`: a *generator* of code units to be decoded.
   mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult
 
+  /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
+  /// 'ing each `CodeUnit` to `output`.
   class func encode<
     S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S)
@@ -731,6 +748,8 @@ internal func _transcodeSomeUTF16AsUTF8<
   return (nextIndex, result)
 }
 
+/// Instances of conforming types are used in internal `String`
+/// representation.
 internal protocol _StringElementType {
   class func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
   class func _fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
