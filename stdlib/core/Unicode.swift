@@ -731,30 +731,29 @@ internal func _transcodeSomeUTF16AsUTF8<
   return (nextIndex, result)
 }
 
-public
-protocol StringElementType {
+internal protocol _StringElementType {
   class func toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
   class func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
-extension UTF16.CodeUnit : StringElementType {
-  public
-  static func toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
+extension UTF16.CodeUnit : _StringElementType {
+  internal static func toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return x
   }
-  public
-  static func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> UTF16.CodeUnit {
+  internal static func fromUTF16CodeUnit(
+    utf16: UTF16.CodeUnit
+  ) -> UTF16.CodeUnit {
     return utf16
   }
 }
 
-extension UTF8.CodeUnit : StringElementType {
-  public
-  static func toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
+extension UTF8.CodeUnit : _StringElementType {
+  internal static func toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
     return UTF16.CodeUnit(x)
   }
-  public
-  static func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> UTF8.CodeUnit {
+  internal static func fromUTF16CodeUnit(
+    utf16: UTF16.CodeUnit
+  ) -> UTF8.CodeUnit {
     return UTF8.CodeUnit(utf16)
   }
 }
@@ -771,10 +770,13 @@ extension UTF16 {
 
   public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return (UTF16.CodeUnit(x.value - 0x1_0000) & (((1 as UTF16.CodeUnit) << 10) - 1)) + 0xDC00
+    return (
+      UTF16.CodeUnit(x.value - 0x1_0000)
+      & (((1 as UTF16.CodeUnit) << 10) - 1)
+    ) + 0xDC00
   }
 
-  public static func copy<T : StringElementType, U : StringElementType>(
+  internal static func copy<T : _StringElementType, U : _StringElementType>(
     source: UnsafeMutablePointer<T>,
     destination: UnsafeMutablePointer<U>, count: Int
   ) {
