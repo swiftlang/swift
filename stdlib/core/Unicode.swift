@@ -732,15 +732,15 @@ internal func _transcodeSomeUTF16AsUTF8<
 }
 
 internal protocol _StringElementType {
-  class func toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
-  class func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
+  class func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
+  class func _fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
 extension UTF16.CodeUnit : _StringElementType {
-  internal static func toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
+  internal static func _toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return x
   }
-  internal static func fromUTF16CodeUnit(
+  internal static func _fromUTF16CodeUnit(
     utf16: UTF16.CodeUnit
   ) -> UTF16.CodeUnit {
     return utf16
@@ -748,12 +748,14 @@ extension UTF16.CodeUnit : _StringElementType {
 }
 
 extension UTF8.CodeUnit : _StringElementType {
-  internal static func toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
+  internal static func _toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
+    _sanityCheck(x <= 0x7f, "should only be doing this with ASCII")
     return UTF16.CodeUnit(x)
   }
-  internal static func fromUTF16CodeUnit(
+  internal static func _fromUTF16CodeUnit(
     utf16: UTF16.CodeUnit
   ) -> UTF8.CodeUnit {
+    _sanityCheck(utf16 <= 0x7f, "should only be doing this with ASCII")
     return UTF8.CodeUnit(utf16)
   }
 }
@@ -788,8 +790,8 @@ extension UTF16 {
     }
     else {
       for i in 0..<count {
-        let u16 = T.toUTF16CodeUnit((source + i).memory)
-        (destination + i).memory = U.fromUTF16CodeUnit(u16)
+        let u16 = T._toUTF16CodeUnit((source + i).memory)
+        (destination + i).memory = U._fromUTF16CodeUnit(u16)
       }
     }
   }
