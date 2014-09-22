@@ -41,7 +41,6 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LLVMContext.h"
