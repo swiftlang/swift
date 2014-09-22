@@ -1070,9 +1070,13 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   
   // If the type is dependent, substitute it into our current context.
   auto contextTy = canonicalTy;
-  if (contextTy->isDependentType())
-    contextTy = getArchetypes().substDependentType(contextTy)
-                              ->getCanonicalType();
+  if (contextTy->isDependentType()) {
+    // The type we got should be lowered, so lower it like a SILType.
+    contextTy = getArchetypes().substDependentType(*IGM.SILMod,
+                                   SILType::getPrimitiveAddressType(contextTy))
+      .getSwiftRValueType();
+    
+  }
   
   // Fold archetypes to unique exemplars. Any archetype with the same
   // constraints is equivalent for type lowering purposes.

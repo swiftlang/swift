@@ -128,19 +128,28 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
 }
 
 namespace {
-struct MapSILTypeIntoContext : CanTypeVisitor<MapSILTypeIntoContext, CanType> {
-  const SILFunction *ContextFn;
+template<typename SubstFn>
+struct SubstDependentSILType
+  : CanTypeVisitor<SubstDependentSILType<SubstFn>, CanType>
+{
+  SILModule &M;
+  SubstFn Subst;
   
-  MapSILTypeIntoContext(const SILFunction *ContextFn) : ContextFn(ContextFn) {}
+  SubstDependentSILType(SILModule &M, SubstFn Subst)
+    : M(M), Subst(std::move(Subst))
+  {}
+  
+  using super = CanTypeVisitor<SubstDependentSILType<SubstFn>, CanType>;
+  using super::visit;
   
   CanType visitDependentMemberType(CanDependentMemberType t) {
     // If a dependent member type appears in lowered position, we need to lower
     // its context substitution against the associated type's abstraction
     // pattern.
-    CanType astTy = ContextFn->mapTypeIntoContext(t)->getCanonicalType();
+    CanType astTy = Subst(t);
     AbstractionPattern origTy(t->getAssocType()->getArchetype());
     
-    return ContextFn->getModule().Types.getLoweredType(origTy, astTy)
+    return M.Types.getLoweredType(origTy, astTy)
       .getSwiftRValueType();
   }
   
@@ -179,14 +188,31 @@ struct MapSILTypeIntoContext : CanTypeVisitor<MapSILTypeIntoContext, CanType> {
   
   CanType visitType(CanType t) {
     // Other types get substituted into context normally.
-    return ContextFn->mapTypeIntoContext(t)->getCanonicalType();
+    return Subst(t);
   }
 };
+
+template<typename SubstFn>
+SILType doSubstDependentSILType(SILModule &M,
+                                SubstFn Subst,
+                                SILType t) {
+  CanType result = SubstDependentSILType<SubstFn>(M, std::move(Subst))
+    .visit(t.getSwiftRValueType());
+  return SILType::getPrimitiveType(result, t.getCategory());
+}
+  
 } // end anonymous namespace
 
 SILType SILFunction::mapTypeIntoContext(SILType type) const {
-  CanType astTy = MapSILTypeIntoContext(this).visit(type.getSwiftRValueType());
-  return SILType::getPrimitiveType(astTy, type.getCategory());
+  return doSubstDependentSILType(getModule(),
+    [&](CanType t) { return mapTypeIntoContext(t)->getCanonicalType(); },
+    type);
+}
+
+SILType ArchetypeBuilder::substDependentType(SILModule &M, SILType type) {
+  return doSubstDependentSILType(M,
+    [&](CanType t) { return substDependentType(t)->getCanonicalType(); },
+    type);
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {

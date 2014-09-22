@@ -1363,7 +1363,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     SILType loweredType = getLoweredType(origObjectType, substObjectType,
                                          uncurryLevel).getAddressType();
 
-    auto *theInfo = new (*this, key.isDependent()) TrivialTypeLowering(loweredType);
+    auto *theInfo = new (*this, key.isDependent())
+      TrivialTypeLowering(loweredType);
     insert(key, theInfo);
     return *theInfo;
   }
