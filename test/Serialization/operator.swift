@@ -2,7 +2,8 @@
 // RUN: mkdir %t
 // RUN: %swift -emit-module -o %t %S/Inputs/def_operator.swift
 // RUN: llvm-bcanalyzer %t/def_operator.swiftmodule | FileCheck %s
-// RUN: %swift -interpret -I=%t %s | FileCheck --check-prefix=OUTPUT %s
+// RUN: %swift -parse -I%t %s
+// RUN: %swift -interpret -I=%t -DINTERP %s | FileCheck --check-prefix=OUTPUT %s
 // REQUIRES: swift_interpreter
 
 // FIXME: iOS doesn't work because this test needs the interpreter to handle 
@@ -45,6 +46,8 @@ println("\(5 *- 3 -* 2) \(5 -* 3 *- 2)")
 println("\(5 *- 3 *-* 2) \(5 *-* 3 *- 2)")
 // OUTPUT: 0 4
 
+#if !INTERP
+
 func typeCheckOnly() {
   ~~~true
   var b = false
@@ -52,3 +55,5 @@ func typeCheckOnly() {
   true *-* false
   b *- false
 }
+
+#endif

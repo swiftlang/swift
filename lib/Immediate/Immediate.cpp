@@ -39,8 +39,10 @@
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -60,6 +62,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 // FIXME: We need a more library-neutral way for frameworks to take ownership of
 // the main loop.
@@ -368,6 +371,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
   builder.setErrorStr(&ErrorMsg);
+  builder.setUseMCJIT(true);
   builder.setEngineKind(llvm::EngineKind::JIT);
   llvm::ExecutionEngine *EE = builder.create();
   if (!EE) {
@@ -377,6 +381,8 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 
   DEBUG(llvm::dbgs() << "Module to be executed:\n";
         Module->dump());
+
+  EE->finalizeObject();
   
   // Run the generated program.
   for (auto InitFn : InitFns) {
@@ -957,6 +963,8 @@ private:
   bool RanGlobalInitializers;
   llvm::LLVMContext &LLVMContext;
   llvm::Module *Module;
+  llvm::StringSet<> FuncsAlreadyGenerated;
+  llvm::StringSet<> GlobalsAlreadyEmitted;
   llvm::Module DumpModule;
   llvm::SmallString<128> DumpSource;
 
@@ -969,6 +977,37 @@ private:
   PersistentParserState PersistentState;
 
 private:
+
+  void stripPreviouslyGenerated(llvm::Module &M) {
+
+    for (auto& function : M.getFunctionList()) {
+      function.setVisibility(llvm::GlobalValue::DefaultVisibility);
+      if (FuncsAlreadyGenerated.count(function.getName()))
+        function.deleteBody();
+      else {
+        if (function.getName() != "top_level_code" &&
+            function.getName() != "main")
+          FuncsAlreadyGenerated.insert(function.getName());
+      }
+    }
+
+    for (auto& global : M.globals()) {
+      if (!global.hasName())
+        continue;
+
+      global.setVisibility(llvm::GlobalValue::DefaultVisibility);
+      if (!global.hasAvailableExternallyLinkage() &&
+          !global.hasAppendingLinkage() &&
+          !global.hasCommonLinkage()) {
+        global.setLinkage(llvm::GlobalValue::ExternalLinkage);
+        if (GlobalsAlreadyEmitted.count(global.getName()))
+          global.setInitializer(nullptr);
+        else
+          GlobalsAlreadyEmitted.insert(global.getName());
+      }
+    }
+  }
+
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     // Parse the current line(s).
     auto InputBuf = std::unique_ptr<llvm::MemoryBuffer>(
@@ -1027,6 +1066,14 @@ private:
       llvm::errs() << ErrorMessage << "\n";
       return false;
     }
+
+    std::unique_ptr<llvm::Module> NewModule(CloneModule(Module));
+
+    Module->getFunction("main")->eraseFromParent();
+    Module->getFunction("top_level_code")->eraseFromParent();
+
+    stripPreviouslyGenerated(*NewModule);
+
     if (llvm::Linker::LinkModules(&DumpModule, LineModule.get(),
                                   llvm::Linker::DestroySource,
                                   &ErrorMessage)) {
@@ -1037,10 +1084,15 @@ private:
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
     
-    if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns,
+    if (IRGenImportedModules(CI, *NewModule, ImportedModules, InitFns,
                              IRGenOpts, SILOpts, sil.get()))
       return false;
     
+    llvm::Module *TempModule = NewModule.get();
+    EE->addModule(std::move(NewModule));
+
+    EE->finalizeObject();
+
     for (auto InitFn : InitFns)
       EE->runFunctionAsMain(InitFn, CmdLine, 0);
     InitFns.clear();
@@ -1048,13 +1100,11 @@ private:
     // FIXME: The way we do this is really ugly... we should be able to
     // improve this.
     if (!RanGlobalInitializers) {
-      EE->runStaticConstructorsDestructors(*Module, false);
+      EE->runStaticConstructorsDestructors(*TempModule, false);
       RanGlobalInitializers = true;
     }
-    llvm::Function *EntryFn = Module->getFunction("main");
+    llvm::Function *EntryFn = TempModule->getFunction("main");
     EE->runFunctionAsMain(EntryFn, CmdLine, 0);
-    EE->freeMachineCodeForFunction(EntryFn);
-    EntryFn->eraseFromParent();
     
     return true;
   }
@@ -1103,6 +1153,7 @@ public:
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
     builder.setErrorStr(&ErrorMsg);
+    builder.setUseMCJIT(true);
     builder.setEngineKind(llvm::EngineKind::JIT);
     EE = builder.create();
 
