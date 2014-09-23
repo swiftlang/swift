@@ -13,6 +13,7 @@
 public struct RangeGenerator<
   T: ForwardIndexType
 > : GeneratorType, SequenceType {
+  /// The type of element returned by `next()`.
   public typealias Element = T
 
   @transparent public
@@ -21,6 +22,8 @@ public struct RangeGenerator<
     self.endIndex = bounds.endIndex
   }
 
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
   public mutating func next() -> Element? {
     if startIndex == endIndex {
       return .None

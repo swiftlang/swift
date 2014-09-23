@@ -13,12 +13,19 @@
 public struct ZipGenerator2<
   E0 : GeneratorType, E1 : GeneratorType
 > : GeneratorType {
+  /// The type of element returned by `next()`.
   public typealias Element = (E0.Element,E1.Element)
 
   public init(_ e0: E0, _ e1: E1) {
     baseStreams = (e0,e1)
   }
 
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// Requires: `next()` has not been applied to a copy of `self`
+  /// since the copy was made, and no preceding call to `self.next()`
+  /// has returned `nil`.
   public mutating func next() -> Element? {
     var e0 = baseStreams.0.next()
     if e0 == nil { return .None }

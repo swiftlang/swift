@@ -23,8 +23,12 @@ struct _ConcatenateSequenceGenerator<
     self._outer = outer
   }
 
-  /// Return the next element in the sequence, or `nil`` if none exists,
-  /// in either case advancing the generator.
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// Requires: `next()` has not been applied to a copy of `self`
+  /// since the copy was made, and no preceding call to `self.next()`
+  /// has returned `nil`.
   mutating func next() -> Outer.Element.Generator.Element? {
     do {
       if _fastPath(_inner != nil) {

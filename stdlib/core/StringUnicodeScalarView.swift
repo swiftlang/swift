@@ -125,6 +125,11 @@ extension String {
         self._base = _base
       }
 
+      /// Advance to the next element and return it, or `nil` if no next
+      /// element exists.
+      ///
+      /// Requires: no preceding call to `self.next()` has returned
+      /// `nil`.
       public mutating func next() -> UnicodeScalar? {
         switch _decoder.decode(&self._base) {
         case .Result(let us):

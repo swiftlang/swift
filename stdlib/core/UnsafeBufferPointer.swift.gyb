@@ -13,6 +13,8 @@
 /// A generator for the elements in the buffer referenced by
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`
 public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
   public mutating func next() -> T? {
     return position == end ? nil : (position++).memory
   }

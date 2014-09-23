@@ -1883,6 +1883,10 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
     }
   }
 
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// Requires: no preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> (Key, Value)? {
     if _fastPath(_guaranteedNative) {
       return _nativeNext()

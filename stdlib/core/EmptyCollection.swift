@@ -22,6 +22,7 @@ public struct EmptyGenerator<T> : GeneratorType, SequenceType {
     return self
   }
   
+  /// Return `nil`, indicating that there are no more elements.
   public mutating func next() -> T? {
     return nil
   }

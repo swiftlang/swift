@@ -175,8 +175,10 @@ public struct IndexingGenerator<
     return self
   }
 
-  /// Return the next element of the underlying collection, or `nil`
-  /// if no next element exists.
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// Requires: no preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> C._Element? {
     return _position == _elements.endIndex
     ? .None : .Some(_elements[_position++])
@@ -206,8 +208,13 @@ public struct PermutationGenerator<
   var seq : C
   var indices : Indices.Generator
 
+  /// The type of element returned by `next()`.
   public typealias Element = C.Generator.Element
 
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// Requires: no preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     var result = indices.next()
     return result != nil ? seq[result!] : .None

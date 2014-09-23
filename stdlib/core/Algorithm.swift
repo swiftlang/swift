@@ -215,6 +215,7 @@ public func startsWith<
 public struct EnumerateGenerator<
   Base: GeneratorType
 > : GeneratorType, SequenceType {
+  /// The type of element returned by `next()`.
   public typealias Element = (index: Int, element: Base.Element)
   var base: Base
   var count: Int
@@ -225,8 +226,10 @@ public struct EnumerateGenerator<
     count = 0
   }
 
-  /// If all elements are exhausted, return `nil`.  Otherwise, advance
-  /// to the next element and return it.
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// Requires: no preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     var b = base.next()
     if b == nil { return .None }

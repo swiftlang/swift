@@ -85,6 +85,8 @@ public struct StrideToGenerator<T: Strideable> : GeneratorType {
   let end: T
   let stride: T.Stride
 
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
   public mutating func next() -> T? {
     if stride > 0 ? current >= end : current <= end {
       return nil
@@ -130,6 +132,8 @@ public struct StrideThroughGenerator<T: Strideable> : GeneratorType {
   let stride: T.Stride
   var done: Bool = false
   
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
   public mutating func next() -> T? {
     if done {
       return nil
