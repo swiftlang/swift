@@ -54,8 +54,11 @@ struct _HashingDetail {
 // their inputs and just exhibit avalance effect.
 //
 
+// TODO: This function is only public because it is used in the
+// stdlib/HashingAvalanche.swift validation test. Check if there is another
+// way to let the test access the function.
 @transparent
-func _mixUInt32(value: UInt32) -> UInt32 {
+public func _mixUInt32(value: UInt32) -> UInt32 {
   // Zero-extend to 64 bits, hash, select 32 bits from the hash.
   //
   // NOTE: this differs from LLVM's implementation, which selects the lower
@@ -71,8 +74,11 @@ func _mixInt32(value: Int32) -> Int32 {
   return Int32(bitPattern: _mixUInt32(UInt32(bitPattern: value)))
 }
 
+// TODO: This function is only public because it is used in the
+// stdlib/HashingAvalanche.swift validation test. Check if there is another
+// way to let the test access the function.
 @transparent
-func _mixUInt64(value: UInt64) -> UInt64 {
+public func _mixUInt64(value: UInt64) -> UInt64 {
   // Similar to hash_4to8_bytes but using a seed instead of length.
   let seed: UInt64 = _HashingDetail.getExecutionSeed()
   let low: UInt64 = value & 0xffff_ffff
