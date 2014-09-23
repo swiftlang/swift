@@ -877,7 +877,7 @@ bb0(%0 : $DerivedClassWithIVars, %i : $Int):
 
   // Access a super property before super.init is called.
   %a = load %1#1 : $*DerivedClassWithIVars
-  %b = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars  // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
+  %b = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars  // expected-error {{use of property 'x' in base object before super.init initializes it}}
   %c = ref_element_addr %b : $RootClassWithIVars, #RootClassWithIVars.x
   load %c : $*Int
 

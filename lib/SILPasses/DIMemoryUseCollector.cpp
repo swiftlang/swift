@@ -203,9 +203,9 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-static ValueDecl *getPathStringToElementRec(CanType T, unsigned EltNo,
-                                          bool IsSelfOfNonDelegatingInitializer,
-                                            std::string &Result) {
+static void getPathStringToElementRec(CanType T, unsigned EltNo,
+                                      bool IsSelfOfNonDelegatingInitializer,
+                                      std::string &Result) {
   if (CanTupleType TT = dyn_cast<TupleType>(T)) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
     unsigned FieldNo = 0;
@@ -238,8 +238,7 @@ static ValueDecl *getPathStringToElementRec(CanType T, unsigned EltNo,
       if (EltNo < NumFieldElements) {
         Result += '.';
         Result += VD->getName().str();
-        getPathStringToElementRec(FieldType, EltNo, false, Result);
-        return VD;
+        return getPathStringToElementRec(FieldType, EltNo, false, Result);
       }
       EltNo -= NumFieldElements;
     }
@@ -247,13 +246,12 @@ static ValueDecl *getPathStringToElementRec(CanType T, unsigned EltNo,
 
   // Otherwise, there are no subelements.
   assert(EltNo == 0 && "Element count problem");
-  return nullptr;
 }
 
-ValueDecl *DIMemoryObjectInfo::
-getPathStringToElement(unsigned Element, std::string &Result) const {
-  return getPathStringToElementRec(getType(), Element,
-                                   IsSelfOfNonDelegatingInitializer, Result);
+void DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
+                                                std::string &Result) const {
+  getPathStringToElementRec(getType(), Element,
+                            IsSelfOfNonDelegatingInitializer, Result);
 }
 
 
