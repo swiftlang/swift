@@ -469,11 +469,19 @@ postfix func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; ret
 
 @transparent
 extension ${Self} : Strideable {
+  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
+  /// `other`.
+  ///
+  /// Complexity: O(1).
   @transparent public
   func distanceTo(other: ${Self}) -> ${Self} {
     return other - self
   }
   
+  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
+  /// `n`.
+  ///
+  /// Complexity: O(1).
   @transparent public
   func advancedBy(amount: ${Self}) -> ${Self} {
     return self + amount

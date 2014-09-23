@@ -219,11 +219,19 @@ func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
 }
 
 @transparent extension CGFloat : Strideable {
+  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
+  /// `other`.
+  ///
+  /// Complexity: O(1).
   @transparent public
   func distanceTo(other: CGFloat) -> CGFloat {
     return CGFloat(other.native - self.native)
   }
 
+  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
+  /// `n`.
+  ///
+  /// Complexity: O(1).
   @transparent public
   func advancedBy(amount: CGFloat) -> CGFloat {
     return CGFloat(self.native + amount.native)
