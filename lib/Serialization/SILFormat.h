@@ -136,6 +136,7 @@ namespace sil_block {
     SIL_WITNESS_ASSOC_PROTOCOL,
     SIL_WITNESS_ASSOC_ENTRY,
     SIL_GENERIC_OUTER_PARAMS,
+    SIL_INST_WITNESS_METHOD,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -345,6 +346,20 @@ namespace sil_block {
   using SILGenericOuterParamsLayout = BCRecordLayout<
     SIL_GENERIC_OUTER_PARAMS,
     DeclIDField // The decl id of the outer param if any.
+  >;
+
+  using SILInstWitnessMethodLayout = BCRecordLayout<
+    SIL_INST_WITNESS_METHOD,
+    TypeIDField,           // result type
+    SILTypeCategoryField,
+    BCFixed<1>,            // volatile?
+    TypeIDField,           // lookup type
+    SILTypeCategoryField,
+    DeclIDField,           // conformance proto
+    TypeIDField,           // conformance type
+    ModuleIDField,         // conformance module
+    BCArray<ValueIDField>  // SILDeclRef
+    // may be trailed by an inline protocol conformance
   >;
 }
 

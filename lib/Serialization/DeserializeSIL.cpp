@@ -614,6 +614,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ValueID ValID, ValID2;
   TypeID TyID, TyID2;
   TypeID ConcreteTyID;
+  DeclID ProtoID;
+  ModuleID OwningModuleID;
   SourceLoc SLoc;
   ArrayRef<uint64_t> ListOfValues;
   SILLocation Loc = SILFileLocation(SLoc);
@@ -672,6 +674,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, OpCode);
+    break;
+  case SIL_INST_WITNESS_METHOD:
+    SILInstWitnessMethodLayout::readRecord(scratch, TyID, TyCategory, Attr,
+                                           TyID2, TyCategory2,
+                                           ProtoID, ConcreteTyID,
+                                           OwningModuleID,
+                                           ListOfValues);
+    OpCode = (unsigned)ValueKind::WitnessMethodInst;
     break;
   }
 
@@ -1362,7 +1372,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                              ResultTy);
     break;
   }
-  case ValueKind::WitnessMethodInst:
   case ValueKind::ProtocolMethodInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst:
@@ -1370,8 +1379,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
     // and an operand.
-    // WitnessMethodInst is additionally optionally followed by a
-    // ProtocolConformance record.
     unsigned NextValueIndex = 1;
     SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
@@ -1384,14 +1391,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::WitnessMethodInst: {
-      auto conformance = MF->maybeReadConformance(Ty.getSwiftRValueType(),
-                                                  SILCursor);
-      ResultVal = Builder.createWitnessMethod(Loc, Ty,
-                                              conformance.getValueOr(nullptr),
-                                              DRef, operandTy, IsVolatile);
-      break;
-    }
     case ValueKind::ProtocolMethodInst:
       ResultVal = Builder.createProtocolMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex],
@@ -1417,6 +1416,24 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     DRef, Ty, IsVolatile);
       break;
     }
+    break;
+  }
+  case ValueKind::WitnessMethodInst: {
+    unsigned NextValueIndex = 0;
+    SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
+    assert(ListOfValues.size() >= NextValueIndex &&
+           "Out of entries for MethodInst");
+
+    SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    SILType OperandTy = getSILType(MF->getType(TyID2),
+                                   (SILValueCategory)TyCategory2);
+
+    auto *Proto = cast_or_null<ProtocolDecl>(MF->getDecl(ProtoID));
+    auto *Conformance = MF->readReferencedConformance(Proto, ConcreteTyID,
+                                                      OwningModuleID,
+                                                      SILCursor);
+    ResultVal = Builder.createWitnessMethod(Loc, Ty, Conformance, DRef,
+                                            OperandTy, Attr);
     break;
   }
   case ValueKind::DynamicMethodBranchInst: {

@@ -382,7 +382,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     for (auto conformance : conformancesToWrite) {
       S.writeConformance(conformance->getProtocol(), conformance, nullptr,
-                         SILAbbrCodes, /*writeIncomplete=*/true);
+                         SILAbbrCodes);
     }
     break;
   }
@@ -1123,23 +1123,38 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILType Ty = AMI->getLookupType();
     SILType Ty2 = AMI->getType(0);
 
-    SmallVector<ValueID, 7> ListOfValues;
-    ListOfValues.push_back(AMI->isVolatile());
+    SmallVector<ValueID, 8> ListOfValues;
     handleSILDeclRef(S, AMI->getMember(), ListOfValues);
-    ListOfValues.push_back(S.addTypeRef(Ty2.getSwiftRValueType()));
-    ListOfValues.push_back((unsigned)Ty2.getCategory());
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-        S.addTypeRef(Ty.getSwiftRValueType()),
-        (unsigned)Ty.getCategory(), ListOfValues);
+    DeclID ConformanceProto;
+    TypeID AdopterTy;
+    ModuleID ConformanceModule;
+    bool WriteConformance = false;
 
-    if (AMI->getConformance())
-      S.writeConformance(
-               cast<ProtocolDecl>(AMI->getMember().getDecl()->getDeclContext()),
-               AMI->getConformance(),
-               nullptr,
-               SILAbbrCodes);
+    if (auto *Conformance = AMI->getConformance()) {
+      ConformanceProto = S.addDeclRef(Conformance->getProtocol());
+      WriteConformance = S.encodeReferencedConformance(Conformance,
+                                                       AdopterTy,
+                                                       ConformanceModule,
+                                                       true);
+    } else {
+      ConformanceProto = S.addDeclRef(nullptr);
+    }
+
+    SILInstWitnessMethodLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstWitnessMethodLayout::Code],
+        S.addTypeRef(Ty.getSwiftRValueType()), (unsigned)Ty.getCategory(),
+        AMI->isVolatile(),
+        S.addTypeRef(Ty2.getSwiftRValueType()), (unsigned)Ty2.getCategory(),
+        ConformanceProto, AdopterTy, ConformanceModule,
+        ListOfValues);
+
+    if (WriteConformance) {
+      S.writeConformance(AMI->getConformance()->getProtocol(),
+                         AMI->getConformance(),
+                         nullptr,
+                         SILAbbrCodes);
+    }
 
     break;
   }
@@ -1525,6 +1540,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILGenericOuterParamsLayout>();
 
   registerSILAbbr<SILInstCastLayout>();
+  registerSILAbbr<SILInstWitnessMethodLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.
