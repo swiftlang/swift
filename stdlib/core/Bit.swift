@@ -127,6 +127,8 @@ extension Bit : IntegerArithmeticType {
     return _withOverflow(Int.remainderWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
+  /// Represent this number using Swift's widest native signed integer
+  /// type.
   public func toIntMax() -> IntMax {
     return IntMax(rawValue)
   }

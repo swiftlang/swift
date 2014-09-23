@@ -72,11 +72,12 @@ public protocol IntegerType : _IntegerType, RandomAccessIndexType {
 /// Its requirements are inherited by `SignedIntegerType` and thus
 /// must be satisfied by types conforming to that protocol.
 public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
-  /// Represent this number using Swift's widest native integer type.
+  /// Represent this number using Swift's widest native signed integer
+  /// type.
   func toIntMax() -> IntMax
   
-  // Convert from Swift's widest signed integer type, trapping on
-  // overflow.
+  /// Convert from Swift's widest signed integer type, trapping on
+  /// overflow.
   init(IntMax)
 }
 
@@ -90,10 +91,12 @@ public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
 /// Its requirements are inherited by `SignedIntegerType` and thus
 /// must be satisfied by types conforming to that protocol.
 public protocol _UnsignedIntegerType : _IntegerType {
+  /// Represent this number using Swift's widest native unsigned
+  /// integer type.
   func toUIntMax() -> UIntMax
 
-  // Convert from Swift's widest unsigned integer type, trapping on
-  // overflow.
+  /// Convert from Swift's widest unsigned integer type, trapping on
+  /// overflow.
   init(UIntMax)
 }
 
@@ -321,12 +324,15 @@ extension ${Self} {
   }
 %end
 
-% U = '' if signed else 'U'
+% (U, un) = ('','') if signed else ('U','un')
+  /// Represent this number using Swift's widest native ${un}signed
+  /// integer type.
   @transparent public
   func to${U}IntMax() -> ${U}IntMax {
     return ${'self' if Self == U+'Int%s'%int_max_bits else U+'IntMax(self)'}
   }
 % if not signed:
+  /// Explicitly convert to `IntMax`${', trapping on overflow (except in -Ounchecked builds)' if bits == int_max_bits else ''}.
   @transparent public
   func toIntMax() -> IntMax {
     return IntMax(toUIntMax())
