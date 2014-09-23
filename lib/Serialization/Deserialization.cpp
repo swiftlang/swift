@@ -2644,10 +2644,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::DESTRUCTOR_DECL: {
     DeclID parentID;
     bool isImplicit, isObjC;
-    TypeID signatureID;
+    TypeID signatureID, interfaceID;
 
     decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
-                                              isObjC, signatureID);
+                                              isObjC, signatureID, interfaceID);
 
     DeclContext *DC = getDeclContext(parentID);
     if (declOrOffset.isComplete())
@@ -2663,6 +2663,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     dtor->setSelfPattern(selfParams);
 
     dtor->setType(getType(signatureID));
+    dtor->setInterfaceType(getType(interfaceID));
     if (isImplicit)
       dtor->setImplicit();
 

@@ -1981,7 +1981,8 @@ void Serializer::writeDecl(const Decl *D) {
                                  addDeclRef(DC),
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
-                                 addTypeRef(dtor->getType()));
+                                 addTypeRef(dtor->getType()),
+                                 addTypeRef(dtor->getInterfaceType()));
     assert(dtor->getBodyParamPatterns().size() == 1);
     for (auto pattern : dtor->getBodyParamPatterns())
       writePattern(pattern);
