@@ -44,6 +44,8 @@ public struct ${Index}<I: ${IndexProtocol}> : ${IndexProtocol} {
     return ${Index}(_base.successor())
   }
   
+  /// A type that can represent the number of steps between pairs of
+  /// `${Self}` values where one value is reachable from the other.
   typealias Distance = I.Distance
   
 %   if traversal == 'RandomAccess':

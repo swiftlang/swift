@@ -143,8 +143,12 @@ public struct ${Self}
   // FIXME: this declaration should be inferred.
   // <rdar://problem/18379938> Type checker refuses to use the default for
   // Int.Distance associated type
+  
+  /// A type that can represent the number of steps between pairs of
+  /// values.
   public typealias Distance = Int
 
+  /// Create an instance initialized to zero.
   @transparent public
   init() {
     var maxWidthZero: IntMax = 0
@@ -157,6 +161,7 @@ public struct ${Self}
     value = v
   }
 
+  /// Create an instance initialized to `value`.
   @transparent public
   init(_ value: ${Self}) { self = value }
 

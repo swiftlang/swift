@@ -113,7 +113,7 @@ public protocol _ForwardIndexType : _Incrementable {
   /// `Self` values where one value is reachable from the other.
   ///
   /// Reachability is defined by the ability to produce one value from
-  /// the other via zero or more applications of `successor`
+  /// the other via zero or more applications of `successor`.
   typealias Distance : _SignedIntegerType = Int
 
   // See the implementation of Range for an explanation of this
