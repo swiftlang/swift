@@ -818,7 +818,7 @@ func _parseDottedVersion(s: String) -> [Int] {
   return s._split(".").map { $0.toInt()! }
 }
 
-func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {
+public func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {
   var array = _parseDottedVersion(s)
   if array.count >= 4 {
     fatalError("unexpected version")

@@ -19,21 +19,22 @@ import Darwin
 //
 
 public struct _stdlib_pthread_barrierattr_t {
+  public init() {}
 }
 
-func _stdlib_pthread_barrierattr_init(
+public func _stdlib_pthread_barrierattr_init(
   attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>
 ) -> CInt {
   return 0
 }
 
-func _stdlib_pthread_barrierattr_destroy(
+public func _stdlib_pthread_barrierattr_destroy(
   attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>
 ) -> CInt {
   return 0
 }
 
-var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
+public var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
   return 1
 }
 
@@ -48,6 +49,8 @@ public struct _stdlib_pthread_barrier_t {
   ///
   /// This shared variable is protected by `mutex`.
   var numThreadsWaiting: CUnsignedInt = 0
+
+  public init() {}
 }
 
 public func _stdlib_pthread_barrier_init(

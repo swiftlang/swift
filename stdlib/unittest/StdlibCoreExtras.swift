@@ -105,8 +105,10 @@ func withArrayOfCStrings<R>(
   }
 }
 
-struct _Stderr : OutputStreamType {
-  mutating func write(string: String) {
+public struct _Stderr : OutputStreamType {
+  public init() {}
+
+  public mutating func write(string: String) {
     for c in string.utf8 {
       putc(Int32(c), stderr)
     }
@@ -212,11 +214,11 @@ public struct _stdlib_ShardedAtomicCounter {
   public struct PRNG {
     var _state: Int
 
-    init() {
+    public init() {
       _state = Int(Int32(bitPattern: StdlibUnittest.rand32()))
     }
 
-    mutating func randomInt() -> Int {
+    public mutating func randomInt() -> Int {
       var result = 0
       for var i = 0; i != Int._sizeInBits; ++i {
         result = (result << 1) | (_state & 1)
