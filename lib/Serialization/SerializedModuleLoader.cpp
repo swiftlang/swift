@@ -334,13 +334,6 @@ bool SerializedModuleLoader::isSerializedAST(StringRef data) {
   return data.startswith(signatureStr);
 }
 
-void SerializedModuleLoader::verifyAllModules() {
-#ifndef NDEBUG
-  for (const LoadedModulePair &loaded : LoadedModuleFiles)
-    loaded.first->verify();
-#endif
-}
-
 //-----------------------------------------------------------------------------
 // SerializedASTFile implementation
 //-----------------------------------------------------------------------------

@@ -12,7 +12,6 @@
 
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/ModuleFormat.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -1174,12 +1173,4 @@ Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
   Identifier discriminator = PrivateDiscriminatorsByValue.lookup(D);
   assert(!discriminator.empty() && "no discriminator found for decl");
   return discriminator;
-}
-
-void ModuleFile::verify() const {
-#ifndef NDEBUG
-  for (const Serialized<Decl*> &next : Decls)
-    if (next.isComplete())
-      swift::verify(next);
-#endif
 }

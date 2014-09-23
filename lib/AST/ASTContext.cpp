@@ -1028,11 +1028,6 @@ void ASTContext::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
-void ASTContext::verifyAllLoadedModules() const {
-  for (auto &loader : Impl.ModuleLoaders)
-    loader->verifyAllModules();
-}
-
 ClangModuleLoader *ASTContext::getClangModuleLoader() const {
   return Impl.TheClangModuleLoader;
 }

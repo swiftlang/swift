@@ -536,11 +536,6 @@ public:
   /// The loader is owned by the AST context.
   ClangModuleLoader *getClangModuleLoader() const;
 
-  /// Asks every module loader to verify the ASTs it has loaded.
-  ///
-  /// Does nothing in non-asserts (NDEBUG) builds.
-  void verifyAllLoadedModules() const;
-
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
   Module *getLoadedModule(
