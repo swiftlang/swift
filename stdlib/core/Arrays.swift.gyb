@@ -553,6 +553,7 @@ func _${Self}Extend<
 }
 
 extension ${Self} : Reflectable {
+  /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _ArrayTypeMirror(self)
   }

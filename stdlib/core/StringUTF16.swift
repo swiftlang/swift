@@ -104,6 +104,7 @@ extension String {
       self._core = _core
     }
     
+    /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _UTF16ViewMirror(self)
     }

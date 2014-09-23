@@ -54,7 +54,7 @@ public enum Bit : Int, RandomAccessIndexType, Reflectable {
     return rawValue.advancedBy(distance) > 0 ? One : Zero
   }
 
-  /// Reflection
+  /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _BitMirror(self)
   }

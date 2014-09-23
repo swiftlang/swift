@@ -2333,6 +2333,7 @@ class _DictionaryMirror<Key : Hashable,Value> : MirrorType {
 }
 
 extension Dictionary : Reflectable {
+  /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _DictionaryMirror(self)
   }

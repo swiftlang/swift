@@ -26,6 +26,7 @@
 
 % for Type in Types:
 extension ${Type[0]} : Reflectable {
+  /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _LeafMirror(self, { "\($0)" }, { .Some(${Type[1]}(${Type[2]})) })
   }

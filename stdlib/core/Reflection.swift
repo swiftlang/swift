@@ -17,7 +17,7 @@ public protocol Reflectable {
   // witness tables are laid out. Changing this protocol requires a
   // corresponding change to Reflection.cpp.
     
-  /// Get a mirror that reflects `self`.
+  /// Returns a mirror that reflects `self`.
   func getMirror() -> MirrorType
 }
 

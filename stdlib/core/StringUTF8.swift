@@ -154,6 +154,7 @@ extension String {
       return IndexingGenerator(self)
     }
     
+    /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _UTF8ViewMirror(self)
     }

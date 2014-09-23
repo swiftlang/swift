@@ -186,6 +186,7 @@ struct _UIViewMirror : MirrorType {
 }
 
 extension UIView : Reflectable {
+  /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _UIViewMirror(self)
   }

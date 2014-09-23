@@ -158,6 +158,7 @@ extension String {
       return Generator(_core.generate())
     }
 
+    /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _UnicodeScalarViewMirror(self)
     }

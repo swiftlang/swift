@@ -120,6 +120,7 @@ struct _NSViewMirror : MirrorType {
 }
 
 extension NSView : Reflectable {
+  /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _NSViewMirror(self)
   }

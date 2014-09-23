@@ -455,6 +455,7 @@ extension String : CollectionType {
       return endIndexUTF16 - graphemeClusterStartUTF16
     }
     
+    /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _IndexMirror(self)
     }
