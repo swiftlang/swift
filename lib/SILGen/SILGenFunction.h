@@ -24,6 +24,7 @@ namespace Lowering {
 
 class Condition;
 class ConsumableManagedValue;
+enum ForMutation_t : bool;
 class Initialization;
 class LogicalPathComponent;
 class LValue;
@@ -721,6 +722,13 @@ public:
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
                                 SILValue buffer);
+  ManagedValue emitAddressorAccessor(SILLocation loc, AbstractStorageDecl *decl,
+                                     ForMutation_t forMutation,
+                                     ArrayRef<Substitution> substitutions,
+                                     RValueSource &&optionalSelfValue,
+                                     bool isSuper, bool isDirectAccessorUse,
+                                     RValue &&optionalSubscripts,
+                                     SILType addressType);
 
   ManagedValue emitApplyConversionFunction(SILLocation loc,
                                            Expr *funcExpr,
@@ -768,7 +776,8 @@ public:
                                 const LValue &src, const LValue &dest);
   void emitCopyLValueInto(SILLocation loc, const LValue &src,
                           Initialization *dest);
-  ManagedValue emitAddressOfLValue(SILLocation loc, const LValue &src);
+  ManagedValue emitAddressOfLValue(SILLocation loc, const LValue &src,
+                                   ForMutation_t forMutation);
   ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
                                 SGFContext C);
   

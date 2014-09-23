@@ -340,7 +340,8 @@ namespace {
       : PhysicalPathComponent(typeData, RefElementKind),
         Field(field), SubstFieldType(substFieldType) {}
     
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base)
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        ForMutation_t forMutation)
       const override {
       assert(base.getType().isObject() &&
              "base for ref element component must be an object");
@@ -363,8 +364,8 @@ namespace {
       : PhysicalPathComponent(typeData, TupleElementKind),
         ElementIndex(elementIndex) {}
     
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        ForMutation_t forMutation) const override {
       assert(base && "invalid value for element base");
       auto Res = gen.B.createTupleElementAddr(loc, base.getUnmanagedValue(),
                                               ElementIndex,
@@ -386,8 +387,8 @@ namespace {
       : PhysicalPathComponent(typeData, StructElementKind),
         Field(field), SubstFieldType(substFieldType) {}
     
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        ForMutation_t forMutation) const override {
       assert(base && "invalid value for element base");
       auto Res = gen.B.createStructElementAddr(loc, base.getUnmanagedValue(),
                                                Field, SubstFieldType);
@@ -407,8 +408,8 @@ namespace {
       : PhysicalPathComponent(typeData, OptionalObjectKind)
     {}
     
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        ForMutation_t forMutation) const override {
       // Assert that the optional value is present.
       gen.emitPreconditionOptionalHasValue(loc, base.getValue());
       // Project out the 'Some' payload.
@@ -461,8 +462,8 @@ namespace {
   public:
     using OptionalObjectComponent::OptionalObjectComponent;
     
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        ForMutation_t forMutation) const override {
       // Assert that the optional value is present.
       gen.emitPreconditionOptionalHasValue(loc, base.getValue());
       // Project out the payload.
@@ -482,8 +483,8 @@ namespace {
       : OptionalObjectComponent(typeData), Depth(Depth)
     {}
     
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        ForMutation_t forMutation) const override {
       // Check if the optional value is present.
       gen.emitBindOptional(loc, base.getUnmanagedValue(), Depth);
       
@@ -503,8 +504,8 @@ namespace {
       Value(value) {
     }
 
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base) const override {
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        ForMutation_t forMutation) const override {
       assert(!base && "value component must be root of lvalue path");
       return Value;
     }
@@ -604,7 +605,11 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
 }
 
 namespace {
-  class GetterSetterComponent : public LogicalPathComponent {
+  /// A helper class for implementing a component that involves
+  /// calling accessors.
+  template <class Base>
+  class AccessorBasedComponent : public Base {
+  protected:
     // The VarDecl or SubscriptDecl being get/set.
     AbstractStorageDecl *decl;
     bool IsSuper;
@@ -612,12 +617,12 @@ namespace {
     std::vector<Substitution> substitutions;
     Expr *subscriptIndexExpr;
     mutable RValue origSubscripts;
-    
+
     struct AccessorArgs {
       RValueSource base;
       RValue subscripts;
     };
-    
+
     /// Returns a tuple of RValues holding the accessor value, base (retained if
     /// necessary), and subscript arguments, in that order.
     AccessorArgs
@@ -638,32 +643,62 @@ namespace {
       
       return result;
     }
-    
+
+     AccessorBasedComponent(PathComponent::KindTy kind,
+                            AbstractStorageDecl *decl,
+                            bool isSuper, bool isDirectAccessorUse,
+                            ArrayRef<Substitution> substitutions,
+                            LValueTypeData typeData,
+                            Expr *subscriptIndexExpr)
+      : Base(typeData, kind), decl(decl),
+        IsSuper(isSuper), IsDirectAccessorUse(isDirectAccessorUse),
+        substitutions(substitutions.begin(), substitutions.end()),
+        subscriptIndexExpr(subscriptIndexExpr)
+    {
+    }
+
+    AccessorBasedComponent(const AccessorBasedComponent &copied,
+                           SILGenFunction &gen,
+                           SILLocation loc)
+      : Base(copied.getTypeData(), copied.getKind()),
+        decl(copied.decl),
+        IsSuper(copied.IsSuper),
+        IsDirectAccessorUse(copied.IsDirectAccessorUse),
+        substitutions(copied.substitutions),
+        subscriptIndexExpr(copied.subscriptIndexExpr),
+        origSubscripts(copied.origSubscripts.copy(gen, loc)) {}
+
+    void printBase(raw_ostream &OS, StringRef name) const {
+      OS << name << "(" << decl->getName() << ")";
+      if (IsSuper) OS << " isSuper";
+      if (IsDirectAccessorUse) OS << " isDirectAccessorUse";
+      if (subscriptIndexExpr) {
+        OS << " subscript_index:\n";
+        subscriptIndexExpr->print(OS, 2);
+      }
+      OS << '\n';
+    }
+  };
+
+  class GetterSetterComponent
+    : public AccessorBasedComponent<LogicalPathComponent> {
   public:
 
      GetterSetterComponent(AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                          ArrayRef<Substitution> substitutions,
-                          LValueTypeData typeData,
-                          Expr *subscriptIndexExpr = nullptr)
-      : LogicalPathComponent(typeData, GetterSetterKind),
-        decl(decl),
-        IsSuper(isSuper), IsDirectAccessorUse(isDirectAccessorUse),
-        substitutions(substitutions.begin(), substitutions.end()),
-        subscriptIndexExpr(subscriptIndexExpr)
+                           ArrayRef<Substitution> substitutions,
+                           LValueTypeData typeData,
+                           Expr *subscriptIndexExpr = nullptr)
+      : AccessorBasedComponent(GetterSetterKind, decl, isSuper,
+                               isDirectAccessorUse, substitutions,
+                               typeData, subscriptIndexExpr)
     {
     }
     
     GetterSetterComponent(const GetterSetterComponent &copied,
                           SILGenFunction &gen,
                           SILLocation loc)
-      : LogicalPathComponent(copied.getTypeData(), GetterSetterKind),
-        decl(copied.decl),
-        IsSuper(copied.IsSuper),
-        IsDirectAccessorUse(copied.IsDirectAccessorUse),
-        substitutions(copied.substitutions),
-        subscriptIndexExpr(copied.subscriptIndexExpr),
-        origSubscripts(copied.origSubscripts.copy(gen, loc))
+      : AccessorBasedComponent(copied, gen, loc)
     {
     }
     
@@ -775,14 +810,7 @@ namespace {
     }
 
     void print(raw_ostream &OS) const override {
-      OS << "GetterSetterComponent(" << decl->getName() << ")";
-      if (IsSuper) OS << " isSuper";
-      if (IsDirectAccessorUse) OS << " isDirectAccessorUse";
-      if (subscriptIndexExpr) {
-        OS << " subscript_index:\n";
-        subscriptIndexExpr->print(OS, 2);
-      }
-      OS << '\n';
+      printBase(OS, "GetterSetterComponent");
     }
 
     /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
@@ -840,6 +868,40 @@ namespace {
         gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
            .highlight(loc2.getSourceRange());
       }
+    }
+  };
+
+  /// A physical component which involves calling addressors.
+  class AddressorComponent
+      : public AccessorBasedComponent<PhysicalPathComponent> {
+    SILType SubstFieldType;
+  public:
+     AddressorComponent(AbstractStorageDecl *decl,
+                        bool isSuper, bool isDirectAccessorUse,
+                        ArrayRef<Substitution> substitutions,
+                        LValueTypeData typeData, SILType substFieldType,
+                        Expr *subscriptIndexExpr = nullptr)
+      : AccessorBasedComponent(AddressorKind, decl, isSuper,
+                               isDirectAccessorUse, substitutions,
+                               typeData, subscriptIndexExpr),
+        SubstFieldType(substFieldType)
+    {
+    }
+
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        ForMutation_t forMutation) const override {
+      auto addressor = (forMutation ? decl->getMutableAddressor()
+                                    : decl->getAddressor());
+      auto args = prepareAccessorArgs(gen, loc, base, addressor);
+      return gen.emitAddressorAccessor(loc, decl, forMutation, substitutions,
+                                       std::move(args.base), IsSuper,
+                                       IsDirectAccessorUse,
+                                       std::move(args.subscripts),
+                                       SubstFieldType);
+    }
+
+    void print(raw_ostream &OS) const override {
+      printBase(OS, "AddressorComponent");
     }
   };
 } // end anonymous namespace.
@@ -1102,7 +1164,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // them.
   // FIXME: This has to be dynamically looked up for classes, and
   // dynamically instantiated for generics.
-  if (var->isStatic()) {
+  if (var->isStatic() && !var->hasAddressors()) {
     auto baseMeta = e->getBase()->getType()->castTo<MetatypeType>()
       ->getInstanceType();
     (void)baseMeta;
@@ -1119,7 +1181,12 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 
   // For member variables, this access is done w.r.t. a base computation that
   // was already emitted.  This member is accessed off of it.
-  if (!e->getBase()->getType()->is<LValueType>()) {
+  if (var->hasAddressors()) {
+    lv.add(new AddressorComponent(var, e->isSuper(),
+                            e->getAccessKind() == AccessKind::DirectToAccessor,
+                                  e->getMember().getSubstitutions(),
+                                  typeData, varStorageType));
+  } else if (!e->getBase()->getType()->is<LValueType>()) {
     assert(e->getBase()->getType()->hasReferenceSemantics());
     lv.add(new RefElementComponent(var, varStorageType, typeData));
   } else {
@@ -1136,16 +1203,26 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto accessKind = e->getAccessKind();
-  assert(accessKind != AccessKind::DirectToStorage &&
-         "direct storage access for subscripts not yet implemented");
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
   
   LValue lv = visitRec(e->getBase());
-  lv.add(new GetterSetterComponent(decl, e->isSuper(),
-                                   accessKind == AccessKind::DirectToAccessor,
-                                   e->getDecl().getSubstitutions(),
-                                   typeData, e->getIndex()));
+
+  if (decl->hasAccessorFunctions() &&
+      e->getAccessKind() != AccessKind::DirectToStorage) {
+    lv.add(new GetterSetterComponent(decl, e->isSuper(),
+                                     accessKind == AccessKind::DirectToAccessor,
+                                     e->getDecl().getSubstitutions(),
+                                     typeData, e->getIndex()));
+  } else {
+    auto storageType = 
+      gen.SGM.Types.getSubstitutedStorageType(decl, e->getType());
+    lv.add(new AddressorComponent(decl, e->isSuper(),
+                            e->getAccessKind() == AccessKind::DirectToAccessor,
+                                  e->getDecl().getSubstitutions(),
+                                  typeData, storageType, e->getIndex()));
+  }
+
   return lv;
 }
 
@@ -1608,10 +1685,11 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 static ManagedValue drillIntoComponent(SILGenFunction &SGF,
                                        SILLocation loc,
                                        const PathComponent &component,
-                                       ManagedValue base) {
+                                       ManagedValue base,
+                                       ForMutation_t forMutation) {
   ManagedValue addr;
   if (component.isPhysical()) {
-    addr = component.asPhysical().offset(SGF, loc, base);
+    addr = component.asPhysical().offset(SGF, loc, base, forMutation);
   } else {
     auto &lcomponent = component.asLogical();
     addr = ManagedValue::forLValue(lcomponent.getMaterialized(SGF, loc, base));
@@ -1625,14 +1703,15 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
 static const PathComponent &drillToLastComponent(SILGenFunction &SGF,
                                                  SILLocation loc,
                                                  const LValue &lv,
-                                                 ManagedValue &addr) {
+                                                 ManagedValue &addr,
+                                                 ForMutation_t forMutation) {
   assert(lv.begin() != lv.end() &&
          "lvalue must have at least one component");
 
   auto component = lv.begin(), next = lv.begin(), end = lv.end();
   ++next;
   for (; next != end; component = next, ++next) {
-    addr = drillIntoComponent(SGF, loc, **component, addr);
+    addr = drillIntoComponent(SGF, loc, **component, addr, forMutation);
   }
 
   return **component;
@@ -1645,11 +1724,11 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
   DisableWritebackScope scope(*this);
 
   ManagedValue addr;
-  auto &component = drillToLastComponent(*this, loc, src, addr);
+  auto &component = drillToLastComponent(*this, loc, src, addr, NotForMutation);
 
   // If the last component is physical, just drill down and load from it.
   if (component.isPhysical()) {
-    addr = component.asPhysical().offset(*this, loc, addr);
+    addr = component.asPhysical().offset(*this, loc, addr, NotForMutation);
     return emitLoad(loc, addr.getValue(),
                     getTypeLowering(src.getTypeOfRValue()), C, IsNotTake);
   }
@@ -1659,10 +1738,11 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
-                                                 const LValue &src) {
+                                                 const LValue &src,
+                                                 ForMutation_t forMutation) {
   ManagedValue addr;
-  auto &component = drillToLastComponent(*this, loc, src, addr);
-  addr = drillIntoComponent(*this, loc, component, addr);
+  auto &component = drillToLastComponent(*this, loc, src, addr, forMutation);
+  addr = drillIntoComponent(*this, loc, component, addr, forMutation);
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
   return addr;
@@ -1675,11 +1755,13 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
   ManagedValue destAddr;
-  auto &component = drillToLastComponent(*this, loc, dest, destAddr);
+  auto &component = drillToLastComponent(*this, loc, dest, destAddr,
+                                         ForMutation);
   
   // Write to the tail component.
   if (component.isPhysical()) {
-    auto finalDestAddr = component.asPhysical().offset(*this, loc, destAddr);
+    auto finalDestAddr = component.asPhysical().offset(*this, loc, destAddr,
+                                                       ForMutation);
     
     std::move(src).getAsSingleValue(*this, loc)
       .assignInto(*this, loc, finalDestAddr.getValue());
@@ -1712,7 +1794,8 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, const LValue &src,
         != destAddr.getType().getSwiftRValueType())
     return skipPeephole();
   
-  auto srcAddr = emitAddressOfLValue(loc, src).getUnmanagedValue();
+  auto srcAddr =
+    emitAddressOfLValue(loc, src, NotForMutation).getUnmanagedValue();
   B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
   dest->finishInitialization(*this);
 }
@@ -1733,8 +1816,10 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
   if (!dest.isPhysical())
     return skipPeephole();
   
-  auto srcAddr = emitAddressOfLValue(loc, src).getUnmanagedValue();
-  auto destAddr = emitAddressOfLValue(loc, dest).getUnmanagedValue();
+  auto srcAddr =
+    emitAddressOfLValue(loc, src, NotForMutation).getUnmanagedValue();
+  auto destAddr =
+    emitAddressOfLValue(loc, dest, ForMutation).getUnmanagedValue();
 
   if (srcAddr.getType() == destAddr.getType()) {
     B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsNotInitialization);

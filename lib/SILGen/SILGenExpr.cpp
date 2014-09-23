@@ -141,7 +141,8 @@ namespace {
     // These always produce lvalues.
     RValue visitInOutExpr(InOutExpr *E, SGFContext C) {
       LValue lv = SGF.emitLValue(E->getSubExpr());
-      return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv));
+      return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv,
+                                                    ForMutation));
     }
     
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
@@ -4863,7 +4864,7 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
 RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
                                                SGFContext C) {
   LValue lv = SGF.emitLValue(E->getSubExpr());
-  SILValue address = SGF.emitAddressOfLValue(E->getSubExpr(), lv)
+  SILValue address = SGF.emitAddressOfLValue(E->getSubExpr(), lv, ForMutation)
     .getUnmanagedValue();
   // TODO: Reabstract the lvalue to match the abstraction level expected by
   // the inout address conversion's InOutType. For now, just report cases where
@@ -5838,10 +5839,15 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   Type elt = E->getType()->getAnyPointerElementType(pointerKind);
   assert(elt && "not a pointer");
   (void)elt;
+  ForMutation_t forMutation = ForMutation;
   switch (pointerKind) {
   case PTK_UnsafeMutablePointer:
-  case PTK_UnsafePointer:
     // +1 is fine.
+    break;
+
+  case PTK_UnsafePointer:
+    // +1 is fine, but we don't need a mutable l-value.
+    forMutation = NotForMutation;
     break;
 
   case PTK_AutoreleasingUnsafeMutablePointer: {
@@ -5858,7 +5864,8 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   }
   
   // Get the lvalue address as a raw pointer.
-  SILValue address = SGF.emitAddressOfLValue(E, lv).getUnmanagedValue();
+  SILValue address =
+    SGF.emitAddressOfLValue(E, lv, forMutation).getUnmanagedValue();
   address = SGF.B.createAddressToPointer(E, address,
                                SILType::getRawPointerType(SGF.getASTContext()));
   

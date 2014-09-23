@@ -2193,7 +2193,13 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
   // same substitutions to value->getType().
 
   // Canonicalize and lower the l-value's object type.
-  CanType origType = value->getType()->getCanonicalType();
+  CanType origType;
+  if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
+    origType = subscript->getElementType()->getCanonicalType();
+  } else {
+    origType = value->getType()->getCanonicalType();
+  }
+
   CanType substType
     = cast<LValueType>(lvalueType->getCanonicalType()).getObjectType();
   SILType silSubstType

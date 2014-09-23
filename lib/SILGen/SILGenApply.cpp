@@ -1928,7 +1928,7 @@ namespace {
                                      getSemanticsProvidingExpr());
 
         LValue lv = SGF.emitLValue(e->getSubExpr());
-        address = SGF.emitAddressOfLValue(e->getSubExpr(), lv);
+        address = SGF.emitAddressOfLValue(e->getSubExpr(), lv, ForMutation);
       }
 
       if (hasAbstractionDifference(CC, loweredSubstParamType,
@@ -3122,6 +3122,58 @@ emitMaterializeForSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
     B.createTupleExtract(loc, pointerAndNeedsWriteback, 1);
 
   return { address, needsWriteback };
+}
+
+/// Emit a call to an addressor.
+ManagedValue SILGenFunction::
+emitAddressorAccessor(SILLocation loc, AbstractStorageDecl *decl,
+                      ForMutation_t forMutation,
+                      ArrayRef<Substitution> substitutions,
+                      RValueSource &&selfValue, bool isSuper, bool isDirectUse,
+                      RValue &&subscripts, SILType addressType) {
+  FuncDecl *addressorFunc = (forMutation ? decl->getMutableAddressor()
+                                         : decl->getAddressor());
+
+  SILDeclRef addressor(addressorFunc, SILDeclRef::Kind::Func,
+                       SILDeclRef::ConstructAtBestResilienceExpansion,
+                       SILDeclRef::ConstructAtNaturalUncurryLevel,
+                       /*foreign*/ false);
+
+  Callee callee =
+    emitSpecializedAccessorFunctionRef(*this, loc, addressor,
+                                       substitutions, selfValue,
+                                       isSuper, isDirectUse);
+  CanAnyFunctionType accessType = callee.getSubstFormalType();
+
+  CallEmission emission(*this, std::move(callee));
+  // Self ->
+  if (selfValue) {
+    emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
+    accessType = cast<AnyFunctionType>(accessType.getResult());
+  }
+  // Index or () if none.
+  if (!subscripts)
+    subscripts = emitEmptyTupleRValue(loc);
+
+  emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
+                       accessType.getResult());
+
+  // Unsafe{Mutable}Pointer<T>
+  SILValue pointer = emission.apply().getUnmanagedValue();
+
+  // Drill down to the raw pointer using intrinsic knowledge of those types.
+  auto pointerType =
+    pointer.getType().castTo<BoundGenericStructType>()->getDecl();
+  auto props = pointerType->getStoredProperties();
+  assert(props.begin() != props.end());
+  assert(std::next(props.begin()) == props.end());
+  VarDecl *rawPointerField = *props.begin();
+  pointer = B.createStructExtract(loc, pointer, rawPointerField,
+                                  SILType::getRawPointerType(getASTContext()));
+
+  // Convert to the appropriate address type and return.
+  auto address = B.createPointerToAddress(loc, pointer, addressType);
+  return ManagedValue::forLValue(address);
 }
 
 
