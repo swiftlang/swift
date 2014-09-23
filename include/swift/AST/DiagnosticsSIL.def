@@ -95,13 +95,6 @@ ERROR(self_use_before_init_in_delegatinginit,sil_analysis,none,
 ERROR(variable_addrtaken_before_initialized,sil_analysis,none,
       "address of variable '%0' taken before it is initialized",
       (StringRef))
-ERROR(property_in_base_object_use_before_initialized,sil_analysis,none,
-      "use of property %0 in base object before super.init"
-      " initializes it",
-      (Identifier))
-ERROR(method_in_base_object_use_before_initialized,sil_analysis,none,
-      "use of method %0 in base object before super.init initializes it",
-      (Identifier))
 ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
       "property '%0' not initialized at super.init call", (StringRef))
 ERROR(ivar_not_initialized_at_implicit_superinit,sil_analysis,none,
@@ -110,8 +103,17 @@ ERROR(ivar_not_initialized_at_implicit_superinit,sil_analysis,none,
 ERROR(ivar_not_initialized_at_selfinit,sil_analysis,none,
       "property '%0' not initialized at self.init call",
       (StringRef))
-ERROR(ivar_not_initialized_at_init_return,sil_analysis,none,
-      "property '%0' not initialized", (StringRef))
+
+ERROR(self_use_before_fully_init,sil_analysis,none,
+      "use of 'self' in %select{method call|property access}1 %0 before "
+      "%select{all stored properties are initialized|"
+      "super.init initializes self}2", (Identifier, bool, bool))
+ERROR(use_of_self_before_fully_init,sil_analysis,none,
+      "'self' used before all stored properties are initialized", ())
+
+NOTE(stored_property_not_initialized,sil_analysis,none,
+     "'%0' not initialized", (StringRef))
+
 ERROR(selfinit_multiple_times,sil_analysis,none,
       "%select{super|self}0.init called multiple times in initializer",
       (unsigned))
@@ -123,6 +125,9 @@ ERROR(self_before_superselfinit,sil_analysis,none,
      (unsigned))
 ERROR(return_from_init_without_initing_self,sil_analysis,none,
       "return from enum initializer method without storing to 'self'", ())
+ERROR(return_from_init_without_initing_stored_properties,sil_analysis,none,
+      "return from initializer without initializing all"
+      " stored properties", ())
 ERROR(return_from_init_without_self_init,sil_analysis,none,
       "self.init isn't called on all paths in delegating initializer", ())
 

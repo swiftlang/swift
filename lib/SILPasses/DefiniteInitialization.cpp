@@ -388,6 +388,8 @@ namespace {
     void getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result);
 
     bool shouldEmitError(SILInstruction *Inst);
+    std::string getUninitElementName(const DIMemoryUse &Use);
+    void noteUninitializedMembers(const DIMemoryUse &Use);
     void diagnoseInitError(const DIMemoryUse &Use, Diag<StringRef> DiagMessage);
     
     bool isBlockIsReachableFromEntry(SILBasicBlock *BB);
@@ -490,21 +492,40 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
   return true;
 }
 
-void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
-                                        Diag<StringRef> DiagMessage) {
-  auto *Inst = Use.Inst;
 
-  if (!shouldEmitError(Inst))
-    return;
+/// Emit notes for each uninitialized stored property in a designated
+/// initializer.
+void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
+  assert(TheMemory.isAnyInitSelf() && !TheMemory.isDelegatingInit() &&
+         "Not an designated initializer");
 
-  // If the definition is a declaration, try to reconstruct a name and
-  // optionally an access path to the uninitialized element.
-  std::string Name;
-  if (ValueDecl *VD =
-        dyn_cast_or_null<ValueDecl>(TheMemory.getLoc().getAsASTNode<Decl>()))
-    Name = VD->getName().str();
-  else
-    Name = "<unknown>";
+  // Determine which members, specifically are uninitialized.
+  AvailabilitySet Liveness =
+    getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
+
+  for (unsigned i = Use.FirstElement, e = Use.FirstElement+Use.NumElements;
+       i != e; ++i) {
+    if (Liveness.get(i) == DIKind::Yes) continue;
+
+    // Ignore a failed super.init requirement.
+    if (i == TheMemory.NumElements-1 && TheMemory.isDerivedClassSelf())
+      continue;
+
+    std::string Name = "self";
+    auto *Decl = TheMemory.getPathStringToElement(i, Name);
+    SILLocation Loc = Use.Inst->getLoc();
+
+    // If we found a non-implicit declaration, use its source location.
+    if (Decl && !Decl->isImplicit())
+      Loc = SILLocation(Decl);
+
+    diagnose(Module, Loc, diag::stored_property_not_initialized, Name);
+  }
+}
+
+/// Given a use that has at least one uninitialized element in it, produce a
+/// nice symbolic name for the element being accessed.
+std::string LifetimeChecker::getUninitElementName(const DIMemoryUse &Use) {
 
   // If the overall memory allocation has multiple elements, then dive in to
   // explain *which* element is being used uninitialized.  Start by rerunning
@@ -527,11 +548,33 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
           FirstUndefElement != TheMemory.NumElements-1) &&
          "super.init failure not handled in the right place");
 
+  // If the definition is a declaration, try to reconstruct a name and
+  // optionally an access path to the uninitialized element.
+  std::string Name;
+  if (ValueDecl *VD =
+        dyn_cast_or_null<ValueDecl>(TheMemory.getLoc().getAsASTNode<Decl>()))
+    Name = VD->getName().str();
+  else
+    Name = "<unknown>";
+
   // TODO: Given that we know the range of elements being accessed, we don't
   // need to go all the way deep into a recursive tuple here.  We could print
   // an error about "v" instead of "v.0" when "v" has tuple type and the whole
   // thing is accessed inappropriately.
   TheMemory.getPathStringToElement(FirstUndefElement, Name);
+
+  return Name;
+}
+
+void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
+                                        Diag<StringRef> DiagMessage) {
+  auto *Inst = Use.Inst;
+  if (!shouldEmitError(Inst))
+    return;
+
+  // If the definition is a declaration, try to reconstruct a name and
+  // optionally an access path to the uninitialized element.
+  std::string Name = getUninitElementName(Use);
 
   // Figure out the source location to emit the diagnostic to.  If this is null,
   // it is probably implicitly generated code, so we'll adjust it.
@@ -749,96 +792,148 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   // return in the enum init case, and we haven't stored to self.   Emit a
   // specific diagnostic.
   if (auto *LI = dyn_cast<LoadInst>(Inst))
-    if (TheMemory.isEnumInitSelf() && LI->hasOneUse() &&
-        isa<ReturnInst>((*LI->use_begin())->getUser())) {
-      if (shouldEmitError(Inst))
+    if (LI->hasOneUse() && isa<ReturnInst>((*LI->use_begin())->getUser())) {
+      if (TheMemory.isEnumInitSelf()) {
+        if (!shouldEmitError(Inst)) return;
         diagnose(Module, Inst->getLoc(),
                  diag::return_from_init_without_initing_self);
-      return;
+        return;
+      } else if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
+                 !TheMemory.isDelegatingInit()) {
+        if (!shouldEmitError(Inst)) return;
+        diagnose(Module, Inst->getLoc(),
+                 diag::return_from_init_without_initing_stored_properties);
+        noteUninitializedMembers(Use);
+        return;
+      }
     }
 
-  // If this is the super.init marker not being initialized, then the load
-  // requires super.init to be called, and it isn't.  Emit a specific
-  // diagnostic.
-  if (!IsSuperInitComplete) {
+  // Check to see if we're returning self in a class initializer before all the
+  // ivars/super.init are set up.
+  if (isa<ReturnInst>(Inst) && TheMemory.isAnyInitSelf()) {
     if (!shouldEmitError(Inst)) return;
-
-    if (isa<ReturnInst>(Inst)) {
+    if (!IsSuperInitComplete) {
       diagnose(Module, Inst->getLoc(),
                diag::superselfinit_not_called_before_return,
                (unsigned)TheMemory.isDelegatingInit());
-      return;
+    } else {
+      diagnose(Module, Inst->getLoc(),
+               diag::return_from_init_without_initing_stored_properties);
+      noteUninitializedMembers(Use);
     }
+    return;
+  }
 
-    // Handle conversions of self to a base type.
-    if (auto UCI = dyn_cast<UpcastInst>(Inst)) {
-      // If the upcast is used by a ref_element_addr, then it is an access to a
-      // base ivar.
-      if (UCI->hasOneUse())
-        if (auto *REI =
-              dyn_cast<RefElementAddrInst>((*UCI->use_begin())->getUser())) {
-          diagnose(Module, Inst->getLoc(),
-                   diag::property_in_base_object_use_before_initialized,
-                   REI->getField()->getName());
-          return;
-        }
-      
-      // If the upcast is used by a class_method + apply, then this is a call of
-      // a superclass method or property accessor.
-      ClassMethodInst *CMI = nullptr;
-      ApplyInst *AI = nullptr;
-      bool isUnrecognized = false;
-      
-      for (auto UI : SILValue(UCI, 0).getUses()) {
-        auto *User = UI->getUser();
-        if (auto *TAI = dyn_cast<ApplyInst>(User)) {
-          if (!AI) {
-            AI = TAI;
-            continue;
-          }
-        }
-        if (auto *TCMI = dyn_cast<ClassMethodInst>(User)) {
-          if (!CMI) {
-            CMI = TCMI;
-            continue;
-          }
-        }
-        
-        isUnrecognized = true;
-        break;
-      }
-      
-      if (!isUnrecognized && CMI && AI) {
-        // TODO: Could handle many other members more specifically.
-        auto *Decl = CMI->getMember().getDecl();
-        if (auto *FD = dyn_cast<FuncDecl>(Decl)) {
-          // Calls to getters and setters are calls are accesses to a property.
-          if (FD->isAccessor()) {
-            diagnose(Module, Inst->getLoc(),
-                     diag::property_in_base_object_use_before_initialized,
-                     FD->getAccessorStorageDecl()->getName());
-            return;
-          }
-          
-          // Otherwise, this is a method access.
-          diagnose(Module, Inst->getLoc(),
-                   diag::method_in_base_object_use_before_initialized,
-                   FD->getName());
-          return;
-        }
+  // Check to see if this is a use of self or super, due to a method call.  If
+  // so, emit a specific diagnostic.
+  FuncDecl *Method = nullptr;
+
+  // Check for an access to the base class through an Upcast.
+  if (auto UCI = dyn_cast<UpcastInst>(Inst)) {
+    // If the upcast is used by a ref_element_addr, then it is an access to a
+    // base ivar before super.init is called.
+    if (UCI->hasOneUse() && !IsSuperInitComplete) {
+      if (auto *REI =
+          dyn_cast<RefElementAddrInst>((*UCI->use_begin())->getUser())) {
+        if (!shouldEmitError(Inst)) return;
+        diagnose(Module, Inst->getLoc(),
+                 diag::self_use_before_fully_init,
+                 REI->getField()->getName(), true, true);
+        return;
       }
     }
 
-    // Otherwise, this is a general use of self.
+    // If the upcast is used by a class_method + apply, then this is a call of
+    // a superclass method or property accessor.
+    ClassMethodInst *CMI = nullptr;
+    ApplyInst *AI = nullptr;
+    for (auto UI : SILValue(UCI, 0).getUses()) {
+      auto *User = UI->getUser();
+      if (auto *TAI = dyn_cast<ApplyInst>(User)) {
+        if (!AI) {
+          AI = TAI;
+          continue;
+        }
+      }
+      if (auto *TCMI = dyn_cast<ClassMethodInst>(User)) {
+        if (!CMI) {
+          CMI = TCMI;
+          continue;
+        }
+      }
+
+      // Not a pattern we recognize, conservatively generate a generic
+      // diagnostic.
+      CMI = nullptr;
+      break;
+    }
+
+    if (AI && CMI) {
+      // TODO: Could handle many other members more specifically.
+      auto *Decl = CMI->getMember().getDecl();
+      Method = dyn_cast<FuncDecl>(Decl);
+    }
+  }
+
+  // If this is an apply instruction and we're in an class initializer, we're
+  // calling a method on self.
+  if (isa<ApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
+    // If this is a method application, produce a nice, specific, error.
+    if (auto *CMI = dyn_cast<ClassMethodInst>(Inst->getOperand(0)))
+      Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
+
+    // If this is a direct/devirt method application, check the location info.
+    if (auto *FRI = dyn_cast<FunctionRefInst>(Inst->getOperand(0))) {
+      auto SILLoc = FRI->getReferencedFunction()->getLocation();
+      Method = SILLoc.getAsASTNode<FuncDecl>();
+    }
+  }
+
+  // If we were able to find a method call, emit a diagnostic about the method.
+  if (Method) {
+    Identifier Name;
+    if (Method->isAccessor())
+      Name = Method->getAccessorStorageDecl()->getName();
+    else
+      Name = Method->getName();
+
+    // If this is a use of self before super.init was called, emit a diagnostic
+    // about *that* instead of about individual properties not being
+    // initialized.
+    if (!shouldEmitError(Inst)) return;
+    diagnose(Module, Inst->getLoc(), diag::self_use_before_fully_init,
+             Name, Method->isAccessor(), !IsSuperInitComplete);
+
+    if (IsSuperInitComplete)
+      noteUninitializedMembers(Use);
+    return;
+  }
+
+  // Otherwise, we couldn't find a specific thing to complain about, so emit a
+  // generic error, depending on what kind of failure this is.
+  if (!IsSuperInitComplete) {
+    if (!shouldEmitError(Inst)) return;
     diagnose(Module, Inst->getLoc(), diag::self_before_superselfinit,
              (unsigned)TheMemory.isDelegatingInit());
     return;
   }
 
-  // Check to see if we're returning self in a class initializer before all the
-  // ivars are set up.
-  if (isa<ReturnInst>(Inst) && TheMemory.isAnyInitSelf()) {
-    diagnoseInitError(Use, diag::ivar_not_initialized_at_init_return);
+  // If this is a call to a method in a class initializer, then it must be a use
+  // of self before the stored properties are set up.
+  if (isa<ApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
+    if (!shouldEmitError(Inst)) return;
+    diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
+    noteUninitializedMembers(Use);
+    return;
+  }
+
+  // If this is a load of self in a struct/enum initializer, then it must be a
+  // use of 'self' before all the stored properties are set up.
+  if (isa<LoadInst>(Inst) && TheMemory.isAnyInitSelf() &&
+      !TheMemory.isClassInitSelf()) {
+    if (!shouldEmitError(Inst)) return;
+    diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
+    noteUninitializedMembers(Use);
     return;
   }
 
