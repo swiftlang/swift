@@ -2047,7 +2047,11 @@ public struct Dictionary<
     return _variantStorage.updateValue(value, forKey: key)
   }
 
-  /// Remove the key-value pair referenced by the given index.
+  /// Remove the key-value pair at index `i`
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `count`\ ).
   public mutating func removeAtIndex(index: Index) {
     _variantStorage.removeAtIndex(index)
   }
@@ -2059,8 +2063,13 @@ public struct Dictionary<
     return _variantStorage.removeValueForKey(key)
   }
 
-  /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
-  /// will not decrease.
+  /// Remove all elements.
+  ///
+  /// Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `count`\ ).
   public mutating func removeAll(keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with

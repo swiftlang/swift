@@ -600,13 +600,14 @@ var _emptyStringBase: COpaquePointer {
 }
 
 extension _StringCore : RangeReplaceableCollectionType {
-  /// Replace the given `subRange` of elements with `newValues`.
+  /// Replace the given `subRange` of elements with `newElements`.
+  ///
   /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newValues)`\ , O(N) otherwise.
+  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UTF16.CodeUnit
   >(
-    subRange: Range<Int>, with newValues: C
+    subRange: Range<Int>, with newElements: C
   ) {
     _precondition(
       subRange.startIndex >= 0,
@@ -616,8 +617,8 @@ extension _StringCore : RangeReplaceableCollectionType {
       subRange.endIndex <= count,
       "replaceRange: subRange extends past String end")
     
-    let width = elementWidth == 2 || contains(newValues) { $0 > 0x7f } ? 2 : 1
-    let replacementCount = numericCast(countElements(newValues)) as Int
+    let width = elementWidth == 2 || contains(newElements) { $0 > 0x7f } ? 2 : 1
+    let replacementCount = numericCast(countElements(newElements)) as Int
     let replacedCount = countElements(subRange)
     let tailCount = count - subRange.endIndex
     let growth = replacementCount - replacedCount
@@ -646,13 +647,13 @@ extension _StringCore : RangeReplaceableCollectionType {
       
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart
-        for u in newValues {
+        for u in newElements {
           dst++.memory = UInt8(u & 0xFF)
         }
       }
       else {
         var dst = UnsafeMutablePointer<UTF16.CodeUnit>(rangeStart)
-        for u in newValues {
+        for u in newElements {
           dst++.memory = u
         }
       }
@@ -669,11 +670,11 @@ extension _StringCore : RangeReplaceableCollectionType {
           initialSize: 0,
           elementWidth:
             width == 1 ? 1
-            : representableAsASCII() && !contains(newValues) { $0 > 0x7f } ? 1
+            : representableAsASCII() && !contains(newElements) { $0 > 0x7f } ? 1
             : 2
         ))
       r.extend(self[0..<subRange.startIndex])
-      r.extend(newValues)
+      r.extend(newElements)
       r.extend(self[subRange.endIndex..<count])
       self = r
     }
@@ -685,8 +686,8 @@ extension _StringCore : RangeReplaceableCollectionType {
   
   public mutating func splice<
     S : CollectionType where S.Generator.Element == UTF16.CodeUnit
-  >(newValues: S, atIndex i: Int) {
-    Swift.splice(&self, newValues, atIndex: i)
+  >(newElements: S, atIndex i: Int) {
+    Swift.splice(&self, newElements, atIndex: i)
   }
 
   public mutating func removeAtIndex(i: Int) -> UTF16.CodeUnit {

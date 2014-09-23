@@ -69,11 +69,16 @@ internal protocol ArrayType
   /// the removed element. Requires: count > 0
   mutating func removeLast() -> Self.Generator.Element
   
-  /// Insert an element at the given index in O(N).  Requires: atIndex
-  /// <= count
-  mutating func insert(newElement: Self.Generator.Element, atIndex: Int)
+  /// Insert `newElement` at index `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self)`\ ).
+  ///
+  /// Requires: `atIndex` <= `count`
+  mutating func insert(newElement: Self.Generator.Element, atIndex i: Int)
 
-  /// Remove the element at the given index.  Returns: the removed
+  /// Remove and return the element at the given index.  Returns: the removed
   /// element.  Worst case complexity: O(N).  Requires: count > index
   mutating func removeAtIndex(index: Int) -> Self.Generator.Element
 

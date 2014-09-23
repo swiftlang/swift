@@ -598,40 +598,70 @@ extension String {
 }
 
 extension String : RangeReplaceableCollectionType {
-  /// Replace the given `subRange` of elements with `newValues`.
+  /// Replace the given `subRange` of elements with `newElements`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
   /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newValues)`\ , O(N) otherwise.
+  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
   >(
-    subRange: Range<Index>, with newValues: C
+    subRange: Range<Index>, with newElements: C
   ) {
     _core.replaceRange(
       subRange.startIndex._base._position
       ..< subRange.endIndex._base._position,
       with:
-        _lazyConcatenate(lazy(newValues).map { $0.utf16 })
+        _lazyConcatenate(lazy(newElements).map { $0.utf16 })
     )
   }
 
+  /// Insert `newElement` at index `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self)`\ ).
   public mutating func insert(newElement: Character, atIndex i: Index) {
     Swift.insert(&self, newElement, atIndex: i)
   }
   
+  /// Insert `newElements` at index `i`
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self) + countElements(newElements)`\ ).
   public mutating func splice<
     S : CollectionType where S.Generator.Element == Character
-  >(newValues: S, atIndex i: Index) {
-    Swift.splice(&self, newValues, atIndex: i)
+  >(newElements: S, atIndex i: Index) {
+    Swift.splice(&self, newElements, atIndex: i)
   }
 
+  /// Remove and return the element at index `i`
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self)`\ ).
   public mutating func removeAtIndex(i: Index) -> Character {
     return Swift.removeAtIndex(&self, i)
   }
   
+  /// Remove the indicated `subRange` of characters
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// Complexity: O(\ `countElements(self)`\ ).
   public mutating func removeRange(subRange: Range<Index>) {
     Swift.removeRange(&self, subRange)
   }
 
+  /// Remove all characters.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// :param: `keepCapacity`, if `true`, prevents the release of
+  ////   allocated storage, which can be a useful optimization
+  ///    when `self` is going to be grown again.
   public mutating func removeAll(keepCapacity: Bool = false) {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
