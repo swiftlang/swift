@@ -12,7 +12,7 @@
 // Bool Datatype and Supporting Operators
 //===----------------------------------------------------------------------===//
 
-// Bool is the standard way to reason about truth values.
+/// A value type whose instances are either `true` or `false`.
 public struct Bool {
   var value: Builtin.Int1
 
@@ -45,9 +45,10 @@ extension Bool : BooleanType {
   /// Identical to `self`.
   @transparent public var boolValue: Bool { return self }
 
-  // Bool can be constructed from BooleanType
-  public init<T: BooleanType>(_ v: T) {
-    self = v.boolValue
+  /// Construct an instance representing the same logical value as
+  /// `value`
+  public init<T: BooleanType>(_ value: T) {
+    self = value.boolValue
   }
 }
 

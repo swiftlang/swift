@@ -390,7 +390,10 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     }
   }
 
-  // Allow read-only subscripting through an AutoreleasingUnsafeMutablePointer.t
+  /// Access the `i`\ th element of the raw array pointed to by
+  /// `self`.
+  ///
+  /// Requires: `self != nil`
   public subscript(i: Int) -> T {
     @transparent
     get {

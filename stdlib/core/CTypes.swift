@@ -79,6 +79,7 @@ public typealias CBool = Bool
 public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   var value: Builtin.RawPointer
 
+  /// Construct a `nil` instance.
   @transparent
   public init() {
     value = _nilRawPointer

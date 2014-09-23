@@ -38,8 +38,10 @@ public func maxElement<
   return result
 }
 
-// Returns the first index where `value` appears in `domain` or `nil` if
-// `domain` doesn't contain `value`. O(countElements(domain))
+/// Returns the first index where `value` appears in `domain` or `nil` if
+/// `value` is not found.
+///
+/// Complexity: O(\ `countElements(domain)`\ )
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, value: C.Generator.Element) -> C.Index? {
