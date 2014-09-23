@@ -15,11 +15,54 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/TypeRefinementContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
+#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/SourceManager.h"
 
 using namespace swift;
+
+TypeRefinementContext::TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
+                                             TypeRefinementContext *Parent,
+                                             SourceRange SrcRange,
+                                             const VersionRange &Versions)
+    : Node(Node), SrcRange(SrcRange), PotentialVersions(Versions) {
+  if (Parent) {
+    assert(SrcRange.isValid());
+    Parent->addChild(this);
+  }
+  Ctx.addDestructorCleanup(Children);
+}
+
+TypeRefinementContext *
+TypeRefinementContext::createRoot(ASTContext &Ctx, SourceFile *SF,
+                                  const VersionRange &Versions) {
+  assert(SF);
+  return new (Ctx)
+      TypeRefinementContext(Ctx, SF,
+                            /*Parent=*/nullptr, SourceRange(), Versions);
+}
+
+TypeRefinementContext *
+TypeRefinementContext::createForDecl(ASTContext &Ctx, Decl *D,
+                                     TypeRefinementContext *Parent,
+                                     const VersionRange &Versions) {
+  assert(D);
+  assert(Parent);
+  return new (Ctx)
+      TypeRefinementContext(Ctx, D, Parent, D->getSourceRange(), Versions);
+}
+
+TypeRefinementContext *
+TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
+                                           TypeRefinementContext *Parent,
+                                           const VersionRange &Versions) {
+  assert(S);
+  assert(Parent);
+  return new (Ctx) TypeRefinementContext(
+      Ctx, S, Parent, S->getThenStmt()->getSourceRange(), Versions);
+}
 
 // Only allow allocation of TypeRefinementContext using the allocator in
 // ASTContext.

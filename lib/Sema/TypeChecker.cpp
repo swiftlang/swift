@@ -722,13 +722,12 @@ private:
     // The potential versions in the body are constrained by both
     // the declared availability of the function and potential versions
     // of its lexical context.
-    VersionRange bodyVersionRange = TypeChecker::availableRange(D, AC);
-    bodyVersionRange.meetWith(CurTRC->getPotentialVersions());
+    VersionRange BodyVersionRange = TypeChecker::availableRange(D, AC);
+    BodyVersionRange.meetWith(CurTRC->getPotentialVersions());
     
     TypeRefinementContext *newTRC =
-        new (AC) TypeRefinementContext(CurTRC, D->getSourceRange(),
-                                       bodyVersionRange);
-
+        TypeRefinementContext::createForDecl(AC, D, CurTRC, BodyVersionRange);
+    
     Stmt *Body = D->getBody();
     // If there is no body it may be because we will synthesize it and
     // type check it later.
@@ -786,7 +785,7 @@ private:
 
     // Create a new context for the Then branch and traverse it in that new
     // context.
-    auto *ThenTRC = refinedThenContextForQuery(QueryExpr, IS->getThenStmt());
+    auto *ThenTRC = refinedThenContextForQuery(QueryExpr, IS);
     TypeRefinementContextBuilder(ThenTRC, AC).build(IS->getThenStmt());
 
     if (IS->getElseStmt()) {
@@ -819,7 +818,7 @@ private:
   /// Return the type refinement context for the Then branch of an
   /// availability query.
   TypeRefinementContext *refinedThenContextForQuery(AvailabilityQueryExpr *E,
-                                                    Stmt *ThenStmt) {
+                                                    IfStmt *IS) {
     VersionConstraintAvailabilitySpec *Spec = bestActiveSpecForQuery(E);
     if (!Spec) {
       // We couldn't find an appropriate spec for the current platform,
@@ -831,8 +830,8 @@ private:
       return CurTRC;
     }
 
-    return new (AC) TypeRefinementContext(CurTRC, ThenStmt->getSourceRange(),
-                                          rangeForSpec(Spec));
+    return TypeRefinementContext::createForIfStmtThen(AC, IS, CurTRC,
+                                                      rangeForSpec(Spec));
   }
 
   /// Return the best active spec for the target platform or nullptr if no

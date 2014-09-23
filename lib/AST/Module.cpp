@@ -1424,7 +1424,7 @@ SourceFile::SourceFile(Module &M, SourceFileKind K,
   // the source file are guaranteed to be executing on at least the minimum
   // platform version.
   auto VersionRange = VersionRange::allGTE(M.Ctx.LangOpts.MinPlatformVersion);
-  TRC = new (M.Ctx) TypeRefinementContext(VersionRange);
+  TRC = TypeRefinementContext::createRoot(M.Ctx, this, VersionRange);
 }
 
 SourceFile::~SourceFile() {}
