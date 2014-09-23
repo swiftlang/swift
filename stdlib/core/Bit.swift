@@ -36,15 +36,20 @@ public enum Bit : Int, RandomAccessIndexType, Reflectable {
   }
 
   /// Return the minimum number of applications of `successor` or
-  /// `predecessor` required to reach `other` from `self`. O(1).
+  /// `predecessor` required to reach `other` from `self`.
+  ///
+  /// Complexity: O(1).
   public func distanceTo(other: Bit) -> Int {
     return rawValue.distanceTo(other.rawValue)
   }
 
-  /// If `n > 0` returns the result of `successor` to `self` `n`
-  /// times.  Otherwise, if `n < 0`, returns the result of applying
-  /// `predecessor` to `self` `-n` times. Otherwise, returns
-  /// `self`. O(1)
+  /// Return `self` offset by `n` steps.
+  ///
+  /// :returns: If `n > 0`, the result of applying `successor` to
+  /// `self` `n` times.  If `n < 0`, the result of applying
+  /// `predecessor` to `self` `-n` times. Otherwise, `self`.
+  ///
+  /// Complexity: O(1)
   public func advancedBy(distance: Int) -> Bit {
     return rawValue.advancedBy(distance) > 0 ? One : Zero
   }

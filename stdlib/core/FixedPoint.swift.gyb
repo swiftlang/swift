@@ -295,11 +295,22 @@ extension ${Self} : RandomAccessIndexType {
     return self &- 1
   }
   
+  /// Return the minimum number of applications of `successor` or
+  /// `predecessor` required to reach `other` from `self`.
+  ///
+  /// Complexity: O(1).
   @transparent public
   func distanceTo(other: ${Self}) -> ${Self}.Distance {
     return numericCast((numericCast(other) as IntMax) &- numericCast(self))
   }
   
+  /// Return `self` offset by `n` steps.
+  ///
+  /// :returns: If `n > 0`, the result of applying `successor` to
+  /// `self` `n` times.  If `n < 0`, the result of applying
+  /// `predecessor` to `self` `-n` times. Otherwise, `self`.
+  ///
+  /// Complexity: O(1)
   @transparent public
   func advancedBy(amount: ${Self}.Distance) -> ${Self} {
     return numericCast((numericCast(self) as IntMax) &+ numericCast(amount))
