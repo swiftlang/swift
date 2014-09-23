@@ -34,6 +34,7 @@ public enum ImplicitlyUnwrappedOptional<T>
 
   // Make nil work with ImplicitlyUnwrappedOptional
   @transparent public
+  /// Create an instance initialized with `nil`.
   init(nilLiteral: ()) {
     self = .None
   }

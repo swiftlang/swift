@@ -116,6 +116,7 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
     ptr = nil
   }
   
+  /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
     ptr = nil
@@ -165,6 +166,7 @@ public struct NSZone : NilLiteralConvertible {
 
   public init() { pointer = nil }
 
+  /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
     pointer = nil

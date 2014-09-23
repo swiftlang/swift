@@ -93,7 +93,7 @@ public struct ${Self}<T>
     value = from.value
   }
 
-  // Make nil work with ${Self}.
+  /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
     self = .null()

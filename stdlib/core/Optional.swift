@@ -36,6 +36,7 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
     return _OptionalMirror(self)
   }
 
+  /// Create an instance initialized with `nil`.
   @transparent
   public init(nilLiteral: ()) {
     self = .None
@@ -130,6 +131,7 @@ public func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
 public struct _OptionalNilComparisonType : NilLiteralConvertible {
+  /// Create an instance initialized with `nil`.
   @transparent
   public init(nilLiteral: ()) {
   }

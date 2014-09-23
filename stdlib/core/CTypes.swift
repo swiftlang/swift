@@ -134,6 +134,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
     return Int(Builtin.ptrtoint_Word(value))
   }
   
+  /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
     value = _nilRawPointer
@@ -179,6 +180,7 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
     return value.hashValue
   }
 
+  /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
     value = COpaquePointer()

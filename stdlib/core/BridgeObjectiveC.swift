@@ -400,6 +400,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     }
   }
   
+  /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
     value = _nilRawPointer
