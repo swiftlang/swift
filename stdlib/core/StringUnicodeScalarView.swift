@@ -185,17 +185,26 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
   public init() {
     self = String.UnicodeScalarView(_StringCore())
   }
-  public mutating func reserveCapacity(capacity: Int) {
-    _core.reserveCapacity(capacity)
+  /// Reserve enough space to store `n` ASCII characters.
+  ///
+  /// Complexity: O(`n`)
+  public mutating func reserveCapacity(n: Int) {
+    _core.reserveCapacity(n)
   }
+  /// Append `x` to `self`.
+  ///
+  /// Complexity: amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
   }
+  /// Append the elements of `newElements` to `self`.
+  ///
+  /// Complexity: O(*length of result*) 
   public mutating func extend<
     S : SequenceType where S.Generator.Element == UnicodeScalar
-  >(seq: S) {
+  >(newElements: S) {
     _core.extend(
-      _lazyConcatenate(lazy(seq).map { $0.utf16 })
+      _lazyConcatenate(lazy(newElements).map { $0.utf16 })
     )
   }
 }

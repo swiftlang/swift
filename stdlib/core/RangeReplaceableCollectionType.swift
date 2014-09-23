@@ -153,13 +153,13 @@ public func removeAll<
   }
 }
 
-/// Append elements from `newValues` to `x`.  Complexity:
+/// Append elements from `newElements` to `x`.  Complexity:
 /// O(N)
 public func extend<
   C: RangeReplaceableCollectionType,
   S : CollectionType where S.Generator.Element == C.Generator.Element
->(inout x: C, newValues: S) {
-  x.replaceRange(x.endIndex..<x.endIndex, with: newValues)
+>(inout x: C, newElements: S) {
+  x.replaceRange(x.endIndex..<x.endIndex, with: newElements)
 }
 
 /// Remove an element from the end of `x`  in O(1).

@@ -430,6 +430,10 @@ public struct _StringCore {
     self = _StringCore(newStorage)
   }
 
+  /// Append `c` to `self`.
+  ///
+  /// Complexity: O(1) when amortized over repeated appends of equal
+  /// character values
   mutating func append(c: UnicodeScalar) {
     let width = UTF16.width(c)
     append(
@@ -438,6 +442,9 @@ public struct _StringCore {
     )
   }
 
+  /// Append `u` to `self`.
+  ///
+  /// Complexity: amortized O(1).
   public mutating func append(u: UTF16.CodeUnit) {
     append(u, nil)
   }

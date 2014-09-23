@@ -43,9 +43,12 @@ internal protocol ArrayType
   
   //===--- basic mutations ------------------------------------------------===//
 
-  /// Reserve enough space to store minimumCapacity elements in O(N).
-  /// If minimumCapacity is less than count, has no effect.
-  /// PostCondition: the array has mutable contiguous storage
+  /// Reserve enough space to store minimumCapacity elements.
+  ///
+  /// PostCondition: `capacity >= minimumCapacity` and the array has
+  /// mutable contiguous storage.
+  ///
+  /// Complexity: O(`count`)
   mutating func reserveCapacity(minimumCapacity: Int)
   
   /// Append newElement to the Array in O(1) (amortized)

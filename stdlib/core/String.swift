@@ -231,10 +231,14 @@ public func <(lhs: String, rhs: String) -> Bool {
 // Support for copy-on-write
 extension String {
 
-  public mutating func extend(rhs: String) {
-    _core.append(rhs._core)
+  /// Append the elements of `other` to `self`.
+  public mutating func extend(other: String) {
+    _core.append(other._core)
   }
 
+  /// Append `x` to `self`.
+  ///
+  /// Complexity: amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
   }
@@ -543,13 +547,16 @@ extension String : Sliceable {
 }
 
 extension String : ExtensibleCollectionType {
-  /// Reserve enough space to store `n` ASCII characters in O(N).
+  /// Reserve enough space to store `n` ASCII characters.
   ///
-  /// If current capacity is sufficient, has no effect.
+  /// Complexity: O(`n`)
   public mutating func reserveCapacity(n: Int) {
     _core.reserveCapacity(n)
   }
 
+  /// Append `c` to `self`.
+  ///
+  /// Complexity: amortized O(1).
   public mutating func append(c: Character) {
     switch c {
     case .SmallRepresentation(let _63bits):
@@ -560,12 +567,13 @@ extension String : ExtensibleCollectionType {
     }
   }
   
+  /// Append the elements of `newElements` to `self`.
   public mutating func extend<
       S : SequenceType
       where S.Generator.Element == Character
-  >(seq: S) {
-    reserveCapacity(_core.count + underestimateCount(seq))
-    for c in seq {
+  >(newElements: S) {
+    reserveCapacity(_core.count + underestimateCount(newElements))
+    for c in newElements {
       self.append(c)
     }
   }

@@ -395,9 +395,12 @@ extension ${Self} : ArrayType {
   //===--- basic mutations ------------------------------------------------===//
 
 
-  /// Ensure the array has enough mutable contiguous storage to store
-  /// minimumCapacity elements in.  Note: does not affect count.
-  /// Complexity: O(N)
+  /// Reserve enough space to store minimumCapacity elements.
+  ///
+  /// PostCondition: `capacity >= minimumCapacity` and the array has
+  /// mutable contiguous storage.
+  ///
+  /// Complexity: O(`count`)
   @semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
@@ -411,24 +414,29 @@ extension ${Self} : ArrayType {
     _sanityCheck(capacity >= minimumCapacity)
   }
   
-  /// Append newElement to the ${Self} in O(1) (amortized)
+  /// Append newElement to the ${Self}
+  ///
+  /// Complexity: amortized ${O1}
   @semantics("array.mutate_unknown")
   public mutating func append(newElement: T) {
     _arrayAppend(&_buffer, newElement)
   }
 
-  /// Append elements from `sequence` to the Array
+  /// Append the elements of `newElements` to `self`.
+  ///
+  /// Complexity: O(*length of result*) 
+  /// 
   public mutating func extend<
       S : SequenceType
       where S.Generator.Element == T
-  >(sequence: S) {
+  >(newElements: S) {
     // Calling a helper free function instead of writing the code inline
     // because of:
     //
     // <rdar://problem/16954386> Type checker assertion: Unable to solve for
     // call to witness?
 
-    _${Self}Extend(&self, sequence)
+    _${Self}Extend(&self, newElements)
   }
 
   /// Remove an element from the end of the ${Self} in O(1).
