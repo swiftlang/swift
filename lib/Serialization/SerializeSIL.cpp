@@ -1398,14 +1398,24 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   WitnessTableList[wt.getIdentifier()] = WitnessTableID++;
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
+
+  auto conformance = wt.getConformance();
+  DeclID conformanceTypeID;
+  ModuleID owningModuleID;
+
+  bool writeConformance =
+    S.encodeReferencedConformance(wt.getConformance(), conformanceTypeID,
+                                  owningModuleID, true);
+  assert(!writeConformance && "should be a normal conformance reference");
+  (void)writeConformance;
+
   WitnessTableLayout::emitRecord(Out, ScratchRecord,
                            SILAbbrCodes[WitnessTableLayout::Code],
-                           S.addTypeRef(wt.getConformance()->getType()),
+                           conformanceTypeID,
                            toStableSILLinkage(wt.getLinkage()),
-                           unsigned(wt.isDeclaration()));
-
-  S.writeConformance(wt.getConformance()->getProtocol(), wt.getConformance(),
-                     nullptr, SILAbbrCodes);
+                           unsigned(wt.isDeclaration()),
+                           S.addDeclRef(conformance->getProtocol()),
+                           owningModuleID);
 
   // If we have a declaration, do not attempt to serialize entries.
   if (wt.isDeclaration())
@@ -1414,24 +1424,40 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   for (auto &entry : wt.getEntries()) {
     if (entry.getKind() == SILWitnessTable::BaseProtocol) {
       auto &baseWitness = entry.getBaseProtocolWitness();
+
+      DeclID conformanceTypeID;
+      ModuleID owningModuleID;
+      bool writeConformance =
+        S.encodeReferencedConformance(baseWitness.Witness, conformanceTypeID,
+                                      owningModuleID, true);
+
       WitnessBaseEntryLayout::emitRecord(Out, ScratchRecord,
           SILAbbrCodes[WitnessBaseEntryLayout::Code],
           S.addDeclRef(baseWitness.Requirement),
-          S.addTypeRef(baseWitness.Witness->getType()));
-      S.writeConformance(baseWitness.Witness->getProtocol(),
-                         baseWitness.Witness, nullptr, SILAbbrCodes);
+          conformanceTypeID, owningModuleID);
+      if (writeConformance)
+        S.writeConformance(baseWitness.Witness->getProtocol(),
+                           baseWitness.Witness, nullptr, SILAbbrCodes);
       continue;
     }
     if (entry.getKind() == SILWitnessTable::AssociatedTypeProtocol) {
       auto &assoc = entry.getAssociatedTypeProtocolWitness();
+
+      DeclID conformanceTypeID;
+      ModuleID owningModuleID;
+      bool writeConformance =
+        S.encodeReferencedConformance(assoc.Witness, conformanceTypeID,
+                                      owningModuleID, true);
+
       WitnessAssocProtocolLayout::emitRecord(Out, ScratchRecord,
           SILAbbrCodes[WitnessAssocProtocolLayout::Code],
           S.addDeclRef(assoc.Requirement),
           S.addDeclRef(assoc.Protocol),
-          assoc.Witness ? S.addTypeRef(assoc.Witness->getType()) : (TypeID)0);
-      if (assoc.Witness)
-        S.writeConformance(assoc.Witness->getProtocol(),
-                           assoc.Witness, nullptr, SILAbbrCodes);
+          conformanceTypeID, owningModuleID);
+          
+      if (writeConformance)
+        S.writeConformance(assoc.Protocol, assoc.Witness, nullptr,
+                           SILAbbrCodes);
       continue;
     }
     if (entry.getKind() == SILWitnessTable::AssociatedType) {

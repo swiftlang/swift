@@ -1760,11 +1760,14 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   assert(kind == SIL_WITNESSTABLE && "expect a sil witnesstable");
   (void)kind;
 
-  TypeID TyID;
+  DeclID ConformanceTyID;
   unsigned RawLinkage;
   unsigned IsDeclaration;
-  WitnessTableLayout::readRecord(scratch, TyID, RawLinkage, IsDeclaration);
-  if (TyID == 0) {
+  DeclID ProtoID;
+  ModuleID OwningModuleID;
+  WitnessTableLayout::readRecord(scratch, ConformanceTyID, RawLinkage,
+                                 IsDeclaration, ProtoID, OwningModuleID);
+  if (ConformanceTyID == 0) {
     DEBUG(llvm::dbgs() << "WitnessTable conforming typeID is 0.\n");
     MF->error();
     return nullptr;
@@ -1779,12 +1782,12 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   }
 
   // Deserialize Conformance.
-  auto maybeConformance = MF->maybeReadConformance(MF->getType(TyID),
-                                                   SILCursor);
-  assert((maybeConformance &&
-          isa<NormalProtocolConformance>(*maybeConformance)) &&
-         "Protocol conformance in witness table should be normal.");
-  auto theConformance = cast<NormalProtocolConformance>(*maybeConformance);
+  auto proto = cast<ProtocolDecl>(MF->getDecl(ProtoID));
+  auto plainConformance = MF->readReferencedConformance(proto, ConformanceTyID,
+                                                        OwningModuleID,
+                                                        SILCursor);
+  assert(plainConformance);
+  auto theConformance = cast<NormalProtocolConformance>(plainConformance);
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false).first;
@@ -1832,23 +1835,23 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     if (kind == SIL_WITNESS_BASE_ENTRY) {
       DeclID protoId;
       TypeID tyId;
-      WitnessBaseEntryLayout::readRecord(scratch, protoId, tyId);
+      ModuleID modId;
+      WitnessBaseEntryLayout::readRecord(scratch, protoId, tyId, modId);
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
-      auto conformance = MF->maybeReadConformance(MF->getType(tyId), SILCursor);
+      auto conformance = MF->readReferencedConformance(proto, tyId, modId,
+                                                       SILCursor);
       witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
-        proto, conformance.getValueOr(nullptr)
+        proto, conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
       DeclID assocId, protoId;
       TypeID tyId;
-      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId, tyId);
+      ModuleID modId;
+      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId, tyId,
+                                             modId);
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
-      ProtocolConformance *conformance = nullptr;
-      if (tyId) {
-        auto maybeConformance =
-          MF->maybeReadConformance(MF->getType(tyId), SILCursor);
-        conformance = maybeConformance.getValueOr(nullptr);
-      }
+      auto conformance = MF->readReferencedConformance(proto, tyId, modId,
+                                                       SILCursor);
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto, conformance
       });
