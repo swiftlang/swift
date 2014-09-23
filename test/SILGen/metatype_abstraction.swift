@@ -97,3 +97,34 @@ func genericMetatypeToGeneric<U>(var x: U.Type) {
 func genericMetatypeToGenericMetatype<U>(x: U.Type) {
   takeGenericMetatype(x)
 }
+
+// CHECK-LABEL: sil @_TF20metatype_abstraction27static_metatype_of_metatypeFVS_1SMMS0_
+// CHECK:         metatype $@thin S.Type.Type
+func static_metatype_of_metatype(x: S) -> S.Type.Type {
+  return x.dynamicType.dynamicType
+}
+
+// CHECK-LABEL: sil @_TF20metatype_abstraction26class_metatype_of_metatypeFCS_1CMMS0_
+// CHECK:         [[METATYPE:%.*]] = value_metatype $@thick C.Type
+// CHECK:         [[META_METATYPE:%.*]] = value_metatype $@thick C.Type.Type, [[METATYPE]]
+func class_metatype_of_metatype(x: C) -> C.Type.Type {
+  return x.dynamicType.dynamicType
+}
+
+// CHECK-LABEL: sil @_TF20metatype_abstraction28generic_metatype_of_metatypeU__FQ_MMQ_
+// CHECK:         [[METATYPE:%.*]] = value_metatype $@thick T.Type
+// CHECK:         [[META_METATYPE:%.*]] = value_metatype $@thick T.Type.Type, [[METATYPE]]
+func generic_metatype_of_metatype<T>(x: T) -> T.Type.Type {
+  return x.dynamicType.dynamicType
+}
+
+// FIXME rdar://problem/18419772
+/*
+func existential_metatype_of_metatype(x: protocol<>) -> protocol<>.Type.Type {
+  return x.dynamicType.dynamicType
+}
+ */
+
+func function_metatype_of_metatype(x: () -> ()) -> (() -> ()).Type.Type {
+  return x.dynamicType.dynamicType
+}

@@ -1271,7 +1271,8 @@ public:
     // If we're using the allocating constructor, we need to pass along the
     // metatype.
     if (useAllocatingCtor) {
-      SILValue selfMeta = gen.emitMetatypeOfValue(expr, self.getValue());
+      SILValue selfMeta = gen.emitMetatypeOfValue(expr, self.getValue(),
+                                  arg->getType()->getLValueOrInOutObjectType());
       self = ManagedValue::forUnmanaged(selfMeta);
     }
 

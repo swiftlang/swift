@@ -837,6 +837,46 @@ public:
     }
   }
 
+  // Is a SIL type a potential lowering of a formal type?
+  static bool isLoweringOf(SILType loweredType,
+                           CanType formalType) {
+    // Metatypes preserve their instance type through lowering.
+    if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
+      if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
+        return loweredMT.getInstanceType() == formalMT.getInstanceType();
+      }
+    }
+    if (auto loweredEMT = loweredType.getAs<ExistentialMetatypeType>()) {
+      if (auto formalEMT = dyn_cast<ExistentialMetatypeType>(formalType)) {
+        return loweredEMT.getInstanceType() == formalEMT.getInstanceType();
+      }
+    }
+    
+    // TODO: Function types go through a more elaborate lowering.
+    // For now, just check that a SIL function type came from some AST function
+    // type.
+    if (loweredType.is<SILFunctionType>())
+      return isa<AnyFunctionType>(formalType);
+    
+    // Tuples are lowered elementwise.
+    // TODO: Will this always be the case?
+    if (auto loweredTT = loweredType.getAs<TupleType>())
+      if (auto formalTT = dyn_cast<TupleType>(formalType)) {
+        if (loweredTT->getNumElements() != formalTT->getNumElements())
+          return false;
+        for (unsigned i = 0, e = loweredTT->getNumElements(); i < e; ++i) {
+          if (!isLoweringOf(SILType::getPrimitiveAddressType(
+                                                   loweredTT.getElementType(i)),
+                            formalTT.getElementType(i)))
+            return false;
+        }
+        return true;
+      }
+    
+    // Other types are preserved through lowering.
+    return loweredType.getSwiftRValueType() == formalType;
+  }
+  
   void checkMetatypeInst(MetatypeInst *MI) {
     require(MI->getType(0).is<MetatypeType>(),
             "metatype instruction must be of metatype type");
@@ -848,9 +888,11 @@ public:
             "value_metatype instruction must be of metatype type");
     require(MI->getType().castTo<MetatypeType>()->hasRepresentation(),
             "value_metatype instruction must have a metatype representation");
-    require(MI->getOperand().getType().getSwiftRValueType() ==
-            CanType(MI->getType().castTo<MetatypeType>()->getInstanceType()),
-            "value_metatype result must be metatype of operand type");
+    auto formalInstanceTy
+      = MI->getType().castTo<MetatypeType>().getInstanceType();
+    require(isLoweringOf(MI->getOperand().getType(), formalInstanceTy),
+            "value_metatype result must be formal metatype of "
+            "lowered operand type");
   }
   void checkExistentialMetatypeInst(ExistentialMetatypeInst *MI) {
     require(MI->getType().is<ExistentialMetatypeType>(),
@@ -859,9 +901,11 @@ public:
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand().getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
-    require(MI->getOperand().getType().getSwiftRValueType() ==
-            MI->getType().castTo<ExistentialMetatypeType>().getInstanceType(),
-            "existential_metatype result must be metatype of operand type");
+    auto formalInstanceTy
+      = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
+    require(isLoweringOf(MI->getOperand().getType(), formalInstanceTy),
+            "existential_metatype result must be formal metatype of "
+            "lowered operand type");
   }
 
   void checkStrongRetainInst(StrongRetainInst *RI) {

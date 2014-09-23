@@ -2556,8 +2556,9 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
   return result;
 }
 
-SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
-  CanType baseTy = base.getType().getSwiftRValueType();
+SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base,
+                                             Type formalBaseType) {
+  CanType baseTy = formalBaseType->getCanonicalType();
   // For class, archetype, and protocol types, look up the dynamic metatype.
   if (baseTy.isAnyExistentialType()) {
     SILType metaTy = getLoweredLoadableType(CanExistentialMetatypeType::get(baseTy));
@@ -2565,10 +2566,13 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   }
 
   SILType metaTy = getLoweredLoadableType(CanMetatypeType::get(baseTy));
-  if (baseTy.getClassOrBoundGenericClass() || isa<ArchetypeType>(baseTy))
+  // If the lowered metatype has a thick representation, we need to derive it
+  // dynamically from the instance.
+  if (metaTy.castTo<MetatypeType>()->getRepresentation()
+        != MetatypeRepresentation::Thin)
     return B.createValueMetatype(loc, metaTy, base);
   
-  // Otherwise, ignore the base and return the static metatype.
+  // Otherwise, ignore the base and return the static thin metatype.
   return B.createMetatype(loc, metaTy);
 }
 
@@ -2586,7 +2590,7 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
     Ctx = SGFContext::AllowPlusZero;
 
   SILValue baseVal = SGF.emitRValueAsSingleValue(base, Ctx).getValue();
-  metatype = SGF.emitMetatypeOfValue(E, baseVal);
+  metatype = SGF.emitMetatypeOfValue(E, baseVal, E->getBase()->getType());
   return RValue(SGF, E, ManagedValue::forUnmanaged(metatype));
 }
 
