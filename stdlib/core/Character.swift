@@ -158,6 +158,10 @@ public enum Character :
       var d = data
       return UnsafePointer<UTF16.CodeUnit>(Builtin.addressof(&d))[position]
     }
+    
+    /// Return a *generator* over the elements of this *sequence*.
+    ///
+    /// Complexity: O(1)
     func generate() -> IndexingGenerator<_SmallUTF16> {
       return IndexingGenerator(self)
     }

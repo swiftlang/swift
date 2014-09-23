@@ -236,7 +236,8 @@ public struct EnumerateGenerator<
     return .Some((index: count++, element: b!))
   }
 
-  // Every GeneratorType is also a single-pass SequenceType
+  /// A type whose instances can produce the elements of this
+  /// sequence, in order.
   public typealias Generator = EnumerateGenerator<Base>
   
   /// `EnumerateGenerator` is also a `SequenceType`, so it `generate`\
@@ -266,7 +267,9 @@ public struct EnumerateSequence<
     self.base = base
   }
 
-  /// Return a generator for this sequence's elements.
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> EnumerateGenerator<Base.Generator> {
     return EnumerateGenerator(base.generate())
   }

@@ -169,8 +169,9 @@ public struct IndexingGenerator<
     self._position = seq.startIndex
   }
 
-  /// Return a generator over the elements of this sequence.  The
-  /// generator's next element is the first element of the sequence.
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> IndexingGenerator {
     return self
   }
@@ -220,8 +221,13 @@ public struct PermutationGenerator<
     return result != nil ? seq[result!] : .None
   }
 
-  // Every GeneratorType is also a single-pass SequenceType
+  /// A type whose instances can produce the elements of this
+  /// sequence, in order.
   public typealias Generator = PermutationGenerator
+
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> Generator {
     return self
   }

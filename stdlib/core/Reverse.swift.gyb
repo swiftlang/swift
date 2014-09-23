@@ -68,12 +68,18 @@ public struct ${View}<
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ${Index}<T.Index>
+  
+  /// A type whose instances can produce the elements of this
+  /// sequence, in order.
   public typealias Generator = IndexingGenerator<${View}>
 
   init(_ _base: T) {
     self._base = _base 
   }
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> IndexingGenerator<${View}> {
     return IndexingGenerator(self)
   }

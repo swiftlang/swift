@@ -144,6 +144,10 @@ extension String {
       var _base: _StringCore.Generator
     }
 
+    /// Return a *generator* over the `UnicodeScalar`\ s that comprise
+    /// this *sequence*.
+    ///
+    /// Complexity: O(1)
     public func generate() -> Generator {
       return Generator(_core.generate())
     }

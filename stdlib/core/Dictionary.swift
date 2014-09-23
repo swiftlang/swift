@@ -1478,6 +1478,9 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     }
   }
 
+  /// Return a *generator* over the (key, value) pairs.
+  ///
+  /// Complexity: O(1)
   func generate() -> DictionaryGenerator<Key, Value> {
     switch self {
     case .Native:
@@ -2063,6 +2066,9 @@ public struct Dictionary<
   // `SequenceType` conformance
   //
 
+  /// Return a *generator* over the (key, value) pairs.
+  ///
+  /// Complexity: O(1)
   public func generate() -> DictionaryGenerator<Key, Value> {
     return _variantStorage.generate()
   }

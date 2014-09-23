@@ -31,6 +31,8 @@ public struct FilterGenerator<
     }
   }
   
+  /// `FilterGenerator` is also a `SequenceType`, so it `generate`\ 's
+  /// a copy of itself
   public func generate() -> FilterGenerator {
     return self
   }
@@ -42,6 +44,9 @@ public struct FilterGenerator<
 /// The lazy `SequenceType` returned by `filter(c)` where `c` is a
 /// `SequenceType`
 public struct FilterSequenceView<Base: SequenceType> : SequenceType {
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> FilterGenerator<Base.Generator> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }
@@ -144,6 +149,9 @@ public struct FilterCollectionView<Base: CollectionType> : CollectionType {
     return _base[position._pos]
   }
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> FilterGenerator<Base.Generator> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }

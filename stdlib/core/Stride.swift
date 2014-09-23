@@ -101,6 +101,9 @@ public struct StrideToGenerator<T: Strideable> : GeneratorType {
 public struct StrideTo<T: Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> StrideToGenerator<T> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
@@ -155,6 +158,9 @@ public struct StrideThroughGenerator<T: Strideable> : GeneratorType {
 public struct StrideThrough<T: Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> StrideThroughGenerator<T> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)

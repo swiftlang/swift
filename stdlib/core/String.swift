@@ -479,6 +479,9 @@ extension String : CollectionType {
     )
   }
 
+  /// Return a *generator* over the `Characters` in this `String`.
+  ///
+  /// Complexity: O(1)
   public func generate() -> IndexingGenerator<String> {
     return IndexingGenerator(self)
   }

@@ -46,7 +46,8 @@ struct _ConcatenateSequenceGenerator<
     while true
   }
 
-  /// Returns the generator itself
+  /// `_ConcatenateSequenceGenerator` is also a `SequenceType`, so it
+  /// `generate`\ 's a copy of itself
   func generate() -> _ConcatenateSequenceGenerator {
     return self
   }
@@ -69,7 +70,9 @@ struct _ConcatenateSequenceView<
     self._base = base
   }
 
-  /// Create a generator for this sequence
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   func generate() -> _ConcatenateSequenceGenerator<Base.Generator> {
     return _ConcatenateSequenceGenerator(_base.generate())
   }
@@ -184,6 +187,9 @@ struct ${View}<
     self._base = _base
   }
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   func generate() -> _ConcatenateSequenceGenerator<C.Generator> {
     return _ConcatenateSequenceGenerator(_base.generate())
   }

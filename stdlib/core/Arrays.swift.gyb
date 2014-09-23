@@ -195,7 +195,9 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
     }
   }
 
-  /// Return a `GeneratorType` over the elements
+  /// Return a *generator* over the elements.
+  ///
+  /// Complexity: O(1)
   public func generate() -> IndexingGenerator<${Self}> {
     return IndexingGenerator(self)
   }

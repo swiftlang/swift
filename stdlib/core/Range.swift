@@ -31,8 +31,12 @@ public struct RangeGenerator<
     return startIndex++
   }
 
-  // Every GeneratorType is also a single-pass SequenceType
+  /// A type whose instances can produce the elements of this
+  /// sequence, in order.
   public typealias Generator = RangeGenerator<T>
+
+  /// `RangeGenerator` is also a `SequenceType`, so it
+  /// `generate`\ 's a copy of itself
   public func generate() -> Generator {
     return self
   }
@@ -98,7 +102,13 @@ public struct Range<
   
   //===--------------------------------------------------------------------===//
   
+  /// A type whose instances can produce the elements of this
+  /// sequence, in order.
   public typealias Generator = RangeGenerator<T>
+
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> RangeGenerator<T> {
     return Generator(self)
   }

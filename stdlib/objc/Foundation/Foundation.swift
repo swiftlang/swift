@@ -900,6 +900,10 @@ final public class NSFastGenerator : GeneratorType {
 
 extension NSArray : SequenceType {
   final public
+  
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -925,6 +929,9 @@ extension NSArray : Swift.CollectionType {
 */
 
 extension NSSet : SequenceType {
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -956,6 +963,9 @@ extension NSDictionary : SequenceType {
     }
   }
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> Generator {
     return Generator(self)
   }

@@ -19,6 +19,8 @@ public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
     return position == end ? nil : (position++).memory
   }
 
+  /// `UnsafeBufferPointerGenerator` is also a `SequenceType`, so it
+  /// `generate`\ 's a copy of itself
   public func generate() -> UnsafeBufferPointerGenerator {
     return self
   }
@@ -72,7 +74,9 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
     _end = start + count
   }
 
-  /// Return a generator over the buffer's elements
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> UnsafeBufferPointerGenerator<T> {
     return UnsafeBufferPointerGenerator(position: _position, end: _end)
   }

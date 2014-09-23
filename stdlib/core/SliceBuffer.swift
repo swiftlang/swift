@@ -286,8 +286,10 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return count
   }
 
-  public
-  func generate() -> IndexingGenerator<_SliceBuffer> {
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
+  public func generate() -> IndexingGenerator<_SliceBuffer> {
     return IndexingGenerator(self)
   }
 

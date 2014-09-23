@@ -33,8 +33,15 @@ extension String {
 
     // This is to avoid printing "func generate() -> GeneratorOf<UInt16>"
     public typealias _GeneratorType = GeneratorOf<UInt16>
+
+    /// A type whose instances can produce the elements of this
+    /// sequence, in order.
     public typealias Generator = _GeneratorType
 
+    /// Return a *generator* over the code points that comprise this
+    /// *sequence*.
+    ///
+    /// Complexity: O(1)
     public func generate() -> Generator {
       var index = startIndex
       return GeneratorOf<UInt16> {

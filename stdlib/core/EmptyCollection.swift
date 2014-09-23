@@ -18,6 +18,8 @@
 //===----------------------------------------------------------------------===//
 
 public struct EmptyGenerator<T> : GeneratorType, SequenceType {
+  /// `EmptyGenerator` is also a `SequenceType`, so it `generate`\ 's
+  /// a copy of itself
   public func generate() -> EmptyGenerator {
     return self
   }
@@ -47,6 +49,9 @@ public struct EmptyCollection<T> : CollectionType {
     return 0
   }
 
+  /// Returns an empty *generator*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> EmptyGenerator<T> {
     return EmptyGenerator()
   }

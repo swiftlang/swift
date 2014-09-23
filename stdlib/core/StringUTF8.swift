@@ -143,6 +143,10 @@ extension String {
       return result
     }
 
+    /// Return a *generator* over the code points that comprise this
+    /// *sequence*.
+    ///
+    /// Complexity: O(1)
     public func generate() -> IndexingGenerator<UTF8View> {
       return IndexingGenerator(self)
     }

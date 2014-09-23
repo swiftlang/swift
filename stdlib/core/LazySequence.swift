@@ -18,8 +18,10 @@ struct LazySequence<S: SequenceType> : SequenceType {
     self._base = base
   }
 
-  public
-  func generate() -> S.Generator {
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
+  public func generate() -> S.Generator {
     return self._base.generate()
   }
 

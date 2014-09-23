@@ -90,9 +90,7 @@ public protocol SequenceType : _Sequence_Type {
   /// encapsulates its iteration state.
   typealias Generator : GeneratorType
 
-  /// Return a *generator* over the elements of this *sequence*.  The
-  /// *generator*\ 's next element is the first element of the
-  /// sequence.
+  /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
   func generate() -> Generator
@@ -180,6 +178,9 @@ public struct GeneratorSequence<
     return _base.next()
   }
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> GeneratorSequence {
     return self
   }

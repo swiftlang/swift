@@ -36,6 +36,8 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
     return _next()
   }
 
+  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`\
+  /// 's a copy of itself
   public func generate() -> GeneratorOf {
     return self
   }
@@ -50,6 +52,9 @@ public struct SequenceOf<T> : SequenceType {
     self = SequenceOf({ self_.generate() })
   }
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> GeneratorOf<T> {
     return _generate()
   }
@@ -67,6 +72,9 @@ internal struct _CollectionOf<
     _subscriptImpl = subscriptImpl
   }
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   func generate() -> GeneratorOf<T> {
     var index = startIndex
     return GeneratorOf {

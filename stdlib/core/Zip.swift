@@ -41,12 +41,18 @@ public struct Zip2<S0: SequenceType, S1: SequenceType> : SequenceType
 {
   public typealias Stream1 = S0.Generator
   public typealias Stream2 = S1.Generator
+  
+  /// A type whose instances can produce the elements of this
+  /// sequence, in order.
   public typealias Generator = ZipGenerator2<Stream1, Stream2>
 
   public init(_ s0: S0, _ s1: S1) {
     sequences = (s0,s1)
   }
 
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> Generator {
     return Generator(
       sequences.0.generate(), 
