@@ -27,8 +27,9 @@ public enum Bit : Int, RandomAccessIndexType, Reflectable {
     return .One
   }
 
-  /// Return the previous consecutive value in a discrete sequence of
-  /// `Bit` values.
+  /// Returns the previous consecutive value before `self`.
+  ///
+  /// Requires: `self != .Zero`.
   public func predecessor() -> Bit {
     _precondition(self == .One, "Can't decrement past zero")
     return .Zero

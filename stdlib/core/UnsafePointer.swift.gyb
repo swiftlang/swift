@@ -358,6 +358,9 @@ public struct ${Self}<T>
   public func successor() -> ${Self} {
     return self + 1
   }
+  /// Returns the previous consecutive value before `self`.
+  ///
+  /// Requires: the previous value is representable.
   public func predecessor() -> ${Self} {
     return self - 1
   }

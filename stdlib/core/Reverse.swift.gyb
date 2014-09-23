@@ -40,6 +40,9 @@ public struct ${Index}<I: ${IndexProtocol}> : ${IndexProtocol} {
     return ${Index}(_base.predecessor())
   }
   
+  /// Returns the previous consecutive value before `self`.
+  ///
+  /// Requires: the previous value is representable.
   public func predecessor() -> ${Index} {
     return ${Index}(_base.successor())
   }

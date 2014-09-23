@@ -153,7 +153,9 @@ struct ${Index}<
   }
 
   % if traversal == 'Bidirectional':
-  /// Return an index for the previous position.
+  /// Returns the previous consecutive value before `self`.
+  ///
+  /// Requires: the previous value is representable.
   func predecessor() -> ${Index} {
 
     var outer = _outer

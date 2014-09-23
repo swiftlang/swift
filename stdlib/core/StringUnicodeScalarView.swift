@@ -61,6 +61,9 @@ extension String {
         return Index(_position + length, _core)
       }
 
+      /// Returns the previous consecutive value before `self`.
+      ///
+      /// Requires: the previous value is representable.
       public func predecessor() -> Index {
         var i = _position
         let codeUnit = _core[--i]

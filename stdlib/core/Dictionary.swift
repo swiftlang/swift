@@ -1680,6 +1680,9 @@ public struct DictionaryIndex<Key : Hashable, Value> :
 
   public typealias Index = DictionaryIndex<Key, Value>
 
+  /// Returns the previous consecutive value before `self`.
+  ///
+  /// Requires: the previous value is representable.
   public func predecessor() -> Index {
     if _fastPath(_guaranteedNative) {
       return ._Native(_nativeIndex.predecessor())
