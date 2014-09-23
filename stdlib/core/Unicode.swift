@@ -44,7 +44,9 @@ public enum UnicodeDecodingResult {
 /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
 public protocol UnicodeCodecType {
 
-  /// A type that can hold code unit values for this encoding.
+  /// A type that can hold `code unit
+  /// <http://www.unicode.org/glossary/#code_unit>`_ values for this
+  /// encoding.
   typealias CodeUnit
 
   init()
@@ -74,6 +76,9 @@ public protocol UnicodeCodecType {
 
 public struct UTF8 : UnicodeCodecType {
 
+  /// A type that can hold `code unit
+  /// <http://www.unicode.org/glossary/#code_unit>`_ values for this
+  /// encoding.
   public typealias CodeUnit = UInt8
 
   public init() {}
@@ -315,6 +320,18 @@ public struct UTF8 : UnicodeCodecType {
     return 1
   }
 
+  /// Start or continue decoding a UTF sequence.
+  ///
+  /// In order to decode a code unit sequence completely, this function should
+  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// can have an internal buffer that is pre-filled with data from the input
+  /// generator.
+  ///
+  /// Because of buffering, it is impossible to find the corresponing position
+  /// in the generator for a given returned `UnicodeScalar` or an error.
+  ///
+  /// :param: `next`: a *generator* of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult {
@@ -426,6 +443,8 @@ public struct UTF8 : UnicodeCodecType {
     return .Result(UnicodeScalar(result & 0x001fffff)) // 21 bits
   }
 
+  /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
+  /// 'ing each `CodeUnit` to `output`.
   public static func encode<
     S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
@@ -462,6 +481,9 @@ public struct UTF8 : UnicodeCodecType {
 }
 
 public struct UTF16 : UnicodeCodecType {
+  /// A type that can hold `code unit
+  /// <http://www.unicode.org/glossary/#code_unit>`_ values for this
+  /// encoding.
   public typealias CodeUnit = UInt16
 
   public init() {}
@@ -476,6 +498,18 @@ public struct UTF16 : UnicodeCodecType {
   /// `x` is set when `_decodeLookahead` contains a code unit.
   var _lookaheadFlags: UInt8 = 0
 
+  /// Start or continue decoding a UTF sequence.
+  ///
+  /// In order to decode a code unit sequence completely, this function should
+  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// can have an internal buffer that is pre-filled with data from the input
+  /// generator.
+  ///
+  /// Because of buffering, it is impossible to find the corresponing position
+  /// in the generator for a given returned `UnicodeScalar` or an error.
+  ///
+  /// :param: `next`: a *generator* of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
@@ -570,6 +604,8 @@ public struct UTF16 : UnicodeCodecType {
     }
   }
 
+  /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
+  /// 'ing each `CodeUnit` to `output`.
   public static func encode<
       S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
@@ -589,10 +625,25 @@ public struct UTF16 : UnicodeCodecType {
 }
 
 public struct UTF32 : UnicodeCodecType {
+  /// A type that can hold `code unit
+  /// <http://www.unicode.org/glossary/#code_unit>`_ values for this
+  /// encoding.
   public typealias CodeUnit = UInt32
 
   public init() {}
 
+  /// Start or continue decoding a UTF sequence.
+  ///
+  /// In order to decode a code unit sequence completely, this function should
+  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// can have an internal buffer that is pre-filled with data from the input
+  /// generator.
+  ///
+  /// Because of buffering, it is impossible to find the corresponing position
+  /// in the generator for a given returned `UnicodeScalar` or an error.
+  ///
+  /// :param: `next`: a *generator* of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
@@ -612,6 +663,8 @@ public struct UTF32 : UnicodeCodecType {
     return .EmptyInput
   }
 
+  /// Encode a `UnicodeScalar` as a series of `CodeUnit`\ s by `put`\
+  /// 'ing each `CodeUnit` to `output`.
   public static func encode<
     S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
