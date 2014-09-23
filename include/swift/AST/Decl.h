@@ -181,9 +181,11 @@ enum class DescriptiveDeclKind : uint8_t {
   ClassMethod,
   Getter,
   Setter,
+  MaterializeForSet,
+  Addressor,
+  MutableAddressor,
   WillSet,
   DidSet,
-  MaterializeForSet,
   EnumElement,
 };
 
@@ -3265,6 +3267,10 @@ enum class AccessorKind {
   IsDidSet = 3,
   /// \brief This is a materializeForSet accessor for a property.
   IsMaterializeForSet = 4,
+  /// \brief This is an address accessor for a property or subscript.
+  IsAddressor = 5,
+  /// \brief This is a mutableAddress accessor for a property or subscript.
+  IsMutableAddressor = 6,
 };
 
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
@@ -3300,21 +3306,53 @@ public:
     Observing
   };
 private:
-  llvm::PointerIntPair<AbstractStorageDecl*, 2, StorageKindTy> OverriddenDecl;
+  enum {
+    StorageKindMask = 0x3,
+    HasAddressors = 0x4,
+  };
+
+  /// The low bits are (1) the StorageKind and (2) whether it has addressors.
+  llvm::PointerIntPair<AbstractStorageDecl*, 3, unsigned> OverriddenDecl;
+
+  struct GetSetRecord;
+
+  /// This is stored immediately before the GetSetRecord.
+  struct AddressorRecord {
+    FuncDecl *Address = nullptr;        // User-defined address accessor
+    FuncDecl *MutableAddress = nullptr; // User-defined mutableAddress accessor
+
+    GetSetRecord *getGetSet() {
+      // Relies on not-strictly-portable ABI layout assumptions.
+      return reinterpret_cast<GetSetRecord*>(this+1);
+    }
+  };
+  void configureAddressorRecord(AddressorRecord *record,
+                                FuncDecl *addressor, FuncDecl *mutableAddressor);
 
   struct GetSetRecord {
     SourceRange Braces;
     FuncDecl *Get = nullptr;       // User-defined getter
     FuncDecl *Set = nullptr;       // User-defined setter
     FuncDecl *MaterializeForSet = nullptr; // optional materializeForSet accessor
+
+    AddressorRecord *getAddressors() {
+      // Relies on not-strictly-portable ABI layout assumptions.
+      return reinterpret_cast<AddressorRecord*>(this) - 1;
+    }
   };
-  void configureGetSetRecord(FuncDecl *getter, FuncDecl *setter,
+  void configureGetSetRecord(GetSetRecord *getSetRecord,
+                             FuncDecl *getter, FuncDecl *setter,
                              FuncDecl *materializeForSet);
 
   struct ObservingRecord : GetSetRecord {
     FuncDecl *WillSet = nullptr;   // willSet(value):
     FuncDecl *DidSet = nullptr;    // didSet:
   };
+  void configureObservingRecord(ObservingRecord *record,
+                                FuncDecl *willSet, FuncDecl *didSet);
+
+  struct GetSetRecordWithAddressors : AddressorRecord, GetSetRecord {};
+  struct ObservingRecordWithAddressors : AddressorRecord, ObservingRecord {};
 
   llvm::PointerIntPair<GetSetRecord*, 2, OptionalEnum<Accessibility>> GetSetInfo;
 
@@ -3322,8 +3360,15 @@ private:
     assert(getStorageKind() == Observing);
     return *static_cast<ObservingRecord*>(GetSetInfo.getPointer());
   }
+  AddressorRecord &getAddressorInfo() const {
+    assert(hasAddressors());
+    return *GetSetInfo.getPointer()->getAddressors();
+  }
 
-  void setStorageKind(StorageKindTy K) { OverriddenDecl.setInt(K); }
+  void setStorageKind(StorageKindTy K, bool hasAddressors) {
+    OverriddenDecl.setInt(unsigned(K) |
+                          (hasAddressors ? HasAddressors : 0));
+  }
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
                       SourceLoc NameLoc)
@@ -3337,12 +3382,23 @@ public:
   /// has no storage but does have a user-defined getter or setter.
   ///
   StorageKindTy getStorageKind() const {
-    return OverriddenDecl.getInt();
+    return (StorageKindTy) (OverriddenDecl.getInt() & StorageKindMask);
+  }
+
+  /// \brief Determine whether this property has addressors.
+  ///
+  /// Only Stored, StoredWithTrivialAccessors, and Observing
+  /// properties can have addressors.
+  bool hasAddressors() const {
+    return OverriddenDecl.getInt() & HasAddressors;
   }
 
   /// \brief Return true if this is a VarDecl that has storage associated with
   /// it.
   bool hasStorage() const {
+    // Nothing with an addressor has independent storage.
+    if (hasAddressors()) return false;
+
     switch (getStorageKind()) {
     case Stored:
     case StoredWithTrivialAccessors:
@@ -3382,6 +3438,17 @@ public:
   /// specifiers.
   void makeObserving(SourceLoc LBraceLoc, FuncDecl *WillSet, FuncDecl *DidSet,
                      SourceLoc RBraceLoc);
+
+  /// \brief Turn this into an addressed var.
+  void makeAddressed(SourceLoc LBraceLoc, FuncDecl *Addressor,
+                     FuncDecl *MutableAddressor,
+                     SourceLoc RBraceLoc);
+
+  /// \brief Turn this into an addressed var with observing accessors.
+  void makeAddressedObserving(SourceLoc LBraceLoc, FuncDecl *Addressor,
+                              FuncDecl *MutableAddressor,
+                              FuncDecl *WillSet, FuncDecl *DidSet,
+                              SourceLoc RBraceLoc);
 
   /// \brief Specify the synthesized get/set functions for a Observing var.
   /// This is used by Sema.
@@ -3443,13 +3510,23 @@ public:
       return info->MaterializeForSet;
     return nullptr;
   }
+
+  /// \brief Return the funcdecl for the 'address' accessor if it
+  /// exists; this is only valid on a declaration with addressors.
+  FuncDecl *getAddressor() const { return getAddressorInfo().Address; }
+
+  /// \brief Return the funcdecl for the 'mutableAddress' accessors if
+  /// it exists; this is only valid on a declaration with addressors.
+  FuncDecl *getMutableAddressor() const {
+    return getAddressorInfo().MutableAddress;
+  }
   
   /// \brief Return the funcdecl for the willSet specifier if it exists, this is
-  /// only valid on a VarDecl with Observing storage.
+  /// only valid on a declaration with Observing storage.
   FuncDecl *getWillSetFunc() const { return getDidSetInfo().WillSet; }
 
   /// \brief Return the funcdecl for the didSet specifier if it exists, this is
-  /// only valid on a VarDecl with Observing storage.
+  /// only valid on a declaration with Observing storage.
   FuncDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
 
   /// Return true if this storage can (but doesn't have to) be accessed with
@@ -3674,13 +3751,6 @@ public:
     setIndices(Indices);
   }
   
-  void setAccessors(SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
-                    FuncDecl *MaterializeForSet) {
-    assert(Get && "subscripts should always have at least a getter");
-    makeComputed(Braces.Start, Get, Set, MaterializeForSet, Braces.End);
-  }
-  
-  
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getSubscriptLoc(); }
   SourceRange getSourceRange() const;
@@ -3702,8 +3772,8 @@ public:
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
 
-  /// \brief Returns whether the subscript operation has a setter.
-  bool isSettable() const { return getSetter() != nullptr; }
+  /// \brief Returns whether the result of the subscript operation can be set.
+  bool isSettable() const;
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.

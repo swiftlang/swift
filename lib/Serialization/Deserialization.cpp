@@ -142,6 +142,12 @@ namespace {
           case MaterializeForSet:
             os << "(materializeForSet)";
             break;
+          case Addressor:
+            os << "(addressor)";
+            break;
+          case MutableAddressor:
+            os << "(mutableAddressor)";
+            break;
           case WillSet:
             os << "(willSet)";
             break;
@@ -1205,6 +1211,12 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
           case MaterializeForSet:
             values.front() = storage->getMaterializeForSetFunc();
             break;
+          case Addressor:
+            values.front() = storage->getAddressor();
+            break;
+          case MutableAddressor:
+            values.front() = storage->getMutableAddressor();
+            break;
           case WillSet:
           case DidSet:
             llvm_unreachable("invalid XREF accessor kind");
@@ -1445,6 +1457,70 @@ getActualOptionalTypeKind(uint8_t raw) {
   }
 
   return Nothing;
+}
+
+void ModuleFile::configureStorage(AbstractStorageDecl *decl,
+                                  unsigned rawStorageKind,
+                                  serialization::DeclID getter,
+                                  serialization::DeclID setter,
+                                  serialization::DeclID materializeForSet,
+                                  serialization::DeclID addressor,
+                                  serialization::DeclID mutableAddressor,
+                                  serialization::DeclID willSet,
+                                  serialization::DeclID didSet) {
+  // We currently don't serialize these locations.
+  SourceLoc beginLoc, endLoc;
+
+  assert(addressor || !mutableAddressor);
+  bool hasAddressors = (addressor != 0);
+
+  switch ((StorageKind) rawStorageKind) {
+  case StorageKind::Stored:
+  case StorageKind::StoredWithTrivialAccessors:
+    if (hasAddressors) {
+      decl->makeAddressed(beginLoc,
+                          cast<FuncDecl>(getDecl(addressor)),
+                          cast_or_null<FuncDecl>(getDecl(mutableAddressor)),
+                          endLoc);      
+    }
+    if (rawStorageKind == (unsigned) StorageKind::StoredWithTrivialAccessors) {
+      decl->makeStoredWithTrivialAccessors(
+                       cast_or_null<FuncDecl>(getDecl(getter)),
+                       cast_or_null<FuncDecl>(getDecl(setter)),
+                       cast_or_null<FuncDecl>(getDecl(materializeForSet)));
+    }
+    return;
+
+  case StorageKind::Computed:
+    assert(!hasAddressors && "computed storage with addressors?");
+    decl->makeComputed(beginLoc,
+                       cast_or_null<FuncDecl>(getDecl(getter)),
+                       cast_or_null<FuncDecl>(getDecl(setter)),
+                       cast_or_null<FuncDecl>(getDecl(materializeForSet)),
+                       endLoc);
+    return;
+
+  case StorageKind::Observing:
+    if (hasAddressors) {
+      decl->makeAddressedObserving(beginLoc,
+                       cast_or_null<FuncDecl>(getDecl(addressor)),
+                       cast_or_null<FuncDecl>(getDecl(mutableAddressor)),
+                       cast_or_null<FuncDecl>(getDecl(willSet)),
+                       cast_or_null<FuncDecl>(getDecl(didSet)),
+                       endLoc);
+    } else {
+      decl->makeObserving(beginLoc,
+                       cast_or_null<FuncDecl>(getDecl(willSet)),
+                       cast_or_null<FuncDecl>(getDecl(didSet)),
+                       endLoc);
+    }
+    decl->setObservingAccessors(
+                       cast_or_null<FuncDecl>(getDecl(getter)),
+                       cast_or_null<FuncDecl>(getDecl(setter)),
+                       cast_or_null<FuncDecl>(getDecl(materializeForSet)));
+    return;
+  }
+  llvm_unreachable("bad storage kind");
 }
 
 template <typename T, typename ...Args>
@@ -1958,13 +2034,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
-    DeclID overriddenID;
+    DeclID addressorID, mutableAddressorID, overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                        isObjC, isStatic,
                                        isLet, storageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
                                        materializeForSetID,
+                                       addressorID, mutableAddressorID,
                                        willSetID, didSetID, overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel);
 
@@ -1987,31 +2064,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto referenceStorage = type->getAs<ReferenceStorageType>())
       AddAttribute(new (ctx) OwnershipAttr(referenceStorage->getOwnership()));
 
-    switch ((VarDeclStorageKind)storageKind) {
-    case VarDeclStorageKind::Stored: break;
-    case VarDeclStorageKind::StoredWithTrivialAccessors:
-      var->makeStoredWithTrivialAccessors(
-                                    cast_or_null<FuncDecl>(getDecl(getterID)),
-                                    cast_or_null<FuncDecl>(getDecl(setterID)),
-                         cast_or_null<FuncDecl>(getDecl(materializeForSetID)));
-      break;
-    case VarDeclStorageKind::Computed:
-      var->makeComputed(SourceLoc(),
-                        cast_or_null<FuncDecl>(getDecl(getterID)),
-                        cast_or_null<FuncDecl>(getDecl(setterID)),
-                        cast_or_null<FuncDecl>(getDecl(materializeForSetID)),
-                        SourceLoc());
-      break;
-    case VarDeclStorageKind::Observing:
-      var->makeObserving(SourceLoc(),
-                         cast_or_null<FuncDecl>(getDecl(willSetID)),
-                         cast_or_null<FuncDecl>(getDecl(didSetID)),
-                         SourceLoc());
-      var->setObservingAccessors(cast_or_null<FuncDecl>(getDecl(getterID)),
-                                 cast_or_null<FuncDecl>(getDecl(setterID)),
-                         cast_or_null<FuncDecl>(getDecl(materializeForSetID)));
-      break;
-    }
+    configureStorage(var, storageKind, getterID, setterID, materializeForSetID,
+                     addressorID, mutableAddressorID, willSetID, didSetID);
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       var->setAccessibility(*accessLevel);
@@ -2533,20 +2587,23 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit, isObjC;
     TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID;
+    DeclID addressorID, mutableAddressorID, willSetID, didSetID;
     DeclID overriddenID;
-    uint8_t rawAccessLevel;
+    uint8_t rawAccessLevel, rawSetterAccessLevel;
+    uint8_t rawStorageKind;
     ArrayRef<uint64_t> argNameIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
-                                             isObjC, declTypeID, elemTypeID,
+                                             isObjC, rawStorageKind,
+                                             declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
                                              materializeForSetID,
+                                             addressorID, mutableAddressorID,
+                                             willSetID, didSetID,
                                              overriddenID, rawAccessLevel,
+                                             rawSetterAccessLevel,
                                              argNameIDs);
-    auto Getter = cast_or_null<FuncDecl>(getDecl(getterID));
-    auto Setter = cast_or_null<FuncDecl>(getDecl(setterID));
-    auto MaterializeForSet = cast_or_null<FuncDecl>(getDecl(materializeForSetID));
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -2568,6 +2625,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                SourceLoc(), elemTy, DC);
     declOrOffset = subscript;
 
+    assert(addressorID || !mutableAddressorID);
+    configureStorage(subscript, rawStorageKind,
+                     getterID, setterID, materializeForSetID,
+                     addressorID, mutableAddressorID, willSetID, didSetID);
+
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       subscript->setAccessibility(*accessLevel);
     } else {
@@ -2575,9 +2637,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    subscript->setAccessors(SourceRange(), Getter, Setter, MaterializeForSet);
-    if (Setter)
-      subscript->setSetterAccessibility(Setter->getAccessibility());
+    if (subscript->isSettable()) {
+      if (auto setterAccess = getActualAccessibility(rawSetterAccessLevel)) {
+        subscript->setSetterAccessibility(*setterAccess);
+      } else {
+        error();
+        return nullptr;
+      }
+    }
 
     subscript->setType(getType(declTypeID));
     if (auto interfaceType = getType(interfaceTypeID))

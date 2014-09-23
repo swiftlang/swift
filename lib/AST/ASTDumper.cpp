@@ -653,6 +653,8 @@ namespace {
         case AccessorKind::IsWillSet: OS << " willset"; break;
         case AccessorKind::IsDidSet: OS << " didset"; break;
         case AccessorKind::IsMaterializeForSet: OS << " materializeForSet"; break;
+        case AccessorKind::IsAddressor: OS << " addressor"; break;
+        case AccessorKind::IsMutableAddressor: OS << " mutableAddressor"; break;
         }
 
         OS << "_for=" << ASD->getFullName();

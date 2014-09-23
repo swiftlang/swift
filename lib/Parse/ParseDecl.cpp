@@ -3952,7 +3952,8 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     Decls.push_back(Get);
   }
 
-  Subscript->setAccessors(DefRange, Get, Set, /*materializeForSet*/ nullptr);
+  Subscript->makeComputed(DefRange.Start, Get, Set,
+                          /*materializeForSet*/ nullptr, DefRange.End);
 
   if (Invalid) {
     Subscript->setType(ErrorType::get(Context));

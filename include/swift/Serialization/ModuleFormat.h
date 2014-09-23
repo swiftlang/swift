@@ -76,10 +76,10 @@ using CharOffsetField = BitOffsetField;
 using FileSizeField = BCVBR<16>;
 using FileModTimeField = BCVBR<16>;
 
-enum class VarDeclStorageKind : uint8_t {
+enum class StorageKind : uint8_t {
   Stored, StoredWithTrivialAccessors, Computed, Observing
 };
-using VarDeclStorageKindField = BCFixed<2>;
+using StorageKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -119,6 +119,8 @@ enum AccessorKind : uint8_t {
   WillSet,
   DidSet,
   MaterializeForSet,
+  Addressor,
+  MutableAddressor,
 };
 using AccessorKindField = BCFixed<3>;
 
@@ -733,12 +735,14 @@ namespace decls_block {
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // static?
     BCFixed<1>,   // isLet?
-    VarDeclStorageKindField,   // StorageKind
+    StorageKindField,   // StorageKind
     TypeIDField,  // type
     TypeIDField,  // interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
     DeclIDField,  // materializeForSet
+    DeclIDField,  // addressor
+    DeclIDField,  // mutableAddressor
     DeclIDField,  // willset
     DeclIDField,  // didset
     DeclIDField,  // overridden decl
@@ -826,14 +830,20 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
+    StorageKindField,   // StorageKind
     TypeIDField, // subscript dummy type
     TypeIDField, // element type
     TypeIDField, // interface type
     DeclIDField, // getter
     DeclIDField, // setter
     DeclIDField, // materializeForSet
+    DeclIDField, // addressor
+    DeclIDField, // mutableAddressor
+    DeclIDField, // willSet
+    DeclIDField, // didSet
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
+    AccessibilityKindField, // setter accessibility, if applicable
     BCArray<IdentifierIDField> // name components
     // The indices pattern trails the record.
   >;

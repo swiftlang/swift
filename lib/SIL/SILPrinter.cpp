@@ -240,6 +240,14 @@ void SILDeclRef::print(raw_ostream &OS) const {
       Suffix = "!materializeForSet";
       decl = FD->getAccessorStorageDecl();
       break;
+    case AccessorKind::IsAddressor:
+      Suffix = "!addressor";
+      decl = FD->getAccessorStorageDecl();
+      break;
+    case AccessorKind::IsMutableAddressor:
+      Suffix = "!mutableAddressor";
+      decl = FD->getAccessorStorageDecl();
+      break;
     }
 
     printFullContext(decl->getDeclContext(), OS);

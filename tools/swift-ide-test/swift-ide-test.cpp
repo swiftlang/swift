@@ -1425,6 +1425,12 @@ public:
         case AccessorKind::IsDidSet:
           OS << "<didSet for ";
           break;
+        case AccessorKind::IsAddressor:
+          OS << "<addressor for ";
+          break;
+        case AccessorKind::IsMutableAddressor:
+          OS << "<mutableAddressor for ";
+          break;
         case AccessorKind::IsMaterializeForSet:
           OS << "<materializeForSet for ";
           break;

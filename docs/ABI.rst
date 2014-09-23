@@ -737,13 +737,14 @@ Globals
   entity-kind ::= 'I'                    // initializer
   entity-name ::= decl-name type         // named declaration
   entity-name ::= 'A' index              // default argument generator
-  entity-name ::= 'a' decl-name type     // addressor
+  entity-name ::= 'a' decl-name type     // mutable addressor
   entity-name ::= 'C' type               // allocating constructor
   entity-name ::= 'c' type               // non-allocating constructor
   entity-name ::= 'D'                    // deallocating destructor; untyped
   entity-name ::= 'd'                    // non-deallocating destructor; untyped
   entity-name ::= 'g' decl-name type     // getter
   entity-name ::= 'i'                    // non-local variable initializer
+  entity-name ::= 'l' decl-name type     // non-mutable addressor
   entity-name ::= 'm' decl-name type     // materializeForSet
   entity-name ::= 's' decl-name type     // setter
   entity-name ::= 'U' index type         // explicit anonymous closure expression

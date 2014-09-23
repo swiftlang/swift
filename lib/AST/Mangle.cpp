@@ -1316,6 +1316,8 @@ static char getCodeForAccessorKind(AccessorKind kind) {
   case AccessorKind::IsSetter:    return 's';
   case AccessorKind::IsWillSet:   return 'w';
   case AccessorKind::IsDidSet:    return 'W';
+  case AccessorKind::IsAddressor: return 'l'; // "location"? 'A' was taken
+  case AccessorKind::IsMutableAddressor:  return 'a';
   case AccessorKind::IsMaterializeForSet: return 'm';
   }
   llvm_unreachable("bad accessor kind");

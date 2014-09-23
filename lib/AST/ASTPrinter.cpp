@@ -1248,25 +1248,28 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (decl->isAccessor()) {
     printDocumentationComment(decl);
     printAttributes(decl);
-    switch (decl->getAccessorKind()) {
+    switch (auto kind = decl->getAccessorKind()) {
     case AccessorKind::NotAccessor: break;
     case AccessorKind::IsGetter:
+    case AccessorKind::IsAddressor:
       recordDeclLoc(decl,
         [&]{
           if (decl->isMutating())
             Printer << "mutating ";
-          Printer << "get";
+          Printer << (kind == AccessorKind::IsGetter ? "get" : "address");
         });
       Printer << " {";
       break;
     case AccessorKind::IsDidSet:
     case AccessorKind::IsMaterializeForSet:
+    case AccessorKind::IsMutableAddressor:
       recordDeclLoc(decl,
         [&]{
           if (decl->isExplicitNonMutating())
             Printer << "nonmutating ";
-          Printer << (decl->getAccessorKind() == AccessorKind::IsDidSet
-                        ? "didSet" : "materializeForSet");
+          Printer << (kind == AccessorKind::IsDidSet ? "didSet" :
+                      kind == AccessorKind::IsMaterializeForSet
+                        ? "materializeForSet" : "mutableAddress");
         });
       Printer << " {";
       break;

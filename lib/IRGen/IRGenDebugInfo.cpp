@@ -543,6 +543,8 @@ StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
       case AccessorKind::IsWillSet: Kind = ".willset"; break;
       case AccessorKind::IsDidSet: Kind = ".didset"; break;
       case AccessorKind::IsMaterializeForSet: Kind = ".materialize"; break;
+      case AccessorKind::IsAddressor: Kind = ".addressor"; break;
+      case AccessorKind::IsMutableAddressor: Kind = ".mutableAddressor"; break;
       }
 
       SmallVector<char, 64> Buf;

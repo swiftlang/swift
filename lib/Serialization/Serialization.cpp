@@ -1044,6 +1044,8 @@ static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
   CASE(WillSet)
   CASE(DidSet)
   CASE(MaterializeForSet)
+  CASE(Addressor)
+  CASE(MutableAddressor)
 #undef CASE
   }
 }
@@ -1776,23 +1778,28 @@ void Serializer::writeDecl(const Decl *D) {
     Type type = var->hasType() ? var->getType() : nullptr;
 
     FuncDecl *willSet = nullptr, *didSet = nullptr;
-
-    VarDeclStorageKind storageKind;
+    StorageKind storageKind;
     switch (var->getStorageKind()) {
     case VarDecl::Stored:
-      storageKind = VarDeclStorageKind::Stored;
+      storageKind = StorageKind::Stored;
       break;
     case VarDecl::StoredWithTrivialAccessors:
-      storageKind = VarDeclStorageKind::StoredWithTrivialAccessors;
+      storageKind = StorageKind::StoredWithTrivialAccessors;
       break;
     case VarDecl::Computed:
-      storageKind = VarDeclStorageKind::Computed;
+      storageKind = StorageKind::Computed;
       break;
     case VarDecl::Observing:
-      storageKind = VarDeclStorageKind::Observing;
+      storageKind = StorageKind::Observing;
       willSet = var->getWillSetFunc();
       didSet = var->getDidSetFunc();
       break;
+    }
+
+    FuncDecl *addressor = nullptr, *mutableAddressor = nullptr;
+    if (var->hasAddressors()) {
+      addressor = var->getAddressor();
+      mutableAddressor = var->getMutableAddressor();
     }
 
     uint8_t rawAccessLevel =
@@ -1816,6 +1823,8 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
                           addDeclRef(var->getMaterializeForSetFunc()),
+                          addDeclRef(addressor),
+                          addDeclRef(mutableAddressor),
                           addDeclRef(willSet),
                           addDeclRef(didSet),
                           addDeclRef(var->getOverriddenDecl()),
@@ -1908,22 +1917,57 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto argName : subscript->getFullName().getArgumentNames())
       nameComponents.push_back(addIdentifierRef(argName));
 
+    FuncDecl *willSet = nullptr, *didSet = nullptr;
+    StorageKind storageKind;
+    switch (subscript->getStorageKind()) {
+    case VarDecl::Stored:
+      storageKind = StorageKind::Stored;
+      break;
+    case VarDecl::StoredWithTrivialAccessors:
+      storageKind = StorageKind::StoredWithTrivialAccessors;
+      break;
+    case VarDecl::Computed:
+      storageKind = StorageKind::Computed;
+      break;
+    case VarDecl::Observing:
+      storageKind = StorageKind::Observing;
+      willSet = subscript->getWillSetFunc();
+      didSet = subscript->getDidSetFunc();
+      break;
+    }
+
+    FuncDecl *addressor = nullptr, *mutableAddressor = nullptr;
+    if (subscript->hasAddressors()) {
+      addressor = subscript->getAddressor();
+      mutableAddressor = subscript->getMutableAddressor();
+    }
+
     uint8_t rawAccessLevel =
       getRawStableAccessibility(subscript->getAccessibility());
+    uint8_t rawSetterAccessLevel = rawAccessLevel;
+    if (subscript->isSettable())
+      rawSetterAccessLevel =
+        getRawStableAccessibility(subscript->getSetterAccessibility());
 
     unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addDeclRef(DC),
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
+                                (unsigned) storageKind,
                                 addTypeRef(subscript->getType()),
                                 addTypeRef(subscript->getElementType()),
                                 addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(subscript->getGetter()),
                                 addDeclRef(subscript->getSetter()),
                                 addDeclRef(subscript->getMaterializeForSetFunc()),
+                                addDeclRef(addressor),
+                                addDeclRef(mutableAddressor),
+                                addDeclRef(willSet),
+                                addDeclRef(didSet),
                                 addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
+                                rawSetterAccessLevel,
                                 nameComponents);
 
     writePattern(subscript->getIndices());

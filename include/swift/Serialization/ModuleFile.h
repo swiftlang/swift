@@ -376,6 +376,15 @@ private:
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
+  void configureStorage(AbstractStorageDecl *storage, unsigned rawStorageKind,
+                        serialization::DeclID getter,
+                        serialization::DeclID setter,
+                        serialization::DeclID materializeForSet,
+                        serialization::DeclID addressor,
+                        serialization::DeclID mutableAddressor,
+                        serialization::DeclID willSet,
+                        serialization::DeclID didSet);
+
 public:
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);

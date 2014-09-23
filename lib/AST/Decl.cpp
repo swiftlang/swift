@@ -150,6 +150,12 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
      case AccessorKind::IsDidSet:
        return DescriptiveDeclKind::DidSet;
 
+     case AccessorKind::IsAddressor:
+       return DescriptiveDeclKind::Addressor;
+
+     case AccessorKind::IsMutableAddressor:
+       return DescriptiveDeclKind::MutableAddressor;
+
      case AccessorKind::IsMaterializeForSet:
        return DescriptiveDeclKind::MaterializeForSet;
      }
@@ -220,6 +226,8 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(WillSet, "willSet observer");
   ENTRY(DidSet, "didSet observer");
   ENTRY(MaterializeForSet, "materializeForSet accessor");
+  ENTRY(Addressor, "address accessor");
+  ENTRY(MutableAddressor, "mutableAddress accessor");
   ENTRY(EnumElement, "enum element");
   }
 #undef ENTRY
@@ -1925,6 +1933,8 @@ FuncDecl *AbstractStorageDecl::getAccessorFunction(AccessorKind kind) const {
   case AccessorKind::IsGetter: return getGetter();
   case AccessorKind::IsSetter: return getSetter();
   case AccessorKind::IsMaterializeForSet: return getMaterializeForSetFunc();
+  case AccessorKind::IsAddressor: return getAddressor();
+  case AccessorKind::IsMutableAddressor: return getMutableAddressor();
   case AccessorKind::IsDidSet: return getDidSetFunc();
   case AccessorKind::IsWillSet: return getWillSetFunc();
   case AccessorKind::NotAccessor: llvm_unreachable("called with NotAccessor");
@@ -1932,10 +1942,10 @@ FuncDecl *AbstractStorageDecl::getAccessorFunction(AccessorKind kind) const {
   llvm_unreachable("bad accessor kind!");
 }
 
-void AbstractStorageDecl::configureGetSetRecord(FuncDecl *getter,
+void AbstractStorageDecl::configureGetSetRecord(GetSetRecord *getSetInfo,
+                                                FuncDecl *getter,
                                                 FuncDecl *setter,
                                                 FuncDecl *materializeForSet) {
-  auto getSetInfo = GetSetInfo.getPointer();
   getSetInfo->Get = getter;
   getSetInfo->Set = setter;
   getSetInfo->MaterializeForSet = materializeForSet;
@@ -1963,20 +1973,51 @@ void AbstractStorageDecl::configureGetSetRecord(FuncDecl *getter,
   }
 }
 
+void AbstractStorageDecl::configureAddressorRecord(AddressorRecord *record,
+                                                   FuncDecl *addressor,
+                                                   FuncDecl *mutableAddressor) {
+  record->Address = addressor;
+  record->MutableAddress = mutableAddressor;
+
+  if (addressor) {
+    addressor->makeAccessor(this, AccessorKind::IsAddressor);
+  }
+
+  if (mutableAddressor) {
+    mutableAddressor->makeAccessor(this, AccessorKind::IsMutableAddressor);
+  }
+}
+
+void AbstractStorageDecl::configureObservingRecord(ObservingRecord *record,
+                                                   FuncDecl *willSet,
+                                                   FuncDecl *didSet) {
+  record->WillSet = willSet;
+  record->DidSet = didSet;
+
+  if (willSet) {
+    willSet->makeAccessor(this, AccessorKind::IsWillSet);
+  }
+
+  if (didSet) {
+    didSet->makeAccessor(this, AccessorKind::IsDidSet);
+  }
+}
+
 void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
                                        FuncDecl *Get, FuncDecl *Set,
                                        FuncDecl *MaterializeForSet,
                                        SourceLoc RBraceLoc) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
+  assert(!hasAddressors() && "can't be computed with addressors!");
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   auto *getSetInfo = new (Mem) GetSetRecord();
   getSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
   GetSetInfo.setPointer(getSetInfo);
-  configureGetSetRecord(Get, Set, MaterializeForSet);
+  configureGetSetRecord(getSetInfo, Get, Set, MaterializeForSet);
 
   // Mark that this is a computed property.
-  setStorageKind(Computed);
+  setStorageKind(Computed, false);
 }
 
 void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
@@ -2013,21 +2054,46 @@ void AbstractStorageDecl::makeStoredWithTrivialAccessors(FuncDecl *Get,
                                  FuncDecl *Set, FuncDecl *MaterializeForSet) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   assert(Get);
-  auto &Context = getASTContext();
-  void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
-  auto *getSetInfo = new (Mem) GetSetRecord();
-  getSetInfo->Braces = SourceRange();
-  GetSetInfo.setPointer(getSetInfo);
-  configureGetSetRecord(Get, Set, MaterializeForSet);
-  
-  // Mark that this is a StoredWithTrivialAccessors property.
-  setStorageKind(StoredWithTrivialAccessors);
+
+  auto &ctx = getASTContext();
+  GetSetRecord *getSetInfo;
+  if (hasAddressors()) {
+    getSetInfo = GetSetInfo.getPointer();
+    setStorageKind(StoredWithTrivialAccessors, true);
+  } else {
+    void *mem = ctx.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
+    getSetInfo = new (mem) GetSetRecord();
+    getSetInfo->Braces = SourceRange();
+    GetSetInfo.setPointer(getSetInfo);
+    setStorageKind(StoredWithTrivialAccessors, false);
+  }
+  configureGetSetRecord(getSetInfo, Get, Set, MaterializeForSet);
+}
+
+void AbstractStorageDecl::makeAddressed(SourceLoc lbraceLoc, FuncDecl *addressor,
+                                        FuncDecl *mutableAddressor,
+                                        SourceLoc rbraceLoc) {
+  assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
+  assert(!hasAddressors() && "already has addressors!");
+  assert(addressor && "addressed mode, but no addressor function?");
+
+  auto &ctx = getASTContext();
+
+  void *mem = ctx.Allocate(sizeof(GetSetRecordWithAddressors),
+                           alignof(GetSetRecordWithAddressors));
+  auto info = new (mem) GetSetRecordWithAddressors();
+  info->Braces = SourceRange(lbraceLoc, rbraceLoc);
+  GetSetInfo.setPointer(info);
+  setStorageKind(Stored, true);
+
+  configureAddressorRecord(info, addressor, mutableAddressor);
 }
 
 void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
                                         FuncDecl *WillSet, FuncDecl *DidSet,
                                         SourceLoc RBraceLoc) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
+  assert(!hasAddressors() && "can't be observing with addressors!");
   assert((WillSet || DidSet) &&
          "Can't be Observing without one or the other");
   auto &Context = getASTContext();
@@ -2038,13 +2104,34 @@ void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
   GetSetInfo.setPointer(observingInfo);
 
   // Mark that this is a Observing property.
-  setStorageKind(Observing);
+  setStorageKind(Observing, false);
 
-  observingInfo->WillSet = WillSet;
-  observingInfo->DidSet = DidSet;
-  
-  if (WillSet) WillSet->makeAccessor(this, AccessorKind::IsWillSet);
-  if (DidSet) DidSet->makeAccessor(this, AccessorKind::IsDidSet);
+  configureObservingRecord(observingInfo, WillSet, DidSet);
+}
+
+void AbstractStorageDecl::makeAddressedObserving(SourceLoc lbraceLoc,
+                                                 FuncDecl *addressor,
+                                                 FuncDecl *mutableAddressor,
+                                                 FuncDecl *willSet,
+                                                 FuncDecl *didSet,
+                                                 SourceLoc rbraceLoc) {
+  assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
+  assert(!hasAddressors() && "already has addressors!");
+  assert(addressor);
+  assert(mutableAddressor && "observing but immutable?");
+  assert((willSet || didSet) &&
+         "Can't be Observing without one or the other");
+
+  auto &ctx = getASTContext();
+  void *mem = ctx.Allocate(sizeof(ObservingRecordWithAddressors),
+                           alignof(ObservingRecordWithAddressors));
+  auto info = new (mem) ObservingRecordWithAddressors();
+  info->Braces = SourceRange(lbraceLoc, rbraceLoc);
+  GetSetInfo.setPointer(info);
+  setStorageKind(Observing, true);
+
+  configureAddressorRecord(info, addressor, mutableAddressor);
+  configureObservingRecord(info, willSet, didSet);
 }
 
 /// \brief Specify the synthesized get/set functions for a Observing var.
@@ -2055,7 +2142,7 @@ void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
   assert(getStorageKind() == Observing && "VarDecl is wrong type");
   assert(!getGetter() && !getSetter() && "getter and setter already set");
   assert(Get && Set && "Must specify getter and setter");
-  configureGetSetRecord(Get, Set, MaterializeForSet);
+  configureGetSetRecord(GetSetInfo.getPointer(), Get, Set, MaterializeForSet);
 }
 
 void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
@@ -2145,6 +2232,23 @@ SourceLoc AbstractStorageDecl::getOverrideLoc() const {
   return SourceLoc();
 }
 
+static bool isSettable(const AbstractStorageDecl *decl) {
+  switch (decl->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    if (decl->hasAddressors())
+      return decl->getMutableAddressor() != nullptr;
+    return true;
+
+  case AbstractStorageDecl::Observing:
+    return true;
+
+  case AbstractStorageDecl::Computed:
+    return decl->getSetter() != nullptr;
+  }
+  llvm_unreachable("bad storage kind");
+}
+
 /// \brief Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
@@ -2175,8 +2279,11 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
     return false;
   }
 
-  // vars are settable unless they are computed and have no setter.
-  return hasStorage() || getSetter();
+  return ::isSettable(this);
+}
+
+bool SubscriptDecl::isSettable() const {
+  return ::isSettable(this);
 }
 
 SourceRange VarDecl::getSourceRange() const {
@@ -2480,6 +2587,8 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
 
         case AccessorKind::IsSetter:
         case AccessorKind::IsMaterializeForSet:
+        case AccessorKind::IsAddressor:
+        case AccessorKind::IsMutableAddressor:
         case AccessorKind::IsDidSet:
         case AccessorKind::IsWillSet: {
           SmallVector<Identifier, 4> argNames;

@@ -408,6 +408,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
           case AccessorKind::NotAccessor: llvm_unreachable("expected accessor");
           case AccessorKind::IsGetter: TokLen = 3; break;
           case AccessorKind::IsSetter: TokLen = 3; break;
+          case AccessorKind::IsAddressor: TokLen = 7; break;
+          case AccessorKind::IsMutableAddressor: TokLen = 14; break;
           case AccessorKind::IsWillSet: TokLen = 7; break;
           case AccessorKind::IsDidSet: TokLen = 6; break;
           case AccessorKind::IsMaterializeForSet: llvm_unreachable("always implicit");
