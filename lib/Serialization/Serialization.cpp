@@ -145,9 +145,6 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
     return id.first;
   }
 
-  assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
-         "cannot cross-reference this decl");
-
   // Record any generic parameters that come from this decl, so that we can use
   // the decl to refer to the parameters later.
   const GenericParamList *paramList = nullptr;
@@ -296,7 +293,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_PROTOCOL);
   BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_ENTRY);
   BLOCK_RECORD(sil_block, SIL_GENERIC_OUTER_PARAMS);
-  BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
@@ -740,12 +736,6 @@ Serializer::encodeReferencedConformance(const ProtocolConformance *conformance,
                                         DeclID &typeID,
                                         ModuleID &moduleID,
                                         bool allowReferencingCurrentModule) {
-  if (!conformance) {
-    typeID = addDeclRef(nullptr);
-    moduleID = serialization::BUILTIN_MODULE_ID;
-    return false;
-  }
-
   bool append = !isa<NormalProtocolConformance>(conformance);
   if (!allowReferencingCurrentModule)
     append |= conformance->getDeclContext()->getParentModule() == M;
@@ -828,9 +818,9 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode
       = abbrCodes[NormalProtocolConformanceLayout::Code];
-    auto ownerID = addDeclRef(getDeclForContext(conf->getDeclContext()));
+    auto moduleID = addModuleRef(conf->getDeclContext()->getParentModule());
     NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                addDeclRef(protocol), ownerID,
+                                                addDeclRef(protocol), moduleID,
                                                 numValueWitnesses,
                                                 numTypeWitnesses,
                                                 numInheritedConformances,
@@ -943,8 +933,13 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
     for (const ProtocolConformance *conformance : sub.getConformances()) {
       DeclID typeID;
       ModuleID moduleID;
-      if (encodeReferencedConformance(conformance, typeID, moduleID, false))
+      if (!conformance) {
+        typeID = addDeclRef(nullptr);
+        moduleID = BUILTIN_MODULE_ID;
+      } else if (encodeReferencedConformance(conformance, typeID, moduleID,
+                                             false)) {
         conformancesToWrite.push_back(conformance);
+      }
       conformanceData.push_back(typeID);
       conformanceData.push_back(moduleID);
     }
@@ -1981,8 +1976,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  addDeclRef(DC),
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
-                                 addTypeRef(dtor->getType()),
-                                 addTypeRef(dtor->getInterfaceType()));
+                                 addTypeRef(dtor->getType()));
     assert(dtor->getBodyParamPatterns().size() == 1);
     for (auto pattern : dtor->getBodyParamPatterns())
       writePattern(pattern);

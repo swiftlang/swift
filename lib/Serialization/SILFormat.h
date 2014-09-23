@@ -136,7 +136,6 @@ namespace sil_block {
     SIL_WITNESS_ASSOC_PROTOCOL,
     SIL_WITNESS_ASSOC_ENTRY,
     SIL_GENERIC_OUTER_PARAMS,
-    SIL_INST_WITNESS_METHOD,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -171,14 +170,12 @@ namespace sil_block {
 
   using WitnessTableLayout = BCRecordLayout<
     SIL_WITNESSTABLE,
-    DeclIDField,         // Conforming Type, for reference purposes.
+    TypeIDField,         // Conforming Type.
     SILLinkageField,     // Linkage
-    BCFixed<1>,          // Is this a declaration. We represent this separately
+    BCFixed<1>           // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
-    DeclIDField,         // ID of protocol decl
-    ModuleIDField        // module containing conformance
-    // Witness table entries will be serialized after.
+    // Normal Protocol Conformance will be serialized immediately after.
   >;
 
   using WitnessMethodEntryLayout = BCRecordLayout<
@@ -190,18 +187,16 @@ namespace sil_block {
   using WitnessBaseEntryLayout = BCRecordLayout<
     SIL_WITNESS_BASE_ENTRY,
     DeclIDField,  // ID of protocol decl
-    TypeIDField,  // ID of conforming type
-    ModuleIDField // ID of the module where the conformance lives
-    // Trailed by the conformance itself if appropriate.
+    TypeIDField   // ID of conforming type
+    // Protocol Conformance will be serialized immediately after.
   >;
 
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
-    DeclIDField,  // ID of AssociatedTypeDecl
+    DeclIDField,  // ID of AssocaitedTypeDecl
     DeclIDField,  // ID of ProtocolDecl
-    DeclIDField,  // ID of conformance's type
-    ModuleIDField // ID of the module where the conformance lives
-    // Trailed by the conformance itself if appropriate.
+    TypeIDField   // ID of conforming type
+    // Protocol Conformance will be serialized immediately after.
   >;
 
   using WitnessAssocEntryLayout = BCRecordLayout<
@@ -274,9 +269,8 @@ namespace sil_block {
     ValueIDField,         // operand id
     SILValueResultField,  // operand result id
     TypeIDField,          // formal concrete type
-    BCArray<DeclIDField>  // triplets of protocol-type-module, used to identify
-                          // a referenced protocol conformance
-    // Trailed by inline protocol conformance info (if any)
+    BCFixed<32>           // number of conformances
+                          // followed by conformances
   >;
 
   // SIL Cast instructions with a cast kind, one type and one typed valueref.
@@ -350,20 +344,6 @@ namespace sil_block {
   using SILGenericOuterParamsLayout = BCRecordLayout<
     SIL_GENERIC_OUTER_PARAMS,
     DeclIDField // The decl id of the outer param if any.
-  >;
-
-  using SILInstWitnessMethodLayout = BCRecordLayout<
-    SIL_INST_WITNESS_METHOD,
-    TypeIDField,           // result type
-    SILTypeCategoryField,
-    BCFixed<1>,            // volatile?
-    TypeIDField,           // lookup type
-    SILTypeCategoryField,
-    DeclIDField,           // conformance proto
-    TypeIDField,           // conformance type
-    ModuleIDField,         // conformance module
-    BCArray<ValueIDField>  // SILDeclRef
-    // may be trailed by an inline protocol conformance
   >;
 }
 

@@ -340,6 +340,14 @@ private:
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
 
+  /// Read a referenced conformance, such as the underlying conformance for a
+  /// specialized or inherited protocol conformance.
+  ProtocolConformance *
+  readReferencedConformance(ProtocolDecl *proto,
+                            serialization::DeclID typeID,
+                            serialization::ModuleID moduleID,
+                            llvm::BitstreamCursor &Cursor);
+
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
                                                 DeclContext *DC,
                                                 llvm::BitstreamCursor &Cursor);
@@ -369,6 +377,9 @@ private:
   void buildTopLevelDeclMap();
 
 public:
+  /// Returns the decl context with the given ID, deserializing it if needed.
+  DeclContext *getDeclContext(serialization::DeclID DID);
+
   /// Loads a module from the given memory buffer.
   ///
   /// \param moduleInputBuffer A memory buffer containing the serialized module
@@ -491,9 +502,6 @@ public:
   Decl *getDecl(serialization::DeclID DID,
                 Optional<DeclContext *> ForcedContext = {});
 
-  /// Returns the decl context with the given ID, deserializing it if needed.
-  DeclContext *getDeclContext(serialization::DeclID DID);
-
   /// Returns the appropriate module for the given ID.
   Module *getModule(serialization::ModuleID MID);
 
@@ -517,14 +525,6 @@ public:
   /// Nothing. Note that a null pointer is a valid conformance value.
   Optional<ProtocolConformance *>
   maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
-
-  /// Read a referenced conformance, such as the underlying conformance for a
-  /// specialized or inherited protocol conformance.
-  ProtocolConformance *
-  readReferencedConformance(ProtocolDecl *proto,
-                            serialization::DeclID typeID,
-                            serialization::ModuleID moduleID,
-                            llvm::BitstreamCursor &Cursor);
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///

@@ -410,11 +410,8 @@ static ProtocolConformance *findConformance(ProtocolDecl *proto,
 ProtocolConformance *
 ModuleFile::readReferencedConformance(ProtocolDecl *proto,
                                       DeclID typeID,
-                                      ModuleID moduleID,
+                                      IdentifierID moduleID,
                                       llvm::BitstreamCursor &Cursor) {
-  if (!typeID)
-    return nullptr;
-
   if (moduleID == serialization::BUILTIN_MODULE_ID) {
     // The underlying conformance is in the following record.
     return *maybeReadConformance(getType(typeID), Cursor);
@@ -524,7 +521,8 @@ ModuleFile::maybeReadConformance(Type conformingType,
 
   lastRecordOffset.reset();
 
-  DeclID protoID, ownerID;
+  DeclID protoID;
+  ModuleID ownerID;
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   bool isIncomplete;
   ArrayRef<uint64_t> rawIDs;
@@ -537,7 +535,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
   ASTContext &ctx = getContext();
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
-                                        getDeclContext(ownerID),
+                                        getModule(ownerID),
                                         ProtocolConformanceState::Incomplete);
 
   InheritedConformanceMap inheritedConformances;
@@ -663,12 +661,14 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
   assert(rawConformanceData.size() % 2 == 0);
   while (!rawConformanceData.empty()) {
     ProtocolConformance *conformance = nullptr;
-    conformance = readReferencedConformance(protos.front(),
-                                            rawConformanceData[0],
-                                            rawConformanceData[1],
-                                            cursor);
-    assert((conformance || !DeclID(rawConformanceData[0])) &&
-           "Missing conformance");
+    // A null associated type means there is no conformance.
+    if (DeclID(rawConformanceData[0])) {
+      conformance = readReferencedConformance(protos.front(),
+                                              rawConformanceData[0],
+                                              rawConformanceData[1],
+                                              cursor);
+      assert(conformance && "Missing conformance");
+    }
     conformanceBuf.push_back(conformance);
 
     protos = protos.slice(1);
@@ -2644,10 +2644,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::DESTRUCTOR_DECL: {
     DeclID parentID;
     bool isImplicit, isObjC;
-    TypeID signatureID, interfaceID;
+    TypeID signatureID;
 
     decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
-                                              isObjC, signatureID, interfaceID);
+                                              isObjC, signatureID);
 
     DeclContext *DC = getDeclContext(parentID);
     if (declOrOffset.isComplete())
@@ -2663,7 +2663,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     dtor->setSelfPattern(selfParams);
 
     dtor->setType(getType(signatureID));
-    dtor->setInterfaceType(getType(interfaceID));
     if (isImplicit)
       dtor->setImplicit();
 
