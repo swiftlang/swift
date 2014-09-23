@@ -51,6 +51,9 @@ extension String {
         self._core = _core
       }
 
+      /// Returns the next consecutive value after `self`.
+      ///
+      /// Requires: the next value is representable.
       public func successor() -> Index {
         var scratch = _ScratchGenerator(_core, _position)
         var decoder = UTF16()

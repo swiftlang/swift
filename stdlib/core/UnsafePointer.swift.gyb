@@ -352,6 +352,9 @@ public struct ${Self}<T>
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(value))
   }
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: the next value is representable.
   public func successor() -> ${Self} {
     return self + 1
   }

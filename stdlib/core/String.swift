@@ -337,6 +337,9 @@ extension String : CollectionType {
       self._lengthUTF16 = _lengthUTF16
     }
 
+    /// Returns the next consecutive value after `self`.
+    ///
+    /// Requires: the next value is representable.
     public func successor() -> Index {
       _precondition(_base != _base._viewEndIndex, "can not increment endIndex")
       return Index(_endBase)

@@ -93,6 +93,9 @@ extension String {
         _sanityCheck(_coreIndex <= _core.count)
       }
       
+      /// Returns the next consecutive value after `self`.
+      ///
+      /// Requires: the next value is representable.
       public func successor() -> Index {
         let newBuffer0 = (_buffer >> 8) | (
           0xFF << numericCast((sizeofValue(_buffer) &- 1) &* 8)

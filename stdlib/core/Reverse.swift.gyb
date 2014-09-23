@@ -33,6 +33,9 @@ public struct ${Index}<I: ${IndexProtocol}> : ${IndexProtocol} {
 
   init(_ _base: I) { self._base = _base }
 
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: the next value is representable.
   public func successor() -> ${Index} {
     return ${Index}(_base.predecessor())
   }

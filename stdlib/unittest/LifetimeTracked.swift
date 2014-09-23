@@ -30,6 +30,9 @@ public final class LifetimeTracked : ForwardIndexType, Printable {
     return value.description
   }
 
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: the next value is representable.
   public func successor() -> LifetimeTracked {
     return LifetimeTracked(self.value.successor())
   }

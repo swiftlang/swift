@@ -59,6 +59,9 @@ public struct FilterSequenceView<Base: SequenceType> : SequenceType {
 public struct FilterCollectionViewIndex<
   Base: CollectionType
 > : ForwardIndexType {
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: the next value is representable.
   public func successor() -> FilterCollectionViewIndex {
     for nextPos in _pos.successor()..<_end {
       if _include(_base[nextPos]) {

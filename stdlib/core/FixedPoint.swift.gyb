@@ -275,6 +275,9 @@ extension ${Self} : RandomAccessIndexType {
   // for details of how this works.
   typealias _DisabledRangeIndex = ${Self}
   
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: the next value is representable.
   @transparent public
   func successor() -> ${Self} {
     return self &+ 1

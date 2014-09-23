@@ -1521,6 +1521,9 @@ struct _NativeDictionaryIndex<Key : Hashable, Value> :
     return self
   }
 
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: the next value is representable.
   func successor() -> NativeIndex {
     var i = offset + 1
     // FIXME: Can't write the simple code pending
@@ -1592,6 +1595,9 @@ struct _CocoaDictionaryIndex : BidirectionalIndexType, Comparable {
     return _CocoaDictionaryIndex(cocoaDictionary, allKeys, currentKeyIndex - 1)
   }
 
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: the next value is representable.
   func successor() -> _CocoaDictionaryIndex {
     _precondition(
         currentKeyIndex < allKeys.value, "can not increment endIndex")
@@ -1687,6 +1693,9 @@ public struct DictionaryIndex<Key : Hashable, Value> :
     }
   }
 
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: the next value is representable.
   public func successor() -> Index {
     if _fastPath(_guaranteedNative) {
       return ._Native(_nativeIndex.successor())

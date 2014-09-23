@@ -19,8 +19,9 @@
 public enum Bit : Int, RandomAccessIndexType, Reflectable {
   case Zero = 0, One = 1
 
-  /// Return the next consecutive value in a discrete sequence of
-  /// `Bit` values
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// Requires: `self == .Zero`.
   public func successor() -> Bit {
     _precondition(self == .Zero, "Can't increment past one")
     return .One
