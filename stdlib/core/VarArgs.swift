@@ -29,6 +29,8 @@
 ///     return withVaList(arguments) { f(x, $0) }
 ///   }
 public protocol CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   func encode() -> [Word]
 }
 
@@ -81,30 +83,40 @@ public func _encodeBitsAsWords<T: CVarArgType>(x: T) -> [Word] {
 
 // Signed types
 extension Int : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension Int64 : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension Int32 : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension Int16 : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(CInt(self))
   }
 }
 
 extension Int8 : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(CInt(self))
   }
@@ -112,48 +124,64 @@ extension Int8 : CVarArgType {
 
 // Unsigned types
 extension UInt : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt64 : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt32 : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt16 : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
 
 extension UInt8 : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
 
 extension COpaquePointer : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension Float : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(Double(self))
   }
 }
 
 extension Double : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
   public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
