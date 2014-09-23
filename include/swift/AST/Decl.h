@@ -4341,6 +4341,8 @@ public:
 
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
   Type getArgumentType() const { return ArgumentType.getType(); }
+  Type getArgumentInterfaceType() const;
+
   TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
   const TypeLoc &getArgumentTypeLoc() const { return ArgumentType; }
 

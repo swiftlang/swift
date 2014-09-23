@@ -1742,7 +1742,8 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
         sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                    elt, nullptr, elt->getArgumentType())
+                                    elt, nullptr,
+                                    elt->getArgumentInterfaceType())
                   ->getCanonicalType();
 
       eltCMV = emitReabstractedSubobject(SGF, loc, origCMV, eltTL,

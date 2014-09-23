@@ -1012,7 +1012,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       if (elt->hasArgumentType())
         elementType = type->getTypeOfMember(elt->getModuleContext(),
                                             elt, this,
-                                            elt->getArgumentType());
+                                            elt->getArgumentInterfaceType());
       else
         elementType = TupleType::getEmpty(Context);
       Pattern *sub = OP->getSubPattern();

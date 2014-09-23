@@ -748,7 +748,7 @@ namespace {
           auto origTy = AbstractionPattern(elt->getArgumentType());
           auto substTy = silTy.getSwiftRValueType()
             ->getTypeOfMember(M.getSwiftModule(), elt, nullptr,
-                              elt->getArgumentType());
+                              elt->getArgumentInterfaceType());
           elts.push_back(NonTrivialElement{elt,
                                      M.Types.getTypeLowering(origTy, substTy)});
         }
@@ -1051,9 +1051,10 @@ namespace {
         if (!elt->hasArgumentType())
           continue;
         
-        auto substEltType = enumType->getTypeOfMember(D->getModuleContext(),
-                                                      elt, nullptr,
-                                                      elt->getArgumentType())
+        auto substEltType = enumType->getTypeOfMember(
+                              D->getModuleContext(),
+                              elt, nullptr,
+                              elt->getArgumentInterfaceType())
           ->getCanonicalType();
         
         switch (classifyType(substEltType->getCanonicalType(), TC.M)) {

@@ -2952,6 +2952,16 @@ SourceRange EnumElementDecl::getSourceRange() const {
     return {getStartLoc(), ArgumentType.getSourceRange().End};
   return {getStartLoc(), getNameLoc()};
 }
+
+Type EnumElementDecl::getArgumentInterfaceType() const {
+  if (!hasArgumentType())
+    return nullptr;
+
+  auto funcTy = getInterfaceType()->castTo<AnyFunctionType>();
+  funcTy = funcTy->getResult()->castTo<AnyFunctionType>();
+  return funcTy->getInput();
+}
+
 SourceRange ConstructorDecl::getSourceRange() const {
   if (isImplicit())
     return getConstructorLoc();
