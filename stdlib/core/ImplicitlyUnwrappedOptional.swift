@@ -60,6 +60,7 @@ public enum ImplicitlyUnwrappedOptional<T>
 }
 
 extension ImplicitlyUnwrappedOptional : Printable {
+  /// A textual representation of `self`.
   public var description: String {
     switch self {
     case .Some(let value):

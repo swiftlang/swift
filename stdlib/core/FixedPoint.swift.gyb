@@ -256,6 +256,7 @@ extension ${Self} : Hashable {
 }
 
 extension ${Self} : Printable {
+  /// A textual representation of `self`.
   public var description: String {
 % if signed:
     return _int64ToString(self.toIntMax())

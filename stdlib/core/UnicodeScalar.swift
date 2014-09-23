@@ -190,9 +190,11 @@ public struct UnicodeScalar :
 }
 
 extension UnicodeScalar : Printable, DebugPrintable {
+  /// A textual representation of `self`.
   public var description: String {
     return "\"\(escape(asASCII: false))\""
   }
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "\"\(escape(asASCII: true))\""
   }

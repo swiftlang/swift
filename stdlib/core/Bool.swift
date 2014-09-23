@@ -52,6 +52,7 @@ extension Bool : BooleanType {
 }
 
 extension Bool : Printable {
+  /// A textual representation of `self`.
   public var description: String {
     return self ? "true" : "false"
   }

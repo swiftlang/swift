@@ -142,6 +142,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
 }
 
 extension COpaquePointer : DebugPrintable {
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(value)
   }
@@ -188,6 +189,7 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
 }
 
 extension CFunctionPointer : DebugPrintable {
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return value.debugDescription
   }
@@ -214,6 +216,7 @@ public struct CVaListPointer {
 }
 
 extension CVaListPointer : DebugPrintable {
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return value.debugDescription
   }

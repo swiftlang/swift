@@ -178,10 +178,12 @@ public struct StaticString
     self = value
   }
 
+  /// A textual representation of `self`.
   public var description: String {
     return self.stringValue
   }
 
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return self.stringValue.debugDescription
   }

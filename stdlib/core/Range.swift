@@ -139,12 +139,12 @@ public struct Range<
     }
   }
 
-  /// The `Range`\ 's printed representation
+  /// A textual representation of `self`.
   public var description: String {
     return "\(startIndex)..<\(endIndex)"
   }
   
-  /// The `Range`\ 's verbose printed representation
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "Range(\(toDebugString(startIndex))..<\(toDebugString(endIndex)))"
   }

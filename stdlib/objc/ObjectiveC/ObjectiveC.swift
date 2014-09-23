@@ -67,6 +67,7 @@ extension ObjCBool : Reflectable {
 }
 
 extension ObjCBool : Printable {
+  /// A textual representation of `self`.
   public var description: String {
     return self.boolValue.description
   }
@@ -135,6 +136,7 @@ extension Selector : Equatable, Hashable {
 }
 
 extension Selector : Printable {
+  /// A textual representation of `self`.
   public var description: String {
     if let s = String.fromCStringRepairingIllFormedUTF8(sel_getName(self)).0 {
       return s

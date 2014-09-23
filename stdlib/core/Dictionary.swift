@@ -416,6 +416,7 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
     self[i.offset] = Element(key: key, value: value)
   }
 
+  /// A textual representation of `self`.
   var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED
@@ -2224,10 +2225,12 @@ extension Dictionary : Printable, DebugPrintable {
     return result
   }
 
+  /// A textual representation of `self`.
   public var description: String {
     return _makeDescription(isDebug: false)
   }
 
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return _makeDescription(isDebug: true)
   }

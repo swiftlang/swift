@@ -152,6 +152,7 @@ extension String : StringLiteralConvertible {
 }
 
 extension String : DebugPrintable {
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {

@@ -384,6 +384,7 @@ public struct ${Self}<T>
 }
 
 extension ${Self} : DebugPrintable {
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(value)
   }

@@ -143,6 +143,7 @@ public struct ${Self} {
 }
 
 extension ${Self} : Printable {
+  /// A textual representation of `self`.
   public var description: String {
     return _float${bits}ToString(self)
   }

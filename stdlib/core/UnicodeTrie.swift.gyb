@@ -59,6 +59,7 @@ internal enum _GraphemeClusterBreakPropertyValue : Int, Printable {
   case LV = 11
   case LVT = 12
 
+  /// A textual representation of `self`.
   var description: String {
     switch self {
     case Other:

@@ -27,6 +27,7 @@ public protocol OutputStreamType {
 ///
 /// For example: `String`, `Character`, `UnicodeScalar`.
 public protocol Streamable {
+  /// Write a textual representation of `self` into `target`
   func writeTo<Target : OutputStreamType>(inout target: Target)
 }
 
@@ -35,7 +36,7 @@ public protocol Streamable {
 /// This textual representation is used when objects are written to an
 /// *output stream*, for example, by `print` and `println`.
 public protocol Printable {
-  /// A textual representation of `self`
+  /// A textual representation of `self`.
   var description: String { get }
 }
 
@@ -47,7 +48,7 @@ public protocol Printable {
 /// typically more verbose than the text provided by a `Printable`\ 's
 /// `description` property.
 public protocol DebugPrintable {
-  /// A textual representation of `self` suitable for debugging.
+  /// A textual representation of `self`, suitable for debugging.
   var debugDescription: String { get }
 }
 
@@ -263,8 +264,10 @@ internal struct _Stdout : OutputStreamType {
 
 extension String : OutputStreamType {
   public mutating
-  func write(string: String) {
-    self += string
+  
+  /// Append `other` to this stream.
+  func write(other: String) {
+    self += other
   }
 }
 
@@ -273,18 +276,21 @@ extension String : OutputStreamType {
 //===----------------------------------------------------------------------===//
 
 extension String : Streamable {
+  /// Write a textual representation of `self` into `target`
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(self)
   }
 }
 
 extension Character : Streamable {
+  /// Write a textual representation of `self` into `target`
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(String(self))
   }
 }
 
 extension UnicodeScalar : Streamable {
+  /// Write a textual representation of `self` into `target`
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(String(Character(self)))
   }

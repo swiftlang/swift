@@ -569,12 +569,12 @@ extension ${Self} : Printable, DebugPrintable {
     return result
   }
 
-  /// A textual representation of `self`
+  /// A textual representation of `self`.
   public var description: String {
     return _makeDescription(isDebug: false)
   }
 
-  /// A textual representation of `self`, suitable for debugging
+  /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return _makeDescription(isDebug: true)
   }
