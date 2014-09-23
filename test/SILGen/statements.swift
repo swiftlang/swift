@@ -10,7 +10,7 @@ func assignment(var x: Int, var y: Int) {
   (x, y) = (1,2)
 }
 
-// CHECK-LABEL: sil  @{{.*}}assignment
+// CHECK-LABEL: sil hidden  @{{.*}}assignment
 // CHECK: integer_literal $Builtin.Int2048, 42
 // CHECK: assign
 // CHECK: integer_literal $Builtin.Int2048, 57
@@ -23,7 +23,7 @@ func if_test(x: Int, y: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil  @_TF10statements7if_test
+// CHECK-LABEL: sil hidden  @_TF10statements7if_test
 
 func if_else(x: Int, y: Bool) {
   if (y) {
@@ -34,7 +34,7 @@ func if_else(x: Int, y: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil  @_TF10statements7if_else
+// CHECK-LABEL: sil hidden  @_TF10statements7if_else
 
 func nested_if(x: Int, y: Bool, z: Bool) {
   if (y) {
@@ -49,7 +49,7 @@ func nested_if(x: Int, y: Bool, z: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil  @_TF10statements9nested_if
+// CHECK-LABEL: sil hidden  @_TF10statements9nested_if
 
 func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
   if (y) {
@@ -63,7 +63,7 @@ func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
   }
 }
 
-// CHECK-LABEL: sil  @_TF10statements21nested_if_merge_noret
+// CHECK-LABEL: sil hidden  @_TF10statements21nested_if_merge_noret
 
 func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
   if (y) {
@@ -79,7 +79,7 @@ func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
   return 2;
 }
 
-// CHECK-LABEL: sil  @_TF10statements19nested_if_merge_ret
+// CHECK-LABEL: sil hidden  @_TF10statements19nested_if_merge_ret
 
 func else_break(x: Int, y: Bool, z: Bool) {
   while z {
@@ -90,7 +90,7 @@ func else_break(x: Int, y: Bool, z: Bool) {
   }
 }
 
-// CHECK-LABEL: sil  @_TF10statements10else_break
+// CHECK-LABEL: sil hidden  @_TF10statements10else_break
 
 func loop_with_break(x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
@@ -101,7 +101,7 @@ func loop_with_break(x: Int, y: Bool, z: Bool) -> Int {
   }
 }
 
-// CHECK-LABEL: sil  @_TF10statements15loop_with_break
+// CHECK-LABEL: sil hidden  @_TF10statements15loop_with_break
 
 func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
@@ -114,7 +114,7 @@ func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil  @_TF10statements18loop_with_continue
+// CHECK-LABEL: sil hidden  @_TF10statements18loop_with_continue
 
 func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   do {
@@ -128,7 +128,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil  @_TF10statements21do_loop_with_continue 
+// CHECK-LABEL: sil hidden  @_TF10statements21do_loop_with_continue 
 
 
 func for_loops(var x: Int, c: Bool) {
@@ -149,7 +149,7 @@ func for_loops(var x: Int, c: Bool) {
   
   return 
 }
-// CHECK-LABEL: sil  @{{.*}}for_loops
+// CHECK-LABEL: sil hidden  @{{.*}}for_loops
 
 func void_return() {
   var b:Bool
@@ -157,7 +157,7 @@ func void_return() {
     return
   }
 }
-// CHECK-LABEL: sil  @_TF10statements11void_return
+// CHECK-LABEL: sil hidden  @_TF10statements11void_return
 // CHECK: cond_br {{%[0-9]+}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 // CHECK: [[BB1]]:
 // CHECK:   br [[EPILOG:bb[0-9]+]]
@@ -170,7 +170,7 @@ func void_return() {
 func foo() {}
 
 // <rdar://problem/13549626>
-// CHECK-LABEL: sil  @_TF10statements14return_from_if
+// CHECK-LABEL: sil hidden  @_TF10statements14return_from_if
 func return_from_if(a: Bool) -> Int {
   // CHECK: bb0(%0 : $Bool):
   // CHECK: cond_br {{.*}}, [[THEN:bb[0-9]+]], [[ELSE:bb[0-9]+]]
@@ -207,7 +207,7 @@ func for_ignored_lvalue_init() {
 }
 
 
-// CHECK-LABEL: sil @{{.*}}test_break
+// CHECK-LABEL: sil hidden @{{.*}}test_break
 func test_break(i : Int) {
   switch i {
   case (let x) where x != 17: 

@@ -207,8 +207,16 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   }
   
   // Otherwise, we have external linkage.
-  // FIXME: access control
-  return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
+  switch (d->getAccessibility()) {
+    case Accessibility::Private:
+      return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+
+    case Accessibility::Internal:
+      return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
+
+    default:
+      return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
+  }
 }
 
 SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,

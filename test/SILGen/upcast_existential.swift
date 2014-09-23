@@ -9,7 +9,7 @@ func makePQ() -> protocol<P,Q> { return X() }
 
 func useP(x: P) { }
 
-// CHECK-LABEL: sil @_TF18upcast_existential5PQtoPFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF18upcast_existential5PQtoPFT_T_ : $@thin () -> () {
 func PQtoP() {
   // CHECK: upcast_existential [take] [[PQ:%.*]]#1 : $*protocol<P, Q> to {{%.*}}#1 : $*P
   // CHECK-NOT: destroy_addr [[PQ]]

@@ -49,7 +49,7 @@ static void cleanFunction(SILFunction &Fn) {
   // Rename functions with public_external linkage to prevent symbol conflict
   // with stdlib.
   if (Fn.isDefinition() && Fn.getLinkage() == SILLinkage::PublicExternal) {
-    Fn.setLinkage(SILLinkage::Shared);
+    Fn.setLinkage(SILLinkage::SharedExternal);
   }
 }
 

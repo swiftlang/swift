@@ -8,7 +8,7 @@ func call(f: () -> Int) -> Int {
   return f()
 }
 
-// CHECK: sil @_TF17capture_typealias3fooFT_T_ : $@thin () -> () {
+// CHECK: sil hidden @_TF17capture_typealias3fooFT_T_ : $@thin () -> () {
 // CHECK: function_ref [[CLOSURE:@_TFF17capture_typealias3fooFT_T_U_FT_Bi64_]]
 func foo() {
   typealias X = Int

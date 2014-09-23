@@ -11,7 +11,7 @@ struct AStruct {
   func f() -> Int { return 3 }
 }
 
-// CHECK: define void @_TF9nostorage3appFT_T_()
+// CHECK: define hidden void @_TF9nostorage3appFT_T_()
 func app() {
 	var ac : AClass = AnotherClass()
         // No members? No storage! Emitted as a constant 0, because.

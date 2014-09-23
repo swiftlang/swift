@@ -19,7 +19,7 @@ class SomeClass : SomeProtocol {
 
 class SomeSubclass : SomeClass {}
 
-// CHECK-LABEL: sil  @_TF9metatypes16static_metatypes
+// CHECK-LABEL: sil hidden @_TF9metatypes16static_metatypes
 func static_metatypes()
   -> (SomeStruct.Type, SomeClass.Type, SomeClass.Type)
 {
@@ -31,7 +31,7 @@ func static_metatypes()
   return (SomeStruct.self, SomeClass.self, SomeSubclass.self)
 }
 
-// CHECK-LABEL: sil  @_TF9metatypes16struct_metatypes
+// CHECK-LABEL: sil hidden @_TF9metatypes16struct_metatypes
 func struct_metatypes(s: SomeStruct)
   -> (SomeStruct.Type, SomeStruct.Type)
 {
@@ -41,7 +41,7 @@ func struct_metatypes(s: SomeStruct)
   return (s.dynamicType, SomeStruct.self)
 }
 
-// CHECK-LABEL: sil  @_TF9metatypes15class_metatypes
+// CHECK-LABEL: sil hidden @_TF9metatypes15class_metatypes
 func class_metatypes(c: SomeClass, s: SomeSubclass)
   -> (SomeClass.Type, SomeClass.Type)
 {
@@ -52,7 +52,7 @@ func class_metatypes(c: SomeClass, s: SomeSubclass)
   return (c.dynamicType, s.dynamicType)
 }
 
-// CHECK-LABEL: sil  @_TF9metatypes19archetype_metatypes
+// CHECK-LABEL: sil hidden @_TF9metatypes19archetype_metatypes
 // CHECK-NEXT: bb0(%0 : $*T):
 func archetype_metatypes<T>(t: T) -> (T.Type, T.Type) {
   // CHECK: [[STATIC_T:%[0-9]+]] = metatype $@thick T.Type
@@ -61,7 +61,7 @@ func archetype_metatypes<T>(t: T) -> (T.Type, T.Type) {
   return (T.self, t.dynamicType)
 }
 
-// CHECK-LABEL: sil  @_TF9metatypes21existential_metatypes
+// CHECK-LABEL: sil hidden @_TF9metatypes21existential_metatypes
 func existential_metatypes(p: SomeProtocol) -> SomeProtocol.Type {
   // CHECK: existential_metatype $@thick SomeProtocol.Type
   return p.dynamicType
@@ -79,7 +79,7 @@ func generic_metatypes<T>(x: T)
 
 // rdar://16610078
 
-// CHECK-LABEL: sil @_TF9metatypes30existential_metatype_from_thinFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
+// CHECK-LABEL: sil hidden @_TF9metatypes30existential_metatype_from_thinFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T1]] : $@thick SomeStruct.Type to $@thick Any.Type
@@ -88,7 +88,7 @@ func existential_metatype_from_thin() -> Any.Type {
   return SomeStruct.self
 }
 
-// CHECK-LABEL: sil @_TF9metatypes36existential_metatype_from_thin_valueFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
+// CHECK-LABEL: sil hidden @_TF9metatypes36existential_metatype_from_thin_valueFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = function_ref @_TFV9metatypes10SomeStructCfMS0_FT_S0_
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
@@ -102,7 +102,7 @@ func existential_metatype_from_thin_value() -> Any.Type {
   return s.dynamicType
 }
 
-// CHECK-LABEL: sil @_TF9metatypes20specialized_metatypeFT_GVSs10DictionarySSSi_
+// CHECK-LABEL: sil hidden @_TF9metatypes20specialized_metatypeFT_GVSs10DictionarySSSi_
 // CHECK:         metatype $@thin Dictionary<String, Int>.Type
 func specialized_metatype() -> Dictionary<String, Int> {
   let dict = Swift.Dictionary<Swift.String, Int>()

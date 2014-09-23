@@ -11,7 +11,7 @@ class Bar {
 class C {}
 class D: C {}
 
-// CHECK-LABEL: sil @_TF27force_cast_chained_optional4testFCS_3FooCS_1D
+// CHECK-LABEL: sil hidden @_TF27force_cast_chained_optional4testFCS_3FooCS_1D
 // CHECK:         class_method %0 : $Foo, #Foo.bar!getter.1 : Foo -> () -> Bar! , $@cc(method) @thin (@owned Foo) ->
 // CHECK:         function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
 // CHECK:         cond_br {{%.*}}, [[SOME_BAR:bb[0-9]+]], [[NO_BAR:bb[0-9]+]]

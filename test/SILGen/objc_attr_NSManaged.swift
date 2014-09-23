@@ -10,11 +10,11 @@ import gizmo
 class SwiftGizmo : Gizmo {
   @NSManaged var x: X
 
-  // CHECK-NOT: sil @_TToFC19objc_attr_NSManaged10SwiftGizmog1xCS_1X : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X
-  // CHECK-NOT: sil @_TToFC19objc_attr_NSManaged10SwiftGizmos1xCS_1X
+  // CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmog1xCS_1X : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X
+  // CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmos1xCS_1X
 
   // Make sure that we're calling through the @objc entry points.
-  // CHECK-LABEL: sil @_TFC19objc_attr_NSManaged10SwiftGizmo7modifyX{{.*}} : $@cc(method) @thin (@owned SwiftGizmo) -> () {
+  // CHECK-LABEL: sil hidden @_TFC19objc_attr_NSManaged10SwiftGizmo7modifyX{{.*}} : $@cc(method) @thin (@owned SwiftGizmo) -> () {
   func modifyX() {
     // CHECK:   [[GETTER:%[0-9]+]] = class_method [volatile] [[SELF:%.*]] : $SwiftGizmo, #SwiftGizmo.x!getter.1.foreign : SwiftGizmo -> () -> X , $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X
     // CHECK-NEXT: apply [[GETTER]]([[SELF]]) : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X
@@ -26,8 +26,8 @@ class SwiftGizmo : Gizmo {
   }
 }
 
-// CHECK-NOT: sil @_TToFC19objc_attr_NSManaged10SwiftGizmog1xCS_1X : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X
-// CHECK-NOT: sil @_TToFC19objc_attr_NSManaged10SwiftGizmos1xCS_1X
+// CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmog1xCS_1X : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X
+// CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmos1xCS_1X
 
 
 // The vtable should not contain any entry points for getters and setters.

@@ -157,14 +157,21 @@ namespace swift {
   /// Turn the given module into SIL IR.
   ///
   /// The module must contain source files.
-  std::unique_ptr<SILModule> performSILGeneration(Module *M);
+  ///
+  /// If \p makeModuleFragile is true, all functions and global variables of
+  /// the module are marked as fragile. This is used for compiling the stdlib.
+  std::unique_ptr<SILModule> performSILGeneration(Module *M,
+                                               bool makeModuleFragile = false);
 
   /// Turn a source file into SIL IR.
   ///
   /// If \p StartElem is provided, the module is assumed to be only part of the
   /// SourceFile, and any optimizations should take that into account.
+  /// If \p makeModuleFragile is true, all functions and global variables of
+  /// the module are marked as fragile. This is used for compiling the stdlib.
   std::unique_ptr<SILModule>
-  performSILGeneration(SourceFile &SF, Optional<unsigned> StartElem = Nothing);
+  performSILGeneration(SourceFile &SF, Optional<unsigned> StartElem = Nothing,
+                       bool makeModuleFragile = false);
 
   using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;
 

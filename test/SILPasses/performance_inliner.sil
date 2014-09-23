@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -inline -sil-inline-threshold=50 -verify | FileCheck %s
+// RUN: %sil-opt %s -inline -sil-inline-threshold=50 -sil-combine -verify | FileCheck %s
 
 sil_stage canonical
 
@@ -561,8 +561,8 @@ bb0(%0 : $UWord):
   return %6 : $UWord                              // id: %7
 }
 
-// Make sure that private symbol references do not get inlined into
-// transparent functions.
+// Transparent function may inline private functions.
+//
 sil private @private_ret_undef : $@thin () -> () {
 entry:
   return undef : $()
@@ -576,11 +576,64 @@ entry:
 }
 
 // CHECK-LABEL: sil [transparent] @transparent_uses_uses_private : $@thin () -> () {
-// CHECK: [[USES_PRIVATE:%.*]] = function_ref @uses_private
-// CHECK: apply [[USES_PRIVATE]]()
+// CHECK-NOT: function_ref @uses_private
+// CHECK: return
 sil [transparent] @transparent_uses_uses_private : $@thin () -> () {
 entry:
   %f = function_ref @uses_private : $@thin () -> ()
+  %z = apply %f() : $@thin () -> ()
+  return %z : $()
+}
+
+// Test fragile-resilient inlining rules:
+// Everything is allowed except inlining of a resilient function into a fragile function.
+
+sil @resilient_function : $@thin () -> () {
+entry:
+  return undef : $()
+}
+
+sil [fragile] @fragile_function : $@thin () -> () {
+entry:
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [fragile] @fragile_calls_resilient : $@thin () -> () {
+// CHECK: function_ref @resilient_function
+// CHECK: return
+sil [fragile] @fragile_calls_resilient : $@thin () -> () {
+entry:
+  %f = function_ref @resilient_function : $@thin () -> ()
+  %z = apply %f() : $@thin () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil [fragile] @fragile_calls_fragile : $@thin () -> () {
+// CHECK-NOT: function_ref @resilient_function
+// CHECK: return
+sil [fragile] @fragile_calls_fragile : $@thin () -> () {
+entry:
+  %f = function_ref @fragile_function : $@thin () -> ()
+  %z = apply %f() : $@thin () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil @resilient_calls_fragile : $@thin () -> () {
+// CHECK-NOT: function_ref @resilient_function
+// CHECK: return
+sil @resilient_calls_fragile : $@thin () -> () {
+entry:
+  %f = function_ref @fragile_function : $@thin () -> ()
+  %z = apply %f() : $@thin () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil @resilient_calls_resilient : $@thin () -> () {
+// CHECK-NOT: function_ref @resilient_function
+// CHECK: return
+sil @resilient_calls_resilient : $@thin () -> () {
+entry:
+  %f = function_ref @resilient_function : $@thin () -> ()
   %z = apply %f() : $@thin () -> ()
   return %z : $()
 }
@@ -598,6 +651,9 @@ entry:
 }
 
 // Visiblity Tests
+// These tests stem from a time where visiblity had an influence
+// on the inlining. This is no longer the case so we just check
+// if everything can be inlined, regardless of visibility.
 
 sil_global private @private_global : $Builtin.Word
 sil private @private_function : $@thin () -> () {
@@ -669,14 +725,8 @@ sil @references_public_function : $@thin () -> () {
 }
 
 // CHECK-LABEL: sil private @private_function_test : $@thin () -> () {
-// CHECK: function_ref @public_function
-// CHECK: function_ref @shared_function
-// CHECK: function_ref @hidden_function
-// CHECK: function_ref @private_function
-// CHECK: sil_global_addr @public_global
-// CHECK: sil_global_addr @shared_global
-// CHECK: sil_global_addr @hidden_global
-// CHECK: sil_global_addr @private_global
+// CHECK-NOT: function_ref
+// CHECK: return
 sil private @private_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
@@ -699,14 +749,8 @@ sil private @private_function_test : $@thin () -> () {
 }
 
 // CHECK-LABEL: sil shared @shared_function_test : $@thin () -> () {
-// CHECK: function_ref @public_function
-// CHECK: function_ref @shared_function
-// CHECK-NOT: function_ref @hidden_function
-// CHECK-NOT: function_ref @private_function
-// CHECK: sil_global_addr @public_global
-// CHECK: sil_global_addr @shared_global
-// CHECK-NOT: sil_global_addr @hidden_global
-// CHECK-NOT: sil_global_addr @private_global
+// CHECK-NOT: function_ref
+// CHECK: return
 sil shared @shared_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
@@ -729,14 +773,8 @@ sil shared @shared_function_test : $@thin () -> () {
 }
 
 // CHECK-LABEL: sil hidden @hidden_function_test : $@thin () -> () {
-// CHECK: function_ref @public_function
-// CHECK: function_ref @shared_function
-// CHECK: function_ref @hidden_function
-// CHECK-NOT: function_ref @private_function
-// CHECK: sil_global_addr @public_global
-// CHECK: sil_global_addr @shared_global
-// CHECK: sil_global_addr @hidden_global
-// CHECK-NOT: sil_global_addr @private_global
+// CHECK-NOT: function_ref
+// CHECK: return
 sil hidden @hidden_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
@@ -759,14 +797,8 @@ sil hidden @hidden_function_test : $@thin () -> () {
 }
 
 // CHECK-LABEL: sil @public_function_test : $@thin () -> () {
-// CHECK: function_ref @public_function
-// CHECK: function_ref @shared_function
-// CHECK-NOT: function_ref @hidden_function
-// CHECK-NOT: function_ref @private_function
-// CHECK: sil_global_addr @public_global
-// CHECK: sil_global_addr @shared_global
-// CHECK-NOT: sil_global_addr @hidden_global
-// CHECK-NOT: sil_global_addr @private_global
+// CHECK-NOT: function_ref
+// CHECK: return
 sil @public_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
@@ -789,14 +821,8 @@ sil @public_function_test : $@thin () -> () {
 }
 
 // CHECK-LABEL: sil hidden_external @hidden_external_function_test : $@thin () -> () {
-// CHECK: function_ref @public_function
-// CHECK: function_ref @shared_function
-// CHECK: function_ref @hidden_function
-// CHECK-NOT: function_ref @private_function
-// CHECK: sil_global_addr @public_global
-// CHECK: sil_global_addr @shared_global
-// CHECK: sil_global_addr @hidden_global
-// CHECK-NOT: sil_global_addr @private_global
+// CHECK-NOT: function_ref
+// CHECK: return
 sil hidden_external @hidden_external_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
@@ -819,14 +845,8 @@ sil hidden_external @hidden_external_function_test : $@thin () -> () {
 }
 
 // CHECK-LABEL: sil public_external @public_external_function_test : $@thin () -> () {
-// CHECK: function_ref @public_function
-// CHECK: function_ref @shared_function
-// CHECK-NOT: function_ref @hidden_function
-// CHECK-NOT: function_ref @private_function
-// CHECK: sil_global_addr @public_global
-// CHECK: sil_global_addr @shared_global
-// CHECK-NOT: sil_global_addr @hidden_global
-// CHECK-NOT: sil_global_addr @private_global
+// CHECK-NOT: function_ref
+// CHECK: return
 sil public_external @public_external_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
@@ -884,7 +904,7 @@ bb0(%0 : $*C, %1 : $Bool):
 }
 
 // Specialized call to "slowPath" for use in @coldcall_caller
-sil shared [transparent] [semantics "slowpath"] @_TTSSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool {
+sil shared [noinline] [transparent] [semantics "slowpath"] @_TTSSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool {
 bb0(%0 : $*Bool):
   %3 = integer_literal $Builtin.Int1, 0
   %4 = struct $Bool (%3 : $Builtin.Int1)
@@ -941,7 +961,6 @@ sil [transparent] [semantics "fastpath"] @fastPathHelper : $@thin <τ_0_0 where 
 // CHECK: function_ref @fastPathHelper
 // CHECK-LABEL: bb1:
 // CHECK: function_ref @slowHelper
-// CHECK-NEXT: apply
 // CHECK-LABEL: bb2:
 sil @testNoInlineSlow : $@thin () -> () {
 bb0:
@@ -969,8 +988,7 @@ bb2:
 // CHECK-LABEL: bb0:
 // CHECK: function_ref @fastPathHelper
 // CHECK-LABEL: bb1:
-// CHECK: function_ref @slowHelper
-// CHECK-NOT: apply
+// CHECK-NOT: function_ref @slowHelper
 // CHECK-LABEL: bb2:
 sil @testInlineSlowTransparent : $@thin () -> () {
 bb0:

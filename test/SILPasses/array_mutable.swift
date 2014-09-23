@@ -5,7 +5,7 @@
 // loop header. If this becomes to fragile, we could check debug-only
 // output instead.
 
-// CHECK-LABEL: sil @_TF13array_mutable8inoutarrFRGSaSi_T_
+// CHECK-LABEL: sil hidden @_TF13array_mutable8inoutarrFRGSaSi_T_
 // CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced 
 // CHECK-NOT: {{^bb}}
 // CHECK: apply %[[FR]]
@@ -23,7 +23,7 @@ struct S {
   var a: [Int]
 }
 
-// CHECK-LABEL: sil @_TF13array_mutable6arreltFRVS_1ST_
+// CHECK-LABEL: sil hidden @_TF13array_mutable6arreltFRVS_1ST_
 // CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
 // CHECK-NOT: {{^bb}}
 // CHECK: apply %[[FR]]
@@ -38,7 +38,7 @@ func arrelt(inout s: S) {
 
 // Check that we have an explicit retain before calling isUniquelyReferenced.
 // <rdar:18109082> ARC: make _isUniquelyReferenced a barrier
-// CHECK-LABEL: sil @_TF13array_mutable7arrcopyFRGSaSi_Si
+// CHECK-LABEL: sil hidden @_TF13array_mutable7arrcopyFRGSaSi_Si
 // CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
 // CHECK: retain_value
 // CHECK: apply %[[FR]]

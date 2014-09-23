@@ -7,7 +7,7 @@ class Base {
 // The ordering here is unfortunate: we generate the property
 // getters and setters after we've processed the decl.
 
-// CHECK: sil [transparent] @_TFC17materializeForSet4Basem8computedSi : $@cc(method) @thin (Builtin.RawPointer, @owned Base) -> (Builtin.RawPointer, Builtin.Int1) {
+// CHECK: sil hidden [transparent] @_TFC17materializeForSet4Basem8computedSi : $@cc(method) @thin (Builtin.RawPointer, @owned Base) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $Base):
 // CHECK:   [[T0:%.*]] = function_ref @_TFC17materializeForSet4Baseg8computedSi
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
@@ -18,7 +18,7 @@ class Base {
 // CHECK:   return [[T4]] : $(Builtin.RawPointer, Builtin.Int1)
 // CHECK: }
 
-// CHECK: sil [transparent] @_TFC17materializeForSet4Basem6storedSi : $@cc(method) @thin (Builtin.RawPointer, @owned Base) -> (Builtin.RawPointer, Builtin.Int1) {
+// CHECK: sil hidden [transparent] @_TFC17materializeForSet4Basem6storedSi : $@cc(method) @thin (Builtin.RawPointer, @owned Base) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $Base):
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
@@ -42,7 +42,7 @@ class HasDidSet : Base {
 // Checking this after silgen, but before mandatory inlining, lets us
 // test the intent much better.
 
-// SILGEN: sil [transparent] @_TFC17materializeForSet9HasDidSetm6storedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
+// SILGEN: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm6storedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
 // SILGEN: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasDidSet):
 // SILGEN:   [[T0:%.*]] = function_ref @_TFC17materializeForSet9HasDidSetg6storedSi
 // SILGEN:   [[T1:%.*]] = apply [[T0]]([[SELF]])
@@ -58,7 +58,7 @@ class HasDidSet : Base {
     set(value) {}
   }
 
-// CHECK: sil [transparent] @_TFC17materializeForSet9HasDidSetm8computedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
+// CHECK: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm8computedSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasDidSet) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasDidSet):
 // CHECK:   [[T0:%.*]] = function_ref @_TFC17materializeForSet9HasDidSetg8computedSi
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
@@ -73,7 +73,7 @@ class HasDidSet : Base {
 class HasWeak {
   weak var weakvar: HasWeak? = nil
 }
-// CHECK: sil [transparent] @_TFC17materializeForSet7HasWeakm7weakvarXwGSqS0__ : $@cc(method) @thin (Builtin.RawPointer, @owned HasWeak) -> (Builtin.RawPointer, Builtin.Int1) {
+// CHECK: sil hidden [transparent] @_TFC17materializeForSet7HasWeakm7weakvarXwGSqS0__ : $@cc(method) @thin (Builtin.RawPointer, @owned HasWeak) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $HasWeak):
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
 // CHECK:   [[T1:%.*]] = load_weak [[T0]] : $*@sil_weak Optional<HasWeak>
@@ -92,7 +92,7 @@ struct Bill : Totalled {
   var total: Int
 }
 
-// CHECK: sil [transparent] @_TFV17materializeForSet4Billm5totalSi : $@cc(method) @thin (Builtin.RawPointer, @inout Bill) -> (Builtin.RawPointer, Builtin.Int1) {
+// CHECK: sil hidden [transparent] @_TFV17materializeForSet4Billm5totalSi : $@cc(method) @thin (Builtin.RawPointer, @inout Bill) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $*Bill):
 // CHECK:   [[T0:%.*]] = struct_element_addr [[SELF]] : $*Bill, #Bill.total
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer

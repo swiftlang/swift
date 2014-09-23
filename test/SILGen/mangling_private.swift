@@ -12,28 +12,28 @@
 
 import mangling_private_helper
 
-// CHECK-LABEL: sil @_TF16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506811privateFuncFT_Si
-// OTHER-NAME-LABEL: sil @_TF16mangling_privateP33_CF726049E48876D30EA29D63CF139F1D11privateFuncFT_Si
+// CHECK-LABEL: sil private @_TF16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506811privateFuncFT_Si
+// OTHER-NAME-LABEL: sil private @_TF16mangling_privateP33_CF726049E48876D30EA29D63CF139F1D11privateFuncFT_Si
 private func privateFunc() -> Int {
   return 0
 }
 
 public struct PublicStruct {
-  // CHECK-LABEL: sil @_TFV16mangling_private12PublicStructP33_A3CCBB841DB59E79A4AD4EE45865506813privateMethodfMS0_FT_T_
+  // CHECK-LABEL: sil private @_TFV16mangling_private12PublicStructP33_A3CCBB841DB59E79A4AD4EE45865506813privateMethodfMS0_FT_T_
   private static func privateMethod() {}
 }
 
 public struct InternalStruct {
-  // CHECK-LABEL: sil @_TFV16mangling_private14InternalStructP33_A3CCBB841DB59E79A4AD4EE45865506813privateMethodfMS0_FT_T_
+  // CHECK-LABEL: sil private @_TFV16mangling_private14InternalStructP33_A3CCBB841DB59E79A4AD4EE45865506813privateMethodfMS0_FT_T_
   private static func privateMethod() {}
 }
 
 private struct PrivateStruct {
-  // CHECK-LABEL: sil @_TFV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct13privateMethodfMS0_FT_T_
+  // CHECK-LABEL: sil private @_TFV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct13privateMethodfMS0_FT_T_
   private static func privateMethod() {}
 
   struct Inner {
-    // CHECK-LABEL: sil @_TFVV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct5Inner13privateMethodfMS1_FT_T_
+    // CHECK-LABEL: sil private @_TFVV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct5Inner13privateMethodfMS1_FT_T_
     private static func privateMethod() {}
   }
 }
@@ -46,11 +46,11 @@ func localTypes() {
 }
 
 extension PublicStruct {
-  // CHECK-LABEL: sil @_TFV16mangling_private12PublicStructP33_A3CCBB841DB59E79A4AD4EE45865506816extPrivateMethodfS0_FT_T_
+  // CHECK-LABEL: sil private @_TFV16mangling_private12PublicStructP33_A3CCBB841DB59E79A4AD4EE45865506816extPrivateMethodfS0_FT_T_
   private func extPrivateMethod() {}
 }
 extension PrivateStruct {
-  // CHECK-LABEL: sil @_TFV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct16extPrivateMethodfS0_FT_T_
+  // CHECK-LABEL: sil private @_TFV16mangling_privateP33_A3CCBB841DB59E79A4AD4EE45865506813PrivateStruct16extPrivateMethodfS0_FT_T_
   private func extPrivateMethod() {}
 }
 

@@ -22,5 +22,5 @@ var a = AlwaysInlineInitStruct(x: false)
 
 // SIL-LABEL: [always_inline] @_TF17def_always_inline16testAlwaysInlineFT1xSb_Sb : $@thin (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [always_inline] @_TFV17def_always_inline22AlwaysInlineInitStructCfMS0_FT1xSb_S0_ : $@thin (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
+// SIL-LABEL: sil public_external [fragile] [always_inline] @_TFV17def_always_inline22AlwaysInlineInitStructCfMS0_FT1xSb_S0_ : $@thin (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 

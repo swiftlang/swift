@@ -20,7 +20,7 @@ func higher_order_function2(f: (Int, Int) -> Int, x: Int, y: Int) -> Int {
 }
 
 // -- Entry point BBs correspond to curried arguments in left-to-right order.
-// CHECK-LABEL: sil  @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+// CHECK-LABEL: sil hidden @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
 func curried_function(var x: Int)(var y: Int) -> Int {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Builtin.Int64
@@ -39,7 +39,7 @@ func curried_function(var x: Int)(var y: Int) -> Int {
 func generic_curried_function<T, U>(x: T)(y: U) { }
 
 // -- Curried function that returns a function uncurries to the right "natural" level
-// CHECK-LABEL: sil  @_TF9functions33curried_function_returns_function{{.*}} :  $@thin (Builtin.Int64, Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
+// CHECK-LABEL: sil hidden @_TF9functions33curried_function_returns_function{{.*}} :  $@thin (Builtin.Int64, Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
 func curried_function_returns_function(var x:Int)(var y:Int) -> (z:Int) -> Int {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   return { z in standalone_function(standalone_function(x, y), z) }
@@ -71,26 +71,26 @@ class SomeClass {
   // -- Constructors and methods are uncurried in 'self'
   // -- Instance methods use 'method' cc
 
-  // CHECK-LABEL: sil  @_TFC9functions9SomeClasscfMS0_FT1xBi64_1yBi64__S0_ : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClasscfMS0_FT1xBi64_1yBi64__S0_ : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
 
-  // CHECK-LABEL: sil  @_TFC9functions9SomeClassCfMS0_FT1xBi64_1yBi64__S0_ : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClassCfMS0_FT1xBi64_1yBi64__S0_ : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
   init(x:Int, y:Int) {}
 
-  // CHECK-LABEL: sil  @_TFC9functions9SomeClass6method{{.*}} : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> () 
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass6method{{.*}} : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> () 
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $SomeClass):
   func method(x: Int) {}
 
-  // CHECK-LABEL: sil  @_TFC9functions9SomeClass14curried_method{{.*}} : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> ()
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass14curried_method{{.*}} : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
   func curried_method(x: Int)(y: Int) {}
 
-  // CHECK-LABEL: sil  @_TFC9functions9SomeClass13static_method{{.*}} : $@thin (Builtin.Int64, @thick SomeClass.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass13static_method{{.*}} : $@thin (Builtin.Int64, @thick SomeClass.Type) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $@thick SomeClass.Type):
   class func static_method(x: Int) {}
 
-  // CHECK-LABEL: sil  @_TFC9functions9SomeClass21static_curried_method{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass21static_curried_method{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
   class func static_curried_method(x: Int)(y: Int) {}
 
@@ -134,7 +134,7 @@ class SomeGeneric<T> {
   func generic<U>(x: U) -> U { return x }
 }
 
-// CHECK-LABEL: sil  @_TF9functions5calls{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> ()
+// CHECK-LABEL: sil hidden @_TF9functions5calls{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> ()
 func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Builtin.Int64
@@ -463,7 +463,7 @@ func return_func() -> (x: Builtin.Int64, y: Builtin.Int64) -> Builtin.Int64 {
 
 func standalone_generic<T>(x: T, y: T) -> T { return x }
 
-// CHECK-LABEL: sil  @_TF9functions14return_genericFT_FT1xBi64_1yBi64__Bi64_
+// CHECK-LABEL: sil hidden @_TF9functions14return_genericFT_FT1xBi64_1yBi64__Bi64_
 func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
   // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}} : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
   // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<Builtin.Int64>()
@@ -473,7 +473,7 @@ func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
   return standalone_generic
 }
 
-// CHECK-LABEL: sil  @_TF9functions20return_generic_tuple{{.*}}
+// CHECK-LABEL: sil hidden @_TF9functions20return_generic_tuple{{.*}}
 func return_generic_tuple()
 -> (x: (Builtin.Int64, Builtin.Int64), y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
   // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}}  : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
@@ -484,27 +484,27 @@ func return_generic_tuple()
   return standalone_generic
 }
 
-// CHECK-LABEL: sil  @_TF9functions16testNoReturnAttrFT_T_ : $@thin @noreturn () -> ()
+// CHECK-LABEL: sil hidden @_TF9functions16testNoReturnAttrFT_T_ : $@thin @noreturn () -> ()
 @noreturn func testNoReturnAttr() -> () {}
-// CHECK-LABEL: sil  @_TF9functions20testNoReturnAttrPoly{{.*}} : $@thin @noreturn <T> (@in T) -> ()
+// CHECK-LABEL: sil hidden @_TF9functions20testNoReturnAttrPoly{{.*}} : $@thin @noreturn <T> (@in T) -> ()
 @noreturn func testNoReturnAttrPoly<T>(x: T) -> () {}
 
-// CHECK-LABEL: sil  @_TF9functions21testNoReturnAttrParam{{.*}} : $@thin (@owned @noreturn @callee_owned () -> ()) -> ()
+// CHECK-LABEL: sil hidden @_TF9functions21testNoReturnAttrParam{{.*}} : $@thin (@owned @noreturn @callee_owned () -> ()) -> ()
 func testNoReturnAttrParam(fptr: @noreturn ()->()) -> () {}
 
-// CHECK-LABEL: sil [transparent] @_TF9functions15testTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1
+// CHECK-LABEL: sil hidden [transparent] @_TF9functions15testTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1
 @transparent func testTransparent(x: Bool) -> Bool {
   return x
 }
 
-// CHECK-LABEL: sil  @_TF9functions16applyTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil hidden @_TF9functions16applyTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1 {
 func applyTransparent(x: Bool) -> Bool {
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions15testTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1
   // CHECK: apply [transparent] [[FUNC]]({{%[0-9]+}}) : $@thin (Builtin.Int1) -> Builtin.Int1
   return testTransparent(x)
 }
 
-// CHECK-LABEL: sil @_TF9functions11funcToBlock{{.*}} : $@thin (@owned @callee_owned () -> ()) -> @owned @cc(cdecl) @objc_block () -> ()
+// CHECK-LABEL: sil hidden @_TF9functions11funcToBlock{{.*}} : $@thin (@owned @callee_owned () -> ()) -> @owned @cc(cdecl) @objc_block () -> ()
 // CHECK:         [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
 // CHECK:         [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]]
 // CHECK:         [[COPY:%.*]] = copy_block [[BLOCK]] : $@cc(cdecl) @objc_block () -> ()
@@ -513,7 +513,7 @@ func funcToBlock(x: () -> ()) -> @objc_block () -> () {
   return x
 }
 
-// CHECK-LABEL: sil @_TF9functions11blockToFunc{{.*}} : $@thin (@owned @cc(cdecl) @objc_block () -> ()) -> @owned @callee_owned () -> ()
+// CHECK-LABEL: sil hidden @_TF9functions11blockToFunc{{.*}} : $@thin (@owned @cc(cdecl) @objc_block () -> ()) -> @owned @callee_owned () -> ()
 // CHECK:         [[COPIED:%.*]] = copy_block %0
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb__dT__XFo__dT__
 // CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED]])
@@ -522,15 +522,15 @@ func blockToFunc(x: @objc_block () -> ()) -> () -> () {
   return x
 }
 
-// CHECK-LABEL: sil [noinline] @_TF9functions15noinline_calleeFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden [noinline] @_TF9functions15noinline_calleeFT_T_ : $@thin () -> ()
 @inline(never)
 func noinline_callee() {}
 
-// CHECK-LABEL: sil [always_inline] @_TF9functions20always_inline_calleeFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden [always_inline] @_TF9functions20always_inline_calleeFT_T_ : $@thin () -> ()
 @inline(__always)
 func always_inline_callee() {}
 
-// CHECK-LABEL: sil [semantics "foo"] @_TF9functions9semanticsFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden [semantics "foo"] @_TF9functions9semanticsFT_T_ : $@thin () -> ()
 @semantics("foo")
 func semantics() {}
 

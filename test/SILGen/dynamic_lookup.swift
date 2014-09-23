@@ -19,7 +19,7 @@ class X {
   func g()
 }
 
-// CHECK-LABEL: sil  @_TF14dynamic_lookup15direct_to_class
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup15direct_to_class
 func direct_to_class(obj: AnyObject) {
   // CHECK: [[OBJ_SELF:%[0-9]+]] = project_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@sil_self AnyObject
   // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@sil_self AnyObject, #X.f!1.foreign : X -> () -> (), $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
@@ -27,7 +27,7 @@ func direct_to_class(obj: AnyObject) {
   obj.f!()
 }
 
-// CHECK-LABEL: sil  @_TF14dynamic_lookup18direct_to_protocol
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup18direct_to_protocol
 func direct_to_protocol(obj: AnyObject) {
   // CHECK: [[OBJ_SELF:%[0-9]+]] = project_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@sil_self AnyObject
   // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@sil_self AnyObject, #P.g!1.foreign : <`Self` : P> Self -> () -> (), $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
@@ -35,7 +35,7 @@ func direct_to_protocol(obj: AnyObject) {
   obj.g!()
 }
 
-// CHECK-LABEL: sil @_TF14dynamic_lookup23direct_to_static_method
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup23direct_to_static_method
 func direct_to_static_method(var obj: AnyObject) {
   // CHECK: [[START:[A-Za-z0-9_]+]]([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK-NEXT: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
@@ -48,7 +48,7 @@ func direct_to_static_method(var obj: AnyObject) {
   obj.dynamicType.staticF!()
 }
 
-// CHECK-LABEL: sil @_TF14dynamic_lookup12opt_to_class
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup12opt_to_class
 func opt_to_class(var obj: AnyObject) {
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[PARAM:%[0-9]+]] : $AnyObject)
   // CHECK-NEXT: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject 
@@ -94,13 +94,13 @@ func opt_to_class(var obj: AnyObject) {
   // CHECK-NEXT: return [[RESULT]] : $()
 }
 
-// CHECK-LABEL: sil @_TF14dynamic_lookup20forced_without_outer
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup20forced_without_outer
 func forced_without_outer(obj: AnyObject) {
   // CHECK: dynamic_method_br
   var f = obj.f!
 }
 
-// CHECK-LABEL: sil @_TF14dynamic_lookup20opt_to_static_method
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup20opt_to_static_method
 func opt_to_static_method(var obj: AnyObject) {
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK-NEXT: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
@@ -115,7 +115,7 @@ func opt_to_static_method(var obj: AnyObject) {
   var optF = obj.dynamicType.staticF
 }
 
-// CHECK-LABEL: sil @_TF14dynamic_lookup15opt_to_property
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup15opt_to_property
 func opt_to_property(var obj: AnyObject) {
   // CHECK-NEXT: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
@@ -140,7 +140,7 @@ func opt_to_property(var obj: AnyObject) {
   var i: Int = obj.value!
 }
 
-// CHECK-LABEL: sil @_TF14dynamic_lookup19direct_to_subscript
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup19direct_to_subscript
 func direct_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
@@ -169,7 +169,7 @@ func direct_to_subscript(var obj: AnyObject, var i: Int) {
   var x: Int = obj[i]!
 }
 
-// CHECK-LABEL: sil @_TF14dynamic_lookup16opt_to_subscript
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup16opt_to_subscript
 func opt_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
@@ -196,7 +196,7 @@ func opt_to_subscript(var obj: AnyObject, var i: Int) {
   obj[i]
 }
 
-// CHECK-LABEL: sil @_TF14dynamic_lookup8downcast
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup8downcast
 func downcast(var obj: AnyObject) -> X {
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject

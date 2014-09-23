@@ -7,7 +7,7 @@ class AClass : AProtocol {
   func f() -> String { return "A" }
 }
 
-// CHECK: define void @{{.*}}aFunction
+// CHECK: define hidden void @{{.*}}aFunction
 // CHECK:  call void @llvm.dbg.declare(metadata !{%swift.type** %{{.*}}}, metadata ![[TYPEARG:.*]]),
 // CHECK: ![[TYPEARG]] = metadata !{i32 {{.*}}, metadata !{{.*}}, metadata !"$swift.type.T", metadata !{{.*}}, i32 {{.*}}, metadata ![[SWIFTMETATYPE:.*]], i32 64, i32 0} ; [ DW_TAG_auto_variable ] [$swift.type.T]
 // CHECK: ![[SWIFTMETATYPE]] = {{.*}} ; [ DW_TAG_typedef ] [$swift.type] [line 0, size 0, align 0, offset 0] [from _TtBp]

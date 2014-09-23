@@ -10,7 +10,7 @@ func onDestruct() { }
 class SwiftGizmo : Gizmo {
   var x = X()
 
-  // CHECK-LABEL: sil @_TFC12objc_dealloc10SwiftGizmocfMS0_FT_S0_ : $@cc(method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo
+  // CHECK-LABEL: sil hidden @_TFC12objc_dealloc10SwiftGizmocfMS0_FT_S0_ : $@cc(method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo
   // CHECK-NEXT: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
   override init() {
     // CHECK:   [[SELF_UNINIT:%[0-9]+]] = mark_uninitialized [derivedselfonly]
@@ -21,7 +21,7 @@ class SwiftGizmo : Gizmo {
     super.init()
   }
 
-  // CHECK-LABEL: sil @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (@owned SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (@owned SwiftGizmo) -> ()
   deinit {
     // CHECK: bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
     // Call onDestruct()
@@ -41,7 +41,7 @@ class SwiftGizmo : Gizmo {
   }
 
   // Objective-C deallocation deinit thunk (i.e., -dealloc).
-  // CHECK-LABEL: sil @_TToFC12objc_dealloc10SwiftGizmoD : $@cc(objc_method) @thin (SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC12objc_dealloc10SwiftGizmoD : $@cc(objc_method) @thin (SwiftGizmo) -> ()
   // CHECK: bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
   // CHECK:   strong_retain [[SELF]] : $SwiftGizmo
 
@@ -50,7 +50,7 @@ class SwiftGizmo : Gizmo {
   // CHECK:   return [[RESULT]] : $()
 
   // Objective-C IVar initializer (i.e., -.cxx_construct)
-  // CHECK-LABEL: sil @_TToFC12objc_dealloc10SwiftGizmoe : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo
+  // CHECK-LABEL: sil hidden @_TToFC12objc_dealloc10SwiftGizmoe : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
   // CHECK-NEXT:   debug_value [[SELF_PARAM]] : $SwiftGizmo  // let self
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
@@ -62,7 +62,7 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo
 
   // Objective-C IVar destroyer (i.e., -.cxx_destruct)
-  // CHECK-LABEL: sil @_TToFC12objc_dealloc10SwiftGizmoE : $@cc(objc_method) @thin (SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC12objc_dealloc10SwiftGizmoE : $@cc(objc_method) @thin (SwiftGizmo) -> ()
   // CHECK:      bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
   // CHECK-NEXT:  debug_value [[SELF]] : $SwiftGizmo  // let self
   // CHECK-NEXT: [[X:%[0-9]+]] = ref_element_addr [[SELF]] : $SwiftGizmo, #SwiftGizmo.x
@@ -71,6 +71,6 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT: return [[RESULT]] : $()
 }
 
-// CHECK-NOT: sil @_TToFCSo11SwiftGizmo2E : $@cc(objc_method) @thin (SwiftGizmo2) -> ()
+// CHECK-NOT: sil hidden @_TToFCSo11SwiftGizmo2E : $@cc(objc_method) @thin (SwiftGizmo2) -> ()
 class SwiftGizmo2 : Gizmo {
 }

@@ -30,6 +30,7 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  Optional<SILLocation> loc,
                                  IsBare_t isBareSILFunction,
                                  IsTransparent_t isTrans,
+                                 IsFragile_t isFragile,
                                  Inline_t inlineStrategy, EffectsKind E,
                                  SILFunction *insertBefore,
                                  SILDebugScope *debugScope,
@@ -45,8 +46,8 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
 
   auto fn = new (M) SILFunction(M, linkage, name,
                                 loweredType, contextGenericParams, loc,
-                                isBareSILFunction, isTrans, inlineStrategy, E,
-                                insertBefore, debugScope, DC);
+                                isBareSILFunction, isTrans, isFragile,
+                                inlineStrategy, E, insertBefore, debugScope, DC);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -58,6 +59,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          Optional<SILLocation> Loc,
                          IsBare_t isBareSILFunction,
                          IsTransparent_t isTrans,
+                         IsFragile_t isFragile,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          SILDebugScope *DebugScope,
@@ -72,6 +74,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     DebugScope(DebugScope),
     Bare(isBareSILFunction),
     Transparent(isTrans),
+    Fragile(isFragile),
     GlobalInitFlag(false),
     InlineStrategy(inlineStrategy),
     Linkage(unsigned(Linkage)), EK(E) {

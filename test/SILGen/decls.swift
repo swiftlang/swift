@@ -1,23 +1,23 @@
 // RUN: %swift -parse-as-library -emit-silgen %s | FileCheck %s
 
-// CHECK-LABEL: sil  @_TF5decls11void_returnFT_T_
+// CHECK-LABEL: sil hidden @_TF5decls11void_returnFT_T_
 // CHECK: = tuple
 // CHECK: return
 func void_return() {
 }
 
-// CHECK-LABEL: sil  @_TF5decls14typealias_declFT_T_
+// CHECK-LABEL: sil hidden @_TF5decls14typealias_declFT_T_
 func typealias_decl() {
   typealias a = Int
 }
 
-// CHECK-LABEL: sil  @_TF5decls15simple_patternsFT_T_
+// CHECK-LABEL: sil hidden @_TF5decls15simple_patternsFT_T_
 func simple_patterns() {
   var _ = 4
   var _ : Int
 }
 
-// CHECK-LABEL: sil  @_TF5decls13named_patternFT_Si
+// CHECK-LABEL: sil hidden @_TF5decls13named_patternFT_Si
 func named_pattern() -> Int {
   var local_var : Int = 4
 
@@ -28,7 +28,7 @@ func named_pattern() -> Int {
 
 func MRV() -> (Int, Float, (), Double) {}
 
-// CHECK-LABEL: sil  @_TF5decls14tuple_patternsFT_T_
+// CHECK-LABEL: sil hidden @_TF5decls14tuple_patternsFT_T_
 func tuple_patterns() {
   var (a, b) : (Int, Float)
   // CHECK: [[AADDR1:%[0-9]+]] = alloc_box $Int
@@ -74,7 +74,7 @@ func tuple_patterns() {
   var (j,_,k,_) = MRV()
 }
 
-// CHECK-LABEL: sil  @_TF5decls16simple_arguments
+// CHECK-LABEL: sil hidden @_TF5decls16simple_arguments
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box $Int
 // CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $Int
@@ -84,7 +84,7 @@ func simple_arguments(var x: Int, var y: Int) -> Int {
   return x+y
 }
 
-// CHECK-LABEL: sil  @_TF5decls17curried_arguments
+// CHECK-LABEL: sil hidden @_TF5decls17curried_arguments
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box $Int
 // CHECK-NEXT: store %0 to [[X]]
@@ -94,7 +94,7 @@ func curried_arguments(var x: Int)(var y: Int) -> Int {
   return x+y
 }
 
-// CHECK-LABEL: sil  @_TF5decls14tuple_argument
+// CHECK-LABEL: sil hidden @_TF5decls14tuple_argument
 // CHECK: bb0(%0 : $Int, %1 : $Float):
 // CHECK: [[XADDR:%[0-9]+]] = alloc_box $(Int, Float, ())
 // CHECK: [[T0:%[0-9]+]] = tuple_element_addr [[XADDR]]#1  : $*(Int, Float, ()), 0
@@ -105,7 +105,7 @@ func curried_arguments(var x: Int)(var y: Int) -> Int {
 func tuple_argument(var x: (Int, Float, ())) {
 }
 
-// CHECK-LABEL: sil  @_TF5decls14inout_argument
+// CHECK-LABEL: sil hidden @_TF5decls14inout_argument
 // CHECK: bb0(%0 : $*Int, %1 : $Int):
 // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box $Int
@@ -116,7 +116,7 @@ func inout_argument(inout x: Int, var y: Int) {
 
 var global = 42
 
-// CHECK-LABEL: sil  @_TF5decls16load_from_global
+// CHECK-LABEL: sil hidden @_TF5decls16load_from_global
 func load_from_global() -> Int {
   return global
   // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_TF5declsa6globalSi
@@ -126,7 +126,7 @@ func load_from_global() -> Int {
   // CHECK: return [[VALUE]]
 }
 
-// CHECK-LABEL: sil  @_TF5decls15store_to_global
+// CHECK-LABEL: sil hidden @_TF5decls15store_to_global
 func store_to_global(var x: Int) {
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
@@ -140,7 +140,7 @@ func store_to_global(var x: Int) {
 struct S {
   var x:Int
 
-  // CHECK-LABEL: sil  @_TFV5decls1SCfMS0_FT_S0_
+  // CHECK-LABEL: sil hidden @_TFV5decls1SCfMS0_FT_S0_
   init() {
     x = 219
   }
@@ -162,7 +162,7 @@ struct StructWithStaticVar {
 
 // <rdar://problem/17405715> lazy property crashes silgen of implicit memberwise initializer
 // CHECK-LABEL: // decls.StructWithLazyField.init
-// CHECK-NEXT: sil @_TFV5decls19StructWithLazyFieldCfMS0_FT4onceGSqSi_8somePropSS_S0_ : $@thin (Optional<Int>, @owned String, @thin StructWithLazyField.Type) -> @owned StructWithLazyField {
+// CHECK-NEXT: sil hidden @_TFV5decls19StructWithLazyFieldCfMS0_FT4onceGSqSi_8somePropSS_S0_ : $@thin (Optional<Int>, @owned String, @thin StructWithLazyField.Type) -> @owned StructWithLazyField {
 struct StructWithLazyField {
   lazy var once : Int = 42
   let someProp = "Some value"

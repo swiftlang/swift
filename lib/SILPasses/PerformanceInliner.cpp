@@ -105,26 +105,6 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
 //                                  Inliner
 //===----------------------------------------------------------------------===//
 
-// Check if F transitively references a global, function, vtable, or witness
-// table with a less visible SILLinkage than linkage.
-//
-// FIXME: When vtables/witness tables get linkage, update this.
-static bool transitivelyReferencesLessVisibleLinkage(const SILFunction &F,
-                                                     SILLinkage linkage) {
-  for (auto &BB : F)
-    for (auto &I : BB) {
-      if (auto *GA = dyn_cast<SILGlobalAddrInst>(&I))
-        if (isLessVisibleThan(GA->getReferencedGlobal()->getLinkage(),
-                              linkage))
-          return true;
-      if (auto *FRI = dyn_cast<FunctionRefInst>(&I))
-        if (isLessVisibleThan(FRI->getReferencedFunction()->getLinkage(),
-                              linkage))
-          return true;
-    }
-  return false;
-}
-
 /// return true if inlining this call site is sane and profitable.
 bool SILPerformanceInliner::isProfitableToInline(SILFunction *Caller,
                                                  SILFunction *Callee,
@@ -155,9 +135,8 @@ bool SILPerformanceInliner::isProfitableToInline(SILFunction *Caller,
 
   // If Callee has a less visible linkage than caller or references something
   // with a less visible linkage than caller, don't inline Callee into caller.
-  if (transitivelyReferencesLessVisibleLinkage(*Callee,
-                                               Caller->getLinkage())) {
-    DEBUG(llvm::dbgs() << "        FAIL! Skipping less visible call.");
+  if (Caller->isFragile() && !Callee->isFragile()) {
+    DEBUG(llvm::dbgs() << "        FAIL! Can't inline resilient into fragile.");
     return false;
   }
 
@@ -247,6 +226,14 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
       DEBUG(llvm::dbgs() << "        FAIL! Cannot find inlineable callee.\n");
       continue;
     }
+    
+    if (Callee->isGlobalInit()) {
+      // This is a workaround to prevent inlining of globalinit functions
+      // before the GlobalOpt did run.
+      // TODO: Prevent inlining of this functions only _before_ GlobalOpt.
+      continue;
+    }
+    
     if (Callee->getInlineStrategy() == NoInline)
       continue;
 

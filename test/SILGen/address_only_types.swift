@@ -10,7 +10,7 @@ protocol Unloadable {
   var loadable_prop : Int { get }
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types21address_only_argument
+// CHECK-LABEL: sil hidden @_TF18address_only_types21address_only_argument
 func address_only_argument(let x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $*Unloadable):
   // CHECK: debug_value_addr [[XARG]]
@@ -19,7 +19,7 @@ func address_only_argument(let x: Unloadable) {
   // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types29address_only_ignored_argument
+// CHECK-LABEL: sil hidden @_TF18address_only_types29address_only_ignored_argument
 func address_only_ignored_argument(_: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $*Unloadable):
   // CHECK: destroy_addr [[XARG]]
@@ -27,7 +27,7 @@ func address_only_ignored_argument(_: Unloadable) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types30address_only_curried_arguments
+// CHECK-LABEL: sil hidden @_TF18address_only_types30address_only_curried_arguments
 func address_only_curried_arguments(let x: Unloadable)(y: Unloadable) {
   // CHECK: bb0([[YARG:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable):
   // CHECK-NEXT: debug_value_addr [[YARG]] : $*Unloadable  // let y
@@ -38,7 +38,7 @@ func address_only_curried_arguments(let x: Unloadable)(y: Unloadable) {
   // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types41address_only_curried_arguments_and_return
+// CHECK-LABEL: sil hidden @_TF18address_only_types41address_only_curried_arguments_and_return
 func address_only_curried_arguments_and_return(let x: Unloadable)(y: Unloadable) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable):
   // CHECK-NEXT: debug_value_addr [[YARG]] : $*Unloadable  // let y
@@ -50,7 +50,7 @@ func address_only_curried_arguments_and_return(let x: Unloadable)(y: Unloadable)
   return x
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types19address_only_return
+// CHECK-LABEL: sil hidden @_TF18address_only_types19address_only_return
 func address_only_return(let x: Unloadable, let y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64):
   // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable  // let x
@@ -61,7 +61,7 @@ func address_only_return(let x: Unloadable, let y: Int) -> Unloadable {
   return x
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types27address_only_curried_return
+// CHECK-LABEL: sil hidden @_TF18address_only_types27address_only_curried_return
 func address_only_curried_return(let x: Unloadable)(y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64, [[XADDR:%[0-9]+]] : $*Unloadable):
   // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64  // let y
@@ -72,12 +72,12 @@ func address_only_curried_return(let x: Unloadable)(y: Int) -> Unloadable {
   return x
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types27address_only_missing_return
+// CHECK-LABEL: sil hidden @_TF18address_only_types27address_only_missing_return
 func address_only_missing_return() -> Unloadable {
   // CHECK: unreachable
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types39address_only_conditional_missing_return
+// CHECK-LABEL: sil hidden @_TF18address_only_types39address_only_conditional_missing_return
 func address_only_conditional_missing_return(let x: Unloadable) -> Unloadable {
   // CHECK: bb0({{%.*}} : $*Unloadable, {{%.*}} : $*Unloadable):
   // CHECK:   switch_enum {{%.*}}, case #Bool.true_!enumelt: [[TRUE:bb[0-9]+]], case #Bool.false_!enumelt: [[FALSE:bb[0-9]+]]
@@ -94,7 +94,7 @@ func address_only_conditional_missing_return(let x: Unloadable) -> Unloadable {
   // CHECK:   unreachable
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types41address_only_conditional_missing_return
+// CHECK-LABEL: sil hidden @_TF18address_only_types41address_only_conditional_missing_return
 func address_only_conditional_missing_return_2(x: Unloadable) -> Unloadable {
   // CHECK: bb0({{%.*}} : $*Unloadable, {{%.*}} : $*Unloadable):
   // CHECK:   switch_enum {{%.*}}, case #Bool.true_!enumelt: [[TRUE1:bb[0-9]+]], case #Bool.false_!enumelt: [[FALSE1:bb[0-9]+]]
@@ -123,7 +123,7 @@ var crap : Unloadable = some_address_only_function_1()
 func some_address_only_function_1() -> Unloadable { return crap }
 func some_address_only_function_2(x: Unloadable) -> () {}
 
-// CHECK-LABEL: sil  @_TF18address_only_types19address_only_call
+// CHECK-LABEL: sil hidden @_TF18address_only_types19address_only_call
 func address_only_call_1() -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable):
   return some_address_only_function_1()
@@ -133,7 +133,7 @@ func address_only_call_1() -> Unloadable {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types33address_only_call_1_ignore_returnFT_T_
+// CHECK-LABEL: sil hidden @_TF18address_only_types33address_only_call_1_ignore_returnFT_T_
 func address_only_call_1_ignore_return() {
   // CHECK: bb0:
   some_address_only_function_1()
@@ -145,7 +145,7 @@ func address_only_call_1_ignore_return() {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types19address_only_call_2
+// CHECK-LABEL: sil hidden @_TF18address_only_types19address_only_call_2
 func address_only_call_2(let x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $*Unloadable):
   // CHECK: debug_value_addr [[XARG]] : $*Unloadable
@@ -158,7 +158,7 @@ func address_only_call_2(let x: Unloadable) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types24address_only_call_1_in_2
+// CHECK-LABEL: sil hidden @_TF18address_only_types24address_only_call_1_in_2
 func address_only_call_1_in_2() {
   // CHECK: bb0:
   some_address_only_function_2(some_address_only_function_1())
@@ -171,7 +171,7 @@ func address_only_call_1_in_2() {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types24address_only_materialize
+// CHECK-LABEL: sil hidden @_TF18address_only_types24address_only_materialize
 func address_only_materialize() -> Int {
   // CHECK: bb0:
   return some_address_only_function_1().foo()
@@ -186,7 +186,7 @@ func address_only_materialize() -> Int {
   // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types33address_only_assignment_from_temp
+// CHECK-LABEL: sil hidden @_TF18address_only_types33address_only_assignment_from_temp
 func address_only_assignment_from_temp(inout dest: Unloadable) {
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable):
   // CHECK: [[DEST_LOCAL:%.*]] = alloc_box $Unloadable
@@ -200,7 +200,7 @@ func address_only_assignment_from_temp(inout dest: Unloadable) {
   // CHECK: release [[DEST_LOCAL]]#0
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types31address_only_assignment_from_lv
+// CHECK-LABEL: sil hidden @_TF18address_only_types31address_only_assignment_from_lv
 func address_only_assignment_from_lv(inout dest: Unloadable, var v: Unloadable) {
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable, [[VARG:%[0-9]+]] : $*Unloadable):
   // CHECK: [[VBOX:%.*]] = alloc_box $Unloadable
@@ -222,7 +222,7 @@ var global_prop : Unloadable {
   set {}
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types45address_only_assignment_from_temp_to_property
+// CHECK-LABEL: sil hidden @_TF18address_only_types45address_only_assignment_from_temp_to_property
 func address_only_assignment_from_temp_to_property() {
   // CHECK: bb0:
   global_prop = some_address_only_function_1()
@@ -232,7 +232,7 @@ func address_only_assignment_from_temp_to_property() {
   // CHECK: dealloc_stack [[TEMP]]#0
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types43address_only_assignment_from_lv_to_property
+// CHECK-LABEL: sil hidden @_TF18address_only_types43address_only_assignment_from_lv_to_property
 func address_only_assignment_from_lv_to_property(let v: Unloadable) {
   // CHECK: bb0([[VARG:%[0-9]+]] : $*Unloadable):
   // CHECK: debug_value_addr [[VARG]] : $*Unloadable
@@ -244,7 +244,7 @@ func address_only_assignment_from_lv_to_property(let v: Unloadable) {
   global_prop = v
 }
 
-// CHECK-LABEL: sil  @_TF18address_only_types16address_only_varFT_PS_10Unloadable_
+// CHECK-LABEL: sil hidden @_TF18address_only_types16address_only_varFT_PS_10Unloadable_
 func address_only_var() -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable):
   var x = some_address_only_function_1()
@@ -259,7 +259,7 @@ func address_only_var() -> Unloadable {
 func unloadable_to_unloadable(x: Unloadable) -> Unloadable { return x }
 var some_address_only_nontuple_arg_function : (Unloadable) -> Unloadable = unloadable_to_unloadable
 
-// CHECK-LABEL: sil  @_TF18address_only_types39call_address_only_nontuple_arg_function
+// CHECK-LABEL: sil hidden @_TF18address_only_types39call_address_only_nontuple_arg_function
 func call_address_only_nontuple_arg_function(x: Unloadable) {
   some_address_only_nontuple_arg_function(x)
 }

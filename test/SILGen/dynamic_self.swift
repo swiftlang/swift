@@ -11,10 +11,10 @@ protocol CP : class {
 class X : P, CP {
   required init(int i: Int) { }
 
-  // CHECK-LABEL: sil @_TFC12dynamic_self1X1ffDS0_FT_DS0_ : $@cc(method) @thin (@owned X) -> @owned
+  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1X1ffDS0_FT_DS0_ : $@cc(method) @thin (@owned X) -> @owned
   func f() -> Self { return self }
 
-  // CHECK-LABEL: sil @_TFC12dynamic_self1X7factory{{.*}} : $@thin (Int, @thick X.Type) -> @owned X
+  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1X7factory{{.*}} : $@thin (Int, @thick X.Type) -> @owned X
   // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $@thick X.Type):
   // CHECK: [[CTOR:%[0-9]+]] = class_method [[SELF]] : $@thick X.Type, #X.init!allocator.1 : X.Type -> (int: Int) -> X , $@thin (Int, @thick X.Type) -> @owned X
   // CHECK: apply [[CTOR]]([[I]], [[SELF]]) : $@thin (Int, @thick X.Type) -> @owned X
@@ -31,7 +31,7 @@ class GX<T> {
 
 class GY<T> : GX<[T]> { }
 
-// CHECK-LABEL: sil @_TF12dynamic_self23testDynamicSelfDispatch{{.*}} : $@thin (@owned Y) -> ()
+// CHECK-LABEL: sil hidden @_TF12dynamic_self23testDynamicSelfDispatch{{.*}} : $@thin (@owned Y) -> ()
 func testDynamicSelfDispatch(y: Y) {
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
 // CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X
@@ -42,7 +42,7 @@ func testDynamicSelfDispatch(y: Y) {
   y.f()
 }
 
-// CHECK-LABEL: sil @_TF12dynamic_self30testDynamicSelfDispatchGeneric{{.*}} : $@thin (@owned GY<Int>) -> ()
+// CHECK-LABEL: sil hidden @_TF12dynamic_self30testDynamicSelfDispatchGeneric{{.*}} : $@thin (@owned GY<Int>) -> ()
 func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : $GY<Int>):
   // CHECK:   [[GY_AS_GX:%[0-9]+]] = upcast [[GY]] : $GY<Int> to $GX<Array<Int>>
@@ -53,7 +53,7 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   gy.f()
 }
 
-// CHECK-LABEL: sil @_TF12dynamic_self21testArchetypeDispatch{{.*}} : $@thin <T where T : P> (@in T) -> ()
+// CHECK-LABEL: sil hidden @_TF12dynamic_self21testArchetypeDispatch{{.*}} : $@thin <T where T : P> (@in T) -> ()
 func testArchetypeDispatch<T: P>(t: T) {
   // CHECK: bb0([[T:%[0-9]+]] : $*T):
   // CHECK:   [[ARCHETYPE_F:%[0-9]+]] = witness_method $T, #P.f!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @inout τ_0_0) -> ()
@@ -62,7 +62,7 @@ func testArchetypeDispatch<T: P>(t: T) {
   t.f()
 }
 
-// CHECK-LABEL: sil @_TF12dynamic_self23testExistentialDispatch{{.*}}
+// CHECK-LABEL: sil hidden @_TF12dynamic_self23testExistentialDispatch{{.*}}
 func testExistentialDispatch(p: P) {
 // CHECK: bb0([[P:%[0-9]+]] : $*P):
 // CHECK:   [[PCOPY:%[0-9]+]] = alloc_stack $P
@@ -80,7 +80,7 @@ func testExistentialDispatch(p: P) {
   p.f()
 }
 
-// CHECK-LABEL: sil @_TF12dynamic_self28testExistentialDispatchClass{{.*}} : $@thin (@owned CP) -> ()
+// CHECK-LABEL: sil hidden @_TF12dynamic_self28testExistentialDispatchClass{{.*}} : $@thin (@owned CP) -> ()
 func testExistentialDispatchClass(cp: CP) {
 // CHECK: bb0([[CP:%[0-9]+]] : $CP):
 // CHECK:   strong_retain [[CP]] : $CP
@@ -97,7 +97,7 @@ func testExistentialDispatchClass(cp: CP) {
   @objc func method() -> Self { return self }
 }
 
-// CHECK-LABEL: sil @_TF12dynamic_self21testAnyObjectDispatch{{.*}} : $@thin (@owned AnyObject) -> ()
+// CHECK-LABEL: sil hidden @_TF12dynamic_self21testAnyObjectDispatch{{.*}} : $@thin (@owned AnyObject) -> ()
 func testAnyObjectDispatch(o: AnyObject) {
   // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@sil_self AnyObject, #ObjC.method!1.foreign, bb1, bb2
 
@@ -111,7 +111,7 @@ class ObjCInit {
   dynamic required init() { }
 }
 
-// CHECK: sil @_TF12dynamic_self12testObjCInit{{.*}} : $@thin (@thick ObjCInit.Type) -> ()
+// CHECK: sil hidden @_TF12dynamic_self12testObjCInit{{.*}} : $@thin (@thick ObjCInit.Type) -> ()
 func testObjCInit(meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
 // CHECK:   [[O:%[0-9]+]] = alloc_box $ObjCInit
@@ -129,7 +129,7 @@ func testObjCInit(meta: ObjCInit.Type) {
 class OptionalResult {
   func foo() -> Self? { return self }
 }
-// CHECK-LABEL: sil @_TFC12dynamic_self14OptionalResult3foofDS0_FT_GSqDS0__ : $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
+// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foofDS0_FT_GSqDS0__ : $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ :
 // CHECK-NEXT: apply [transparent] [[T0]]<OptionalResult>([[T1:%.*]]#1, [[T2:%.*]]#1)
 // CHECK-NEXT: dealloc_stack [[T2]]#0
@@ -145,7 +145,7 @@ class OptionalResultInheritor : OptionalResult {
 func testOptionalResult(v : OptionalResultInheritor) {
   v.foo()?.bar()
 }
-// CHECK-LABEL: sil @_TF12dynamic_self18testOptionalResult{{.*}} : $@thin (@owned OptionalResultInheritor) -> ()
+// CHECK-LABEL: sil hidden @_TF12dynamic_self18testOptionalResult{{.*}} : $@thin (@owned OptionalResultInheritor) -> ()
 // CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : Self -> () -> Self? , $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: apply [[T0]]([[V]])
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_

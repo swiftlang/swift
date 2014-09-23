@@ -29,7 +29,7 @@ struct B : AddressOnly {}
 
 func consumeAddressOnly(_: AddressOnly) {}
 
-// CHECK: sil @_TF7if_expr19addr_only_ternary_1
+// CHECK: sil hidden @_TF7if_expr19addr_only_ternary_1
 func addr_only_ternary_1(let x: Bool) -> AddressOnly {
   // CHECK: bb0([[RET:%.*]] : $*AddressOnly, {{.*}}):
   // CHECK: [[a:%[0-9]+]] = alloc_box $AddressOnly  // var a

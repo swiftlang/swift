@@ -1,6 +1,6 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
-// CHECK-LABEL: sil  private @top_level_code
+// CHECK-LABEL: sil private @top_level_code
 // CHECK: bb0:
 
 // -- initialize x
@@ -24,7 +24,7 @@
 
 var x = 999
 
-// CHECK-LABEL: sil  @_TF8toplevel7print_xFT_T_
+// CHECK-LABEL: sil hidden @_TF8toplevel7print_xFT_T_
 func print_x() {
   println(x)
 }
@@ -34,7 +34,7 @@ print_x()
 
 var y : Int
 
-// CHECK-LABEL: sil  @_TF8toplevel7print_yFT_T_
+// CHECK-LABEL: sil hidden @_TF8toplevel7print_yFT_T_
 func print_y() {
   println(y)
 }
@@ -43,7 +43,7 @@ y = 1
 print_y()
 
 
-// CHECK: sil @_TF8toplevel13testGlobalCSEFT_Si
+// CHECK: sil hidden @_TF8toplevel13testGlobalCSEFT_Si
 // CHECK-NOT: global_addr
 // CHECK: %0 = sil_global_addr @_Tv8toplevel1xSi : $*Int
 // CHECK-NOT: global_addr

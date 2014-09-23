@@ -71,6 +71,10 @@ public:
   
   size_t anonymousSymbolCounter = 0;
   
+  /// If true, all functions and global's are made fragile. Currently only used
+  /// for compiling the stdlib.
+  bool makeModuleFragile;
+  
   Optional<SILDeclRef> StringToNSStringFn;
   Optional<SILDeclRef> NSStringToStringFn;
   Optional<SILDeclRef> ArrayToNSArrayFn;
@@ -83,7 +87,7 @@ public:
   Optional<ProtocolDecl*> PointerProtocol;
   
 public:
-  SILGenModule(SILModule &M, Module *SM);
+  SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
   ~SILGenModule();
   
   SILGenModule(SILGenModule const &) = delete;
@@ -121,7 +125,8 @@ public:
                                            GenericParamList *thunkContextParams,
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
-                                           CanSILFunctionType toType);
+                                           CanSILFunctionType toType,
+                                           IsFragile_t Fragile);
   
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms

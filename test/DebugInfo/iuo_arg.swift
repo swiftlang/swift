@@ -13,7 +13,7 @@ class CIFilter {
 }
 
 class MyClass {
-  // CHECK: define %C7iuo_arg7UIImage* @_TFC7iuo_arg7MyClass11filterImagefS0_FTGSQCS_7UIImage_Sb_S1_
+  // CHECK: define hidden %C7iuo_arg7UIImage* @_TFC7iuo_arg7MyClass11filterImagefS0_FTGSQCS_7UIImage_Sb_S1_
   func filterImage(image: UIImage!, _ doSomething:Bool) -> UIImage
 	{
     // Test that image is in an alloca, but not an indirect location.

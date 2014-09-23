@@ -14,7 +14,7 @@ class A {
   }
 
   // Regular methods go through the @objc property accessors.
-  // CHECK-LABEL: sil @_TFC15objc_properties1A6method
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties1A6method
   // CHECK: class_method {{.*}} #A.prop
   func method(x: Int) {
     prop = x
@@ -23,7 +23,7 @@ class A {
 
   // Initializers and destructors always directly access stored properties, even
   // when they are @objc.
-  // CHECK-LABEL: sil @_TFC15objc_properties1AcfMS0_FT_S0_ : $@cc(method) @thin (@owned A) -> @owned A {
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties1AcfMS0_FT_S0_ : $@cc(method) @thin (@owned A) -> @owned A {
   // CHECK-NOT: class_method {{.*}} #A.prop
   init() {
     prop = 5
@@ -33,7 +33,7 @@ class A {
   
   // rdar://15858869 - However, direct access only applies to (implicit or
   // explicit) 'self' ivar references, not ALL ivar refs.
-  // CHECK-LABEL: sil @_TFC15objc_properties1AcfMS0_FT5otherS0_1xSi_S0_
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties1AcfMS0_FT5otherS0_1xSi_S0_
   // CHECK-NEXT: bb0(%0 : $A, %1 : $Int, %2 : $A):
   // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized [rootself] %2 : $A
   init(other : A, x : Int) {
@@ -46,7 +46,7 @@ class A {
     other.prop = x
   }
 
-  // CHECK-LABEL: sil @_TFC15objc_properties1Ad : $@cc(method) @thin (@owned A) -> @owned Builtin.NativeObject
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties1Ad : $@cc(method) @thin (@owned A) -> @owned Builtin.NativeObject
   // CHECK-NOT: class_method {{.*}} #A.prop
   deinit {
     prop = 7
@@ -55,25 +55,25 @@ class A {
 
 }
 
-// CHECK-LABEL: sil @_TF15objc_properties11testPropGet
+// CHECK-LABEL: sil hidden @_TF15objc_properties11testPropGet
 func testPropGet(a: A) -> Int {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : A -> () -> Int , $@cc(objc_method) @thin (A) -> Int
   return a.prop
 }
 
-// CHECK-LABEL: sil @_TF15objc_properties11testPropSet
+// CHECK-LABEL: sil hidden @_TF15objc_properties11testPropSet
 func testPropSet(a: A, i: Int) {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : A -> (Int) -> () , $@cc(objc_method) @thin (Int, A) -> ()
   a.prop = i
 }
 
-// CHECK-LABEL: sil @_TF15objc_properties19testComputedPropGet
+// CHECK-LABEL: sil hidden @_TF15objc_properties19testComputedPropGet
 func testComputedPropGet(a: A) -> Int {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : A -> () -> Int , $@cc(objc_method) @thin (A) -> Int
   return a.computedProp
 }
 
-// CHECK-LABEL: sil @_TF15objc_properties19testComputedPropSet
+// CHECK-LABEL: sil hidden @_TF15objc_properties19testComputedPropSet
 func testComputedPropSet(a: A, i: Int) {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : A -> (Int) -> () , $@cc(objc_method) @thin (Int, A) -> ()
   a.computedProp = i
@@ -82,12 +82,12 @@ func testComputedPropSet(a: A, i: Int) {
 // 'super' property references.
 class B : A {
   @objc override var computedProp: Int {
-    // CHECK-LABEL: sil @_TFC15objc_properties1Bg12computedPropSi : $@cc(method) @thin (@owned B) -> Int
+    // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bg12computedPropSi : $@cc(method) @thin (@owned B) -> Int
     get {
       // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : A -> () -> Int , $@cc(objc_method) @thin (A) -> Int
       return super.computedProp
     }
-    // CHECK-LABEL: sil @_TFC15objc_properties1Bs12computedPropSi : $@cc(method) @thin (Int, @owned B) -> ()
+    // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bs12computedPropSi : $@cc(method) @thin (Int, @owned B) -> ()
     set(value) {
       // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : A -> (Int) -> () , $@cc(objc_method) @thin (Int, A) -> ()
       super.computedProp = value
@@ -99,7 +99,7 @@ class B : A {
 // Test the @NSCopying attribute.
 class TestNSCopying {
   // CHECK: // objc_properties.TestNSCopying.property.setter : ObjectiveC.NSString
-  // CHECK-NEXT: sil [transparent] @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@cc(method) @thin (@owned NSString, @owned TestNSCopying) -> ()
+  // CHECK-NEXT: sil hidden [transparent] @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@cc(method) @thin (@owned NSString, @owned TestNSCopying) -> ()
   // CHECK-NEXT: bb0(%0 : $NSString, %1 : $TestNSCopying):
   // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copyWithZone!1.foreign
   @NSCopying var property : NSString

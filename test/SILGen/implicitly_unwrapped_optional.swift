@@ -3,7 +3,7 @@
 func foo(var #f: (()->())!) {
   f?()
 }
-// CHECK:    sil @{{.*}}foo{{.*}} : $@thin (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> () {
+// CHECK:    sil hidden @{{.*}}foo{{.*}} : $@thin (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> () {
 // CHECK:    bb0([[T0:%.*]] : $ImplicitlyUnwrappedOptional<() -> ()>):
 // CHECK-NEXT: [[F:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
@@ -39,14 +39,14 @@ func foo(var #f: (()->())!) {
 
 func wrap<T>(#x: T) -> T! { return x }
 
-// CHECK: sil @_TF29implicitly_unwrapped_optional16wrap_then_unwrapU__FT1xQ__Q_
+// CHECK: sil hidden @_TF29implicitly_unwrapped_optional16wrap_then_unwrapU__FT1xQ__Q_
 func wrap_then_unwrap<T>(#x: T) -> T {
   // CHECK: [[FORCE:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
   // CHECK: apply [transparent] [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x: x)!
 }
 
-// CHECK: sil @_TF29implicitly_unwrapped_optional10tuple_bindFT1xGSQTSiSS___GSqSS_ : $@thin (@owned ImplicitlyUnwrappedOptional<(Int, String)>) -> @owned Optional<String> {
+// CHECK: sil hidden @_TF29implicitly_unwrapped_optional10tuple_bindFT1xGSQTSiSS___GSqSS_ : $@thin (@owned ImplicitlyUnwrappedOptional<(Int, String)>) -> @owned Optional<String> {
 func tuple_bind(#x: (Int, String)!) -> String? {
   return x?.1
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]

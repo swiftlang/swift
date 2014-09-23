@@ -30,7 +30,7 @@ struct id {
 // Class and methods are [objc] by inheritance.
 class MyBlammo : Blammo {
   func foo() {}
-// CHECK:  define void @_TFC4objc8MyBlammo3foofS0_FT_T_([[MYBLAMMO]]*) {
+// CHECK:  define hidden void @_TFC4objc8MyBlammo3foofS0_FT_T_([[MYBLAMMO]]*) {
 // CHECK:    call {{.*}} @swift_release
 // CHECK:    ret void
 }
@@ -38,14 +38,14 @@ class MyBlammo : Blammo {
 // Class and methods are [objc] by inheritance.
 class Test2 : Gizmo {
   func foo() {}
-// CHECK:  define void @_TFC4objc5Test23foofS0_FT_T_([[TEST2]]*) {
+// CHECK:  define hidden void @_TFC4objc5Test23foofS0_FT_T_([[TEST2]]*) {
 // CHECK:    call {{.*}} @objc_release
 // CHECK:    ret void
 
   dynamic func bar() {}
 }
 
-// CHECK:    define %objc_object* @_TF4objc5test0{{.*}}(%objc_object*)
+// CHECK:    define hidden %objc_object* @_TF4objc5test0{{.*}}(%objc_object*)
 // CHECK-NOT:  call {{.*}} @swift_unknownRetain
 // CHECK:      call {{.*}} @swift_unknownRetain
 // CHECK-NOT:  call {{.*}} @swift_unknownRelease
@@ -59,7 +59,7 @@ func test0(arg: id) -> id {
 }
 
 func test1(cell: Blammo) {}
-// CHECK:  define void @_TF4objc5test1{{.*}}([[BLAMMO]]*) {
+// CHECK:  define hidden void @_TF4objc5test1{{.*}}([[BLAMMO]]*) {
 // CHECK:    call {{.*}} @swift_release
 // CHECK:    ret void
 

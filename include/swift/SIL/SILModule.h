@@ -204,9 +204,13 @@ public:
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file, starting from the specified element number.
+  ///
+  /// If \p makeModuleFragile is true, all functions and global variables of
+  /// the module are marked as fragile. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
   constructSIL(Module *M, SourceFile *sf = nullptr,
-               Optional<unsigned> startElem = Nothing);
+               Optional<unsigned> startElem = Nothing,
+               bool makeModuleFragile = false);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
@@ -346,7 +350,8 @@ public:
                                          StringRef name,
                                          CanSILFunctionType type,
                                          IsBare_t isBareSILFunction,
-                                         IsTransparent_t isTransparent);
+                                         IsTransparent_t isTransparent,
+                                         IsFragile_t isFragile);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist..
@@ -355,7 +360,8 @@ public:
                                    SILLinkage linkage,
                                    CanSILFunctionType type,
                                    IsBare_t isBareSILFunction,
-                                   IsTransparent_t isTransparent);
+                                   IsTransparent_t isTransparent,
+                                   IsFragile_t isFragile);
 
   void markFunctionAsInlined(SILFunction *Fn) {
     if (InlinedFunctions.insert(Fn).second)

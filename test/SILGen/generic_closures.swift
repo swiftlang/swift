@@ -5,7 +5,7 @@ typealias Char = Builtin.Int32
 typealias Bool = Builtin.Int1
 var zero: Int
 
-// CHECK-LABEL: sil  @_TF16generic_closures28generic_nondependent_context{{.*}}
+// CHECK-LABEL: sil hidden @_TF16generic_closures28generic_nondependent_context{{.*}}
 func generic_nondependent_context<T>(x: T, var y: Int) -> Int {
   func foo() -> Int { return y }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout Builtin.Int64) -> Builtin.Int64
@@ -13,7 +13,7 @@ func generic_nondependent_context<T>(x: T, var y: Int) -> Int {
   return foo()
 }
 
-// CHECK-LABEL: sil  @_TF16generic_closures25generic_dependent_context{{.*}}
+// CHECK-LABEL: sil hidden @_TF16generic_closures25generic_dependent_context{{.*}}
 func generic_dependent_context<T>(x: T, y: Int) -> T {
   func foo() -> T { return x }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures25generic_dependent_context{{.*}} : $@thin <τ_0_0> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
@@ -47,7 +47,7 @@ class NestedGeneric<U> {
     return foo()
   }
 
-  // CHECK-LABEL: sil @_TFC16generic_closures13NestedGeneric20nested_reabstraction{{.*}}
+  // CHECK-LABEL: sil hidden @_TFC16generic_closures13NestedGeneric20nested_reabstraction{{.*}}
   //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_TTRG0_0_R_XFo__dT__XFo_iT__iT__
   //   CHECK:       partial_apply [[REABSTRACT]]<U, T>
   func nested_reabstraction<T>(x: T) -> Optionable<() -> ()> {
@@ -55,7 +55,7 @@ class NestedGeneric<U> {
   }
 }
 
-// CHECK-LABEL: sil  @_TF16generic_closures24generic_curried_function{{.*}} : $@thin <T, U> (@in U, @in T) -> () {
+// CHECK-LABEL: sil hidden @_TF16generic_closures24generic_curried_function{{.*}} : $@thin <T, U> (@in U, @in T) -> () {
 // CHECK-LABEL: sil shared @_TF16generic_closures24generic_curried_function{{.*}}
 func generic_curried_function<T, U>(x: T)(y: U) { }
 
@@ -65,7 +65,7 @@ var f: (Char) -> () = generic_curried_function(zero)
   // Ensure that nested closures capture the generic parameters of their nested
   // context.
 
-  // CHECK: sil @_TF16generic_closures25nested_closure_in_generic{{.*}} : $@thin <T> (@out T, @in T) -> ()
+  // CHECK: sil hidden @_TF16generic_closures25nested_closure_in_generic{{.*}} : $@thin <T> (@out T, @in T) -> ()
   // CHECK:   function_ref [[OUTER_CLOSURE:@_TFF16generic_closures25nested_closure_in_genericU__FQ_Q_U_FT_Q_]]
   // CHECK: sil shared [[OUTER_CLOSURE]] : $@thin <T> (@out T, @owned Builtin.NativeObject, @inout T) -> ()
   // CHECK:   function_ref [[INNER_CLOSURE:@_TFFF16generic_closures25nested_closure_in_genericU__FQ_Q_U_FT_Q_U_FT_Q_]]
@@ -74,7 +74,7 @@ var f: (Char) -> () = generic_curried_function(zero)
     return { { x }() }()
   }
 
-// CHECK-LABEL: sil @_TF16generic_closures16local_properties
+// CHECK-LABEL: sil hidden @_TF16generic_closures16local_properties
 func local_properties<T>(inout t: T) {
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   var prop: T {
@@ -125,7 +125,7 @@ protocol Fooable {
 // <rdar://problem/16399018>
 func shmassert(f: @autoclosure () -> Bool) {}
 
-// CHECK-LABEL: sil @_TF16generic_closures21capture_generic_param
+// CHECK-LABEL: sil hidden @_TF16generic_closures21capture_generic_param
 func capture_generic_param<A: Fooable>(x: A) {
   shmassert(A.foo())
 }

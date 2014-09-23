@@ -3,7 +3,7 @@
 struct Bool {}
 var false_ = Bool()
 
-// CHECK-LABEL: sil @_TF13auto_closures17call_auto_closure
+// CHECK-LABEL: sil hidden @_TF13auto_closures17call_auto_closure
 func call_auto_closure(var x: @autoclosure () -> Bool) -> Bool {
   // CHECK: [[XBOX:%.*]] = alloc_box $@callee_owned () -> Bool
   // CHECK: [[XLOAD:%.*]] = load [[XBOX]]#1
@@ -12,7 +12,7 @@ func call_auto_closure(var x: @autoclosure () -> Bool) -> Bool {
   return x()
 }
 
-// CHECK-LABEL: sil @_TF13auto_closures18call_auto_closure2
+// CHECK-LABEL: sil hidden @_TF13auto_closures18call_auto_closure2
 func call_auto_closure2(inout x: @autoclosure () -> Bool) -> Bool {
   // CHECK: [[XBOX:%.*]] = alloc_box $@callee_owned () -> Bool
   // CHECK: [[XLOAD:%.*]] = load [[XBOX]]#1
@@ -30,7 +30,7 @@ func test_auto_closure_with_capture(x: Bool) -> Bool {
   return call_auto_closure(x)
 }
 
-// CHECK-LABEL: sil @_TF13auto_closures33test_auto_closure_without_capture
+// CHECK-LABEL: sil hidden @_TF13auto_closures33test_auto_closure_without_capture
 func test_auto_closure_without_capture() -> Bool {
   // CHECK: [[CLOSURE:%.*]] = function_ref @_TFF13auto_closures33test_auto_closure_without_capture
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[CLOSURE]] : $@thin () -> Bool to $@callee_owned () -> Bool

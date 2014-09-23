@@ -4,7 +4,7 @@
 import gizmo
 
 extension Gizmo {
-  // CHECK-LABEL: sil @_TFE24objc_init_ref_delegationCSo5GizmocfMS0_FT3intSi_S0_ : $@cc(method) @thin (Int, @owned Gizmo) -> @owned Gizmo
+  // CHECK-LABEL: sil hidden @_TFE24objc_init_ref_delegationCSo5GizmocfMS0_FT3intSi_S0_ : $@cc(method) @thin (Int, @owned Gizmo) -> @owned Gizmo
   convenience init(int i: Int) {
     // CHECK: bb0([[I:%[0-9]+]] : $Int, [[ORIG_SELF:%[0-9]+]] : $Gizmo):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Gizmo

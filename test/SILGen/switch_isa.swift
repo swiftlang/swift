@@ -9,7 +9,7 @@ func testSwitchOnExistential(value: Any) {
   }
 }
 
-// CHECK: sil @_TF10switch_isa23testSwitchOnExistentialFP_T_ :
+// CHECK: sil hidden @_TF10switch_isa23testSwitchOnExistentialFP_T_ :
 // CHECK:   [[ANY:%.*]] = alloc_stack $protocol<>
 // CHECK:   copy_addr %0 to [initialization] [[ANY]]#1
 // CHECK:   [[BOOL:%.*]] = alloc_stack $Bool

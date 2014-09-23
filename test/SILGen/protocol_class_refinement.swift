@@ -8,7 +8,7 @@ protocol ObjectUID : class, UID {}
 
 class Base {}
 
-// CHECK-LABEL: sil @_TF25protocol_class_refinement12getObjectUIDUS_9ObjectUID__FQ_Si
+// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement12getObjectUIDUS_9ObjectUID__FQ_Si
 // CHECK-NOT:     strong_retain %0
 // CHECK:         [[MATERIALIZED_SELF:%.*]] = alloc_stack $T
 // CHECK-NOT:     strong_retain %0
@@ -21,7 +21,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> Int {
   return x.uid()
 }
 
-// CHECK-LABEL: sil @_TF25protocol_class_refinement16getBaseObjectUIDUS_3UID__FQ_Si
+// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement16getBaseObjectUIDUS_3UID__FQ_Si
 // CHECK-NOT:     strong_retain %0
 // CHECK:         [[MATERIALIZED_SELF:%.*]] = alloc_stack $T
 // CHECK-NOT:     strong_retain %0

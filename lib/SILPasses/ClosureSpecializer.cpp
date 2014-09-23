@@ -127,7 +127,8 @@ SILFunction *ClosureSpecCloner::initCloned(SILFunction *PAIUser,
   auto Fn = SILFunction::create(M, PAIUser->getLinkage(), ClonedName, ClonedTy,
                                 PAIUser->getContextGenericParams(),
                                 PAIUser->getLocation(), IsBare,
-                                PAIUser->isTransparent(), PAIUser->getInlineStrategy(),
+                                PAIUser->isTransparent(), PAIUser->isFragile(),
+                                PAIUser->getInlineStrategy(),
                                 PAIUser->getEffectsInfo(),
                                 PAIUser, PAIUser->getDebugScope());
   Fn->setSemanticsAttr(PAIUser->getSemanticsAttr());

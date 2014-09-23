@@ -11,7 +11,7 @@ protocol P {
 
 struct S {}
 
-// CHECK-LABEL: define void @_TF27sil_generic_witness_methods12call_methods{{.*}}(%swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T, i8** %T.P, %swift.type* %U)
+// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods12call_methods{{.*}}(%swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T, i8** %T.P, %swift.type* %U)
 func call_methods<T: P, U>(x: T, y: S, z: U) {
   // CHECK: [[STATIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8** %T.P, i32 1
   // CHECK: [[STATIC_METHOD_PTR:%.*]] = load i8** [[STATIC_METHOD_ADDR]], align 8
@@ -35,7 +35,7 @@ func call_methods<T: P, U>(x: T, y: S, z: U) {
   x.generic_method(z)
 }
 
-// CHECK-LABEL: define void @_TF27sil_generic_witness_methods24call_existential_methods{{.*}}(%P27sil_generic_witness_methods1P_* noalias)
+// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods24call_existential_methods{{.*}}(%P27sil_generic_witness_methods1P_* noalias)
 func call_existential_methods(var x: P, var y: S) {
   // CHECK: [[X:%.*]] = alloca %P27sil_generic_witness_methods1P_, align 8
   // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_* [[X]], i32 0, i32 2
@@ -63,7 +63,7 @@ func call_existential_methods(var x: P, var y: S) {
   func method()
 }
 
-// CHECK-LABEL: define void @_TF27sil_generic_witness_methods16call_objc_method{{.*}}(%objc_object*, %swift.type* %T) {
+// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods16call_objc_method{{.*}}(%objc_object*, %swift.type* %T) {
 // CHECK:         [[SEL:%.*]] = load i8** @"\01L_selector(method)", align 8
 // CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to [[SELFTYPE:%?.*]]*
 // CHECK:         call void bitcast (void ()* @objc_msgSend to void ([[SELFTYPE]]*, i8*)*)([[SELFTYPE]]* [[CAST]], i8* [[SEL]])
@@ -71,13 +71,13 @@ func call_objc_method<T: ObjC>(x: T) {
   x.method()
 }
 
-// CHECK-LABEL: define void @_TF27sil_generic_witness_methods21call_call_objc_method{{.*}}(%objc_object*, %swift.type* %T) {
+// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods21call_call_objc_method{{.*}}(%objc_object*, %swift.type* %T) {
 // CHECK:         call void @_TF27sil_generic_witness_methods16call_objc_method{{.*}}(%objc_object* %0, %swift.type* %T)
 func call_call_objc_method<T: ObjC>(x: T) {
   call_objc_method(x)
 }
 
-// CHECK-LABEL: define void @_TF27sil_generic_witness_methods28call_objc_existential_method{{.*}}(%objc_object*) {
+// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods28call_objc_existential_method{{.*}}(%objc_object*) {
 // CHECK:         [[SEL:%.*]] = load i8** @"\01L_selector(method)", align 8
 // CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to [[SELFTYPE:%?.*]]*
 // CHECK:         call void bitcast (void ()* @objc_msgSend to void ([[SELFTYPE]]*, i8*)*)([[SELFTYPE]]* [[CAST]], i8* [[SEL]])

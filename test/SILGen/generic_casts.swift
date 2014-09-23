@@ -7,7 +7,7 @@ class C : ClassBound, NotClassBound {}
 struct S : NotClassBound {}
 struct Unloadable : NotClassBound { var x : NotClassBound }
 
-// CHECK-LABEL: sil  @_TF13generic_casts36opaque_archetype_to_opaque_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts36opaque_archetype_to_opaque_archetype{{.*}}
 func opaque_archetype_to_opaque_archetype
 <T:NotClassBound, U>(t:T) -> U {
   return t as U
@@ -15,7 +15,7 @@ func opaque_archetype_to_opaque_archetype
   // CHECK:   unconditional_checked_cast_addr take_always T in {{%.*}} : $*T to U in [[RET]] : $*U
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts36opaque_archetype_is_opaque_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts36opaque_archetype_is_opaque_archetype{{.*}}
 func opaque_archetype_is_opaque_archetype
 <T:NotClassBound, U>(t:T) -> Bool {
   return t is U
@@ -36,7 +36,7 @@ func opaque_archetype_is_opaque_archetype
   // CHECK:   return [[RES]] : $Bool
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts35opaque_archetype_to_class_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts35opaque_archetype_to_class_archetype{{.*}}
 func opaque_archetype_to_class_archetype
 <T:NotClassBound, U:ClassBound> (t:T) -> U {
   return t as U
@@ -45,7 +45,7 @@ func opaque_archetype_to_class_archetype
   // CHECK: return [[DOWNCAST]] : $U
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts35opaque_archetype_is_class_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts35opaque_archetype_is_class_archetype{{.*}}
 func opaque_archetype_is_class_archetype
 <T:NotClassBound, U:ClassBound> (t:T) -> Bool {
   return t is U
@@ -53,7 +53,7 @@ func opaque_archetype_is_class_archetype
   // CHECK: checked_cast_addr_br take_always T in [[VAL:%.*]] : {{.*}} to U
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts34class_archetype_to_class_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts34class_archetype_to_class_archetype{{.*}}
 func class_archetype_to_class_archetype
 <T:ClassBound, U:ClassBound>(t:T) -> U {
   return t as U
@@ -61,14 +61,14 @@ func class_archetype_to_class_archetype
   // CHECK: return [[DOWNCAST]] : $U
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts34class_archetype_is_class_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts34class_archetype_is_class_archetype{{.*}}
 func class_archetype_is_class_archetype
 <T:ClassBound, U:ClassBound>(t:T) -> Bool {
   return t is U
   // CHECK: checked_cast_br [[VAL:%.*]] : {{.*}} to $U
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts38opaque_archetype_to_addr_only_concrete{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts38opaque_archetype_to_addr_only_concrete{{.*}}
 func opaque_archetype_to_addr_only_concrete
 <T:NotClassBound> (t:T) -> Unloadable {
   return t as Unloadable
@@ -76,14 +76,14 @@ func opaque_archetype_to_addr_only_concrete
   // CHECK:   unconditional_checked_cast_addr take_always T in {{%.*}} : $*T to Unloadable in [[RET]] : $*Unloadable
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts38opaque_archetype_is_addr_only_concrete{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts38opaque_archetype_is_addr_only_concrete{{.*}}
 func opaque_archetype_is_addr_only_concrete
 <T:NotClassBound> (t:T) -> Bool {
   return t is Unloadable
   // CHECK: checked_cast_addr_br take_always T in [[VAL:%.*]] : {{.*}} to Unloadable in
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts37opaque_archetype_to_loadable_concrete{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts37opaque_archetype_to_loadable_concrete{{.*}}
 func opaque_archetype_to_loadable_concrete
 <T:NotClassBound>(t:T) -> S {
   return t as S
@@ -92,14 +92,14 @@ func opaque_archetype_to_loadable_concrete
   // CHECK: return [[DOWNCAST]] : $S
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts37opaque_archetype_is_loadable_concrete{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts37opaque_archetype_is_loadable_concrete{{.*}}
 func opaque_archetype_is_loadable_concrete
 <T:NotClassBound>(t:T) -> Bool {
   return t is S
   // CHECK: checked_cast_addr_br take_always T in {{%.*}} : $*T to S in
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts24class_archetype_to_class{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts24class_archetype_to_class{{.*}}
 func class_archetype_to_class
 <T:ClassBound>(t:T) -> C {
   return t as C
@@ -107,14 +107,14 @@ func class_archetype_to_class
   // CHECK: return [[DOWNCAST]] : $C
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts24class_archetype_is_class{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts24class_archetype_is_class{{.*}}
 func class_archetype_is_class
 <T:ClassBound>(t:T) -> Bool {
   return t is C
   // CHECK: checked_cast_br {{%.*}} to $C
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts38opaque_existential_to_opaque_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts38opaque_existential_to_opaque_archetype{{.*}}
 func opaque_existential_to_opaque_archetype
 <T:NotClassBound>(p:NotClassBound) -> T {
   return p as T
@@ -128,14 +128,14 @@ func opaque_existential_to_opaque_archetype
   // CHECK-NEXT: return [[T0]]
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts38opaque_existential_is_opaque_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts38opaque_existential_is_opaque_archetype{{.*}}
 func opaque_existential_is_opaque_archetype
 <T:NotClassBound>(p:NotClassBound) -> Bool {
   return p is T
   // CHECK:   checked_cast_addr_br take_always NotClassBound in [[CONTAINER:%.*]] : {{.*}} to T in
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts37opaque_existential_to_class_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts37opaque_existential_to_class_archetype{{.*}}
 func opaque_existential_to_class_archetype
 <T:ClassBound>(p:NotClassBound) -> T {
   return p as T
@@ -144,14 +144,14 @@ func opaque_existential_to_class_archetype
   // CHECK: return [[DOWNCAST]] : $T
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts37opaque_existential_is_class_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts37opaque_existential_is_class_archetype{{.*}}
 func opaque_existential_is_class_archetype
 <T:ClassBound>(p:NotClassBound) -> Bool {
   return p is T
   // CHECK: checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to T in
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts36class_existential_to_class_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts36class_existential_to_class_archetype{{.*}}
 func class_existential_to_class_archetype
 <T:ClassBound>(p:ClassBound) -> T {
   return p as T
@@ -159,27 +159,27 @@ func class_existential_to_class_archetype
   // CHECK: return [[DOWNCAST]] : $T
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts36class_existential_is_class_archetype{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts36class_existential_is_class_archetype{{.*}}
 func class_existential_is_class_archetype
 <T:ClassBound>(p:ClassBound) -> Bool {
   return p is T
   // CHECK: checked_cast_br {{%.*}} to $T
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts40opaque_existential_to_addr_only_concrete{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts40opaque_existential_to_addr_only_concrete{{.*}}
 func opaque_existential_to_addr_only_concrete(p: NotClassBound) -> Unloadable {
   return p as Unloadable
   // CHECK: bb0([[RET:%.*]] : $*Unloadable, {{%.*}}: $*NotClassBound):
   // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to Unloadable in [[RET]] : $*Unloadable
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts40opaque_existential_is_addr_only_concrete{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts40opaque_existential_is_addr_only_concrete{{.*}}
 func opaque_existential_is_addr_only_concrete(p: NotClassBound) -> Bool {
   return p is Unloadable
   // CHECK:   checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to Unloadable in
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts39opaque_existential_to_loadable_concrete{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts39opaque_existential_to_loadable_concrete{{.*}}
 func opaque_existential_to_loadable_concrete(p: NotClassBound) -> S {
   return p as S
   // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to S in [[DOWNCAST_ADDR]] : $*S
@@ -187,26 +187,26 @@ func opaque_existential_to_loadable_concrete(p: NotClassBound) -> S {
   // CHECK: return [[DOWNCAST]] : $S
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts39opaque_existential_is_loadable_concrete{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts39opaque_existential_is_loadable_concrete{{.*}}
 func opaque_existential_is_loadable_concrete(p: NotClassBound) -> Bool {
   return p is S
   // CHECK: checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to S in
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts26class_existential_to_class{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts26class_existential_to_class{{.*}}
 func class_existential_to_class(p: ClassBound) -> C {
   return p as C
   // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} to $C
   // CHECK: return [[DOWNCAST]] : $C
 }
 
-// CHECK-LABEL: sil  @_TF13generic_casts26class_existential_is_class{{.*}}
+// CHECK-LABEL: sil hidden @_TF13generic_casts26class_existential_is_class{{.*}}
 func class_existential_is_class(p: ClassBound) -> Bool {
   return p is C
   // CHECK: checked_cast_br {{%.*}} to $C
 }
 
-// CHECK-LABEL: sil @_TF13generic_casts27optional_anyobject_to_classFGSqPSs9AnyObject__GSqCS_1C_ 
+// CHECK-LABEL: sil hidden @_TF13generic_casts27optional_anyobject_to_classFGSqPSs9AnyObject__GSqCS_1C_ 
 // CHECK:         checked_cast_br {{%.*}} : $AnyObject to $C
 func optional_anyobject_to_class(p: AnyObject?) -> C? {
   return p as? C

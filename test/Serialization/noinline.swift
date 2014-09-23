@@ -20,6 +20,6 @@ var raw = testNoinline(x: false)
 
 var a = NoInlineInitStruct(x: false)
 
-// SIL-LABEL: [noinline] @_TF12def_noinline12testNoinlineFT1xSb_Sb : $@thin (Bool) -> Bool
+// SIL-LABEL: [fragile] [noinline] @_TF12def_noinline12testNoinlineFT1xSb_Sb : $@thin (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [noinline] @_TFV12def_noinline18NoInlineInitStructCfMS0_FT1xSb_S0_ : $@thin (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {
+// SIL-LABEL: sil public_external [fragile] [noinline] @_TFV12def_noinline18NoInlineInitStructCfMS0_FT1xSb_S0_ : $@thin (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {

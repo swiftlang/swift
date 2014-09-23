@@ -7,7 +7,7 @@ struct A {
 }
 
 func test(var x : A) {}
-// CHECK:    define void @_TF7structs4test
+// CHECK:    define hidden void @_TF7structs4test
 // CHECK:      [[X:%.*]] = alloca [[A:%.*]], align 8
 // CHECK-NEXT: call void @llvm.dbg.declare(metadata !{[[A]]* [[X]]}, metadata [[X_DBG:!.*]])
 // CHECK: null, null, metadata ![[A_DI:.*]]} ; [ DW_TAG_structure_type ] [A] [line [[@LINE-8]]

@@ -1,6 +1,6 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
-// CHECK-LABEL: sil  @_TF16generic_literals21genericIntegerLitera
+// CHECK-LABEL: sil hidden @_TF16generic_literals21genericIntegerLitera
 func genericIntegerLiteral<T : IntegerLiteralConvertible>(var x: T) {
   // CHECK: [[TMETA:%.*]] = metatype $@thick T.Type
   // CHECK: [[TCONV:%.*]] = witness_method $T, #IntegerLiteralConvertible.init!allocator.1
@@ -15,7 +15,7 @@ func genericIntegerLiteral<T : IntegerLiteralConvertible>(var x: T) {
   x = 17
 }
 
-// CHECK-LABEL: sil  @_TF16generic_literals22genericFloatingLiteral
+// CHECK-LABEL: sil hidden @_TF16generic_literals22genericFloatingLiteral
 func genericFloatingLiteral<T : FloatLiteralConvertible>(var x: T) {
   // CHECK: [[TMETA:%.*]] = metatype $@thick T.Type
   // CHECK: [[CONV:%.*]] = witness_method $T, #FloatLiteralConvertible.init!allocator.1

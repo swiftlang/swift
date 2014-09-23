@@ -43,7 +43,7 @@ func getNonTrivialUnion3() -> NonTrivialUnion3 { return .Bar(C()) }
 func getAddressOnlyUnion<T>(_: T.Type) -> AddressOnlyUnion<T> { return .Foo }
  */
 
-// CHECK-LABEL: sil  @_TF15lifetime_unions19destroyUnionRValuesFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF15lifetime_unions19destroyUnionRValuesFT_T_ : $@thin () -> () {
 func destroyUnionRValues() {
   // CHECK:   [[GET_TRIVIAL_UNION:%.*]] = function_ref @_TF15lifetime_unions15getTrivialUnionFT_OS_12TrivialUnion : $@thin () -> TrivialUnion
   // CHECK:   [[TRIVIAL_UNION:%.*]] = apply [[GET_TRIVIAL_UNION]]() : $@thin () -> TrivialUnion

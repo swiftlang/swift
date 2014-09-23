@@ -2,7 +2,7 @@
 
 func standalone_generic<T>(x: T, y: T) -> T { return x }
 
-// CHECK: sil @_TF16specialize_thunk21return_specialization
+// CHECK: sil hidden @_TF16specialize_thunk21return_specialization
 func return_specialization() -> (x: Int, y: Int) -> Int {
 // CHECK:      [[T0:%.*]] = function_ref @_TF16specialize_thunk18standalone_genericU__FTQ_Q__Q_ : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[T0]]<Int>() : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()

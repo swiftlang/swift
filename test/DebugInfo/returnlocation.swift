@@ -8,7 +8,7 @@ import Foundation
 // cleanups/no cleanups, single / multiple return locations.
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_NONE
-// CHECK_NONE: define void {{.*}}none
+// CHECK_NONE: define hidden void {{.*}}none
 func none(inout a: Int) {
   // CHECK_NONE: call void @llvm.dbg{{.*}}, !dbg
   // CHECK_NONE: !dbg ![[NONE_INIT:.*]]
@@ -19,7 +19,7 @@ func none(inout a: Int) {
 }
 
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_EMPTY
-// CHECK_EMPTY: define {{.*}}empty
+// CHECK_EMPTY: define hidden {{.*}}empty
 func empty(inout a: Int) {
   if a > 24 {
       // CHECK-DAG_EMPTY: br {{.*}}, !dbg ![[EMPTY_RET1:.*]]

@@ -22,6 +22,7 @@
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/DenseSet.h"
@@ -537,19 +538,25 @@ public:
             "builtin_function_ref should have a thin function result");
   }
 
-  bool isValidLinkageForTransparentRef(SILLinkage linkage) {
+  bool isValidLinkageForFragileRef(SILLinkage linkage) {
     switch (linkage) {
     case SILLinkage::Private:
+    case SILLinkage::PrivateExternal:
     case SILLinkage::Hidden:
     case SILLinkage::HiddenExternal:
+    case SILLinkage::SharedExternal:
       return false;
+
+    case SILLinkage::Shared:
+        // This handles some kind of generated functions, like constructors
+        // of clang imported types.
+        // TODO: check why those functions are not fragile anyway and make
+        // a less conservative check here.
+        return true;
 
     case SILLinkage::Public:
     case SILLinkage::PublicExternal:
-    case SILLinkage::Shared:
-    case SILLinkage::SharedExternal:
       return true;
-
     }
   }
 
@@ -559,11 +566,12 @@ public:
     require(fnType->getRepresentation()
               == FunctionType::Representation::Thin,
             "function_ref should have a thin function result");
-    if (F.isTransparent()) {
-      require(isValidLinkageForTransparentRef(
-                                    FRI->getReferencedFunction()->getLinkage())
-                || FRI->getReferencedFunction()->isExternalDeclaration(),
-              "function_ref inside transparent function cannot "
+    if (F.isFragile()) {
+      SILFunction *RefF = FRI->getReferencedFunction();
+      require(RefF->isFragile()
+                || isValidLinkageForFragileRef(RefF->getLinkage())
+                || RefF->isExternalDeclaration(),
+              "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }
     verifySILFunctionType(fnType);
@@ -585,10 +593,11 @@ public:
               GAI->getReferencedGlobal()->getLoweredType(),
             "SILGlobalAddr must be the address type of the variable it "
             "references");
-    if (F.isTransparent()) {
-      require(isValidLinkageForTransparentRef(
-                                      GAI->getReferencedGlobal()->getLinkage()),
-              "function_ref inside transparent function cannot "
+    if (F.isFragile()) {
+      SILGlobalVariable *RefG = GAI->getReferencedGlobal();
+      require(RefG->isFragile()
+                || isValidLinkageForFragileRef(RefG->getLinkage()),
+              "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }
   }

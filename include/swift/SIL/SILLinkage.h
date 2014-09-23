@@ -66,6 +66,11 @@ enum class SILLinkage : unsigned char {
   /// module. Besides that caveat this should be treated exactly the same as
   /// shared.
   SharedExternal,
+  
+  /// The same as SharedExternal, except that the definition is private in the
+  /// other module. This can only occur if an inlined fragile function from
+  /// another module references a private definition in the other module.
+  PrivateExternal,
 
   /// The default linkage for a definition.
   DefaultForDefinition = Public,
@@ -79,6 +84,12 @@ enum {
   NumSILLinkageBits = 3
 };
 
+/// Reslated to linkage: flag if a function or global variable is fragle.
+enum IsFragile_t {
+  IsNotFragile,
+  IsFragile
+};
+  
 /// Strip external from public_external, hidden_external. Otherwise just return
 /// the linkage.
 inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
@@ -88,6 +99,8 @@ inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
     return SILLinkage::Hidden;
   if (linkage == SILLinkage::SharedExternal)
     return SILLinkage::Shared;
+  if (linkage == SILLinkage::PrivateExternal)
+    return SILLinkage::Private;
   return linkage;
 }
 
@@ -112,6 +125,7 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
     case SILLinkage::Shared:
     case SILLinkage::SharedExternal:
     case SILLinkage::Private:
+    case SILLinkage::PrivateExternal:
     case SILLinkage::HiddenExternal:
       return false;
   }
@@ -127,6 +141,7 @@ inline bool hasSharedVisibility(SILLinkage linkage) {
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
   case SILLinkage::Private:
+  case SILLinkage::PrivateExternal:
     return false;
   }
 }
@@ -141,6 +156,8 @@ inline bool isLessVisibleThan(SILLinkage l1, SILLinkage l2) {
     l1 = SILLinkage::Public;
   else if (l1 == SILLinkage::SharedExternal)
     l1 = SILLinkage::Public;
+  else if (l1 == SILLinkage::PrivateExternal)
+    l1 = SILLinkage::Private;
 
   if (l2 == SILLinkage::PublicExternal)
     l2 = SILLinkage::Public;
@@ -150,6 +167,8 @@ inline bool isLessVisibleThan(SILLinkage l1, SILLinkage l2) {
     l2 = SILLinkage::Public;
   else if (l2 == SILLinkage::SharedExternal)
     l2 = SILLinkage::Public;
+  else if (l2 == SILLinkage::PrivateExternal)
+    l2 = SILLinkage::Private;
 
   return unsigned(l1) > unsigned(l2);
 }

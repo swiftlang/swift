@@ -10,11 +10,11 @@
 
 // CHECK: func unknown()
 
-// CHECK-NOT: sil public @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X
+// CHECK-NOT: sil {{.*}} @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X
 
 // CHECK: sil @unknown : $@thin () -> ()
 
-// CHECK-LABEL: sil @_TFVSs1X4testfS_FT_T_ : $@cc(method) @thin (X) -> ()
+// CHECK-LABEL: sil hidden [fragile] @_TFVSs1X4testfS_FT_T_ : $@cc(method) @thin (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@thin () -> ()
@@ -23,7 +23,7 @@
 // CHECK-NEXT: return
 
 @asmname("unknown")
-func unknown() -> ()
+public func unknown() -> ()
 
 struct X {
   func test() {

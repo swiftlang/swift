@@ -7,7 +7,7 @@ func a(x: String) {}
 func b(x: String) {}
 func c(x: String) {}
 
-// CHECK-LABEL: sil @_TF16if_while_binding10if_no_else
+// CHECK-LABEL: sil hidden @_TF16if_while_binding10if_no_else
 func if_no_else() {
   // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3fooFT_GSqSS_
@@ -33,7 +33,7 @@ func if_no_else() {
   // CHECK:   br [[CONT]]
 }
 
-// CHECK-LABEL: sil @_TF16if_while_binding13if_else_chainFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF16if_while_binding13if_else_chainFT_T_ : $@thin () -> () {
 func if_else_chain() {
   // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3foo
@@ -76,7 +76,7 @@ func if_else_chain() {
   // CHECK:   dealloc_stack [[OPT_BUF]]#0
 }
 
-// CHECK-LABEL: sil @_TF16if_while_binding10while_loopFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF16if_while_binding10while_loopFT_T_ : $@thin () -> () {
 func while_loop() {
   // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
@@ -106,7 +106,7 @@ func while_loop() {
 
 // Don't leak alloc_stacks for address-only conditional bindings in 'while'.
 // <rdar://problem/16202294>
-// CHECK-LABEL: sil @_TF16if_while_binding18while_loop_generic
+// CHECK-LABEL: sil hidden @_TF16if_while_binding18while_loop_generic
 // CHECK:         br [[COND:bb[0-9]+]]
 // CHECK:       [[COND]]:
 // CHECK:         cond_br {{.*}}, [[LOOP:bb.*]], bb{{.*}}

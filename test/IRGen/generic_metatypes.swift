@@ -1,6 +1,6 @@
 // RUN: %swift -emit-ir -parse-stdlib -target x86_64-apple-macosx10.9 %s | FileCheck %s
 
-// CHECK: define %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias, %swift.type* [[TYPE:%.*]])
+// CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]])
   // CHECK: ret %swift.type* [[METATYPE]]
@@ -10,7 +10,7 @@ func genericTypeof<T>(x: T) -> T.Type {
 struct Foo {}
 class Bar {}
 
-// CHECK: define %swift.type* @_TF17generic_metatypes27remapToSubstitutedMetatypes{{.*}}(%C17generic_metatypes3Bar*) {
+// CHECK: define hidden %swift.type* @_TF17generic_metatypes27remapToSubstitutedMetatypes{{.*}}(%C17generic_metatypes3Bar*) {
 func remapToSubstitutedMetatypes(x: Foo, y: Bar)
   -> (Foo.Type, Bar.Type)
 {
@@ -22,7 +22,7 @@ func remapToSubstitutedMetatypes(x: Foo, y: Bar)
 }
 
 
-// CHECK: define void @_TF17generic_metatypes23remapToGenericMetatypesFT_T_()
+// CHECK: define hidden void @_TF17generic_metatypes23remapToGenericMetatypesFT_T_()
 func remapToGenericMetatypes() {
   // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
   // CHECK: [[T1:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
@@ -34,7 +34,7 @@ func genericMetatypes<T, U>(t: T.Type, u: U.Type) {}
 
 protocol Bas {}
 
-// CHECK: define %swift.type* @_TF17generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_* noalias)
+// CHECK: define hidden %swift.type* @_TF17generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_* noalias)
 func protocolTypeof(x: Bas) -> Bas.Type {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_* [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type** [[METADATA_ADDR]]
@@ -72,7 +72,7 @@ struct FiveArgs<T, U, V, W, X> {}
 
 func genericMetatype<A>(x: A.Type) {}
 
-// CHECK-LABEL: define void @_TF17generic_metatypes20makeGenericMetatypesFT_T_() {
+// CHECK-LABEL: define hidden void @_TF17generic_metatypes20makeGenericMetatypesFT_T_() {
 func makeGenericMetatypes() {
   // CHECK: call %swift.type* @_TMaGV17generic_metatypes6OneArgVS_3Foo_() [[NOUNWIND_READNONE:#[0-9]+]]
   genericMetatype(OneArg<Foo>.self)

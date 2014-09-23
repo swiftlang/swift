@@ -730,16 +730,55 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   llvm_unreachable("bad link entity kind");
 }
 
+bool LinkEntity::isFragile() const {
+  switch (getKind()) {
+    case Kind::SILFunction:
+      return getSILFunction()->isFragile();
+      
+    case Kind::SILGlobalVariable:
+      return getSILGlobalVariable()->isFragile();
+      
+    default:
+      break;
+  }
+  return false;
+}
+
+
 static std::pair<llvm::GlobalValue::LinkageTypes,
                  llvm::GlobalValue::VisibilityTypes>
 getIRLinkage(IRGenModule &IGM,
-             SILLinkage linkage, ForDefinition_t isDefinition,
+             SILLinkage linkage, bool isFragile, ForDefinition_t isDefinition,
              bool isWeakImported) {
-  switch (linkage) {
+  
 #define RESULT(LINKAGE, VISIBILITY)        \
-    { llvm::GlobalValue::LINKAGE##Linkage, \
-      llvm::GlobalValue::VISIBILITY##Visibility }
+{ llvm::GlobalValue::LINKAGE##Linkage, \
+llvm::GlobalValue::VISIBILITY##Visibility }
+  
+  if (isFragile) {
+    // Fragile functions/globals must be visible from outside, regardless of
+    // their accessibility. If a caller is also fragile and inlined into another
+    // module it must be able to access this (not-inlined) function/global.
+    switch (linkage) {
+      case SILLinkage::Shared:
+        return RESULT(LinkOnceODR, Default);
+        
+      case SILLinkage::Hidden:
+      case SILLinkage::Private:
+        linkage = SILLinkage::Public;
+        break;
 
+      case SILLinkage::PrivateExternal:
+        // Just handle it like a hidden symbol.
+        linkage = SILLinkage::HiddenExternal;
+        break;
+
+      default:
+        break;
+    }
+  }
+  
+  switch (linkage) {
   case SILLinkage::Public: return RESULT(External, Default);
   case SILLinkage::Shared: return RESULT(LinkOnceODR, Hidden);
   case SILLinkage::SharedExternal: return RESULT(LinkOnceODR, Hidden);
@@ -766,6 +805,8 @@ getIRLinkage(IRGenModule &IGM,
       return RESULT(AvailableExternally, Hidden);
     }
     return RESULT(External, Hidden);
+  case SILLinkage::PrivateExternal:
+    break;
   }
   llvm_unreachable("bad SIL linkage");
 }
@@ -779,7 +820,8 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   // entire linkage computation.
   auto linkage = getIRLinkage(
                    IGM,
-                   entity.getLinkage(ForDefinition), ForDefinition,
+                   entity.getLinkage(ForDefinition), entity.isFragile(),
+                   ForDefinition,
                    entity.isWeakImported(IGM.SILMod->getSwiftModule()));
   global->setLinkage(linkage.first);
   global->setVisibility(linkage.second);
@@ -799,7 +841,8 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
   entity.mangle(result.Name);
 
   std::tie(result.Linkage, result.Visibility) =
-    getIRLinkage(IGM, entity.getLinkage(isDefinition), isDefinition,
+    getIRLinkage(IGM, entity.getLinkage(isDefinition), entity.isFragile(),
+                 isDefinition,
                  entity.isWeakImported(IGM.SILMod->getSwiftModule()));
 
   result.ForDefinition = isDefinition;
@@ -1086,7 +1129,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
     auto linkage = fnRef.getLinkage(forDefinition);
     auto type = SILMod->Types.getConstantType(fnRef).castTo<SILFunctionType>();
     fn = SILFunction::create(*SILMod, linkage, name, type, nullptr,
-                             Nothing, IsNotBare, IsNotTransparent);
+                             Nothing, IsNotBare, IsNotTransparent, IsNotFragile);
   }
   return getAddrOfSILFunction(fn, forDefinition);
 }

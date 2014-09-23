@@ -3,7 +3,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil @_TF11switch_objc13matchesEitherFT5inputCSo4Hive1aS0_1bS0__Sb :
+// CHECK-LABEL: sil hidden @_TF11switch_objc13matchesEitherFT5inputCSo4Hive1aS0_1bS0__Sb :
 func matchesEither(#input: Hive, #a: Hive, #b: Hive) -> Bool {
   switch input {
   // CHECK:   function_ref @_TF10ObjectiveCoi2teFTCSo8NSObjectS0__Sb

@@ -1301,6 +1301,7 @@ static StringRef getLinkageString(SILLinkage linkage) {
   case SILLinkage::PublicExternal: return "public_external ";
   case SILLinkage::HiddenExternal: return "hidden_external ";
   case SILLinkage::SharedExternal: return "shared_external ";
+  case SILLinkage::PrivateExternal: return "private_external ";
   }
   llvm_unreachable("bad linkage");
 }
@@ -1323,6 +1324,9 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isTransparent())
     OS << "[transparent] ";
 
+  if (isFragile())
+    OS << "[fragile] ";
+  
   if (isGlobalInit())
     OS << "[global_init] ";
   
@@ -1375,6 +1379,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_global ";
   printLinkage(OS, getLinkage(), isDefinition());
 
+  if (isFragile())
+    OS << "[fragile] ";
+  
   printName(OS);
   OS << " : " << LoweredType;
 

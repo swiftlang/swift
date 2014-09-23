@@ -316,7 +316,8 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
-                            IsBare, IsTransparent);
+                            IsBare, IsTransparent,
+                            makeModuleFragile ? IsFragile : IsNotFragile);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -1243,7 +1244,8 @@ static ManagedValue emitFuncToBlock(SILGenFunction &gen,
                                                      nullptr,
                                                      invokeTy,
                                                      fnTy,
-                                                     blockTy);
+                                                     blockTy,
+                                                     gen.F.isFragile());
   
   // Build it if necessary.
   if (thunk->empty()) {
@@ -1339,7 +1341,8 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
                                                  F.getContextGenericParams(),
                                                  thunkTy,
                                                  blockTy,
-                                                 funcTy);
+                                                 funcTy,
+                                                 F.isFragile());
   
   // Build it if necessary.
   if (thunk->empty()) {
@@ -2953,7 +2956,7 @@ void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
       = SGM.M.getOrCreateFunction(mainClass, "NSStringFromClass",
                                   SILLinkage::PublicExternal,
                                   NSStringFromClassType,
-                                  IsBare, IsTransparent);
+                                  IsBare, IsTransparent, IsNotFragile);
     auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
@@ -2992,7 +2995,7 @@ void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
       = SGM.M.getOrCreateFunction(mainClass, "UIApplicationMain",
                                   SILLinkage::PublicExternal,
                                   UIApplicationMainType,
-                                  IsBare, IsTransparent);
+                                  IsBare, IsTransparent, IsNotFragile);
     
     auto UIApplicationMain = B.createFunctionRef(mainClass, UIApplicationMainFn);
     auto nil = B.createEnum(mainClass, SILValue(),
@@ -3035,7 +3038,7 @@ void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
       = SGM.M.getOrCreateFunction(mainClass, "NSApplicationMain",
                                   SILLinkage::PublicExternal,
                                   NSApplicationMainType,
-                                  IsBare, IsTransparent);
+                                  IsBare, IsTransparent, IsNotFragile);
     
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };

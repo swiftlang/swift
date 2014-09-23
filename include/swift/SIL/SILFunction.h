@@ -80,6 +80,12 @@ private:
   /// The function's transparent attribute.
   unsigned Transparent : 1; // FIXME: pack this somewhere
 
+  /// The function's fragile attribute.
+  /// Fragile means that the function can be inlined into another module.
+  /// Currently this flag is set for public transparent functions and for all
+  /// functions in the stdlib.
+  unsigned Fragile : 1;
+
   /// The function's global_init attribute.
   unsigned GlobalInitFlag : 1;
 
@@ -104,6 +110,7 @@ private:
               Optional<SILLocation> loc,
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
+              IsFragile_t isFragile,
               Inline_t inlineStrategy, EffectsKind E,
               SILFunction *insertBefore,
               SILDebugScope *debugScope,
@@ -113,9 +120,10 @@ public:
   static SILFunction *create(SILModule &M, SILLinkage linkage, StringRef name,
                              CanSILFunctionType loweredType,
                              GenericParamList *contextGenericParams,
-                             Optional<SILLocation> loc = Nothing,
-                             IsBare_t isBareSILFunction = IsNotBare,
-                             IsTransparent_t isTrans = IsNotTransparent,
+                             Optional<SILLocation> loc,
+                             IsBare_t isBareSILFunction,
+                             IsTransparent_t isTrans,
+                             IsFragile_t isFragile,
                              Inline_t inlineStrategy = InlineDefault,
                              EffectsKind EK = EffectsKind::Unspecified,
                              SILFunction *InsertBefore = nullptr,
@@ -230,6 +238,10 @@ public:
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
   void setTransparent(IsTransparent_t isT) { Transparent = isT; }
 
+  /// Get this function's fragile attribute.
+  IsFragile_t isFragile() const { return IsFragile_t(Fragile); }
+  void setFragile(IsFragile_t isFrag) { Fragile = isFrag; }
+    
   /// Get this function's noinline attribute.
   Inline_t getInlineStrategy() const { return Inline_t(InlineStrategy); }
   void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }

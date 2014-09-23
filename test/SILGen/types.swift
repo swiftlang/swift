@@ -4,7 +4,7 @@ class C {
   var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK-LABEL: sil  @{{.*}}C3foo{{.*}} : $@cc(method) @thin (Int, @owned C) -> ()
+  // CHECK-LABEL: sil hidden  @{{.*}}C3foo{{.*}} : $@cc(method) @thin (Int, @owned C) -> ()
   func foo(#x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
@@ -21,7 +21,7 @@ class C {
 struct S {
   var member: Int
 
-  // CHECK-LABEL: sil  @{{.*}}foo{{.*}} : $@cc(method) @thin (Int, @inout S) -> ()
+  // CHECK-LABEL: sil hidden  @{{.*}}foo{{.*}} : $@cc(method) @thin (Int, @inout S) -> ()
   mutating
   func foo(var #x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
@@ -33,7 +33,7 @@ struct S {
   }
 
   class SC {
-    // CHECK-LABEL: sil  @_TFCV5types1S2SC3barfS1_FT_T_
+    // CHECK-LABEL: sil hidden  @_TFCV5types1S2SC3barfS1_FT_T_
     func bar() {}
   }
 }
@@ -69,7 +69,7 @@ enum ReferencedFromFunctionEnum {
   case g(ReferencedFromFunctionStruct -> ())
 }
 
-// CHECK-LABEL: sil @_TF5types34referencedFromFunctionStructFieldsFVS_28ReferencedFromFunctionStructTFS0_T_FOS_26ReferencedFromFunctionEnumT__
+// CHECK-LABEL: sil hidden @_TF5types34referencedFromFunctionStructFieldsFVS_28ReferencedFromFunctionStructTFS0_T_FOS_26ReferencedFromFunctionEnumT__
 // CHECK:         [[F:%.*]] = struct_extract [[X:%.*]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
 // CHECK:         [[F]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()
 // CHECK:         [[G:%.*]] = struct_extract [[X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
@@ -79,7 +79,7 @@ func referencedFromFunctionStructFields(x: ReferencedFromFunctionStruct)
   return (x.f, x.g)
 }
 
-// CHECK-LABEL: sil @_TF5types32referencedFromFunctionEnumFieldsFOS_26ReferencedFromFunctionEnumTGSqFS0_T__GSqFVS_28ReferencedFromFunctionStructT___
+// CHECK-LABEL: sil hidden @_TF5types32referencedFromFunctionEnumFieldsFOS_26ReferencedFromFunctionEnumTGSqFS0_T__GSqFVS_28ReferencedFromFunctionStructT___
 // CHECK:       bb{{[0-9]+}}([[F:%.*]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()):
 // CHECK:       bb{{[0-9]+}}([[G:%.*]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()):
 func referencedFromFunctionEnumFields(x: ReferencedFromFunctionEnum)

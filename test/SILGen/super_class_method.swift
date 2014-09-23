@@ -3,7 +3,7 @@
 
 import Foundation
 class MyFunkyDictionary: NSDictionary {
-  // CHECK-LABEL: sil @_TFC18super_class_method17MyFunkyDictionary10initializefMS0_FT_T_
+  // CHECK-LABEL: sil hidden @_TFC18super_class_method17MyFunkyDictionary10initializefMS0_FT_T_
   // CHECK:         super_method [volatile] %0 : $@thick MyFunkyDictionary.Type, #NSObject.initialize!1.foreign : NSObject.Type -> () -> Void
   override class func initialize() {
     super.initialize()

@@ -6,7 +6,7 @@ func liftOptional(x : Int) -> Int? { return x }
 func test0() {
   takeFn(liftOptional)
 }
-// CHECK:    sil @_TF10reabstract5test0FT_T_ : $@thin () -> () {
+// CHECK:    sil hidden @_TF10reabstract5test0FT_T_ : $@thin () -> () {
 // CHECK:      [[T0:%.*]] = function_ref @_TF10reabstract6takeFn
 //   Emit a generalized reference to liftOptional.
 //   TODO: just emit a globalized thunk

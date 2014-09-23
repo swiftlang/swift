@@ -3,7 +3,7 @@
 func foo(var f: (()->())?) {
   f?()
 }
-// CHECK:    sil @{{.*}}foo{{.*}} : $@thin (@owned Optional<() -> ()>) -> () {
+// CHECK:    sil hidden @{{.*}}foo{{.*}} : $@thin (@owned Optional<() -> ()>) -> () {
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> ()>):
 // CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> ()>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
@@ -39,7 +39,7 @@ func foo(var f: (()->())?) {
 func foo2<T>(var f: (()->T)?) {
   var x = f?()
 }
-// CHECK-LABEL: sil @{{.*}}foo{{.*}} : $@thin <T> (@owned Optional<() -> T>) -> ()
+// CHECK-LABEL: sil hidden @{{.*}}foo{{.*}} : $@thin <T> (@owned Optional<() -> T>) -> ()
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> T>):
 // CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> T>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
@@ -87,14 +87,14 @@ func foo2<T>(var f: (()->T)?) {
 
 func wrap<T>(x: T) -> T? { return x }
 
-// CHECK: sil @_TF8optional16wrap_then_unwrap
+// CHECK: sil hidden @_TF8optional16wrap_then_unwrap
 func wrap_then_unwrap<T>(x: T) -> T {
   // CHECK: [[FORCE:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
   // CHECK: apply [transparent] [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x)!
 }
 
-// CHECK: sil @_TF8optional10tuple_bind
+// CHECK: sil hidden @_TF8optional10tuple_bind
 func tuple_bind(x: (Int, String)?) -> String? {
   return x?.1
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]

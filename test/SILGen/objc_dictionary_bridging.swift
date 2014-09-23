@@ -6,7 +6,7 @@ import gizmo
 
 @objc class Foo : NSObject {
   // Bridging dictionary parameters
-  // CHECK-LABEL: sil @_TToFC24objc_dictionary_bridging3Foo23bridge_Dictionary_param{{.*}} : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC24objc_dictionary_bridging3Foo23bridge_Dictionary_param{{.*}} : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
   func bridge_Dictionary_param(dict: Dictionary<Foo, Foo>) {
     // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
@@ -18,7 +18,7 @@ import gizmo
   }
 
   // Bridging dictionary results
-  // CHECK-LABEL: sil @_TToFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden @_TToFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
   func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
     // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
@@ -32,7 +32,7 @@ import gizmo
   var property: Dictionary<Foo, Foo> = [:]
 
   // Property getter
-  // CHECK-LABEL: sil [transparent] @_TToFC24objc_dictionary_bridging3Foog8propertyGVSs10DictionaryS0_S0__ : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC24objc_dictionary_bridging3Foog8propertyGVSs10DictionaryS0_S0__ : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foog8propertyGVSs10DictionaryS0_S0__ : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
   // CHECK:   [[DICT:%[0-9]+]] = apply [transparent] [[GETTER]]([[SELF]]) : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
@@ -42,7 +42,7 @@ import gizmo
   // CHECK:   autorelease_return [[NSDICT]] : $NSDictionary
 
   // Property setter
-  // CHECK-LABEL: sil [transparent] @_TToFC24objc_dictionary_bridging3Foos8propertyGVSs10DictionaryS0_S0__ : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC24objc_dictionary_bridging3Foos8propertyGVSs10DictionaryS0_S0__ : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
   // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
 // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
 // CHECK:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[NSDICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
@@ -51,9 +51,9 @@ import gizmo
 // CHECK:   [[RESULT:%[0-9]+]] = apply [transparent] [[SETTER]]([[DICT]], [[SELF]]) : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
 // CHECK:   return [[RESULT]] : $()
 
-  // CHECK-LABEL: sil [transparent] @_TToFC24objc_dictionary_bridging3Foog19nonVerbatimProperty{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC24objc_dictionary_bridging3Foog19nonVerbatimProperty{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
 
-  // CHECK-LABEL: sil [transparent] @_TToFC24objc_dictionary_bridging3Foos19nonVerbatimProperty{{.*}} : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC24objc_dictionary_bridging3Foos19nonVerbatimProperty{{.*}} : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
   @objc var nonVerbatimProperty: Dictionary<String, Int> = [:]
 }
 

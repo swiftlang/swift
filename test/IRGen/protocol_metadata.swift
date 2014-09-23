@@ -68,7 +68,7 @@ protocol ABO : A, B, O { func abo() }
 
 func reify_metadata<T>(x: T) {}
 
-// CHECK: define void @_TF17protocol_metadata14protocol_types
+// CHECK: define hidden void @_TF17protocol_metadata14protocol_types
 func protocol_types(a: A,
                     abc: protocol<A, B, C>,
                     abco: protocol<A, B, C, O>) {

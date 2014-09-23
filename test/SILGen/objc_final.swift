@@ -5,14 +5,14 @@ import Foundation
 
 final class Foo {
   @objc func foo() {}
-  // CHECK-LABEL: sil @_TToFC10objc_final3Foo3foofS0_FT_T_ : $@cc(objc_method) @thin (Foo) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC10objc_final3Foo3foofS0_FT_T_ : $@cc(objc_method) @thin (Foo) -> ()
 
   @objc var prop: Int = 0
-  // CHECK-LABEL: sil [transparent] @_TToFC10objc_final3Foog4propSi
-  // CHECK-LABEL: sil [transparent] @_TToFC10objc_final3Foos4propSi
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC10objc_final3Foog4propSi
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC10objc_final3Foos4propSi
 }
 
-// CHECK-LABEL: sil @_TF10objc_final7callFooFCS_3FooT_
+// CHECK-LABEL: sil hidden @_TF10objc_final7callFooFCS_3FooT_
 func callFoo(x: Foo) {
   // Calls to the final @objc method statically reference the native entry
   // point.

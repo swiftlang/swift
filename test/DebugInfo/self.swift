@@ -12,7 +12,7 @@ func f() {
 // is constructed in an alloca. The debug info for the alloca should not
 // describe a reference type as we would normally do with inout arguments.
 //
-// CHECK: define void  @_TFV4self11stuffStructCfMS0_FT_S0_(%V4self11stuffStruct* noalias sret) {
+// CHECK: define hidden void  @_TFV4self11stuffStructCfMS0_FT_S0_(%V4self11stuffStruct* noalias sret) {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %V4self11stuffStruct, align 8
 // CHECK:  call void @llvm.dbg.declare(metadata !{%V4self11stuffStruct* %[[ALLOCA]]}, metadata ![[SELF:.*]]), !dbg

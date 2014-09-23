@@ -656,7 +656,9 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   auto silTy = M.Types.getLoweredType(AbstractionPattern(gDecl->getType()),
                  gDecl->getType()->getCanonicalType()).getObjectType();
 
-  auto *silGlobal = SILGlobalVariable::create(M, link, mangledName, silTy,
+  auto *silGlobal = SILGlobalVariable::create(M, link,
+                                              makeModuleFragile ? IsFragile : IsNotFragile,
+                                              mangledName, silTy,
                                               Nothing, gDecl);
   silGlobal->setDeclaration(!forDef);
 
@@ -1992,7 +1994,10 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
   
+  // TODO: include the module in the onceToken's name mangling.
+  // Then we can make it fragile.
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
+                                             false,
                                              onceTokenName, onceSILTy);
   onceToken->setDeclaration(false);
   
@@ -2487,7 +2492,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                 witnessContextParams,
                 SILLocation(witness.getDecl()),
                 IsNotBare,
-                IsNotTransparent);
+                IsNotTransparent,
+                makeModuleFragile ? IsFragile : IsNotFragile);
   
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witness.getDecl()), *f));
@@ -2507,7 +2513,8 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
                                             GenericParamList *thunkContextParams,
                                             CanSILFunctionType thunkType,
                                             CanSILFunctionType fromType,
-                                            CanSILFunctionType toType) {
+                                            CanSILFunctionType toType,
+                                            IsFragile_t Fragile) {
   // Mangle the reabstraction thunk.
   llvm::SmallString<256> buffer;
   {
@@ -2537,5 +2544,6 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
 
   return M.getOrCreateSharedFunction(loc, buffer.str(),
                                      thunkType,
-                                     IsBare, IsTransparent);
+                                     IsBare, IsTransparent,
+                                     Fragile);
 }

@@ -183,7 +183,7 @@ class GenericGizmo<T> : Gizmo {
 
   var array : [T] = []
 }
-// CHECK: define i64 @_TFC13objc_subclass12GenericGizmog1xSi(
+// CHECK: define hidden i64 @_TFC13objc_subclass12GenericGizmog1xSi(
 
 var sg = SwiftGizmo()
 sg.duplicate()

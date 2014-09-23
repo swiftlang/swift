@@ -21,7 +21,7 @@ protocol Ansible {
   func anse()
 }
 
-// CHECK-LABEL: sil  @_TF14objc_protocols12objc_generic
+// CHECK-LABEL: sil hidden  @_TF14objc_protocols12objc_generic
 func objc_generic<T : NSRuncing>(x: T) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
   // -- Result of runce is retain_autoreleased according to default objc conv
@@ -38,7 +38,7 @@ func objc_generic<T : NSRuncing>(x: T) -> (NSObject, NSObject) {
   // CHECK: release [[THIS2]]
 }
 
-// CHECK-LABEL: sil  @_TF14objc_protocols13objc_protocol
+// CHECK-LABEL: sil hidden  @_TF14objc_protocols13objc_protocol
 func objc_protocol(x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
   // -- Result of runce is retain_autoreleased according to default objc conv
@@ -57,7 +57,7 @@ func objc_protocol(x: NSRuncing) -> (NSObject, NSObject) {
   // CHECK: release [[THIS2_ORIG]]
 }
 
-// CHECK-LABEL: sil  @_TF14objc_protocols25objc_protocol_composition
+// CHECK-LABEL: sil hidden  @_TF14objc_protocols25objc_protocol_composition
 func objc_protocol_composition(x: protocol<NSRuncing, NSFunging>) {
   // CHECK: [[THIS:%.*]] = project_existential_ref [[THIS_ORIG:%.*]] : $protocol<NSFunging, NSRuncing>
   // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS_ORIG]] : {{.*}}, #NSRuncing.runce!1.foreign
@@ -86,11 +86,11 @@ class Foo : NSRuncing, NSFunging, Ansible {
   func anse() {}
 }
 
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Foo5runcefS0_FT_CSo8NSObject
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Foo11copyRuncingfS0_FT_CSo8NSObject
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Foo5fungefS0_FT_T_
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Foo3foofS0_FT_T_
-// CHECK-NOT: sil @_TToF{{.*}}anse{{.*}}
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Foo5runcefS0_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Foo11copyRuncingfS0_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Foo5fungefS0_FT_T_
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Foo3foofS0_FT_T_
+// CHECK-NOT: sil hidden @_TToF{{.*}}anse{{.*}}
 
 class Bar { }
 
@@ -100,9 +100,9 @@ extension Bar : NSRuncing {
   func foo() {}
 }
 
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Bar5runcefS0_FT_CSo8NSObject
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Bar11copyRuncingfS0_FT_CSo8NSObject
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Bar3foofS0_FT_T_
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Bar5runcefS0_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Bar11copyRuncingfS0_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Bar3foofS0_FT_T_
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -111,8 +111,8 @@ extension Bas : NSRuncing {
   func foo() {}
 }
 
-// CHECK-LABEL: sil  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncingfS1_FT_CSo8NSObject
-// CHECK-LABEL: sil  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foofS1_FT_T_
+// CHECK-LABEL: sil hidden  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncingfS1_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foofS1_FT_T_
 
 // -- Inherited objc protocols
 
@@ -123,8 +123,8 @@ class Zim : Fungible {
   func foo() {}
 }
 
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Zim5fungefS0_FT_T_
-// CHECK-LABEL: sil  @_TToFC14objc_protocols3Zim3foofS0_FT_T_
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Zim5fungefS0_FT_T_
+// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Zim3foofS0_FT_T_
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
@@ -132,7 +132,7 @@ extension Zang : Fungible {
   func foo() {}
 }
 
-// CHECK-LABEL: sil  @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofS1_FT_T_
+// CHECK-LABEL: sil hidden  @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofS1_FT_T_
 
 // -- objc protocols with property requirements in extensions
 //    <rdar://problem/16284574>
@@ -146,14 +146,14 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil [transparent] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
+// CHECK-LABEL: sil hidden [transparent] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
 
 class ComputedPropertyCount {
   var count: Int { return 0 }
 }
 
 extension ComputedPropertyCount: NSCounting {}
-// CHECK-LABEL: sil @_TToFC14objc_protocols21ComputedPropertyCountg5countSi
+// CHECK-LABEL: sil hidden @_TToFC14objc_protocols21ComputedPropertyCountg5countSi
 
 // -- adding @objc protocol conformances to native ObjC classes should not
 //    emit thunks since the methods are already available to ObjC.
@@ -174,7 +174,7 @@ extension InformallyFunging: NSFunging { }
   init(int: Int)
 }
 
-// CHECK-LABEL: sil @_TF14objc_protocols28testInitializableExistential
+// CHECK-LABEL: sil hidden @_TF14objc_protocols28testInitializableExistential
 func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
 // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box $Initializable
@@ -196,7 +196,7 @@ func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializab
 class InitializableConformer: Initializable {
   required init(int: Int) {}
 }
-// CHECK-LABEL: sil @_TToFC14objc_protocols22InitializableConformercfMS0_FT3intSi_S0_
+// CHECK-LABEL: sil hidden @_TToFC14objc_protocols22InitializableConformercfMS0_FT3intSi_S0_
 
 final class InitializableConformerByExtension {
   init() {}
@@ -207,4 +207,4 @@ extension InitializableConformerByExtension: Initializable {
     self.init()
   }
 }
-// CHECK-LABEL: sil @_TToFC14objc_protocols33InitializableConformerByExtensioncfMS0_FT3intSi_S0_
+// CHECK-LABEL: sil hidden @_TToFC14objc_protocols33InitializableConformerByExtensioncfMS0_FT3intSi_S0_

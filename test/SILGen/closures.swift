@@ -4,7 +4,7 @@ import Swift
 var zero = 0
 
 // <rdar://problem/15921334>
-// CHECK-LABEL: sil @_TF8closures46return_local_generic_function_without_capturesU___FT_FQ_Q0_ : $@thin <A, R> () -> @owned @callee_owned (@out R, @in A) -> () {
+// CHECK-LABEL: sil hidden @_TF8closures46return_local_generic_function_without_capturesU___FT_FQ_Q0_ : $@thin <A, R> () -> @owned @callee_owned (@out R, @in A) -> () {
 func return_local_generic_function_without_captures<A, R>() -> A -> R {
   func f(_: A) -> R {
     Builtin.int_trap()
@@ -15,7 +15,7 @@ func return_local_generic_function_without_captures<A, R>() -> A -> R {
   return f
 }
 
-// CHECK-LABEL: sil  @_TF8closures17read_only_capture
+// CHECK-LABEL: sil hidden @_TF8closures17read_only_capture
 func read_only_capture(var x: Int) -> Int {
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -40,7 +40,7 @@ func read_only_capture(var x: Int) -> Int {
 // CHECK: release [[XBOX]]
 // CHECK: return [[X]]
 
-// CHECK-LABEL: sil  @_TF8closures16write_to_capture
+// CHECK-LABEL: sil hidden @_TF8closures16write_to_capture
 func write_to_capture(var x: Int) -> Int {
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -71,7 +71,7 @@ func write_to_capture(var x: Int) -> Int {
 // CHECK: release [[XBOX]]
 // CHECK: return
 
-// CHECK-LABEL: sil  @_TF8closures21multiple_closure_refs
+// CHECK-LABEL: sil hidden @_TF8closures21multiple_closure_refs
 func multiple_closure_refs(var x: Int) -> (() -> Int, () -> Int) {
   func cap() -> Int {
     return x
@@ -86,7 +86,7 @@ func multiple_closure_refs(var x: Int) -> (() -> Int, () -> Int) {
 }
 
 /* TODO: Full support for references between local functions
-// C/HECK-LABEL: sil  @_TF8closures18capture_local_func
+// C/HECK-LABEL: sil hidden @_TF8closures18capture_local_func
 func capture_local_func(var x: Int) -> () -> () -> Int {
   // C/HECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
@@ -111,7 +111,7 @@ func capture_local_func(var x: Int) -> () -> () -> Int {
 // C/HECK: return [[ALEPH]]
    */
 
-// CHECK-LABEL: sil  @_TF8closures22anon_read_only_capture
+// CHECK-LABEL: sil hidden @_TF8closures22anon_read_only_capture
 func anon_read_only_capture(var x: Int) -> Int {
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -133,7 +133,7 @@ func anon_read_only_capture(var x: Int) -> Int {
 // CHECK: release [[XBOX]]
 // CHECK: return [[X]]
 
-// CHECK-LABEL: sil  @_TF8closures21small_closure_capture
+// CHECK-LABEL: sil hidden @_TF8closures21small_closure_capture
 func small_closure_capture(var x: Int) -> Int {
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -156,7 +156,7 @@ func small_closure_capture(var x: Int) -> Int {
 // CHECK: return [[X]]
 
 
-// CHECK-LABEL: sil  @_TF8closures35small_closure_capture_with_argument
+// CHECK-LABEL: sil hidden @_TF8closures35small_closure_capture_with_argument
 func small_closure_capture_with_argument(var x: Int) -> (y: Int) -> Int {
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
@@ -177,7 +177,7 @@ func small_closure_capture_with_argument(var x: Int) -> (y: Int) -> Int {
 // CHECK: release [[XBOX]]
 // CHECK: return [[RET]]
 
-// CHECK-LABEL: sil  @_TF8closures24small_closure_no_capture
+// CHECK-LABEL: sil hidden @_TF8closures24small_closure_no_capture
 func small_closure_no_capture() -> (y: Int) -> Int {
   // CHECK:   [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures24small_closure_no_captureFT_FT1ySi_SiU_FSiSi]] : $@thin (Int) -> Int
   // CHECK:   [[ANON_THICK:%[0-9]+]] = thin_to_thick_function [[ANON]] : ${{.*}} to $@callee_owned (Int) -> Int
@@ -187,7 +187,7 @@ func small_closure_no_capture() -> (y: Int) -> Int {
 // CHECK: sil shared @[[CLOSURE_NAME]] : $@thin (Int) -> Int
 // CHECK: bb0([[YARG:%[0-9]+]] : $Int):
 
-// CHECK-LABEL: sil  @_TF8closures17uncaptured_locals{{.*}} :
+// CHECK-LABEL: sil hidden @_TF8closures17uncaptured_locals{{.*}} :
 func uncaptured_locals(var x: Int) -> (Int, Int) {
   // -- locals without captures are stack-allocated
   // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
@@ -251,7 +251,7 @@ class Base {}
 class SelfCapturedInInit : Base {
   var foo : () -> SelfCapturedInInit
 
-  // CHECK-LABEL: sil @_TFC8closures18SelfCapturedInInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit {
+  // CHECK-LABEL: sil hidden @_TFC8closures18SelfCapturedInInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit {
   // CHECK:         [[VAL:%.*]] = load {{%.*}}#1 : $*SelfCapturedInInit
   // CHECK:         [[VAL:%.*]] = load {{%.*}}#1 : $*SelfCapturedInInit
   // CHECK:         strong_retain [[VAL]] : $SelfCapturedInInit

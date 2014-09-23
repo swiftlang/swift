@@ -7,18 +7,18 @@
 import devirt_access_other_module
 
 
-//PRIMARY-FILE-LABEL: sil @_TF13devirt_access19testExternalPrivateFT_T_
+//PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access19testExternalPrivateFT_T_
 //PRIMARY-FILE: class_method
-//WHOLE-MODULE-LABEL: sil @_TF13devirt_access19testExternalPrivateFT_T_
+//WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access19testExternalPrivateFT_T_
 //WHOLE-MODULE: class_method
 func testExternalPrivate() {
   let obj = getExternalClass()
   invokeFoo(obj)
 }
 
-//PRIMARY-FILE-LABEL: sil @_TF13devirt_access20testInternalInternalFT_T_
+//PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access20testInternalInternalFT_T_
 //PRIMARY-FILE: class_method 
-//WHOLE-MODULE-LABEL: sil @_TF13devirt_access20testInternalInternalFT_T_
+//WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access20testInternalInternalFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_access16getInternalClassFT_CS_13InternalClass
 //WHOLE-MODULE: return
 func testInternalInternal() {
@@ -26,11 +26,11 @@ func testInternalInternal() {
   obj.bar()
 }
 
-//PRIMARY-FILE-LABEL: sil @_TF13devirt_access19testInternalPrivateFT_T_
+//PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access19testInternalPrivateFT_T_
 //PRIMARY-FILE: function_ref @_TF13devirt_access16getInternalClassFT_CS_13InternalClass 
 //PRIMARY-FILE: function_ref @_TF13devirt_access9invokeFooFCS_13InternalClassT_ 
 //PRIMARY-FILE: return
-//WHOLE-MODULE-LABEL: sil @_TF13devirt_access19testInternalPrivateFT_T_
+//WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access19testInternalPrivateFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_access16getInternalClassFT_CS_13InternalClass
 //WHOLE-MODULE: return
 func testInternalPrivate() {
@@ -49,9 +49,9 @@ class LocalInternalClass {
   return LocalInternalClass()
 }
 
-//PRIMARY-FILE-LABEL: sil @_TF13devirt_access17testLocalInternalFT_T_
+//PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access17testLocalInternalFT_T_
 //PRIMARY-FILE: class_method
-//WHOLE-MODULE-LABEL: sil @_TF13devirt_access17testLocalInternalFT_T_
+//WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access17testLocalInternalFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_access21getLocalInternalClassFT_CS_18LocalInternalClass
 //WHOLE-MODULE: return
 func testLocalInternal() {
@@ -59,10 +59,10 @@ func testLocalInternal() {
   obj.bar()
 }
 
-//PRIMARY-FILE-LABEL: sil @_TF13devirt_access16testLocalPrivateFT_T_
+//PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access16testLocalPrivateFT_T_
 //PRIMARY-FILE: function_ref @_TF13devirt_access21getLocalInternalClassFT_CS_18LocalInternalClass
 //PRIMARY-FILE: return
-//WHOLE-MODULE-LABEL: sil @_TF13devirt_access16testLocalPrivateFT_T_
+//WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access16testLocalPrivateFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_access21getLocalInternalClassFT_CS_18LocalInternalClass
 //WHOLE-MODULE: return
 func testLocalPrivate() {
@@ -85,9 +85,9 @@ private class LocalPrivateSubclass : PrivateClass {
   return LocalPrivateSubclass()
 }
 
-//PRIMARY-FILE-LABEL: sil @_TF13devirt_access11testPrivateFT_T_
+//PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access11testPrivateFT_T_
 //PRIMARY-FILE: class_method
-//WHOLE-MODULE-LABEL: sil @_TF13devirt_access11testPrivateFT_T_
+//WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access11testPrivateFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_accessP[[DISCRIMINATOR:[0-9]+_.+]]15getPrivateClassFT_CS_P[[DISCRIMINATOR]]12PrivateClass
 //WHOLE-MODULE: return
 func testPrivate() {
@@ -95,9 +95,9 @@ func testPrivate() {
   obj.foo()
 }
 
-//PRIMARY-FILE-LABEL: sil @_TF13devirt_access21testPrivateOverriddenFT_T_
+//PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access21testPrivateOverriddenFT_T_
 //PRIMARY-FILE: function_ref @_TF13devirt_accessP[[DISCRIMINATOR:[0-9]+_.+]]15getPrivateClassFT_CS_P[[DISCRIMINATOR]]12PrivateClass
-//WHOLE-MODULE-LABEL: sil @_TF13devirt_access21testPrivateOverriddenFT_T_
+//WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access21testPrivateOverriddenFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_accessP[[DISCRIMINATOR]]15getPrivateClassFT_CS_P[[DISCRIMINATOR]]12PrivateClass
 //WHOLE-MODULE: return
 func testPrivateOverridden() {

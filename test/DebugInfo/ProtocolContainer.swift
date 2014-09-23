@@ -8,7 +8,7 @@ class AClass : AProtocol {
 	init() { x = 0xDEADBEEF }
 	func print() { println("x = \(x)")}
 }
-// CHECK: define void @_TF17ProtocolContainer3foo
+// CHECK: define hidden void @_TF17ProtocolContainer3foo
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %[[X:.*]] = alloca %P17ProtocolContainer9AProtocol_, align 8
 // CHECK-NEXT: call void @llvm.dbg.declare(metadata !{%P17ProtocolContainer9AProtocol_* %[[X]]}, metadata ![[XMD:.*]])

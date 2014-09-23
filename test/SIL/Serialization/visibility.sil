@@ -13,103 +13,100 @@ import Builtin
 // NEG-CHECK-NOT: sil private @private_function_test : $@thin () -> ()
 
 // Check Global Variables.
-// CHECK: sil_global shared @shared_global : $Builtin.Word
-// CHECK: sil_global @public_global : $Builtin.Word
-// CHECK: sil_global hidden @hidden_global : $Builtin.Word
+// CHECK: sil_global shared [fragile] @shared_global : $Builtin.Word
+// CHECK: sil_global [fragile] @public_global : $Builtin.Word
+// CHECK: sil_global hidden [fragile] @hidden_global : $Builtin.Word
 
 // Check that all functions are defined/declared appropriately.
-// CHECK-NOT: sil @public_external_function_test : $@thin () -> () {
-// CHECK: sil @public_external_function_test : $@thin () -> ()
-// CHECK: sil hidden @hidden_function_test : $@thin () -> () {
-// CHECK: sil @references_public_function : $@thin () -> () {
-// CHECK: sil @references_shared_function : $@thin () -> () {
-// CHECK: sil @references_hidden_function : $@thin () -> () {
-// CHECK-NOT: sil public @references_private_function : $@thin () -> () {
-// CHECK: sil public @references_private_function : $@thin () -> ()
-// CHECK: sil @references_public_global : $@thin () -> () {
-// CHECK: sil @references_shared_global : $@thin () -> () {
-// CHECK: sil @references_hidden_global : $@thin () -> () {
-// CHECK-NOT: sil public @references_private_global : $@thin () -> () {
-// CHECK: sil public @references_private_global : $@thin () -> ()
-// CHECK-NOT: sil hidden_external @hidden_external_function_test : $@thin () -> () {
-// CHECK: sil hidden_external @hidden_external_function_test : $@thin () -> ()
-// CHECK: sil @public_function_test : $@thin () -> () {
-// CHECK: sil @public_function : $@thin () -> () {
-// CHECK: sil hidden @hidden_function : $@thin () -> () {
-// CHECK-NOT: sil shared_external @shared_external_function_test : $@thin () -> () {
-// CHECK: sil shared_external @shared_external_function_test : $@thin () -> ()
+// CHECK-NOT: sil [fragile] @public_external_function_test : $@thin () -> () {
+// CHECK: sil [fragile] @public_external_function_test : $@thin () -> ()
+// CHECK: sil hidden [fragile] @hidden_function_test : $@thin () -> () {
+// CHECK: sil [fragile] @references_public_function : $@thin () -> () {
+// CHECK: sil [fragile] @references_shared_function : $@thin () -> () {
+// CHECK: sil [fragile] @references_hidden_function : $@thin () -> () {
+// CHECK: sil [fragile] @references_private_function : $@thin () -> ()
+// CHECK: sil [fragile] @references_public_global : $@thin () -> () {
+// CHECK: sil [fragile] @references_shared_global : $@thin () -> () {
+// CHECK: sil [fragile] @references_hidden_global : $@thin () -> () {
+// CHECK: sil [fragile] @references_private_global : $@thin () -> ()
+// CHECK: sil hidden_external [fragile] @hidden_external_function_test : $@thin () -> ()
+// CHECK: sil [fragile] @public_function_test : $@thin () -> () {
+// CHECK: sil [fragile] @public_function : $@thin () -> () {
+// CHECK: sil hidden [fragile] @hidden_function : $@thin () -> () {
+// CHECK-NOT: sil shared_external [fragile] @shared_external_function_test : $@thin () -> () {
+// CHECK: sil shared_external [fragile] @shared_external_function_test : $@thin () -> ()
 
-sil_global private @private_global : $Builtin.Word
-sil_global @public_global : $Builtin.Word
-sil_global shared @shared_global : $Builtin.Word
-sil_global hidden @hidden_global : $Builtin.Word
+sil_global private [fragile] @private_global : $Builtin.Word
+sil_global [fragile] @public_global : $Builtin.Word
+sil_global shared [fragile] @shared_global : $Builtin.Word
+sil_global hidden [fragile] @hidden_global : $Builtin.Word
 
-sil private @private_function : $@thin () -> () {
+sil private [fragile] @private_function : $@thin () -> () {
   %0 = integer_literal $Builtin.Int32, 0
   %1 = tuple()
   return %1 : $()
 }
-sil @references_private_global : $@thin () -> () {
+sil [fragile] @references_private_global : $@thin () -> () {
   %0 = sil_global_addr @private_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil @references_private_function : $@thin () -> () {
+sil [fragile] @references_private_function : $@thin () -> () {
   %0 = function_ref @private_function : $@thin () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil shared @shared_function : $@thin () -> () {
+sil shared [fragile] @shared_function : $@thin () -> () {
   %0 = integer_literal $Builtin.Int32, 1
   %1 = tuple()
   return %1 : $()
 }
-sil @references_shared_global : $@thin () -> () {
+sil [fragile] @references_shared_global : $@thin () -> () {
   %0 = sil_global_addr @shared_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil @references_shared_function : $@thin () -> () {
+sil [fragile] @references_shared_function : $@thin () -> () {
   %0 = function_ref @shared_function : $@thin () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil hidden @hidden_function : $@thin () -> () {
+sil hidden [fragile] @hidden_function : $@thin () -> () {
   %0 = integer_literal $Builtin.Int32, 2
   %1 = tuple()
   return %1 : $()
 }
-sil @references_hidden_global : $@thin () -> () {
+sil [fragile] @references_hidden_global : $@thin () -> () {
   %0 = sil_global_addr @hidden_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil @references_hidden_function : $@thin () -> () {
+sil [fragile] @references_hidden_function : $@thin () -> () {
   %0 = function_ref @hidden_function : $@thin () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil @public_function : $@thin () -> () {
+sil [fragile] @public_function : $@thin () -> () {
   %0 = integer_literal $Builtin.Int32, 4
   %1 = tuple()
   return %1 : $()
 }
 
-sil @references_public_global : $@thin () -> () {
+sil [fragile] @references_public_global : $@thin () -> () {
   %0 = sil_global_addr @public_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil @references_public_function : $@thin () -> () {
+sil [fragile] @references_public_function : $@thin () -> () {
   %0 = function_ref @public_function : $@thin () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil private @private_function_test : $@thin () -> () {
+sil private [fragile] @private_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
   %2 = function_ref @references_hidden_function : $@thin () -> ()
@@ -130,7 +127,7 @@ sil private @private_function_test : $@thin () -> () {
   return %8 : $()
 }
 
-sil shared @shared_function_test : $@thin () -> () {
+sil shared [fragile] @shared_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
   %2 = function_ref @references_hidden_function : $@thin () -> ()
@@ -151,7 +148,7 @@ sil shared @shared_function_test : $@thin () -> () {
   return %8 : $()
 }
 
-sil hidden @hidden_function_test : $@thin () -> () {
+sil hidden [fragile] @hidden_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
   %2 = function_ref @references_hidden_function : $@thin () -> ()
@@ -172,7 +169,7 @@ sil hidden @hidden_function_test : $@thin () -> () {
   return %8 : $()
 }
 
-sil @public_function_test : $@thin () -> () {
+sil [fragile] @public_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
   %2 = function_ref @references_hidden_function : $@thin () -> ()
@@ -193,7 +190,7 @@ sil @public_function_test : $@thin () -> () {
   return %8 : $()
 }
 
-sil hidden_external @hidden_external_function_test : $@thin () -> () {
+sil hidden_external [fragile] @hidden_external_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
   %2 = function_ref @references_hidden_function : $@thin () -> ()
@@ -214,7 +211,7 @@ sil hidden_external @hidden_external_function_test : $@thin () -> () {
   return %8 : $()
 }
 
-sil public_external @public_external_function_test : $@thin () -> () {
+sil public_external [fragile] @public_external_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
   %2 = function_ref @references_hidden_function : $@thin () -> ()
@@ -235,7 +232,7 @@ sil public_external @public_external_function_test : $@thin () -> () {
   return %8 : $()
 }
 
-sil shared_external @shared_external_function_test : $@thin () -> () {
+sil shared_external [fragile] @shared_external_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
   %2 = function_ref @references_hidden_function : $@thin () -> ()

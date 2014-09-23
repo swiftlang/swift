@@ -354,7 +354,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
       P.diagnose(It->second.second, diag::sil_prior_reference);
       auto loc = SILFileLocation(Loc);
       Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
-                               nullptr, loc);
+                               nullptr, loc, IsNotBare, IsNotTransparent, IsNotFragile);
       Fn->setDebugScope(new (SILMod) SILDebugScope(loc, *Fn));
     }
     
@@ -374,14 +374,16 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   if (SILMod.lookUpFunction(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
     auto fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
-                                  nullptr, loc);
+                                  nullptr, loc, IsNotBare, IsNotTransparent,
+                                  IsNotFragile);
     fn->setDebugScope(new (SILMod) SILDebugScope(loc, *fn));
     return fn;
   }
 
   // Otherwise, this definition is the first use of this name.
   auto fn = SILFunction::create(SILMod, SILLinkage::Private, Name.str(),
-                                Ty, nullptr, loc);
+                                Ty, nullptr, loc, IsNotBare, IsNotTransparent,
+                                IsNotFragile);
   fn->setDebugScope(new (SILMod) SILDebugScope(loc, *fn));
   return fn;
 }
@@ -402,7 +404,8 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Name.str(), FnRef->getLoweredFunctionType(), Ty);
       FnRef = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
-                                  loc);
+                                  loc, IsNotBare, IsNotTransparent,
+                                  IsNotFragile);
       FnRef->setDebugScope(new (SILMod) SILDebugScope(loc, *FnRef));
     }
     return FnRef;
@@ -411,7 +414,8 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
   auto Fn = SILFunction::create(SILMod, SILLinkage::Private,
-                                Name.str(), Ty, nullptr, loc);
+                                Name.str(), Ty, nullptr, loc, IsNotBare,
+                                IsNotTransparent, IsNotFragile);
   Fn->setDebugScope(new (SILMod) SILDebugScope(loc, *Fn));
   TUState.ForwardRefFns[Name] = { Fn, Loc };
   TUState.Diags = &P.Diags;
@@ -671,29 +675,31 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
   return false;
 }
 
-static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
-                                 Inline_t &inlineStrategy, std::string &Semantics,
-                                 EffectsKind &MRK,
+static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
+                                 bool *isGlobalInit, Inline_t *inlineStrategy,
+                                 std::string *Semantics, EffectsKind *MRK,
                                  Parser &P) {
   while (P.consumeIf(tok::l_square)) {
     if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_in_attribute_list);
       return true;
-    } else if (P.Tok.getText() == "transparent")
-      isTransparent = true;
-    else if (P.Tok.getText() == "global_init")
-      isGlobalInit = true;
-    else if (P.Tok.getText() == "noinline")
-      inlineStrategy = NoInline;
-    else if (P.Tok.getText() == "always_inline")
-      inlineStrategy = AlwaysInline;
-    else if (P.Tok.getText() == "readnone")
-      MRK = EffectsKind::ReadNone;
-    else if (P.Tok.getText() == "readonly")
-      MRK = EffectsKind::ReadOnly;
-    else if (P.Tok.getText() == "readwrite")
-      MRK = EffectsKind::ReadWrite;
-    else if (P.Tok.getText() == "semantics") {
+    } else if (isTransparent && P.Tok.getText() == "transparent")
+      *isTransparent = true;
+    else if (isFragile && P.Tok.getText() == "fragile")
+      *isFragile = true;
+    else if (isGlobalInit && P.Tok.getText() == "global_init")
+      *isGlobalInit = true;
+    else if (inlineStrategy && P.Tok.getText() == "noinline")
+      *inlineStrategy = NoInline;
+    else if (inlineStrategy && P.Tok.getText() == "always_inline")
+      *inlineStrategy = AlwaysInline;
+    else if (MRK && P.Tok.getText() == "readnone")
+      *MRK = EffectsKind::ReadNone;
+    else if (MRK && P.Tok.getText() == "readonly")
+      *MRK = EffectsKind::ReadOnly;
+    else if (MRK && P.Tok.getText() == "readwrite")
+      *MRK = EffectsKind::ReadWrite;
+    else if (Semantics && P.Tok.getText() == "semantics") {
       P.consumeToken(tok::identifier);
       if (P.Tok.getKind() != tok::string_literal) {
         P.diagnose(P.Tok, diag::expected_in_attribute_list);
@@ -702,7 +708,7 @@ static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
   
       // Drop the double quotes.
       StringRef rawString = P.Tok.getText().drop_front().drop_back();
-      Semantics = rawString;
+      *Semantics = rawString;
       P.consumeToken(tok::string_literal);
 
       P.parseToken(tok::r_square, diag::expected_in_attribute_list);
@@ -3053,13 +3059,14 @@ bool Parser::parseDeclSIL() {
 
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
+  bool isFragile = false;
   bool isGlobalInit = false;
   Inline_t inlineStrategy = InlineDefault;
   std::string Semantics;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
-      parseDeclSILOptional(isTransparent, isGlobalInit, inlineStrategy, Semantics,
-                           MRK, *this) ||
+      parseDeclSILOptional(&isTransparent, &isFragile, &isGlobalInit,
+                           &inlineStrategy, &Semantics, &MRK, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3081,6 +3088,7 @@ bool Parser::parseDeclSIL() {
       FunctionState.getGlobalNameForDefinition(FnName, SILFnType, FnNameLoc);
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
+    FunctionState.F->setFragile(IsFragile_t(isFragile));
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setEffectsInfo(MRK);
@@ -3169,11 +3177,14 @@ bool Parser::parseSILGlobal() {
   Identifier GlobalName;
   SILType GlobalType;
   SourceLoc NameLoc;
+  bool isFragile = false;
 
   // Inform the lexer that we're lexing the body of the SIL declaration.
   Lexer::SILBodyRAII Tmp(*L);
   Scope S(this, ScopeKind::TopLevel);
   if (parseSILLinkage(GlobalLinkage, *this) ||
+      parseDeclSILOptional(nullptr, &isFragile, nullptr,
+                           nullptr, nullptr, nullptr, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3189,6 +3200,7 @@ bool Parser::parseSILGlobal() {
 
   // FIXME: check for existing global variable?
   auto *GV = SILGlobalVariable::create(*SIL->M, GlobalLinkage.getValue(),
+                                       (IsFragile_t)isFragile,
                                        GlobalName.str(),GlobalType,
                                        SILFileLocation(NameLoc));
 
@@ -3258,15 +3270,21 @@ bool Parser::parseSILVTable() {
       SILDeclRef Ref;
       Identifier FuncName;
       SourceLoc FuncLoc;
-      if (VTableState.parseSILDeclRef(Ref) ||
-          parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
+      if (VTableState.parseSILDeclRef(Ref))
+        return true;
+      SILFunction *Func = nullptr;
+      if (Tok.is(tok::kw_nil)) {
+        consumeToken();
+      } else {
+        if (parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
           VTableState.parseSILIdentifier(FuncName, FuncLoc,
                                          diag::expected_sil_value_name))
         return true;
-      SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
-      if (!Func) {
-        diagnose(FuncLoc, diag::sil_vtable_func_not_found, FuncName);
-        return true;
+        Func = SIL->M->lookUpFunction(FuncName.str());
+        if (!Func) {
+          diagnose(FuncLoc, diag::sil_vtable_func_not_found, FuncName);
+          return true;
+        }
       }
       vtableEntries.emplace_back(Ref, Func);
     } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));

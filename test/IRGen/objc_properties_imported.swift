@@ -15,7 +15,7 @@ class OverridesBoolProperty : HasProperties {
   }
 }
 
-// CHECK-LABEL: define void @_TF24objc_properties_imported16testBoolProperty
+// CHECK-LABEL: define hidden void @_TF24objc_properties_imported16testBoolProperty
 func testBoolProperty(hp: HasProperties) {
   // CHECK-NOT: ret void
   // CHECK: load i8** @"\01L_selector(isEnabled)"

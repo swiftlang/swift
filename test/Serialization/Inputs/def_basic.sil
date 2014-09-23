@@ -11,8 +11,8 @@ sil_global private @globalinit_token0 : $Builtin.Word
 // CHECK-NOT: sil_global public @public_global : $Builtin.Word
 sil_global public @public_global : $Builtin.Word
 
-var staticProp: Int = 0
-sil @globalinit_func0 : $@thin () -> ()
+public var staticProp: Int = 0
+sil [fragile] @globalinit_func0 : $@thin () -> ()
 
 // We should not serialize this since it references the private variable globalinit_token0.
 // CHECK-NOT: sil public_external @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
@@ -30,8 +30,8 @@ bb0:
 }
 
 // This references a public global so we *SHOULD* derserialize this.
-// CHECK-LABEL: sil public_external @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer {
-sil @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer {
+// CHECK-LABEL: sil public_external [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer {
+sil [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer {
 bb0:
   %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
   // CHECK: sil_global_addr @public_global : $*Builtin.Word
@@ -61,8 +61,8 @@ class Class2 {
 
 // Instructions
 
-// CHECK-LABEL: sil public_external @test1 : $@thin () -> ()
-sil @test1 : $@thin () -> () {
+// CHECK-LABEL: sil public_external [fragile] @test1 : $@thin () -> ()
+sil [fragile] @test1 : $@thin () -> () {
 bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
   br bb1                              // CHECK:   br bb1
@@ -75,8 +75,8 @@ bb1:
 }
 
 // Forward referenced values.
-// CHECK-LABEL: sil public_external @test2 : $@thin (Int) -> ()
-sil @test2 : $@thin (Int) -> () {
+// CHECK-LABEL: sil public_external [fragile] @test2 : $@thin (Int) -> ()
+sil [fragile] @test2 : $@thin (Int) -> () {
   // CHECK: bb1:
   // CHECK: %2 = tuple ()
   // CHECK: br bb2
@@ -98,14 +98,14 @@ bb2:
 }
 
 // CHECK-LABEL: @named_tuple : $@thin () -> (Builtin.Word, Builtin.Word)
-sil @named_tuple : $@thin () -> (Builtin.Word, Builtin.Word) {
+sil [fragile] @named_tuple : $@thin () -> (Builtin.Word, Builtin.Word) {
   %0 = integer_literal $Builtin.Word, 42
   // CHECK: integer_literal $Builtin.Word, 42
   %9 = tuple $(Builtin.Word, Builtin.Word) (%0, %0)
   %10 = return %9 : $(Builtin.Word, Builtin.Word)
 }
 
-sil @return_int : $@thin (Int) -> Int { // CHECK-LABEL: $@thin (Int) -> Int {
+sil [fragile] @return_int : $@thin (Int) -> Int { // CHECK-LABEL: $@thin (Int) -> Int {
 bb0(%0 : $Int):                          // CHECK: bb0(%0 : $Int):
   // CHECK: alloc_stack $Int
   // CHECK: store
@@ -117,7 +117,7 @@ bb0(%0 : $Int):                          // CHECK: bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: @call_fn_pointer : $@thin (() -> Int) -> Int {
-sil @call_fn_pointer : $@thin (() -> Int) -> Int {
+sil [fragile] @call_fn_pointer : $@thin (() -> Int) -> Int {
 bb0(%0 : $() -> Int):
   %1 = alloc_stack $() -> Int
   store %0 to %1#1 : $*() -> Int
@@ -133,7 +133,7 @@ bb0(%0 : $() -> Int):
   return %5 : $Int                       // CHECK: return %{{.*}} : $Int
 }
 
-sil @return_constant : $@thin () -> Int {  // CHECK-LABEL: @return_constant
+sil [fragile] @return_constant : $@thin () -> Int {  // CHECK-LABEL: @return_constant
 bb0:                                         // CHECK: bb0:
   // CHECK: function_ref @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Word, @thin Int.Type) -> Int
   %1 = function_ref @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Word, @thin Int.Type) -> Int
@@ -150,12 +150,12 @@ bb0:                                         // CHECK: bb0:
   %5 = return %4 : $Int
 }
 
-sil @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Word, @thin Int.Type) -> Int
+sil [fragile] @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Word, @thin Int.Type) -> Int
 
 // Parse SIL generated from the following swift program:
 // func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
-sil @_TFSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
-sil @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+sil [fragile] @_TFSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
+sil [fragile] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, @thin Int.Type) -> Int
 
 
 protocol P {
@@ -163,7 +163,7 @@ protocol P {
 }
 
 // CHECK-LABEL: @existentials : $@thin (@in P) -> () {
-sil @existentials : $@thin (@in P) -> () {
+sil [fragile] @existentials : $@thin (@in P) -> () {
 bb0(%0 : $*P):
   %1 = project_existential %0 : $*P to $*@sil_self P // CHECK: project_existential %0
 
@@ -188,7 +188,7 @@ class D : C {
 }
 
 // CHECK-LABEL: @classes : $@thin () -> () {
-sil @classes : $@thin () -> () {
+sil [fragile] @classes : $@thin () -> () {
 bb0:
   // CHECK: %0 = alloc_ref $C
   %C = alloc_ref $C
@@ -246,7 +246,7 @@ protocol Runcible {
 protocol Bendable { }
 
 // CHECK-LABEL: $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
-sil @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
+sil [fragile] @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
 bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: alloc_box
   %2 = alloc_box $protocol<Bendable, Runcible>
@@ -273,7 +273,7 @@ protocol ClassBound : class {
 }
 
 // CHECK-LABEL: @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> ()
-sil @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> () {
+sil [fragile] @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (@owned ClassBound) -> () {
 bb0(%0 : $ClassBound):
   %1 = alloc_box $ClassBound
   %2 = store %0 to %1#1 : $*ClassBound
@@ -307,7 +307,7 @@ struct Aleph {
 }
 
 // CHECK-LABEL: @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, @thin Aleph.Type) -> Aleph
-sil @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, @thin Aleph.Type) -> Aleph {
+sil [fragile] @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, @thin Aleph.Type) -> Aleph {
 bb0(%0 : $Ref, %1 : $Val, %2 : $@thin Aleph.Type):
   // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
   %3 = struct $Aleph (%0 : $Ref, %1 : $Val)
@@ -315,7 +315,7 @@ bb0(%0 : $Ref, %1 : $Val, %2 : $@thin Aleph.Type):
 }
 
 // CHECK-LABEL: @_TFV6struct5AlephCfMS0_FT_S0_ : $@thin (@thin Aleph.Type) -> Aleph
-sil @_TFV6struct5AlephCfMS0_FT_S0_ : $@thin (@thin Aleph.Type) -> Aleph {
+sil [fragile] @_TFV6struct5AlephCfMS0_FT_S0_ : $@thin (@thin Aleph.Type) -> Aleph {
 bb0(%0 : $@thin Aleph.Type):
   %1 = tuple ()
   %2 = alloc_box $Aleph       // CHECK: alloc_box
@@ -337,7 +337,7 @@ enum Beth {
 }
 
 // CHECK-LABEL: @test_union_empty_case : $@thin () -> Beth {
-sil @test_union_empty_case : $@thin () -> Beth {
+sil [fragile] @test_union_empty_case : $@thin () -> Beth {
 bb0:
   // CHECK: %0 = enum $Beth, #Beth.EmptyCase!enumelt
   %0 = enum $Beth, #Beth.EmptyCase!enumelt
@@ -345,7 +345,7 @@ bb0:
 }
 
 // CHECK-LABEL: @test_union_data_case : $@thin (Int) -> Beth {
-sil @test_union_data_case : $@thin Int -> Beth {
+sil [fragile] @test_union_data_case : $@thin Int -> Beth {
 bb0(%0 : $Int):
   // CHECK: %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
   %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
@@ -360,7 +360,7 @@ enum Gimel {
 }
 
 // CHECK-LABEL: @test_union_addr_empty_case : $@thin (@out Gimel) -> () {
-sil @test_union_addr_empty_case : $@thin (@out Gimel) -> () {
+sil [fragile] @test_union_addr_empty_case : $@thin (@out Gimel) -> () {
 bb0(%0 : $*Gimel):
   // CHECK: inject_enum_addr {{%.*}} : $*Gimel, #Gimel.EmptyCase!enumelt
   inject_enum_addr %0 : $*Gimel, #Gimel.EmptyCase!enumelt
@@ -369,7 +369,7 @@ bb0(%0 : $*Gimel):
 }
 
 // CHECK-LABEL: @test_union_addr_data_case : $@thin (@out Gimel, @in Q) -> () {
-sil @test_union_addr_data_case : $@thin (@out Gimel, @in Q) -> () {
+sil [fragile] @test_union_addr_data_case : $@thin (@out Gimel, @in Q) -> () {
 bb0(%0 : $*Gimel, %1 : $*Q):
   // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt.1
   %p = init_enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
@@ -379,11 +379,11 @@ bb0(%0 : $*Gimel, %1 : $*Q):
   return %t : $()
 }
 
-sil @_TF5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
-sil @_TF5tuple5tupleFT_TSiSf_ : $@thin () -> (Int, Float32)
+sil [fragile] @_TF5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
+sil [fragile] @_TF5tuple5tupleFT_TSiSf_ : $@thin () -> (Int, Float32)
 
 // CHECK-LABEL: @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int, Float) -> ()
-sil @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int, Float) -> () {
+sil [fragile] @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int, Float) -> () {
 bb0(%0 : $Int, %1 : $Float32):
   %2 = alloc_box $(Int, Float32)
   %3 = tuple (%0 : $Int, %1 : $Float32)
@@ -415,7 +415,7 @@ class M {
 }
 
 // CHECK-LABEL: @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, M) -> ()
-sil @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, M) -> () {
+sil [fragile] @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, M) -> () {
 bb0(%0 : $Int, %1 : $M):
   %2 = alloc_box $Int
   %3 = store %0 to %2#1 : $*Int
@@ -438,7 +438,7 @@ class B { }
 class E : B { }
 
 // CHECK-LABEL: @_TF4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1
-sil @_TF4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1 {
+sil [fragile] @_TF4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1 {
 bb0(%0 : $B):
   %1 = alloc_box $B
   %2 = store %0 to %1#1 : $*B
@@ -457,13 +457,13 @@ isa(%6 : $Builtin.Int1):
   %9 = return %6 : $Builtin.Int1
 }
 
-sil @_TF7literal8literalsFT_T_ : $@thin () -> ()
+sil [fragile] @_TF7literal8literalsFT_T_ : $@thin () -> ()
 
-sil @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil [fragile] @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
+sil [fragile] @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
 // CHECK-LABEL: @_TF5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
-sil @_TF5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+sil [fragile] @_TF5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %2 = alloc_box $Builtin.RawPointer
   %3 = alloc_box $Builtin.Word
@@ -479,10 +479,10 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 }
 
 var x : Int = 0
-sil @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+sil [fragile] @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
 
 // CHECK-LABEL: @global_code : $@thin () -> ()
-sil @global_code : $@thin () -> () {
+sil [fragile] @global_code : $@thin () -> () {
 bb0:
   // CHECK: global_addr #x : $*Int
   %0 = global_addr #x : $*Int
@@ -502,7 +502,7 @@ class SomeClass : SomeProtocol {
 class SomeSubclass : SomeClass {}
 
 // CHECK-LABEL: @test_class_metatype : $@thin (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
-sil @test_class_metatype : $@thin (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
+sil [fragile] @test_class_metatype : $@thin (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
 bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %2 = alloc_box $SomeClass
   %3 = alloc_box $SomeSubclass
@@ -529,7 +529,7 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
 }
 
 // CHECK-LABEL: @test_existential_metatype : $@thin (@in SomeProtocol) -> @thick SomeProtocol.Type {
-sil @test_existential_metatype : $@thin (@in SomeProtocol) -> @thick SomeProtocol.Type {
+sil [fragile] @test_existential_metatype : $@thin (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
   %1 = alloc_box $SomeProtocol
   // CHECK: copy_addr [take] %0 to [initialization] %1#1 : $*SomeProtocol
@@ -546,15 +546,15 @@ bb0(%0 : $*SomeProtocol):
   %10 = return %6 : $@thick SomeProtocol.Type
 }
 
-// CHECK-LABEL: sil public_external @test_unreachable
-sil @test_unreachable : $@thin () -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_unreachable
+sil [fragile] @test_unreachable : $@thin () -> () {
 bb0:
   unreachable
 // CHECK: unreachable
 }
 
 // CHECK-LABEL: @test_unowned_retain : $@thin (SomeClass) -> () {
-sil @test_unowned_retain : $@thin (SomeClass) -> () {
+sil [fragile] @test_unowned_retain : $@thin (SomeClass) -> () {
 bb0(%0 : $SomeClass):
   %1 = ref_to_unowned %0 : $SomeClass to $@sil_unowned SomeClass
   // CHECK: ref_to_unowned %0 : $SomeClass to $@sil_unowned SomeClass
@@ -568,8 +568,8 @@ bb0(%0 : $SomeClass):
   %6 = return %5 : $()
 }
 
-// CHECK-LABEL: sil public_external @test_basic_block_arguments
-sil @test_basic_block_arguments : $@thin (Builtin.Int1) -> Builtin.Word {
+// CHECK-LABEL: sil public_external [fragile] @test_basic_block_arguments
+sil [fragile] @test_basic_block_arguments : $@thin (Builtin.Int1) -> Builtin.Word {
 bb0(%0 : $Builtin.Int1):
   // CHECK: cond_br
   cond_br %0, bb1, bb2
@@ -586,8 +586,8 @@ bb3(%6 : $Builtin.Word):
   return %6 : $Builtin.Word
 }
 
-// CHECK-LABEL: sil public_external @test_cond_branch_basic_block_args
-sil @test_cond_branch_basic_block_args : $@thin (Int, Builtin.Int1) -> Int {
+// CHECK-LABEL: sil public_external [fragile] @test_cond_branch_basic_block_args
+sil [fragile] @test_cond_branch_basic_block_args : $@thin (Int, Builtin.Int1) -> Int {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
   cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
   // CHECK: cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
@@ -603,14 +603,14 @@ class Bas : NSObject {
   var strRealProp : String
   override init()
 }
-sil @test_autorelease_return : $@cc(objc_method) @thin (Bas) -> NSString 
-sil @test_super_method : $@cc(method) @thin (Bas) -> Bas
+sil [fragile] @test_autorelease_return : $@cc(objc_method) @thin (Bas) -> NSString 
+sil [fragile] @test_super_method : $@cc(method) @thin (Bas) -> Bas
 
-sil @swift_StringToNSString : $@thin (@inout String) -> @owned NSString
-sil @_TFSSCfMSSFT_SS : $@thin (@thin String.Type) -> String
+sil [fragile] @swift_StringToNSString : $@thin (@inout String) -> @owned NSString
+sil [fragile] @_TFSSCfMSSFT_SS : $@thin (@thin String.Type) -> String
 
-// CHECK-LABEL: sil public_external @test_builtin_func_ref
-sil @test_builtin_func_ref : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil public_external [fragile] @test_builtin_func_ref
+sil [fragile] @test_builtin_func_ref : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %2 = alloc_box $Builtin.Int1
   %3 = alloc_box $Builtin.Int1
@@ -626,8 +626,8 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   return %10 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil public_external @test_dealloc_ref
-sil @test_dealloc_ref : $@thin () -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_dealloc_ref
+sil [fragile] @test_dealloc_ref : $@thin () -> () {
 bb0:
   %0 = alloc_ref $Class1
   // CHECK: dealloc_ref %{{.*}} : $Class1
@@ -636,8 +636,8 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil public_external @test_dealloc_box
-sil @test_dealloc_box : $@thin () -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_dealloc_box
+sil [fragile] @test_dealloc_box : $@thin () -> () {
 bb0:
   %0 = alloc_box $Class1
   dealloc_box $Class1, %0#0 : $Builtin.NativeObject
@@ -646,10 +646,10 @@ bb0:
 }
 
 // CHECK-LABEL: @closure_test
-sil @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-sil @closure0 : $@thin (Builtin.NativeObject, @inout Int) -> ()
+sil [fragile] @takes_closure : $@thin (@callee_owned () -> ()) -> ()
+sil [fragile] @closure0 : $@thin (Builtin.NativeObject, @inout Int) -> ()
 
-sil @closure_test : $@thin () -> () {
+sil [fragile] @closure_test : $@thin () -> () {
 bb0:
   %0 = alloc_box $Int                           // users: %10, %8, %8, %7, %4
 
@@ -671,12 +671,12 @@ enum MaybePair {
   case Left(Int)
 }
 
-sil @_TF6switch1aFT_T_ : $@thin () -> ()
-sil @_TF6switch1bFT_T_ : $@thin () -> ()
-sil @_TF6switch1cFT_T_ : $@thin () -> ()
+sil [fragile] @_TF6switch1aFT_T_ : $@thin () -> ()
+sil [fragile] @_TF6switch1bFT_T_ : $@thin () -> ()
+sil [fragile] @_TF6switch1cFT_T_ : $@thin () -> ()
 
-// CHECK-LABEL: sil public_external @test_switch_union : $@thin (MaybePair) -> ()
-sil @test_switch_union : $@thin (MaybePair) -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_switch_union : $@thin (MaybePair) -> ()
+sil [fragile] @test_switch_union : $@thin (MaybePair) -> () {
 bb0(%0 : $MaybePair):
   %1 = alloc_box $MaybePair
   store %0 to %1#1 : $*MaybePair
@@ -716,8 +716,8 @@ enum MaybeAddressOnlyPair {
   case Left(Q)
 }
 
-// CHECK-LABEL: sil public_external @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> ()
-sil @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> ()
+sil [fragile] @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
   // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
   switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt.1: bb2
@@ -735,8 +735,8 @@ bb3:
   return %t : $()
 }
 
-// CHECK-LABEL: sil public_external @test_switch_int : $@thin (Builtin.Word) -> ()
-sil @test_switch_int : $@thin (Builtin.Word) -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_switch_int : $@thin (Builtin.Word) -> ()
+sil [fragile] @test_switch_int : $@thin (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
   // CHECK: switch_int %{{.*}} : $Builtin.Word, case 1: bb1, case 2: bb2
   switch_int %0 : $Builtin.Word, case 1: bb1, case 2: bb2
@@ -761,8 +761,8 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil public_external @test_init_existential : $@thin (@out Bendable, Spoon) -> ()
-sil @test_init_existential : $@thin (@out Bendable, Spoon) -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_init_existential : $@thin (@out Bendable, Spoon) -> ()
+sil [fragile] @test_init_existential : $@thin (@out Bendable, Spoon) -> () {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
   store %1 to %2#1 : $*Spoon
@@ -777,8 +777,8 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil public_external @test_existential_ref : $@thin (ConcreteClass) -> ClassP
-sil @test_existential_ref : $@thin (ConcreteClass) -> ClassP {
+// CHECK-LABEL: sil public_external [fragile] @test_existential_ref : $@thin (ConcreteClass) -> ClassP
+sil [fragile] @test_existential_ref : $@thin (ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
   %1 = alloc_box $ConcreteClass
   store %0 to %1#1 : $*ConcreteClass
@@ -790,14 +790,14 @@ bb0(%0 : $ConcreteClass):
   return %5 : $ClassP
 }
 
-sil @test_assign : $@thin (Int, @inout Int) -> () {    // CHECK-LABEL: sil public_external @test_assign
+sil [fragile] @test_assign : $@thin (Int, @inout Int) -> () {    // CHECK-LABEL: sil public_external [fragile] @test_assign
 bb0(%0 : $Int, %1 : $*Int):
   assign %0 to %1 : $*Int                   // CHECK: assign
   unreachable
 }
 
-// CHECK-LABEL: sil public_external @test_transparent : $@thin () -> () {
-sil @test_transparent : $@thin () -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_transparent : $@thin () -> () {
+sil [fragile] @test_transparent : $@thin () -> () {
 bb0:
   // CHECK: function_ref
   // CHECK: apply [transparent]
@@ -808,7 +808,7 @@ bb0:
 }
 
 // CHECK-LABEL: [noinline] @noinline_callee
-sil [noinline] @noinline_callee : $@thin () -> Int {
+sil [fragile] [noinline] @noinline_callee : $@thin () -> Int {
 bb0:
   %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
@@ -817,7 +817,7 @@ bb0:
   return %3 : $Int
 }
 // CHECK-LABEL: [always_inline] @always_inline_callee
-sil [always_inline] @always_inline_callee : $@thin () -> Int {
+sil [fragile] [always_inline] @always_inline_callee : $@thin () -> Int {
 bb0:
   %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
@@ -825,21 +825,21 @@ bb0:
   %3 = apply [transparent] %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
-sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+sil [fragile] [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
 
 // CHECK-LABEL: [semantics "foo"] @test_semantics : $@thin () -> ()
-sil [semantics "foo"] @test_semantics : $@thin () -> () {
+sil [fragile] [semantics "foo"] @test_semantics : $@thin () -> () {
 bb0:
   %2 = tuple ()
   %3 = return %2 : $()
 }
 
-sil @takes_unnamed_closure : $@thin (@callee_owned () -> Int) -> @callee_owned () -> @callee_owned () -> Int
+sil [fragile] @takes_unnamed_closure : $@thin (@callee_owned () -> Int) -> @callee_owned () -> @callee_owned () -> Int
 
-sil @takes_int64_float32 : $@thin (Int, Float32) -> ()
+sil [fragile] @takes_int64_float32 : $@thin (Int, Float32) -> ()
 
-// CHECK-LABEL: sil public_external @test_partial_apply : $@thin (Float) -> @callee_owned (Int) -> () {
-sil @test_partial_apply : $@thin Float32 -> @callee_owned Int -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_partial_apply : $@thin (Float) -> @callee_owned (Int) -> () {
+sil [fragile] @test_partial_apply : $@thin Float32 -> @callee_owned Int -> () {
 bb0(%0 : $Float32):
   %1 = function_ref @takes_int64_float32 : $@thin (Int, Float) -> ()
   // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@thin (Int, Float) -> ()
@@ -851,8 +851,8 @@ class X {
   @objc func f() { }
 }
 
-// CHECK-LABEL: sil public_external @test_dynamic_lookup_br : $@thin (AnyObject) -> ()
-sil @test_dynamic_lookup_br : $@thin (AnyObject) -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_dynamic_lookup_br : $@thin (AnyObject) -> ()
+sil [fragile] @test_dynamic_lookup_br : $@thin (AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %1 = alloc_box $AnyObject
   store %0 to %1#1 : $*AnyObject
@@ -875,8 +875,8 @@ bb3:
   return %28 : $()
 }
 
-// CHECK-LABEL: sil public_external @test_mark_fn_escape
-sil @test_mark_fn_escape : $@thin () -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_mark_fn_escape
+sil [fragile] @test_mark_fn_escape : $@thin () -> () {
   %b = alloc_box $Int
   %c = alloc_box $Int
 
@@ -887,8 +887,8 @@ sil @test_mark_fn_escape : $@thin () -> () {
   return %28 : $()
 }
 
-// CHECK-LABEL: sil public_external @test_copy_release_value
-sil @test_copy_release_value : $@thin (X) -> (X) {
+// CHECK-LABEL: sil public_external [fragile] @test_copy_release_value
+sil [fragile] @test_copy_release_value : $@thin (X) -> (X) {
 bb0(%0 : $X):
   retain_value %0 : $X
   release_value %0 : $X
@@ -903,8 +903,8 @@ bb0(%0 : $X):
 public func serialize_all() {
 }
 
-// CHECK: sil public_external @cond_fail_test : $@thin (Builtin.Int1) -> () {
-sil @cond_fail_test : $@thin Builtin.Int1 -> () {
+// CHECK: sil public_external [fragile] @cond_fail_test : $@thin (Builtin.Int1) -> () {
+sil [fragile] @cond_fail_test : $@thin Builtin.Int1 -> () {
 entry(%0 : $Builtin.Int1):
   // CHECK: cond_fail %0 : $Builtin.Int1
   cond_fail %0 : $Builtin.Int1
@@ -912,8 +912,8 @@ entry(%0 : $Builtin.Int1):
   return %1 : $()
 }
 
-// CHECK-LABEL: sil public_external @block_storage_type
-sil @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> () {
+// CHECK-LABEL: sil public_external [fragile] @block_storage_type
+sil [fragile] @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> () {
 entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
   %s = alloc_stack $@block_storage Int
@@ -933,10 +933,10 @@ entry(%0 : $Int):
 
 protocol SomeClassProtocol : class {}
 
-// CHECK-LABEL: sil public_external @metatype_to_object
+// CHECK-LABEL: sil public_external [fragile] @metatype_to_object
 // CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject
 // CHECK:         {{%.*}} = objc_existential_metatype_to_object {{%.*}} : $@objc_metatype SomeClassProtocol.Type to $AnyObject
-sil @metatype_to_object : $@thin (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
+sil [fragile] @metatype_to_object : $@thin (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
 entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtocol.Type):
   %x = objc_metatype_to_object %a : $@objc_metatype SomeClass.Type to $AnyObject
   %y = objc_existential_metatype_to_object %b : $@objc_metatype SomeClassProtocol.Type to $AnyObject
@@ -944,13 +944,13 @@ entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtoco
   return %z : $(AnyObject, AnyObject)
 }
 
-// CHECK-LABEL: sil public_external @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
+// CHECK-LABEL: sil public_external [fragile] @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
 // CHECK-NEXT:  bb0(%0 : $Class1):
 // CHECK-NEXT:    %1 = unchecked_ref_bit_cast %0 : $Class1 to $Class2
 // CHECK-NEXT:    %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
 // CHECK-NEXT:    %3 = tuple (%1 : $Class2, %2 : $Int)
 // CHECK-NEXT:    return %3 : $(Class2, Int)
-sil @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
+sil [fragile] @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
 entry(%0 : $Class1):
   %1 = unchecked_ref_bit_cast %0 : $Class1 to $Class2
   %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
@@ -960,25 +960,25 @@ entry(%0 : $Class1):
 
 @objc protocol ObjCProto {}
 
-// CHECK-LABEL: sil public_external @protocol_conversion
-sil @protocol_conversion : $@thin () -> @owned Protocol {
+// CHECK-LABEL: sil public_external [fragile] @protocol_conversion
+sil [fragile] @protocol_conversion : $@thin () -> @owned Protocol {
 entry:
   // CHECK: {{%.*}} = objc_protocol #ObjCProto : $Protocol
   %p = objc_protocol #ObjCProto : $Protocol
   return %p : $Protocol
 }
 
-sil @block_invoke : $@thin @cc(cdecl) (@inout @block_storage Int) -> ()
+sil [fragile] @block_invoke : $@thin @cc(cdecl) (@inout @block_storage Int) -> ()
 
 
 // rdar://15351123
 // CHECK-LABEL: @test_forward_ref
-sil  @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
+sil [fragile]  @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
 
-// CHECK-LABEL: sil public_external @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int {
+// CHECK-LABEL: sil public_external [fragile] @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int {
 // CHECK: [[PA:%.*]] = partial_apply {{%.*}}({{%.*}}) : $@thin (@out Int, Int) -> ()
 // CHECK: apply [[PA]]({{%.*}}) : $@callee_owned (@out Int) -> ()
-sil @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int {
+sil [fragile] @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int {
 entry(%f : $@thin (@out Int, Int) -> (), %x : $Int):
   %p = partial_apply %f(%x) : $@thin (@out Int, Int) -> ()
   %i = alloc_stack $Int
@@ -990,7 +990,7 @@ entry(%f : $@thin (@out Int, Int) -> (), %x : $Int):
 
 // Make sure we serialize the body of closure even without -sil-serialize-all.
 // CHECK_DECL-LABEL:  @partial_apply_with_closure
-sil [transparent] @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> () {
+sil [fragile] [transparent] @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> () {
 bb0(%0 : $@callee_owned () -> Bool, %1 : $String, %2 : $UnsafePointer<Int8>, %3 : $Int64):
   %17 = function_ref @closure_body : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
 // CHECK_DECL: function_ref @closure_body
@@ -1000,7 +1000,7 @@ bb0(%0 : $@callee_owned () -> Bool, %1 : $String, %2 : $UnsafePointer<Int8>, %3 
   return %30 : $()
 }
 
-sil shared @closure_body : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
+sil shared [fragile] @closure_body : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
 bb0(%0 : $UnsafePointer<Int8>, %1 : $UnsafePointer<Int8>, %2 : $Int64):
   %3 = function_ref @assert_fail : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
   %4 = apply %3(%0, %1, %2) : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
@@ -1011,7 +1011,7 @@ bb0(%0 : $UnsafePointer<Int8>, %1 : $UnsafePointer<Int8>, %2 : $Int64):
 // CHECK_DECL-LABEL: @closure_body : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
 // CHECK_DECL: function_ref @assert_fail
 
-sil @assert_fail : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
+sil [fragile] @assert_fail : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
 
 // rdar: 15893086 
 struct GenericStruct<T> {
@@ -1019,7 +1019,7 @@ struct GenericStruct<T> {
 }
 
 // CHECK-LABEL: @extract_generic_struct
-sil @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64 {
+sil [fragile] @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64 {
 entry(%0 : $GenericStruct<Int64>):
   // CHECK: %1 = struct_extract %0 : $GenericStruct<Int64>, #GenericStruct.x
   %1 = struct_extract %0 : $GenericStruct<Int64>, #GenericStruct.x
@@ -1034,9 +1034,9 @@ class Foo {
   init()
 }
 
-// CHECK-LABEL: sil @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Foo) -> Int
-// CHECK_DECL-LABEL: sil @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Foo) -> Int{{$}}
-sil @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Foo) -> Int {
+// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Foo) -> Int
+// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Foo) -> Int{{$}}
+sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Foo) -> Int {
 bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int  // var x               // users: %17, %6
@@ -1055,9 +1055,9 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   return %13 : $Int
 }
 
-// CHECK-LABEL: sil @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, Foo) -> ()
-// CHECK_DECL-LABEL: sil @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, Foo) -> (){{$}}
-sil @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, Foo) -> () {
+// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, Foo) -> ()
+// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, Foo) -> (){{$}}
+sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Int, Foo) -> () {
 bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Foo):
   %4 = alloc_stack $Int  // var value           // users: %16, %5
   store %0 to %4#1 : $*Int
@@ -1097,14 +1097,14 @@ struct ConformingAssoc : AssocReqt {
   func requiredMethod()
 }
 
-sil @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> () {
+sil [fragile] @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> () {
 bb0(%0 : $ConformingAssoc):
   debug_value %0 : $ConformingAssoc
   %2 = tuple ()
   return %2 : $()
 }
 
-sil @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout ConformingAssoc) -> () {
+sil [fragile] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
   %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> ()
@@ -1154,7 +1154,7 @@ sil_witness_table InheritedConformance: AnyProtocol module witness_tables {
   associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 }
 
-sil [transparent] @_TF9def_basic13serialize_allFT_T_ : $@thin () -> () {
+sil [fragile] [transparent] @_TF9def_basic13serialize_allFT_T_ : $@thin () -> () {
 bb0:
   %0 = function_ref @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer
   %1 = function_ref @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer

@@ -16,6 +16,7 @@
 using namespace swift;
 
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
+                                             bool IsFragile,
                                              StringRef name,
                                              SILType loweredType,
                                              Optional<SILLocation> loc,
@@ -29,8 +30,8 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
     name = entry->getKey();
   }
 
-  auto var = new (M) SILGlobalVariable(M, linkage, name, loweredType, loc,
-                                       Decl);
+  auto var = new (M) SILGlobalVariable(M, linkage, IsFragile, name,
+                                       loweredType, loc, Decl);
 
   if (entry) entry->setValue(var);
   return var;
@@ -38,13 +39,16 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
 
 
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
+                                     bool IsFragile,
                                      StringRef Name, SILType LoweredType,
                                      Optional<SILLocation> Loc, VarDecl *Decl)
   : Module(Module),
     Name(Name),
     LoweredType(LoweredType),
     Location(Loc),
-    Linkage(unsigned(Linkage)), VDecl(Decl) {
+    Linkage(unsigned(Linkage)),
+    Fragile(IsFragile),
+	VDecl(Decl) {
   IsDeclaration = isAvailableExternally(Linkage);
   InitializerF = nullptr;
   Module.silGlobals.push_back(this);

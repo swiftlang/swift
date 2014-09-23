@@ -7,19 +7,19 @@ import gizmo
 // a super_method instruction.
 class Hoozit : Gizmo {
 
-  // CHECK-LABEL: sil  @_TFC10objc_super6HoozitcfMS0_FT_S0_{{.*}} : $@cc(method) @thin (@owned Hoozit) -> @owned Hoozit
+  // CHECK-LABEL: sil hidden  @_TFC10objc_super6HoozitcfMS0_FT_S0_{{.*}} : $@cc(method) @thin (@owned Hoozit) -> @owned Hoozit
   override init() {
     // CHECK: super_method [volatile] {{%.*}} : $Hoozit, #Gizmo.init!initializer.1.foreign
     super.init()
   }
 
-  // CHECK-LABEL: sil  @_TFC10objc_super6Hoozit5runcefMS0_FT_T_ : $@thin (@thick Hoozit.Type) -> ()
+  // CHECK-LABEL: sil hidden  @_TFC10objc_super6Hoozit5runcefMS0_FT_T_ : $@thin (@thick Hoozit.Type) -> ()
   override class func runce() {
     // CHECK: super_method [volatile] {{%.*}} : $@thick Hoozit.Type, #Gizmo.runce!1.foreign
     super.runce()
   }
 
-  // CHECK-LABEL: sil  @_TFC10objc_super6Hoozit4frobfS0_FT_T_ : $@cc(method) @thin (@owned Hoozit) -> ()
+  // CHECK-LABEL: sil hidden  @_TFC10objc_super6Hoozit4frobfS0_FT_T_ : $@cc(method) @thin (@owned Hoozit) -> ()
   override func frob() {
     // CHECK: super_method [volatile] {{%.*}} : $Hoozit, #Gizmo.frob!1.foreign
     super.frob()
@@ -39,7 +39,7 @@ class Wotsit : Hoozit {
 }
 
 class NonObjCSuperInit : Wotsit {
-  // CHECK-LABEL: sil @_TFC10objc_super16NonObjCSuperInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned NonObjCSuperInit) -> @owned NonObjCSuperInit
+  // CHECK-LABEL: sil hidden @_TFC10objc_super16NonObjCSuperInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned NonObjCSuperInit) -> @owned NonObjCSuperInit
   init() {
     // CHECK: function_ref @_TFC10objc_super6WotsitcfMS0_FT4nopeGVS_9NotInObjCSi__S0_ : $@cc(method) @thin (NotInObjC<Int>, @owned Wotsit) -> @owned Wotsit
     super.init(nope: NotInObjC<Int>())

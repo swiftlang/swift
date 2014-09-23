@@ -14,7 +14,7 @@ struct Baz {
   var x = 42
 }
 
-// CHECK: sil @_TF17capture_promotion22test_capture_promotionFT_FT_Si
+// CHECK: sil hidden @_TF17capture_promotion22test_capture_promotionFT_FT_Si
 func test_capture_promotion() -> () -> Int {
   var x : Int = 1
   var y : Foo = Foo()

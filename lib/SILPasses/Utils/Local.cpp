@@ -314,7 +314,10 @@ SILLinkage swift::getSpecializedLinkage(SILLinkage L) {
     return SILLinkage::Shared;
 
   case SILLinkage::Private:
+  case SILLinkage::PrivateExternal:
     // Specializations of private symbols should remain so.
+    // TODO: maybe PrivateExternals should get SharedExternal (these are private
+    // functions from the stdlib which are specialized in another module).
     return SILLinkage::Private;
   }
 }

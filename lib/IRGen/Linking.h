@@ -357,6 +357,11 @@ public:
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
+  
+  /// Returns true if this function or global variable may be inlined into
+  /// another module.
+  ///
+  bool isFragile() const;
 
   ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));

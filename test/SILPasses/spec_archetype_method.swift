@@ -23,7 +23,7 @@ func useFoo<T>(#x: T) {
   generic_call(x: a)
 }
 
-//CHECK-LABEL: sil @_TF21spec_archetype_method21interesting_code_hereFT_T_
+//CHECK-LABEL: sil hidden @_TF21spec_archetype_method21interesting_code_hereFT_T_
 //CHECK: function_ref @_TTSC21spec_archetype_method3ABCS0_S_8pingable___TF21spec_archetype_method12generic_callUS_8pingable__FT1xQ__T_
 //CHECK-NEXT: retain
 //CHECK-NEXT: apply

@@ -9,7 +9,7 @@ class C {
 struct A {
   unowned var x: C
 }
-// CHECK-LABEL: sil @_TFV7unowned1ACfMS0_FT1xCS_1C_S0_
+// CHECK-LABEL: sil hidden @_TFV7unowned1ACfMS0_FT1xCS_1C_S0_
 // CHECK: bb0([[X:%.*]] : $C, %1 : $@thin A.Type):
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
 // CHECK:   unowned_retain [[X_UNOWNED]]
@@ -24,7 +24,7 @@ struct AddressOnly {
   unowned var x: C
   var p: P
 }
-// CHECK-LABEL: sil @_TFV7unowned11AddressOnlyCfMS0_FT1xCS_1C1pPS_1P__S0_
+// CHECK-LABEL: sil hidden @_TFV7unowned11AddressOnlyCfMS0_FT1xCS_1C1pPS_1P__S0_
 // CHECK: bb0([[RET:%.*]] : $*AddressOnly, [[X:%.*]] : $C, {{.*}}):
 // CHECK:   [[X_ADDR:%.*]] = struct_element_addr [[RET]] : $*AddressOnly, #AddressOnly.x
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
@@ -33,7 +33,7 @@ struct AddressOnly {
 // CHECK:   strong_release [[X]]
 // CHECK: }
 
-// CHECK-LABEL:    sil @_TF7unowned5test0FT1cCS_1C_T_ : $@thin (@owned C) -> () {
+// CHECK-LABEL:    sil hidden @_TF7unowned5test0FT1cCS_1C_T_ : $@thin (@owned C) -> () {
 func test0(let #c: C) {
 // CHECK:    bb0(%0 : $C):
 
@@ -64,7 +64,7 @@ func test0(let #c: C) {
 // CHECK-NEXT:  strong_release [[T3]] : $C
 }
 
-// CHECK-LABEL: sil @{{.*}}unowned_local
+// CHECK-LABEL: sil hidden @{{.*}}unowned_local
 func unowned_local() -> C {
   // CHECK: [[c:%.*]] = apply
   let c = C()
@@ -110,7 +110,7 @@ class TestUnownedMember {
   }
 }
 
-// CHECK-LABEL: sil @_TFC7unowned17TestUnownedMembercfMS0_FT5invalCS_1C_S0_
+// CHECK-LABEL: sil hidden @_TFC7unowned17TestUnownedMembercfMS0_FT5invalCS_1C_S0_
 // CHECK-NEXT:  bb0(%0 : $C, %1 : $TestUnownedMember):
 // CHECK:  [[SELF:%.*]] = mark_uninitialized [rootself] %1 : $TestUnownedMember
 // CHECK:  [[FIELDPTR:%.*]] = ref_element_addr [[SELF]] : $TestUnownedMember, #TestUnownedMember.member

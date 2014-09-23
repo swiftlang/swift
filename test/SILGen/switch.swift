@@ -23,7 +23,7 @@ func e() {}
 func f() {}
 func g() {}
 
-// CHECK-LABEL: sil  @_TF6switch5test1FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test1FT_T_
 func test1() {
   switch foo() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -39,7 +39,7 @@ func test1() {
   b()
 }
 
-// CHECK-LABEL: sil  @_TF6switch5test2FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test2FT_T_
 func test2() {
   switch foo() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -57,7 +57,7 @@ func test2() {
   c()
 }
 
-// CHECK-LABEL: sil  @_TF6switch5test3FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test3FT_T_
 func test3() {
   switch foo() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -86,7 +86,7 @@ func test3() {
   c()
 }
 
-// CHECK-LABEL: sil  @_TF6switch5test4FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test4FT_T_
 func test4() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -103,7 +103,7 @@ func test4() {
   b()
 }
 
-// CHECK-LABEL: sil  @_TF6switch5test5FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test5FT_T_
 func test5() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -142,7 +142,7 @@ func test5() {
   d()
 }
 
-// CHECK-LABEL: sil  @_TF6switch5test6FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test6FT_T_
 func test6() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -161,7 +161,7 @@ func test6() {
   c()
 }
 
-// CHECK-LABEL: sil  @_TF6switch5test7FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test7FT_T_
 func test7() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -189,7 +189,7 @@ func test7() {
   // CHECK:   function_ref @_TF6switch1cFT_T_
 }
 
-// CHECK-LABEL: sil  @_TF6switch5test8FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test8FT_T_
 func test8() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -266,7 +266,7 @@ func test8() {
   g()
 }
 
-// CHECK-LABEL: sil  @_TF6switch5test9FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch5test9FT_T_
 func test9() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -305,7 +305,7 @@ func test9() {
   d()
 }
 
-// CHECK-LABEL: sil  @_TF6switch6test10FT_T_
+// CHECK-LABEL: sil hidden  @_TF6switch6test10FT_T_
 func test10() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -338,7 +338,7 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil  @_TF6switch10test_isa_1FT1pPS_1P__T_
+// CHECK-LABEL: sil hidden  @_TF6switch10test_isa_1FT1pPS_1P__T_
 func test_isa_1(#p: P) {
   switch p {
   // CHECK:   checked_cast_addr_br take_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
@@ -386,7 +386,7 @@ func test_isa_1(#p: P) {
   e()
 }
 
-// CHECK-LABEL: sil  @_TF6switch10test_isa_2FT1pPS_1P__T_
+// CHECK-LABEL: sil hidden  @_TF6switch10test_isa_2FT1pPS_1P__T_
 func test_isa_2(#p: P) {
   switch (p, foo()) {
   // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
@@ -456,7 +456,7 @@ class D1 : C {}
 class D2 : D1 {}
 class E : C {}
 
-// CHECK-LABEL: sil @_TF6switch16test_isa_class_1FT1xCS_1B_T_
+// CHECK-LABEL: sil hidden @_TF6switch16test_isa_class_1FT1xCS_1B_T_
 func test_isa_class_1(let #x: B) {
   // CHECK: strong_retain %0
   switch x {
@@ -527,7 +527,7 @@ func test_isa_class_1(let #x: B) {
   f()
 }
 
-// CHECK-LABEL: sil @_TF6switch16test_isa_class_2FT1xCS_1B_PSs9AnyObject_
+// CHECK-LABEL: sil hidden @_TF6switch16test_isa_class_2FT1xCS_1B_PSs9AnyObject_
 func test_isa_class_2(#x: B) -> AnyObject {
   // CHECK:   strong_retain [[X:%0]]
   switch x {
@@ -614,7 +614,7 @@ enum MaybePair {
   case Both(Int, String)
 }
 
-// CHECK-LABEL: sil  @_TF6switch12test_union_1FT1uOS_9MaybePair_T_
+// CHECK-LABEL: sil hidden  @_TF6switch12test_union_1FT1uOS_9MaybePair_T_
 func test_union_1(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum [[SUBJECT:%.*]] : $MaybePair,
@@ -666,7 +666,7 @@ func test_union_1(#u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil  @_TF6switch12test_union_2FT1uOS_9MaybePair_T_
+// CHECK-LABEL: sil hidden  @_TF6switch12test_union_2FT1uOS_9MaybePair_T_
 func test_union_2(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
@@ -709,7 +709,7 @@ func test_union_2(#u: MaybePair) {
   d()
 }
 
-// CHECK-LABEL: sil  @_TF6switch12test_union_3FT1uOS_9MaybePair_T_
+// CHECK-LABEL: sil hidden  @_TF6switch12test_union_3FT1uOS_9MaybePair_T_
 func test_union_3(#u: MaybePair) {
   // CHECK:   retain_value [[SUBJECT:%0]]
   switch u {
@@ -766,7 +766,7 @@ func test_union_3(#u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil  @_TF6switch12test_union_4FT1uOS_9MaybePair_T_
+// CHECK-LABEL: sil hidden  @_TF6switch12test_union_4FT1uOS_9MaybePair_T_
 func test_union_4(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
@@ -813,7 +813,7 @@ func test_union_4(#u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil  @_TF6switch12test_union_5FT1uOS_9MaybePair_T_
+// CHECK-LABEL: sil hidden  @_TF6switch12test_union_5FT1uOS_9MaybePair_T_
 func test_union_5(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
@@ -936,7 +936,7 @@ func test_union_generic_instance(#u: Generic<Int, String>) {
 
 enum Foo { case A, B }
 
-// CHECK: sil @_TF6switch22test_switch_two_unionsFT1xOS_3Foo1yS0__T_
+// CHECK: sil hidden @_TF6switch22test_switch_two_unionsFT1xOS_3Foo1yS0__T_
 func test_switch_two_unions(#x: Foo, #y: Foo) {
   // CHECK:   [[T0:%.*]] = tuple (%0 : $Foo, %1 : $Foo)
   // CHECK:   [[X:%.*]] = tuple_extract [[T0]] : $(Foo, Foo), 0
@@ -980,7 +980,7 @@ struct StructPatternTest {
   var y: String
 }
 
-// CHECK: sil @_TF6switch19test_struct_patternFT1sVS_17StructPatternTest_T_
+// CHECK: sil hidden @_TF6switch19test_struct_patternFT1sVS_17StructPatternTest_T_
 func test_struct_pattern(#s: StructPatternTest) {
   switch s {
   // CHECK:   [[X:%.*]] = struct_extract [[S:%.*]] : $StructPatternTest, #StructPatternTest.x
@@ -1033,7 +1033,7 @@ struct StructPatternTestAO {
 
 func ~=(a: P, b: P) -> Bool { return true }
 
-// CHECK: sil @_TF6switch22test_struct_pattern_aoFT1sVS_19StructPatternTestAO1pPS_1P__T_
+// CHECK: sil hidden @_TF6switch22test_struct_pattern_aoFT1sVS_19StructPatternTestAO1pPS_1P__T_
 func test_struct_pattern_ao(#s: StructPatternTestAO, #p: P) {
   // CHECK:   [[S:%.*]] = alloc_stack $StructPatternTestAO
   // CHECK:   copy_addr %0 to [initialization] [[S]]#1
@@ -1103,7 +1103,7 @@ class ClassPatternTest {
   var y: String = ""
 }
 
-// CHECK-LABEL: sil @_TF6switch18test_class_patternFT1kCS_16ClassPatternTest_T_
+// CHECK-LABEL: sil hidden @_TF6switch18test_class_patternFT1kCS_16ClassPatternTest_T_
 // CHECK-NEXT: bb0([[C:%.*]] : $ClassPatternTest):
 func test_class_pattern(#k: ClassPatternTest) {
   switch k {
@@ -1154,7 +1154,7 @@ func test_class_pattern(#k: ClassPatternTest) {
 class SubclassTestA : ClassPatternTest {}
 class SubclassTestB : ClassPatternTest {}
 
-// CHECK-LABEL: sil @{{.*}}test_class_pattern_with_isa_1
+// CHECK-LABEL: sil hidden @{{.*}}test_class_pattern_with_isa_1
 // CHECK-NEXT: bb0([[C:%.*]] : $ClassPatternTest):
 
 func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
@@ -1248,7 +1248,7 @@ func rdar14826416<T, U>(#t: T, #u: U) {
   case _: println("other")
   }
 }
-// CHECK-LABEL: sil @_TF6switch12rdar14826416U___FT1tQ_1uQ0__T_
+// CHECK-LABEL: sil hidden @_TF6switch12rdar14826416U___FT1tQ_1uQ0__T_
 // CHECK:   checked_cast_addr_br take_on_success T in {{%.*}} : $*T to Int in {{%.*}} : $*Int, [[IS_INT:bb[0-9]+]], [[ISNT_INT:bb[0-9]+]]
 // CHECK: [[ISNT_INT]]:
 // CHECK:   checked_cast_addr_br take_on_success T in {{%.*}} : $*T to U in {{%.*}} : $*U, [[ISNT_INT_IS_U:bb[0-9]+]], [[ISNT_INT_ISNT_U:bb[0-9]+]]
@@ -1257,7 +1257,7 @@ func rdar14826416<T, U>(#t: T, #u: U) {
 class Rdar14835992 {}
 class SubRdar14835992 : Rdar14835992 {}
 
-// CHECK-LABEL: sil @_TF6switch12rdar14835992U___FT1tCS_12Rdar148359922ttQ_2uuQ0__T_
+// CHECK-LABEL: sil hidden @_TF6switch12rdar14835992U___FT1tCS_12Rdar148359922ttQ_2uuQ0__T_
 func rdar14835992<T, U>(#t: Rdar14835992, #tt: T, #uu: U) {
   switch t {
   case is SubRdar14835992: println("Sub")
@@ -1273,7 +1273,7 @@ struct StructWithComputedProperty {
 }
 
 // rdar://15859432
-// CHECK-LABEL: sil @{{.*}}StructWithComputedProperty
+// CHECK-LABEL: sil hidden @{{.*}}StructWithComputedProperty
 // CHECK: function_ref{{.*}}StructWithComputedProperty.foo.getter
 func testStructWithComputedProperty(#s : StructWithComputedProperty) {
   switch s {
@@ -1285,7 +1285,7 @@ func testStructWithComputedProperty(#s : StructWithComputedProperty) {
 // <rdar://problem/17272985>
 enum ABC { case A, B, C }
 
-// CHECK-LABEL: sil @_TF6switch18testTupleWildcardsFTOS_3ABCS0__T_ 
+// CHECK-LABEL: sil hidden @_TF6switch18testTupleWildcardsFTOS_3ABCS0__T_ 
 // CHECK:         [[X:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 0
 // CHECK:         [[Y:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 1
 // CHECK:         switch_enum [[X]] : $ABC, case #ABC.A!enumelt: [[X_A:bb[0-9]+]], default [[X_NOT_A:bb[0-9]+]]

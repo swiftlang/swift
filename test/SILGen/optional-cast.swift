@@ -6,7 +6,7 @@ class B : A {}
 func foo(y : A?) {
   var x = (y as? B)
 }
-// CHECK-DAG: sil @_TF4main3foo
+// CHECK-DAG: sil hidden @_TF4main3foo
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B>
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[X]]#1 : $*Optional<B>, #Optional.Some
 //   Materialize the parameter.
@@ -59,7 +59,7 @@ func foo(y : A?) {
 func bar(y : A????) {
   var x = (y as? B??)
 }
-// CHECK-DAG: sil @_TF4main3bar
+// CHECK-DAG: sil hidden @_TF4main3bar
 // CHECK:      [[X:%.*]] = alloc_box $Optional<Optional<Optional<B>>>
 // CHECK-NEXT: [[TMP_OOB:%.*]] = alloc_stack $Optional<Optional<B>>
 // CHECK-NEXT: [[TMP_OB:%.*]] = alloc_stack $Optional<B>
@@ -228,7 +228,7 @@ func bar(y : A????) {
 func baz(y : AnyObject?) {
   var x = (y as? B)
 }
-// CHECK-DAG: sil @_TF4main3baz
+// CHECK-DAG: sil hidden @_TF4main3baz
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B>
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[X]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: [[TMP_OPTANY:%.*]] = alloc_stack $Optional<AnyObject>

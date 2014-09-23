@@ -2,7 +2,7 @@
 struct X { }
 
 class A {
-  // CHECK-LABEL: sil @_TFC20complete_object_init1AcfMS0_FT_S0_ : $@cc(method) @thin (@owned A) -> @owned A
+  // CHECK-LABEL: sil hidden @_TFC20complete_object_init1AcfMS0_FT_S0_ : $@cc(method) @thin (@owned A) -> @owned A
 // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $A):
 // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $A
 // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_PARAM]] : $A
@@ -19,7 +19,7 @@ class A {
 // CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
 // CHECK:   return [[RESULT]] : $A
 
-  // CHECK-LABEL: sil @_TFC20complete_object_init1ACfMS0_FT_S0_ : $@thin (@thick A.Type) -> @owned A
+  // CHECK-LABEL: sil hidden @_TFC20complete_object_init1ACfMS0_FT_S0_ : $@thin (@thick A.Type) -> @owned A
   convenience init() {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thick A.Type):
     // CHECK:   [[SELF:%[0-9]+]] = alloc_ref_dynamic [[SELF_META]] : $@thick A.Type, $A

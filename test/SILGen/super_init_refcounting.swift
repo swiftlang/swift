@@ -6,7 +6,7 @@ class Foo {
 }
 
 class Bar: Foo {
-  // CHECK-LABEL: sil @_TFC22super_init_refcounting3BarcfMS0_FT_S0_
+  // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3BarcfMS0_FT_S0_
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box $Bar
   // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_VAR]]
   // CHECK-NOT:     strong_retain [[ORIG_SELF]]
@@ -22,7 +22,7 @@ class Bar: Foo {
 }
 
 extension Foo {
-  // CHECK-LABEL: sil @_TFC22super_init_refcounting3FoocfMS0_FT1xSi_S0_ 
+  // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3FoocfMS0_FT1xSi_S0_ 
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box $Foo
   // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_VAR]]
   // CHECK-NOT:     strong_retain [[ORIG_SELF]]
@@ -36,7 +36,7 @@ extension Foo {
 
 class Zim: Foo {
   var foo = Foo()
-  // CHECK-LABEL: sil @_TFC22super_init_refcounting3ZimcfMS0_FT_S0_
+  // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3ZimcfMS0_FT_S0_
   // CHECK-NOT:     strong_retain
   // CHECK-NOT:     strong_release
   // CHECK:         function_ref @_TFC22super_init_refcounting3FoocfMS0_FT_S0_
@@ -49,7 +49,7 @@ class Zang: Foo {
     foo = Foo()
     super.init()
   }
-  // CHECK-LABEL: sil @_TFC22super_init_refcounting4ZangcfMS0_FT_S0_
+  // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting4ZangcfMS0_FT_S0_
   // CHECK-NOT:     strong_retain
   // CHECK-NOT:     strong_release
   // CHECK:         function_ref @_TFC22super_init_refcounting3FoocfMS0_FT_S0_

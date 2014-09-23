@@ -8,7 +8,7 @@ class CustomDeallocator {
   }
 }
 
-// CHECK:    define void @_TFC10deallocate17CustomDeallocatorD([[CD:%.*]]*
+// CHECK:    define hidden void @_TFC10deallocate17CustomDeallocatorD([[CD:%.*]]*
 // CHECK:      [[T0:%.*]] = call [[OBJECT:%.*]]* @_TFC10deallocate17CustomDeallocatord(
 // CHECK-NEXT: [[T1:%.*]] = bitcast [[OBJECT]]* [[T0]] to [[CD]]*
 // CHECK-NEXT: [[T2:%.*]] = bitcast [[CD]]* [[T1]] to [[OBJECT]]*

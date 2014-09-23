@@ -1037,7 +1037,8 @@ static ManagedValue createThunk(SILGenFunction &gen,
                                        gen.F.getContextGenericParams(),
                                        thunkType,
                                        fn.getType().castTo<SILFunctionType>(),
-                                       expectedType);
+                                       expectedType,
+                                       gen.F.isFragile());
 
   // Build it if necessary.
   if (thunk->empty()) {

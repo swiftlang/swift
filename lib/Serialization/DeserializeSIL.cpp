@@ -52,6 +52,7 @@ fromStableSILLinkage(unsigned value) {
   case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
   case SIL_LINKAGE_SHARED_EXTERNAL: return SILLinkage::SharedExternal;
+  case SIL_LINKAGE_PRIVATE_EXTERNAL: return SILLinkage::PrivateExternal;
   default: return Nothing;
   }
 }
@@ -293,8 +294,8 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   SourceLoc loc;
   return SILFunction::create(M, SILLinkage::Private, name,
                              type.castTo<SILFunctionType>(),
-                             nullptr,
-                             SILFileLocation(loc));
+                             nullptr, SILFileLocation(loc), IsNotBare,
+                             IsNotTransparent, IsNotFragile);
 }
 
 /// Helper function to find a SILFunction, given its name and type.
@@ -366,11 +367,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   (void)kind;
 
   TypeID funcTyID;
-  unsigned rawLinkage, isTransparent, isGlobal, inlineStrategy,
+  unsigned rawLinkage, isTransparent, isFragile, isGlobal, inlineStrategy,
       effect;
   IdentifierID SemanticsID;
+  // TODO: read fragile
   SILFunctionLayout::readRecord(scratch, rawLinkage,
-                                isTransparent, isGlobal,
+                                isTransparent, isFragile, isGlobal,
                                 inlineStrategy, effect, funcTyID,
                                 SemanticsID);
 
@@ -410,6 +412,9 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       return nullptr;
     }
 
+    if (isFragile)
+      fn->setFragile(IsFragile);
+
     // Don't override the transparency or linkage of a function with
     // an existing declaration.
 
@@ -417,10 +422,11 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   } else {
     fn = SILFunction::create(SILMod, linkage.getValue(), name,
                              ty.castTo<SILFunctionType>(),
-                             nullptr, loc);
-    fn->setTransparent(IsTransparent_t(isTransparent == 1));
+                             nullptr, loc,
+                             IsNotBare, IsTransparent_t(isTransparent == 1),
+                             IsFragile_t(isFragile == 1),
+                             (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
-    fn->setInlineStrategy((Inline_t)inlineStrategy);
     fn->setEffectsInfo((EffectsKind)effect);
     if (SemanticsID)
       fn->setSemanticsAttr(MF->getIdentifier(SemanticsID).str());
@@ -1578,8 +1584,9 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   TypeID TyID;
   DeclID dID;
-  unsigned rawLinkage, IsDeclaration;
-  GlobalVarLayout::readRecord(scratch, rawLinkage, TyID, dID, IsDeclaration);
+  unsigned rawLinkage, isFragile, IsDeclaration;
+  GlobalVarLayout::readRecord(scratch, rawLinkage, isFragile, TyID, dID,
+                              IsDeclaration);
   if (TyID == 0) {
     DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
     return nullptr;
@@ -1594,7 +1601,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
-                           SILMod, linkage.getValue(),
+                           SILMod, linkage.getValue(), (IsFragile_t)isFragile,
                            Name.str(), getSILType(Ty, SILValueCategory::Object),
                            Nothing,
                            dID ? cast<VarDecl>(MF->getDecl(dID)): nullptr);

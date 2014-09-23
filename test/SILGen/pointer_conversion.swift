@@ -8,7 +8,7 @@ func takesConstPointer(x: UnsafePointer<Int>) {}
 func takesMutableVoidPointer(x: UnsafeMutablePointer<Void>) {}
 func takesConstVoidPointer(x: UnsafePointer<Void>) {}
 
-// CHECK-LABEL: sil @_TF18pointer_conversion16pointerToPointerFTGVSs20UnsafeMutablePointerSi_GVSs13UnsafePointerSi__T_
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion16pointerToPointerFTGVSs20UnsafeMutablePointerSi_GVSs13UnsafePointerSi__T_
 // CHECK: bb0([[MP:%.*]] : $UnsafeMutablePointer<Int>, [[CP:%.*]] : $UnsafePointer<Int>):
 func pointerToPointer(mp: UnsafeMutablePointer<Int>,
                       cp: UnsafePointer<Int>) {
@@ -36,7 +36,7 @@ func pointerToPointer(mp: UnsafeMutablePointer<Int>,
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]
 }
 
-// CHECK-LABEL: sil @_TF18pointer_conversion14arrayToPointerFT_T_
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion14arrayToPointerFT_T_
 func arrayToPointer() {
   var ints = [1,2,3]
 
@@ -61,7 +61,7 @@ func arrayToPointer() {
   // CHECK: release_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil @_TF18pointer_conversion15stringToPointerFSST_ 
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion15stringToPointerFSST_ 
 func stringToPointer(s: String) {
   takesConstVoidPointer(s)
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGVSs13UnsafePointerT__T_
@@ -74,7 +74,7 @@ func stringToPointer(s: String) {
   // CHECK: release_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil @_TF18pointer_conversion14inoutToPointerFT_T_ 
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion14inoutToPointerFT_T_ 
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box $Int
@@ -106,7 +106,7 @@ func takesPlusOnePointer(x: UnsafeMutablePointer<C>) {}
 func takesPlusZeroPointer(x: AutoreleasingUnsafeMutablePointer<C>) {}
 func takesPlusZeroOptionalPointer(x: AutoreleasingUnsafeMutablePointer<C?>) {}
 
-// CHECK-LABEL: sil @_TF18pointer_conversion19classInoutToPointerFT_T_
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion19classInoutToPointerFT_T_
 func classInoutToPointer() {
   var c = C()
   // CHECK: [[VAR:%.*]] = alloc_box $C
@@ -138,7 +138,7 @@ func classInoutToPointer() {
 
 // Check that pointer types don't bridge anymore.
 @objc class ObjCMethodBridging {
-  // CHECK-LABEL: sil @_TToFC18pointer_conversion18ObjCMethodBridging11pointerArgsfS0_FTGVSs20UnsafeMutablePointerSi_1yGVSs13UnsafePointerSi_1zGVSs33AutoreleasingUnsafeMutablePointerS0___T_ : $@cc(objc_method) @thin (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
+  // CHECK-LABEL: sil hidden @_TToFC18pointer_conversion18ObjCMethodBridging11pointerArgsfS0_FTGVSs20UnsafeMutablePointerSi_1yGVSs13UnsafePointerSi_1zGVSs33AutoreleasingUnsafeMutablePointerS0___T_ : $@cc(objc_method) @thin (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
   @objc func pointerArgs(x: UnsafeMutablePointer<Int>,
                          y: UnsafePointer<Int>,
                          z: AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>) {}

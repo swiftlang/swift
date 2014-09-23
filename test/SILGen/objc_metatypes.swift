@@ -6,9 +6,9 @@ import gizmo
 @objc class ObjCClass {}
 
 class A {
-  // CHECK-LABEL: sil @_TFC14objc_metatypes1A3foo
+  // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A3foo
 
-  // CHECK-LABEL: sil @_TToFC14objc_metatypes1A3foo
+  // CHECK-LABEL: sil hidden @_TToFC14objc_metatypes1A3foo
   dynamic func foo(m: ObjCClass.Type) -> ObjCClass.Type {
     // CHECK: bb0([[M:%[0-9]+]] : $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : $A):
     // CHECK:   strong_retain [[SELF]] : $A
@@ -21,9 +21,9 @@ class A {
     return m
   }
 
-  // CHECK-LABEL: sil @_TFC14objc_metatypes1A3bar
+  // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A3bar
 
-  // CHECK-LABEL: sil @_TToFC14objc_metatypes1A3bar
+  // CHECK-LABEL: sil hidden @_TToFC14objc_metatypes1A3bar
   // CHECK: bb0([[SELF:%[0-9]+]] : $@objc_metatype A.Type):
   // CHECK-NEXT:   [[OBJC_SELF:%[0-9]+]] = objc_to_thick_metatype [[SELF]] : $@objc_metatype A.Type to $@thick A.Type
   // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TFC14objc_metatypes1A3barfMS0_FT_T_ : $@thin (@thick A.Type) -> ()
@@ -33,7 +33,7 @@ class A {
 
   dynamic func takeGizmo(g: Gizmo.Type) { }
 
-  // CHECK-LABEL: sil @_TFC14objc_metatypes1A7callFoo
+  // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A7callFoo
   func callFoo() {
     // Make sure we peephole Type/thick_to_objc_metatype.
     // CHECK-NOT: thick_to_objc_metatype

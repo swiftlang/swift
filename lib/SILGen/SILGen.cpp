@@ -54,8 +54,9 @@ SILGenFunction::~SILGenFunction() {
 // SILGenModule Class implementation
 //===--------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M, Module *SM)
-  : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr) {
+SILGenModule::SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile)
+  : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
+    makeModuleFragile(makeModuleFragile) {
 }
 
 SILGenModule::~SILGenModule() {
@@ -234,7 +235,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   auto loweredType = getLoweredType(topLevelType).castTo<SILFunctionType>();
   return SILFunction::create(M, SILLinkage::Private,
                              SWIFT_ENTRY_POINT_FUNCTION, loweredType, nullptr,
-                             Loc);
+                             Loc, IsNotBare, IsNotTransparent, IsNotFragile);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -254,9 +255,14 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   auto found = emittedFunctions.find(constant);
   if (found != emittedFunctions.end()) {
-    if (forDefinition)
-      updateLinkageForDefinition(*this, found->second, constant);
-    return found->second;
+    SILFunction *F = found->second;
+    if (forDefinition) {
+      updateLinkageForDefinition(*this, F, constant);
+      if (makeModuleFragile && !constant.isGlobal()) {
+        F->setFragile(IsFragile);
+      }
+    }
+    return F;
   }
   
   auto constantType = getConstantType(constant).castTo<SILFunctionType>();
@@ -264,7 +270,22 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   IsTransparent_t IsTrans = constant.isTransparent()?
                               IsTransparent : IsNotTransparent;
+  IsFragile_t IsFrag = IsNotFragile;
+  if (IsTrans == IsTransparent && (linkage == SILLinkage::Public
+                                   || linkage == SILLinkage::PublicExternal)) {
+    IsFrag = IsFragile;
+  }
+  if (makeModuleFragile && linkage != SILLinkage::PublicExternal) {
+    IsFrag = IsFragile;
+  }
 
+  if (makeModuleFragile && constant.isGlobal() && forDefinition) {
+    // TODO: make global variables fragile. For this we need to mangle the
+    // module name into the global name.
+    linkage = SILLinkage::Public;
+    IsFrag = IsNotFragile;
+  }
+  
   EffectsKind EK = constant.hasEffectsAttribute() ?
   constant.getEffectsAttribute() : EffectsKind::Unspecified;
 
@@ -277,7 +298,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
-                                Nothing, IsNotBare, IsTrans,
+                                Nothing, IsNotBare, IsTrans, IsFrag,
                                 inlineStrategy, EK);
 
   F->setGlobalInit(constant.isGlobal());
@@ -594,7 +615,9 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *f = 
     SILFunction::create(M, SILLinkage::Private, funcName,
                         initSILType, nullptr,
-                        binding, IsNotBare, IsNotTransparent, InlineDefault);
+                        binding, IsNotBare, IsNotTransparent,
+                        IsNotFragile,
+                        InlineDefault);
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(binding->getInit()), *f));
   f->setLocation(binding);
@@ -831,7 +854,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(Module *mod, SourceFile *sf,
-                        Optional<unsigned> startElem) {
+                        Optional<unsigned> startElem, bool makeModuleFragile) {
   const DeclContext *DC;
   if (startElem) {
     assert(sf && "cannot have a start element without a source file");
@@ -845,7 +868,7 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
   }
 
   std::unique_ptr<SILModule> m(new SILModule(mod, DC));
-  SILGenModule sgm(*m, mod);
+  SILGenModule sgm(*m, mod, makeModuleFragile);
 
   if (sf) {
     sgm.emitSourceFile(sf, startElem.getValueOr(0));
@@ -866,11 +889,14 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
   return m;
 }
 
-std::unique_ptr<SILModule> swift::performSILGeneration(Module *mod) {
-  return SILModule::constructSIL(mod);
+std::unique_ptr<SILModule> swift::performSILGeneration(Module *mod,
+                                                       bool makeModuleFragile) {
+  return SILModule::constructSIL(mod, nullptr, Nothing, makeModuleFragile);
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(SourceFile &sf, Optional<unsigned> startElem) {
-  return SILModule::constructSIL(sf.getParentModule(), &sf, startElem);
+swift::performSILGeneration(SourceFile &sf, Optional<unsigned> startElem,
+                            bool makeModuleFragile) {
+  return SILModule::constructSIL(sf.getParentModule(), &sf, startElem,
+                                 makeModuleFragile);
 }

@@ -20,14 +20,14 @@ struct Spoon : Runcible {
 }
 
 struct Owl<T : Runcible, U> {
-  // CHECK: define void @_TFV16associated_types3Owl3eat{{.*}}(%swift.opaque*
+  // CHECK: define hidden void @_TFV16associated_types3Owl3eat{{.*}}(%swift.opaque*
   func eat(what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
 }
 
 class Pussycat<T : Runcible, U> {
   init() {} 
 
-  // CHECK: define void @_TFC16associated_types8Pussycat3eat{{.*}}(%swift.opaque* noalias, %swift.opaque* noalias, %swift.opaque* noalias, %C16associated_types8Pussycat*)
+  // CHECK: define hidden void @_TFC16associated_types8Pussycat3eat{{.*}}(%swift.opaque* noalias, %swift.opaque* noalias, %swift.opaque* noalias, %C16associated_types8Pussycat*)
   func eat(what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
 }
 

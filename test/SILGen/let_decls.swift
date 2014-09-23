@@ -3,7 +3,7 @@ func takeClosure(a : () -> Int) {}
 
 // Let decls don't get boxes for trivial types.
 //
-// CHECK-LABEL: sil @{{.*}}test1
+// CHECK-LABEL: sil hidden @{{.*}}test1
 func test1(let a : Int) -> Int {
   // CHECK-NOT: alloc_box
   // CHECK-NOT: alloc_stack
@@ -24,7 +24,7 @@ func let_destructuring() -> Int {
 
 // Let decls being closed over.
 //
-// CHECK-LABEL: sil @{{.*}}test2
+// CHECK-LABEL: sil hidden @{{.*}}test2
 func test2() {
   // No allocations.
   // CHECK-NOT: alloc_box
@@ -59,7 +59,7 @@ func useAString(a : String) {}
 // rdar://15689514 - Verify that the cleanup for the let decl runs at the end of
 // the 'let' lifetime, not at the end of the initializing expression.
 //
-// CHECK-LABEL: sil @{{.*}}test3
+// CHECK-LABEL: sil hidden @{{.*}}test3
 func test3() {
   // CHECK: [[GETFN:%[0-9]+]] = function_ref{{.*}}getAString
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
@@ -84,7 +84,7 @@ struct AddressOnlyStruct<T> {
 
 func produceAddressOnlyStruct<T>(x : T) -> AddressOnlyStruct<T> {}
 
-// CHECK-LABEL: sil @{{.*}}testAddressOnlyStructString
+// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructString
 func testAddressOnlyStructString<T>(a : T) -> String {
   return produceAddressOnlyStruct(a).str
   
@@ -99,7 +99,7 @@ func testAddressOnlyStructString<T>(a : T) -> String {
   // CHECK: return [[STRVAL]]
 }
 
-// CHECK-LABEL: sil @{{.*}}testAddressOnlyStructElt
+// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructElt
 func testAddressOnlyStructElt<T>(a : T) -> T {
   return produceAddressOnlyStruct(a).elt
   
@@ -115,7 +115,7 @@ func testAddressOnlyStructElt<T>(a : T) -> T {
 
 // rdar://15717123 - let decls of address-only type.
 
-// CHECK-LABEL: sil @{{.*}}testAddressOnlyLet
+// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyLet
 func testAddressOnlyLet<T>(a : T) {
   let x = produceAddressOnlyStruct(a)
 }
@@ -123,7 +123,7 @@ func testAddressOnlyLet<T>(a : T) {
 
 func produceSubscriptableRValue() -> [String] {}
 
-// CHECK-LABEL: sil @{{.*}}subscriptRValue
+// CHECK-LABEL: sil hidden @{{.*}}subscriptRValue
 func subscriptRValue() {
   var a = produceSubscriptableRValue()[0]
 }
@@ -135,7 +135,7 @@ struct GetOnlySubscriptStruct {
 }
 
 
-// CHECK-LABEL: sil @{{.*}}testGetOnlySubscript
+// CHECK-LABEL: sil hidden @{{.*}}testGetOnlySubscript
 func testGetOnlySubscript(x : GetOnlySubscriptStruct, idx : Int) -> Int {
   return x[idx]
   
@@ -156,7 +156,7 @@ struct CloseOverAddressOnlyConstant<T>  {
   
 }
 
-// CHECK-LABEL: sil @{{.*}}callThroughLet
+// CHECK-LABEL: sil hidden @{{.*}}callThroughLet
 func callThroughLet(predicate: (Int, Int) -> Bool) {
   let p = predicate
   if p(1, 2) {
@@ -169,9 +169,9 @@ func callThroughLet(predicate: (Int, Int) -> Bool) {
 func var_argument_mangling(var a : Int) {}
 func let_argument_mangling(let a : Int) {}
 func def_argument_mangling(a : Int) {}
-// CHECK: sil @[[MANPREFIX:[^ :]*]]var_argument_mangling[[MANSUFFIX:[^ :]*]] : $
-// CHECK: sil @[[MANPREFIX]]let_argument_mangling[[MANSUFFIX]] : $
-// CHECK: sil @[[MANPREFIX]]def_argument_mangling[[MANSUFFIX]] : $
+// CHECK: sil hidden @[[MANPREFIX:[^ :]*]]var_argument_mangling[[MANSUFFIX:[^ :]*]] : $
+// CHECK: sil hidden @[[MANPREFIX]]let_argument_mangling[[MANSUFFIX]] : $
+// CHECK: sil hidden @[[MANPREFIX]]def_argument_mangling[[MANSUFFIX]] : $
 
 
 
@@ -187,7 +187,7 @@ struct GenericTestStruct<T> {
    }
 }
 
-// CHECK-LABEL: sil @{{.*}}pass_address_only_rvalue_result
+// CHECK-LABEL: sil hidden @{{.*}}pass_address_only_rvalue_result
 // CHECK: bb0(%0 : $*T,
 // CHECK: [[FN:%[0-9]+]] = function_ref @{{.*}}GenericTestStructg9subscript
 // CHECK: apply [[FN]]<T>(%0,
@@ -204,7 +204,7 @@ struct NonMutableSubscriptable {
 func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 
 
-// CHECK-LABEL: sil @{{.*}}test_nm_subscript_get
+// CHECK-LABEL: sil hidden @{{.*}}test_nm_subscript_get
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
@@ -215,7 +215,7 @@ func test_nm_subscript_get(let a : Int) -> Int {
   return produceNMSubscriptableRValue()[a]
 }
 
-// CHECK-LABEL: sil @{{.*}}test_nm_subscript_set
+// CHECK-LABEL: sil hidden @{{.*}}test_nm_subscript_set
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
@@ -235,7 +235,7 @@ struct WeirdPropertyTest {
   }
 }
 
-// CHECK-LABEL: sil @{{.*}}test_weird_property
+// CHECK-LABEL: sil hidden @{{.*}}test_weird_property
 func test_weird_property(var v : WeirdPropertyTest, let i : Int) -> Int {
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box $WeirdPropertyTest
   // CHECK: store %0 to [[VBOX]]#1
@@ -254,7 +254,7 @@ func test_weird_property(var v : WeirdPropertyTest, let i : Int) -> Int {
 }
 
 
-// CHECK-LABEL: sil @{{.*}}generic_identity
+// CHECK-LABEL: sil hidden @{{.*}}generic_identity
 // CHECK-NEXT: bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: debug_value_addr %1 : $*T
 // CHECK-NEXT: copy_addr [take] %1 to [initialization] %0 : $*T
@@ -269,7 +269,7 @@ struct StaticLetMember {
   static let x = 5
 }
 
-// CHECK-LABEL: sil @{{.*}}testStaticLetMember
+// CHECK-LABEL: sil hidden @{{.*}}testStaticLetMember
 func testStaticLetMember() -> Int {
 
   // CHECK: function_ref @{{.*}}StaticLetMembera1xSi
@@ -285,7 +285,7 @@ protocol SimpleProtocol {
 // Verify that no temporaries+copies are produced when calling non-@mutable
 // methods on protocol and archetypes calls.
 
-// CHECK-LABEL: sil @{{.*}}testLetProtocolBases
+// CHECK-LABEL: sil hidden @{{.*}}testLetProtocolBases
 // CHECK-NEXT: bb0(%0 : $*SimpleProtocol):
 func testLetProtocolBases(let p : SimpleProtocol) {
   // CHECK-NEXT: debug_value_addr
@@ -304,7 +304,7 @@ func testLetProtocolBases(let p : SimpleProtocol) {
   // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil @{{.*}}testLetArchetypeBases
+// CHECK-LABEL: sil hidden @{{.*}}testLetArchetypeBases
 // CHECK-NEXT: bb0(%0 : $*T):
 func testLetArchetypeBases<T : SimpleProtocol>(let p : T) {
   // CHECK-NEXT: debug_value_addr
@@ -320,7 +320,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(let p : T) {
   // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil @{{.*}}testDebugValue
+// CHECK-LABEL: sil hidden @{{.*}}testDebugValue
 // CHECK-NEXT: bb0(%0 : $Int, %1 : $*SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int  // let a
 // CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol  // let b
@@ -339,7 +339,7 @@ func testDebugValue(let a : Int, let b : SimpleProtocol) -> Int {
 }
 
 
-// CHECK-LABEL: sil @{{.*}}testAddressOnlyTupleArgument
+// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(let bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK-NEXT:  bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int)  // let bounds
@@ -361,14 +361,14 @@ struct GenericFunctionStruct<T, U> {
 }
 
 
-// CHECK-LABEL: sil @{{.*}}member_ref_abstraction_change
+// CHECK-LABEL: sil hidden @{{.*}}member_ref_abstraction_change
 // CHECK: function_ref reabstraction thunk helper
 // CHECK: return
 func member_ref_abstraction_change(let x: GenericFunctionStruct<Int, Int>) -> Int -> Int {
   return x.f
 }
 
-// CHECK-LABEL: sil @{{.*}}call_auto_closure
+// CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
 // CHECK: apply [transparent] %0()
 func call_auto_closure(let x: @autoclosure () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.
@@ -393,7 +393,7 @@ struct StructMemberTest {
   func testIntMemberLoad() -> Int {
     return i
   }
-  // CHECK-LABEL: sil @{{.*}}testIntMemberLoad
+  // CHECK-LABEL: sil hidden @{{.*}}testIntMemberLoad
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest  // let self
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.i
@@ -404,7 +404,7 @@ struct StructMemberTest {
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
-  // CHECK-LABEL: sil @{{.*}}testRecursiveIntMemberLoad
+  // CHECK-LABEL: sil hidden @{{.*}}testRecursiveIntMemberLoad
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest  // let self
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
@@ -415,7 +415,7 @@ struct StructMemberTest {
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
-  // CHECK-LABEL: sil @{{.*}}testTupleMemberLoad
+  // CHECK-LABEL: sil hidden @{{.*}}testTupleMemberLoad
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:   debug_value %0 : $StructMemberTest  // let self
   // CHECK:   %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
@@ -434,7 +434,7 @@ struct GenericStruct<T> {
   func getA() -> T {
     return a
   }
-  // CHECK-LABEL: sil @{{.*}}GenericStruct4getA
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA
   // CHECK-NEXT: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>  // let self
   // CHECK-NEXT:  %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
@@ -447,7 +447,7 @@ struct GenericStruct<T> {
     return b
   }
   
-  // CHECK-LABEL: sil @{{.*}}GenericStruct4getB
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB
   // CHECK-NEXT: bb0(%0 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>  // let self
   // CHECK-NEXT: %2 = struct_element_addr %0 : $*GenericStruct<T>, #GenericStruct.b
@@ -462,7 +462,7 @@ struct LetPropertyStruct {
   let lp : Int
 }
 
-// CHECK-LABEL: sil @{{.*}}testLetPropertyAccessOnLValueBase
+// CHECK-LABEL: sil hidden @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
 // CHECK:  %1 = alloc_box $LetPropertyStruct
 // CHECK:   store %0 to %1#1 : $*LetPropertyStruct
@@ -477,7 +477,7 @@ func testLetPropertyAccessOnLValueBase(var a : LetPropertyStruct) -> Int {
 
 var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 
-// CHECK-LABEL: sil @{{.*}}testAddressOnlyGetOnlyGlobalProperty
+// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyGetOnlyGlobalProperty
 // CHECK-NEXT: bb0(%0 : $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:  %1 = function_ref @{{.*}}addressOnlyGetOnlyGlobalProperty

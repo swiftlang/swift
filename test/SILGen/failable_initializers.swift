@@ -6,7 +6,7 @@ class C: P {}
 struct LoadableStruct {
   var x: C
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT10alwaysFailCS_1C_GSqS0__
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT10alwaysFailCS_1C_GSqS0__
   // CHECK:       bb0([[C:%.*]] : $C
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
   // CHECK:         strong_release [[SELF_BOX]]
@@ -21,7 +21,7 @@ struct LoadableStruct {
     return nil
   }
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT3optSb_GSqS0__
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT3optSb_GSqS0__
   init?(opt: Bool) {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
@@ -46,7 +46,7 @@ struct LoadableStruct {
 
   }
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT3iuoSb_GSQS0__
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT3iuoSb_GSQS0__
   init!(iuo: Bool) {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
@@ -71,7 +71,7 @@ struct LoadableStruct {
 
   }
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT15delegatesOptOptSb_GSqS0__
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT15delegatesOptOptSb_GSqS0__
   init?(delegatesOptOpt: Bool) {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1
@@ -102,7 +102,7 @@ struct LoadableStruct {
     self.init(opt: true)
   }
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers14LoadableStructCfMS0_FT16delegatesNormIUOSb_S0_
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT16delegatesNormIUOSb_S0_
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1
   // CHECK:         [[DELEGATEE_INIT:%.*]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FT3iuoSb_GSQS0__
@@ -124,7 +124,7 @@ struct LoadableStruct {
 struct AddressOnlyStruct {
   var x: P
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3optSb_GSqS0__
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3optSb_GSqS0__
   init?(opt: Bool) {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $AddressOnlyStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
@@ -148,7 +148,7 @@ struct AddressOnlyStruct {
   // CHECK:         br [[EXIT]]
   }
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3iuoSb_GSQS0__
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3iuoSb_GSQS0__
   init!(iuo: Bool) {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $AddressOnlyStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
@@ -169,7 +169,7 @@ struct AddressOnlyStruct {
   // CHECK:         inject_enum_addr %0 : $*ImplicitlyUnwrappedOptional<AddressOnlyStruct>, #ImplicitlyUnwrappedOptional.Some
   }
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT15delegatesOptOptSb_GSqS0__
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT15delegatesOptOptSb_GSqS0__
   init?(delegatesOptOpt: Bool) {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $AddressOnlyStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1
@@ -198,7 +198,7 @@ struct AddressOnlyStruct {
     self.init(opt: true)
   }
 
-  // CHECK-LABEL: sil @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT16delegatesNormIUOSb_S0_
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT16delegatesNormIUOSb_S0_
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $AddressOnlyStruct
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1
   // CHECK:         [[DELEGATEE_INIT:%.*]] = function_ref @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3iuoSb_GSQS0__
@@ -226,7 +226,7 @@ class RootClass {
     return nil
   }
 
-  // CHECK-LABEL: sil @_TFC21failable_initializers9RootClasscfMS0_FT3optSb_GSqS0__
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers9RootClasscfMS0_FT3optSb_GSqS0__
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself]
   init?(opt: Bool) {
     x = C()
@@ -257,7 +257,7 @@ class RootClass {
     }
   }
 
-  // CHECK-LABEL: sil @_TFC21failable_initializers9RootClasscfMS0_FT16delegatesOptNormSb_GSqS0__
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers9RootClasscfMS0_FT16delegatesOptNormSb_GSqS0__
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $RootClass
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself]
   // CHECK:         store [[SELF_MARKED]] to [[SELF_BOX]]
@@ -278,7 +278,7 @@ class RootClass {
     self.init(norm: true)
   }
 
-  // CHECK-LABEL: sil @_TFC21failable_initializers9RootClasscfMS0_FT15delegatesOptOptSb_GSqS0__
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers9RootClasscfMS0_FT15delegatesOptOptSb_GSqS0__
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $RootClass
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself]
   // CHECK:         store [[SELF_MARKED]] to [[SELF_BOX]]

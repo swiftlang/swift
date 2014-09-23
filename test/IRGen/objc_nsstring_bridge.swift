@@ -151,7 +151,7 @@ class Bas : NSObject {
   // CHECK: define internal void @_TToFC20objc_nsstring_bridge3Bass13nsstrRealPropCSo8NSString([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {
   var nsstrRealProp : NSString
 
-  // CHECK: define %CSo8NSString* @_TFC20objc_nsstring_bridge3Basg13nsstrFakePropCSo8NSString(%C20objc_nsstring_bridge3Bas*) {
+  // CHECK: define hidden %CSo8NSString* @_TFC20objc_nsstring_bridge3Basg13nsstrFakePropCSo8NSString(%C20objc_nsstring_bridge3Bas*) {
   // CHECK: define internal void @_TToFC20objc_nsstring_bridge3Bass13nsstrFakePropCSo8NSString([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {
   var nsstrFakeProp : NSString {
     get {

@@ -4,7 +4,7 @@ import gizmo
 
 class Hoozit : Gizmo {
   func typical(x: Int, y: Gizmo) -> Gizmo { return y }
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozit7typicalfS0_FTSi1yCSo5Gizmo_S1_ : $@cc(objc_method) @thin (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
+  // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozit7typicalfS0_FTSi1yCSo5Gizmo_S1_ : $@cc(objc_method) @thin (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
   // CHECK-NEXT: bb0([[X:%.*]] : $Int, [[Y:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[Y]]
   // CHECK-NEXT:   retain [[THIS]]
@@ -16,7 +16,7 @@ class Hoozit : Gizmo {
 
   // NS_CONSUMES_SELF by inheritance
   override func fork() { }
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozit4forkfS0_FT_T_ : $@cc(objc_method) @thin (@owned Hoozit) -> () {
+  // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozit4forkfS0_FT_T_ : $@cc(objc_method) @thin (@owned Hoozit) -> () {
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit4forkfS0_FT_T_ : $@cc(method) @thin (@owned Hoozit) -> ()
@@ -26,7 +26,7 @@ class Hoozit : Gizmo {
 
   // NS_CONSUMED 'gizmo' argument by inheritance
   override class func consume(gizmo: Gizmo?) { }
-   // CHECK-LABEL: sil @_TToFC11objc_thunks6Hoozit7consumefMS0_FGSqCSo5Gizmo_T_ : $@cc(objc_method) @thin (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
+   // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Hoozit7consumefMS0_FGSqCSo5Gizmo_T_ : $@cc(objc_method) @thin (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
   // CHECK-NEXT: bb0([[GIZMO:%.*]] : $Optional<Gizmo>, [[THIS:%.*]] : $@objc_metatype Hoozit.Type):
   // CHECK-NEXT: [[THICK_THIS:%[0-9]+]] = objc_to_thick_metatype [[THIS]] : $@objc_metatype Hoozit.Type to $@thick Hoozit.Type
   // CHECK:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7consumefMS0_FGSqCSo5Gizmo_T_ : $@thin (@owned Optional<Gizmo>, @thick Hoozit.Type) -> ()
@@ -36,7 +36,7 @@ class Hoozit : Gizmo {
 
   // NS_RETURNS_RETAINED by family (-copy)
   func copyFoo() -> Gizmo { return self }
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozit7copyFoofS0_FT_CSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @owned Gizmo
+  // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozit7copyFoofS0_FT_CSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @owned Gizmo
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
@@ -49,7 +49,7 @@ class Hoozit : Gizmo {
 
   var typicalProperty: Gizmo
   // -- getter
-  // CHECK-LABEL: sil [transparent]  @_TToFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @autoreleased Gizmo {
+  // CHECK-LABEL: sil hidden [transparent]  @_TToFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @autoreleased Gizmo {
   // CHECK-NEXT: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   strong_retain %0
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.getter
@@ -58,7 +58,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo
   // CHECK-NEXT: }
   
-  // CHECK-LABEL: sil [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
+  // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
   // CHECK-NEXT: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty {{.*}}
@@ -68,7 +68,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter
-  // CHECK-LABEL: sil [transparent]  @_TToFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
+  // CHECK-LABEL: sil hidden [transparent]  @_TToFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
   // CHECK-NEXT: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[VALUE]] : $Gizmo
   // CHECK-NEXT:   retain [[THIS]] : $Hoozit
@@ -77,7 +77,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[RES:%.*]] = apply [transparent] [[FR]](%0, %1)
   // CHECK_NEXT:   return [[RES]] line:[[@LINE-19]]:7:auto_gen
 
-  // CHECK-LABEL: sil [transparent] @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
+  // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
   // CHECK-NEXT: bb0(%0 : $Gizmo, %1 : $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %1 : {{.*}}, #Hoozit.typicalProperty
   // CHECK-NEXT:   assign %0 to [[ADDR]] : $*Gizmo
@@ -85,7 +85,7 @@ class Hoozit : Gizmo {
   // NS_RETURNS_RETAINED getter by family (-copy)
   var copyProperty: Gizmo
   // -- getter
-  // CHECK-LABEL: sil [transparent] @_TToFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @owned Gizmo {
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @owned Gizmo {
   // CHECK-NEXT: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   strong_retain %0
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.getter
@@ -94,7 +94,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
-  // CHECK-LABEL: sil [transparent] @_TFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo
+  // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo
   // CHECK-NEXT: bb0(%0 : $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.copyProperty
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]]
@@ -103,7 +103,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter is normal
-  // CHECK-LABEL: sil [transparent]  @_TToFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
+  // CHECK-LABEL: sil hidden [transparent]  @_TToFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
   // CHECK-NEXT: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[VALUE]]
   // CHECK-NEXT:   retain [[THIS]]
@@ -112,14 +112,14 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[RES:%.*]] = apply [transparent] [[FR]](%0, %1)
   // CHECK-NEXT:   return [[RES]]
 
-  // CHECK-LABEL: sil [transparent] @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo
+  // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo
   // CHECK:        bb0(%0 : $Gizmo, %1 : $Hoozit):
   // CHECK:   [[ADDR:%.*]] = ref_element_addr %1 : {{.*}}, #Hoozit.copyProperty
   // CHECK-NEXT:   assign %0 to [[ADDR]]
 
   var roProperty: Gizmo { return self }
   // -- getter
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @autoreleased Gizmo {
+  // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @autoreleased Gizmo {
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
@@ -129,7 +129,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // -- no setter
-  // CHECK-NOT: sil @_TToFC11objc_thunks6Hoozits10roPropertyCSo5Gizmo
+  // CHECK-NOT: sil hidden @_TToFC11objc_thunks6Hoozits10roPropertyCSo5Gizmo
 
   var rwProperty: Gizmo {
     get {
@@ -138,10 +138,10 @@ class Hoozit : Gizmo {
     set {}
   }
   // -- getter
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozitg10rwPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @autoreleased Gizmo 
+  // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozitg10rwPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @autoreleased Gizmo 
 
   // -- setter
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
+  // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
   // CHECK-NEXT: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[VALUE]]
   // CHECK-NEXT:   retain [[THIS]]
@@ -158,7 +158,7 @@ class Hoozit : Gizmo {
     set {}
   }
   // -- getter
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @owned Gizmo {
+  // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @owned Gizmo {
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
@@ -170,7 +170,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // -- setter is normal
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozits14copyRWPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
+  // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozits14copyRWPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
   // CHECK-NEXT: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[VALUE]]
   // CHECK-NEXT:   retain [[THIS]]
@@ -182,10 +182,10 @@ class Hoozit : Gizmo {
 
   // Don't export generics to ObjC yet
   func generic<T>(x: T) {}
-  // CHECK-NOT: sil @_TToFC11objc_thunks6Hoozit7genericfS_U__FT_T_
+  // CHECK-NOT: sil hidden @_TToFC11objc_thunks6Hoozit7genericfS_U__FT_T_
 
   // Constructor.
-  // CHECK-LABEL: sil @_TFC11objc_thunks6HoozitcfMS0_FT7bellsOnSi_S0_ : $@cc(method) @thin (Int, @owned Hoozit) -> @owned Hoozit {
+  // CHECK-LABEL: sil hidden @_TFC11objc_thunks6HoozitcfMS0_FT7bellsOnSi_S0_ : $@cc(method) @thin (Int, @owned Hoozit) -> @owned Hoozit {
   // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
   // CHECK-NEXT: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
@@ -214,7 +214,7 @@ class Hoozit : Gizmo {
   // Subscript
   subscript (i: Int) -> Hoozit {
   // Getter
-  // CHECK-LABEL: sil @_TToFC11objc_thunks6Hoozitg9subscriptFSiS0_ : $@cc(objc_method) @thin (Int, Hoozit) -> @autoreleased Hoozit
+  // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Hoozitg9subscriptFSiS0_ : $@cc(objc_method) @thin (Int, Hoozit) -> @autoreleased Hoozit
   // CHECK-NEXT: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $Hoozit):
   // CHECK-NEXT:   strong_retain [[SELF]] : $Hoozit
   // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozitg9subscript{{.*}} : $@cc(method) @thin (Int, @owned Hoozit) -> @owned Hoozit
@@ -225,7 +225,7 @@ class Hoozit : Gizmo {
   }
 
   // Setter
-  // CHECK-LABEL: sil @_TToFC11objc_thunks6Hoozits9subscriptFSiS0_ : $@cc(objc_method) @thin (Hoozit, Int, Hoozit) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Hoozits9subscriptFSiS0_ : $@cc(objc_method) @thin (Hoozit, Int, Hoozit) -> ()
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Hoozit, [[I:%[0-9]+]] : $Int, [[VALUE:%[0-9]+]] : $Hoozit):
   // CHECK-NEXT: strong_retain [[SELF]] : $Hoozit
   // CHECK_NEXT: strong_retain [[VALUE]] : $Hoozit
@@ -251,16 +251,16 @@ class Wotsit<T> : Gizmo {
 }
 // We should emit no @objc symbols except for the deallocator and ivar
 // destroyer.
-// CHECK-NOT: sil @_TToF{{.*}}Wotsit{{.*}}
-// CHECK: sil @_TToF{{.*}}WotsitE
-// CHECK-NOT: sil @_TToF{{.*}}Wotsit{{.*}}
+// CHECK-NOT: sil hidden @_TToF{{.*}}Wotsit{{.*}}
+// CHECK: sil hidden @_TToF{{.*}}WotsitE
+// CHECK-NOT: sil hidden @_TToF{{.*}}Wotsit{{.*}}
 
 // Extension initializers, properties and methods need thunks too.
 extension Hoozit {
-  // CHECK-LABEL: sil @_TToFC11objc_thunks6HoozitcfMS0_FT3intSi_S0_ : $@cc(objc_method) @thin (Int, @owned Hoozit) -> @owned Hoozit
+  // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6HoozitcfMS0_FT3intSi_S0_ : $@cc(objc_method) @thin (Int, @owned Hoozit) -> @owned Hoozit
   dynamic convenience init(int i: Int) { self.init(bellsOn: i) }
 
-  // CHECK-LABEL: sil @_TFC11objc_thunks6HoozitcfMS0_FT6doubleSd_S0_ : $@cc(method) @thin (Double, @owned Hoozit) -> @owned Hoozit
+  // CHECK-LABEL: sil hidden @_TFC11objc_thunks6HoozitcfMS0_FT6doubleSd_S0_ : $@cc(method) @thin (Double, @owned Hoozit) -> @owned Hoozit
   convenience init(double d: Double) { 
     // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
     // CHECK: [[X_BOX:%[0-9]+]] = alloc_box $X
@@ -288,10 +288,10 @@ extension Hoozit {
   }
 
   func foof() {}
-  // CHECK-LABEL: sil @_TToFC11objc_thunks6Hoozit4fooffS0_FT_T_ : $@cc(objc_method) @thin (Hoozit) -> () {
+  // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Hoozit4fooffS0_FT_T_ : $@cc(objc_method) @thin (Hoozit) -> () {
 
   var extensionProperty: Int { return 0 }
-  // CHECK-LABEL: sil  @_TFC11objc_thunks6Hoozitg17extensionPropertySi : $@cc(method) @thin (@owned Hoozit) -> Int
+  // CHECK-LABEL: sil hidden  @_TFC11objc_thunks6Hoozitg17extensionPropertySi : $@cc(method) @thin (@owned Hoozit) -> Int
 }
 
 // Calling objc methods of subclass should go through native entry points
@@ -322,13 +322,13 @@ func other() { }
 
 class X { }
 
-// CHECK-LABEL: sil @_TF11objc_thunks8property
+// CHECK-LABEL: sil hidden @_TF11objc_thunks8property
 func property(g: Gizmo) -> Int {
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.count!getter.1.foreign
   return g.count
 }
 
-// CHECK-LABEL: sil @_TF11objc_thunks13blockProperty
+// CHECK-LABEL: sil hidden @_TF11objc_thunks13blockProperty
 func blockProperty(g: Gizmo) {
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.block!setter.1.foreign
   g.block = { }
@@ -341,26 +341,26 @@ class DesignatedStubs : Gizmo {
 
   override init() { i = 5 }
 
-  // CHECK-LABEL: sil @_TFC11objc_thunks15DesignatedStubscfMS0_FT7bellsOnSi_GSQS0__
+  // CHECK-LABEL: sil hidden @_TFC11objc_thunks15DesignatedStubscfMS0_FT7bellsOnSi_GSQS0__
   // CHECK: function_ref @_TFSs26_unimplemented_initializer
   // CHECK: string_literal utf8 "objc_thunks.DesignatedStubs"
   // CHECK: string_literal utf8 "init(bellsOn:)"
   // CHECK: string_literal utf8 "{{.*}}objc_thunks.swift"
   // CHECK: return
 
-  // CHECK-NOT: sil @_TFCSo15DesignatedStubscfMS_FT12withoutBellsSi_S_
+  // CHECK-NOT: sil hidden @_TFCSo15DesignatedStubscfMS_FT12withoutBellsSi_S_
 }
 
 class DesignatedOverrides : Gizmo {
   var i: Int = 5
 
-  // CHECK-LABEL: sil @_TFC11objc_thunks19DesignatedOverridescfMS0_FT_GSQS0__
+  // CHECK-LABEL: sil hidden @_TFC11objc_thunks19DesignatedOverridescfMS0_FT_GSQS0__
   // CHECK-NOT: return
   // CHECK: function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
   // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> () -> Gizmo! , $@cc(objc_method) @thin (@owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return
 
-  // CHECK-LABEL: sil @_TFC11objc_thunks19DesignatedOverridescfMS0_FT7bellsOnSi_GSQS0__
+  // CHECK-LABEL: sil hidden @_TFC11objc_thunks19DesignatedOverridescfMS0_FT7bellsOnSi_GSQS0__
   // CHECK: function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
   // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return

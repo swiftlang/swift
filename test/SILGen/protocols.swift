@@ -19,7 +19,7 @@ func use_subscript_rvalue_get(i : Int) -> Int {
   return subscriptableGet[i]
 }
 
-// CHECK-LABEL: sil @{{.*}}use_subscript_rvalue_get
+// CHECK-LABEL: sil hidden @{{.*}}use_subscript_rvalue_get
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols16subscriptableGetPS_16SubscriptableGet_ : $*SubscriptableGet
 // CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*SubscriptableGet to $*@sil_self SubscriptableGet
@@ -31,7 +31,7 @@ func use_subscript_lvalue_get(i : Int) -> Int {
   return subscriptableGetSet[i]
 }
 
-// CHECK-LABEL: sil @{{.*}}use_subscript_lvalue_get
+// CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_get
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
 // CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*SubscriptableGetSet to $*@sil_self SubscriptableGetSet
@@ -43,7 +43,7 @@ func use_subscript_lvalue_set(i : Int) {
   subscriptableGetSet[i] = i
 }
 
-// CHECK-LABEL: sil @{{.*}}use_subscript_lvalue_set
+// CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_set
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
 // CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*SubscriptableGetSet to $*@sil_self SubscriptableGetSet
@@ -58,7 +58,7 @@ func use_subscript_lvalue_set(i : Int) {
 func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(generic : T, idx : Int) -> Int {
   return generic[idx]
 }
-// CHECK-LABEL: sil @{{.*}}use_subscript_archetype_rvalue_get
+// CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_rvalue_get
 // CHECK-NEXT: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGet.subscript!getter.1
 // CHECK-NEXT: apply [[METH]]<T>(%1, %0)
@@ -68,7 +68,7 @@ func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(generic : T, idx :
 func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(inout generic : T, idx : Int) -> Int {
   return generic[idx]
 }
-// CHECK-LABEL: sil @{{.*}}use_subscript_archetype_lvalue_get
+// CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
 // CHECK-NEXT: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!getter.1
@@ -79,7 +79,7 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(inout generic :
 func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(inout generic : T, idx : Int) {
   generic[idx] = idx
 }
-// CHECK-LABEL: sil @{{.*}}use_subscript_archetype_lvalue_set
+// CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
 // CHECK-NEXT: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!setter.1
@@ -106,7 +106,7 @@ var propertyGetSet : PropertyWithGetterSetter
 func use_property_rvalue_get() -> Int {
   return propertyGet.a
 }
-// CHECK-LABEL: sil @{{.*}}use_property_rvalue_get
+// CHECK-LABEL: sil hidden @{{.*}}use_property_rvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols11propertyGetPS_18PropertyWithGetter_ : $*PropertyWithGetter
 // CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*PropertyWithGetter to $*@sil_self PropertyWithGetter
 // CHECK-NEXT: [[METH:%[0-9]+]] = protocol_method [[GLOB]] : $*PropertyWithGetter, #PropertyWithGetter.a!getter.1
@@ -115,7 +115,7 @@ func use_property_rvalue_get() -> Int {
 func use_property_lvalue_get() -> Int {
   return propertyGetSet.b
 }
-// CHECK-LABEL: sil @{{.*}}use_property_lvalue_get
+// CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
 // CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*PropertyWithGetterSetter to $*@sil_self PropertyWithGetterSetter
 // CHECK-NEXT: [[METH:%[0-9]+]] = protocol_method [[GLOB]] : $*PropertyWithGetterSetter, #PropertyWithGetterSetter.b!getter.1
@@ -125,7 +125,7 @@ func use_property_lvalue_set(x : Int) {
   propertyGetSet.b = x
 }
 
-// CHECK-LABEL: sil @{{.*}}use_property_lvalue_set
+// CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_set
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
 // CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*PropertyWithGetterSetter to $*@sil_self PropertyWithGetterSetter
@@ -140,7 +140,7 @@ func use_property_archetype_rvalue_get<T : PropertyWithGetter>(generic : T) -> I
   return generic.a
 }
 
-// CHECK-LABEL: sil @{{.*}}use_property_archetype_rvalue_get
+// CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_rvalue_get
 // CHECK-NEXT: bb0(%0 : $*T):
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetter.a!getter.1
 // CHECK-NEXT: apply [[METH]]<T>(%0)
@@ -151,7 +151,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(generic : T
   return generic.b
 }
 
-// CHECK-LABEL: sil @{{.*}}use_property_archetype_lvalue_get
+// CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_get
 // CHECK-NEXT: bb0(%0 : $*T):
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!getter.1
 // CHECK-NEXT: apply [[METH]]<T>(%0)
@@ -161,7 +161,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(generic : T
 func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(inout generic : T, v : Int) {
   generic.b = v
 }
-// CHECK-LABEL: sil @{{.*}}use_property_archetype_lvalue_set
+// CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
 // CHECK-NEXT: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!setter.1
@@ -175,7 +175,7 @@ protocol Initializable {
   init(int: Int)
 }
 
-// CHECK-LABEL: sil @_TF9protocols27use_initializable_archetype
+// CHECK-LABEL: sil hidden @_TF9protocols27use_initializable_archetype
 func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
   // CHECK:   [[T_META:%[0-9]+]] = metatype $@thick T.Type
   // CHECK:   [[T_INIT:%[0-9]+]] = witness_method $T, #Initializable.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
@@ -189,7 +189,7 @@ func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
   T(int: i)
 }
 
-// CHECK: sil @_TF9protocols29use_initializable_existential
+// CHECK: sil hidden @_TF9protocols29use_initializable_existential
 func use_initializable_existential(im: Initializable.Type, i: Int) {
 // CHECK: bb0([[IM:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
 // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_ref [[IM]] : $@thick Initializable.Type to $@thick @opened(0) Initializable.Type
@@ -258,7 +258,7 @@ class ClassWithStoredProperty : PropertyWithGetter {
   func methodUsingProperty() -> Int {
     return a
   }
-  // CHECK-LABEL: sil @{{.*}}ClassWithStoredProperty{{.*}}methodUsingProperty
+  // CHECK-LABEL: sil hidden @{{.*}}ClassWithStoredProperty{{.*}}methodUsingProperty
   // CHECK-NEXT: bb0(%0 : $ClassWithStoredProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: strong_retain %0 : $ClassWithStoredProperty
@@ -275,7 +275,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
   func methodUsingProperty() -> Int {
     return a
   }
-  // CHECK-LABEL: sil @{{.*}}StructWithStoredProperty{{.*}}methodUsingProperty
+  // CHECK-LABEL: sil hidden @{{.*}}StructWithStoredProperty{{.*}}methodUsingProperty
   // CHECK-NEXT: bb0(%0 : $StructWithStoredProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: %2 = struct_extract %0 : $StructWithStoredProperty, #StructWithStoredProperty.a

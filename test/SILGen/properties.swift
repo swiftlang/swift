@@ -5,7 +5,7 @@ var zero: Int = 0
 func use(_:Int) {}
 func getInt() -> Int { return zero }
 
-// CHECK-LABEL: sil  @{{.*}}physical_tuple_lvalue
+// CHECK-LABEL: sil hidden  @{{.*}}physical_tuple_lvalue
 // CHECK-NEXT: bb0(%0 : $Int):
 func physical_tuple_lvalue(c: Int) {
   var x : (Int, Int)
@@ -18,7 +18,7 @@ func physical_tuple_lvalue(c: Int) {
 
 func tuple_rvalue() -> (Int, Int) {}
 
-// CHECK-LABEL: sil  @{{.*}}physical_tuple_rvalue
+// CHECK-LABEL: sil hidden  @{{.*}}physical_tuple_rvalue
 func physical_tuple_rvalue() -> Int {
   return tuple_rvalue().1
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF10properties12tuple_rvalue
@@ -27,7 +27,7 @@ func physical_tuple_rvalue() -> Int {
   // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil  @_TF10properties16tuple_assignment
+// CHECK-LABEL: sil hidden  @_TF10properties16tuple_assignment
 func tuple_assignment(inout a: Int, inout b: Int) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
   // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
@@ -39,7 +39,7 @@ func tuple_assignment(inout a: Int, inout b: Int) {
   (a, b) = (b, a)
 }
 
-// CHECK-LABEL: sil  @_TF10properties18tuple_assignment_2
+// CHECK-LABEL: sil hidden  @_TF10properties18tuple_assignment_2
 func tuple_assignment_2(inout a: Int, inout b: Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int, [[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int):
   // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
@@ -89,7 +89,7 @@ struct Val {
   subscript(i: Int) -> Float { get {} set {} }
 }
 
-// CHECK-LABEL: sil  @_TF10properties22physical_struct_lvalue
+// CHECK-LABEL: sil hidden  @_TF10properties22physical_struct_lvalue
 func physical_struct_lvalue(c: Int) {
   var v : Val
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
@@ -97,7 +97,7 @@ func physical_struct_lvalue(c: Int) {
   // CHECK: assign %0 to [[X_1]]
 }
 
-// CHECK-LABEL: sil  @_TF10properties21physical_class_lvalue
+// CHECK-LABEL: sil hidden  @_TF10properties21physical_class_lvalue
  func physical_class_lvalue(r: Ref, a: Int) {
     r.y = a
 
@@ -108,7 +108,7 @@ func physical_struct_lvalue(c: Int) {
   }
 
 
-// CHECK-LABEL: sil  @_TF10properties24physical_subclass_lvalue
+// CHECK-LABEL: sil hidden  @_TF10properties24physical_subclass_lvalue
  func physical_subclass_lvalue(r: RefSubclass, a: Int) {
     r.y = a
    // CHECK: strong_retain %0 : $RefSubclass
@@ -127,7 +127,7 @@ func physical_struct_lvalue(c: Int) {
 
 func struct_rvalue() -> Val {}
 
-// CHECK-LABEL: sil  @_TF10properties22physical_struct_rvalue
+// CHECK-LABEL: sil hidden  @_TF10properties22physical_struct_rvalue
 func physical_struct_rvalue() -> Int {
   return struct_rvalue().y
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF10properties13struct_rvalueFT_VS_3Val
@@ -138,7 +138,7 @@ func physical_struct_rvalue() -> Int {
 
 func class_rvalue() -> Ref {}
 
-// CHECK-LABEL: sil  @_TF10properties21physical_class_rvalue
+// CHECK-LABEL: sil hidden  @_TF10properties21physical_class_rvalue
 func physical_class_rvalue() -> Int {
   return class_rvalue().y
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF10properties12class_rvalueFT_CS_3Ref
@@ -149,7 +149,7 @@ func physical_class_rvalue() -> Int {
   // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil  @_TF10properties18logical_struct_get
+// CHECK-LABEL: sil hidden  @_TF10properties18logical_struct_get
 func logical_struct_get() -> Int {
   return struct_rvalue().z
   // CHECK: [[GET_RVAL:%[0-9]+]] = function_ref @_TF10properties13struct_rvalue
@@ -159,7 +159,7 @@ func logical_struct_get() -> Int {
   // CHECK: return [[VALUE]]
 }
 
-// CHECK-LABEL: sil  @_TF10properties18logical_struct_set
+// CHECK-LABEL: sil hidden  @_TF10properties18logical_struct_set
 func logical_struct_set(inout value: Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
@@ -169,7 +169,7 @@ func logical_struct_set(inout value: Val, z: Int) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF10properties27logical_struct_in_tuple_set
+// CHECK-LABEL: sil hidden  @_TF10properties27logical_struct_in_tuple_set
 func logical_struct_in_tuple_set(inout value: (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
@@ -180,7 +180,7 @@ func logical_struct_in_tuple_set(inout value: (Int, Val), z: Int) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF10properties29logical_struct_in_reftype_set
+// CHECK-LABEL: sil hidden  @_TF10properties29logical_struct_in_reftype_set
 func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.ref.val_prop.z_tuple.1 = z1
@@ -227,12 +227,12 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
 
 func reftype_rvalue() -> Ref {}
 
-// CHECK-LABEL: sil  @_TF10properties18reftype_rvalue_set
+// CHECK-LABEL: sil hidden  @_TF10properties18reftype_rvalue_set
 func reftype_rvalue_set(value: Val) {
   reftype_rvalue().val_prop = value
 }
 
-// CHECK-LABEL: sil  @_TF10properties27tuple_in_logical_struct_set
+// CHECK-LABEL: sil hidden  @_TF10properties27tuple_in_logical_struct_set
 func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
@@ -253,17 +253,17 @@ func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
 }
 
 var global_prop : Int {
-  // CHECK-LABEL: sil  @_TF10propertiesg11global_prop
+  // CHECK-LABEL: sil hidden  @_TF10propertiesg11global_prop
   get {
     return zero
   }
-  // CHECK-LABEL: sil  @_TF10propertiess11global_prop
+  // CHECK-LABEL: sil hidden  @_TF10propertiess11global_prop
   set {
     use(newValue)
   }
 }
 
-// CHECK-LABEL: sil  @_TF10properties18logical_global_get
+// CHECK-LABEL: sil hidden  @_TF10properties18logical_global_get
 func logical_global_get() -> Int {
   return global_prop
   // CHECK: [[GET:%[0-9]+]] = function_ref @_TF10propertiesg11global_prop
@@ -271,14 +271,14 @@ func logical_global_get() -> Int {
   // CHECK: return [[VALUE]]
 }
 
-// CHECK-LABEL: sil  @_TF10properties18logical_global_set
+// CHECK-LABEL: sil hidden  @_TF10properties18logical_global_set
 func logical_global_set(x: Int) {
   global_prop = x
   // CHECK: [[SET:%[0-9]+]] = function_ref @_TF10propertiess11global_prop
   // CHECK: apply [[SET]](%0)
 }
 
-// CHECK-LABEL: sil  @_TF10properties17logical_local_get
+// CHECK-LABEL: sil hidden  @_TF10properties17logical_local_get
 func logical_local_get(x: Int) -> Int {
   var prop : Int {
     get {
@@ -293,7 +293,7 @@ func logical_local_get(x: Int) -> Int {
 // CHECK-: sil shared [[PROP_GET_CLOSURE]]
 // CHECK: bb0(%{{[0-9]+}} : $Int):
 
-// CHECK-LABEL: sil  @_TF10properties26logical_local_captured_get
+// CHECK-LABEL: sil hidden  @_TF10properties26logical_local_captured_get
 func logical_local_captured_get(x: Int) -> Int {
   var prop : Int {
     get {
@@ -317,7 +317,7 @@ func logical_local_captured_get(x: Int) -> Int {
 
 func inout_arg(inout x: Int) {}
 
-// CHECK-LABEL: sil  @_TF10properties14physical_inout
+// CHECK-LABEL: sil hidden  @_TF10properties14physical_inout
 func physical_inout(var x: Int) {
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
   inout_arg(&x)
@@ -329,7 +329,7 @@ func physical_inout(var x: Int) {
 /* TODO check writeback to more complex logical prop, check that writeback
  * reuses temporaries */
 
-// CHECK-LABEL: sil  @_TF10properties17val_subscript_get
+// CHECK-LABEL: sil hidden  @_TF10properties17val_subscript_get
 // CHECK-NEXT: bb0([[VVAL:%[0-9]+]] : $Val, [[I:%[0-9]+]] : $Int):
 func val_subscript_get(v: Val, i: Int) -> Float {
   return v[i]
@@ -339,7 +339,7 @@ func val_subscript_get(v: Val, i: Int) -> Float {
   // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil  @_TF10properties17val_subscript_set
+// CHECK-LABEL: sil hidden  @_TF10properties17val_subscript_set
 // CHECK: bb0(%0 : $Val, [[I:%[0-9]+]] : $Int, [[X:%[0-9]+]] : $Float):
 func val_subscript_set(var v: Val, i: Int, x: Float) {
   v[i] = x
@@ -357,61 +357,61 @@ struct Generic<T> {
 
   subscript(x: T) -> T { get {} set {} }
 
-  // CHECK-LABEL: sil  @_TFV10properties7Generic19copy_typevar_member
+  // CHECK-LABEL: sil hidden  @_TFV10properties7Generic19copy_typevar_member
   mutating
   func copy_typevar_member(x: Generic<T>) {
     typevar_member = x.typevar_member
   }
 }
 
-// CHECK-LABEL: sil  @_TF10properties21generic_mono_phys_get
+// CHECK-LABEL: sil hidden  @_TF10properties21generic_mono_phys_get
 func generic_mono_phys_get<T>(g: Generic<T>) -> Int {
   return g.mono_phys
   // CHECK: struct_element_addr %{{.*}}, #Generic.mono_phys
 }
 
-// CHECK-LABEL: sil  @_TF10properties20generic_mono_log_get
+// CHECK-LABEL: sil hidden  @_TF10properties20generic_mono_log_get
 func generic_mono_log_get<T>(g: Generic<T>) -> Int {
   return g.mono_log
   // CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties7Genericg8mono_log
   // CHECK: apply [[GENERIC_GET_METHOD]]<
 }
 
-// CHECK-LABEL: sil  @_TF10properties20generic_mono_log_set
+// CHECK-LABEL: sil hidden  @_TF10properties20generic_mono_log_set
 func generic_mono_log_set<T>(var g: Generic<T>, x: Int) {
   g.mono_log = x
   // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties7Generics8mono_log
   // CHECK: apply [[GENERIC_SET_METHOD]]<
 }
 
-// CHECK-LABEL: sil  @_TF10properties26generic_mono_subscript_get
+// CHECK-LABEL: sil hidden  @_TF10properties26generic_mono_subscript_get
 func generic_mono_subscript_get<T>(g: Generic<T>, i: Int) -> Float {
   return g[i]
   // CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties7Genericg9subscript
   // CHECK: apply [[GENERIC_GET_METHOD]]<
 }
 
-// CHECK-LABEL: sil  @{{.*}}generic_mono_subscript_set
+// CHECK-LABEL: sil hidden  @{{.*}}generic_mono_subscript_set
 func generic_mono_subscript_set<T>(inout g: Generic<T>, i: Int, x: Float) {
   g[i] = x
   // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties7Generics9subscript
   // CHECK: apply [[GENERIC_SET_METHOD]]<
 }
 
-// CHECK-LABEL: sil  @{{.*}}bound_generic_mono_phys_get
+// CHECK-LABEL: sil hidden  @{{.*}}bound_generic_mono_phys_get
 func bound_generic_mono_phys_get(inout g: Generic<UnicodeScalar>, x: Int) -> Int {
   return g.mono_phys
   // CHECK: struct_element_addr %{{.*}}, #Generic.mono_phys
 }
 
-// CHECK-LABEL: sil  @_TF10properties26bound_generic_mono_log_get
+// CHECK-LABEL: sil hidden  @_TF10properties26bound_generic_mono_log_get
 func bound_generic_mono_log_get(g: Generic<UnicodeScalar>, x: Int) -> Int {
   return g.mono_log
 // CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties7Genericg8mono_log
   // CHECK: apply [[GENERIC_GET_METHOD]]<
 }
 
-// CHECK-LABEL: sil  @_TF10properties22generic_subscript_type
+// CHECK-LABEL: sil hidden  @_TF10properties22generic_subscript_type
 func generic_subscript_type<T>(var g: Generic<T>, i: T, x: T) -> T {
   g[i] = x
   return g[i]
@@ -428,13 +428,13 @@ struct StaticProperty {
   }
 }
 
-// CHECK-LABEL: sil @_TF10properties10static_get
+// CHECK-LABEL: sil hidden @_TF10properties10static_get
 // CHECK:   function_ref @_TFV10properties14StaticPropertyg3foo{{.*}} : $@thin (@thin StaticProperty.Type) -> Int
 func static_get() -> Int {
   return StaticProperty.foo
 }
 
-// CHECK-LABEL: sil @_TF10properties10static_set
+// CHECK-LABEL: sil hidden @_TF10properties10static_set
 // CHECK:   function_ref @_TFV10properties14StaticPropertys3foo{{.*}} : $@thin (Int, @thin StaticProperty.Type) -> ()
 func static_set(x: Int) {
   StaticProperty.foo = x
@@ -446,7 +446,7 @@ struct DidSetWillSetTests {
   var a : Int {
     willSet(newA) {
       // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.willset
-      // CHECK-NEXT: sil @_TFV10properties18DidSetWillSetTestsw1a
+      // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsw1a
       // CHECK-NEXT: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
       // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
@@ -470,7 +470,7 @@ struct DidSetWillSetTests {
 
     didSet {
       // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.didset
-      // CHECK-NEXT: sil @_TFV10properties18DidSetWillSetTestsW1a
+      // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsW1a
       // CHECK-NEXT: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
       // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
@@ -506,14 +506,14 @@ struct DidSetWillSetTests {
   // These are the synthesized getter and setter for the willset/didset variable.
 
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.getter
-  // CHECK-NEXT: sil [transparent] @_TFV10properties18DidSetWillSetTestsg1a
+  // CHECK-NEXT: sil hidden [transparent] @_TFV10properties18DidSetWillSetTestsg1a
   // CHECK-NEXT: bb0(%0 : $DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   return %2 : $Int                      // id: %3
   
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
-  // CHECK-NEXT: sil @_TFV10properties18DidSetWillSetTestss1a
+  // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestss1a
   // CHECK-NEXT: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
@@ -536,7 +536,7 @@ struct DidSetWillSetTests {
   // CHECK-NEXT: copy_addr [[SELFBOX]]#1 to %1 : $*DidSetWillSetTests
 
 
-  // CHECK-LABEL: sil @_TFV10properties18DidSetWillSetTestsCfMS0_FT1x
+  // CHECK-LABEL: sil hidden @_TFV10properties18DidSetWillSetTestsCfMS0_FT1x
   // CHECK-NEXT: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
   // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
   // CHECK:        [[P1:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
@@ -563,13 +563,13 @@ var global_observing_property : Int = zero {
 
 // The didSet implementation needs to call takeInt.
 
-// CHECK-LABEL: sil @_TF10propertiesW25global_observing_property
+// CHECK-LABEL: sil hidden @_TF10propertiesW25global_observing_property
 // CHECK: function_ref properties.takeInt
 // CHECK-NEXT: function_ref @_TF10properties7takeInt
 
 // The setter needs to call didSet implementation.
 
-// CHECK-LABEL: sil @_TF10propertiess25global_observing_property
+// CHECK-LABEL: sil hidden @_TF10propertiess25global_observing_property
 // CHECK: function_ref properties.global_observing_property.addressor
 // CHECK-NEXT:  function_ref @_TF10propertiesa25global_observing_property
 // CHECK: function_ref properties.global_observing_property.didset
@@ -592,7 +592,7 @@ func local_observing_property(arg: Int) {
 // This is the local_observing_property function itself.  First alloc and 
 // initialize the property to the argument value.
 
-// CHECK-LABEL: sil @{{.*}}local_observing_property
+// CHECK-LABEL: sil hidden @{{.*}}local_observing_property
 // CHECK-NEXT: bb0([[ARG:%[0-9]+]] : $Int)
 // CHECK: [[BOX:%[0-9]+]] = alloc_box $Int
 // CHECK: store [[ARG]] to [[BOX]]#1
@@ -637,7 +637,7 @@ class rdar16151899Base {
 }
 
 class rdar16151899Derived : rdar16151899Base {
-    // CHECK-LABEL: sil @_TFC10properties19rdar16151899DerivedcfMS0_FT_S0_
+    // CHECK-LABEL: sil hidden @_TFC10properties19rdar16151899DerivedcfMS0_FT_S0_
     override init() {
         super.init()
         // CHECK: upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
@@ -698,7 +698,7 @@ class DerivedProperty : BaseProperty {
 
 // rdar://16381392 - Super property references in non-objc classes should be direct.
 
-// CHECK: sil @_TFC10properties15DerivedProperty24super_property_referencefS0_FT_
+// CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_referencefS0_FT_
 // CHECK-NEXT: bb0(%0 : $DerivedProperty):
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
 // CHECK:  // function_ref properties.BaseProperty.x.getter
@@ -713,7 +713,7 @@ struct ReferenceStorageTypeRValues {
   func testRValueUnowned() -> Ref {
     return p1
   }
-// CHECK: sil @{{.*}}testRValueUnowned
+// CHECK: sil hidden @{{.*}}testRValueUnowned
 // CHECK-NEXT: bb0(%0 : $ReferenceStorageTypeRValues):
 // CHECK-NEXT:   debug_value %0 : $ReferenceStorageTypeRValues
 // CHECK-NEXT:   %2 = struct_extract %0 : $ReferenceStorageTypeRValues, #ReferenceStorageTypeRValues.p1
@@ -759,7 +759,7 @@ struct SomeGenericStruct<T> {
   var x: Int
 }
 
-// CHECK-LABEL: sil @_TF10properties4getX
+// CHECK-LABEL: sil hidden @_TF10properties4getX
 // CHECK:         struct_extract {{%.*}} : $SomeGenericStruct<T>, #SomeGenericStruct.x
 func getX<T>(g: SomeGenericStruct<T>) -> Int {
   return g.x
@@ -828,7 +828,7 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil @_TF10properties12genericPropsFGCS_12GenericClassSS_T_ 
+// CHECK-LABEL: sil hidden @_TF10properties12genericPropsFGCS_12GenericClassSS_T_ 
 func genericProps(x: GenericClass<String>) {
   // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.x!getter.1
   let _ = x.x
@@ -839,7 +839,7 @@ func genericProps(x: GenericClass<String>) {
   let _ = x.z
 }
 
-// CHECK-LABEL: sil @_TF10properties28genericPropsInGenericContextU__FGCS_12GenericClassQ__T_
+// CHECK-LABEL: sil hidden @_TF10properties28genericPropsInGenericContextU__FGCS_12GenericClassQ__T_
 func genericPropsInGenericContext<U>(x: GenericClass<U>) {
   // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<U>, #GenericClass.z
   // CHECK: copy_addr [[Z]] {{.*}} : $*U
@@ -854,7 +854,7 @@ class ClassWithLetProperty {
 
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }
-// CHECK-LABEL: sil @_TFC10properties20ClassWithLetProperty14ReturnConstantfS0_FT_Si
+// CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty14ReturnConstantfS0_FT_Si
 // CHECK-NEXT:  bb0(%0 : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr %0 : $ClassWithLetProperty, #ClassWithLetProperty.p
@@ -865,6 +865,6 @@ class ClassWithLetProperty {
 
   // This property is marked dynamic, so go through the getter, always.
   func ReturnDynamicConstant() -> Int { return q }
-// CHECK-LABEL: sil @_TFC10properties20ClassWithLetProperty21ReturnDynamicConstantfS0_FT_Si
+// CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty21ReturnDynamicConstantfS0_FT_Si
 // CHECK: class_method [volatile] %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
 }

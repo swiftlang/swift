@@ -9,7 +9,7 @@
 func useTransparentFuncWithDefaultArgument() ->Int {
   return transparentFuncWithDefaultArgument();
 
-  // CHECK-LABEL: sil @_TF21transparent_attribute37useTransparentFuncWithDefaultArgumentFT_Si
+  // CHECK-LABEL: sil hidden @_TF21transparent_attribute37useTransparentFuncWithDefaultArgumentFT_Si
   // CHECK: apply [transparent] {{.*}} line:10:44
   // CHECK: apply [transparent] {{.*}} line:10:10
   // CHECK: return
@@ -22,7 +22,7 @@ func transparentFuncWithoutDefaultArgument (x: Int = 1) -> Int {
 func useTransparentFuncWithoutDefaultArgument() -> Int {
   return transparentFuncWithoutDefaultArgument();
 
-  // CHECK-LABEL: sil @_TF21transparent_attribute40useTransparentFuncWithoutDefaultArgumentFT_Si
+  // CHECK-LABEL: sil hidden @_TF21transparent_attribute40useTransparentFuncWithoutDefaultArgumentFT_Si
   // CHECK: apply {{.*}} line:23:47
   // CHECK-NOT: transparent
   // CHECK: apply {{.*}} line:23:10
@@ -38,7 +38,7 @@ func testStructWithTranspConstructor() -> StructWithTranspConstructor {
   return StructWithTranspConstructor()
   
   // transparent_attribute.StructWithTranspConstructor.constructor
-  // CHECK-APPLY: sil @_TFV21transparent_attribute27StructWithTranspConstructorCfMS0_FT_S0_
+  // CHECK-APPLY: sil hidden @_TFV21transparent_attribute27StructWithTranspConstructorCfMS0_FT_S0_
   
   // testStructWithTranspConstructor
   // CHECK-APPLY: _T21transparent_attribute31testStructWithTranspConstructorFT_VS_27StructWithTranspConstructor
@@ -73,7 +73,7 @@ func testProperty(z: MySt) {
   x2 = z
   var m1 : MySt = x1;
   var m2 : MySt = x2;
-  // CHECK-APPLY: sil @_TF21transparent_attribute12testPropertyFT1zVS_4MySt_T_
+  // CHECK-APPLY: sil hidden @_TF21transparent_attribute12testPropertyFT1zVS_4MySt_T_
   // CHECK: function_ref @_TF21transparent_attributes2x1VS_4MySt
   // CHECK-NEXT: apply [transparent]
   // CHECK: function_ref @_TF21transparent_attributes2x2VS_4MySt
@@ -103,7 +103,7 @@ func testStructExtension() {
   var c : MyTranspStruct = MyTranspStruct(input: _x)
   c.tr1()
   var s : MySt = c.tr2
-  // CHECK-APPLY: sil @_TF21transparent_attribute13testStructExtensionFT_T_
+  // CHECK-APPLY: sil hidden @_TF21transparent_attribute13testStructExtensionFT_T_
   // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructCfMS0_FT5inputVS_4MySt_S0_
   // CHECK: apply [transparent] [[INIT]]
   // CHECK: [[TR1:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStruct3tr1fRS0_FT_T_
@@ -123,7 +123,7 @@ enum MyEnum {
 
 func testEnumExtension() {
   MyEnum.onetransp.tr3()
-  // CHECK-APPLY: sil @_TF21transparent_attribute17testEnumExtensionFT_T_
+  // CHECK-APPLY: sil hidden @_TF21transparent_attribute17testEnumExtensionFT_T_
   // CHECK: [[TR3:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum3tr3fS0_FT_T_
   // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum9onetranspFMS0_S0_
   // CHECK: apply [transparent] [[INIT]]
@@ -142,7 +142,7 @@ struct testVarDecl {
   }
   func testVarDeclFoo () {
     var z: Int = max
-    // CHECK-APPLY: sil @_TFV21transparent_attribute11testVarDecl14testVarDeclFoofRS0_FT_T_
+    // CHECK-APPLY: sil hidden @_TFV21transparent_attribute11testVarDecl14testVarDeclFoofRS0_FT_T_
     // CHECK: [[TR4:%[0-9]+]] = function_ref @_TFV21transparent_attribute11testVarDeclg3maxSi
     // CHECK: apply [transparent] [[TR4]]
   }
@@ -152,7 +152,7 @@ struct testVarDeclShortenedSyntax {
   @transparent static var max: Int { return 0xFF };
   func testVarDeclShortenedSyntaxfoo () {
     var z: Int = testVarDeclShortenedSyntax.max
-    // CHECK-APPLY: sil @_TFV21transparent_attribute26testVarDeclShortenedSyntax29testVarDeclShortenedSyntaxfoofRS0_FT_T_
+    // CHECK-APPLY: sil hidden @_TFV21transparent_attribute26testVarDeclShortenedSyntax29testVarDeclShortenedSyntaxfoofRS0_FT_T_
     // CHECK: [[TR5:%[0-9]+]] = function_ref @_TFV21transparent_attribute26testVarDeclShortenedSyntaxg3maxSi
     // CHECK: apply [transparent] [[TR5]]
   }
@@ -163,7 +163,7 @@ struct testVarDeclShortenedSyntax {
     return 0xFF
   }
 }
-// CHECK: sil [transparent] @_TF21transparent_attributeg22transparentOnGlobalVarSi
+// CHECK: sil hidden [transparent] @_TF21transparent_attributeg22transparentOnGlobalVarSi
 
 // Local functions in transparent context have public linkage.
 @transparent func foo() {

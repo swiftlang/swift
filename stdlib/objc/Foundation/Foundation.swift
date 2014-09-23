@@ -636,10 +636,15 @@ public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
 }
 
 extension Array : _ObjectiveCBridgeable {
+
+  // TODO: This constructor is only public because it is used in the
+  // stdlib/NewArray.swift.gyb test. Check if there is another way
+  // to let the test access the constructor.
+
   /// Construct from the given `NSArray`.  If `noCopy` is `true`,
   /// either `source` must be known to be immutable, or the resulting
   /// `Array` must not survive across code that could mutate `source`.
-  init(_fromNSArray source: NSArray, noCopy: Bool = false) {
+  public init(_fromNSArray source: NSArray, noCopy: Bool = false) {
     // _SwiftNSArrayRequiredOverridesType has selectors compatible with those
     // of NSArray; we use it to decouple the core stdlib from Foundation.
     // Bit-cast our NSArray to _SwiftNSArrayRequiredOverridesType so it can be

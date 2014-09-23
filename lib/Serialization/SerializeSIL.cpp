@@ -47,6 +47,7 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   case SILLinkage::PublicExternal: return SIL_LINKAGE_PUBLIC_EXTERNAL;
   case SILLinkage::HiddenExternal: return SIL_LINKAGE_HIDDEN_EXTERNAL;
   case SILLinkage::SharedExternal: return SIL_LINKAGE_SHARED_EXTERNAL;
+  case SILLinkage::PrivateExternal: return SIL_LINKAGE_PRIVATE_EXTERNAL;
   }
   llvm_unreachable("bad linkage");
 }
@@ -164,6 +165,7 @@ namespace {
                          << " for layout " << Layout::Code << "\n");
     }
 
+    // TODO: this is not required anymore. Remove it.
     bool ShouldSerializeAll;
 
     /// Helper function to update ListOfValues for MethodInst. Format:
@@ -224,6 +226,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 toStableSILLinkage(F.getLinkage()),
                                 (unsigned)F.isTransparent(),
+                                (unsigned)F.isFragile(),
                                 (unsigned)F.isGlobalInit(),
                                 (unsigned)F.getInlineStrategy(),
                                 (unsigned)F.getEffectsInfo(),
@@ -1346,6 +1349,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   GlobalVarLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[GlobalVarLayout::Code],
                               toStableSILLinkage(g.getLinkage()),
+                              (unsigned)g.isFragile(),
                               TyID, dID, unsigned(!g.isDefinition()));
 }
 
@@ -1427,45 +1431,6 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   }
 }
 
-/// Can we always serialize entities with the given linkage no matter what?
-static bool canAlwaysSerializeLinkage(SILLinkage linkage) {
-  switch (linkage) {
-  case SILLinkage::Public:
-  case SILLinkage::PublicExternal:
-  case SILLinkage::Hidden:
-  case SILLinkage::HiddenExternal:
-  // We always serialize shared linkage items since we leave elimination of them
-  // as a responsibility of the optimizer.
-  case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
-    return true;
-  // We never serialize anything with private linkage.
-  case SILLinkage::Private:
-    return false;
-  }
-}
-
-/// If a Global/Function referenced by one of F's instructions has private
-/// linkage return true.
-///
-/// SILWitnessTables do not need to be checked here since WitnessMethodInst
-/// always looks up the relevant witness method indirectly from a table in the
-/// SILModule that maps ProtocolConformances to SILWitnessTables.
-static bool
-transitivelyReferencesPotentiallyUnserializableLinkage(const SILFunction &F) {
-  for (auto &BB : F)
-    for (auto &I : BB) {
-      if (auto *GA = dyn_cast<SILGlobalAddrInst>(&I))
-        if (!canAlwaysSerializeLinkage(GA->getReferencedGlobal()->getLinkage()))
-          return true;
-      if (auto *FRI = dyn_cast<FunctionRefInst>(&I))
-        if (!canAlwaysSerializeLinkage(FRI->getReferencedFunction()->getLinkage()))
-          return true;
-    }
-  return false;
-}
-
-
 /// Helper function for whether to emit a function body.
 bool SILSerializer::shouldEmitFunctionBody(const SILFunction &F) {
   // If F is a declaration, it has no body to emit...
@@ -1473,18 +1438,12 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction &F) {
     return false;
 
   // If F is transparent, we should always emit its body.
-  if (F.isTransparent())
+  if (F.isFragile())
     return true;
-
-  // If F or a Global/Function referenced by one of F's instructions has private
-  // linkage, we should not emit a body and potentially expose it.
-  if (!canAlwaysSerializeLinkage(F.getLinkage()) ||
-      transitivelyReferencesPotentiallyUnserializableLinkage(F))
-    return false;
 
   // Otherwise serialize the body of the function only if we are asked to
   // serialize everything.
-  return ShouldSerializeAll;
+  return false;
 }
 
 void SILSerializer::writeSILBlock(const SILModule *SILMod) {

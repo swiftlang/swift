@@ -79,10 +79,13 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
     case SILLinkage::Shared:
       decl->setLinkage(SILLinkage::SharedExternal);
       return;
-    case SILLinkage::Private: // ?
+    case SILLinkage::Private:
+        decl->setLinkage(SILLinkage::PrivateExternal);
+        return;
     case SILLinkage::PublicExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::SharedExternal:
+    case SILLinkage::PrivateExternal:
       return;
     }
   }
@@ -238,7 +241,8 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             SILLinkage linkage,
                                             CanSILFunctionType type,
                                             IsBare_t isBareSILFunction,
-                                            IsTransparent_t isTransparent) {
+                                            IsTransparent_t isTransparent,
+                                            IsFragile_t isFragile) {
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(fn->getLinkage() == linkage);
@@ -246,7 +250,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   }
 
   auto fn = SILFunction::create(*this, linkage, name, type, nullptr,
-                                loc, isBareSILFunction, isTransparent);
+                                loc, isBareSILFunction, isTransparent, isFragile);
   fn->setDebugScope(new (*this) SILDebugScope(loc, *fn));
   return fn;
 }
@@ -255,9 +259,10 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   StringRef name,
                                                   CanSILFunctionType type,
                                                   IsBare_t isBareSILFunction,
-                                                  IsTransparent_t isTransparent) {
+                                                  IsTransparent_t isTransparent,
+                                                  IsFragile_t isFragile) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared,
-                             type, isBareSILFunction, isTransparent);
+                             type, isBareSILFunction, isTransparent, isFragile);
 }
 
 ArrayRef<SILType> ValueBase::getTypes() const {

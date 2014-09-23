@@ -3,7 +3,7 @@
 // CHECK: sil private @globalinit_func0 : $@thin () -> () {
 // CHECK:   [[XADDR:%.*]] = sil_global_addr @_Tv12lazy_globals1xSi : $*Int
 // CHECK:   store {{%.*}} to [[XADDR]] : $*Int
-// CHECK: sil [global_init] @_TF12lazy_globalsa1xSi : $@thin () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] @_TF12lazy_globalsa1xSi : $@thin () -> Builtin.RawPointer {
 // CHECK:   %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
 // CHECK:   %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word
 // CHECK:   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
@@ -17,7 +17,7 @@
 var x: Int = 0
 
 struct Foo {
-// CHECK: sil [global_init] @_TFV12lazy_globals3Fooa3fooSi : $@thin () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] @_TFV12lazy_globals3Fooa3fooSi : $@thin () -> Builtin.RawPointer {
   static var foo: Int = 22
 
   static var computed: Int {
@@ -28,7 +28,7 @@ struct Foo {
 }
 
 enum Bar {
-// CHECK: sil [global_init] @_TFO12lazy_globals3Bara3barSi : $@thin () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] @_TFO12lazy_globals3Bara3barSi : $@thin () -> Builtin.RawPointer {
   static var bar: Int = 33
 }
 
@@ -39,10 +39,10 @@ func f() -> (Int, Int) { return (1, 2) }
 
 // CHECK: sil private @globalinit_func4 : $@thin () -> () {
 // CHECK:   function_ref @_TF12lazy_globals1fFT_TSiSi_ : $@thin () -> (Int, Int)
-// CHECK: sil [global_init] @_TF12lazy_globalsa2a1Si : $@thin () -> Builtin.RawPointer
+// CHECK: sil hidden [global_init] @_TF12lazy_globalsa2a1Si : $@thin () -> Builtin.RawPointer
 // CHECK:   function_ref @globalinit_func4 : $@thin () -> ()
 // CHECK:   sil_global_addr @_Tv12lazy_globals2a1Si : $*Int
-// CHECK: sil [global_init] @_TF12lazy_globalsa2b1Si : $@thin () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] @_TF12lazy_globalsa2b1Si : $@thin () -> Builtin.RawPointer {
 // CHECK:   function_ref @globalinit_func4 : $@thin () -> ()
 // CHECK:   sil_global_addr @_Tv12lazy_globals2b1Si : $*Int
 var (a1, b1) = f()

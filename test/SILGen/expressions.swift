@@ -70,7 +70,7 @@ func literals() {
   var d = "foö"
   var e:SillyString = "foo"
 }
-// CHECK-LABEL: sil  @_TF11expressions8literalsFT_T_
+// CHECK-LABEL: sil hidden @_TF11expressions8literalsFT_T_
 // CHECK: integer_literal $Builtin.Int2048, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
 // CHECK: integer_literal $Builtin.Int32, 120
@@ -84,7 +84,7 @@ func call_one() {
   bar(42);
 }
 
-// CHECK-LABEL: sil  @_TF11expressions8call_oneFT_T_
+// CHECK-LABEL: sil hidden @_TF11expressions8call_oneFT_T_
 // CHECK: [[BAR:%[0-9]+]] = function_ref @_TF11expressions3bar{{.*}} : $@thin (Int) -> ()
 // CHECK: [[FORTYTWO:%[0-9]+]] = integer_literal {{.*}} 42
 // CHECK: [[FORTYTWO_CONVERTED:%[0-9]+]] = apply {{.*}}([[FORTYTWO]], {{.*}})
@@ -94,7 +94,7 @@ func call_two() {
   bar(42, 219)
 }
 
-// CHECK-LABEL: sil  @_TF11expressions8call_twoFT_T_
+// CHECK-LABEL: sil hidden @_TF11expressions8call_twoFT_T_
 // CHECK: [[BAR:%[0-9]+]] = function_ref @_TF11expressions3bar{{.*}} : $@thin (Int, Int) -> ()
 // CHECK: [[FORTYTWO:%[0-9]+]] = integer_literal {{.*}} 42
 // CHECK: [[FORTYTWO_CONVERTED:%[0-9]+]] = apply {{.*}}([[FORTYTWO]], {{.*}})
@@ -108,7 +108,7 @@ func tuples() {
   var T1 : (a: Int16, b: Int) = (b : 42, a : 777)
 }
 
-// CHECK-LABEL: sil  @_TF11expressions6tuplesFT_T_
+// CHECK-LABEL: sil hidden @_TF11expressions6tuplesFT_T_
 
 
 class C {
@@ -121,7 +121,7 @@ class C {
   }
 }
 
-// CHECK-LABEL: sil  @_TF11expressions7classesFT_T_
+// CHECK-LABEL: sil hidden @_TF11expressions7classesFT_T_
 func classes() {
   // CHECK: function_ref @_TFC11expressions1CCfMS0_FT_S0_ : $@thin (@thick C.Type) -> @owned C
   var a = C()
@@ -139,7 +139,7 @@ struct S {
   }
 }
 
-// CHECK-LABEL: sil  @_TF11expressions7structsFT_T_
+// CHECK-LABEL: sil hidden @_TF11expressions7structsFT_T_
 func structs() {
   // CHECK: function_ref @_TFV11expressions1SCfMS0_FT_S0_ : $@thin (@thin S.Type) -> S
   var a = S()
@@ -163,7 +163,7 @@ struct SomeStruct {
   func a() {}
 }
 
-// CHECK-LABEL: sil  @_TF11expressions5callsFT_T_
+// CHECK-LABEL: sil hidden @_TF11expressions5callsFT_T_
 // CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFV11expressions10SomeStruct1afRS0_FT_T_ : $@cc(method) @thin (@inout SomeStruct) -> ()
 // CHECK: apply [[METHOD]]({{.*}})
 func calls() {
@@ -171,7 +171,7 @@ func calls() {
   a.a()
 }
 
-// CHECK-LABEL: sil  @_TF11expressions11module_path
+// CHECK-LABEL: sil hidden @_TF11expressions11module_path
 func module_path() -> CInt {
   return Swift.C_ARGC
   // CHECK: [[C_ARGC_GET:%[0-9]+]] = function_ref @_TFSsa6C_ARGCV
@@ -180,7 +180,7 @@ func module_path() -> CInt {
 
 func default_args(x: Int, y: Int = 219, z: Int = 20721) {}
 
-// CHECK-LABEL: sil  @_TF11expressions19call_default_args_1
+// CHECK-LABEL: sil hidden @_TF11expressions19call_default_args_1
 func call_default_args_1(x: Int) {
   default_args(x)
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF11expressions12default_args
@@ -191,7 +191,7 @@ func call_default_args_1(x: Int) {
   // CHECK: apply [[FUNC]]({{.*}}, [[Y]], [[Z]])
 }
 
-// CHECK-LABEL: sil  @_TF11expressions19call_default_args_2
+// CHECK-LABEL: sil hidden @_TF11expressions19call_default_args_2
 func call_default_args_2(x: Int, z: Int) {
   default_args(x, z:z)
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF11expressions12default_args
@@ -204,7 +204,7 @@ struct Generic<T> {
   var mono_member:Int
   var typevar_member:T
 
-  // CHECK-LABEL: sil  @_TFV11expressions7Generic13type_variable
+  // CHECK-LABEL: sil hidden @_TFV11expressions7Generic13type_variable
   mutating
   func type_variable() -> T.Type {
     return T.self
@@ -212,17 +212,17 @@ struct Generic<T> {
     // CHECK: return [[METATYPE]]
   }
 
-  // CHECK-LABEL: sil  @_TFV11expressions7Generic19copy_typevar_member
+  // CHECK-LABEL: sil hidden @_TFV11expressions7Generic19copy_typevar_member
   mutating
   func copy_typevar_member(x: Generic<T>) {
     typevar_member = x.typevar_member
   }
 
-  // CHECK-LABEL: sil  @_TFV11expressions7Generic12class_methodU__fMGS0_Q__FT_T_
+  // CHECK-LABEL: sil hidden @_TFV11expressions7Generic12class_methodU__fMGS0_Q__FT_T_
   static func class_method() {}
 }
 
-// CHECK-LABEL: sil  @_TF11expressions18generic_member_ref
+// CHECK-LABEL: sil hidden @_TF11expressions18generic_member_ref
 func generic_member_ref<T>(x: Generic<T>) -> Int {
   // CHECK: bb0([[XADDR:%[0-9]+]] : $*Generic<T>):
   return x.mono_member
@@ -230,7 +230,7 @@ func generic_member_ref<T>(x: Generic<T>) -> Int {
   // CHECK: load [[MEMBER_ADDR]]
 }
 
-// CHECK-LABEL: sil  @_TF11expressions24bound_generic_member_ref
+// CHECK-LABEL: sil hidden @_TF11expressions24bound_generic_member_ref
 func bound_generic_member_ref(var x: Generic<UnicodeScalar>) -> Int {
   // CHECK: bb0([[XADDR:%[0-9]+]] : $Generic<UnicodeScalar>):
   return x.mono_member
@@ -238,7 +238,7 @@ func bound_generic_member_ref(var x: Generic<UnicodeScalar>) -> Int {
   // CHECK: load [[MEMBER_ADDR]]
 }
 
-// CHECK-LABEL: sil  @_TF11expressions6coerce
+// CHECK-LABEL: sil hidden @_TF11expressions6coerce
 func coerce(x: Int32) -> Int64 {
   return 0
 }
@@ -249,26 +249,26 @@ class B {
 class D : B {
 }
 
-// CHECK-LABEL: sil  @_TF11expressions8downcast
+// CHECK-LABEL: sil hidden @_TF11expressions8downcast
 func downcast(x: B) -> D {
   return x as D
   // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $D
 }
 
-// CHECK-LABEL: sil  @_TF11expressions6upcast
+// CHECK-LABEL: sil hidden @_TF11expressions6upcast
 func upcast(x: D) -> B {
   return x
   // CHECK: upcast %{{[0-9]+}} : ${{.*}} to $B
 }
 
-// CHECK-LABEL: sil  @_TF11expressions14generic_upcast
+// CHECK-LABEL: sil hidden @_TF11expressions14generic_upcast
 func generic_upcast<T : B>(x: T) -> B {
   return x
   // CHECK: upcast %{{.*}} to $B
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF11expressions16generic_downcast
+// CHECK-LABEL: sil hidden @_TF11expressions16generic_downcast
 func generic_downcast<T : B>(x: T, y: B) -> T {
   return y as T
   // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $T
@@ -277,14 +277,14 @@ func generic_downcast<T : B>(x: T, y: B) -> T {
 
 // TODO: generic_downcast
 
-// CHECK-LABEL: sil  @_TF11expressions15metatype_upcast
+// CHECK-LABEL: sil hidden @_TF11expressions15metatype_upcast
 func metatype_upcast() -> B.Type {
   return D.self
   // CHECK: metatype $@thick D
   // CHECK-NEXT: upcast
 }
 
-// CHECK-LABEL: sil  @_TF11expressions19interpolated_string
+// CHECK-LABEL: sil hidden @_TF11expressions19interpolated_string
 func interpolated_string(x: Int, y: String) -> String {
   return "The \(x) Million Dollar \(y)"
 }
@@ -308,7 +308,7 @@ protocol Mincible {
 protocol Bendable { }
 protocol Wibbleable { }
 
-// CHECK-LABEL: sil  @_TF11expressions20archetype_member_ref
+// CHECK-LABEL: sil hidden @_TF11expressions20archetype_member_ref
 func archetype_member_ref<T : Runcible>(var x: T) {
   x.free_method()
   // CHECK: witness_method
@@ -317,7 +317,7 @@ func archetype_member_ref<T : Runcible>(var x: T) {
   T.static_method()
 }
 
-// CHECK-LABEL: sil  @_TF11expressions22existential_member_ref
+// CHECK-LABEL: sil hidden @_TF11expressions22existential_member_ref
 func existential_member_ref(x: Mincible) {
   x.free_method()
   // CHECK: project_existential
@@ -357,7 +357,7 @@ struct Hat<T> : Runcible {
 
   func free_method() -> Int {}
 
-  // CHECK-LABEL: sil  @_TFV11expressions3Hat17associated_method
+  // CHECK-LABEL: sil hidden @_TFV11expressions3Hat17associated_method
   mutating
   func associated_method() -> U.Type {
     return U.self
@@ -368,27 +368,27 @@ struct Hat<T> : Runcible {
   static func static_method() {}
 }
 
-// CHECK-LABEL: sil  @_TF11expressions7erasure
+// CHECK-LABEL: sil hidden @_TF11expressions7erasure
 func erasure(x: Spoon) -> Mincible {
   return x
   // CHECK: init_existential
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF11expressions18erasure_from_proto
+// CHECK-LABEL: sil hidden @_TF11expressions18erasure_from_proto
 func erasure_from_proto(x: protocol<Wibbleable, Bendable>) -> Bendable {
   return x
   // CHECK: upcast_existential
   // CHECK: return
 }
 
-// CHECK-LABEL: sil  @_TF11expressions19declref_to_metatypeFT_MVS_5Spoon
+// CHECK-LABEL: sil hidden @_TF11expressions19declref_to_metatypeFT_MVS_5Spoon
 func declref_to_metatype() -> Spoon.Type {
   return Spoon.self
   // CHECK: metatype $@thin Spoon.Type
 }
 
-// CHECK-LABEL: sil  @_TF11expressions27declref_to_generic_metatype
+// CHECK-LABEL: sil hidden @_TF11expressions27declref_to_generic_metatype
 func declref_to_generic_metatype() -> Generic<UnicodeScalar>.Type {
   // FIXME parsing of T<U> in expression context
   typealias GenericChar = Generic<UnicodeScalar>
@@ -401,7 +401,7 @@ func float(x: Float) {}
 
 func tuple() -> (Int, Float) { return (1, 1.0) }
 
-// CHECK-LABEL: sil  @_TF11expressions13tuple_element
+// CHECK-LABEL: sil hidden @_TF11expressions13tuple_element
 func tuple_element(var x: (Int, Float)) {
   // CHECK: [[XADDR:%.*]] = alloc_box $(Int, Float)
 
@@ -422,12 +422,12 @@ func tuple_element(var x: (Int, Float)) {
   // CHECK: apply {{.*}}([[ONE]])
 }
 
-// CHECK-LABEL: sil  @_TF11expressions10containers
+// CHECK-LABEL: sil hidden @_TF11expressions10containers
 func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
 }
 
-// CHECK-LABEL: sil  @_TF11expressions7if_expr
+// CHECK-LABEL: sil hidden @_TF11expressions7if_expr
 func if_expr(var a: Bool, var b: Bool, var x: Int, var y: Int, var z: Int) -> Int {
   // CHECK: bb0({{.*}}):
   // CHECK: [[AB:%[0-9]+]] = alloc_box $Bool
@@ -467,7 +467,7 @@ func if_expr(var a: Bool, var b: Bool, var x: Int, var y: Int, var z: Int) -> In
 // Test that magic identifiers expand properly.  We test __COLUMN__ here because
 // it isn't affected as this testcase slides up and down the file over time.
 func magic_identifier_expansion(a: Int = __COLUMN__) {
-  // CHECK-LABEL: sil  @{{.*}}magic_identifier_expansion
+  // CHECK-LABEL: sil hidden @{{.*}}magic_identifier_expansion
   
   // This should expand to the column number of the first _.
   var tmp = __COLUMN__

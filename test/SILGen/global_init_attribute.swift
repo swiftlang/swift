@@ -11,7 +11,7 @@ import def_global
 let InternalConst = 42
 // CHECK-NOT: [global_init]
 // CHECK: // global_init_attribute.InternalConst.addressor : Swift.Int
-// CHECK-NEXT: sil [global_init] @_TF21global_init_attributea13InternalConstSi
+// CHECK-NEXT: sil hidden [global_init] @_TF21global_init_attributea13InternalConstSi
 
 func foo() -> Int {
   return ExportedVar
@@ -29,4 +29,4 @@ var InternalFoo = foo()
 
 // CHECK-NOT: [global_init]
 // CHECK: // global_init_attribute.InternalFoo.addressor : Swift.Int
-// CHECK-NEXT: sil [global_init] @_TF21global_init_attributea11InternalFooSi
+// CHECK-NEXT: sil hidden [global_init] @_TF21global_init_attributea11InternalFooSi

@@ -43,6 +43,7 @@ enum SILLinkageEncoding : uint8_t {
   SIL_LINKAGE_PUBLIC_EXTERNAL,
   SIL_LINKAGE_HIDDEN_EXTERNAL,
   SIL_LINKAGE_SHARED_EXTERNAL,
+  SIL_LINKAGE_PRIVATE_EXTERNAL,
 };
 using SILLinkageField = BCFixed<3>;
 
@@ -208,6 +209,7 @@ namespace sil_block {
   using GlobalVarLayout = BCRecordLayout<
     SIL_GLOBALVAR,
     SILLinkageField,
+    BCFixed<1>,        // fragile
     TypeIDField,
     DeclIDField,
     BCFixed<1>           // Is this a declaration.
@@ -217,6 +219,7 @@ namespace sil_block {
     SIL_FUNCTION,
     SILLinkageField,
     BCFixed<1>,        // transparent
+    BCFixed<1>,        // fragile
     BCFixed<1>,        // global_init
     BCFixed<2>,        // inlineStrategy
     BCFixed<2>,        // side effect info.

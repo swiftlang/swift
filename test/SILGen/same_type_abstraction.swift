@@ -11,7 +11,7 @@ struct Abstracted<T: Associated, U: Associated> {
 struct S1 {}
 struct S2 {}
 
-// CHECK-LABEL: sil @_TF21same_type_abstraction28callClosureWithConcreteTypesUS_10Associated_S0___FT1xGVS_10AbstractedQ_Q0__3argVS_2S1_VS_2S2
+// CHECK-LABEL: sil hidden @_TF21same_type_abstraction28callClosureWithConcreteTypesUS_10Associated_S0___FT1xGVS_10AbstractedQ_Q0__3argVS_2S1_VS_2S2
 // CHECK:         function_ref @_TTRG1_RPq_P21same_type_abstraction10Associated_Pq0_PS0__Eqq_5AssocVS_2S1Eqq0_5AssocVS_2S2_XFo_iS1__iS2__XFo_dS1__dS2__ 
 func callClosureWithConcreteTypes<
   T: Associated, U: Associated

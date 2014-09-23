@@ -13,32 +13,32 @@ import Foundation
 // arm64-ios: [[ARM64MYRECT:%.*]] = type { float, float, float, float }
 
 class Foo {
-  // x86_64-macosx: define void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {
+  // x86_64-macosx: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {
   // x86_64-macosx: define internal { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {
-  // x86_64-ios: define void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {
+  // x86_64-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {
   // x86_64-ios: define internal { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {
-  // i386-ios: define void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {
+  // i386-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {
   // i386-ios: define internal void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, i8*, i8*) unnamed_addr {
-  // armv7-ios: define void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {
+  // armv7-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {
   // armv7-ios: define internal void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, i8*, i8*) unnamed_addr {
-  // arm64-ios: define { float, float, float, float } @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%C8abitypes3Foo*) {
+  // arm64-ios: define hidden { float, float, float, float } @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%C8abitypes3Foo*) {
   // arm64-ios: define internal [[ARM64MYRECT]] @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {
   dynamic func bar() -> MyRect {
     return MyRect(x: 1, y: 2, width: 3, height: 4)
   }
 
 
-  // x86_64-macosx: define double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(double, double, double, double, %C8abitypes3Foo*) {
+  // x86_64-macosx: define hidden double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(double, double, double, double, %C8abitypes3Foo*) {
   // x86_64-macosx: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, %VSC6CGRect* byval align 8) unnamed_addr {
-  // armv7-ios: define double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
+  // armv7-ios: define hidden double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // armv7-ios: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr { 
   dynamic func getXFromNSRect(r: NSRect) -> Double {
     return Double(r.origin.x)
   }
 
-  // x86_64-macosx: define float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
+  // x86_64-macosx: define hidden float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // x86_64-macosx: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, <2 x float>, <2 x float>) unnamed_addr {
-  // armv7-ios: define float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
+  // armv7-ios: define hidden float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // armv7-ios: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr {
   dynamic func getXFromRect(r: MyRect) -> Float {
     return r.x
@@ -46,7 +46,7 @@ class Foo {
 
   // Call from Swift entrypoint with exploded Rect to @objc entrypoint
   // with unexploaded ABI-coerced type.
-  // x86_64-macosx: define float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
+  // x86_64-macosx: define hidden float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
   // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // x86_64-macosx: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 8
   // x86_64-macosx: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { <2 x float>, <2 x float> }*
@@ -56,7 +56,7 @@ class Foo {
   // x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>* [[T0]]
   // x86_64-macosx: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
   // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*,  <2 x float>, <2 x float>)*)(i8* [[SELFCAST]], i8* [[SEL]], <2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
-  // armv7-ios: define float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
+  // armv7-ios: define hidden float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
   // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { [4 x i32] }*
@@ -79,7 +79,7 @@ class Foo {
   }
 
   // Make sure the caller-side from Swift also uses indirect-byval for the argument
-  // x86_64-macosx: define float @_TFC8abitypes3Foo25getXFromRectIndirectSwift{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
+  // x86_64-macosx: define hidden float @_TFC8abitypes3Foo25getXFromRectIndirectSwift{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   func getXFromRectIndirectSwift(r: MyRect) -> Float {
     let f : Float = 1.0;
     // x86_64-macosx: [[TEMP:%.*]] = alloca [[TEMPTYPE:%.*]], align 4
@@ -89,7 +89,7 @@ class Foo {
   }
 
   // x86-64 returns an HA of four floats directly in two <2 x float>
-  // x86_64-macosx:      define float @_TFC8abitypes3Foo4barc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
+  // x86_64-macosx:      define hidden float @_TFC8abitypes3Foo4barc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
   // x86_64-macosx:      load i8** @"\01L_selector(newRect)", align 8
   // x86_64-macosx:      [[RESULT:%.*]] = call { <2 x float>, <2 x float> } bitcast (void ()* @objc_msgSend
   // x86_64-macosx:      store { <2 x float>, <2 x float> } [[RESULT]]
@@ -97,7 +97,7 @@ class Foo {
   // x86_64-macosx:      load { float, float, float, float }* [[CAST]]
   // x86_64-macosx:      ret float
   // armv7 returns an HA of four floats indirectly
-  // armv7-ios: define float @_TFC8abitypes3Foo4barc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
+  // armv7-ios: define hidden float @_TFC8abitypes3Foo4barc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
   // armv7-ios: [[RESULT:%.*]] = alloca [[RECTTYPE:%.*MyRect.*]], align 4
   // armv7-ios: load i8** @"\01L_selector(newRect)", align 4
   // armv7-ios: call void bitcast (void ()* @objc_msgSend_stret to void ([[RECTTYPE]]*, [[RECEIVER:.*]]*, i8*)*)([[RECTTYPE]]* noalias sret %call.aggresult
@@ -109,13 +109,13 @@ class Foo {
     return p.newRect().y
   }
 
-  // x86_64-macosx: define { double, double, double } @_TFC8abitypes3Foo3baz{{.*}}(%C8abitypes3Foo*) {
+  // x86_64-macosx: define hidden { double, double, double } @_TFC8abitypes3Foo3baz{{.*}}(%C8abitypes3Foo*) {
   // x86_64-macosx: define internal void @_TToFC8abitypes3Foo3baz{{.*}}(%VSC4Trio* noalias sret, i8*, i8*) unnamed_addr {
   dynamic func baz() -> Trio {
     return Trio(i: 1.0, j: 2.0, k: 3.0)
   }
 
-  // x86_64-macosx:      define double @_TFC8abitypes3Foo4bazc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
+  // x86_64-macosx:      define hidden double @_TFC8abitypes3Foo4bazc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
   // x86_64-macosx:      load i8** @"\01L_selector(newTrio)", align 8
   // x86_64-macosx:      [[CAST:%[0-9]+]] = bitcast {{%.*}}* %0
   // x86_64-macosx:      call void bitcast (void ()* @objc_msgSend_stret to void (%VSC4Trio*, [[OPAQUE:.*]]*, i8*)*)
@@ -123,7 +123,7 @@ class Foo {
     return p.newTrio().j
   }
 
-  // x86_64-macosx:      define { i32, i32 } @_TFC8abitypes3Foo7getpair{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
+  // x86_64-macosx:      define hidden { i32, i32 } @_TFC8abitypes3Foo7getpair{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
   // x86_64-macosx:      [[RESULT:%.*]] = call i64 bitcast (void ()* @objc_msgSend to i64 ([[OPAQUE:.*]]*, i8*)*)
   // x86_64-macosx:      store i64 [[RESULT]]
   // x86_64-macosx:      [[CAST:%.*]] = bitcast i64* {{%.*}} to { i32, i32 }*
@@ -138,7 +138,7 @@ class Foo {
     return p
   }
 
-  // x86_64-macosx:      define { i32, i32 } @_TFC8abitypes3Foo9getnested{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
+  // x86_64-macosx:      define hidden { i32, i32 } @_TFC8abitypes3Foo9getnested{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
   // x86_64-macosx:      call i64 bitcast (void ()* @objc_msgSend to i64 ([[OPAQUE:.*]]*, i8*)*)
   // x86_64-macosx-NEXT: store i64
   // x86_64-macosx-NEXT: bitcast i64* {{[^ ]*}} to { i32, i32 }*
@@ -174,35 +174,35 @@ class Foo {
     return a
   }
 
-  // x86_64-macosx:       define i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {
+  // x86_64-macosx:       define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {
   // x86_64-macosx:       define internal signext i8 @_TToFC8abitypes3Foo6negate{{.*}}(i8*, i8*, i8 signext) unnamed_addr {
   // x86_64-macosx:       [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool
   // x86_64-macosx:       [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate
   // x86_64-macosx:       [[R3:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[R2]]
   // x86_64-macosx:       ret i8 [[R3]]
   //
-  // x86_64-ios-fixme:          define i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1, %C8abitypes3Foo*) {
+  // x86_64-ios-fixme:          define hidden i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1, %C8abitypes3Foo*) {
   // x86_64-ios-fixme:          define internal zeroext i1 @_TToFC8abitypes3Foo6negatefS0_FT
   // x86_64-ios-fixme:          [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBoolFT1xVS_8ObjCBool_Sb(i1 %2)
   // x86_64-ios-fixme:          [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1 [[R1]]
   // x86_64-ios-fixme:          [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBoolFT1xSb_VS_8ObjCBool(i1 [[R2]])
   // x86_64-ios-fixme:          ret i1 [[R3]]
   //
-  // armv7-ios-fixme:     define i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1, %C8abitypes3Foo*) {
+  // armv7-ios-fixme:     define hidden i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1, %C8abitypes3Foo*) {
   // armv7-ios-fixme:     define internal signext i8 @_TToFC8abitypes3Foo6negatefS0_FTSb_Sb(i8*, i8*, i8 signext) unnamed_addr {
   // armv7-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBoolFT1xVS_8ObjCBool_Sb
   // armv7-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1 [[R1]]
   // armv7-ios-fixme:     [[R3:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBoolFT1xSb_VS_8ObjCBool(i1 [[R2]]
   // armv7-ios-fixme:     ret i8 [[R3]]
   //
-  // arm64-ios-fixme:     define i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {
+  // arm64-ios-fixme:     define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {
   // arm64-ios-fixme:     define internal zeroext i1 @_TToFC8abitypes3Foo6negate
   // arm64-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool
   // arm64-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate
   // arm64-ios-fixme:     [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[R2]])
   // arm64-ios-fixme:     ret i1 [[R3]]
   //
-  // i386-ios-fixme:      define i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {
+  // i386-ios-fixme:      define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {
   // i386-ios-fixme:      define internal signext i8 @_TToFC8abitypes3Foo6negate{{.*}}(i8*, i8*, i8 signext) unnamed_addr {
   // i386-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool
   // i386-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate{{.*}}(i1 [[R1]]
@@ -212,7 +212,7 @@ class Foo {
     return !b
   }
 
-  // x86_64-macosx: define i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
+  // x86_64-macosx: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // x86_64-macosx: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
   // x86_64-macosx: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 8
   // x86_64-macosx: [[NEG:%[0-9]+]] = call i8 bitcast (void ()* @objc_msgSend to i8 ([[RECEIVER:.*]]*, i8*, i8)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i8 [[TOOBJCBOOL]])
@@ -225,7 +225,7 @@ class Foo {
   // x86_64-macosx: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // x86_64-macosx: ret i8 [[TOOBJCBOOL]]
   //
-  // x86_64-ios: define i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
+  // x86_64-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // x86_64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
   // x86_64-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 8
   // x86_64-ios: [[NEG:%[0-9]+]] = call i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 [[TOOBJCBOOL]])
@@ -238,7 +238,7 @@ class Foo {
   // x86_64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // x86_64-ios: ret i1 [[TOOBJCBOOL]]
   //
-  // armv7-ios: define i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
+  // armv7-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // armv7-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
   // armv7-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 4
   // armv7-ios: [[NEG:%[0-9]+]] = call i8 bitcast (void ()* @objc_msgSend to i8 ([[RECEIVER:.*]]*, i8*, i8)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i8 [[TOOBJCBOOL]])
@@ -251,7 +251,7 @@ class Foo {
   // armv7-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // armv7-ios: ret i8 [[TOOBJCBOOL]]
   //
-  // arm64-ios: define i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
+  // arm64-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // arm64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
   // arm64-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 8
   // arm64-ios: [[NEG:%[0-9]+]] = call i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 [[TOOBJCBOOL]])
@@ -264,7 +264,7 @@ class Foo {
   // arm64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // arm64-ios: ret i1 [[TOOBJCBOOL]]
   //
-  // i386-ios: define i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
+  // i386-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // i386-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
   // i386-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 4
   // i386-ios: [[NEG:%[0-9]+]] = call i8 bitcast (void ()* @objc_msgSend to i8 ([[RECEIVER:.*]]*, i8*, i8)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i8 [[TOOBJCBOOL]])
@@ -300,7 +300,7 @@ class Foo {
     }
   }
 
-  // x86_64-macosx: define i32 @_TFC8abitypes3Foo10getRawEnum{{.*}}(%C8abitypes3Foo*) {
+  // x86_64-macosx: define hidden i32 @_TFC8abitypes3Foo10getRawEnum{{.*}}(%C8abitypes3Foo*) {
   // x86_64-macosx: define internal i32 @_TToFC8abitypes3Foo10getRawEnum{{.*}}(i8*, i8*) unnamed_addr {
   dynamic func getRawEnum() -> RawEnum {
     return Intergalactic
@@ -324,7 +324,7 @@ class Foo {
     return 1
   }
 
-  // x86_64-macosx: define void @_TFC8abitypes3Foo20testGenericTypeParam{{.*}}(%objc_object*, %C8abitypes3Foo*, %swift.type* %T) {
+  // x86_64-macosx: define hidden void @_TFC8abitypes3Foo20testGenericTypeParam{{.*}}(%objc_object*, %C8abitypes3Foo*, %swift.type* %T) {
   func testGenericTypeParam<T: Pasta>(x: T) {
     // x86_64-macosx: [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
     // x86_64-macosx: call void bitcast (void ()* @objc_msgSend to void (i8*, i8*)*)(i8* [[CAST]], i8* %{{.*}})
@@ -347,7 +347,7 @@ class Foo {
 // armv7-ios: define internal void @makeOne(%struct.One* noalias sret %agg.result, float %f, float %s)
 
 // rdar://17631440 - Expand direct arguments that are coerced to aggregates.
-// x86_64-macosx: define float @_TF8abitypes13testInlineAggFVSC6MyRectSf(float, float, float, float) {
+// x86_64-macosx: define hidden float @_TF8abitypes13testInlineAggFVSC6MyRectSf(float, float, float, float) {
 // x86_64-macosx: [[COERCED:%.*]] = alloca %VSC6MyRect, align 4
 // x86_64-macosx: store float %0,
 // x86_64-macosx: store float %1,

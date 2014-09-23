@@ -13,7 +13,7 @@
 @asmname("swift_stdlib_getPointer")
 func _stdlib_getPointer(x: COpaquePointer) -> COpaquePointer
 
-func _opaqueIdentity<T>(x: T) -> T {
+public func _opaqueIdentity<T>(x: T) -> T {
   var ptr = UnsafeMutablePointer<T>.alloc(1)
   ptr.initialize(x)
   let result =
@@ -27,7 +27,7 @@ func _blackHolePtr<T>(x: UnsafePointer<T>) {
   _stdlib_getPointer(COpaquePointer(x))
 }
 
-func _blackHole<T>(var x: T) {
+public func _blackHole<T>(var x: T) {
   _blackHolePtr(&x)
 }
 

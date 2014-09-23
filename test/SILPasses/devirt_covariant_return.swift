@@ -4,7 +4,7 @@
 // protocol conformances with covariant return types correctly. The verifier
 // should trip if we do not handle things correctly.
 
-// CHECK-LABEL: sil @_TF23devirt_covariant_return6driverFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return6driverFT_T_ : $@thin () -> () {
 // CHECK: bb0
 // CHECK: alloc_ref
 // CHECK: alloc_ref

@@ -5,7 +5,7 @@ infix operator <~> {}
 func archetype_method<T: X>(var #x: T, var #y: T) -> T {
   return x.selfTypes(x: y)
 }
-// CHECK-LABEL: sil @_TF9witnesses16archetype_methodUS_1X__FT1xQ_1yQ__Q_ : $@thin <T where T : X> (@out T, @in T, @in T) -> () {
+// CHECK-LABEL: sil hidden @_TF9witnesses16archetype_methodUS_1X__FT1xQ_1yQ__Q_ : $@thin <T where T : X> (@out T, @in T, @in T) -> () {
 // CHECK:         [[METHOD:%.*]] = witness_method $T, #X.selfTypes!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : X> (@out τ_0_0, @in τ_0_0, @inout τ_0_0) -> ()
 // CHECK:         apply [[METHOD]]<T>({{%.*}}, {{%.*}}, {{%.*}}) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : X> (@out τ_0_0, @in τ_0_0, @inout τ_0_0) -> ()
 // CHECK:       }
@@ -13,12 +13,12 @@ func archetype_method<T: X>(var #x: T, var #y: T) -> T {
 func archetype_generic_method<T: X>(var #x: T, #y: Loadable) -> Loadable {
   return x.generic(x: y)
 }
-// CHECK-LABEL: sil @_TF9witnesses24archetype_generic_methodUS_1X__FT1xQ_1yVS_8Loadable_S1_ : $@thin <T where T : X> (@in T, Loadable) -> Loadable {
+// CHECK-LABEL: sil hidden @_TF9witnesses24archetype_generic_methodUS_1X__FT1xQ_1yVS_8Loadable_S1_ : $@thin <T where T : X> (@in T, Loadable) -> Loadable {
 // CHECK:         [[METHOD:%.*]] = witness_method $T, #X.generic!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : X><τ_1_0> (@out τ_1_0, @in τ_1_0, @inout τ_0_0) -> ()
 // CHECK:         apply [[METHOD]]<T, Loadable>({{%.*}}, {{%.*}}, {{%.*}}) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : X><τ_1_0> (@out τ_1_0, @in τ_1_0, @inout τ_0_0) -> ()
 // CHECK:       }
 
-// CHECK-LABEL: sil @_TF9witnesses32archetype_associated_type_methodUS_13WithAssocType_U__FT1xQ_1yQQ_9AssocType_Q_ : $@thin <T where T : WithAssocType> (@out T, @in T, @in T.AssocType) -> ()
+// CHECK-LABEL: sil hidden @_TF9witnesses32archetype_associated_type_methodUS_13WithAssocType_U__FT1xQ_1yQQ_9AssocType_Q_ : $@thin <T where T : WithAssocType> (@out T, @in T, @in T.AssocType) -> ()
 // CHECK:         apply %{{[0-9]+}}<T, T.AssocType>
 func archetype_associated_type_method<T: WithAssocType>(#x: T, #y: T.AssocType) -> T {
   return x.useAssocType(x: y)
@@ -26,7 +26,7 @@ func archetype_associated_type_method<T: WithAssocType>(#x: T, #y: T.AssocType) 
 
 protocol StaticMethod { class func staticMethod() }
 
-// CHECK-LABEL: sil @_TF9witnesses23archetype_static_methodUS_12StaticMethod__FT1xQ__T_ : $@thin <T where T : StaticMethod> (@in T) -> ()
+// CHECK-LABEL: sil hidden @_TF9witnesses23archetype_static_methodUS_12StaticMethod__FT1xQ__T_ : $@thin <T where T : StaticMethod> (@in T) -> ()
 func archetype_static_method<T: StaticMethod>(#x: T) {
   // CHECK: [[METHOD:%.*]] = witness_method $T, #StaticMethod.staticMethod!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : StaticMethod> (@thick τ_0_0.Type) -> ()
   // CHECK: apply [[METHOD]]<T>
@@ -41,7 +41,7 @@ protocol Existentiable {
 func protocol_method(#x: Existentiable) -> Loadable {
   return x.foo()
 }
-// CHECK-LABEL: sil @_TF9witnesses15protocol_methodFT1xPS_13Existentiable__VS_8Loadable : $@thin (@in Existentiable) -> Loadable {
+// CHECK-LABEL: sil hidden @_TF9witnesses15protocol_methodFT1xPS_13Existentiable__VS_8Loadable : $@thin (@in Existentiable) -> Loadable {
 // CHECK:         [[METHOD:%.*]] = protocol_method {{%.*}} : $*Existentiable, #Existentiable.foo!1 : <`Self` : Existentiable> inout Self -> () -> Loadable, $@cc(witness_method) @callee_owned (@inout @sil_self Existentiable) -> Loadable
 // CHECK:         apply [[METHOD]]({{%.*}}) : $@cc(witness_method) @callee_owned (@inout @sil_self Existentiable) -> Loadable
 // CHECK:       }
@@ -49,7 +49,7 @@ func protocol_method(#x: Existentiable) -> Loadable {
 func protocol_generic_method(#x: Existentiable) -> Loadable {
   return x.generic()
 }
-// CHECK-LABEL: sil @_TF9witnesses23protocol_generic_methodFT1xPS_13Existentiable__VS_8Loadable : $@thin (@in Existentiable) -> Loadable {
+// CHECK-LABEL: sil hidden @_TF9witnesses23protocol_generic_methodFT1xPS_13Existentiable__VS_8Loadable : $@thin (@in Existentiable) -> Loadable {
 // CHECK:         [[METHOD:%.*]] = protocol_method {{%.*}} : $*Existentiable, #Existentiable.generic!1 : <`Self` : Existentiable> inout Self -> <T> () -> T, $@cc(witness_method) @callee_owned <τ_1_0> (@out τ_1_0, @inout @sil_self Existentiable) -> ()
 // CHECK:         apply [[METHOD]]<Loadable>({{%.*}}, {{%.*}}) : $@cc(witness_method) @callee_owned <τ_1_0> (@out τ_1_0, @inout @sil_self Existentiable) -> ()
 // CHECK:       }
@@ -58,7 +58,7 @@ func protocol_generic_method(#x: Existentiable) -> Loadable {
   func foo()
 }
 
-// CHECK-LABEL: sil @_TF9witnesses20protocol_objc_methodFT1xPS_8ObjCAble__T_ : $@thin (@owned ObjCAble) -> ()
+// CHECK-LABEL: sil hidden @_TF9witnesses20protocol_objc_methodFT1xPS_8ObjCAble__T_ : $@thin (@owned ObjCAble) -> ()
 // CHECK:         protocol_method [volatile] %{{[0-9]+}} : $ObjCAble, #ObjCAble.foo!1.foreign : <`Self` : ObjCAble> Self -> () -> (), $@cc(objc_method) @thin (@sil_self ObjCAble) -> ()
 func protocol_objc_method(#x: ObjCAble) {
   x.foo()

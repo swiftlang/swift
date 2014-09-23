@@ -22,7 +22,7 @@ func call_me(code: () -> Void)
 }
 
 func main(x: Int) -> Void
-// CHECK: define void @_TF9linetable4main
+// CHECK: define hidden void @_TF9linetable4main
 {
     var my_class = MyClass(input: 10)
 // Linetable continuity. Don't go into the closure expression.

@@ -178,9 +178,10 @@ static bool performCompile(CompilerInstance &Instance,
   std::unique_ptr<SILModule> SM = Instance.takeSILModule();
   if (!SM) {
     if (PrimarySourceFile)
-      SM = performSILGeneration(*PrimarySourceFile);
+      SM = performSILGeneration(*PrimarySourceFile, Nothing,
+                                opts.SILSerializeAll);
     else
-      SM = performSILGeneration(Instance.getMainModule());
+      SM = performSILGeneration(Instance.getMainModule(), opts.SILSerializeAll);
   }
 
   // We've been told to emit SIL after SILGen, so write it now.

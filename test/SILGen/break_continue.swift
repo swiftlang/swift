@@ -10,7 +10,7 @@ struct Bool : BooleanType {
   var boolValue: Bool { return self }
 }
 
-// CHECK-LABEL: sil  @_TFSs5test1
+// CHECK-LABEL: sil hidden @_TFSs5test1
 func test1(bi: Bool) {
   var b = bi
   for var c = b; b; b = c {

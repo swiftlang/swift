@@ -4,7 +4,7 @@
 func Close(fn: () -> Int) { fn() }
 typealias MyFloat = Float
 
-// CHECK: define void @_TF5inout13modifyFooHeap
+// CHECK: define hidden void @_TF5inout13modifyFooHeap
 // CHECK: %[[ALLOCB:.*]] = alloca
 // CHECK: %[[ALLOCA:.*]] = alloca
 // CHECK: %[[ALLOCABOX:.*]] = alloca

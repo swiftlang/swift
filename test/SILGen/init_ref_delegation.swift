@@ -4,7 +4,7 @@ struct X { }
 
 // Initializer delegation within a struct.
 struct S {
-  // CHECK-LABEL: sil @_TFV19init_ref_delegation1SCfMS0_FT_S0_ : $@thin (@thin S.Type) -> S {
+  // CHECK-LABEL: sil hidden @_TFV19init_ref_delegation1SCfMS0_FT_S0_ : $@thin (@thin S.Type) -> S {
   init() {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin S.Type):
     // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box $S
@@ -29,7 +29,7 @@ struct S {
 
 // Initializer delegation within an enum
 enum E {
-  // CHECK-LABEL: sil @_TFO19init_ref_delegation1ECfMS0_FT_S0_ : $@thin (@thin E.Type) -> E
+  // CHECK-LABEL: sil hidden @_TFO19init_ref_delegation1ECfMS0_FT_S0_ : $@thin (@thin E.Type) -> E
   init() {
     // CHECK: bb0([[E_META:%[0-9]+]] : $@thin E.Type):
     // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box $E
@@ -54,7 +54,7 @@ enum E {
 
 // Initializer delegation to a generic initializer
 struct S2 {
-  // CHECK-LABEL: sil @_TFV19init_ref_delegation2S2CfMS0_FT_S0_ : $@thin (@thin S2.Type) -> S2
+  // CHECK-LABEL: sil hidden @_TFV19init_ref_delegation2S2CfMS0_FT_S0_ : $@thin (@thin S2.Type) -> S2
   init() {
     // CHECK: bb0([[S2_META:%[0-9]+]] : $@thin S2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $S2
@@ -85,7 +85,7 @@ struct S2 {
 class C1 {
   var ivar: X
 
- // CHECK-LABEL: sil @_TFC19init_ref_delegation2C1cfMS0_FT1xVS_1X_S0_ : $@cc(method) @thin (X, @owned C1) -> @owned C1
+ // CHECK-LABEL: sil hidden @_TFC19init_ref_delegation2C1cfMS0_FT1xVS_1X_S0_ : $@cc(method) @thin (X, @owned C1) -> @owned C1
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[ORIG_SELF:%[0-9]+]] : $C1):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $C1
@@ -109,7 +109,7 @@ class C1 {
 @objc class C2 {
   var ivar: X
 
-  // CHECK-LABEL: sil @_TFC19init_ref_delegation2C2cfMS0_FT1xVS_1X_S0_ : $@cc(method) @thin (X, @owned C2) -> @owned C2
+  // CHECK-LABEL: sil hidden @_TFC19init_ref_delegation2C2cfMS0_FT1xVS_1X_S0_ : $@cc(method) @thin (X, @owned C2) -> @owned C2
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[ORIG_SELF:%[0-9]+]] : $C2):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $C2
@@ -125,10 +125,10 @@ class C1 {
     // CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
     // CHECK:   return [[VAR_15]] : $C2
     self.init(x1: x, x2: x)
-    // CHECK-NOT: sil @_TToFC19init_ref_delegation2C2cfMS_FT1xV19init_ref_delegation1X_S_ : $@cc(objc_method) @thin (X, @owned C2) -> @owned C2 {
+    // CHECK-NOT: sil hidden @_TToFC19init_ref_delegation2C2cfMS_FT1xV19init_ref_delegation1X_S_ : $@cc(objc_method) @thin (X, @owned C2) -> @owned C2 {
   }
 
-  // CHECK-LABEL: sil @_TFC19init_ref_delegation2C2CfMS0_FT2x1VS_1X2x2S1__S0_ : $@thin (X, X, @thick C2.Type) -> @owned C2 {
+  // CHECK-LABEL: sil hidden @_TFC19init_ref_delegation2C2CfMS0_FT2x1VS_1X2x2S1__S0_ : $@thin (X, X, @thick C2.Type) -> @owned C2 {
   // CHECK-NOT:   sil @_TToFC19init_ref_delegation2C2cfMS_FT2x1V19init_ref_delegation1X2x2S1__S_ : $@cc(objc_method) @thin (X, X, @owned C2) -> @owned C2 {
   init(x1: X, x2: X) { ivar = x1 }
 }
@@ -138,7 +138,7 @@ var x: X = X()
 class C3 {
   var i: Int = 5
 
-  // CHECK-LABEL: sil @_TFC19init_ref_delegation2C3cfMS0_FT_S0_ : $@cc(method) @thin (@owned C3) -> @owned C3
+  // CHECK-LABEL: sil hidden @_TFC19init_ref_delegation2C3cfMS0_FT_S0_ : $@cc(method) @thin (@owned C3) -> @owned C3
   convenience init() {
     // CHECK: mark_uninitialized [delegatingself]
     // CHECK-NOT: integer_literal
@@ -157,7 +157,7 @@ extension C4 {
   convenience init(x1: X) {
     self.init()
   }
-  // CHECK: sil @_TFC19init_ref_delegation2C4cfMS0_FT2x2VS_1X_S0_
+  // CHECK: sil hidden @_TFC19init_ref_delegation2C4cfMS0_FT2x2VS_1X_S0_
   // CHECK: [[PEER:%[0-9]+]] = function_ref @_TFC19init_ref_delegation2C4cfMS0_FT2x1VS_1X_S0_
   // CHECK: apply [[PEER]]([[X:%[0-9]+]], [[OBJ:%[0-9]+]])
   convenience init(x2: X) {

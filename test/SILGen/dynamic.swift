@@ -56,31 +56,31 @@ protocol Proto {
 // ObjC entry points for @objc and dynamic entry points
 
 // normal and @objc initializing ctors can be statically dispatched
-// CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT6nativeSi_S0_
+// CHECK-LABEL: sil hidden @_TFC7dynamic3FooCfMS0_FT6nativeSi_S0_
 // CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT6nativeSi_S0_
 
-// CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT4objcSi_S0_
+// CHECK-LABEL: sil hidden @_TFC7dynamic3FooCfMS0_FT4objcSi_S0_
 // CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT4objcSi_S0_
 
-// CHECK-LABEL: sil @_TToFC7dynamic3FoocfMS0_FT4objcSi_S0_
-// CHECK-LABEL: sil @_TToFC7dynamic3Foo10objcMethodfS0_FT_T_
-// CHECK-LABEL: sil [transparent] @_TToFC7dynamic3Foog8objcPropSi
-// CHECK-LABEL: sil [transparent] @_TToFC7dynamic3Foos8objcPropSi
-// CHECK-LABEL: sil @_TToFC7dynamic3Foog9subscriptFT4objcSi_Si
-// CHECK-LABEL: sil @_TToFC7dynamic3Foos9subscriptFT4objcSi_Si
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3FoocfMS0_FT4objcSi_S0_
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foo10objcMethodfS0_FT_T_
+// CHECK-LABEL: sil hidden [transparent] @_TToFC7dynamic3Foog8objcPropSi
+// CHECK-LABEL: sil hidden [transparent] @_TToFC7dynamic3Foos8objcPropSi
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foog9subscriptFT4objcSi_Si
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foos9subscriptFT4objcSi_Si
 
 // TODO: dynamic initializing ctor must be objc dispatched
-// CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
+// CHECK-LABEL: sil hidden @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
 // CHECK:         function_ref @_TTDFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
 // CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.init!initializer.1.foreign :
 
-// CHECK-LABEL: sil @_TToFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
-// CHECK-LABEL: sil @_TToFC7dynamic3Foo13dynamicMethodfS0_FT_T_
-// CHECK-LABEL: sil [transparent] @_TToFC7dynamic3Foog11dynamicPropSi
-// CHECK-LABEL: sil [transparent] @_TToFC7dynamic3Foos11dynamicPropSi
-// CHECK-LABEL: sil @_TToFC7dynamic3Foog9subscriptFT7dynamicSi_Si
-// CHECK-LABEL: sil @_TToFC7dynamic3Foos9subscriptFT7dynamicSi_Si
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foo13dynamicMethodfS0_FT_T_
+// CHECK-LABEL: sil hidden [transparent] @_TToFC7dynamic3Foog11dynamicPropSi
+// CHECK-LABEL: sil hidden [transparent] @_TToFC7dynamic3Foos11dynamicPropSi
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foog9subscriptFT7dynamicSi_Si
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foos9subscriptFT7dynamicSi_Si
 
 // Protocol witnesses use best appropriate dispatch
 
@@ -140,60 +140,60 @@ class Subclass: Foo {
   override init(native: Int) {
     super.init(native: native)
   }
-  // CHECK-LABEL: sil @_TFC7dynamic8SubclassCfMS0_FT6nativeSi_S0_
+  // CHECK-LABEL: sil hidden @_TFC7dynamic8SubclassCfMS0_FT6nativeSi_S0_
   // CHECK:         function_ref @_TFC7dynamic8SubclasscfMS0_FT6nativeSi_S0_
 
   override func nativeMethod() {
     super.nativeMethod()
   }
-  // CHECK-LABEL: sil @_TFC7dynamic8Subclass12nativeMethodfS0_FT_T_
+  // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclass12nativeMethodfS0_FT_T_
   // CHECK:         function_ref @_TFC7dynamic3Foo12nativeMethodfS0_FT_T_
 
   override var nativeProp: Int {
     get { return super.nativeProp }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg10nativePropSi
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg10nativePropSi
     // CHECK:         function_ref @_TFC7dynamic3Foog10nativePropSi
     set { super.nativeProp = newValue }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss10nativePropSi
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclasss10nativePropSi
     // CHECK:         function_ref @_TFC7dynamic3Foos10nativePropSi
   }
 
   override subscript(#native: Int) -> Int {
     get { return super[native: native] }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg9subscriptFT6nativeSi_Si
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg9subscriptFT6nativeSi_Si
     // CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT6nativeSi_Si
     set { super[native: native] = newValue }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss9subscriptFT6nativeSi_Si
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclasss9subscriptFT6nativeSi_Si
     // CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT6nativeSi_Si
   }
 
   override init(objc: Int) {
     super.init(objc: objc)
   }
-  // CHECK-LABEL: sil @_TFC7dynamic8SubclasscfMS0_FT4objcSi_S0_
+  // CHECK-LABEL: sil hidden @_TFC7dynamic8SubclasscfMS0_FT4objcSi_S0_
   // CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT4objcSi_S0_
 
   override func objcMethod() {
     super.objcMethod()
   }
-  // CHECK-LABEL: sil @_TFC7dynamic8Subclass10objcMethodfS0_FT_T_
+  // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclass10objcMethodfS0_FT_T_
   // CHECK:         function_ref @_TFC7dynamic3Foo10objcMethodfS0_FT_T_
 
   override var objcProp: Int {
     get { return super.objcProp }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg8objcPropSi
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg8objcPropSi
     // CHECK:         function_ref @_TFC7dynamic3Foog8objcPropSi
     set { super.objcProp = newValue }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss8objcPropSi
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclasss8objcPropSi
     // CHECK:         function_ref @_TFC7dynamic3Foos8objcPropSi
   }
 
   override subscript(#objc: Int) -> Int {
     get { return super[objc: objc] }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg9subscriptFT4objcSi_Si
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg9subscriptFT4objcSi_Si
     // CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT4objcSi_Si
     set { super[objc: objc] = newValue }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss9subscriptFT4objcSi_Si
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclasss9subscriptFT4objcSi_Si
     // CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT4objcSi_Si
   }
 
@@ -201,37 +201,37 @@ class Subclass: Foo {
   override init(dynamic: Int) {
     super.init(dynamic: dynamic)
   }
-  // CHECK-LABEL: sil @_TFC7dynamic8SubclasscfMS0_FT7dynamicSi_S0_
+  // CHECK-LABEL: sil hidden @_TFC7dynamic8SubclasscfMS0_FT7dynamicSi_S0_
   // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.init!initializer.1.foreign :
 
   override func dynamicMethod() {
     super.dynamicMethod()
   }
-  // CHECK-LABEL: sil @_TFC7dynamic8Subclass13dynamicMethodfS0_FT_T_
+  // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclass13dynamicMethodfS0_FT_T_
   // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicMethod!1.foreign :
 
   override var dynamicProp: Int {
     get { return super.dynamicProp }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg11dynamicPropSi
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg11dynamicPropSi
     // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicProp!getter.1.foreign :
     set { super.dynamicProp = newValue }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss11dynamicPropSi
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclasss11dynamicPropSi
     // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicProp!setter.1.foreign :
   }
 
   override subscript(#dynamic: Int) -> Int {
     get { return super[dynamic: dynamic] }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg9subscriptFT7dynamicSi_Si
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg9subscriptFT7dynamicSi_Si
     // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.subscript!getter.1.foreign :
     set { super[dynamic: dynamic] = newValue }
-    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss9subscriptFT7dynamicSi_Si
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclasss9subscriptFT7dynamicSi_Si
     // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.subscript!setter.1.foreign :
   }
 
   dynamic override func overriddenByDynamic() {}
 }
 
-// CHECK-LABEL: sil @_TF7dynamic20nativeMethodDispatchFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic20nativeMethodDispatchFT_T_ : $@thin () -> ()
 func nativeMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooCfMS0_FT6nativeSi_S0_
   let c = Foo(native: 0)
@@ -247,7 +247,7 @@ func nativeMethodDispatch() {
   c[native: 0] = y
 }
 
-// CHECK-LABEL: sil @_TF7dynamic18objcMethodDispatchFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic18objcMethodDispatchFT_T_ : $@thin () -> ()
 func objcMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooCfMS0_FT4objcSi_S0_
   let c = Foo(objc: 0)
@@ -263,7 +263,7 @@ func objcMethodDispatch() {
   c[objc: 0] = y
 }
 
-// CHECK-LABEL: sil @_TF7dynamic21dynamicMethodDispatchFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic21dynamicMethodDispatchFT_T_ : $@thin () -> ()
 func dynamicMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
   let c = Foo(dynamic: 0)
@@ -279,7 +279,7 @@ func dynamicMethodDispatch() {
   c[dynamic: 0] = y
 }
 
-// CHECK-LABEL: sil @_TF7dynamic15managedDispatchFCS_3FooT_
+// CHECK-LABEL: sil hidden @_TF7dynamic15managedDispatchFCS_3FooT_
 func managedDispatch(c: Foo) {
   // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign 
   let x = c.managedProp
@@ -287,7 +287,7 @@ func managedDispatch(c: Foo) {
   c.managedProp = x
 }
 
-// CHECK-LABEL: sil @_TF7dynamic21foreignMethodDispatchFT_T_
+// CHECK-LABEL: sil hidden @_TF7dynamic21foreignMethodDispatchFT_T_
 func foreignMethodDispatch() {
   // CHECK: function_ref @_TFCSo9GuisemeauCfMS_FT_GSQS__
   let g = Guisemeau()
@@ -306,19 +306,19 @@ func foreignMethodDispatch() {
 }
 
 extension Gizmo {
-  // CHECK-LABEL: sil @_TFE7dynamicCSo5GizmocfMS0_FT22convenienceInExtensionSi_S0_
+  // CHECK-LABEL: sil hidden @_TFE7dynamicCSo5GizmocfMS0_FT22convenienceInExtensionSi_S0_
   // CHECK:         class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.init!initializer.1.foreign
   convenience init(convenienceInExtension: Int) {
     self.init(bellsOn: convenienceInExtension)
   }
 
-  // CHECK-LABEL: sil @_TFE7dynamicCSo5GizmoCfMS0_FT19foreignClassFactorySi_S0_
+  // CHECK-LABEL: sil hidden @_TFE7dynamicCSo5GizmoCfMS0_FT19foreignClassFactorySi_S0_
   // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassFactory x: Int) {
     self.init(stuff: x)
   }
 
-  // CHECK-LABEL: sil @_TFE7dynamicCSo5GizmoCfMS0_FT24foreignClassExactFactorySi_S0_
+  // CHECK-LABEL: sil hidden @_TFE7dynamicCSo5GizmoCfMS0_FT24foreignClassExactFactorySi_S0_
   // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassExactFactory x: Int) {
     self.init(exactlyStuff: x)
@@ -328,7 +328,7 @@ extension Gizmo {
   dynamic func foreignDynamicExtension() { }
 }
 
-// CHECK-LABEL: sil @_TF7dynamic24foreignExtensionDispatchFCSo5GizmoT_
+// CHECK-LABEL: sil hidden @_TF7dynamic24foreignExtensionDispatchFCSo5GizmoT_
 func foreignExtensionDispatch(g: Gizmo) {
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : Gizmo
   g.foreignObjCExtension()
@@ -337,7 +337,7 @@ func foreignExtensionDispatch(g: Gizmo) {
 }
 
 
-// CHECK-LABEL: sil @_TF7dynamic33nativeMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic33nativeMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
 func nativeMethodDispatchFromOtherFile() {
   // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT6nativeSi_S0_
   let c = FromOtherFile(native: 0)
@@ -353,7 +353,7 @@ func nativeMethodDispatchFromOtherFile() {
   c[native: 0] = y
 }
 
-// CHECK-LABEL: sil @_TF7dynamic31objcMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic31objcMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
 func objcMethodDispatchFromOtherFile() {
   // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT4objcSi_S0_
   let c = FromOtherFile(objc: 0)
@@ -369,7 +369,7 @@ func objcMethodDispatchFromOtherFile() {
   c[objc: 0] = y
 }
 
-// CHECK-LABEL: sil @_TF7dynamic34dynamicMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic34dynamicMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
 func dynamicMethodDispatchFromOtherFile() {
   // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT7dynamicSi_S0_
   let c = FromOtherFile(dynamic: 0)
@@ -385,7 +385,7 @@ func dynamicMethodDispatchFromOtherFile() {
   c[dynamic: 0] = y
 }
 
-// CHECK-LABEL: sil @_TF7dynamic28managedDispatchFromOtherFileFCS_13FromOtherFileT_
+// CHECK-LABEL: sil hidden @_TF7dynamic28managedDispatchFromOtherFileFCS_13FromOtherFileT_
 func managedDispatchFromOtherFile(c: FromOtherFile) {
   // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!getter.1.foreign
   let x = c.managedProp
@@ -393,7 +393,7 @@ func managedDispatchFromOtherFile(c: FromOtherFile) {
   c.managedProp = x
 }
 
-// CHECK-LABEL: sil @_TF7dynamic23dynamicExtensionMethodsFCS_13ObjCOtherFileT_
+// CHECK-LABEL: sil hidden @_TF7dynamic23dynamicExtensionMethodsFCS_13ObjCOtherFileT_
 func dynamicExtensionMethods(obj: ObjCOtherFile) {
   // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionMethod!1.foreign
   obj.extensionMethod()

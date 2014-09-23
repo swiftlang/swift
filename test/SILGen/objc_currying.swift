@@ -7,7 +7,7 @@ import gizmo
 func curry_pod(x: CurryTest) -> Int -> Int {
   return x.pod
 }
-// CHECK-LABEL: sil @_TF13objc_currying9curry_podFCSo9CurryTestFSiSi : $@thin (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
+// CHECK-LABEL: sil hidden @_TF13objc_currying9curry_podFCSo9CurryTestFSiSi : $@thin (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_FOO_1:@_TTOFCSo9CurryTest3podFS_FSiSi]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         return [[FN]]
@@ -26,7 +26,7 @@ func curry_pod(x: CurryTest) -> Int -> Int {
 func curry_bridged(x: CurryTest) -> String! -> String! {
   return x.bridged
 }
-// CHECK-LABEL: sil @_TF13objc_currying13curry_bridgedFCSo9CurryTestFGSQSS_GSQSS_ : $@thin (@owned CurryTest) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
+// CHECK-LABEL: sil hidden @_TF13objc_currying13curry_bridgedFCSo9CurryTestFGSQSS_GSQSS_ : $@thin (@owned CurryTest) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
 // CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_BAR_1:@_TTOFCSo9CurryTest7bridgedFS_FGSQSS_GSQSS_]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         return [[FN]]
@@ -48,7 +48,7 @@ func curry_bridged(x: CurryTest) -> String! -> String! {
 func curry_returnsInnerPointer(x: CurryTest) -> () -> UnsafeMutablePointer<Void> {
   return x.returnsInnerPointer
 }
-// CHECK-LABEL: sil @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GVSs20UnsafeMutablePointerT__ : $@thin (@owned CurryTest) -> @owned @callee_owned () -> UnsafeMutablePointer<()> {
+// CHECK-LABEL: sil hidden @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GVSs20UnsafeMutablePointerT__ : $@thin (@owned CurryTest) -> @owned @callee_owned () -> UnsafeMutablePointer<()> {
 // CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER:@_TTOFCSo9CurryTest19returnsInnerPointerFS_FT_GVSs20UnsafeMutablePointerT__]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         return [[FN]]
@@ -64,7 +64,7 @@ func curry_returnsInnerPointer(x: CurryTest) -> () -> UnsafeMutablePointer<Void>
 // CHECK:   autorelease_value %0
 // CHECK:   return [[RES]]
 
-// CHECK-LABEL: sil @_TF13objc_currying19curry_pod_AnyObjectFPSs9AnyObject_FSiSi : $@thin (@owned AnyObject) -> @owned @callee_owned (Int) -> Int
+// CHECK-LABEL: sil hidden @_TF13objc_currying19curry_pod_AnyObjectFPSs9AnyObject_FSiSi : $@thin (@owned AnyObject) -> @owned @callee_owned (Int) -> Int
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@sil_self AnyObject, #CurryTest.pod!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int):
 // CHECK:         partial_apply [[METHOD]]([[SELF]])
@@ -73,7 +73,7 @@ func curry_pod_AnyObject(x: AnyObject) -> Int -> Int {
 }
 
 // normalOwnership requires a thunk to bring the method to Swift conventions
-// CHECK-LABEL: sil @_TF13objc_currying31curry_normalOwnership_AnyObjectFPSs9AnyObject_FGSQCSo9CurryTest_GSQS1__
+// CHECK-LABEL: sil hidden @_TF13objc_currying31curry_normalOwnership_AnyObjectFPSs9AnyObject_FGSQCSo9CurryTest_GSQS1__
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@sil_self AnyObject, #CurryTest.normalOwnership!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<CurryTest>, @sil_self AnyObject) -> @autoreleased ImplicitlyUnwrappedOptional<CurryTest>):
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
@@ -85,7 +85,7 @@ func curry_normalOwnership_AnyObject(x: AnyObject) -> CurryTest! -> CurryTest! {
 
 // weirdOwnership is NS_RETURNS_RETAINED and NS_CONSUMES_SELF so already
 // follows Swift conventions
-// CHECK-LABEL: sil @_TF13objc_currying30curry_weirdOwnership_AnyObjectFPSs9AnyObject_FGSQCSo9CurryTest_GSQS1__ : $@thin (@owned AnyObject) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<CurryTest>) -> @owned ImplicitlyUnwrappedOptional<CurryTest> 
+// CHECK-LABEL: sil hidden @_TF13objc_currying30curry_weirdOwnership_AnyObjectFPSs9AnyObject_FGSQCSo9CurryTest_GSQS1__ : $@thin (@owned AnyObject) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<CurryTest>) -> @owned ImplicitlyUnwrappedOptional<CurryTest> 
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@sil_self AnyObject, #CurryTest.weirdOwnership!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       bb1([[METHOD:%.*]] : $@cc(objc_method) @thin (@owned ImplicitlyUnwrappedOptional<CurryTest>, @owned @sil_self AnyObject) -> @owned ImplicitlyUnwrappedOptional<CurryTest>):
 // CHECK:         partial_apply [[METHOD]]([[SELF]])
@@ -94,7 +94,7 @@ func curry_weirdOwnership_AnyObject(x: AnyObject) -> CurryTest! -> CurryTest! {
 }
 
 // bridged requires a thunk to handle bridging conversions
-// CHECK-LABEL: sil @_TF13objc_currying23curry_bridged_AnyObjectFPSs9AnyObject_FGSQSS_GSQSS_ : $@thin (@owned AnyObject) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
+// CHECK-LABEL: sil hidden @_TF13objc_currying23curry_bridged_AnyObjectFPSs9AnyObject_FGSQSS_GSQSS_ : $@thin (@owned AnyObject) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@sil_self AnyObject, #CurryTest.bridged!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<NSString>, @sil_self AnyObject) -> @autoreleased ImplicitlyUnwrappedOptional<NSString>):
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
@@ -106,7 +106,7 @@ func curry_bridged_AnyObject(x: AnyObject) -> String! -> String! {
 
 // check that we substitute Self = AnyObject correctly for Self-returning
 // methods
-// CHECK-LABEL: sil @_TF13objc_currying27curry_returnsSelf_AnyObjectFPSs9AnyObject_FT_GSQPS0___
+// CHECK-LABEL: sil hidden @_TF13objc_currying27curry_returnsSelf_AnyObjectFPSs9AnyObject_FT_GSQPS0___
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@sil_self AnyObject, #CurryTest.returnsSelf!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@cc(objc_method) @thin (@sil_self AnyObject) -> @autoreleased ImplicitlyUnwrappedOptional<AnyObject>):
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
@@ -116,7 +116,7 @@ func curry_returnsSelf_AnyObject(x: AnyObject) -> () -> AnyObject! {
   return x.returnsSelf!
 }
 
-// CHECK-LABEL: sil @_TF13objc_currying35curry_returnsInnerPointer_AnyObjectFPSs9AnyObject_FT_GVSs20UnsafeMutablePointerT__
+// CHECK-LABEL: sil hidden @_TF13objc_currying35curry_returnsInnerPointer_AnyObjectFPSs9AnyObject_FT_GVSs20UnsafeMutablePointerT__
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@sil_self AnyObject, #CurryTest.returnsInnerPointer!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@cc(objc_method) @thin (@sil_self AnyObject) -> @unowned_inner_pointer UnsafeMutablePointer<()>):
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])

@@ -212,21 +212,6 @@ enum class InlineCost : unsigned {
 
 } // end anonymous namespace
 
-static bool isValidLinkageForTransparentRef(SILLinkage linkage) {
-  switch (linkage) {
-  case SILLinkage::Public:
-  case SILLinkage::PublicExternal:
-  case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
-    return true;
-
-  case SILLinkage::Private:
-  case SILLinkage::Hidden:
-  case SILLinkage::HiddenExternal:
-    return false;
-  }
-}
-
 /// For now just assume that every SIL instruction is one to one with an LLVM
 /// instruction. This is of course very much so not true.
 ///
@@ -242,23 +227,8 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::DebugValueAddrInst:
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
-      return InlineCost::Free;
-
-    // Private symbol references cannot be inlined into transparent functions.
     case ValueKind::FunctionRefInst:
-      if (Caller && Caller->isTransparent()
-          && !isValidLinkageForTransparentRef(
-              cast<FunctionRefInst>(I).getReferencedFunction()->getLinkage())) {
-        return InlineCost::CannotBeInlined;
-      }
-      return InlineCost::Free;
-
     case ValueKind::SILGlobalAddrInst:
-      if (Caller && Caller->isTransparent()
-          && !isValidLinkageForTransparentRef(
-              cast<SILGlobalAddrInst>(I).getReferencedGlobal()->getLinkage())) {
-        return InlineCost::CannotBeInlined;
-      }
       return InlineCost::Free;
 
     // Typed GEPs are free.

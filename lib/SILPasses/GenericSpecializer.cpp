@@ -93,7 +93,8 @@ SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
     SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
                         NewName, FTy, nullptr,
                         Orig->getLocation(), Orig->isBare(),
-                        Orig->isTransparent(), Orig->getInlineStrategy(),
+                        Orig->isTransparent(), Orig->isFragile(),
+                        Orig->getInlineStrategy(),
                         Orig->getEffectsInfo(), 0,
                         Orig->getDebugScope(), Orig->getDeclContext());
   NewF->setSemanticsAttr(Orig->getSemanticsAttr());

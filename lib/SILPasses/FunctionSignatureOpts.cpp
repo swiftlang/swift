@@ -292,9 +292,9 @@ createEmptyFunctionWithOptimizedSig(SILFunction *OldF,
   // Create the new function.
   SILFunction *NewF = SILFunction::create(
       M, OptimizedLinkage, NewFName, NewFTy, nullptr, OldF->getLocation(),
-      OldF->isBare(), OldF->isTransparent(), OldF->getInlineStrategy(),
-      OldF->getEffectsInfo(), 0, OldF->getDebugScope(),
-      OldF->getDeclContext());
+      OldF->isBare(), OldF->isTransparent(), OldF->isFragile(),
+      OldF->getInlineStrategy(), OldF->getEffectsInfo(), 0,
+      OldF->getDebugScope(), OldF->getDeclContext());
   NewF->setSemanticsAttr(OldF->getSemanticsAttr());
   return NewF;
 }
