@@ -29,6 +29,7 @@ using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
 using namespace llvm::support;
+using llvm::BCBlockRAII;
 
 static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   switch (encoding) {

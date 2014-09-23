@@ -145,7 +145,7 @@ public:
 /// A placeholder for either an array or a member loader.
 template <typename T>
 class LazyLoaderArray {
-  using LengthTy = Fixnum<63>;
+  using LengthTy = llvm::Fixnum<63>;
   PointerUnion<LengthTy, LazyMemberLoader *> lengthOrLoader;
   uint64_t data = 0;
 public:

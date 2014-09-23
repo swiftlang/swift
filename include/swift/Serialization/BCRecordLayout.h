@@ -32,8 +32,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SERIALIZATION_BCRECORDLAYOUT_H
-#define SWIFT_SERIALIZATION_BCRECORDLAYOUT_H
+#ifndef LLVM_BITCODE_BCRECORDLAYOUT_H
+#define LLVM_BITCODE_BCRECORDLAYOUT_H
 
 #include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
@@ -44,8 +44,7 @@
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Support/MathExtras.h"
 
-namespace swift {
-namespace serialization {
+namespace llvm {
 
 namespace impl {
   /// Convenience base for all kinds of bitcode abbreviation fields.
@@ -237,7 +236,7 @@ namespace impl {
 
     template <typename ElementTy, typename... Data>
     static void read(ArrayRef<ElementTy> buffer,
-                     Nothing_t, Data &&...rest) {
+                     NoneType, Data &&...rest) {
       assert(!buffer.empty() && "too few elements in buffer");
       BCRecordCoding<Fields...>::read(buffer.slice(1),
                                       std::forward<Data>(rest)...);
@@ -271,7 +270,7 @@ namespace impl {
     }
 
     template <typename ElementTy>
-    static void read(ArrayRef<ElementTy> buffer, Nothing_t) {
+    static void read(ArrayRef<ElementTy> buffer, NoneType) {
       assert(buffer.size() == 1 && "record data does not match layout");
       (void)buffer;
     }
@@ -319,7 +318,7 @@ namespace impl {
 
     template <typename BufferTy>
     static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
-                     unsigned abbrCode, Nothing_t) {
+                     unsigned abbrCode, NoneType) {
       out.EmitRecordWithAbbrev(abbrCode, buffer);
     }
 
@@ -335,7 +334,7 @@ namespace impl {
     }
 
     template <typename ElementTy>
-    static void read(ArrayRef<ElementTy> buffer, Nothing_t) {
+    static void read(ArrayRef<ElementTy> buffer, NoneType) {
       (void)buffer;
     }
 
@@ -537,7 +536,6 @@ public:
   }
 };
 
-} // end namespace serialization
-} // end namespace swift
+} // end namespace llvm
 
 #endif

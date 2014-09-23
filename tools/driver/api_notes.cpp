@@ -26,6 +26,7 @@
 #include "llvm/ADT/Triple.h"
 
 using namespace llvm;
+namespace api_notes = clang::api_notes;
 
 int apinotes_main(ArrayRef<const char *> Args) {
 
@@ -33,15 +34,15 @@ int apinotes_main(ArrayRef<const char *> Args) {
   // -version and -help) will be hidden.
   static cl::OptionCategory APINotesCategory("API Notes options");
 
-  static cl::opt<swift::api_notes::ActionType>
-  Action(cl::desc("Mode:"), cl::init(swift::api_notes::ActionType::None),
+  static cl::opt<api_notes::ActionType>
+  Action(cl::desc("Mode:"), cl::init(api_notes::ActionType::None),
          cl::values(
-                    clEnumValN(swift::api_notes::ActionType::YAMLToBinary,
+                    clEnumValN(api_notes::ActionType::YAMLToBinary,
                             "yaml-to-binary", "Convert YAML to binary format"),
-                    clEnumValN(swift::api_notes::ActionType::BinaryToYAML,
+                    clEnumValN(api_notes::ActionType::BinaryToYAML,
                                "binary-to-yaml",
                                "Convert binary format to YAML"),
-                    clEnumValN(swift::api_notes::ActionType::Dump,
+                    clEnumValN(api_notes::ActionType::Dump,
                             "dump", "Parse and dump the output"),
                     clEnumValEnd),
          cl::cat(APINotesCategory));
@@ -72,7 +73,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
                               Args.data(),
                               "Swift API Notes Tool\n");
 
-  if (Action == swift::api_notes::ActionType::None) {
+  if (Action == clang::api_notes::ActionType::None) {
     errs() << "action required\n";
     cl::PrintHelpMessage();
     return 1;
@@ -86,27 +87,27 @@ int apinotes_main(ArrayRef<const char *> Args) {
   StringRef input = fileBufOrErr.get()->getBuffer();
 
   switch (Action) {
-  case swift::api_notes::ActionType::None:
+  case api_notes::ActionType::None:
     llvm_unreachable("handled above");
 
-  case swift::api_notes::ActionType::YAMLToBinary: {
+  case api_notes::ActionType::YAMLToBinary: {
     if (OutputFilename.empty()) {
       errs() << "output file is required\n";
       cl::PrintHelpMessage();
       return 1;
     }
 
-    swift::api_notes::OSType targetOS = swift::api_notes::OSType::Absent;
+    api_notes::OSType targetOS = api_notes::OSType::Absent;
     // TODO: Check that we've specified the target.
     if (!Target.empty()) {
       llvm::Triple target(llvm::Triple::normalize(Target));
       switch (target.getOS()) {
         case llvm::Triple::Darwin:
         case llvm::Triple::MacOSX:
-          targetOS = swift::api_notes::OSType::OSX;
+          targetOS = api_notes::OSType::OSX;
           break;
         case llvm::Triple::IOS:
-          targetOS = swift::api_notes::OSType::IOS;
+          targetOS = api_notes::OSType::IOS;
           break;
         default:
           errs() << "traget is not supported\n";
@@ -117,7 +118,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::raw_fd_ostream os(OutputFilename, EC,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    if (swift::api_notes::compileAPINotes(input, os, targetOS))
+    if (api_notes::compileAPINotes(input, os, targetOS))
       return 1;
     
     os.flush();
@@ -125,7 +126,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
     return os.has_error();
   }
 
-  case swift::api_notes::ActionType::BinaryToYAML: {
+  case api_notes::ActionType::BinaryToYAML: {
     if (OutputFilename.empty()) {
       errs() << "output file required\n";
       cl::PrintHelpMessage();
@@ -136,7 +137,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::raw_fd_ostream os(OutputFilename, EC,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    if (swift::api_notes::decompileAPINotes(std::move(fileBufOrErr.get()), os))
+    if (api_notes::decompileAPINotes(std::move(fileBufOrErr.get()), os))
       return 1;
     
     os.flush();
@@ -144,8 +145,8 @@ int apinotes_main(ArrayRef<const char *> Args) {
     return os.has_error();
   }
 
-  case swift::api_notes::ActionType::Dump:
-    return swift::api_notes::parseAndDumpAPINotes(input);
+  case api_notes::ActionType::Dump:
+    return api_notes::parseAndDumpAPINotes(input);
   }
 
   return 1;

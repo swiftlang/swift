@@ -3104,7 +3104,8 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(AbstractTypeParamType, SubstitutableType)
 /// \sa GenericTypeParamDecl
 class GenericTypeParamType : public AbstractTypeParamType {
   /// The generic type parameter or depth/index.
-  llvm::PointerUnion<GenericTypeParamDecl *, Fixnum<31>> ParamOrDepthIndex;
+  llvm::PointerUnion<GenericTypeParamDecl *, llvm::Fixnum<31>>
+    ParamOrDepthIndex;
 
 public:
   /// Retrieve a generic type parameter at the given depth and index.

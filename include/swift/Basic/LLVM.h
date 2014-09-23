@@ -34,7 +34,7 @@ namespace llvm {
   template<typename T> class MutableArrayRef;
   template<typename T> class TinyPtrVector;
   template <typename PT1, typename PT2> class PointerUnion;
-  
+
   // Other common classes.
   class raw_ostream;
   class APInt;

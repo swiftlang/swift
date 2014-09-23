@@ -32,6 +32,7 @@
 #include <functional>
 #include <iterator>
 using namespace swift;
+using llvm::Fixnum;
 
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");

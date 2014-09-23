@@ -1189,7 +1189,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
     case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE: {
       uint8_t rawKind;
-      XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, Nothing,
+      XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, None,
                                                         rawKind);
 
       if (values.size() == 1) {

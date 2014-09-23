@@ -25,9 +25,10 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringExtras.h"
 
-using namespace swift;
+using namespace clang;
 using namespace api_notes;
 using namespace llvm::support;
+using namespace llvm;
 
 namespace {
   /// Read serialized CommonEntityInfo.
@@ -479,14 +480,14 @@ public:
 Optional<IdentifierID> APINotesReader::Implementation::getIdentifier(
                          StringRef str) {
   if (!IdentifierTable)
-    return Nothing;
+    return None;
 
   if (str.empty())
-    return 0;
+    return IdentifierID(0);
 
   auto known = IdentifierTable->find(str);
   if (known == IdentifierTable->end())
-    return Nothing;
+    return None;
 
   return *known;
 }
@@ -494,7 +495,7 @@ Optional<IdentifierID> APINotesReader::Implementation::getIdentifier(
 Optional<SelectorID> APINotesReader::Implementation::getSelector(
                        ObjCSelectorRef selector) {
   if (!ObjCSelectorTable || !IdentifierTable)
-    return Nothing;
+    return None;
 
   // Translate the identifiers.
   StoredObjCSelector key;
@@ -503,13 +504,13 @@ Optional<SelectorID> APINotesReader::Implementation::getSelector(
     if (auto identID = getIdentifier(ident)) {
       key.Identifiers.push_back(*identID);
     } else {
-      return Nothing;
+      return None;
     }
   }
 
   auto known = ObjCSelectorTable->find(key);
   if (known == ObjCSelectorTable->end())
-    return Nothing;
+    return None;
 
   return *known;
 
@@ -1082,50 +1083,50 @@ StringRef APINotesReader::getModuleName() const {
 auto APINotesReader::lookupObjCClass(StringRef name)
        -> Optional<std::pair<ContextID, ObjCContextInfo>> {
   if (!Impl.ObjCContextTable)
-    return Nothing;
+    return None;
 
   Optional<IdentifierID> classID = Impl.getIdentifier(name);
   if (!classID)
-    return Nothing;
+    return None;
 
   auto known = Impl.ObjCContextTable->find({*classID, '\0'});
   if (known == Impl.ObjCContextTable->end())
-    return Nothing;
+    return None;
 
   auto result = *known;
-  return { ContextID(result.first), result.second };
+  return std::make_pair(ContextID(result.first), result.second);
 }
 
 auto APINotesReader::lookupObjCProtocol(StringRef name)
        -> Optional<std::pair<ContextID, ObjCContextInfo>> {
   if (!Impl.ObjCContextTable)
-    return Nothing;
+    return None;
 
   Optional<IdentifierID> classID = Impl.getIdentifier(name);
   if (!classID)
-    return Nothing;
+    return None;
 
   auto known = Impl.ObjCContextTable->find({*classID, '\1'});
   if (known == Impl.ObjCContextTable->end())
-    return Nothing;
+    return None;
 
   auto result = *known;
-  return { ContextID(result.first), result.second };
+  return std::make_pair(ContextID(result.first), result.second);
 }
 
 Optional<ObjCPropertyInfo> APINotesReader::lookupObjCProperty(
                              ContextID contextID,
                              StringRef name) {
   if (!Impl.ObjCPropertyTable)
-    return Nothing;
+    return None;
 
   Optional<IdentifierID> propertyID = Impl.getIdentifier(name);
   if (!propertyID)
-    return Nothing;
+    return None;
 
   auto known = Impl.ObjCPropertyTable->find({contextID.Value, *propertyID});
   if (known == Impl.ObjCPropertyTable->end())
-    return Nothing;
+    return None;
 
   return *known;
 }
@@ -1135,16 +1136,16 @@ Optional<ObjCMethodInfo> APINotesReader::lookupObjCMethod(
                            ObjCSelectorRef selector,
                            bool isInstanceMethod) {
   if (!Impl.ObjCMethodTable)
-    return Nothing;
+    return None;
 
   Optional<SelectorID> selectorID = Impl.getSelector(selector);
   if (!selectorID)
-    return Nothing;
+    return None;
 
   auto known = Impl.ObjCMethodTable->find({contextID.Value, *selectorID,
                                            isInstanceMethod});
   if (known == Impl.ObjCMethodTable->end())
-    return Nothing;
+    return None;
 
   return *known;
 }
@@ -1152,15 +1153,15 @@ Optional<ObjCMethodInfo> APINotesReader::lookupObjCMethod(
 Optional<GlobalVariableInfo> APINotesReader::lookupGlobalVariable(
                                StringRef name) {
   if (!Impl.GlobalVariableTable)
-    return Nothing;
+    return None;
 
   Optional<IdentifierID> nameID = Impl.getIdentifier(name);
   if (!nameID)
-    return Nothing;
+    return None;
 
   auto known = Impl.GlobalVariableTable->find(*nameID);
   if (known == Impl.GlobalVariableTable->end())
-    return Nothing;
+    return None;
 
   return *known;
 }
@@ -1168,15 +1169,15 @@ Optional<GlobalVariableInfo> APINotesReader::lookupGlobalVariable(
 Optional<GlobalFunctionInfo> APINotesReader::lookupGlobalFunction(
                                StringRef name) {
   if (!Impl.GlobalFunctionTable)
-    return Nothing;
+    return None;
 
   Optional<IdentifierID> nameID = Impl.getIdentifier(name);
   if (!nameID)
-    return Nothing;
+    return None;
 
   auto known = Impl.GlobalFunctionTable->find(*nameID);
   if (known == Impl.GlobalFunctionTable->end())
-    return Nothing;
+    return None;
 
   return *known;
 }

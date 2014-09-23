@@ -16,15 +16,15 @@
 // method parameters.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_API_NOTES_READER_H
-#define SWIFT_API_NOTES_READER_H
+#ifndef LLVM_CLANG_API_NOTES_READER_H
+#define LLVM_CLANG_API_NOTES_READER_H
 
 #include "swift/APINotes/Types.h"
-#include "swift/Basic/Optional.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <memory>
 
-namespace swift {
+namespace clang {
 namespace api_notes {
 
 /// A class that reads API notes data from a binary file that was written by
@@ -142,6 +142,6 @@ public:
 };
 
 } // end namespace api_notes
-} // end namespace swift
+} // end namespace clang
 
-#endif // LLVM_SWIFT_API_NOTES_READER_H
+#endif // LLVM_CLANG_API_NOTES_READER_H

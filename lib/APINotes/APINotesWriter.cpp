@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/APINotes/APINotesWriter.h"
 #include "APINotesFormat.h"
-#include "swift/Basic/DenseMapInfo.h"
+#include "swift/Basic/DenseMapInfo.h" // FIXME: Push into LLVM top-of-tree
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
@@ -29,7 +29,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
 #include <vector>
-using namespace swift;
+using namespace clang;
 using namespace api_notes;
 using namespace llvm::support;
 

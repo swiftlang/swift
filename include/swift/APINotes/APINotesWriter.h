@@ -16,8 +16,8 @@
 // method parameters.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_API_NOTES_WRITER_H
-#define SWIFT_API_NOTES_WRITER_H
+#ifndef LLVM_CLANG_API_NOTES_WRITER_H
+#define LLVM_CLANG_API_NOTES_WRITER_H
 
 #include "swift/APINotes/Types.h"
 
@@ -25,7 +25,7 @@ namespace llvm {
   class raw_ostream;
 }
 
-namespace swift {
+namespace clang {
 namespace api_notes {
 
 /// A class that writes API notes data to a binary representation that can be
@@ -95,7 +95,7 @@ public:
 };
 
 } // end namespace api_notes
-} // end namespace swift
+} // end namespace clang
 
-#endif // LLVM_SWIFT_API_NOTES_WRITER_H
+#endif // LLVM_CLANG_API_NOTES_WRITER_H
 

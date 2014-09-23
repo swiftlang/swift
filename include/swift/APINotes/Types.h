@@ -14,23 +14,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIDE_TYPES_H
-#define SWIFT_SIDE_TYPES_H
-#include "swift/Basic/Optional.h"
+#ifndef LLVM_CLANG_API_NOTES_TYPES_H
+#define LLVM_CLANG_API_NOTES_TYPES_H
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <climits>
-#include <initializer_list>
 
-namespace swift {
+namespace llvm {
+  class raw_ostream;
+}
+
+namespace clang {
 namespace api_notes {
 
 /// The file extension used for the binary representation of API notes.
 static const char BINARY_APINOTES_EXTENSION[] = "apinotesc";
 
+using llvm::ArrayRef;
 using llvm::StringRef;
+using llvm::Optional;
+using llvm::None;
 
 /// Describes the nullability of a particular value, whether it is a property,
 /// parameter type, or result type.
@@ -125,12 +130,12 @@ public:
   /// Determine the default nullability for properties and methods of this
   /// class.
   ///
-  /// \returns the default nullability, if implied, or Nothing if there is no
+  /// \returns the default nullability, if implied, or None if there is no
   Optional<NullableKind> getDefaultNullability() const {
     if (HasDefaultNullability)
       return static_cast<NullableKind>(DefaultNullability);
 
-    return Nothing;
+    return None;
   }
 
   /// Set the default nullability for properties and methods of this class.
@@ -198,7 +203,7 @@ public:
     if (NullabilityAudited)
       return static_cast<NullableKind>(Nullable);
 
-    return Nothing;
+    return None;
   }
 
   void setNullabilityAudited(NullableKind kind) {
@@ -246,7 +251,7 @@ public:
 /// referenced by the identifier list persists.
 struct ObjCSelectorRef {
   unsigned NumPieces;
-  llvm::ArrayRef<StringRef> Identifiers;
+  ArrayRef<StringRef> Identifiers;
 };
 
 /// API notes for a function or method.
@@ -409,7 +414,8 @@ class GlobalFunctionInfo : public FunctionInfo {
 public:
   GlobalFunctionInfo() : FunctionInfo() { }
 };
-} // end namespace api_notes
-} // end namespace swift
 
-#endif // LLVM_SWIFT_SIDE_TYPES_H
+} // end namespace api_notes
+} // end namespace clang
+
+#endif // LLVM_CLANG_API_NOTES_TYPES_H

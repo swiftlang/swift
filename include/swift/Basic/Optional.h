@@ -24,6 +24,7 @@
 #ifndef SWIFT_BASIC_OPTIONAL_H
 #define SWIFT_BASIC_OPTIONAL_H
 
+#include "llvm/ADT/Optional.h"
 #include <type_traits>
 #include <utility>
 #include <cassert>
@@ -62,6 +63,16 @@ namespace swift {
     Optional(ArgTypes &&...Args)
       : Value(std::forward<ArgTypes>(Args)...), HasValue(true)
     {
+    }
+
+    Optional(const llvm::Optional<T> &other) : HasValue(false) {
+      if (other)
+        emplace(*other);
+    }
+
+    Optional(llvm::Optional<T> &&other) : HasValue(false) {
+      if (other)
+        emplace(std::move(*other));
     }
 
     Optional(Optional &Other) : HasValue(Other.HasValue) {

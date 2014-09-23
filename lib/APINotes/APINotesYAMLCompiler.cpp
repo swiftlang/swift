@@ -138,7 +138,7 @@ Each global variable definition is of the following form:
 */
 
 using llvm::StringRef;
-using namespace swift;
+using namespace clang;
 namespace {
   enum class APIAvailability {
     Available = 0,
@@ -162,7 +162,7 @@ namespace {
     api_notes::NullableKind::Absent;
   static api_notes::NullableKind DefaultNullability =
     api_notes::NullableKind::NonNullable;
-  typedef std::vector<swift::api_notes::NullableKind> NullabilitySeq;
+  typedef std::vector<clang::api_notes::NullableKind> NullabilitySeq;
 
   struct Method {
     StringRef Selector;
@@ -219,7 +219,7 @@ namespace {
 
 };
 
-LLVM_YAML_IS_FLOW_SEQUENCE_VECTOR(swift::api_notes::NullableKind);
+LLVM_YAML_IS_FLOW_SEQUENCE_VECTOR(clang::api_notes::NullableKind);
 LLVM_YAML_IS_SEQUENCE_VECTOR(Method);
 LLVM_YAML_IS_SEQUENCE_VECTOR(Property);
 LLVM_YAML_IS_SEQUENCE_VECTOR(Class);

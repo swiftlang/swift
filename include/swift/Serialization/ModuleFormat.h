@@ -26,6 +26,14 @@
 namespace swift {
 namespace serialization {
 
+using llvm::Fixnum;
+using llvm::BCArray;
+using llvm::BCBlob;
+using llvm::BCFixed;
+using llvm::BCGenericRecordLayout;
+using llvm::BCRecordLayout;
+using llvm::BCVBR;
+
 /// Magic number for serialized module files.
 const unsigned char MODULE_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
 

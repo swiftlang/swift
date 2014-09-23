@@ -191,6 +191,7 @@ enum class SpecialMethodKind {
 #define SWIFT_PROTOCOL_SUFFIX "Protocol"
 #define SWIFT_CFTYPE_SUFFIX "Ref"
 
+namespace api_notes = clang::api_notes;
 using api_notes::FactoryAsInitKind;
 
 /// \brief Implementation of the Clang importer.

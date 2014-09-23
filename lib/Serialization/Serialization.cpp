@@ -43,6 +43,7 @@
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
+using llvm::BCBlockRAII;
 
 namespace {
   /// Used to serialize the on-disk decl hash table.

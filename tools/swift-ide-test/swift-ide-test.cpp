@@ -52,6 +52,7 @@
 
 using namespace swift;
 using namespace ide;
+namespace api_notes = clang::api_notes;
 
 enum class ActionType {
   None,

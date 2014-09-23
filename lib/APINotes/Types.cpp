@@ -16,18 +16,18 @@
 #include "swift/APINotes/Types.h"
 #include "llvm/Support/raw_ostream.h"
 
-void swift::api_notes::ObjCMethodInfo::dump(llvm::raw_ostream &os) {
+void clang::api_notes::ObjCMethodInfo::dump(llvm::raw_ostream &os) {
     os << DesignatedInit << " " << FactoryAsInit << " " << Unavailable << " "
        << NullabilityAudited << " " << NumAdjustedNullable << " "
        << NullabilityPayload << " " << UnavailableMsg << "\n";
 }
 
-void swift::api_notes::ObjCContextInfo::dump(llvm::raw_ostream &os) {
+void clang::api_notes::ObjCContextInfo::dump(llvm::raw_ostream &os) {
   os << HasDefaultNullability << " " << DefaultNullability << " "
      << HasDesignatedInits << "\n";
 }
 
-void swift::api_notes::ObjCMethodInfo::mergePropInfoIntoSetter(
+void clang::api_notes::ObjCMethodInfo::mergePropInfoIntoSetter(
       const ObjCPropertyInfo &pInfo) {
   // Set the type of the first argument of the the setter or check that the
   // value we have is consistent with the property.
@@ -44,7 +44,7 @@ void swift::api_notes::ObjCMethodInfo::mergePropInfoIntoSetter(
   }
 }
 
-void swift::api_notes::ObjCMethodInfo::mergePropInfoIntoGetter(
+void clang::api_notes::ObjCMethodInfo::mergePropInfoIntoGetter(
       const ObjCPropertyInfo &pInfo) {
   // Set the return type of the getter or check that the value we have is
   // consistent with the property.

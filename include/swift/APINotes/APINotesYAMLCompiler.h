@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_API_NOTES_YAML_COMPILER_H
-#define SWIFT_API_NOTES_YAML_COMPILER_H
+#ifndef LLVM_CLANG_API_NOTES_YAML_COMPILER_H
+#define LLVM_CLANG_API_NOTES_YAML_COMPILER_H
 #include "llvm/ADT/StringRef.h"
 #include <memory>
 
@@ -24,7 +24,7 @@ namespace llvm {
   class MemoryBuffer;
 }
 
-namespace swift {
+namespace clang {
 namespace api_notes {
 
   enum class ActionType {
@@ -50,6 +50,6 @@ namespace api_notes {
   bool decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
                          llvm::raw_ostream &os);
 } // end namespace api_notes
-} // end namespace swift
+} // end namespace clang
 
-#endif // LLVM_SWIFT_API_NOTES_YAML_COMPILER_H
+#endif // LLVM_CLANG_API_NOTES_YAML_COMPILER_H
