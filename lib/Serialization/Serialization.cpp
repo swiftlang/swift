@@ -145,6 +145,9 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
     return id.first;
   }
 
+  assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
+         "cannot cross-reference this decl");
+
   // Record any generic parameters that come from this decl, so that we can use
   // the decl to refer to the parameters later.
   const GenericParamList *paramList = nullptr;
@@ -825,9 +828,9 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode
       = abbrCodes[NormalProtocolConformanceLayout::Code];
-    auto moduleID = addModuleRef(conf->getDeclContext()->getParentModule());
+    auto ownerID = addDeclRef(getDeclForContext(conf->getDeclContext()));
     NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                addDeclRef(protocol), moduleID,
+                                                addDeclRef(protocol), ownerID,
                                                 numValueWitnesses,
                                                 numTypeWitnesses,
                                                 numInheritedConformances,

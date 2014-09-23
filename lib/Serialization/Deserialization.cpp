@@ -524,8 +524,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
 
   lastRecordOffset.reset();
 
-  DeclID protoID;
-  ModuleID ownerID;
+  DeclID protoID, ownerID;
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   bool isIncomplete;
   ArrayRef<uint64_t> rawIDs;
@@ -538,7 +537,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
   ASTContext &ctx = getContext();
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
-                                        getModule(ownerID),
+                                        getDeclContext(ownerID),
                                         ProtocolConformanceState::Incomplete);
 
   InheritedConformanceMap inheritedConformances;
