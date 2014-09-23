@@ -30,10 +30,17 @@ public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
 /// underlying elements.
 public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
 
+  /// Always zero, which is the index of the first element in a
+  /// non-empty buffer.
   public var startIndex: Int {
     return 0
   }
 
+  /// The "past the end" position; always identical to `count`.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   public var endIndex: Int {
     return _end - _position
   }

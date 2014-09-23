@@ -63,16 +63,28 @@ public func map<S:SequenceType, T>(
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct MapCollectionView<Base: CollectionType, T> : CollectionType {
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// Identical to `endIndex` in an empty collection.
   public var startIndex: Base.Index {
     return _base.startIndex
   }
   
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   public var endIndex: Base.Index {
     return _base.endIndex
   }
 
-  public subscript(index: Base.Index) -> T {
-    return _transform(_base[index])
+  /// Access the element at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self` and
+  /// `position != endIndex`.
+  public subscript(position: Base.Index) -> T {
+    return _transform(_base[position])
   }
 
   public func generate() -> MapSequenceView<Base, T>.Generator {

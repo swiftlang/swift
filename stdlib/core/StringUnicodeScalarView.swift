@@ -83,16 +83,27 @@ extension String {
       var _core: _StringCore
     }
 
+    /// The position of the first `UnicodeScalar` if the `String` is
+    /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
       return Index(_core.startIndex, _core)
     }
 
+    /// The "past the end" position.
+    ///
+    /// `endIndex` is not a valid argument to `subscript`, and is always
+    /// reachable from `startIndex` by zero or more applications of
+    /// `successor()`.
     public var endIndex: Index {
       return Index(_core.endIndex, _core)
     }
 
-    public subscript(i: Index) -> UnicodeScalar {
-      var scratch = _ScratchGenerator(_core, i._position)
+    /// Access the element at `position`.
+    ///
+    /// Requires: `position` is a valid position in `self` and
+    /// `position != endIndex`.
+    public subscript(position: Index) -> UnicodeScalar {
+      var scratch = _ScratchGenerator(_core, position._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
       case .Result(let us):

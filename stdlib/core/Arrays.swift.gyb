@@ -170,8 +170,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   /// The type of element stored by this `${Self}`
   public typealias Element = T
 
-  /// The first element of a non-empty `${Self}` is always at index
-  /// zero.
+  /// Always zero, which is the index of the first element when non-empty.
   public var startIndex: Int {
     return 0
   }

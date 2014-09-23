@@ -239,17 +239,20 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return Swift._isUniquelyReferenced(&owner)
   }
 
-  public
-  subscript(i: Int) -> T {
+  /// Access the element at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self` and
+  /// `position != endIndex`.
+  public subscript(position: Int) -> T {
     get {
-      _sanityCheck(i >= 0, "negative slice index is out of range")
-      _sanityCheck(i < count, "slice index out of range")
-      return start[i]
+      _sanityCheck(position >= 0, "negative slice index is out of range")
+      _sanityCheck(position < count, "slice index out of range")
+      return start[position]
     }
     nonmutating set {
-      _sanityCheck(i >= 0, "negative slice index is out of range")
-      _sanityCheck(i < count, "slice index out of range")
-      start[i] = newValue
+      _sanityCheck(position >= 0, "negative slice index is out of range")
+      _sanityCheck(position < count, "slice index out of range")
+      start[position] = newValue
     }
   }
 
@@ -265,11 +268,19 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   }
 
   //===--- CollectionType conformance -------------------------------------===//
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// Identical to `endIndex` in an empty collection.
   public
   var startIndex: Int {
     return 0
   }
 
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   public
   var endIndex: Int {
     return count

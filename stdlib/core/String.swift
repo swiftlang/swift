@@ -446,14 +446,25 @@ extension String : CollectionType {
     }
   }
 
+  /// The position of the first `Character` if the `String` is
+  /// non-empty; identical to `endIndex` otherwise.
   public var startIndex: Index {
     return Index(unicodeScalars.startIndex)
   }
 
+  /// The `String`\ 's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   public var endIndex: Index {
     return Index(unicodeScalars.endIndex)
   }
 
+  /// Access the `Character` at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self` and
+  /// `position != endIndex`.
   public subscript(i: Index) -> Character {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }

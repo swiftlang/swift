@@ -12,9 +12,17 @@
 
 extension String {
   public struct UTF16View : Sliceable, Reflectable {
+    /// The position of the first code unit if the `String` is
+    /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Int {
       return 0
     }
+    
+    /// The "past the end" position.
+    ///
+    /// `endIndex` is not a valid argument to `subscript`, and is always
+    /// reachable from `startIndex` by zero or more applications of
+    /// `successor()`.
     public var endIndex: Int {
       return _length
     }
@@ -37,11 +45,15 @@ extension String {
       }
     }
 
-    public subscript(i: Int) -> Generator.Element {
-      _precondition(i >= 0 && i < _length,
+    /// Access the element at `position`.
+    ///
+    /// Requires: `position` is a valid position in `self` and
+    /// `position != endIndex`.
+    public subscript(position: Int) -> Generator.Element {
+      _precondition(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
 
-      var index = _toInternalIndex(i)
+      var index = _toInternalIndex(position)
       let u = _core[index]
       if _fastPath((u >> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence

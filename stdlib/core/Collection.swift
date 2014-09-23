@@ -37,11 +37,12 @@ public func countElements <T: _CollectionType>(x: T) -> T.Index.Distance {
 /// be satisfied by types conforming to that protocol.
 public protocol _CollectionType : _SequenceType {
   /// A type that represents a valid position in the collection.
+  ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   typealias Index : ForwardIndexType
 
-  /// The position of the first element in a non-empty collection;
+  /// The position of the first element in a non-empty collection.
   ///
   /// Identical to `endIndex` in an empty collection.
   var startIndex: Index {get}
@@ -80,11 +81,11 @@ public protocol _CollectionType : _SequenceType {
 ///     let x = self[i]
 ///   }
 public protocol CollectionType : _CollectionType, SequenceType {
-  /// Access the element indicated by `address`.
+  /// Access the element indicated by `position`.
   ///
-  /// Requires: `address` indicates a valid position in `self` and
-  /// `address != endIndex`.
-  subscript(address: Index) -> Generator.Element {get}
+  /// Requires: `position` indicates a valid position in `self` and
+  /// `position != endIndex`.
+  subscript(position: Index) -> Generator.Element {get}
   
   // Do not use this operator directly; call `countElements(x)` instead
   func ~> (_:Self, _:(_CountElements, ())) -> Index.Distance
@@ -135,11 +136,11 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
 ///   let y = x
 ///
 public protocol MutableCollectionType : CollectionType {
-  /// Access the element indicated by `address`.
+  /// Access the element at `position`.
   ///
-  /// Requires: `address` indicates a valid position in `self` and
-  /// `address != endIndex`.
-  subscript(address: Index) -> Generator.Element {get set}
+  /// Requires: `position` indicates a valid position in `self` and
+  /// `position != endIndex`.
+  subscript(position: Index) -> Generator.Element {get set}
 }
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`

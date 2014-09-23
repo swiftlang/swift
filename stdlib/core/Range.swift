@@ -34,7 +34,11 @@ public struct RangeGenerator<
     return self
   }
 
+  /// The lower bound of the remaining range.
   public var startIndex: T
+  
+  /// The upper bound of the remaining range; not included in the
+  /// generated sequence.
   public var endIndex: T
 }
 
@@ -60,12 +64,21 @@ public struct Range<
     return startIndex == endIndex
   }
 
+  /// A type that represents a valid position in the collection.
+  /// 
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = T
   public typealias Slice = Range<T>
   public typealias _Element = T
   
-  public subscript(i: T) -> T {
-    return i
+  /// Access the element at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self` and
+  /// `position != endIndex`.
+  public subscript(position: T) -> T {
+    _debugPrecondition(position != endIndex, "Index out of range")
+    return position
   }
 
   //===--------------------------------------------------------------------===//
@@ -87,6 +100,9 @@ public struct Range<
     return Generator(self)
   }
 
+  /// The range's lower bound
+  ///
+  /// Identical to `endIndex` in an empty range.
   public var startIndex: T {
     get {
       return _startIndex
@@ -96,6 +112,11 @@ public struct Range<
     }
   }
 
+  /// The range's upper bound
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   public var endIndex: T {
     get {
       return _endIndex

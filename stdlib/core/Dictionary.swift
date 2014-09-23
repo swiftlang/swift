@@ -1963,15 +1963,25 @@ public struct Dictionary<
   // additional processing.
   //
 
+  /// The position of the first element in a non-empty dictionary.
+  ///
+  /// Identical to `endIndex` in an empty dictionary
+  ///
+  /// Complexity: amortized O(1) if `self` does not wrap a bridged
+  /// `NSDictionary`, O(N) otherwise.
   public var startIndex: Index {
-    // Complexity: amortized O(1) for native storage, O(N) when wrapping an
-    // NSDictionary.
     return _variantStorage.startIndex
   }
 
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
+  ///
+  /// Complexity: amortized O(1) if `self` does not wrap a bridged
+  /// `NSDictionary`, O(N) otherwise.
   public var endIndex: Index {
-    // Complexity: amortized O(1) for native storage, O(N) when wrapping an
-    // NSDictionary.
     return _variantStorage.endIndex
   }
 
@@ -1983,11 +1993,11 @@ public struct Dictionary<
     return _variantStorage.indexForKey(key)
   }
 
-  /// Access the key-value pair referenced by the given index.
+  /// Access the key-value pair at `position`.
   ///
   /// Complexity: O(1)
-  public subscript(i: Index) -> Element {
-    return _variantStorage.assertingGet(i)
+  public subscript(position: Index) -> Element {
+    return _variantStorage.assertingGet(position)
   }
 
   public subscript(key: Key) -> Value? {

@@ -29,16 +29,25 @@ public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
 }
 
 public struct CollectionOfOne<T> : CollectionType {
+  /// A type that represents a valid position in the collection.
+  /// 
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Bit
 
   public init(_ element: T) { 
     self.element = element 
   }
 
+  /// The position of the first element.
   public var startIndex: Index {
     return .Zero
   }
-  
+
+  /// The "past the end" position; always identical to
+  /// `startIndex.successor()`.
+  ///
+  /// Note: `endIndex` is not a valid argument to `subscript`.
   public var endIndex: Index {
     return .One
   }
@@ -47,8 +56,11 @@ public struct CollectionOfOne<T> : CollectionType {
     return GeneratorOfOne(element)
   }
 
-  public subscript(i: Index) -> T {
-    _precondition(i == .Zero, "Index out of range")
+  /// Access the element at `position`.
+  ///
+  /// Requires: `position == .Zero`
+  public subscript(position: Index) -> T {
+    _precondition(position == .Zero, "Index out of range")
     return element
   }
   

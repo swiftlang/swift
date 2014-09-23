@@ -114,6 +114,8 @@ extension String {
       let _buffer: _StringCore.UTF8Chunk
     }
   
+    /// The position of the first code unit if the `String` is
+    /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
       if _fastPath(_core.count != 0) {
         let (coreIndex, buffer) = _core._encodeSomeUTF8(0)
@@ -122,12 +124,21 @@ extension String {
       return endIndex
     }
     
+    /// The "past the end" position.
+    ///
+    /// `endIndex` is not a valid argument to `subscript`, and is always
+    /// reachable from `startIndex` by zero or more applications of
+    /// `successor()`.
     public var endIndex: Index {
       return Index(_core, _core.endIndex, ~1)
     }
 
-    public subscript(i: Index) -> UTF8.CodeUnit {
-      let result: UTF8.CodeUnit = numericCast(i._buffer & 0xFF)
+    /// Access the element at `position`.
+    ///
+    /// Requires: `position` is a valid position in `self` and
+    /// `position != endIndex`.
+    public subscript(position: Index) -> UTF8.CodeUnit {
+      let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
       _precondition(result != 0xFE, "can not subscript using endIndex")
       return result
     }

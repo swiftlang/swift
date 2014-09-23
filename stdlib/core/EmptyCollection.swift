@@ -28,14 +28,20 @@ public struct EmptyGenerator<T> : GeneratorType, SequenceType {
 }
 
 public struct EmptyCollection<T> : CollectionType {
+  /// A type that represents a valid position in the collection.
+  /// 
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
 
   public init() {}
-  
+
+  /// Always zero, just like `endIndex`.
   public var startIndex: Index {
     return 0
   }
   
+  /// Always zero, just like `startIndex`.
   public var endIndex: Index {
     return 0
   }
@@ -44,7 +50,10 @@ public struct EmptyCollection<T> : CollectionType {
     return EmptyGenerator()
   }
 
-  public subscript(i: Index) -> T {
+  /// Access the element at `position`.
+  ///
+  /// Should never be called, since this collection is always empty.
+  public subscript(position: Index) -> T {
     _preconditionFailure("Index out of range")
   }
 }

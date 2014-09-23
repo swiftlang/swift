@@ -133,15 +133,30 @@ public enum Character :
         UTF8.self, UTF16.self, input.generate(), dest, stopOnError: false)
       _fixLifetime(u8)
     }
+    
+    /// The position of the first element in a non-empty collection.
+    ///
+    /// Identical to `endIndex` in an empty collection.
     var startIndex : Int {
       return 0
     }
+    
+    /// The collection's "past the end" position.
+    ///
+    /// `endIndex` is not a valid argument to `subscript`, and is always
+    /// reachable from `startIndex` by zero or more applications of
+    /// `successor()`.
     var endIndex : Int {
       return Int(count)
     }
-    subscript(i: Int) -> UTF16.CodeUnit {
+    
+    /// Access the code unit at `position`.
+    ///
+    /// Requires: `position` is a valid position in `self` and
+    /// `position != endIndex`.
+    subscript(position: Int) -> UTF16.CodeUnit {
       var d = data
-      return UnsafePointer<UTF16.CodeUnit>(Builtin.addressof(&d))[i]
+      return UnsafePointer<UTF16.CodeUnit>(Builtin.addressof(&d))[position]
     }
     func generate() -> IndexingGenerator<_SmallUTF16> {
       return IndexingGenerator(self)

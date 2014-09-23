@@ -63,6 +63,10 @@ public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
 public struct ${View}<
   T: CollectionType where T.Index: ${IndexProtocol}
 > : CollectionType {
+  /// A type that represents a valid position in the collection.
+  /// 
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ${Index}<T.Index>
   public typealias Generator = IndexingGenerator<${View}>
 
@@ -74,16 +78,28 @@ public struct ${View}<
     return IndexingGenerator(self)
   }
   
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// Identical to `endIndex` in an empty collection.
   public var startIndex: Index {
     return ${Index}(_base.endIndex)
   }
   
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   public var endIndex: Index {
     return ${Index}(_base.startIndex)
   }
 
-  public subscript(i: Index) -> T.Generator.Element {
-    return _base[i._base.predecessor()]
+  /// Access the element at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self` and
+  /// `position != endIndex`.
+  public subscript(position: Index) -> T.Generator.Element {
+    return _base[position._base.predecessor()]
   }
   
   var _base: T

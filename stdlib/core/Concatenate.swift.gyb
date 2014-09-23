@@ -170,6 +170,10 @@ struct ${View}<
           C.Generator.Element: CollectionType,
           C.Generator.Element.Index : ${IndexProtocol}
 > : CollectionType {
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
   typealias Index = ${Index}<C>
 
   init(_ _base: C) {
@@ -180,16 +184,28 @@ struct ${View}<
     return _ConcatenateSequenceGenerator(_base.generate())
   }
 
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// Identical to `endIndex` in an empty collection.
   var startIndex: Index {
     return ${Index}.adjustForward(_base, _base.startIndex, nil)
   }
 
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   var endIndex: Index {
     return ${Index}(_base, _base.endIndex, nil)
   }
 
-  subscript(i: Index) -> C.Generator.Element.Generator.Element {
-    return _base[i._outer][i._inner!]
+  /// Access the element at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self` and
+  /// `position != endIndex`.
+  subscript(position: Index) -> C.Generator.Element.Generator.Element {
+    return _base[position._outer][position._inner!]
   }
 
   var _base: C

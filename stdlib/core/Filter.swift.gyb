@@ -87,6 +87,10 @@ public func == <Base: CollectionType>(
 ///   element of the underlying collection, which is surprising.
 public struct FilterCollectionView<Base: CollectionType> : CollectionType {
 
+  /// A type that represents a valid position in the collection.
+  /// 
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = FilterCollectionViewIndex<Base>
 
   public
@@ -95,6 +99,12 @@ public struct FilterCollectionView<Base: CollectionType> : CollectionType {
     self._include = includeElement
   }
 
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// Identical to `endIndex` in an empty collection.
+  ///
+  /// Complexity: O(N), where N is the ratio between unfiltered and
+  /// filtered collection counts.
   public var startIndex: Index {
     var first = _base.startIndex
     while first != _base.endIndex {
@@ -107,14 +117,25 @@ public struct FilterCollectionView<Base: CollectionType> : CollectionType {
       _pos: first, _end: _base.endIndex, _base: _base, _include: _include)
   }
   
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
+  ///
+  /// Complexity: O(1)
   public var endIndex: Index {
     return FilterCollectionViewIndex(
       _pos: _base.endIndex, _end: _base.endIndex,
       _base: _base, _include: _include)
   }
 
-  public subscript(index: Index) -> Base.Generator.Element {
-    return _base[index._pos]
+  /// Access the element at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self` and
+  /// `position != endIndex`.
+  public subscript(position: Index) -> Base.Generator.Element {
+    return _base[position._pos]
   }
 
   public func generate() -> FilterGenerator<Base.Generator> {

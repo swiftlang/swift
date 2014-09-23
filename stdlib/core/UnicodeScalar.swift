@@ -249,14 +249,26 @@ extension UnicodeScalar {
 }
 
 extension UnicodeScalar.UTF16View : CollectionType {
+  /// The position of the first code unit.
   var startIndex: Int {
     return 0
   }
+  
+  /// The "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   var endIndex: Int {
     return 0 + UTF16.width(value)
   }
-  subscript(i: Int) -> UTF16.CodeUnit {
-    return i == 0 ? (
+  
+  /// Access the code unit at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self` and
+  /// `position != endIndex`.
+  subscript(position: Int) -> UTF16.CodeUnit {
+    return position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
     ) : UTF16.trailSurrogate(value)
   }

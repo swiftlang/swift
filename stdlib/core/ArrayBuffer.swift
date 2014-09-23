@@ -418,11 +418,19 @@ extension _ArrayBuffer {
   }
   
   //===--- CollectionType conformance -------------------------------------===//
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// Identical to `endIndex` in an empty collection.
   public
   var startIndex: Int {
     return 0
   }
 
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   public var endIndex: Int {
     return count
   }
