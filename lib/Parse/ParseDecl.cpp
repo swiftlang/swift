@@ -2232,25 +2232,12 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
       ValueArgElements.push_back(TuplePatternElt(NamePattern));
       StartLoc = NamePattern->getStartLoc();
       EndLoc = NamePattern->getEndLoc();
-    } else if (Kind == AccessorKind::IsMaterializeForSet) {
-      auto type = TypeLoc::withoutLoc(P->Context.TheRawPointerType);
-      auto buffer = Pattern::buildImplicitLetParameter(DeclLoc, "buffer",
-                                                       type, P->CurDeclContext);
-      ValueArgElements.push_back(TuplePatternElt(buffer));
     }
 
     bool isVararg = false;
     if (Indices) {
       auto clonePattern = [&](const Pattern *p) -> Pattern* {
-        // For materializeForSet accessors, we need to clone the
-        // pattern in a way which allows us to always forward the
-        // arguments.
-        if (Kind == AccessorKind::IsMaterializeForSet) {
-          return p->cloneForwardable(P->Context, P->CurDeclContext,
-                                     Pattern::Implicit);
-        } else {
-          return p->clone(P->Context, Pattern::Implicit);
-        }
+        return p->clone(P->Context, Pattern::Implicit);
       };
 
       if (auto *PP = dyn_cast<ParenPattern>(Indices)) {
@@ -2297,13 +2284,19 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   if (Kind == AccessorKind::IsGetter) {
     ReturnType = ElementTy.clone(P->Context);
 
-  // MaterializeForSet accessors return (Builtin.RawPointer, Builtin.Int1).
-  } else if (Kind == AccessorKind::IsMaterializeForSet) {
-    TupleTypeElt retElts[] = {
-      { P->Context.TheRawPointerType },
-      { BuiltinIntegerType::get(1, P->Context) },
-    };
-    ReturnType = TypeLoc::withoutLoc(TupleType::get(retElts, P->Context));
+  // Addressors return Unsafe{,Mutable}Pointer<T>.
+  } else if (Kind == AccessorKind::IsAddressor ||
+             Kind == AccessorKind::IsMutableAddressor) {
+    TypeRepr *args[] = { ElementTy.clone(P->Context).getTypeRepr() };
+
+    // FIXME: the fact that this could resolve in the local scope is dumb.
+    bool isMutable = (Kind == AccessorKind::IsMutableAddressor);
+    Identifier name = P->Context.getIdentifier(
+                    isMutable ? "UnsafeMutablePointer" : "UnsafePointer");
+
+    ReturnType = new (P->Context) GenericIdentTypeRepr(SourceLoc(), name,
+                                            P->Context.AllocateCopy(args),
+                                                       SourceRange());
 
   // Everything else returns ().
   } else {
@@ -2316,8 +2309,11 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                              DeclLoc, /*GenericParams=*/nullptr, Type(), Params,
                              ReturnType, P->CurDeclContext);
 
-  // non-static set/willSet/didSet/materializeForSet default to mutating.
-  if (!D->isStatic() && Kind != AccessorKind::IsGetter)
+  // Non-static set/willSet/didSet/materializeForSet/mutableAddress
+  // default to mutating.  get/address default to non-mutating.
+  if (!D->isStatic() &&
+      Kind != AccessorKind::IsGetter &&
+      Kind != AccessorKind::IsAddressor)
     D->setMutating();
 
   return D;
@@ -2442,12 +2438,10 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
 /// specifying the index list for a subscript.
 bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
-                             TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
-                             FuncDecl *&WillSet, FuncDecl *&DidSet,
+                             TypeLoc ElementTy, ParsedAccessors &accessors,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
                              SourceLoc VarLBLoc,
                              SmallVectorImpl<Decl *> &Decls) {
-  Get = Set = WillSet = DidSet = nullptr;
 
   // Properties in protocols use sufficiently limited syntax that we have a
   // special parsing loop for them.  SIL mode uses the same syntax.
@@ -2472,10 +2466,10 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       FuncDecl **TheDeclPtr;
       if (Tok.isContextualKeyword("get")) {
         Kind = AccessorKind::IsGetter;
-        TheDeclPtr = &Get;
+        TheDeclPtr = &accessors.Get;
       } else if (Tok.isContextualKeyword("set")) {
         Kind = AccessorKind::IsSetter;
-        TheDeclPtr = &Set;
+        TheDeclPtr = &accessors.Set;
       } else {
         diagnose(Tok, diag::expected_getset_in_protocol);
         return true;
@@ -2551,16 +2545,22 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     FuncDecl **TheDeclPtr;
     if (Tok.isContextualKeyword("get")) {
       Kind = AccessorKind::IsGetter;
-      TheDeclPtr = &Get;
+      TheDeclPtr = &accessors.Get;
     } else if (Tok.isContextualKeyword("set")) {
       Kind = AccessorKind::IsSetter;
-      TheDeclPtr = &Set;
+      TheDeclPtr = &accessors.Set;
     } else if (Tok.isContextualKeyword("willSet")) {
       Kind = AccessorKind::IsWillSet;
-      TheDeclPtr = &WillSet;
+      TheDeclPtr = &accessors.WillSet;
     } else if (Tok.isContextualKeyword("didSet")) {
       Kind = AccessorKind::IsDidSet;
-      TheDeclPtr = &DidSet;
+      TheDeclPtr = &accessors.DidSet;
+    } else if (Tok.isContextualKeyword("address")) {
+      Kind = AccessorKind::IsAddressor;
+      TheDeclPtr = &accessors.Addressor;
+    } else if (Tok.isContextualKeyword("mutableAddress")) {
+      Kind = AccessorKind::IsMutableAddressor;
+      TheDeclPtr = &accessors.MutableAddressor;
     } else {
       // This is an implicit getter.  Might be not valid in this position,
       // though.  Anyway, go back to the beginning of the getter code to ensure
@@ -2577,7 +2577,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
         return false;
       }
       Kind = AccessorKind::IsGetter;
-      TheDeclPtr = &Get;
+      TheDeclPtr = &accessors.Get;
       isImplicitGet = true;
     }
 
@@ -2659,22 +2659,21 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 }
 
 bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
-                         TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
-                         FuncDecl *&WillSet, FuncDecl *&DidSet,
-                         SourceLoc &LBLoc, SourceLoc &RBLoc,
+                         TypeLoc ElementTy, ParsedAccessors &accessors,
                          SourceLoc StaticLoc,
                          SmallVectorImpl<Decl *> &Decls) {
-  LBLoc = consumeToken(tok::l_brace);
-  SourceLoc LastValidLoc = LBLoc;
-  bool Invalid = parseGetSetImpl(Flags, Indices, ElementTy, Get, Set, WillSet,
-                                 DidSet, LastValidLoc, StaticLoc, LBLoc, Decls);
+  accessors.LBLoc = consumeToken(tok::l_brace);
+  SourceLoc LastValidLoc = accessors.LBLoc;
+  bool Invalid = parseGetSetImpl(Flags, Indices, ElementTy, accessors,
+                                 LastValidLoc, StaticLoc, accessors.LBLoc,
+                                 Decls);
 
   // Parse the final '}'.
   if (Invalid)
     skipUntil(tok::r_brace);
 
-  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                     LBLoc);
+  parseMatchingToken(tok::r_brace, accessors.RBLoc,
+                     diag::expected_rbrace_in_getset, accessors.LBLoc);
   return Invalid;
 }
 
@@ -2757,12 +2756,8 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   }
 
   // Parse getter and setter.
-  FuncDecl *Get = nullptr, *Set = nullptr;
-  FuncDecl *WillSet = nullptr, *DidSet = nullptr;
-  SourceLoc LBLoc;
-  SourceLoc RBLoc;
-  if (parseGetSet(Flags, /*Indices=*/0, TyLoc, Get, Set, WillSet, DidSet,
-                  LBLoc, RBLoc, StaticLoc, Decls))
+  ParsedAccessors accessors;
+  if (parseGetSet(Flags, /*Indices=*/0, TyLoc, accessors, StaticLoc, Decls))
     Invalid = true;
 
   // If we have an invalid case, bail out now.
@@ -2771,82 +2766,159 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   
   // Reject accessors on 'let's after parsing them (for better recovery).
   if (PrimaryVar->isLet() && !Attributes.hasAttribute<SILStoredAttr>()) {
-    if (WillSet || DidSet)
-      diagnose(LBLoc, diag::let_cannot_be_observing_property);
+    if (accessors.WillSet || accessors.DidSet)
+      diagnose(accessors.LBLoc, diag::let_cannot_be_observing_property);
+    else if (accessors.Addressor || accessors.MutableAddressor)
+      diagnose(accessors.LBLoc, diag::let_cannot_be_addressed_property);
     else
-      diagnose(LBLoc, diag::let_cannot_be_computed_property);
+      diagnose(accessors.LBLoc, diag::let_cannot_be_computed_property);
 
     Invalid = true;
   }
-  
+
+  accessors.record(*this, PrimaryVar, Invalid, Flags, StaticLoc,
+                   Attributes, TyLoc, /*indices*/ nullptr, Decls);
+
+  return PrimaryVar;
+}
+
+/// Record a bunch of parsed accessors into the given abstract storage decl.
+void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
+                                     bool invalid, ParseDeclOptions flags,
+                                     SourceLoc staticLoc,
+                                     const DeclAttributes &attrs,
+                                     TypeLoc elementTy, Pattern *indices,
+                                     SmallVectorImpl<Decl *> &decls) {
+  auto flagInvalidAccessor = [&](FuncDecl *&func) {
+    if (func) {
+      func->setType(ErrorType::get(P.Context));
+      func->setInvalid();
+    }
+  };
+  auto ignoreInvalidAccessor = [&](FuncDecl *&func) {
+    if (func) {
+      flagInvalidAccessor(func);
+      func = nullptr;
+    }
+  };
+
+  // Create an implicit accessor declaration.
+  auto createImplicitAccessor =
+  [&](AccessorKind kind, TypedPattern *argPattern) -> FuncDecl* {
+    auto accessor = createAccessorFunc(SourceLoc(), argPattern,
+                                       elementTy, indices, staticLoc, flags,
+                                       kind, &P);
+    accessor->setImplicit();
+    decls.push_back(accessor);
+    return accessor;
+  };
+
+  // Addressors are incompatible with getters and setters.
+  // Prefer the addressor.
+  if (Addressor || MutableAddressor) {
+    // Require an 'address' accessor if there's a 'mutableAddress' accessor.
+    // This is in principle an unnnecessary restriction, but enforce it for now.
+    if (!Addressor) {
+      P.diagnose(MutableAddressor->getLoc(), diag::mutableaddress_without_address,
+                 isa<SubscriptDecl>(storage));
+
+      Addressor = createImplicitAccessor(AccessorKind::IsAddressor, nullptr);
+    }
+
+    if (Get || Set) {
+      P.diagnose(Get ? Get->getLoc() : Set->getLoc(),
+                 diag::addressor_with_getset,
+                 isa<SubscriptDecl>(storage));
+      ignoreInvalidAccessor(Get);
+      ignoreInvalidAccessor(Set);
+    }
+  }
+
+  // For now, we don't support the observing accessors on subscripts.
+  if (isa<SubscriptDecl>(storage) && (WillSet || DidSet)) {
+    P.diagnose(DidSet ? DidSet->getLoc() : WillSet->getLoc(),
+               diag::observingproperty_in_subscript, bool(DidSet));
+    ignoreInvalidAccessor(WillSet);
+    ignoreInvalidAccessor(DidSet);
+  }
+
   // If this is a willSet/didSet observing property, record this and we're done.
   if (WillSet || DidSet) {
     if (Get || Set) {
-      diagnose(Get ? Get->getLoc() : Set->getLoc(),
-               diag::observingproperty_with_getset, bool(DidSet), bool(Set));
-      if (Get) {
-        Get->setType(ErrorType::get(Context));
-        Get->setInvalid(); Get = nullptr;
-      }
-      if (Set) {
-        Set->setType(ErrorType::get(Context));
-        Set->setInvalid(); Set = nullptr;
-      }
+      P.diagnose(Get ? Get->getLoc() : Set->getLoc(),
+                 diag::observingproperty_with_getset, bool(DidSet), bool(Set));
+      ignoreInvalidAccessor(Get);
+      ignoreInvalidAccessor(Set);
     }
 
-    PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
+    if (Addressor) {
+      if (!MutableAddressor) {
+        P.diagnose(WillSet ? WillSet->getLoc() : DidSet->getLoc(),
+                   diag::observingproperty_without_mutableaddress,
+                   bool(DidSet));
+        MutableAddressor =
+          createImplicitAccessor(AccessorKind::IsMutableAddressor, nullptr);
+      }
+
+      storage->makeAddressedObserving(LBLoc, Addressor, MutableAddressor,
+                                      WillSet, DidSet, RBLoc);
+    } else {
+      storage->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
+    }
 
     // Observing properties will have getters and setters synthesized by sema.
     // Create their prototypes now.
-    Get = createAccessorFunc(SourceLoc(), /*ArgPattern*/nullptr, TyLoc, nullptr,
-                             StaticLoc, Flags, AccessorKind::IsGetter, this);
-    Get->setImplicit();
-    Decls.push_back(Get);
+    Get = createImplicitAccessor(AccessorKind::IsGetter, nullptr);
 
-    auto ArgPattern = parseOptionalAccessorArgument(SourceLoc(), TyLoc, *this,
+    auto argPattern = parseOptionalAccessorArgument(SourceLoc(), elementTy, P,
                                                     AccessorKind::IsSetter);
-    Set = createAccessorFunc(SourceLoc(), ArgPattern, TyLoc, nullptr,
-                             StaticLoc, Flags, AccessorKind::IsSetter, this);
-    Set->setImplicit();
-    Decls.push_back(Set);
+    Set = createImplicitAccessor(AccessorKind::IsSetter, argPattern);
 
-    PrimaryVar->setObservingAccessors(Get, Set, nullptr);
-    return PrimaryVar;
+    storage->setObservingAccessors(Get, Set, nullptr);
+    return;
   }
 
   // If this decl is invalid, mark any parsed accessors as invalid to avoid
   // tripping up later invariants.
-  if (Invalid) {
-    if (Get) {
-      Get->setType(ErrorType::get(Context));
-      Get->setInvalid();
-    }
-    if (Set) {
-      Set->setType(ErrorType::get(Context));
-      Set->setInvalid();
-    }
+  if (invalid) {
+    flagInvalidAccessor(Get);
+    flagInvalidAccessor(Set);
+    flagInvalidAccessor(Addressor);
+    flagInvalidAccessor(MutableAddressor);
   }
 
-  // Otherwise, this must be a get/set property.  The set is optional, but get
-  // is not.
-  if (!Invalid && Set && !Get) {
-    diagnose(Set->getLoc(), diag::var_set_without_get);
+  // If we have addressors, at this point mark it as addressed.
+  if (Addressor) {
+    assert(!Get && !Set);
+    storage->makeAddressed(LBLoc, Addressor, MutableAddressor, RBLoc);
+    return;
+  }
+
+  // Otherwise, this must be a get/set property.  The set is optional,
+  // but get is not.
+  if (!Get) {
+    // Subscripts always have to have *something*; they can't be
+    // purely stored.
+    if (isa<SubscriptDecl>(storage)) {
+      if (!invalid) P.diagnose(LBLoc, diag::subscript_without_get);
+      Get = createImplicitAccessor(AccessorKind::IsGetter, nullptr);
+    } else if (Set) {
+      if (!invalid) P.diagnose(Set->getLoc(), diag::var_set_without_get);
+    }
   }
 
   if (Set || Get) {
-    if (Attributes.hasAttribute<SILStoredAttr>())
+    if (attrs.hasAttribute<SILStoredAttr>())
       // Turn this into a stored property with trivial accessors.
-      PrimaryVar->makeStoredWithTrivialAccessors(Get, Set, nullptr);
+      storage->makeStoredWithTrivialAccessors(Get, Set, nullptr);
     else
       // Turn this into a computed variable.
-      PrimaryVar->makeComputed(LBLoc, Get, Set, nullptr, RBLoc);
+      storage->makeComputed(LBLoc, Get, Set, nullptr, RBLoc);
   } else {
     // Otherwise this decl is invalid and the accessors have been rejected above.
     // Make sure to at least record the braces range in the AST.
-    PrimaryVar->setInvalidBracesRange(SourceRange(LBLoc, RBLoc));
+    storage->setInvalidBracesRange(SourceRange(LBLoc, RBLoc));
   }
-
-  return PrimaryVar;
 }
 
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
@@ -3905,32 +3977,16 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   
   // '{'
   // Parse getter and setter.
-  SourceRange DefRange = SourceRange();
-  FuncDecl *Get = nullptr;
-  FuncDecl *Set = nullptr;
+  ParsedAccessors accessors;
   if (Tok.isNot(tok::l_brace))  {
     // Subscript declarations must always have at least a getter, so they need
     // to be followed by a {.
     diagnose(Tok, diag::expected_lbrace_subscript);
     Status.setIsParseError();
   } else {
-    FuncDecl *WillSet = nullptr, *DidSet = nullptr;
-    SourceLoc LBLoc;
-    SourceLoc RBLoc;
     if (parseGetSet(Flags, Indices.get(), ElementTy.get(),
-                    Get, Set, WillSet, DidSet, LBLoc, RBLoc,
-                    /*StaticLoc=*/SourceLoc(), Decls))
+                    accessors, /*StaticLoc=*/SourceLoc(), Decls))
       Status.setIsParseError();
-
-    if (Status.isSuccess()) {
-      if (!Get)
-        diagnose(SubscriptLoc, diag::subscript_without_get);
-      if (WillSet || DidSet)
-        diagnose(DidSet ? DidSet->getLoc() : WillSet->getLoc(),
-                 diag::observingproperty_in_subscript, bool(DidSet));
-    }
-
-    DefRange = SourceRange(LBLoc, RBLoc);
   }
 
   bool Invalid = false;
@@ -3940,20 +3996,9 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     Invalid = true;
   }
 
-  // If we had no getter (e.g., because we're in SIL mode or because the
-  // program isn't valid) create a stub here.
-  if (!Get) {
-    Get = createAccessorFunc(SubscriptLoc, /*ArgPattern*/ nullptr,
-                             ElementTy.get(), Indices.get(),
-                             /*StaticLoc*/ SourceLoc(), Flags,
-                             AccessorKind::IsGetter, this);
-    Get->setInvalid();
-    Get->setType(ErrorType::get(Context));
-    Decls.push_back(Get);
-  }
-
-  Subscript->makeComputed(DefRange.Start, Get, Set,
-                          /*materializeForSet*/ nullptr, DefRange.End);
+  accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()),
+                   Flags, /*static*/ SourceLoc(), Attributes,
+                   ElementTy.get(), Indices.get(), Decls);
 
   if (Invalid) {
     Subscript->setType(ErrorType::get(Context));

@@ -698,17 +698,36 @@ public:
                             StaticSpellingKind StaticSpelling);
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
+
+  struct ParsedAccessors {
+    SourceLoc LBLoc, RBLoc;
+    FuncDecl *Get = nullptr;
+    FuncDecl *Set = nullptr;
+    FuncDecl *Addressor = nullptr;
+    FuncDecl *MutableAddressor = nullptr;
+    FuncDecl *WillSet = nullptr;
+    FuncDecl *DidSet = nullptr;
+
+    void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
+                ParseDeclOptions flags, SourceLoc staticLoc,
+                const DeclAttributes &attrs,
+                TypeLoc elementTy, Pattern *indices,
+                SmallVectorImpl<Decl *> &decls);
+  };
+
   bool parseGetSetImpl(ParseDeclOptions Flags,
                        Pattern *Indices, TypeLoc ElementTy,
-                       FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
-                       FuncDecl *&DidSet, SourceLoc &LastValidLoc,
+                       ParsedAccessors &accessors,
+                       SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
                    Pattern *Indices, TypeLoc ElementTy,
-                   FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
-                   FuncDecl *&DidSet, SourceLoc &LBLoc, SourceLoc &RBLoc,
+                   ParsedAccessors &accessors,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
+  void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
+                       TypeLoc elementTy, const DeclAttributes &attrs,
+                       SourceLoc staticLoc, ParsedAccessors &accessors);
   void parseAccessorBodyDelayed(AbstractFunctionDecl *AFD);
   VarDecl *parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                               SourceLoc StaticLoc,

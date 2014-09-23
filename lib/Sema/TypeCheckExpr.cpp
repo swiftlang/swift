@@ -459,7 +459,13 @@ static bool doesSubscriptDeclProduceLValue(SubscriptDecl *SD, Type baseType,
 
   // If the base is an rvalue, then we only produce an lvalue if both the getter
   // and setter are nonmutating.
-  return !SD->getGetter()->isMutating() && !SD->getSetter()->isMutating();
+  if (SD->hasAccessorFunctions()) {
+    return !SD->getGetter()->isMutating() && !SD->getSetter()->isMutating();
+  } else {
+    assert(SD->hasAddressors());
+    return !SD->getAddressor()->isMutating() &&
+           !SD->getMutableAddressor()->isMutating();
+  }
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,

@@ -1411,81 +1411,156 @@ static void makeDynamic(ASTContext &ctx, ValueDecl *D) {
   }
 }
 
-static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
-                                                VarDecl **ValueDecl,
-                                                TypeChecker &TC) {
-  auto VDTy = TC.getTypeOfRValue(VD, /*want interface type*/false);
-  return buildLetArgumentPattern(VD->getLoc(), VD->getDeclContext(),
-                                 "value", VDTy, ValueDecl, TC);
+static Type getTypeOfStorage(AbstractStorageDecl *storage,
+                             TypeChecker &TC) {
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    return TC.getTypeOfRValue(var, /*want interface type*/ false);
+  } else {
+    // None of the transformations done by getTypeOfRValue are
+    // necessary for subscripts.
+    auto subscript = cast<SubscriptDecl>(storage);
+    return subscript->getElementType();
+  }
 }
 
-static FuncDecl *createGetterPrototype(VarDecl *VD, TypeChecker &TC) {
-  auto &Context = VD->getASTContext();
-  SourceLoc Loc = VD->getLoc();
+static Pattern *buildSetterValueArgumentPattern(AbstractStorageDecl *storage,
+                                                VarDecl **valueDecl,
+                                                TypeChecker &TC) {
+  auto storageType = getTypeOfStorage(storage, TC);
+  return buildLetArgumentPattern(storage->getLoc(), storage->getDeclContext(),
+                                 "value", storageType, valueDecl, TC);
+}
+
+/// Build a pattern which can forward the formal index parameters of a
+/// declaration.
+///
+/// \param firstPattern an optional pattern which, if present, will be
+///   used as a source for initial arguments
+static Pattern *buildIndexForwardingPattern(AbstractStorageDecl *storage,
+                                            Pattern *firstPattern,
+                                            TypeChecker &TC) {
+  auto subscript = dyn_cast<SubscriptDecl>(storage);
+
+  // Fast path: if this isn't a subscript, and we have a first
+  // pattern, we can just use that.
+  if (!subscript) {
+    if (firstPattern) return firstPattern;
+
+    return TuplePattern::createSimple(TC.Context, SourceLoc(), {},
+                                      SourceLoc());
+  }
+
+  // Otherwise, we need to build up a new TuplePattern.
+  SmallVector<TuplePatternElt, 4> elements;
+
+  // Start with the fields from the first pattern, if there are any.
+  if (firstPattern) {
+    auto fields = cast<TuplePattern>(firstPattern)->getFields();
+    elements.append(fields.begin(), fields.end());
+  }
+
+  // Clone index patterns in a manner that allows them to be
+  // perfectly forwarded.
+  DeclContext *DC = storage->getDeclContext();
+  auto addVarPatternFor = [&](Pattern *P) {
+    Pattern *vp = P->cloneForwardable(TC.Context, DC, Pattern::Implicit);
+    elements.push_back(TuplePatternElt(vp));
+  };
+
+  // This is the same breakdown the parser does.
+  auto indices = subscript->getIndices();
+  if (auto pp = dyn_cast<ParenPattern>(indices)) {
+    addVarPatternFor(pp);
+  } else {
+    auto tp = cast<TuplePattern>(indices);
+    for (auto &field : tp->getFields()) {
+      addVarPatternFor(field.getPattern());
+    }
+  }
+
+  return TuplePattern::createSimple(TC.Context, SourceLoc(), elements,
+                                    SourceLoc());
+}
+
+static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
+                                       TypeChecker &TC) {
+  SourceLoc loc = storage->getLoc();
 
   // Create the parameter list for the getter.
-  SmallVector<Pattern *, 2> GetterParams;
+  SmallVector<Pattern *, 2> getterParams;
 
   // The implicit 'self' argument if in a type context.
-  if (VD->getDeclContext()->isTypeContext())
-    GetterParams.push_back(buildImplicitSelfParameter(Loc,
-                                                      VD->getDeclContext()));
+  if (storage->getDeclContext()->isTypeContext())
+    getterParams.push_back(
+                  buildImplicitSelfParameter(loc, storage->getDeclContext()));
     
-    // Add a no-parameters clause.
-  GetterParams.push_back(TuplePattern::create(Context, Loc,
-                                              ArrayRef<TuplePatternElt>(),
-                                              Loc, /*hasVararg=*/false,
-                                              SourceLoc(),
-                                              /*Implicit=*/true));
+  // Add an index-forwarding clause.
+  getterParams.push_back(buildIndexForwardingPattern(storage, nullptr, TC));
 
-  SourceLoc StaticLoc = VD->isStatic() ? VD->getLoc() : SourceLoc();
+  SourceLoc staticLoc;
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->isStatic())
+      staticLoc = var->getLoc();
+  }
 
-  auto Ty = TC.getTypeOfRValue(VD, /*want interface type*/false);
+  auto storageType = getTypeOfStorage(storage, TC);
 
-  auto Get = FuncDecl::create(
-      Context, StaticLoc, StaticSpellingKind::None, Loc, Identifier(), Loc,
-      /*GenericParams=*/nullptr, Type(), GetterParams,
-      TypeLoc::withoutLoc(Ty), VD->getDeclContext());
-  Get->setImplicit();
+  auto getter = FuncDecl::create(
+      TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
+      /*GenericParams=*/nullptr, Type(), getterParams,
+      TypeLoc::withoutLoc(storageType), storage->getDeclContext());
+  getter->setImplicit();
+
+  // Getters for truly stored properties default to non-mutating.
+  // Getters for addressed properties follow the ordinary addressor.
+  if (storage->hasAddressors() && storage->getAddressor()->isMutating()) {
+    getter->setMutating();
+  }
 
   // If the var is marked final, then so is the getter.
-  if (VD->isFinal())
-    makeFinal(Context, Get);
+  if (storage->isFinal())
+    makeFinal(TC.Context, getter);
 
-  return Get;
+  return getter;
 }
 
-static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl,
+static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
+                                       VarDecl *&valueDecl,
                                        TypeChecker &TC) {
-  auto &Context = VD->getASTContext();
-  SourceLoc Loc = VD->getLoc();
+  SourceLoc loc = storage->getLoc();
 
   // Create the parameter list for the setter.
-  SmallVector<Pattern *, 2> SetterParams;
+  SmallVector<Pattern *, 2> params;
 
   // The implicit 'self' argument if in a type context.
-  if (VD->getDeclContext()->isTypeContext())
-    SetterParams.push_back(buildImplicitSelfParameter(Loc,
-                                                      VD->getDeclContext()));
+  if (storage->getDeclContext()->isTypeContext()) {
+    params.push_back(
+                  buildImplicitSelfParameter(loc, storage->getDeclContext()));
+  }
 
-    // Add a "(value : T)" pattern.
-  SetterParams.push_back(buildSetterValueArgumentPattern(VD, &ValueDecl, TC));
+  // Add a "(value : T, indices...)" pattern.
+  auto valuePattern = buildSetterValueArgumentPattern(storage, &valueDecl, TC);
+  params.push_back(buildIndexForwardingPattern(storage, valuePattern, TC));
 
-  Type SetterRetTy = TupleType::getEmpty(Context);
-  auto *Set = FuncDecl::create(
-      Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, Loc,
-      Identifier(), Loc, /*generic=*/nullptr, Type(), SetterParams,
-      TypeLoc::withoutLoc(SetterRetTy), VD->getDeclContext());
-  Set->setImplicit();
+  Type setterRetTy = TupleType::getEmpty(TC.Context);
+  FuncDecl *setter = FuncDecl::create(
+      TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
+      Identifier(), loc, /*generic=*/nullptr, Type(), params,
+      TypeLoc::withoutLoc(setterRetTy), storage->getDeclContext());
+  setter->setImplicit();
   
-  // Setters default to mutating.
-  Set->setMutating();
+  // Setters for truly stored properties default to mutating.
+  // Setters for addressed properties follow the mutable addressor.
+  if (!storage->hasAddressors() ||
+      storage->getMutableAddressor()->isMutating()) {
+    setter->setMutating();
+  }
 
   // If the var is marked final, then so is the getter.
-  if (VD->isFinal())
-    makeFinal(Context, Set);
+  if (storage->isFinal())
+    makeFinal(TC.Context, setter);
 
-  return Set;
+  return setter;
 }
 
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
@@ -1502,42 +1577,11 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   if (DC->isTypeContext())
     params.push_back(buildImplicitSelfParameter(loc, DC));
 
-  //  - The buffer parameter, (buffer: Builtin.RawPointer).
+  //  - The buffer parameter, (buffer: Builtin.RawPointer, indices...).
   auto bufferPattern = buildLetArgumentPattern(loc, DC, "buffer",
                                                ctx.TheRawPointerType,
                                                &bufferParamDecl, TC);
-
-  // If this is a subscript, we need to include the indexes
-  // (forwardably).
-  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
-    SmallVector<TuplePatternElt, 4> bufferAndIndexPatterns;
-    bufferAndIndexPatterns.push_back(
-      cast<TuplePattern>(bufferPattern)->getFields()[0]);
-
-    // Clone index patterns in a manner that allows them to be
-    // perfectly forwarded.
-    auto addVarPatternFor = [&](Pattern *P) {
-      Pattern *vp = P->cloneForwardable(ctx, DC, Pattern::Implicit);
-      bufferAndIndexPatterns.push_back(TuplePatternElt(vp));
-    };
-
-    // This is the same breakdown the parser does.
-    auto indices = subscript->getIndices();
-    if (auto pp = dyn_cast<ParenPattern>(indices)) {
-      addVarPatternFor(pp);
-    } else {
-      auto tp = cast<TuplePattern>(indices);
-      for (auto &field : tp->getFields()) {
-        addVarPatternFor(field.getPattern());
-      }
-    }
-
-    params.push_back(TuplePattern::createSimple(ctx, SourceLoc(),
-                                                bufferAndIndexPatterns,
-                                                SourceLoc()));
-  } else {
-    params.push_back(bufferPattern);
-  }
+  params.push_back(buildIndexForwardingPattern(storage, bufferPattern, TC));
 
   // The accessor returns (Builtin.RawPointer, Builtin.Int1)
   TupleTypeElt retElts[] = {
@@ -1578,36 +1622,136 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   TC.typeCheckDecl(VD->getGetter(), false);
 }
 
+/// Build a tuple around the given arguments.
+static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
+  if (args.size() == 1) {
+    return args[0];
+  }
+  SmallVector<Identifier, 4> labels(args.size());
+  SmallVector<SourceLoc, 4> labelLocs(args.size());
+  return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
+                           SourceLoc(), false, IsImplicit);
+}
+
+
+static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
+                                         ArrayRef<TuplePatternElt> params,
+                                    ArrayRef<TupleTypeElt> formalIndexTypes) {
+  assert(params.size() == formalIndexTypes.size());
+
+  // FIXME: do we need to preserve labels in order to disambiguate
+  // subscripts?
+  SmallVector<Identifier, 4> labels;
+  SmallVector<SourceLoc, 4> labelLocs;
+  SmallVector<Expr *, 4> args;
+
+  for (unsigned i = 0, e = params.size(); i != e; ++i) {
+    const Pattern *param = params[i].getPattern();
+    args.push_back(param->buildForwardingRefExpr(ctx));
+    labels.push_back(formalIndexTypes[i].getName());
+    labelLocs.push_back(SourceLoc());
+  }
+
+  // A single unlabelled value is not a tuple.
+  if (args.size() == 1 && labels[0].empty())
+    return args[0];
+
+  return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
+                           SourceLoc(), false, IsImplicit);
+}
+
+/// Build a reference to the subscript index variables for this
+/// subscript accessor.
+static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
+  // Pull out the body parameters, which we should have cloned
+  // previously to be forwardable.  Drop the initial buffer/value
+  // parameter in accessors that have one.
+  auto paramTuple = cast<TuplePattern>(accessor->getBodyParamPatterns().back());
+  auto params = paramTuple->getFields();
+  if (accessor->getAccessorKind() != AccessorKind::IsGetter)
+    params = params.slice(1);
+
+  // Look for formal subscript labels.
+  auto subscript = cast<SubscriptDecl>(accessor->getAccessorStorageDecl());
+  auto indexType = subscript->getIndicesType();
+  if (auto indexTuple = indexType->getAs<TupleType>()) {
+    return buildTupleForwardingRefExpr(ctx, params, indexTuple->getFields());
+  } else {
+    return buildTupleForwardingRefExpr(ctx, params, TupleTypeElt(indexType));
+  }
+}
+
+enum class SelfAccessKind {
+  /// We're building a derived accessor on top of whatever this
+  /// class provides.
+  Peer,
+
+  /// We're building a setter or something around an underlying
+  /// implementation, which might be storage or inherited from a
+  /// superclass.
+  Super,
+};
+
+static Expr *buildSelfReference(VarDecl *selfDecl,
+                                SelfAccessKind selfAccessKind,
+                                TypeChecker &TC) {
+  switch (selfAccessKind) {
+  case SelfAccessKind::Peer:
+    return new (TC.Context) DeclRefExpr(selfDecl, SourceLoc(), IsImplicit);
+
+  case SelfAccessKind::Super:
+    return new (TC.Context) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit);
+  }
+  llvm_unreachable("bad self access kind");
+}
+
+/// Build an l-value for the storage of a declaration.
+static Expr *buildStorageReference(FuncDecl *accessor,
+                                   AbstractStorageDecl *storage,
+                                   AccessKind accessKind,
+                                   SelfAccessKind selfAccessKind,
+                                   TypeChecker &TC) {
+  ASTContext &ctx = TC.Context;
+
+  VarDecl *selfDecl = accessor->getImplicitSelfDecl();
+  if (!selfDecl) {
+    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit, accessKind);
+  }
+
+  // If we should use a super access if applicable, and we have an
+  // overriden decl, then use ordinary access to it.
+  if (selfAccessKind == SelfAccessKind::Super) {
+    if (auto overridden = storage->getOverriddenDecl()) {
+      storage = overridden;
+      accessKind = AccessKind::Ordinary;
+    } else {
+      selfAccessKind = SelfAccessKind::Peer;
+    }
+  }
+
+  Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, TC);
+
+  if (isa<SubscriptDecl>(storage)) {
+    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
+    return new (ctx) SubscriptExpr(selfDRE, indices, ConcreteDeclRef(),
+                                   IsImplicit, accessKind);
+  }
+
+  // This is a potentially polymorphic access, which is unnecessary;
+  // however, it shouldn't be problematic because any overrides
+  // should also redefine materializeForSet.
+  return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
+                                 SourceLoc(), IsImplicit, accessKind);
+}
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
 /// superclass getter.  Otherwise, we do a direct load of the value.
-static Expr *createPropertyLoadOrCallSuperclassGetter(VarDecl *VD,
-                                                      VarDecl *SelfDecl) {
-  auto &Ctx = VD->getASTContext();
-  if (!SelfDecl) {
-    // Non-member observing accessors just directly load the variable.
-    // Create (return (decl_ref_expr(VD)))
-    return new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
-                                 AccessKind::DirectToStorage);
-  }
-  
-  if (!VD->getOverriddenDecl()) {
-    // For a non-overridden getter, just access the storage.  Create:
-    // (return (member_ref_expr(decl_ref_expr(self), VD)))
-    auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
-    return new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
-                                   /*implicit*/true,
-                                   AccessKind::DirectToStorage);
-  }
-
-  // For an override, chain up to super.  Create:
-  // (unresolved_dot_expr field 'declname'
-  //   (super_ref_expr))
-  auto *SRE = new (Ctx) SuperRefExpr(SelfDecl, SourceLoc(), /*implicit*/true);
-  return new (Ctx) UnresolvedDotExpr(SRE, SourceLoc(), VD->getName(),
-                                     SourceLoc(), /*implicit*/true);
+static Expr *createPropertyLoadOrCallSuperclassGetter(FuncDecl *accessor,
+                                              AbstractStorageDecl *storage,
+                                                      TypeChecker &TC) {
+  return buildStorageReference(accessor, storage, AccessKind::DirectToStorage,
+                               SelfAccessKind::Super, TC);
 }
-
 
 /// Look up the NSCopying protocol from the Foundation module, if present.
 /// Otherwise return null.
@@ -1696,38 +1840,32 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   return new (Ctx) OptionalEvaluationExpr(Call);
 }
 
-/// Store 'Val' to 'VD'.  If VD is an @override of another value, we call the
-/// superclass setter.  Otherwise, we do a direct store of the value.
-static void createPropertyStoreOrCallSuperclassSetter(Expr *Val, VarDecl *VD,
-                                                      VarDecl *SelfDecl,
-                                            SmallVectorImpl<ASTNode> &Result,
+/// In a synthesized accessor body, store 'value' to the appropriate element.
+///
+/// If the property is an override, we call the superclass setter.
+/// Otherwise, we do a direct store of the value.
+static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
+                                                      Expr *value,
+                                               AbstractStorageDecl *storage,
+                                               SmallVectorImpl<ASTNode> &body,
                                                       TypeChecker &TC) {
-  auto &Ctx = VD->getASTContext();
-
-  // If this property is @NSCopying, then we store the result of a copyWithZone
-  // call on the value, not the value itself.
-  if (VD->getAttrs().hasAttribute<NSCopyingAttr>())
-    Val = synthesizeCopyWithZoneCall(Val, VD, TC);
+  // If the storage is an @NSCopying property, then we store the
+  // result of a copyWithZone call on the value, not the value itself.
+  if (auto property = dyn_cast<VarDecl>(storage)) {
+    if (property->getAttrs().hasAttribute<NSCopyingAttr>())
+      value = synthesizeCopyWithZoneCall(value, property, TC);
+  }
 
   // Create:
   //   (assign (decl_ref_expr(VD)), decl_ref_expr(value))
   // or:
   //   (assign (member_ref_expr(decl_ref_expr(self), VD)), decl_ref_expr(value))
-  Expr *Dest;
-  if (!SelfDecl) {
-    Dest = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
-                                 AccessKind::DirectToStorage);
-  } else if (VD->getOverriddenDecl() == nullptr) {
-    auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
-    Dest = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
-                                   /*implicit*/true,
-                                   AccessKind::DirectToStorage);
-  } else {
-    auto *SRE = new (Ctx) SuperRefExpr(SelfDecl, SourceLoc(), /*implicit*/true);
-    Dest = new (Ctx) UnresolvedDotExpr(SRE, SourceLoc(), VD->getName(),
-                                       SourceLoc(), /*implicit*/true);
-  }
-  Result.push_back(new (Ctx) AssignExpr(Dest, SourceLoc(), Val, true));
+  Expr *dest = buildStorageReference(accessor, storage,
+                                     AccessKind::DirectToStorage,
+                                     SelfAccessKind::Super, TC);
+
+  body.push_back(new (TC.Context) AssignExpr(dest, SourceLoc(), value,
+                                             IsImplicit));
 }
 
 
@@ -1735,41 +1873,39 @@ static void createPropertyStoreOrCallSuperclassSetter(Expr *Val, VarDecl *VD,
 /// which is not an override of a base class property, it performs a a direct
 /// storage load.  For an override of a base member property, it chains up to
 /// super.
-///
-static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD,
+static void synthesizeTrivialGetter(FuncDecl *getter,
+                                    AbstractStorageDecl *storage,
                                     TypeChecker &TC) {
-  auto &Ctx = VD->getASTContext();
-  VarDecl *SelfDecl = Get->getImplicitSelfDecl();
+  auto &ctx = TC.Context;
   
-  Expr *GetResult = createPropertyLoadOrCallSuperclassGetter(VD, SelfDecl);
-  ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), GetResult,
-                                        /*implicit*/true);
+  Expr *result = createPropertyLoadOrCallSuperclassGetter(getter, storage, TC);
+  ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
 
-  SourceLoc Loc = VD->getLoc();
-  Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
+  SourceLoc loc = storage->getLoc();
+  getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc));
 
   // Mark it transparent, there is no user benefit to this actually existing, we
   // just want it for abstraction purposes (i.e., to make access to the variable
   // uniform and to be able to put the getter in a vtable).
-  Get->getAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
+  getter->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
 }
 
 /// Synthesize the body of a trivial setter.
-static void synthesizeTrivialSetter(FuncDecl *Set, VarDecl *VD,
-                                    VarDecl *ValueDecl, TypeChecker &TC) {
-  auto &Ctx = VD->getASTContext();
-  SourceLoc Loc = VD->getLoc();
+static void synthesizeTrivialSetter(FuncDecl *setter,
+                                    AbstractStorageDecl *storage,
+                                    VarDecl *valueVar,
+                                    TypeChecker &TC) {
+  auto &ctx = TC.Context;
+  SourceLoc loc = storage->getLoc();
 
-  VarDecl *SelfDecl = Set->getImplicitSelfDecl();
-
-  auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
-  SmallVector<ASTNode, 1> SetterBody;
-  createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD, SelfDecl,
-                                            SetterBody, TC);
-  Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
+  auto *valueDRE = new (ctx) DeclRefExpr(valueVar, SourceLoc(), IsImplicit);
+  SmallVector<ASTNode, 1> setterBody;
+  createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storage,
+                                            setterBody, TC);
+  setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc));
 
   // Mark it transparent, there is no user benefit to this actually existing.
-  Set->getAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
+  setter->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
 }
 
 /// Build the result expression of a materializeForSet accessor.
@@ -1792,17 +1928,6 @@ static Expr *buildMaterializeForSetResult(ASTContext &ctx, Expr *address,
                            SourceLoc(), false, IsImplicit);
 }
 
-/// Build a tuple around the given arguments.
-static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
-  if (args.size() == 1) {
-    return args[0];
-  }
-  SmallVector<Identifier, 4> labels(args.size());
-  SmallVector<SourceLoc, 4> labelLocs(args.size());
-  return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
-                           SourceLoc(), false, IsImplicit);
-}
-
 /// Create a call to the builtin function with the given name.
 static Expr *buildCallToBuiltin(ASTContext &ctx, StringRef builtinName,
                                 ArrayRef<Expr*> args) {
@@ -1810,76 +1935,6 @@ static Expr *buildCallToBuiltin(ASTContext &ctx, StringRef builtinName,
   Expr *builtinDRE = new (ctx) DeclRefExpr(builtin, SourceLoc(), IsImplicit);
   Expr *arg = buildTupleExpr(ctx, args);
   return new (ctx) CallExpr(builtinDRE, arg, IsImplicit);
-}
-
-static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
-                                         ArrayRef<TuplePatternElt> params,
-                                    ArrayRef<TupleTypeElt> formalIndexTypes) {
-  assert(params.size() == formalIndexTypes.size());
-
-  // FIXME: do we need to preserve labels in order to disambiguate
-  // subscripts?
-  SmallVector<Identifier, 4> labels;
-  SmallVector<SourceLoc, 4> labelLocs;
-  SmallVector<Expr *, 4> args;
-
-  for (unsigned i = 0, e = params.size(); i != e; ++i) {
-    const Pattern *param = params[i].getPattern();
-    args.push_back(param->buildForwardingRefExpr(ctx));
-    labels.push_back(formalIndexTypes[i].getName());
-    labelLocs.push_back(SourceLoc());
-  }
-
-  // A single unlabelled value is not a tuple.
-  if (args.size() == 1 && labels[0].empty())
-    return args[0];
-
-  return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
-                           SourceLoc(), false, IsImplicit);
-}
-
-/// Build a reference to the subscript index variables for this
-/// subscript accessor.
-static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
-  // Pull out the body parameters, which we cloned previously to be
-  // forwardable, and drop the final buffer parameter.
-  auto paramTuple = cast<TuplePattern>(accessor->getBodyParamPatterns().back());
-  auto params = paramTuple->getFields().slice(1);
-
-  // Look for formal subscript labels.
-  auto subscript = cast<SubscriptDecl>(accessor->getAccessorStorageDecl());
-  auto indexType = subscript->getIndicesType();
-  if (auto indexTuple = indexType->getAs<TupleType>()) {
-    return buildTupleForwardingRefExpr(ctx, params, indexTuple->getFields());
-  } else {
-    return buildTupleForwardingRefExpr(ctx, params, TupleTypeElt(indexType));
-  }
-}
-
-/// Build an l-value for the storage of a declaration.
-static Expr *buildStorageReference(FuncDecl *accessor,
-                                   AbstractStorageDecl *storage,
-                                   AccessKind accessKind,
-                                   TypeChecker &TC) {
-  ASTContext &ctx = TC.Context;
-
-  VarDecl *selfDecl = accessor->getImplicitSelfDecl();
-  if (!selfDecl) {
-    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit, accessKind);
-  }
-
-  Expr *selfDRE = new (ctx) DeclRefExpr(selfDecl, SourceLoc(), IsImplicit);
-  if (isa<SubscriptDecl>(storage)) {
-    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
-    return new (ctx) SubscriptExpr(selfDRE, indices, ConcreteDeclRef(),
-                                   IsImplicit, accessKind);
-  }
-
-  // This is a potentially polymorphic access, which is unnecessary;
-  // however, it shouldn't be problematic because any overrides
-  // should also redefine materializeForSet.
-  return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
-                                 SourceLoc(), IsImplicit, accessKind);
 }
 
 /// Synthesize the body of a materializeForSet accessor for a stored
@@ -1892,7 +1947,8 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
 
   // return (Builtin.addressof(&self.property), false)
   Expr *result = buildStorageReference(materializeForSet, storage,
-                                       AccessKind::DirectToStorage, TC);
+                                       AccessKind::DirectToStorage,
+                                       SelfAccessKind::Peer, TC);
   result = new (ctx) InOutExpr(SourceLoc(), result, Type(), IsImplicit);
   result = buildCallToBuiltin(ctx, "addressof", result);
   result = buildMaterializeForSetResult(ctx, result, /*using buffer*/ false);
@@ -1915,54 +1971,70 @@ static void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
                                         AbstractStorageDecl *storage,
                                         TypeChecker &TC);
 
+static bool doesStoredPropertyNeedSetter(AbstractStorageDecl *storage) {
+  // Addressed storage gets a setter if it has a mutable addressor.
+  if (storage->hasAddressors())
+    return storage->getMutableAddressor() != nullptr;
+
+  // Non-addressed subscripts can't be stored, so this must be a var.
+  // Add a setter unless it's a let.
+  auto var = cast<VarDecl>(storage);
+  return !var->isLet();
+}
+
 /// Given a "Stored" property that needs to be converted to
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
 /// the storage kind.
-static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
-  assert(VD->getStorageKind() == VarDecl::Stored && "Isn't a stored vardecl");
+static void addAccessorsToStoredVar(AbstractStorageDecl *storage,
+                                    TypeChecker &TC) {
+  assert(storage->getStorageKind() == AbstractStorageDecl::Stored &&
+         "Isn't a stored decl");
 
-  auto *Get = createGetterPrototype(VD, TC);
-  synthesizeTrivialGetter(Get, VD, TC);
+  // Create the getter.
+  auto *getter = createGetterPrototype(storage, TC);
 
-  FuncDecl *Set = nullptr;
-  if (!VD->isLet()) {
-    // Okay, the getter is set up, create the setter next.
-    VarDecl *ValueDecl = nullptr;
-    Set = createSetterPrototype(VD, ValueDecl, TC);
-    synthesizeTrivialSetter(Set, VD, ValueDecl, TC);
+  // Create the setter.
+  FuncDecl *setter = nullptr;
+  VarDecl *setterValueParam = nullptr;
+  if (doesStoredPropertyNeedSetter(storage)) {
+    setter = createSetterPrototype(storage, setterValueParam, TC);
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeStoredWithTrivialAccessors(Get, Set, nullptr);
+  storage->makeStoredWithTrivialAccessors(getter, setter, nullptr);
 
-  bool IsDynamic = (VD->isDynamic() && VD->isObjC());
-  if (IsDynamic)
-    Get->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit=*/true));
+  bool isDynamic = (storage->isDynamic() && storage->isObjC());
+  if (isDynamic)
+    getter->getAttrs().add(new (TC.Context) DynamicAttr(IsImplicit));
 
-  // Type check the body of the getter.
-  TC.typeCheckDecl(Get, true);
-  TC.typeCheckDecl(Get, false);
+  // Synthesize and type-check the body of the getter.
+  synthesizeTrivialGetter(getter, storage, TC);
+  TC.typeCheckDecl(getter, true);
+  TC.typeCheckDecl(getter, false);
 
-  if (Set) {
-    if (IsDynamic)
-      Set->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit=*/true));
-    TC.typeCheckDecl(Set, true);
-    TC.typeCheckDecl(Set, false);
+  if (setter) {
+    if (isDynamic)
+      setter->getAttrs().add(new (TC.Context) DynamicAttr(IsImplicit));
+
+    // Synthesize and type-check the body of the setter.
+    synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
+    TC.typeCheckDecl(setter, true);
+    TC.typeCheckDecl(setter, false);
   }
 
   // We've added some members to our containing type, add them to the
   // members list.
-  addMemberToContextIfNeeded(Get, VD->getDeclContext());
-  if (Set)
-    addMemberToContextIfNeeded(Set, VD->getDeclContext());
+  addMemberToContextIfNeeded(getter, storage->getDeclContext());
+  if (setter)
+    addMemberToContextIfNeeded(setter, storage->getDeclContext());
 
   // Always add a materializeForSet when we're creating trivial
   // accessors for a mutable stored property.  We only do this when we
   // need to be able to access something polymorphicly, and we always
   // want a materializeForSet in such situations.
-  if (Set) {
-    FuncDecl *materializeForSet = addMaterializeForSet(VD, TC);
-    synthesizeMaterializeForSet(materializeForSet, VD, TC);
+  if (setter) {
+    FuncDecl *materializeForSet = addMaterializeForSet(storage, TC);
+    synthesizeMaterializeForSet(materializeForSet, storage, TC);
     TC.typeCheckDecl(materializeForSet, true);
     TC.typeCheckDecl(materializeForSet, false);
   }
@@ -1977,9 +2049,7 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
   // If the decl is stored, convert it to StoredWithTrivialAccessors
   // by synthesizing the full set of accessors.
   if (!storage->hasAccessorFunctions()) {
-    assert(isa<VarDecl>(storage) && "stored subscript decl?");
-    auto var = cast<VarDecl>(storage);
-    addAccessorsToStoredVar(var, *this);
+    addAccessorsToStoredVar(storage, *this);
     return;
   }
 
@@ -2009,7 +2079,8 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
 
   // Builtin.initialize(self.property, buffer)
   Expr *curValue = buildStorageReference(materializeForSet, storage,
-                                         AccessKind::DirectToAccessor, TC);
+                                         AccessKind::DirectToAccessor,
+                                         SelfAccessKind::Peer, TC);
   Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
   ASTNode assignment = buildCallToBuiltin(ctx, "initialize",
                                           { curValue, bufferRef });
@@ -2030,6 +2101,9 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
   TC.typeCheckDecl(materializeForSet, true);
 }
 
+/// Is an access to an element of the given abstract storage decl
+/// sufficiently direct that we can implement its materializeForSet
+/// with the stored access pattern?
 static bool isLValueDirectAccess(AbstractStorageDecl *storage) {
   switch (storage->getStorageKind()) {
   case AbstractStorageDecl::Stored:
@@ -2103,7 +2177,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   VarDecl *OldValue = nullptr;
   if (VD->getDidSetFunc()) {
     Expr *OldValueExpr
-      = createPropertyLoadOrCallSuperclassGetter(VD, SelfDecl);
+      = createPropertyLoadOrCallSuperclassGetter(Set, VD, TC);
     
     OldValue = new (Ctx) ParamDecl(/*isLet*/ true,
                                    SourceLoc(), Identifier(),
@@ -2144,8 +2218,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
-  createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD, SelfDecl, SetterBody,
-                                            TC);
+  createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, SetterBody, TC);
 
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
@@ -2250,7 +2323,6 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   //   }
   auto *Get = VD->getGetter();
   TC.validateDecl(Get);
-  VarDecl *SelfDecl = Get->getImplicitSelfDecl();
 
   SmallVector<ASTNode, 6> Body;
 
@@ -2260,7 +2332,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   Tmp1VD->setImplicit();
 
   auto *Tmp1PBDPattern = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
-  auto *Tmp1Init = createPropertyLoadOrCallSuperclassGetter(Storage, SelfDecl);
+  auto *Tmp1Init = createPropertyLoadOrCallSuperclassGetter(Get, Storage, TC);
   auto *Tmp1PBD = new (Ctx) PatternBindingDecl(/*StaticLoc*/SourceLoc(),
                                                StaticSpellingKind::None,
                                                /*VarLoc*/SourceLoc(),
@@ -2329,8 +2401,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // Assign tmp2 into storage.
   auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
                                        AccessKind::DirectToStorage);
-  createPropertyStoreOrCallSuperclassSetter(Tmp2DRE, Storage, SelfDecl,
-                                            Body, TC);
+  createPropertyStoreOrCallSuperclassSetter(Get, Tmp2DRE, Storage, Body, TC);
 
   // Return tmp2.
   Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
@@ -3708,7 +3779,9 @@ public:
 
     validateAttributes(TC, SD);
 
-    maybeAddMaterializeForSet(SD, TC);
+    if (SD->hasAccessorFunctions()) {
+      maybeAddMaterializeForSet(SD, TC);
+    }
 
     // If this variable is marked final and has a getter or setter, mark the
     // getter and setter as final as well.

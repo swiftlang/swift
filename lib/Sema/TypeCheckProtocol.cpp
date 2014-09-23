@@ -426,6 +426,38 @@ static std::pair<Type,Type> getTypesToCompare(ValueDecl *reqt, Type reqtType,
   return {reqtType, witnessType};
 }
 
+// Given that we're looking at a stored property, should we use the
+// mutating rules for the setter or the getter when trying to match
+// the given requirement?
+static bool shouldUseSetterRequirements(AccessorKind reqtKind) {
+  // We have cases for addressors here because we might reasonably
+  // allow them as protocol requirements someday.
+
+  switch (reqtKind) {
+  case AccessorKind::IsGetter:
+  case AccessorKind::IsAddressor:
+    return false;
+
+  case AccessorKind::IsSetter:
+  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::IsMaterializeForSet:
+    return true;
+
+  case AccessorKind::NotAccessor:
+  case AccessorKind::IsWillSet:
+  case AccessorKind::IsDidSet:
+    llvm_unreachable("willSet/didSet protocol requirement?");
+  }
+  llvm_unreachable("bad accessor kind");
+}
+
+static FuncDecl *getAddressorForRequirement(AbstractStorageDecl *witness,
+                                            AccessorKind reqtKind) {
+  assert(witness->hasAddressors());
+  if (shouldUseSetterRequirements(reqtKind))
+    return witness->getMutableAddressor();
+  return witness->getAddressor();
+}
 
 // Verify that the mutating bit is correct between a protocol requirement and a
 // witness.  This returns true on invalid.
@@ -444,7 +476,22 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
     witnessMutating = witness->isMutating();
   else {
     assert(requirement->isAccessor());
-    witnessMutating = requirement->isSetter();
+    auto storage = cast<AbstractStorageDecl>(witnessDecl);
+    assert(storage->getStorageKind() == AbstractStorageDecl::Stored &&
+           "missing witness reference for non-stored property?");
+
+    // For an addressed property, consider the appropriate addressor.
+    if (storage->hasAddressors()) {
+      auto addressor =
+        getAddressorForRequirement(storage, requirement->getAccessorKind());
+      witnessMutating = addressor->isMutating();
+
+    // A stored property on a value type will have a mutating setter
+    // and a non-mutating getter.
+    } else {
+      witnessMutating =
+        shouldUseSetterRequirements(requirement->getAccessorKind());
+    }
   }
   
   // If the requirement is for a nonmutating member, then the witness may not
@@ -522,16 +569,35 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     if (req->isSettable(req->getDeclContext()) &&
         !witness->isSettable(witness->getDeclContext()))
       return RequirementMatch(witness, MatchKind::SettableConflict);
+
+    // Find a standin declaration to place the diagnostic at for the
+    // given accessor kind.
+    auto getStandinForAccessor = [&](AccessorKind kind) -> ValueDecl* {
+      // If the witness actually explicitly provided that accessor,
+      // then great.
+      if (auto accessor = witnessASD->getAccessorFunction(kind))
+        if (!accessor->isImplicit())
+          return accessor;
+
+      // If it didn't, check to see if it provides something else.
+      if (witnessASD->hasAddressors()) {
+        return getAddressorForRequirement(witnessASD, kind);
+      }
+
+      // Otherwise, just diagnose starting at the storage declaration
+      // itself.
+      return witnessASD;
+    };
     
     // Validate that the 'mutating' bit lines up for getters and setters.
     if (checkMutating(reqASD->getGetter(), witnessASD->getGetter(),
                       witnessASD))
-      return RequirementMatch(witnessASD->getGetter(),
+      return RequirementMatch(getStandinForAccessor(AccessorKind::IsGetter),
                               MatchKind::MutatingConflict);
     
     if (req->isSettable(req->getDeclContext()) &&
         checkMutating(reqASD->getSetter(), witnessASD->getSetter(), witnessASD))
-      return RequirementMatch(witnessASD->getSetter(),
+      return RequirementMatch(getStandinForAccessor(AccessorKind::IsSetter),
                               MatchKind::MutatingConflict);
 
     // Decompose the parameters for subscript declarations.

@@ -2581,17 +2581,19 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
         case AccessorKind::NotAccessor:
           break;
 
+        // These don't have any extra implicit parameters.
+        case AccessorKind::IsAddressor:
+        case AccessorKind::IsMutableAddressor:
         case AccessorKind::IsGetter:
           return subscript ? subscript->getFullName()
                            : DeclName(ctx, afd->getName(), { });
 
         case AccessorKind::IsSetter:
         case AccessorKind::IsMaterializeForSet:
-        case AccessorKind::IsAddressor:
-        case AccessorKind::IsMutableAddressor:
         case AccessorKind::IsDidSet:
         case AccessorKind::IsWillSet: {
           SmallVector<Identifier, 4> argNames;
+          // The implicit value/buffer parameter.
           argNames.push_back(Identifier());
           if (subscript) {
             argNames.append(subscript->getFullName().getArgumentNames().begin(),

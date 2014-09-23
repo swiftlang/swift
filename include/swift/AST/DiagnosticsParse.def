@@ -155,9 +155,11 @@ ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
 ERROR(let_cannot_be_computed_property,decl_parsing,none,
-      "'let' declarations cannot be a computed property", ())
+      "'let' declarations cannot be computed properties", ())
 ERROR(let_cannot_be_observing_property,decl_parsing,none,
-      "'let' declarations cannot be an observing property", ())
+      "'let' declarations cannot be observing properties", ())
+ERROR(let_cannot_be_addressed_property,decl_parsing,none,
+      "'let' declarations cannot have addressors", ())
 ERROR(disallowed_var_multiple_getset,decl_parsing,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
@@ -220,19 +222,28 @@ ERROR(expected_lbrace_accessor,decl_parsing,PointsToFirstBadToken,
       "expected '{' to start %select{getter|setter|willSet|didSet}0 definition",
      (unsigned))
 ERROR(expected_accessor_kw,decl_parsing,none,
-      "expected 'get', 'set', 'willSet' or 'didSet' keyword to start "
-      "an accessor definition",())
+      "expected 'get', 'set', 'address', 'mutableAddress', 'willSet', "
+      "or 'didSet' keyword to start an accessor definition",())
 ERROR(var_set_without_get,decl_parsing,none,
       "variable with a setter must also have a getter", ())
 ERROR(observingproperty_with_getset,decl_parsing,none,
       "%select{willSet|didSet}0 variable may not also have a "
       "%select{get|set}1 specifier", (unsigned, unsigned))
+ERROR(observingproperty_without_mutableaddress,decl_parsing,none,
+      "%select{willSet|didSet}0 variable with addressor must provide a "
+      "'mutableAddress' accessor", (unsigned))
 ERROR(observingproperty_in_subscript,decl_parsing,none,
       "%select{willSet|didSet}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_init,decl_parsing,none,
       "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,decl_parsing,none,
       "variable with implied type cannot have implied getter/setter", ())
+ERROR(mutableaddress_without_address,decl_parsing,none,
+      "%select{variable|subscript}0 must provide 'address' if it provides "
+      "'mutableAddress'", (unsigned))
+ERROR(addressor_with_getset,decl_parsing,none,
+      "%select{variable|subscript}0 cannot provide both an addressor and "
+      "a getter/setter", (unsigned))
 
 // Import
 ERROR(decl_expected_module_name,decl_parsing,none,
