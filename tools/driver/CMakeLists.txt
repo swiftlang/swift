@@ -5,7 +5,7 @@ add_swift_executable(swift
   DEPENDS swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftImmediate
           swiftSerialization swiftFrontend swiftClangImporter swiftIDE 
           swiftPrintAsObjC swiftOption
-  COMPONENT_DEPENDS bitreader bitwriter codegen ipo jit linker mcjit asmparser
+  COMPONENT_DEPENDS bitreader bitwriter codegen ipo linker mcjit asmparser
                     selectiondag ${LLVM_TARGETS_TO_BUILD})
 
 find_library(CORE_FOUNDATION NAMES CoreFoundation)
