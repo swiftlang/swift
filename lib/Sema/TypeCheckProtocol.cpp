@@ -1546,7 +1546,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 namespace {
   /// Describes the result of checking a type witness.
   ///
-  /// This class evaluates true if an error occurred, and can be
+  /// This class evaluates true if an error occurred.
   class CheckTypeWitnessResult {
     ProtocolDecl *Proto = nullptr;
 

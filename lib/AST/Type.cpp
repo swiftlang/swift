@@ -2205,9 +2205,8 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
 Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
                                LazyResolver *resolver, Type memberType) {
   // If no member type was provided, use the member's type.
-  // FIXME: Use interface type here.
   if (!memberType)
-    memberType = member->getType();
+    memberType = member->getInterfaceType();
 
   // If the member is not part of a type, there's nothing to substitute.
   auto memberDC = member->getDeclContext();
@@ -2234,6 +2233,9 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
     // for a single substitution.
     TypeSubstitutionMap substitutions;
     substitutions[memberProtocol->getSelf()->getArchetype()] = baseTy;
+    substitutions[memberProtocol->getSelf()->getDeclaredType()
+                    ->getCanonicalType()->castTo<GenericTypeParamType>()]
+      = baseTy;
     return memberType.subst(module, substitutions, /*ignoreMissing=*/false,
                             resolver);
   }
