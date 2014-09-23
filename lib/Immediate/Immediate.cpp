@@ -370,7 +370,6 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
   builder.setErrorStr(&ErrorMsg);
-  builder.setUseMCJIT(true);
   builder.setEngineKind(llvm::EngineKind::JIT);
   llvm::ExecutionEngine *EE = builder.create();
   if (!EE) {
@@ -1152,7 +1151,6 @@ public:
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
     builder.setErrorStr(&ErrorMsg);
-    builder.setUseMCJIT(true);
     builder.setEngineKind(llvm::EngineKind::JIT);
     EE = builder.create();
 
