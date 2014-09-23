@@ -131,6 +131,13 @@ public func ==(lhs: Selector, rhs: Selector) -> Bool {
 }
 
 extension Selector : Equatable, Hashable {
+  /// The hash value.
+  ///
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  ///
+  /// **Note:** the hash value is not guaranteed to be stable across
+  /// different invocations of the same program.  Do not persist the
+  /// hash value across program runs.
   public var hashValue: Int {
     return ptr.hashValue
   }
