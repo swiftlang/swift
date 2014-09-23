@@ -16,14 +16,14 @@ func takes_inout(inout a: Int) {}
 func takes_closure(fn: () -> ()) {}
 
 class SomeClass { 
-  var x : Int
+  var x : Int   // expected-note {{'self.x' not initialized}}
   
   var computedProperty : Int { return 42 }
 
   init() { x = 0 }
   init(b : Bool) {
     if (b) {}
-  } // expected-error {{property 'self.x' not initialized}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
   
   func baseMethod() {}
 }
@@ -374,7 +374,7 @@ class SomeDerivedClass : SomeClass {
 
   init(a : Bool, b : Bool) {
     // x is a superclass member.  It cannot be used before we are initialized.
-    x = 17  // expected-error {{use of property 'x' in base object before super.init}}
+    x = 17  // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
     y = 42
     super.init()
   }
@@ -398,7 +398,7 @@ class SomeDerivedClass : SomeClass {
   init(a : Bool, b : Bool, c : Bool, d : Bool, e : Bool, f : Bool) {
     y = 11
     if a { super.init() }
-    x = 42        // expected-error {{use of property 'x' in base object before super.init}}
+    x = 42        // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
   }               // expected-error {{super.init isn't called before returning from initializer}}
   
   func someMethod() {}
@@ -410,18 +410,18 @@ class SomeDerivedClass : SomeClass {
 
   init(a : Int, b : Bool) {
     y = 42
-    someMethod() // expected-error {{'self' used before super.init call}}
+    someMethod() // expected-error {{use of 'self' in method call 'someMethod' before super.init initializes self}}
     super.init()
   }
 
   init(a : Int, b : Int) {
     y = 42
-    baseMethod()  // expected-error {{use of method 'baseMethod' in base object before super.init initializes it}}
+    baseMethod()  // expected-error {{use of 'self' in method call 'baseMethod' before super.init initializes self}}
     super.init()
   }
   
   init(a : Int, b : Int, c : Int) {
-    y = computedProperty  // expected-error {{use of property 'computedProperty' in base object before super.init initializes it}}
+    y = computedProperty  // expected-error {{use of 'self' in property access 'computedProperty' before super.init initializes self}}
     super.init()
   }
 
@@ -545,7 +545,7 @@ class RequiresInitsDerived : Gizmo {
   } // expected-error{{super.init isn't called before returning from initializer}}
 
   init(d: Double) {
-    f() // expected-error {{'self' used before super.init call}}
+    f() // expected-error {{use of 'self' in method call 'f' before super.init initializes self}}
     super.init()
   }
 
@@ -682,8 +682,96 @@ class r18199087BaseClass {
 }
 class r18199087SubClassA: r18199087BaseClass {
   init() {
-    super.init(val: self.data)  // expected-error {{use of property 'data' in base object before super.init initializes it}}
+    super.init(val: self.data)  // expected-error {{use of 'self' in property access 'data' before super.init initializes self}}
   }
+}
+
+// <rdar://problem/18414728> QoI: DI should talk about "implicit use of self" instead of individual properties in some cases
+class rdar18414728Base {
+  var prop:String? { return "boo" }
+
+  let aaaaa:String  // expected-note 3 {{'self.aaaaa' not initialized}}
+
+  init() {
+    if let p1 = prop { // expected-error {{use of 'self' in property access 'prop' before all stored properties are initialized}}
+      aaaaa = p1
+    }
+    aaaaa = "foo"
+  }
+
+  init(a : ()) {
+    method1(42)   // expected-error {{use of 'self' in method call 'method1' before all stored properties are initialized}}
+    aaaaa = "foo"
+  }
+
+  init(b : ()) {
+    final_method() // expected-error {{use of 'self' in method call 'final_method' before all stored properties are initialized}}
+    aaaaa = "foo"
+  }
+
+  init(c : ()) {
+    aaaaa = "foo"
+    final_method()  // ok
+  }
+
+  func method1(a : Int) {}
+  final func final_method() {}
+}
+
+class rdar18414728Derived : rdar18414728Base {
+  var prop2:String? { return "boo" }
+
+  let aaaaa2:String
+
+  override init() {
+    if let p1 = prop2 {  // expected-error {{use of 'self' in property access 'prop2' before super.init initializes self}}
+      aaaaa2 = p1
+    }
+    aaaaa2 = "foo"
+    super.init()
+  }
+
+  override init(a : ()) {
+    method2()            // expected-error {{use of 'self' in method call 'method2' before super.init initializes self}}
+    aaaaa2 = "foo"
+    super.init()
+  }
+
+  override init(b : ()) {
+    aaaaa2 = "foo"
+    method2()           // expected-error {{use of 'self' in method call 'method2' before super.init initializes self}}
+    super.init()
+  }
+
+  override init(c : ()) {
+    super.init()        // expected-error {{property 'self.aaaaa2' not initialized at super.init call}}
+    aaaaa2 = "foo"
+    method2()
+  }
+
+  func method2() {}
+}
+
+struct rdar18414728Struct {
+  var computed:Int? { return 4 }
+
+  var i : Int  // expected-note 2 {{'self.i' not initialized}}
+  var j : Int  // expected-note {{'self.j' not initialized}}
+
+  init() {
+    j = 42
+    if let p1 = computed { // expected-error {{'self' used before all stored properties are initialized}}
+      i = p1
+    }
+    i = 1
+  }
+  init(a : ()) {
+    method(42)     // expected-error {{'self' used before all stored properties are initialized}}
+    i = 1
+    j = 2
+  }
+
+  func method(a : Int) {}
 }
 
 

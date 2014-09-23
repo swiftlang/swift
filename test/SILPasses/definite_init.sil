@@ -549,9 +549,9 @@ bb2:
 /// Root class tests.
 
 class RootClassWithIVars {
-  var x: Int
+  var x: Int          // expected-note {{'self.x' not initialized}}
   var y: Int
-  var z: (Int, Int)
+  var z: (Int, Int)   // expected-note 2 {{'self.z.1' not initialized}} expected-note {{'self.z.0' not initialized}}
   init()
 }
 
@@ -591,7 +591,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %13 = tuple_element_addr %12 : $*(Int, Int), 0
   assign %1 to %13 : $*Int
 
-  return %3 : $RootClassWithIVars  // expected-error {{property '<unknown>.z.1' not initialized}}
+  return %3 : $RootClassWithIVars  // expected-error {{return from initializer without initializing all stored properties}}
 }
 
 // CHECK-LABEL: sil @rootclass_test3
@@ -602,7 +602,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
   assign %1 to %11 : $*Int
 
-  return %3 : $RootClassWithIVars    // expected-error {{property '<unknown>.x' not initialized}}
+  return %3 : $RootClassWithIVars    // expected-error {{return from initializer without initializing all stored properties}}
 }
 
 class DerivedClassWithIVars : RootClassWithIVars {
@@ -877,7 +877,7 @@ bb0(%0 : $DerivedClassWithIVars, %i : $Int):
 
   // Access a super property before super.init is called.
   %a = load %1#1 : $*DerivedClassWithIVars
-  %b = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars  // expected-error {{use of property 'x' in base object before super.init initializes it}}
+  %b = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars  // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
   %c = ref_element_addr %b : $RootClassWithIVars, #RootClassWithIVars.x
   load %c : $*Int
 

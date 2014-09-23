@@ -6,7 +6,7 @@ struct A {
 }
 
 struct B {
-  var a : A
+  var a : A  // expected-note 3 {{'self.a' not initialized}}
 }
 
 func locals() {
@@ -27,7 +27,7 @@ var c : C
 extension B {
   init() {
     // The usage is that self.a is returned from init() as part of self.
-  } // expected-error {{variable 'self.a' used before being initialized}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
 
   init(inA : A) { // okay
     a = inA
@@ -47,10 +47,10 @@ extension B {
 
   init(j : Int, x : Bool) {
     if true { a = A(i: j) }
-  } // expected-error {{variable 'self.a' used before being initialized}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
 
   init(i : Int, x : Bool, y : Bool) {
-    a = A(i: a.i)    // expected-error {{variable 'self.a' used before being initialized}}
+    a = A(i: a.i)    // expected-error {{'self' used before all stored properties are initialized}}
   }
 
   // Initializing the whole struct at once.
