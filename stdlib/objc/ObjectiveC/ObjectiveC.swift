@@ -44,7 +44,7 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
   }
 #endif
 
-  /// Allow use in a Boolean context.
+  /// The value of `self`, expressed as a `Bool`.
   public var boolValue: Bool {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
     return value != 0

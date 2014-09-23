@@ -41,6 +41,7 @@ extension Bool : BooleanType {
     return value
   }
 
+  /// Identical to `self`.
   @transparent public var boolValue: Bool { return self }
 
   // Bool can be constructed from BooleanType

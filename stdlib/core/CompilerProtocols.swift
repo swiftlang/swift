@@ -22,6 +22,7 @@
 /// to `BooleanType`. Expanding this set to include types that
 /// represent more than simple boolean values is discouraged.
 public protocol BooleanType {
+  /// The value of `self`, expressed as a `Bool`.
   var boolValue: Bool { get }
 }
 
