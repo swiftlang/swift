@@ -104,30 +104,40 @@ extension Bit : IntegerArithmeticType {
     return (Bit(rawValue: v.0)!, v.overflow)
   }
   
+  /// Add `lhs` and `rhs`, returning a result and a `Bool` that is
+  /// true iff the operation caused an arithmetic overflow.
   public static func addWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.addWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
+  /// Subtract `lhs` and `rhs`, returning a result and a `Bool` that is
+  /// true iff the operation caused an arithmetic overflow.
   public static func subtractWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.subtractWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
+  /// Multiply `lhs` and `rhs`, returning a result and a `Bool` that is
+  /// true iff the operation caused an arithmetic overflow.
   public static func multiplyWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.multiplyWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
+  /// Divide `lhs` and `rhs`, returning a result and a `Bool` that is
+  /// true iff the operation caused an arithmetic overflow.
   public static func divideWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.divideWithOverflow(lhs.rawValue, rhs.rawValue))
   }
 
+  /// Divide `lhs` and `rhs`, returning the remainder and a `Bool` that is
+  /// true iff the operation caused an arithmetic overflow.
   public static func remainderWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
