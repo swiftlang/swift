@@ -80,12 +80,12 @@ class NSSimpleCString {}
 @availability(*, unavailable, message="Please use String or NSString") public
 class NSConstantString {}
 
-@asmname("swift_convertStringToNSString") internal
+@asmname("swift_convertStringToNSString") public
 func _convertStringToNSString(string: String) -> NSString {
   return string._bridgeToObjectiveC()
 }
 
-internal func _convertNSStringToString(nsstring: NSString) -> String {
+public func _convertNSStringToString(nsstring: NSString) -> String {
   var result: String?
   String._forceBridgeFromObjectiveC(nsstring, result: &result)
   return result!

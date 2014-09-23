@@ -13,7 +13,7 @@
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
 /// UnsafeMutablePointer, UnsafePointer, and
 /// AutoreleasingUnsafeMutablePointer.
-protocol _PointerType {
+public protocol _PointerType {
   /// The underlying raw pointer value.
   var value: Builtin.RawPointer { get }
 
@@ -22,7 +22,7 @@ protocol _PointerType {
 }
 
 /// Derive a pointer argument from a convertible pointer type.
-@transparent
+@transparent public
 func _convertPointerToPointerArgument<
   FromPointer: _PointerType,
   ToPointer: _PointerType
@@ -31,7 +31,7 @@ func _convertPointerToPointerArgument<
 }
 
 /// Derive a pointer argument from the address of an inout parameter.
-@transparent
+@transparent public
 func _convertInOutToPointerArgument<
   ToPointer: _PointerType
 >(from: Builtin.RawPointer) -> ToPointer {
@@ -39,7 +39,7 @@ func _convertInOutToPointerArgument<
 }
 
 /// Derive a pointer argument from an inout array parameter.
-@transparent
+@transparent public
 func _convertMutableArrayToPointerArgument<
   FromElement,
   ToPointer: _PointerType
@@ -55,7 +55,7 @@ func _convertMutableArrayToPointerArgument<
 }
 
 /// Derive a pointer argument from a value array parameter.
-@transparent
+@transparent public
 func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _PointerType
@@ -65,7 +65,7 @@ func _convertConstArrayToPointerArgument<
 }
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
-@transparent
+@transparent public
 func _convertConstStringToUTF8PointerArgument<
   ToPointer: _PointerType
 >(str: String) -> (AnyObject?, ToPointer) {

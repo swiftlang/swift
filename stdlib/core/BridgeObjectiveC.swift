@@ -348,9 +348,9 @@ var _nilRawPointer: Builtin.RawPointer {
 /// already have writeback-scoped lifetime.
 public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   : Equatable, NilLiteralConvertible, _PointerType {
-  let value: Builtin.RawPointer
+  public let value: Builtin.RawPointer
 
-  @transparent
+  @transparent public
   init(_ value: Builtin.RawPointer) {
     self.value = value
   }
