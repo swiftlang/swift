@@ -160,15 +160,15 @@ extension CGFloat : Reflectable {
 }
 
 @transparent extension CGFloat : FloatLiteralConvertible {
-  public 
-  init(floatLiteral value: NativeType) {
+  /// Create an instance initialized to `value`.
+  public init(floatLiteral value: NativeType) {
     self = CGFloat(value)
   }
 }
 
 @transparent extension CGFloat : IntegerLiteralConvertible {
-  public
-  init(integerLiteral value: Int) {
+  /// Create an instance initialized to `value`.
+  public init(integerLiteral value: Int) {
     self = CGFloat(value)
   }
 }

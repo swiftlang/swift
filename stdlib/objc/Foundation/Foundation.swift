@@ -92,6 +92,7 @@ public func _convertNSStringToString(nsstring: NSString) -> String {
 }
 
 extension NSString : StringLiteralConvertible {
+  /// Create an instance initialized to `value`.
   public required convenience init(unicodeScalarLiteral value: StaticString) {
     self.init(stringLiteral: value)
   }
@@ -102,6 +103,7 @@ extension NSString : StringLiteralConvertible {
     self.init(stringLiteral: value)
   }
 
+  /// Create an instance initialized to `value`.
   public required convenience init(stringLiteral value: StaticString) {
     var immutableResult: NSString
     if value.hasPointerRepresentation {
@@ -577,14 +579,17 @@ extension CGFloat : _ObjectiveCBridgeable {
 // Literal support for NSNumber
 extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
                      BooleanLiteralConvertible {
+  /// Create an instance initialized to `value`.
   public required convenience init(integerLiteral value: Int) {
     self.init(integer: value)
   }
 
+  /// Create an instance initialized to `value`.
   public required convenience init(floatLiteral value: Double) {
     self.init(double: value)
   }
 
+  /// Create an instance initialized to `value`.
   public required convenience init(booleanLiteral value: Bool) {
     self.init(bool: value)
   }
@@ -597,6 +602,7 @@ public let NSNotFound: Int = .max
 //===----------------------------------------------------------------------===//
 
 extension NSArray : ArrayLiteralConvertible {
+  /// Create an instance initialized with `elements`.
   public required convenience init(arrayLiteral elements: AnyObject...) {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)

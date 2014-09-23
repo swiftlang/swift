@@ -289,10 +289,12 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
 extension ${Self} : ArrayLiteralConvertible {
 %if Self == 'Array':
   // Optimized implementation for Array
+  /// Create an instance containing `elements`.
   public init(arrayLiteral elements: Element...) {
     self = elements
   }
 %else:
+  /// Create an instance containing `elements`.
   public init(arrayLiteral elements: Element...) {
     self.init(_extractOrCopyToNativeArrayBuffer(elements._buffer))
   }

@@ -133,6 +133,7 @@ public struct StaticString
     self = StaticString(unicodeScalar: value)
   }
 
+  /// Create an instance initialized to `value`.
   @effects(readonly)
   @transparent
   public init(unicodeScalarLiteral value: StaticString) {
@@ -153,6 +154,7 @@ public struct StaticString
     )
   }
 
+  /// Create an instance initialized to `value`.
   @effects(readonly)
   @transparent
   public init(extendedGraphemeClusterLiteral value: StaticString) {
@@ -169,6 +171,7 @@ public struct StaticString
     self = StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
   }
 
+  /// Create an instance initialized to `value`.
   @effects(readonly)
   @transparent
   public init(stringLiteral value: StaticString) {

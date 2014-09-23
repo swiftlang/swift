@@ -262,7 +262,7 @@ public protocol _BuiltinIntegerLiteralConvertible {
 /// Conforming types can be initialized with integer literals
 public protocol IntegerLiteralConvertible {
   typealias IntegerLiteralType : _BuiltinIntegerLiteralConvertible
-  /// Create an instance initialized with `value`.
+  /// Create an instance initialized to `value`.
   init(integerLiteral value: IntegerLiteralType)
 }
 
@@ -273,7 +273,7 @@ public protocol _BuiltinFloatLiteralConvertible {
 /// Conforming types can be initialized with floating point literals
 public protocol FloatLiteralConvertible {
   typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
-  /// Create an instance initialized with `value`.
+  /// Create an instance initialized to `value`.
   init(floatLiteral value: FloatLiteralType)
 }
 
@@ -285,7 +285,7 @@ public protocol _BuiltinBooleanLiteralConvertible {
 /// `true` and `false`.
 public protocol BooleanLiteralConvertible {
   typealias BooleanLiteralType : _BuiltinBooleanLiteralConvertible
-  /// Create an instance initialized with `value`.
+  /// Create an instance initialized to `value`.
   init(booleanLiteral value: BooleanLiteralType)
 }
 
@@ -295,6 +295,7 @@ internal protocol _BuiltinCharacterLiteralConvertible {
 
 internal protocol CharacterLiteralConvertible {
   typealias CharacterLiteralType : _BuiltinCharacterLiteralConvertible
+  /// Create an instance initialized to `value`.
   init(characterLiteral value: CharacterLiteralType)
 }
 
@@ -307,7 +308,7 @@ public protocol _BuiltinUnicodeScalarLiteralConvertible {
 /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
 public protocol UnicodeScalarLiteralConvertible {
   typealias UnicodeScalarLiteralType : _BuiltinUnicodeScalarLiteralConvertible
-  /// Create an instance initialized with `value`.
+  /// Create an instance initialized to `value`.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
@@ -328,7 +329,7 @@ public protocol ExtendedGraphemeClusterLiteralConvertible
 
   typealias ExtendedGraphemeClusterLiteralType
     : _BuiltinExtendedGraphemeClusterLiteralConvertible
-  /// Create an instance initialized with `value`.
+  /// Create an instance initialized to `value`.
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
@@ -356,7 +357,7 @@ public protocol StringLiteralConvertible
   // an implementation of init(extendedGraphemeClusterLiteral:).
 
   typealias StringLiteralType : _BuiltinStringLiteralConvertible
-  /// Create an instance initialized with `value`.
+  /// Create an instance initialized to `value`.
   init(stringLiteral value: StringLiteralType)
 }
 

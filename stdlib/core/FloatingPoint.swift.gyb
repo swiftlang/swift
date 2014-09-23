@@ -294,6 +294,7 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
     self = ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
   }
 
+  /// Create an instance initialized to `value`.
   public init(integerLiteral value: Int64) {
     self = ${Self}(Builtin.uitofp_Int64_FPIEEE${bits}(value.value))
   }
@@ -339,6 +340,7 @@ extension ${Self} : _BuiltinFloatLiteralConvertible {
 
 @transparent
 extension ${Self} : FloatLiteralConvertible {
+  /// Create an instance initialized to `value`.
   public init(floatLiteral value: ${Self}) {
     self = value
   }

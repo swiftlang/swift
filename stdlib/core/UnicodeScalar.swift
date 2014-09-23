@@ -29,6 +29,7 @@ public struct UnicodeScalar :
     self._value = value
   }
 
+  /// Create an instance initialized to `value`.
   @transparent
   public init(unicodeScalarLiteral value: UnicodeScalar) {
     self = value

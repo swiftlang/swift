@@ -30,6 +30,7 @@ extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
     self.value = value
   }
 
+  /// Create an instance initialized to `value`.
   @transparent
   public init(booleanLiteral value: Bool) {
     self = value

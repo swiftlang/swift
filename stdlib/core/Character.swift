@@ -51,6 +51,7 @@ public enum Character :
         UTF32.self, input: CollectionOfOne(UInt32(value))))
   }
 
+  /// Create an instance initialized to `value`.
   public init(unicodeScalarLiteral value: Character) {
     self = value
   }
@@ -67,6 +68,7 @@ public enum Character :
         isASCII: isASCII))
   }
 
+  /// Create an instance initialized to `value`.
   public init(extendedGraphemeClusterLiteral value: Character) {
     self = value
   }

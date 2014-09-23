@@ -186,6 +186,7 @@ public struct ${Self}
     self = ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0)
   }
 
+  /// Create an instance initialized to `value`.
   @transparent public
   init(integerLiteral value: ${Self}) {
     self = value

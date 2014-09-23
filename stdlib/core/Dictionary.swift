@@ -2076,6 +2076,7 @@ public struct Dictionary<
   //
   // DictionaryLiteralConvertible conformance
   //
+  /// Create an instance initialized with `elements`.
   @effects(readnone)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeStorage: _NativeDictionaryStorage.fromArray(elements))

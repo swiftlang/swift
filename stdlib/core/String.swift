@@ -70,6 +70,7 @@ extension String : _BuiltinUnicodeScalarLiteralConvertible {
 }
 
 extension String : UnicodeScalarLiteralConvertible {
+  /// Create an instance initialized to `value`.
   public init(unicodeScalarLiteral value: String) {
     self = value
   }
@@ -92,6 +93,7 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension String : ExtendedGraphemeClusterLiteralConvertible {
+  /// Create an instance initialized to `value`.
   public init(extendedGraphemeClusterLiteral value: String) {
     self = value
   }
@@ -143,6 +145,7 @@ extension String : _BuiltinStringLiteralConvertible {
 }
 
 extension String : StringLiteralConvertible {
+  /// Create an instance initialized to `value`.
   public init(stringLiteral value: String) {
      self = value
   }

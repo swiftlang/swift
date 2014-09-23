@@ -53,6 +53,7 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
 #endif
   }
 
+  /// Create an instance initialized to `value`.
   @transparent
   public init(booleanLiteral value: Bool) {
     self.init(value)
@@ -95,19 +96,19 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
     ptr = str.withCString { sel_registerName($0).ptr }
   }
 
+  /// Create an instance initialized to `value`.
   public init(unicodeScalarLiteral value: String) {
     self.init(value)
   }
 
-  /// Construct a selector from a string literal.
+  /// Construct a selector from `value`.
   public init(extendedGraphemeClusterLiteral value: String) {
     self.init(value)
   }
 
-  /// Construct a selector from a string literal.
-  ///
-  /// FIXME: Fast-path this in the compiler, so we don't end up with
-  /// the sel_registerName call at compile time.
+  // FIXME: Fast-path this in the compiler, so we don't end up with
+  // the sel_registerName call at compile time.
+  /// Create an instance initialized to `value`.
   public init(stringLiteral value: String) {
     self = sel_registerName(value)
   }

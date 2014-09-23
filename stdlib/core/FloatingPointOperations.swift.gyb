@@ -63,7 +63,7 @@ public protocol FloatingPointType : Strideable {
 
 % for src_ty in all_integer_types(word_bits):
 
-  /// Create an instance initialized with `value`.
+  /// Create an instance initialized to `value`.
   init(_ value: ${src_ty.stdlib_name})
 
 % end
