@@ -196,10 +196,6 @@ BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 /// valid within the scope of the statement for logical lvalues.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
-/// typeof(T) -> T.Type
-/// Returns the runtime type of a value.
-BUILTIN_SIL_OPERATION(TypeOf, "typeof", Special)
-
 /// GetElementPtr has type (Builtin.RawPointer, T) -> Builtin.RawPointer
 BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 

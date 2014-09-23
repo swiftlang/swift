@@ -684,23 +684,6 @@ static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
                                    ResultTy, ResultTy, ParamList);
 }
 
-
-
-static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
-  // <T> T -> T.Type
-  Type GenericTy;
-  Type ArchetypeTy;
-  GenericParamList *ParamList;
-  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
-
-  TupleTypeElt ArgParamElts[] = { GenericTy };
-  TupleTypeElt ArgBodyElts[] = { ArchetypeTy };
-  Type ResultTy = MetatypeType::get(GenericTy);
-  Type BodyResultTy = MetatypeType::get(ArchetypeTy);
-  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
-                                   ResultTy, BodyResultTy, ParamList);
-}
-
 static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
                                           Identifier Id) {
   // <T> T.Type -> Builtin.Int8
@@ -1318,10 +1301,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::AddressOf:
     if (!Types.empty()) return nullptr;
     return getAddressOfOperation(Context, Id);
-      
-  case BuiltinValueKind::TypeOf:
-    if (!Types.empty()) return nullptr;
-    return getTypeOfOperation(Context, Id);
       
   case BuiltinValueKind::CondFail:
     return getCondFailOperation(Context, Id);
