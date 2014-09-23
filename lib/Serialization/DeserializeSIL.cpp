@@ -645,7 +645,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                          TyID2, TyCategory2,
                                          ValID, ValResNum,
                                          ConcreteTyID,
-                                         Attr);
+                                         ListOfValues);
     break;
   case SIL_INST_CAST:
     SILInstCastLayout::readRecord(scratch, OpCode, Attr,
@@ -761,11 +761,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
 
     SmallVector<ProtocolConformance*, 2> conformances;
-    for (unsigned i = 0; i < Attr; ++i) {
-      auto conformance = MF->maybeReadConformance(Ty.getSwiftRValueType(),
-                                                  SILCursor);
-      assert(conformance && "did not read enough conformances");
-      conformances.push_back(conformance.getValueOr(nullptr));
+    assert((ListOfValues.size() % 3) == 0);
+    for (auto DataI = ListOfValues.begin(), DataE = ListOfValues.end();
+         DataI != DataE; DataI += 3) {
+      auto proto = cast_or_null<ProtocolDecl>(MF->getDecl(DataI[0]));
+      auto conformance = MF->readReferencedConformance(proto, DataI[1],
+                                                       DataI[2], SILCursor);
+      conformances.push_back(conformance);
     }
 
     auto ctxConformances = MF->getContext().AllocateCopy(conformances);

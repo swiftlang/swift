@@ -184,28 +184,6 @@ private:
   /// Writes a set of generic requirements.
   void writeRequirements(ArrayRef<Requirement> requirements);
 
-  /// Encode a reference to another conformance.
-  ///
-  /// This is used for the conformances of substitutions and for the
-  /// underlying conformances of specialized and inherited conformances.
-  ///
-  /// \param conformance The conformance we're encoding.
-  ///
-  /// \param typeID Will be set to the "type ID" value to be stored
-  /// in the parent record.
-  ///
-  /// \param moduleID Will be set to the "module ID" value to
-  /// be stored in the parent record.
-  ///
-  /// \param allowReferencingCurrentModule If false, conformances in the current
-  /// module will always be appended rather than referenced.
-  ///
-  /// \returns true if the underlying conformance will need to be written
-  /// out as its own record following the parent record.
-  bool encodeReferencedConformance(const ProtocolConformance *conformance,
-                                   DeclID &typeID, ModuleID &moduleID,
-                                   bool allowReferencingCurrentModule);
-
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolDecl *> protocols,
                          ArrayRef<ProtocolConformance *> conformances,
@@ -330,6 +308,28 @@ public:
                         const Decl *associatedDecl,
                         const std::array<unsigned, 256> &abbrCodes,
                         bool writeIncomplete = false);
+
+  /// Encode a reference to another conformance.
+  ///
+  /// This is used for the conformances of substitutions and for the
+  /// underlying conformances of specialized and inherited conformances.
+  ///
+  /// \param conformance The conformance we're encoding.
+  ///
+  /// \param typeID Will be set to the "type ID" value to be stored
+  /// in the parent record.
+  ///
+  /// \param moduleID Will be set to the "module ID" value to
+  /// be stored in the parent record.
+  ///
+  /// \param allowReferencingCurrentModule If false, conformances in the current
+  /// module will always be appended rather than referenced.
+  ///
+  /// \returns true if the underlying conformance will need to be written
+  /// out as its own record following the parent record.
+  bool encodeReferencedConformance(const ProtocolConformance *conformance,
+                                   DeclID &typeID, ModuleID &moduleID,
+                                   bool allowReferencingCurrentModule);
 
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams,

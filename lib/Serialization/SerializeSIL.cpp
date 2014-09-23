@@ -328,7 +328,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILType Ty;
     CanType FormalConcreteType;
     ArrayRef<ProtocolConformance*> conformances;
-    SmallVector<ProtocolDecl *, 4> protocols;
 
     CanType existentialType;
     switch (SI.getKind()) {
@@ -353,9 +352,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     }
 
-    // Retrieve the protocols.
     assert(existentialType->isExistentialType() && "Not an existential type?");
-    existentialType->isExistentialType(protocols);
+
+    SmallVector<DeclID, 8> conformancesData;
+    SmallVector<const ProtocolConformance *, 4> conformancesToWrite;
+    for (auto conformance : conformances) {
+      DeclID typeID;
+      ModuleID moduleID;
+      if (S.encodeReferencedConformance(conformance, typeID, moduleID, true))
+        conformancesToWrite.push_back(conformance);
+
+      ProtocolDecl *proto = conformance ? conformance->getProtocol() : nullptr;
+      conformancesData.push_back(S.addDeclRef(proto));
+      conformancesData.push_back(typeID);
+      conformancesData.push_back(moduleID);
+    }
 
     unsigned abbrCode = SILAbbrCodes[SILInitExistentialLayout::Code];
     SILInitExistentialLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -367,10 +378,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
        addValueRef(operand),
        operand.getResultNumber(),
        S.addTypeRef(FormalConcreteType),
-       conformances.size());
+       conformancesData);
 
-    for (unsigned i = 0, n = conformances.size(); i != n; ++i) {
-      S.writeConformance(protocols[i], conformances[i], nullptr, SILAbbrCodes);
+    for (auto conformance : conformancesToWrite) {
+      S.writeConformance(conformance->getProtocol(), conformance, nullptr,
+                         SILAbbrCodes, /*writeIncomplete=*/true);
     }
     break;
   }

@@ -410,8 +410,11 @@ static ProtocolConformance *findConformance(ProtocolDecl *proto,
 ProtocolConformance *
 ModuleFile::readReferencedConformance(ProtocolDecl *proto,
                                       DeclID typeID,
-                                      IdentifierID moduleID,
+                                      ModuleID moduleID,
                                       llvm::BitstreamCursor &Cursor) {
+  if (!typeID)
+    return nullptr;
+
   if (moduleID == serialization::BUILTIN_MODULE_ID) {
     // The underlying conformance is in the following record.
     return *maybeReadConformance(getType(typeID), Cursor);
@@ -661,14 +664,12 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
   assert(rawConformanceData.size() % 2 == 0);
   while (!rawConformanceData.empty()) {
     ProtocolConformance *conformance = nullptr;
-    // A null associated type means there is no conformance.
-    if (DeclID(rawConformanceData[0])) {
-      conformance = readReferencedConformance(protos.front(),
-                                              rawConformanceData[0],
-                                              rawConformanceData[1],
-                                              cursor);
-      assert(conformance && "Missing conformance");
-    }
+    conformance = readReferencedConformance(protos.front(),
+                                            rawConformanceData[0],
+                                            rawConformanceData[1],
+                                            cursor);
+    assert((conformance || !DeclID(rawConformanceData[0])) &&
+           "Missing conformance");
     conformanceBuf.push_back(conformance);
 
     protos = protos.slice(1);

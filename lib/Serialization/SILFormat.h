@@ -269,8 +269,9 @@ namespace sil_block {
     ValueIDField,         // operand id
     SILValueResultField,  // operand result id
     TypeIDField,          // formal concrete type
-    BCFixed<32>           // number of conformances
-                          // followed by conformances
+    BCArray<DeclIDField>  // triplets of protocol-type-module, used to identify
+                          // a referenced protocol conformance
+    // Trailed by inline protocol conformance info (if any)
   >;
 
   // SIL Cast instructions with a cast kind, one type and one typed valueref.

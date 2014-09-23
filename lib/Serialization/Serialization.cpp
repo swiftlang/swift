@@ -736,6 +736,12 @@ Serializer::encodeReferencedConformance(const ProtocolConformance *conformance,
                                         DeclID &typeID,
                                         ModuleID &moduleID,
                                         bool allowReferencingCurrentModule) {
+  if (!conformance) {
+    typeID = addDeclRef(nullptr);
+    moduleID = serialization::BUILTIN_MODULE_ID;
+    return false;
+  }
+
   bool append = !isa<NormalProtocolConformance>(conformance);
   if (!allowReferencingCurrentModule)
     append |= conformance->getDeclContext()->getParentModule() == M;
@@ -933,13 +939,8 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
     for (const ProtocolConformance *conformance : sub.getConformances()) {
       DeclID typeID;
       ModuleID moduleID;
-      if (!conformance) {
-        typeID = addDeclRef(nullptr);
-        moduleID = BUILTIN_MODULE_ID;
-      } else if (encodeReferencedConformance(conformance, typeID, moduleID,
-                                             false)) {
+      if (encodeReferencedConformance(conformance, typeID, moduleID, false))
         conformancesToWrite.push_back(conformance);
-      }
       conformanceData.push_back(typeID);
       conformanceData.push_back(moduleID);
     }
