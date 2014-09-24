@@ -331,7 +331,7 @@ class Foo {
     x.alDente()
   }
 
-  // arm64-ios: define void @_TFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias sret, %CSo13StructReturns*, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, %C8abitypes3Foo*) {
+  // arm64-ios: define hidden void @_TFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias sret, %CSo13StructReturns*, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, %C8abitypes3Foo*) {
   // arm64-ios: define internal void @_TToFC8abitypes3Foo14callJustReturnfS0_FTCSo13StructReturns4withVSC9BigStruct_S2_(%VSC9BigStruct* noalias sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {
   dynamic func callJustReturn(r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
