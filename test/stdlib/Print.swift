@@ -678,6 +678,27 @@ func test_ObjectPrinting() {
 test_ObjectPrinting()
 // CHECK: test_ObjectPrinting done
 
+func test_ThickMetatypePrintingImpl<T>(thickMetatype: T.Type, expected: String) {
+  printedIs(thickMetatype, expected)
+  printedIs([ thickMetatype ], "[" + expected + "]")
+}
+
+func test_gcMetatypePrinting() {
+  let structMetatype = StructPrintable.self
+  printedIs(structMetatype, "(Metatype)")
+  printedIs([ structMetatype ], "[(Metatype)]")
+  test_ThickMetatypePrintingImpl(structMetatype, "(Metatype)")
+
+  let classMetatype = ClassPrintable.self
+  printedIs(classMetatype, "(Metatype)")
+  printedIs([ classMetatype ], "[(Metatype)]")
+  test_ThickMetatypePrintingImpl(classMetatype, "(Metatype)")
+
+  println("test_gcMetatypePrinting done")
+}
+test_gcMetatypePrinting()
+// CHECK: test_gcMetatypePrinting done
+
 func test_ArrayPrinting() {
   var arrayOfInts: [Int] = []
   printedIs(arrayOfInts, "[]")
