@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A generator over the elements of `Range<T>`
 public struct RangeGenerator<
   T: ForwardIndexType
 > : GeneratorType, SequenceType {
   /// The type of element returned by `next()`.
   public typealias Element = T
 
+  /// Construct an instance that traverses the elements of `bounds`
   @transparent public
   init(_ bounds: Range<T>) {
     self.startIndex = bounds.startIndex
@@ -49,6 +51,34 @@ public struct RangeGenerator<
   public var endIndex: T
 }
 
+/// A collection of consecutive discrete index values.
+///
+/// :param: `T` is both the element type and the index type of the
+///   collection.
+///
+/// Like other collections, a range containing one element has an
+/// `endIndex` that is the successor of its `startIndex`; and an empty
+/// range has `startIndex == endIndex`.
+///
+/// Axiom: for any `Range` `r`, `r[i] == i`.
+///
+/// Therefore, if `T` has a maximal value, it can serve as an
+/// `endIndex`, but can never be contained in a `Range<T>`.
+///
+/// It also follows from the axiom above that `(-99..<100)[0] == 0`.
+/// To prevent confusion (because some expect the result to be `-99`),
+/// in a context where `T` is known to be an integer type,
+/// subscripting with `T` is a compile-time error::
+///
+///   // error: could not find an overload for 'subscript'...
+///   println( Range<Int>(start:-99, end:100)[0] )
+///
+/// However, subscripting that range still works in a generic context::
+///
+///   func brackets<T:ForwardIndexType>(x: Range<T>, i: T) -> T {
+///     return x[i] // Just forward to subscript
+///   }
+///   println(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
 public struct Range<
   T: ForwardIndexType
 > : Equatable, CollectionType, Printable, DebugPrintable {
@@ -60,13 +90,16 @@ public struct Range<
     // evaluated
     self = x
   }
-  
+
+  /// Construct a range with `startIndex == start` and `endIndex ==
+  /// end`.
   @transparent public
   init(start: T, end: T) {
     _startIndex = start
     _endIndex = end
   }
 
+  /// `true` iff the range is empty, i.e. `startIndex == endIndex`
   public var isEmpty : Bool {
     return startIndex == endIndex
   }
@@ -159,6 +192,7 @@ public func ==<T>(lhs: Range<T>, rhs: Range<T>) -> Bool {
       lhs._endIndex == rhs._endIndex
 }
 
+/// Equivalent to countElements(r)
 public func count<I: RandomAccessIndexType>(r: Range<I>) -> I.Distance {
   return r.startIndex.distanceTo(r.endIndex)
 }
