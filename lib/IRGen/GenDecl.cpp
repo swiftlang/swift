@@ -806,6 +806,8 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     }
     return RESULT(External, Hidden);
   case SILLinkage::PrivateExternal:
+    // Fall through. The linkage should never be PrivateExternal for resilient
+    // (non-fragile) entities.
     break;
   }
   llvm_unreachable("bad SIL linkage");
