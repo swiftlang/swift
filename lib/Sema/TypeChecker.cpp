@@ -547,11 +547,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Verify the SourceFile.
   verify(SF);
 
-  // Verify modules imported by Clang importer.
+  // Verify imported modules.
 #ifndef NDEBUG
-  if (SF.Kind != SourceFileKind::REPL)
-    if (auto ClangLoader = TC.Context.getClangModuleLoader())
-      ClangLoader->verifyAllModules();
+  if (SF.Kind != SourceFileKind::REPL &&
+      !Ctx.LangOpts.DebuggerSupport) {
+    Ctx.verifyAllLoadedModules();
+  }
 #endif
 }
 

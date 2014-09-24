@@ -131,6 +131,8 @@ public:
   /// Note that this does not actually try to load the module or validate any
   /// of its dependencies; it only checks that it /can/ be loaded.
   static ValidationInfo validateSerializedAST(StringRef data);
+
+  virtual void verifyAllModules() override;
 };
 
 /// A file-unit loaded from a serialized AST file.

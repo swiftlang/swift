@@ -478,6 +478,28 @@ public:
     return ModuleInputBuffer->getBufferIdentifier();
   }
 
+  /// AST-verify imported decls.
+  ///
+  /// Has no effect in NDEBUG builds.
+  void verify() const;
+
+  virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
+                                          uint64_t contextData,
+                                          bool *ignored) override;
+
+  virtual ArrayRef<ProtocolConformance *>
+  loadAllConformances(const Decl *D, uint64_t contextData) override;
+
+  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                            uint64_t contextData) override;
+
+  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
+  Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
+
+  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
+
+  // MARK: Deserialization interface
+
   llvm::BitstreamCursor getSILCursor() const {
     return SILCursor;
   }
@@ -542,21 +564,6 @@ public:
   GenericParamList *maybeReadGenericParams(DeclContext *DC,
                                      llvm::BitstreamCursor &Cursor,
                                      GenericParamList *outerParams = nullptr);
-
-  virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
-                                          uint64_t contextData,
-                                          bool *ignored) override;
-
-  virtual ArrayRef<ProtocolConformance *>
-  loadAllConformances(const Decl *D, uint64_t contextData) override;
-
-  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) override;
-
-  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
-  Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
-
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 };
 
 } // end namespace swift
