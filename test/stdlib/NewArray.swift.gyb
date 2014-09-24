@@ -214,7 +214,7 @@ func nsArrayOfStrings() -> Array<NSString> {
 
   return src.withUnsafeBufferPointer {
     let ns =  NSArray(objects: UnsafePointer($0.baseAddress), count: $0.count)
-    return Array(_fromNSArray: ns)
+    return _convertNSArrayToArray(ns)
   }
 }
 
