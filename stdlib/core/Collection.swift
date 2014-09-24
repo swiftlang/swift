@@ -237,7 +237,7 @@ public struct PermutationGenerator<
   ///
   /// Requires: `elements[i]` is valid for every `i` in `indices`.
   public init(elements: C, indices: Indices) {
-    self.seq = seq
+    self.seq = elements
     self.indices = indices.generate()
   }
 }

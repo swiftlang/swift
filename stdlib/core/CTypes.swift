@@ -225,7 +225,7 @@ extension COpaquePointer {
   /// .. Warning:: This is a fundamentally unsafe operation, equivalent to
   ///      `unsafeBitCast(value, COpaquePointer.self)`
   public init<T>(_ value: CFunctionPointer<T>) {
-    self = from.value
+    self = value.value
   }
 }
 
