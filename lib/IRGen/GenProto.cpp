@@ -245,7 +245,8 @@ namespace {
         emitFunc(SD->getGetter());
         if (SD->isSettable(member->getDeclContext())) {
           emitFunc(SD->getSetter());
-          emitFunc(SD->getMaterializeForSetFunc());
+          if (SD->getMaterializeForSetFunc())
+            emitFunc(SD->getMaterializeForSetFunc());
         }
         return;
       }
@@ -3175,9 +3176,10 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
   auto it = Protocols.find(protocol);
   if (it != Protocols.end()) return *it->second;
 
-  // If not, layout the protocol's witness table.
+  // If not, lay out the protocol's witness table, if it needs one.
   WitnessTableLayout layout(IGM);
-  layout.visit(protocol);
+  if (requiresProtocolWitnessTable(protocol))
+    layout.visit(protocol);
 
   // Create a ProtocolInfo object from the layout.
   ProtocolInfo *info = ProtocolInfo::create(layout.getNumWitnesses(),

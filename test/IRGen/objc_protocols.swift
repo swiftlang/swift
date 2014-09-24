@@ -175,3 +175,11 @@ func objc_swift_protocol_composition
 
 // TODO: Mixed class-bounded/fully general protocol compositions.
 
+@objc protocol SettableProperty {
+  var reqt: NSRuncing { get set }
+}
+
+func instantiateArchetype<T: SettableProperty>(x: T) {
+  let y = x.reqt
+  x.reqt = y
+}
