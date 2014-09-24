@@ -486,7 +486,7 @@ struct DidSetWillSetTests {
 
       a = zero  // reassign, but don't infinite loop.
 
-      // CHECK-NEXT: // function_ref properties.zero.addressor : Swift.Int
+      // CHECK-NEXT: // function_ref properties.zero.mutableAddressor : Swift.Int
       // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @_TF10propertiesa4zero
       // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@thin () -> Builtin.RawPointer
       // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to $*Int
@@ -558,7 +558,7 @@ var global_observing_property : Int = zero {
 // CHECK-LABEL: sil private @globalinit_func1 : $@thin () -> () {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: %0 = sil_global_addr @_Tv10properties25global_observing_propertySi : $*Int
-// CHECK: properties.zero.addressor
+// CHECK: properties.zero.mutableAddressor
 // CHECK: return
 
 // The didSet implementation needs to call takeInt.
@@ -570,7 +570,7 @@ var global_observing_property : Int = zero {
 // The setter needs to call didSet implementation.
 
 // CHECK-LABEL: sil hidden @_TF10propertiess25global_observing_property
-// CHECK: function_ref properties.global_observing_property.addressor
+// CHECK: function_ref properties.global_observing_property.mutableAddressor
 // CHECK-NEXT:  function_ref @_TF10propertiesa25global_observing_property
 // CHECK: function_ref properties.global_observing_property.didset
 // CHECK-NEXT: function_ref @_TF10propertiesW25global_observing_property

@@ -23,7 +23,7 @@ bb0:
   return %4 : $()                                 // id: %5
 }
 
-// ginit.MyConst.addressor : Swift.Int
+// ginit.MyConst.mutableAddressor : Swift.Int
 sil [global_init] @_TF5ginita7MyConstSi : $@thin () -> Builtin.RawPointer {
 bb0:
   %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> () // user: %5
@@ -54,7 +54,7 @@ bb0(%0 : $Int):
   cond_br %4, bb1, bb2(%1 : $Builtin.Word)        // id: %5
 
 bb1:                                              // Preds: bb0
-  // function_ref ginit.MyConst.addressor : Swift.Int
+  // function_ref ginit.MyConst.mutableAddressor : Swift.Int
   %6 = function_ref @_TF5ginita7MyConstSi : $@thin () -> Builtin.RawPointer // user: %7
   %7 = apply %6() : $@thin () -> Builtin.RawPointer // user: %8
   %8 = pointer_to_address %7 : $Builtin.RawPointer to $*Int // user: %9
@@ -117,7 +117,7 @@ bb5:                                              // Preds: bb3
   store %18 to %28#1 : $*Optional<Int>            // id: %29
   %30 = unchecked_take_enum_data_addr %28#1 : $*Optional<Int>, #Optional.Some!enumelt.1
   dealloc_stack %28#0 : $*@local_storage Optional<Int> // id: %31
-  // function_ref ginit.MyConst.addressor : Swift.Int
+  // function_ref ginit.MyConst.mutableAddressor : Swift.Int
   %32 = function_ref @_TF5ginita7MyConstSi : $@thin () -> Builtin.RawPointer // user: %33
   %33 = apply %32() : $@thin () -> Builtin.RawPointer // user: %34
   %34 = pointer_to_address %33 : $Builtin.RawPointer to $*Int // user: %35
@@ -133,7 +133,7 @@ bb6:                                              // Preds: bb3
   return %41 : $Int                               // id: %42
 }
 
-// libg.MyGlobal.addressor : Swift.Int
+// libg.MyGlobal.mutableAddressor : Swift.Int
 sil [global_init] @_TF4libga8MyGlobalSi : $@thin () -> Builtin.RawPointer
 
 // Hoist this initializer call out of a loop, but not into the function entry.
@@ -144,6 +144,7 @@ sil [global_init] @_TF4libga8MyGlobalSi : $@thin () -> Builtin.RawPointer
 // CHECK-NEXT: apply
 // CHECK: {{^bb6}}
 // CHECK-NOT: addressor
+// CHECK-NOT: mutableAddressor
 // CHECK: pointer_to_address
 // CHECK: {{br bb6}}
 //
@@ -198,7 +199,7 @@ bb8:                                              // Preds: bb6
   %34 = apply %32(%27, %10, %33) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %35
   %35 = tuple_extract %34 : $(Builtin.Word, Builtin.Int1), 0 // user: %46
   %36 = enum $Optional<Int>, #Optional.Some!enumelt.1, %28 : $Int
-  // function_ref libg.MyGlobal.addressor : Swift.Int
+  // function_ref libg.MyGlobal.mutableAddressor : Swift.Int
   %37 = function_ref @_TF4libga8MyGlobalSi : $@thin () -> Builtin.RawPointer // user: %38
   %38 = apply %37() : $@thin () -> Builtin.RawPointer // user: %39
   %39 = pointer_to_address %38 : $Builtin.RawPointer to $*Int // user: %40
@@ -218,6 +219,7 @@ bb9(%47 : $Int):                                  // Preds: bb1 bb4
 // Do NOT hoist this initializer out of a cold block.
 // CHECK-LABEL: sil @_TF9ginitcold3runFSiSi
 // CHECK-NOT: addressor
+// CHECK-NOT: mutableAddressor
 // CHECK: {{^bb3}}
 // CHECK: cond_br
 // CHECK: {{^bb4}}
@@ -256,7 +258,7 @@ bb3:                                              // Preds: bb1
   cond_br %22, bb4, bb5(%5 : $Builtin.Word)       // id: %23
 
 bb4:                                              // Preds: bb3
-  // function_ref libg.MyGlobal.addressor : Swift.Int
+  // function_ref libg.MyGlobal.mutableAddressor : Swift.Int
   %24 = function_ref @_TF4libga8MyGlobalSi : $@thin () -> Builtin.RawPointer // user: %25
   %25 = apply %24() : $@thin () -> Builtin.RawPointer // user: %26
   %26 = pointer_to_address %25 : $Builtin.RawPointer to $*Int // user: %27

@@ -1066,6 +1066,10 @@ private:
     } else if (Mangled.nextIf('c')) {
       entityKind = Node::Kind::Constructor;
     } else if (Mangled.nextIf('a')) {
+      entityKind = Node::Kind::MutableAddressor;
+      name = demangleDeclName();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('l')) {
       entityKind = Node::Kind::Addressor;
       name = demangleDeclName();
       if (!name) return nullptr;
@@ -2022,6 +2026,7 @@ private:
     case Node::Kind::PrivateDeclName:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::Metaclass:
+    case Node::Kind::MutableAddressor:
     case Node::Kind::NominalTypeDescriptor:
     case Node::Kind::NonObjCAttribute:
     case Node::Kind::Number:
@@ -2633,6 +2638,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   }
   case Node::Kind::Addressor:
     printEntity(true, true, ".addressor");
+    return;
+  case Node::Kind::MutableAddressor:
+    printEntity(true, true, ".mutableAddressor");
     return;
   case Node::Kind::Getter:
     printEntity(true, true, ".getter");
