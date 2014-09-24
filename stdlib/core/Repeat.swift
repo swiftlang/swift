@@ -9,13 +9,18 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+/// A collection whose elements are all identical `T`\ s.
 public struct Repeat<T> : CollectionType {
+  
   /// A type that represents a valid position in the collection.
   /// 
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
 
+  /// Construct an instance that contains `count` elements having the
+  /// value `repeatedValue`.
   public init(count: Int, repeatedValue: T) {
     self.count = count
     self.repeatedValue = repeatedValue
@@ -49,7 +54,10 @@ public struct Repeat<T> : CollectionType {
     return repeatedValue
   }
 
+  /// The number of elements in this collection.
   public var count: Int
+
+  /// The value of every element in this collection.
   public let repeatedValue: T
 }
 

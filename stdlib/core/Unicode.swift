@@ -23,6 +23,8 @@ public enum UnicodeDecodingResult {
   case EmptyInput
   case Error
 
+  /// Return true if `self` indicates no more unicode scalars are
+  /// available.
   public
   func isEmptyInput() -> Bool {
     switch self {
@@ -74,6 +76,7 @@ public protocol UnicodeCodecType {
   >(input: UnicodeScalar, inout output: S)
 }
 
+/// A codec for `UTF-8 <http://www.unicode.org/glossary/#UTF_8>`_.
 public struct UTF8 : UnicodeCodecType {
 
   /// A type that can hold `code unit
@@ -480,6 +483,7 @@ public struct UTF8 : UnicodeCodecType {
   var _value =  UInt8()
 }
 
+/// A codec for `UTF-16 <http://www.unicode.org/glossary/#UTF_16>`_.
 public struct UTF16 : UnicodeCodecType {
   /// A type that can hold `code unit
   /// <http://www.unicode.org/glossary/#code_unit>`_ values for this
@@ -624,6 +628,7 @@ public struct UTF16 : UnicodeCodecType {
   var _value = UInt16()
 }
 
+/// A codec for `UTF-32 <http://www.unicode.org/glossary/#UTF_32>`_.
 public struct UTF32 : UnicodeCodecType {
   /// A type that can hold `code unit
   /// <http://www.unicode.org/glossary/#code_unit>`_ values for this
@@ -672,6 +677,12 @@ public struct UTF32 : UnicodeCodecType {
   }
 }
 
+/// Translate `input`, in the given `InputEncoding`, into `output`, in
+/// the given `OutputEncoding`.
+///
+/// :param: `stopOnError` causes encoding to stop when an encoding
+///   error is detected in `input`, if `true`.  Otherwise, U+FFFD
+///   replacement characters are inserted for each detected error.
 public func transcode<
   Input : GeneratorType,
   Output : SinkType,
@@ -833,15 +844,26 @@ extension UTF8.CodeUnit : _StringElementType {
 }
 
 extension UTF16 {
+  /// Return the number of code units required to encode `x`.
   public static func width(x: UnicodeScalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
+  /// Return the high surrogate code unit of a `surrogate pair
+  /// <http://www.unicode.org/glossary/#surrogate_pair>`_ representing
+  /// `x`.
+  ///
+  /// Requires: `width(x) == 2`
   public static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return (UTF16.CodeUnit(x.value - 0x1_0000) >> 10) + 0xD800
   }
 
+  /// Return the low surrogate code unit of a `surrogate pair
+  /// <http://www.unicode.org/glossary/#surrogate_pair>`_ representing
+  /// `x`.
+  ///
+  /// Requires: `width(x) == 2`
   public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return (

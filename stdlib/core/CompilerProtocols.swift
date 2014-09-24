@@ -387,7 +387,9 @@ public protocol DictionaryLiteralConvertible {
 /// Conforming types can be initialized with string interpolations
 /// containing `\(`\ ...\ `)` clauses.
 public protocol StringInterpolationConvertible {
+  /// Create an instance by concatenating the elements of `strings`
   init(stringInterpolation strings: Self...)
+  /// Create an instance containing `expr`\ 's `print` representation
   init<T>(stringInterpolationSegment expr: T)
 }
 

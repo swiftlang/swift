@@ -12,12 +12,15 @@
 // UnicodeScalar Type
 //===----------------------------------------------------------------------===//
 
+/// A `Unicode scalar value
+/// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
 public struct UnicodeScalar :
   _BuiltinUnicodeScalarLiteralConvertible,
   UnicodeScalarLiteralConvertible {
 
   var _value: Builtin.Int32
 
+  /// A numeric representation of `self`.
   public var value: UInt32 {
     get {
       return UInt32(_value)
@@ -35,6 +38,7 @@ public struct UnicodeScalar :
     self = value
   }
 
+  /// Creates an instance of the NUL scalar value.
   public init() {
     self._value = Int32(0).value
   }
@@ -43,6 +47,9 @@ public struct UnicodeScalar :
     self._value = value
   }
 
+  /// Create an instance with numeric value `v`.
+  ///
+  /// Requires: `v` is a valid Unicode scalar value.
   public init(_ v : UInt32) {
     // Unicode 6.3.0:
     //
@@ -61,20 +68,29 @@ public struct UnicodeScalar :
     self._value = v.value
   }
 
+  /// Create an instance with numeric value `v`.
+  ///
+  /// Requires: `v` is a valid Unicode scalar value.
   public init(_ v : UInt16) {
     self = UnicodeScalar(UInt32(v))
   }
 
+  /// Create an instance with numeric value `v`.
   public init(_ v : UInt8) {
     self = UnicodeScalar(UInt32(v))
   }
 
+  /// Create a duplicate of `v`.
   public init(_ v: UnicodeScalar) {
     // This constructor allows one to provide necessary type context to
     // disambiguate between function overloads on 'String' and 'UnicodeScalar'.
     self = v
   }
 
+  /// Return a String representation of `self` .
+  ///
+  /// :param: `asASCII`, if `true`, forces most values into a numeric
+  /// representation.
   public func escape(#asASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
       var nibble = v & 15
@@ -214,12 +230,18 @@ extension UnicodeScalar : Hashable {
 }
 
 extension UnicodeScalar {
+  /// Construct with value `v`.
+  ///
+  /// Requires: `v` is a valid unicode scalar value.
   public init(_ v : Int) {
     self = UnicodeScalar(UInt32(v))
   }
 }
 
 extension UInt8 {
+  /// Construct with value `v.value`.
+  ///
+  /// Requires: `v.value` can be represented as UInt8.
   public init(_ v : UnicodeScalar) {
     _precondition(v.value <= UInt32(UInt8.max),
         "Code point value does not fit into UInt8")
@@ -227,11 +249,17 @@ extension UInt8 {
   }
 }
 extension UInt32 {
+  /// Construct with value `v.value`.
+  ///
+  /// Requires: `v.value` can be represented as UInt32.
   public init(_ v : UnicodeScalar) {
     self = v.value
   }
 }
 extension UInt64 {
+  /// Construct with value `v.value`.
+  ///
+  /// Requires: `v.value` can be represented as UInt64.
   public init(_ v : UnicodeScalar) {
     self = UInt64(v.value)
   }

@@ -10,6 +10,80 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// An arbitrary Unicode string value.
+///
+/// Unicode-Correct
+/// ===============
+///
+/// Swift strings are designed to be Unicode-correct.  In particular,
+/// the APIs make it easy to write code that works correctly, and does
+/// not surprise end-users, regardless of where you venture in the
+/// Unicode character space.  For example,
+///
+/// * The `==` operator checks for `Unicode canonical equivalence
+///   <http://www.unicode.org/glossary/#deterministic_comparison>`_,
+///   so two different representations of the same string will always
+///   compare equal.
+///
+/// * String elements are `Characters` (`extended grapheme clusters
+///   <http://www.unicode.org/glossary/#extended_grapheme_cluster>`_),
+///   a unit of text that is meaningful to most humans.
+///
+/// Locale-Insensitive
+/// ==================
+///
+/// The fundamental operations on Swift strings are not sensitive to
+/// locale settings.  That's because, for example, the validity of a
+/// `Dictionary<String, T>` in a running program depends on a given
+/// string comparison having a single, stable result.  Therefore,
+/// Swift always uses the default, un-\ `tailored
+/// <http://www.unicode.org/glossary/#tailorable>`_ Unicode algorithms
+/// for basic string operations.
+///
+/// Importing `Foundation` endows swift strings with the full power of
+/// the `NSString` API, which allows you to choose more complex
+/// locale-sensitive operations explicitly.
+///
+/// Value Semantics
+/// ===============
+///
+/// Each string variable, `let` binding, or stored property has an
+/// independent value, so mutations to the string are not observable
+/// through its copies::
+///
+///   var a = "foo"
+///   var b = a
+///   b[b.endIndex.predecessor()] = "x"
+///   println("a=\(a), b=\(b)")     // a=foo, b=fox
+///
+/// Strings use Copy-on-Write so that their data is only copied
+/// lazily, upon mutation, when more than one string instance is using
+/// the same buffer.  Therefore, the first in any sequence of mutating
+/// operations may cost `O(N)` time and space, where `N` is the length
+/// of the string's (unspecified) underlying representation,.
+///
+/// Growth and Capacity
+/// ===================
+///
+/// When a string's contiguous storage fills up, new storage must be
+/// allocated and characters must be moved to the new storage.
+/// `String` uses an exponential growth strategy that makes `append` a
+/// constant time operation *when amortized over many invocations*.
+///
+/// Objective-C Bridge
+/// ==================
+///
+/// `String` is bridged to Objective-C as `NSString`, and a `String`
+/// that originated in Objective-C may store its characters in an
+/// `NSString`.  Since any arbitrary subclass of `NSSString` can
+/// become a `String`, there are no guarantees about representation or
+/// efficiency in this case.  Since `NSString` is immutable, it is
+/// just as though the storage was shared by some copy: the first in
+/// any sequence of mutating operations causes elements to be copied
+/// into unique, contiguous storage which may cost `O(N)` time and
+/// space, where `N` is the length of the string representation (or
+/// more, if the underlying `NSString` is has unusual performance
+/// characteristics).
 public struct String {
   public init() {
     _core = _StringCore()
@@ -281,6 +355,7 @@ extension String : Hashable {
 }
 
 extension String : StringInterpolationConvertible {
+  /// Create an instance by concatenating the elements of `strings`
   @effects(readonly)
   public
   init(stringInterpolation strings: String...) {
@@ -290,6 +365,7 @@ extension String : StringInterpolationConvertible {
     }
   }
 
+  /// Create an instance containing `expr`\ 's `print` representation
   public
   init<T>(stringInterpolationSegment expr: T) {
     self = toString(expr)
@@ -337,7 +413,7 @@ extension String {
 
 /// String is a CollectionType of Character
 extension String : CollectionType {
-  // An adapter over UnicodeScalarView that advances by whole Character
+  /// A character position in a `String`
   public struct Index : BidirectionalIndexType, Comparable, Reflectable {
     public init(_ _base: UnicodeScalarView.Index) {
       self._base = _base
@@ -544,6 +620,10 @@ public func < (lhs: String.Index, rhs: String.Index) -> Bool {
 }
 
 extension String : Sliceable {
+  /// Access the characters in the given `subRange`
+  ///
+  /// Complexity: O(1) unless bridging from Objective-C requires an
+  /// O(N) conversion.
   public subscript(subRange: Range<Index>) -> String {
     return String(
       unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._core)
@@ -586,18 +666,23 @@ extension String : ExtensibleCollectionType {
       self.append(c)
     }
   }
-  
+
+  /// Create an instance containing `characters`.
   public init<
       S : SequenceType
       where S.Generator.Element == Character
-  >(_ seq: S) {
+  >(_ characters: S) {
     self = ""
-    self.extend(seq)
+    self.extend(characters)
   }
 }
 
 // Algorithms
 extension String {
+  /// Interpose `self` between every pair of consecutive `elements`,
+  /// then concatenate the result.  For example::
+  ///
+  ///   "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
   public func join<
       S : SequenceType where S.Generator.Element == String
   >(elements: S) -> String{

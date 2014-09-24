@@ -17,8 +17,16 @@
 // are involved in its construction.  This feature is crucial for
 // preventing infinite recursion even in non-asserting cases.
 
-/// An extremely simple string designed to represent something
-/// "statically knowable".
+/// An simple string designed to represent text that is "knowable at
+/// compile-time".
+///
+/// Logically speaking, each instance looks something like this::
+///
+///    enum StaticString {
+///       case ASCII(start: UnsafePointer<UInt8>, length: Int)
+///       case UTF8(start: UnsafePointer<UInt8>, length: Int)
+///       case Scalar(UnicodeScalar)
+///    }
 public struct StaticString
   : _BuiltinUnicodeScalarLiteralConvertible,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
@@ -46,6 +54,10 @@ public struct StaticString
   ///   ASCII.
   var _flags: Builtin.Word
 
+  /// A pointer to the beginning of UTF-8 code units
+  ///
+  /// Requires: `self` stores a pointer to either ASCII or UTF-8 code
+  /// units.
   @transparent
   public var utf8Start: UnsafePointer<UInt8> {
     _precondition(
@@ -54,6 +66,9 @@ public struct StaticString
     return UnsafePointer(_startPtrOrData)
   }
 
+  /// The stored Unicode scalar value
+  ///
+  /// Requires: `self` stores a single Unicode scalar value.
   @transparent
   public var unicodeScalar: UnicodeScalar {
     _precondition(
@@ -62,21 +77,35 @@ public struct StaticString
     return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, UWord.self)))
   }
 
+  /// If `self` stores a pointer to ASCII or UTF-8 code units, the
+  /// length in bytes of that data.
+  ///
+  /// If `self` stores a single Unicode scalar value, the value of
+  /// `byteSize` is unspecified.
   @transparent
   public var byteSize: Word {
     return Word(_byteSize)
   }
 
+  /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units
   @transparent
   public var hasPointerRepresentation: Bool {
     return (UWord(_flags) & 0x1) == 0
   }
 
+  /// `true` if `self` stores a pointer to ASCII code units.
+  ///
+  /// If `self` stores a single Unicode scalar value, the value of
+  /// `isASCII` is unspecified.
   @transparent
   public var isASCII: Bool {
     return (UWord(_flags) & 0x2) == 1
   }
 
+  /// Invoke `body` with a buffer containing the UTF-8 code units of
+  /// `self`.
+  ///
+  /// This method works regardless of what `self` stores.
   public func withUTF8Buffer<R>(body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(start: utf8Start, count: Int(byteSize)))
@@ -95,6 +124,8 @@ public struct StaticString
     }
   }
 
+  /// Return a `String` representing the same sequence of Unicode
+  /// scalar values as `self` does.
   @transparent
   public var stringValue: String {
     return withUTF8Buffer {
@@ -103,6 +134,7 @@ public struct StaticString
     }
   }
 
+  /// Create an empty instance.
   @transparent
   public init() {
     self = ""

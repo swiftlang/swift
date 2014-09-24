@@ -41,6 +41,7 @@ let _x86_64SSERegisterWords = 2
 let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
 #endif
 
+/// Invoke `f` with a C `va_list` argument derived from `args`.
 public func withVaList<R>(args: [CVarArgType], f: (CVaListPointer)->R) -> R {
   var builder = VaListBuilder()
   for a in args {
@@ -49,12 +50,20 @@ public func withVaList<R>(args: [CVarArgType], f: (CVaListPointer)->R) -> R {
   return withVaList(builder, f)
 }
 
+/// Invoke `f` with a C `va_list` argument derived from `builder`.
 public func withVaList<R>(builder: VaListBuilder, f: (CVaListPointer)->R) -> R {
   let result = f(builder.va_list())
   _fixLifetime(builder)
   return result
 }
 
+/// Returns a `CVaListPointer` built from `args` that's backed by
+/// autoreleased storage.
+///
+/// .. Warning:: This function is best avoided in favor of
+///    `withVaList`, but occasionally (i.e. in a `class` initializer) you
+///    may find that the language rules don't allow you to use
+///    `withVaList` as intended.
 public func getVaList(args: [CVarArgType]) -> CVaListPointer {
   var builder = VaListBuilder()
   for a in args {
@@ -189,8 +198,9 @@ extension Double : CVarArgType {
 
 #if !arch(x86_64)
 
-final public
-class VaListBuilder {
+/// An object that can manage the lifetime of storage backing a
+/// `CVaListPointer`
+final public class VaListBuilder {
   
   func append(arg: CVarArgType) {
     for x in arg.encode() {
@@ -209,8 +219,9 @@ class VaListBuilder {
 
 #else
 
-final public
-class VaListBuilder {
+/// An object that can manage the lifetime of storage backing a
+/// `CVaListPointer`
+final public class VaListBuilder {
 
   struct Header {
     var gp_offset = CUnsignedInt(0)

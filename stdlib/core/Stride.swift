@@ -122,6 +122,9 @@ public struct StrideTo<T: Strideable> : SequenceType {
   let stride: T.Stride
 }
 
+/// Return the sequence of values (`start`, `start + stride`, `start +
+/// stride + stride`, ... *last*) where *last* is the last value in
+/// the progression that is less than `end`.
 public func stride<
   T: Strideable
 >(from start: T, to end: T, by stride: T.Stride) -> StrideTo<T> {
@@ -178,6 +181,12 @@ public struct StrideThrough<T: Strideable> : SequenceType {
   let stride: T.Stride
 }
 
+/// Return the sequence of values (`start`, `start + stride`, `start +
+/// stride + stride`, ... *last*) where *last* is the last value in
+/// the progression less than or equal to `end`.
+///
+/// .. Note:: There is no guarantee that `end` is an element of the
+///      sequence.
 public func stride<
   T: Strideable
 >(from start: T, through end: T, by stride: T.Stride) -> StrideThrough<T> {

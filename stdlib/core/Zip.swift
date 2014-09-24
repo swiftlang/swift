@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A generator for the `Zip2` sequence
 public struct ZipGenerator2<
   E0 : GeneratorType, E1 : GeneratorType
 > : GeneratorType {
   /// The type of element returned by `next()`.
   public typealias Element = (E0.Element,E1.Element)
 
+  /// Construct around a pair of underlying generators.
   public init(_ e0: E0, _ e1: E1) {
     baseStreams = (e0,e1)
   }
@@ -37,6 +39,9 @@ public struct ZipGenerator2<
   var baseStreams : (E0,E1)
 }
 
+/// A sequence of pairs built out of two underlying sequences, where
+/// the elements of the `i`\ th pair are the `i`\ th elements of each
+/// underlying sequence.
 public struct Zip2<S0: SequenceType, S1: SequenceType> : SequenceType
 {
   public typealias Stream1 = S0.Generator
@@ -46,6 +51,8 @@ public struct Zip2<S0: SequenceType, S1: SequenceType> : SequenceType
   /// sequence, in order.
   public typealias Generator = ZipGenerator2<Stream1, Stream2>
 
+  /// Construct an instance that makes pairs of elements from `s0` and
+  /// `s1`.
   public init(_ s0: S0, _ s1: S1) {
     sequences = (s0,s1)
   }

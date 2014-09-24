@@ -12,6 +12,8 @@
 
 
 extension String {
+  /// Construct an instance that is the concatenation of `sz` copies
+  /// of `repeatedValue`
   public init(count sz: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_storage: _StringBuffer(
@@ -23,6 +25,8 @@ extension String {
     }
   }
 
+  /// Construct an instance that is the concatenation of `sz` copies
+  /// of `Character(repeatedValue)`
   public init(count: Int, repeatedValue c: UnicodeScalar) {
     self = String._fromWellFormedCodeUnitSequence(UTF32.self,
         input: Repeat(count: count, repeatedValue: c.value))
@@ -36,7 +40,8 @@ extension String {
     var scalarSlices = Swift.split(unicodeScalars, { $0 == separator })
     return scalarSlices.map { String($0) }
   }
-  
+
+  /// `true` iff `self` contains no characters.
   public var isEmpty : Bool {
     return _core.count == 0
   }
@@ -69,11 +74,13 @@ func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, prefix: AnyObject) -> Bo
 func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, suffix: AnyObject) -> Bool
 
 extension String {
+  /// Return `true` iff `self` begins with `prefix`
   public func hasPrefix(prefix: String) -> Bool {
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
+  /// Return `true` iff `self` ends with `suffix`
   public func hasSuffix(suffix: String) -> Bool {
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
@@ -85,14 +92,21 @@ extension String {
 
   // FIXME: can't just use a default arg for radix below; instead we
   // need these single-arg overloads <rdar://problem/17775455>
+  
+  /// Create an instance representing `v` in base 10.
   public init<T: _SignedIntegerType>(_ v: T) {
     self = _int64ToString(v.toIntMax())
   }
   
+  /// Create an instance representing `v` in base 10.
   public init<T: _UnsignedIntegerType>(_ v: T)  {
     self = _uint64ToString(v.toUIntMax())
   }
 
+  /// Create an instance representing `v` in the given `radix` (base).
+  ///
+  /// Numerals greater than 9 are represented as roman letters,
+  /// starting with `a` if `uppercase` is `false` or `A` otherwise.
   public init<T: _SignedIntegerType>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
@@ -101,6 +115,10 @@ extension String {
       v.toIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
   
+  /// Create an instance representing `v` in the given `radix` (base).
+  ///
+  /// Numerals greater than 9 are represented as roman letters,
+  /// starting with `a` if `uppercase` is `false` or `A` otherwise.
   public init<T: _UnsignedIntegerType>(
     _ v: T, radix: Int, uppercase: Bool = false
   )  {

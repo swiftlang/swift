@@ -87,7 +87,7 @@ if True:
 /// Value Semantics
 /// ---------------
 ///
-/// Each array variable, let binding, or stored property has an
+/// Each array variable, `let` binding, or stored property has an
 /// independent value that includes the values of all of its elements.
 /// Therefore, mutations to the array are not observable through its
 /// copies::

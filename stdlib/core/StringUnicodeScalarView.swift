@@ -25,6 +25,9 @@ public func <(
 }
 
 extension String {
+  /// A collection of `Unicode scalar values
+  /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_ that
+  /// encode a `String` .
   public struct UnicodeScalarView : Sliceable, SequenceType, Reflectable {
     init(_ _core: _StringCore) {
       self._core = _core
@@ -45,6 +48,7 @@ extension String {
       }
     }
 
+    /// A position in a `String.UnicodeScalarView`
     public struct Index : BidirectionalIndexType, Comparable {
       public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
@@ -121,11 +125,18 @@ extension String {
       }
     }
 
+    /// Access the elements delimited by the given half-open range of
+    /// indices.
+    ///
+    /// Complexity: O(1) unless bridging from Objective-C requires an
+    /// O(N) conversion.
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       return UnicodeScalarView(
         _core[r.startIndex._position..<r.endIndex._position])
     }
 
+    /// A type whose instances can produce the elements of this
+    /// sequence, in order.
     public struct Generator : GeneratorType {
       init(_ _base: _StringCore.Generator) {
         self._base = _base
@@ -168,10 +179,15 @@ extension String {
 }
 
 extension String {
+  /// Construct an instance given a collection of `Unicode scalar
+  /// values
+  /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
   public init(_ view: UnicodeScalarView) {
     self = String(view._core)
   }
 
+  /// The value of `self` as a collection of `Unicode scalar values
+  /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
   public var unicodeScalars : UnicodeScalarView {
     get {
       return UnicodeScalarView(_core)
@@ -183,6 +199,7 @@ extension String {
 }
 
 extension String.UnicodeScalarView : ExtensibleCollectionType {
+  /// Construct an empty instance.
   public init() {
     self = String.UnicodeScalarView(_StringCore())
   }

@@ -76,6 +76,7 @@ extension _StringCore {
 }
 
 extension String {
+  /// A collection of UTF-8 code units that encodes a `String` value.
   public struct UTF8View : CollectionType, Reflectable {
     let _core: _StringCore
     
@@ -83,6 +84,7 @@ extension String {
       self._core = _core
     }
 
+    /// A position in a `String.UTF8View`
     public struct Index : ForwardIndexType {
       init(_ _core: _StringCore, _ _coreIndex: Int, 
            _ _buffer: _StringCore.UTF8Chunk) {
@@ -160,6 +162,7 @@ extension String {
     }
   }
 
+  /// A UTF-8 encoding of `self`.
   public var utf8: UTF8View {
     return UTF8View(self._core)
   }
@@ -168,6 +171,11 @@ extension String {
     return _core.elementWidth == 1 ? _core.startASCII : nil
   }
 
+  /// A contiguously-stored nul-terminated UTF-8 representation of
+  /// `self`.
+  ///
+  /// To access the underlying memory, invoke
+  /// `withUnsafeBufferPointer` on the `ContiguousArray`.
   public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
     var result = ContiguousArray<UTF8.CodeUnit>()
     result.reserveCapacity(countElements(utf8) + 1)

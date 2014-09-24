@@ -99,6 +99,7 @@ public struct ${Self}<T>
     self = .null()
   }
 
+  /// Return a `nil` instance.
   @transparent
   public static func null() -> ${Self} {
     return ${Self}()
@@ -302,6 +303,7 @@ public struct ${Self}<T>
     return self == ${Self}.null()
   }
 
+  /// Access the `i`\ th element of the raw array starting at `self`.
   public subscript (i : Int) -> T {
     @transparent
     get {

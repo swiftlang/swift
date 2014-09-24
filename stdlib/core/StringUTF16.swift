@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 extension String {
+  /// A collection of UTF-16 code units that encodes a `String` value.
   public struct UTF16View : Sliceable, Reflectable {
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
@@ -87,6 +88,11 @@ extension String {
       return 0xfffd
     }
 
+    /// Access the elements delimited by the given half-open range of
+    /// indices.
+    ///
+    /// Complexity: O(1) unless bridging from Objective-C requires an
+    /// O(N) conversion.
     public subscript(subRange: Range<Int>) -> UTF16View {
       return UTF16View(_core, offset: _toInternalIndex(subRange.startIndex),
           length: subRange.endIndex - subRange.startIndex)
@@ -114,6 +120,7 @@ extension String {
     let _core: _StringCore
   }
 
+  /// A UTF-16 encoding of `self`.
   public var utf16: UTF16View {
     return UTF16View(_core)
   }

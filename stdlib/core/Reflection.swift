@@ -29,6 +29,9 @@ public protocol Reflectable {
 public struct ObjectIdentifier : Hashable {
   let value: Builtin.RawPointer
 
+  /// Convert to a `UInt` that captures the full value of `self`.
+  ///
+  /// Axiom: `a.uintValue() == b.uintValue()` iff `a == b`
   public func uintValue() -> UInt {
     return UInt(Builtin.ptrtoint_Word(value))
   }
@@ -45,10 +48,12 @@ public struct ObjectIdentifier : Hashable {
     return Int(Builtin.ptrtoint_Word(value))
   }
 
+  /// Construct an instance that uniquely identifies `x`.
   public init(_ x: AnyObject) {
     self.value = unsafeBitCast(x, Builtin.RawPointer.self)
   }
 }
+
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(x.value, y.value))
 }
