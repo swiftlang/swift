@@ -1735,6 +1735,11 @@ public:
     }
     OS << ')';
   }
+  void visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E) {
+    printCommon(E, "unavailable_to_optional_expr") << '\n';
+    printRec(E->getRef());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

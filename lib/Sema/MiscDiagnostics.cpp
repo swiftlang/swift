@@ -224,6 +224,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::ArchetypeToSuper:
           case ExprKind::ScalarToTuple:
           case ExprKind::InjectIntoOptional:
+          case ExprKind::UnavailableToOptional:
           case ExprKind::LValueToPointer:
           case ExprKind::UnresolvedCheckedCast:
           case ExprKind::ForcedCheckedCast:

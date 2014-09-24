@@ -1989,6 +1989,20 @@ public:
   }
 };
   
+/// Conversion from a potentially unavailable declaration reference to an
+/// optional.
+class UnavailableToOptionalExpr : public ImplicitConversionExpr {
+public:
+  UnavailableToOptionalExpr(DeclRefExpr *ref, Type ty)
+      : ImplicitConversionExpr(ExprKind::UnavailableToOptional, ref, ty) {}
+
+  DeclRefExpr *getRef() const { return cast<DeclRefExpr>(getSubExpr()); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnavailableToOptional;
+  }
+};
+  
 /// Convert the address of an lvalue to a raw pointer.
 class LValueToPointerExpr : public ImplicitConversionExpr {
   Type AbstractionPattern;

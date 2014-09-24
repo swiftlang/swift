@@ -1128,6 +1128,17 @@ public:
   static void buildTypeRefinementContextHierarchy(SourceFile &SF,
                                                   unsigned StartElem);
 
+  /// Checks whether a declaration is available when referred to at the given
+  /// location (this reference location must be in the passed-in
+  /// reference DeclContext).
+  /// If the declaration is available, return true.
+  /// If the declaration is not available, return false and write the
+  /// declaration's available version range to the out parameter
+  /// OutAvailableRange.
+  bool isDeclAvailable(Decl *D, SourceLoc referenceLoc,
+                       DeclContext *referenceDC,
+                        VersionRange &OutAvailableRange);
+
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl

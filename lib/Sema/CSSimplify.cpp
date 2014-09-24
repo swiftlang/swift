@@ -3450,6 +3450,11 @@ Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
   llvm_unreachable("attempted to extract a base type from a non-array type");
 }
 
+Type ConstraintSystem::getTypeWhenUnavailable(Type declType) {
+  // Drop lvalue-ness and make optional.
+  return OptionalType::get(declType->getRValueType());
+}
+
 static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
   auto bgt = type->castTo<BoundGenericType>();
   assert((bgt->getDecl() == cs.getASTContext().getUnsafeMutablePointerDecl()

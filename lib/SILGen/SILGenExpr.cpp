@@ -244,6 +244,8 @@ namespace {
                                             SGFContext C);
     
     RValue visitAvailabilityQueryExpr(AvailabilityQueryExpr *E, SGFContext C);
+    RValue visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
+                                          SGFContext C);
   };
 }
 
@@ -5992,6 +5994,12 @@ RValue RValueEmitter::visitAvailabilityQueryExpr(AvailabilityQueryExpr *E,
       SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
                                       ManagedValue::forUnmanaged(trueValue), C);
   return RValue(SGF, E, result);
+}
+
+RValue
+RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
+                                              SGFContext C) {
+  llvm_unreachable("Unimplemented");
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

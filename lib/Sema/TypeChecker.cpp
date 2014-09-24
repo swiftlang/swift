@@ -875,6 +875,43 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
   }
 }
 
+bool TypeChecker::isDeclAvailable(Decl *D, SourceLoc referenceLoc,
+                                  DeclContext *referenceDC,
+                                  VersionRange &OutAvailableRange) {
+  SourceFile *SF = referenceDC->getParentSourceFile();
+  assert(SF);
+  
+  TypeRefinementContext *rootTRC = SF->getTypeRefinementContext();
+  
+  TypeRefinementContext *TRC;
+  if (referenceLoc.isValid()) {
+    TRC = rootTRC->findMostRefinedSubContext(referenceLoc,
+                                             Context.SourceMgr);
+  } else {
+    // For expressions without a valid location (these may be synthesized
+    // code) we conservatively use the root refinement context. In
+    // the future, we can be more precise here by climbing DeclContexts
+    // until we find a DeclContext with a valid location and looking up
+    // the TRC for that.
+    TRC = rootTRC;
+  }
+  
+  VersionRange safeRangeUnderApprox = TypeChecker::availableRange(D, Context);
+  VersionRange runningOSOverApprox = TRC->getPotentialVersions();
+  
+  // The reference is safe if an over-approximation of the running OS
+  // versions is fully contained within an under-approximation
+  // of the versions on which the declaration is available. If this
+  // containment cannot be guaranteed, we say the reference is
+  // not available.
+  if (!(runningOSOverApprox.isContainedIn(safeRangeUnderApprox))) {
+    OutAvailableRange = safeRangeUnderApprox;
+    return false;
+  }
+  
+  return true;
+}
+
 // checkForForbiddenPrefix is for testing purposes.
 
 void TypeChecker::checkForForbiddenPrefix(const Decl *D) {

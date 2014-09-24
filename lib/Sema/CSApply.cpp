@@ -1817,9 +1817,20 @@ namespace {
 
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
-      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
+      auto newDeclRef = dyn_cast<DeclRefExpr>(buildDeclRef(decl, expr->getLoc(),
+                          selected.openedFullType,
                           locator, expr->isSpecialized(), expr->isImplicit(),
-                          expr->getAccessKind());
+                          expr->getAccessKind()));
+      
+      if (!choice.isPotentiallyUnavailable()) {
+        return newDeclRef;
+      }
+      
+      // If the chosen overload is potentially unavailable, wrap the
+      // declaration reference in an UnavailableToOptionalExpr conversion.
+      Type unavailTy = cs.getTypeWhenUnavailable(selected.openedFullType);
+      return new (cs.getASTContext()) UnavailableToOptionalExpr(newDeclRef,
+                                                                unavailTy);
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {

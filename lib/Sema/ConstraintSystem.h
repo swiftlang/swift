@@ -2172,6 +2172,10 @@ public:
   /// \returns the base type of the array.
   Type getBaseTypeForArrayType(TypeBase *type);
   
+  /// Returns the type to use when the passed-in declaration type is potentially
+  /// unavailable.
+  Type getTypeWhenUnavailable(Type declType);
+  
   /// \brief Set whether or not the expression being solved is too complex and
   /// has exceeded the solver's memory threshold.
   void setExpressionTooComplex(bool tc) {

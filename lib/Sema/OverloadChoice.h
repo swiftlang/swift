@@ -89,18 +89,23 @@ class OverloadChoice {
   /// overload choice kind shifted by 1 with the low bit set.
   uintptr_t DeclOrKind;
 
+  unsigned IsPotentiallyUnavailable : 1;
 public:
-  OverloadChoice() : BaseAndBits(nullptr, 0), DeclOrKind() { }
+  OverloadChoice() : BaseAndBits(nullptr, 0), DeclOrKind(),
+      IsPotentiallyUnavailable(false) { }
 
-  OverloadChoice(Type base, ValueDecl *value, bool isSpecialized)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
+  OverloadChoice(Type base, ValueDecl *value, bool isSpecialized,
+                 bool isPotentiallyUnavailable = false)
+    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
+      IsPotentiallyUnavailable(isPotentiallyUnavailable) {
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(value);
   }
 
   OverloadChoice(Type base, TypeDecl *type, bool isSpecialized)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
+    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
+      IsPotentiallyUnavailable(false) {
     assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
@@ -108,7 +113,8 @@ public:
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
     : BaseAndBits(base, 0),
-      DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03) {
+      DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03),
+      IsPotentiallyUnavailable(false) {
     assert(base && "Must have a base type for overload choice");
     assert(kind != OverloadChoiceKind::Decl &&
            kind != OverloadChoiceKind::DeclViaDynamic &&
@@ -122,7 +128,8 @@ public:
     : BaseAndBits(base, 0),
       DeclOrKind(((uintptr_t)index
                   + (uintptr_t)OverloadChoiceKind::TupleIndex) << 2
-                 | (uintptr_t)0x03) {
+                 | (uintptr_t)0x03),
+      IsPotentiallyUnavailable(false) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
@@ -224,6 +231,12 @@ public:
   /// \brief Retrieves an opaque choice that ignores the base type.
   void *getOpaqueChoiceSimple() const {
     return reinterpret_cast<void*>(DeclOrKind);
+  }
+  
+  /// \brief Returns true if the overload choice would result in a
+  /// a reference to a potentially unavailable declaration.
+  bool isPotentiallyUnavailable() const {
+    return IsPotentiallyUnavailable;
   }
 };
 

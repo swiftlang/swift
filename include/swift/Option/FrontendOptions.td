@@ -136,6 +136,10 @@ def enable_experimental_availability_checking : Flag<["-"],
   "enable-experimental-availability-checking">,
   HelpText<"Enable experimental checking for API availability">;
 
+def enable_experimental_unavailable_as_optional : Flag<["-"],
+  "enable-experimental-unavailable-as-optional">,
+  HelpText<"Enable experimental treat unavailable symbols as optional">;
+    
 def enable_character_literals : Flag<["-"], "enable-character-literals">,
   HelpText<"Enable legacy character literals">;
 

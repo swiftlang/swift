@@ -1242,6 +1242,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                              choice.isSpecialized(), locator, nullptr);
     }
 
+    if (choice.isPotentiallyUnavailable()) {
+      // Strip lvalue-ness and make type optional to reflect fact
+      // that declaration may not be available.
+      refType = getTypeWhenUnavailable(refType);
+    }
+    
     if (choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
         !isa<SubscriptDecl>(choice.getDecl())) {
       // For a non-subscript declaration that is an optional
