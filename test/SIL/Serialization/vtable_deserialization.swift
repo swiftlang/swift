@@ -19,11 +19,9 @@ func MakeItNotAGlobal() -> Y {
 // Make sure all abstractions have been removed and everything inlined into top_level_method.
 // CHECK-LABEL: sil private @top_level_code : $@thin () -> () {
 // CHECK: bb0:
-// CHECK-NEXT: alloc_ref
 // CHECK-NEXT: function_ref unknown
 // CHECK-NEXT: function_ref @unknown
 // CHECK-NEXT: apply
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // CHECK-NEXT: }

@@ -21,6 +21,7 @@ class Sub : Base {
 // CHECK-NEXT: #Sub.internalMethod!1: _TFC21accessibility_vtables3Sub14internalMethodfS0_FT_T_       // accessibility_vtables.Sub.internalMethod (accessibility_vtables.Sub)() -> ()
 // CHECK-NEXT: #Sub.prop!setter.1: _TFC21accessibility_vtables3Subs4propSi   // accessibility_vtables.Sub.prop.setter : Swift.Int
 // CHECK-NEXT: #Sub.prop!materializeForSet.1: _TFC21accessibility_vtables3Subm4propSi  // accessibility_vtables.Sub.prop.materializeForSet : Swift.Int
+// CHECK-NEXT: #Sub.deinit
 // CHECK-NEXT: }
 
 class InternalSub : InternalBase {
@@ -40,5 +41,6 @@ class InternalSub : InternalBase {
 // CHECK-NEXT:  #InternalSub.method!1: _TFC21accessibility_vtables11InternalSub6methodfS0_FT_T_       // accessibility_vtables.InternalSub.method (accessibility_vtables.InternalSub)() -> ()
 // CHECK-NEXT:  #InternalSub.prop!setter.1: _TFC21accessibility_vtables11InternalSubs4propSi  // accessibility_vtables.InternalSub.prop.setter : Swift.Int
 // CHECK-NEXT:  #InternalSub.prop!materializeForSet.1: _TFC21accessibility_vtables11InternalSubm4propSi // accessibility_vtables.InternalSub.prop.materializeForSet : Swift.Int
+// CHECK-NEXT:  #InternalSub.deinit
 // CHECK-NEXT: }
 

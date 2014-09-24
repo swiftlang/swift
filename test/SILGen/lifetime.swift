@@ -450,7 +450,17 @@ class Foo<T> {
     x = chi.intify()
   }
 
+  // Deallocating destructor for Foo.
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooD : $@cc(method) @thin <T> (@owned Foo<T>) -> ()
+  // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Foo<T>):
+  // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@cc(method) @thin <τ_0_0> (@owned Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@cc(method) @thin <τ_0_0> (@owned Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>
+  // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
+  // CHECK-NEXT:   [[RESULT:%[0-9]+]] = tuple ()
+  // CHECK-NEXT:   return [[RESULT]] : $()
   // CHECK-LABEL: sil hidden @_TFC8lifetime3Food : $@cc(method) @thin <T> (@owned Foo<T>) -> @owned Builtin.NativeObject
+
   deinit {
     // CHECK: bb0([[THIS:%[0-9]+]] : $Foo<T>):
     bar()
@@ -474,15 +484,6 @@ class Foo<T> {
     // CHECK: return [[PTR]]
   }
 
-  // Deallocating destructor for Foo.
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooD : $@cc(method) @thin <T> (@owned Foo<T>) -> ()
-  // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Foo<T>):
-  // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@cc(method) @thin <τ_0_0> (@owned Foo<τ_0_0>) -> @owned Builtin.NativeObject
-  // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@cc(method) @thin <τ_0_0> (@owned Foo<τ_0_0>) -> @owned Builtin.NativeObject
-  // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>
-  // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
-  // CHECK-NEXT:   [[RESULT:%[0-9]+]] = tuple ()
-  // CHECK-NEXT:   return [[RESULT]] : $()
 }
 
 class ImplicitDtor {

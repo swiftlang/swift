@@ -33,6 +33,7 @@ func testDirectDispatch(c : TestClass) -> Int {
 // Verify that the non-overriding final methods don't get emitted to the vtable.
 // CHECK-LABEL: sil_vtable TestClass {
 // CHECK-NEXT:  #TestClass.baseMethod!1: _TFC5final9TestClass10baseMethodfS0_FT_T_
+// CHECK-NEXT:  #TestClass.deinit!
 // CHECK-NEXT:  #TestClass.init!initializer.1: _TFC5final9TestClasscfMS0_FT_S0_
 // CHECK-NEXT: }
 
@@ -40,4 +41,5 @@ func testDirectDispatch(c : TestClass) -> Int {
 // CHECK-LABEL: sil_vtable TestDerived {
 // CHECK-NEXT:  #TestClass.baseMethod!1: _TFC5final11TestDerived10baseMethodfS0_FT_T_
 // CHECK-NEXT:  #TestClass.init!initializer.1: _TFC5final11TestDerivedcfMS0_FT_S0_
+// CHECK-NEXT:  #TestDerived.deinit!
 // CHECK-NEXT: }

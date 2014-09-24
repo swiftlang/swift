@@ -1228,6 +1228,14 @@ public:
     // added to the vtable when they are visited.
   }
   
+  void visitDestructorDecl(DestructorDecl *dd) {
+    if (dd->getParent()->isClassOrClassExtensionContext() == theClass) {
+      // Add the deallocating destructor to the vtable just for the purpose
+      // that it is referenced and cannot be eliminated by dead function removal.
+      addEntry(SILDeclRef(dd, SILDeclRef::Kind::Deallocator));
+    }
+  }
+  
   void visitSubscriptDecl(SubscriptDecl *sd) {
     // Note: dynamically-dispatched properties have their getter and setter
     // added to the vtable when they are visited.
