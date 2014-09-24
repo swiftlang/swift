@@ -11,7 +11,7 @@ func ifexpr() -> Int {
   // CHECK-LABEL: sil hidden  @_TF13sil_locations6ifexprFT_Si
   // CHECK: apply {{.*}} line:[[@LINE-5]]:6
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-6]]:6
-  // CHECK: br [[FALSE_BB]] // {{.*}} line:[[@LINE-7]]:6
+  // CHECK: br [[FALSE_BB]] // {{.*}} line:[[@LINE-6]]:6
   // CHECK: return {{.*}} // {{.*}} line:[[@LINE-5]]:3:return
 }
 
@@ -26,9 +26,9 @@ func ifelseexpr() -> Int {
   // CHECK-LABEL: sil hidden  @_TF13sil_locations10ifelseexprFT_Si
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-7]]:6
   // CHECK: [[TRUE_BB]]:
-  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-9]]:6
+  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-8]]:6
   // CHECK: [[FALSE_BB]]:
-  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-11]]:6
+  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-8]]:6
   // CHECK: return {{.*}} // {{.*}} line:[[@LINE-7]]:3:return
 }
 
@@ -57,9 +57,9 @@ func ifexpr_rval() -> Int {
   // CHECK: apply {{.*}} line:[[@LINE-3]]:11
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-4]]:11
   // CHECK: [[TRUE_BB]]:
-  // CHECK: br bb{{[0-9]+}}({{%.*}}) // {{.*}} line:[[@LINE-6]]:11
+  // CHECK: br bb{{[0-9]+}}({{%.*}}) // {{.*}} line:[[@LINE-6]]:18
   // CHECK: [[FALSE_BB]]:
-  // CHECK: br bb{{[0-9]+}}({{%.*}}) // {{.*}} line:[[@LINE-8]]:11
+  // CHECK: br bb{{[0-9]+}}({{%.*}}) // {{.*}} line:[[@LINE-8]]:22
 }
 
 // TODO: missing info on the first branch.

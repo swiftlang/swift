@@ -30,6 +30,13 @@ void Condition::enterTrue(SILBuilder &B) {
   B.emitBlock(TrueBB);
 }
 
+/// Extract the last SILLocation used in BB.
+static SILLocation getContinuationLoc(SILBasicBlock &BB, SILLocation Fallback) {
+  for (auto I = BB.rbegin(); I != BB.rend(); ++I)
+    if (auto L = I->getLoc())
+      return L;
+  return Fallback;
+}
 void Condition::exitTrue(SILBuilder &B, ArrayRef<SILValue> Args) {
   // If there's no continuation block, it's because the condition was
   // folded to true.  In that case, we just continue emitting code as
@@ -51,9 +58,9 @@ void Condition::exitTrue(SILBuilder &B, ArrayRef<SILValue> Args) {
   }
   
   // Otherwise, resume into the continuation block.  This branch might
-  // be folded by exitFalse if it turns out that that point is
+  // be folded by exitFalse if it turns out that thapoint is
   // unreachable.
-  B.createBranch(Loc, ContBB, Args);
+  B.createBranch(getContinuationLoc(*B.getInsertionBB(), Loc), ContBB, Args);
   
   // Coming out of exitTrue, we can be in one of three states:
   //   - a valid non-terminal IP, but only if there is no continuation
@@ -110,7 +117,7 @@ void Condition::exitFalse(SILBuilder &B, ArrayRef<SILValue> Args) {
            "Zapping the branch should make ContBB dead");
   } else {
     // Otherwise, branch to the continuation block and start inserting there.
-    B.createBranch(Loc, ContBB, Args);
+    B.createBranch(getContinuationLoc(*B.getInsertionBB(), Loc), ContBB, Args);
   }
 }
 
