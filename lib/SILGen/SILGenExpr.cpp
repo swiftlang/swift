@@ -440,6 +440,8 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
 /// Emit the specified declaration as an LValue if possible, otherwise return
 /// null.
 ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
+                                               CanType formalRValueType,
+                                               ForMutation_t forMutation,
                                                AccessKind accessKind) {
   // For local decls, use the address we allocated or the value if we have it.
   auto It = VarLocs.find(var);
@@ -457,10 +459,27 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
   }
   
   // a getter produces an rvalue unless this is a direct access to storage.
-  if (!var->hasStorage() ||
-      (accessKind != AccessKind::DirectToStorage &&
-       var->hasAccessorFunctions()))
+  switch (var->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    break;
+
+  case AbstractStorageDecl::Observing:
+    // TODO: emit a direct reference if not forMutation?
+    if (accessKind != AccessKind::DirectToStorage)
+      return ManagedValue();
+    break;
+
+  case AbstractStorageDecl::Computed:
     return ManagedValue();
+  }
+
+  if (var->hasAddressors()) {
+    LValue lvalue =
+      emitLValueForAddressedNonMemberVarDecl(loc, var, formalRValueType,
+                                             accessKind);
+    return emitAddressOfLValue(loc, lvalue, forMutation);
+  }
   
   // If this is a global variable, invoke its accessor function to get its
   // address.
@@ -498,7 +517,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     // If this VarDecl is represented as an address, emit it as an lvalue, then
     // perform a load to get the rvalue.
-    if (auto Result = emitLValueForDecl(loc, var, accessKind)) {
+    if (auto Result = emitLValueForDecl(loc, var, refType,
+                                        NotForMutation, accessKind)) {
       IsTake_t takes;
       // 'self' may need to be taken during an 'init' delegation.
       if (var->getName() == getASTContext().Id_self) {
@@ -4106,7 +4126,8 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     if (selfDecl->getType()->hasReferenceSemantics())
       self = SGF.emitSelfForDirectPropertyInConstructor(loc, selfDecl);
     else
-      self = SGF.emitLValueForDecl(loc, selfDecl, AccessKind::DirectToStorage);
+      self = SGF.emitLValueForDecl(loc, selfDecl, src.getType(), ForMutation,
+                                   AccessKind::DirectToStorage);
 
     LValue memberRef = SGF.emitDirectIVarLValue(loc, self, named->getDecl());
 
@@ -4684,7 +4705,9 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   }
 
   // We know that self is a box, so get its address.
-  SILValue selfAddr = SGF.emitLValueForDecl(E, selfDecl).getLValueAddress();
+  SILValue selfAddr =
+    SGF.emitLValueForDecl(E, selfDecl, selfTy->getCanonicalType(),
+                          ForMutation).getLValueAddress();
   // Forward or assign into the box depending on whether we actually consumed
   // 'self'.
   switch (SGF.SelfInitDelegationState) {

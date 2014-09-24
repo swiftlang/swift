@@ -1057,6 +1057,40 @@ LValue SILGenLValue::visitExpr(Expr *e) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
+static ArrayRef<Substitution>
+getNonMemberVarDeclSubstitutions(SILGenFunction &gen, VarDecl *var) {
+  ArrayRef<Substitution> substitutions;
+  if (auto genericParams
+      = gen.SGM.Types.getEffectiveGenericParamsForContext(
+                                                      var->getDeclContext()))
+    substitutions = gen.buildForwardingSubstitutions(genericParams);
+  return substitutions;
+}
+
+static AddressorComponent *
+makeNonMemberVarDeclAddressorComponent(SILGenFunction &gen, VarDecl *var,
+                                       const LValueTypeData &typeData,
+                                       AccessKind accessKind) {
+  assert(var->hasAddressors());
+  SILType storageType = gen.getLoweredType(var->getType()).getAddressType();
+  return new AddressorComponent(var, /*isSuper=*/ false,
+                                accessKind == AccessKind::DirectToAccessor,
+                                getNonMemberVarDeclSubstitutions(gen, var),
+                                typeData, storageType);
+}
+
+LValue
+SILGenFunction::emitLValueForAddressedNonMemberVarDecl(SILLocation loc,
+                                                       VarDecl *var,
+                                                       CanType formalRValueType,
+                                                       AccessKind accessKind) {
+  auto typeData = getUnsubstitutedTypeData(*this, formalRValueType);
+  LValue lv;
+  lv.add(makeNonMemberVarDeclAddressorComponent(*this, var, typeData,
+                                                accessKind));
+  return lv;
+}
+
 static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
                                             SILLocation loc, VarDecl *var,
                                             CanType formalRValueType,
@@ -1067,19 +1101,17 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
   // If it's a computed variable, push a reference to the getter and setter.
   if (var->hasAccessorFunctions() &&
       accessKind != AccessKind::DirectToStorage) {
-    ArrayRef<Substitution> substitutions;
-    if (auto genericParams
-        = gen.SGM.Types.getEffectiveGenericParamsForContext(
-                                                      var->getDeclContext()))
-      substitutions = gen.buildForwardingSubstitutions(genericParams);
-
     lv.add(new GetterSetterComponent(var, /*isSuper=*/false,
                                      accessKind == AccessKind::DirectToAccessor,
-                                     substitutions, typeData));
+                                     getNonMemberVarDeclSubstitutions(gen, var),
+                                     typeData));
+  } else if (var->hasAddressors()) {
+    lv.add(makeNonMemberVarDeclAddressorComponent(gen, var, typeData, accessKind));
   } else {
     // If it's a physical value (e.g. a local variable in memory), push its
     // address.
-    auto address = gen.emitLValueForDecl(loc, var, accessKind);
+    auto address = gen.emitLValueForDecl(loc, var, formalRValueType,
+                                         ForMutation, accessKind);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
     lv.add(new ValueComponent(address, typeData));

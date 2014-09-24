@@ -678,6 +678,8 @@ public:
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
   ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
+                                 CanType formalRValueType,
+                                 ForMutation_t forMutation,
                                  AccessKind accessKind = AccessKind::Ordinary);
   
   /// Produce a singular RValue for a reference to the specified declaration,
@@ -1056,6 +1058,11 @@ public:
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E);
+
+  /// Emit a reference to a variable as an lvalue.
+  LValue emitLValueForAddressedNonMemberVarDecl(SILLocation loc, VarDecl *var,
+                                                CanType formalRValueType,
+                                                AccessKind accessKind);
 
   /// Emit an lvalue that directly refers to the given instance
   /// variable (without going through getters or setters).
