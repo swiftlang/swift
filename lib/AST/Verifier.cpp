@@ -427,6 +427,18 @@ struct ASTNodeBase {};
           if (ActiveArchetypes.count(archetype) > 0)
             return false;
 
+          // FIXME: Make an exception for serialized extensions, which don't
+          // currently have the correct archetypes.
+          if (auto activeScope = Scopes.back().dyn_cast<DeclContext *>()) {
+            do {
+              if (isa<ExtensionDecl>(activeScope) &&
+                  isa<LoadedFile>(activeScope->getModuleScopeContext())) {
+                return false;
+              }
+              activeScope = activeScope->getParent();
+            } while (!activeScope->isModuleScopeContext());
+          }
+
           llvm::errs() << "AST verification error: archetype " << archetype
                        << " not allowed in this context\n";
           return true;
