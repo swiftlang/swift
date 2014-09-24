@@ -161,9 +161,17 @@ internal func _preprocessingPass<Args>(args: Args)
 
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
 // pass a GeneratorType through GeneratorSequence to give it "SequenceType-ness"
+/// A sequence built around a generator of type `G`.
+///
+/// Useful mostly to recover the ability to use `for`\ ...\ `in`,
+/// given just a generator `g`::
+///
+///   for x in GeneratorSequence(g) { ... }
 public struct GeneratorSequence<
   G: GeneratorType
 > : GeneratorType, SequenceType {
+
+  /// Construct an instance whose generator is a copy of `base`.
   public init(_ base: G) {
     _base = base
   }

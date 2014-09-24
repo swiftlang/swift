@@ -171,10 +171,15 @@ public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
 public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   var value: COpaquePointer
 
+  /// Create a `nil` instance.
   public init() {
     value = COpaquePointer()
   }
 
+  /// Reinterpret the bits of `value` as `CFunctionPointer<T>`.
+  ///
+  /// .. Warning:: This is a fundamentally unsafe operation, equivalent to
+  ///      `unsafeBitCast(value, CFunctionPointer<T>.self)`
   public init(_ value: COpaquePointer) {
     self.value = value
   }
@@ -215,13 +220,17 @@ public func ==<T>(lhs: CFunctionPointer<T>, rhs: CFunctionPointer<T>) -> Bool {
 }
 
 extension COpaquePointer {
-  public init<T>(_ from: CFunctionPointer<T>) {
+  /// Reinterpret the bits of `value` as `COpaquePointer`.
+  ///
+  /// .. Warning:: This is a fundamentally unsafe operation, equivalent to
+  ///      `unsafeBitCast(value, COpaquePointer.self)`
+  public init<T>(_ value: CFunctionPointer<T>) {
     self = from.value
   }
 }
 
 
-// The C va_list type
+/// The corresponding Swift type to `va_list` in imported C APIs.
 public struct CVaListPointer {
   var value: UnsafeMutablePointer<Void>
 

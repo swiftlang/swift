@@ -17,6 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A generator that never produces an element.
+///
+/// See also: `EmptyCollection<T>`.
 public struct EmptyGenerator<T> : GeneratorType, SequenceType {
   /// `EmptyGenerator` is also a `SequenceType`, so it `generate`\ 's
   /// a copy of itself
@@ -30,6 +33,7 @@ public struct EmptyGenerator<T> : GeneratorType, SequenceType {
   }
 }
 
+/// A collection whose element type is `T` but that is always empty.
 public struct EmptyCollection<T> : CollectionType {
   /// A type that represents a valid position in the collection.
   /// 
@@ -37,6 +41,7 @@ public struct EmptyCollection<T> : CollectionType {
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
 
+  /// Construct an instance.
   public init() {}
 
   /// Always zero, just like `endIndex`.

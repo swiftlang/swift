@@ -299,7 +299,9 @@ public protocol Hashable : Equatable {
 ///
 ///   func f<T: Sink where T.Element == X>(g: T) { ... g.put(a) ...}
 public protocol SinkType {
+  /// The type of element to be written to this sink.
   typealias Element
+  /// Write `x` to this sink.
   mutating func put(x: Element)
 }
 

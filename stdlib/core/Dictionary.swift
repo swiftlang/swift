@@ -1633,6 +1633,18 @@ enum _DictionaryIndexRepresentation<Key : Hashable, Value> {
   case _Cocoa(_CocoaIndex)
 }
 
+/// Used to access the key-value pairs in an instance of
+/// `Dictionary<Key,Value>`.
+///
+/// Remember that Dictionary has two subscripting interfaces:
+///
+/// 1. Subscripting with a key, yielding an optional value::
+///
+///      v = d[k]!
+///
+/// 2. Subscripting with an index, yielding a key-value pair:
+///
+///      (k,v) = d[i]
 public struct DictionaryIndex<Key : Hashable, Value> :
   BidirectionalIndexType, Comparable {
   // Index for native storage is efficient.  Index for bridged NSDictionary is
@@ -1679,6 +1691,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
     }
   }
 
+  /// Identical to `self.dynamicType`
   public typealias Index = DictionaryIndex<Key, Value>
 
   /// Returns the previous consecutive value before `self`.
@@ -1854,6 +1867,7 @@ enum _DictionaryGeneratorRepresentation<Key : Hashable, Value> {
   case _Cocoa(_CocoaDictionaryGenerator)
 }
 
+/// A generator over the key-value pairs of a `Dictionary<Key, Value>`
 public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
   // Dictionary has a separate GeneratorType and Index because of efficiency
   // and implementability reasons.
@@ -1923,6 +1937,8 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
   }
 }
 
+/// A hash-based mapping from `Key` to `Value` instances.  Also a
+/// collection of key-value pairs with no defined ordering.
 public struct Dictionary<
   Key : Hashable, Value
 > : CollectionType, DictionaryLiteralConvertible {
@@ -2020,6 +2036,11 @@ public struct Dictionary<
     return _variantStorage.assertingGet(position)
   }
 
+  /// Access the value associated with the given key.
+  ///
+  /// Reading a key that is not present in `self` yields `nil`.
+  /// Writing `nil` as the value for a given key erases that key from
+  /// `self`.
   public subscript(key: Key) -> Value? {
     get {
       return _variantStorage.maybeGet(key)
@@ -2114,16 +2135,26 @@ public struct Dictionary<
   // API itself.
   //
 
+  /// True iff `count == 0`
   public var isEmpty: Bool {
     return count == 0
   }
 
+  /// A collection containing just the keys of `self`
+  ///
+  /// Keys appear in the same order as they occur as the `.0` member
+  /// of key-value pairs in `self`.  Each key in the result has a
+  /// unique value.
   public var keys: LazyBidirectionalCollection<
     MapCollectionView<Dictionary, Key>
   > {
     return lazy(self).map { $0.0 }
   }
 
+  /// A collection containing just the values of `self`
+  ///
+  /// Values appear in the same order as they occur as the `.1` member
+  /// of key-value pairs in `self`.
   public var values: LazyBidirectionalCollection<
     MapCollectionView<Dictionary, Value>
   > {

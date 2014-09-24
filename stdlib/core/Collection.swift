@@ -232,7 +232,11 @@ public struct PermutationGenerator<
     return self
   }
 
-  public init(elements seq: C, indices: Indices) {
+  /// Construct a *generator* over a permutation of `elements` given
+  /// by `indices`.
+  ///
+  /// Requires: `elements[i]` is valid for every `i` in `indices`.
+  public init(elements: C, indices: Indices) {
     self.seq = seq
     self.indices = indices.generate()
   }

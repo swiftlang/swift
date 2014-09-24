@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A *generator* that produces one or fewer instances of `T`.
+/// A generator that produces one or fewer instances of `T`.
 public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
-  public init(_ elements: T?) {
-    self.elements = elements
+  /// Construct an instance that generates `element!`, or an empty
+  /// sequence if `element == nil`.
+  public init(_ element: T?) {
+    self.elements = element
   }
 
   /// `GeneratorOfOne` is also a `SequenceType`, so it `generate`\
@@ -36,6 +38,7 @@ public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
   var elements: T?
 }
 
+/// A collection containing a single element of type `T`.
 public struct CollectionOfOne<T> : CollectionType {
   /// A type that represents a valid position in the collection.
   /// 
@@ -43,6 +46,7 @@ public struct CollectionOfOne<T> : CollectionType {
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Bit
 
+  /// Construct an instance containing just `element`.
   public init(_ element: T) { 
     self.element = element 
   }

@@ -37,6 +37,7 @@ public enum Character :
   case LargeRepresentation(OnHeap<String>)
   case SmallRepresentation(Builtin.Int63)
 
+  /// Construct a `Character` containing just the given `scalar`.
   public init(_ scalar: UnicodeScalar) {
     var IE  = IntEncoder()
     UTF8.encode(scalar, output: &IE)
@@ -73,6 +74,9 @@ public enum Character :
     self = value
   }
 
+  /// Create an instance from a single-character `String`.
+  ///
+  /// Requires: `s` contains exactly one extended grapheme cluster.
   public init(_ s: String) {
     // The small representation can accept up to 8 code units as long
     // as the last one is a continuation.  Since the high bit of the
@@ -192,6 +196,7 @@ public enum Character :
 }
 
 extension String {
+  /// Construct an instance containing just the given `Character`.
   public init(_ c: Character) {
     switch c {
     case .SmallRepresentation(var _63bits):

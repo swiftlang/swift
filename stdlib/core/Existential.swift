@@ -17,13 +17,25 @@
 // This file contains "existentials" for the protocols defined in
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
+
+/// A type-erased generator.
+///
+/// The generator for `SequenceOf<T>`.  Forwards operations to an
+/// arbitrary underlying generator with the same `Element` type,
+/// hiding the specifics of the underlying generator type.
+///
+/// See also: `SequenceOf<T>`.
 public struct GeneratorOf<T> : GeneratorType, SequenceType {
-  public init(_ next: ()->T?) {
-    self._next = next
+
+  /// Construct an instance whose `next()` method calls `nextElement`.
+  public init(_ nextElement: ()->T?) {
+    self._next = nextElement
   }
   
-  public init<G: GeneratorType where G.Element == T>(var _ self_: G) {
-    self._next = { self_.next() }
+  /// Construct an instance whose `next()` method pulls its results
+  /// from `base`.
+  public init<G: GeneratorType where G.Element == T>(var _ base: G) {
+    self._next = { base.next() }
   }
   
   /// Advance to the next element and return it, or `nil` if no next
@@ -44,12 +56,26 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   let _next: ()->T?
 }
 
+/// A type-erased sequence.
+/// 
+/// Forwards operations to an arbitrary underlying sequence with the
+/// same `Element` type, hiding the specifics of the underlying
+/// sequence type.
+///
+/// See also: `GeneratorOf<T>`.
 public struct SequenceOf<T> : SequenceType {
-  public init<G: GeneratorType where G.Element == T>(_ generate: ()->G) {
-    _generate = { GeneratorOf(generate()) }
+  /// Construct an instance whose `generate()` method forwards to
+  /// `makeUnderlyingGenerator`
+  public init<G: GeneratorType where G.Element == T>(
+    _ makeUnderlyingGenerator: ()->G
+  ) {
+    _generate = { GeneratorOf(makeUnderlyingGenerator()) }
   }
-  public init<S: SequenceType where S.Generator.Element == T>(_ self_: S) {
-    self = SequenceOf({ self_.generate() })
+  
+  /// Construct an instance whose `generate()` method forwards to
+  /// that of `base`.
+  public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
+    self = SequenceOf({ base.generate() })
   }
 
   /// Return a *generator* over the elements of this *sequence*.
@@ -97,17 +123,26 @@ internal struct _CollectionOf<
   let _subscriptImpl: (IndexType_)->T
 }
 
+/// A type-erased sink.
+///
+/// Forwards operations to an arbitrary underlying sink with the same
+/// `Element` type, hiding the specifics of the underlying sink type.
 public struct SinkOf<T> : SinkType {
-  public init(_ put: (T)->()) {
-    _put = put
+  /// Construct an instance whose `put(x)` calls `putElement(x)`
+  public init(_ putElement: (T)->()) {
+    _put = putElement
   }
 
+  /// Construct an instance whose `put(x)` calls `base.put(x)`
   public init<S: SinkType where S.Element == T>(var _ base: S) {
     _put = { base.put($0) }
   }
+  
+  /// Write `x` to this sink.
   public func put(x: T) {
     _put(x)
   }
+  
   let _put: (T)->()
 }
 
