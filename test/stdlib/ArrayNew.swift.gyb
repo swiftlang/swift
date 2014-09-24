@@ -3,15 +3,33 @@
 //
 // FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
 //
-// RUN: ln -s  %s %t/main.swift
+// RUN: %S/../../utils/gyb %s -o %t/main.swift
 // RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
+// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
 // RUN: %target-run %t/Array
 
 
 import Darwin
 import StdlibUnittest
 import Foundation
+
+extension Array {
+  var identity: UWord {
+    return unsafeBitCast(self, UWord.self)
+  }
+}
+
+extension Slice {
+  var identity: UWord {
+    return unsafeBitCast(self._buffer.owner, UWord.self)
+  }
+}
+
+extension ContiguousArray {
+  var identity: UWord {
+    return unsafeBitCast(self, UWord.self)
+  }
+}
 
 var ArrayTestSuite = TestSuite("Array")
 
@@ -55,6 +73,142 @@ ArrayTestSuite.test("Native/isEmpty") {
   let a = [ TestValueTy(10), TestValueTy(20), TestValueTy(30) ]
   expectFalse(a.isEmpty)
 }
+
+//===----------------------------------------------------------------------===//
+// COW tests
+// FIXME: incomplete.
+//===----------------------------------------------------------------------===//
+
+func withInoutInt(inout x: Int, body: (inout x: Int) -> ()) {
+  body(x: &x)
+}
+
+func withInoutT<T>(inout x: T, body: (inout x: T) -> ()) {
+  body(x: &x)
+}
+
+func withInout<T>(inout x: T) {
+}
+
+
+
+% for array_self in [ 'ContiguousArray', 'Slice', 'Array' ]:
+
+ArrayTestSuite.test("${array_self}/subscript(_: Int)/COW") {
+  var a = ${array_self}([ [
+    TestValueTy(10), TestValueTy(20), TestValueTy(30), TestValueTy(40),
+    TestValueTy(50), TestValueTy(60), TestValueTy(70)
+  ] ])
+  let identityOuter = a.identity
+  let identityInner = a[0].identity
+
+  // Mutating through a subscript expression.
+  a[0][0] = TestValueTy(1010)
+  a[0][1].value = 1020
+  withInoutT(&a) {
+    (inout x: ${array_self}<[TestValueTy]>) in
+    x[0][2].value += 1000
+  }
+  withInoutT(&a[0]) {
+    (inout x: [TestValueTy]) in
+    x[3].value += 1000
+  }
+
+  // This will reallocate storage unless Array uses addressors for subscript.
+  //withInoutT(&a[0][4]) {
+  //  (inout x: TestValueTy) in
+  //  x.value += 1000
+  //}
+
+  // FIXME: both of these lines crash the compiler.
+  // <rdar://problem/18439579> Passing an expression based on addressors as
+  // 'inout' crashes SILGen
+  //withInoutT(&a[0][5].value, { $0 += 1000 })
+  //withInoutInt(&a[0][6].value, { $0 += 1000 })
+
+  // Don't change the last element.
+
+  expectEqual(1010, a[0][0].value)
+  expectEqual(1020, a[0][1].value)
+  expectEqual(1030, a[0][2].value)
+  expectEqual(1040, a[0][3].value)
+  expectEqual(50, a[0][4].value)
+  expectEqual(60, a[0][5].value)
+  expectEqual(70, a[0][6].value)
+
+  expectEqual(identityOuter, a.identity)
+%   if array_self == 'Array':
+  // Currently reallocates storage, but this is not what we want.
+  expectNotEqual(identityInner, a[0].identity)
+%   else:
+  // Should not reallocate storage.
+  expectEqual(identityInner, a[0].identity)
+%   end
+}
+
+ArrayTestSuite.test("${array_self}/subscript(_: Range<Int>)/COW") {
+  var a = ${array_self}([ [
+    TestValueTy(10), TestValueTy(20), TestValueTy(30), TestValueTy(40),
+    TestValueTy(50), TestValueTy(60), TestValueTy(70), TestValueTy(80),
+    TestValueTy(90),
+  ] ])
+  let identityOuter = a.identity
+  let identityInner = a[0].identity
+
+  // Mutating through a subscript expression.
+  a[0..<1][0][0] = TestValueTy(1010)
+
+  a[0..<1][0][1].value = 1020
+
+  withInoutT(&a) {
+    (inout x: ${array_self}<[TestValueTy]>) in
+    x[0..<1][0][2].value += 1000
+  }
+
+  withInoutT(&a[0..<1]) {
+    (inout x: Slice<[TestValueTy]>) in
+    x[0][3].value += 1000
+  }
+
+  withInoutT(&a[0..<1][0]) {
+    (inout x: [TestValueTy]) in
+    x[4].value += 1000
+  }
+
+  withInoutT(&a[0..<1][0][5]) {
+    (inout x: TestValueTy) in
+    x.value += 1000
+  }
+
+  withInoutT(&a[0..<1][0][6].value) {
+    (inout x: Int) in
+    x += 1000
+  }
+
+  withInoutInt(&a[0..<1][0][7].value) {
+    (inout x: Int) in
+    x += 1000
+  }
+
+  // Don't change the last element.
+
+  expectEqual(1010, a[0][0].value)
+  expectEqual(1020, a[0][1].value)
+  expectEqual(1030, a[0][2].value)
+  expectEqual(1040, a[0][3].value)
+  expectEqual(1050, a[0][4].value)
+  expectEqual(1060, a[0][5].value)
+  expectEqual(1070, a[0][6].value)
+  expectEqual(1080, a[0][7].value)
+  expectEqual(90, a[0][8].value)
+
+  expectEqual(identityOuter, a.identity)
+
+  // Currently reallocates storage, but how do we avoid this?..
+  expectNotEqual(identityInner, a[0].identity)
+}
+
+% end
 
 //===----------------------------------------------------------------------===//
 // NSArray -> Array bridging tests
@@ -633,6 +787,10 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
   expectEqual(identity1, unsafeBitCast(native, UWord.self))
 }
 
+//===----------------------------------------------------------------------===//
+// Array and EvilCollection that changes its size while we are not looking
+//===----------------------------------------------------------------------===//
+
 let evilBoundsError = "EvilCollection: index out of range"
 
 final class EvilCollection : CollectionType {
@@ -640,20 +798,20 @@ final class EvilCollection : CollectionType {
     self.growth = growth
     self.boundsChecked = boundsChecked
   }
-  
+
   var growth: Int
   var count: Int = 20
   var boundsChecked: Bool
-  
+
   var startIndex : Int {
     count += growth
     return 0
   }
-  
+
   var endIndex : Int {
     return count
   }
-  
+
   subscript(i: Int) -> TestValueTy {
     if boundsChecked {
       precondition(i >= 0 && i < count, evilBoundsError)
@@ -667,7 +825,7 @@ final class EvilCollection : CollectionType {
 }
 
 for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
-  
+
   let message = step < 0 && evilBoundsCheck
     ? evilBoundsError
     : "invalid CollectionType: count differed in successive traversals"
@@ -675,7 +833,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   let natureOfEvil = step > 0 ? "Growth" : "Shrinkage"
   let boundsChecked = evilBoundsCheck ? "BoundsChecked" : "NoBoundsCheck"
   let testPrefix = "MemorySafety/\(boundsChecked)/Evil\(natureOfEvil)"
-  
+
   let t = ArrayTestSuite.test("\(testPrefix)/Infrastructure")
   (evilBoundsCheck ? t.crashOutputMatches(evilBoundsError) : t).code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
@@ -693,8 +851,8 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     }
     let x = evil[-1]
   }
-  
-  
+
+
   ArrayTestSuite.test("\(testPrefix)/Construction")
   .crashOutputMatches(message)
   .code {

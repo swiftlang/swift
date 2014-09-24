@@ -184,6 +184,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   /// Access the `index`\ th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
+%if Self == 'Array':
     get {
       _checkSubscript(index)
       return _getElement(index)
@@ -193,6 +194,17 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
       _checkSubscript(index)
       _setElement(index, newValue: newValue)
     }
+%else:
+    address {
+      _checkSubscript(index)
+      return UnsafePointer(_buffer.baseAddress + index)
+    }
+    mutableAddress {
+      _makeMutableAndUnique()
+      _checkSubscript(index)
+      return _buffer.baseAddress + index
+    }
+%end
   }
 
   /// Return a *generator* over the elements.
