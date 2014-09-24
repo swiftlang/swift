@@ -254,16 +254,16 @@ var duplicateAccessors2: Int = 0 {
 
 var extraTokensInAccessorBlock1: X {
   get {}
-  a // expected-error {{expected 'get', 'set', 'address', 'mutableAddress', 'willSet', or 'didSet' keyword to start an accessor definition}}
+  a // expected-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}}
 }
 var extraTokensInAccessorBlock2: X {
   get {}
-  weak // expected-error {{expected 'get', 'set', 'address', 'mutableAddress', 'willSet', or 'didSet' keyword to start an accessor definition}}
+  weak // expected-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}}
   a
 }
 var extraTokensInAccessorBlock3: X {
   get {}
-  a = b // expected-error {{expected 'get', 'set', 'address', 'mutableAddress', 'willSet', or 'didSet' keyword to start an accessor definition}}
+  a = b // expected-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}}
   set {}
   get {}
 }
