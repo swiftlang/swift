@@ -2270,33 +2270,64 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // rvalue subscript expressions are produced for get-only subscript
-  // operations.  Emit a call to the getter.
+  // operations.
   auto subscript = cast<SubscriptDecl>(E->getDecl().getDecl());
 
   AccessKind accessKind = E->getAccessKind();
-  assert(accessKind != AccessKind::DirectToStorage &&
-         "direct storage subscript access not yet supported");
+
+  bool useAddressor = (!subscript->hasAccessorFunctions() ||
+                       (subscript->hasAddressors() &&
+                        accessKind == AccessKind::DirectToStorage));
+  FuncDecl *accessor =
+    (useAddressor ? subscript->getAddressor() : subscript->getGetter());
 
   // If this is an existential or archetype subscript, 'self' is passed at +0.
   SGFContext SubContext;
-  if (subscript->getGetter()->getImplicitSelfDecl()->
+  if (accessor->getImplicitSelfDecl()->
         getType()->getInOutObjectType()->is<ArchetypeType>())
     SubContext = SGFContext::AllowPlusZero;
-  
+
   // Emit the base.
   ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase(), SubContext);
-  RValueSource baseRV =
-    SGF.prepareAccessorBaseArg(E, base, subscript->getGetter());
+  RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base, accessor);
 
   // Emit the indices.
   RValue subscriptRV = SGF.emitRValue(E->getIndex());
 
-  ManagedValue MV =
-    SGF.emitGetAccessor(E, subscript, E->getDecl().getSubstitutions(),
-                        std::move(baseRV), E->isSuper(),
-                        accessKind == AccessKind::DirectToAccessor,
-                        std::move(subscriptRV), C);
-  return RValue(SGF, E, MV);
+  // The easy path here is if we don't need to use an addressor.
+  if (!useAddressor) {
+    ManagedValue MV =
+      SGF.emitGetAccessor(E, subscript, E->getDecl().getSubstitutions(),
+                          std::move(baseRV), E->isSuper(),
+                          accessKind == AccessKind::DirectToAccessor,
+                          std::move(subscriptRV), C);
+    return RValue(SGF, E, MV);
+  }
+
+  AbstractionPattern abstraction(subscript->getElementType());
+  CanType substType = E->getType()->getCanonicalType();
+
+  auto &storageTL = SGF.getTypeLowering(abstraction, substType);
+  SILType storageType = storageTL.getLoweredType().getAddressType();
+
+  SILValue address =
+    SGF.emitAddressorAccessor(E, subscript, NotForMutation,
+                              E->getDecl().getSubstitutions(),
+                              std::move(baseRV), E->isSuper(),
+                              accessKind == AccessKind::DirectToAccessor,
+                              std::move(subscriptRV), storageType)
+    .getLValueAddress();
+
+  SILType loweredSubstType = SGF.getLoweredType(substType).getAddressType();
+  bool hasAbstraction = (loweredSubstType != storageType);
+
+  ManagedValue result =
+    SGF.emitLoad(E, address, storageTL,
+                 (hasAbstraction ? SGFContext() : C), IsNotTake);
+  if (hasAbstraction) {
+    result = SGF.emitOrigToSubstValue(E, result, abstraction, substType, C);
+  }
+  return RValue(SGF, E, result);
 }
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(

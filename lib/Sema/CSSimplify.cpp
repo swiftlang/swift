@@ -2976,21 +2976,22 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
           return;
         }
 
-      // Subscripts are ok on rvalues so long as the getter is nonmutating.
-      if (auto *SD = dyn_cast<SubscriptDecl>(result))
-        if (SD->getGetter()->isMutating()) {
+      // Subscripts and computed properties are ok on rvalues so long
+      // as the getter is nonmutating.
+      if (auto storage = dyn_cast<AbstractStorageDecl>(result)) {
+        auto isGetterMutating = [](AbstractStorageDecl *storage) {
+          if (storage->hasAccessorFunctions())
+            return storage->getGetter()->isMutating();
+          if (storage->hasAddressors())
+            return storage->getAddressor()->isMutating();
+          return false;
+        };
+
+        if (isGetterMutating(storage)) {
           FoundMutating = true;
           return;
         }
-
-      // Computed properties are ok on rvalues so long as the getter is
-      // nonmutating.
-      if (auto *VD = dyn_cast<VarDecl>(result))
-        if (auto *GD = VD->getGetter())
-          if (GD->isMutating()) {
-            FoundMutating = true;
-            return;
-          }
+      }
     }
     
     // If the result's type contains delayed members, we need to force them now.
