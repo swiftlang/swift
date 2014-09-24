@@ -46,8 +46,7 @@ func test0() {
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]]#1)
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int
-// CHECK: [[T4:%.*]] = struct_element_addr [[T3]] : $*Int, #Int.value
-// CHECK: load [[T4]]
+// CHECK: load
 // CHECK: sadd_with_overflow_Word
 // CHECK: store {{%.*}} to [[T3]]
   a[5] += z
