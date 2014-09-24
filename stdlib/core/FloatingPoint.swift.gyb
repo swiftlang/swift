@@ -399,6 +399,7 @@ extension ${Self} : Hashable {
 
 @transparent
 extension ${Self} : AbsoluteValuable {
+  /// Returns the absolute value of `x`
   @transparent
   public static func abs(x: ${Self}) -> ${Self} {
     return ${Self}(Builtin.int_fabs_FPIEEE${bits}(x.value))
@@ -443,11 +444,12 @@ extension ${Self} {
 #if arch(i386) || arch(x86_64)
 %     end
 
-  public init(_ v: ${That}) {
+  /// Construct an instance that approximates `other`.
+  public init(_ other: ${That}) {
 %     if srcBits > bits:
-    value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
+    value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other.value)
 %     else:
-    value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
+    value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other.value)
 %     end
   }
 
@@ -542,20 +544,21 @@ extension ${Self} {
 #if arch(i386) || arch(x86_64)
 %     end
 
-  public init(_ v: ${That}) {
+  /// Construct an instance that approximates `other`.
+  public init(_ other: ${That}) {
 %     if srcBits != 80:
     // FIXME: Float80 does not have 'isFinite' property.
     // <rdar://problem/17958458> Int(Float80.quietNaN) is garbage
     // <rdar://problem/17959546> Float80.isFinite is missing
     _precondition(
-      v.isFinite,
+      other.isFinite,
       "floating point value can not be converted to ${Self} because it is either infinite or NaN")
 %     end
-    _precondition(v >= ${That}(${Self}.min),
+    _precondition(other >= ${That}(${Self}.min),
         "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
-    _precondition(v <= ${That}(${Self}.max),
+    _precondition(other <= ${That}(${Self}.max),
         "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
-    value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(v.value)
+    value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other.value)
   }
 
 %      if srcBits == 80:

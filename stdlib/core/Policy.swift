@@ -15,6 +15,10 @@
 //===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
+/// The empty tuple type.
+///
+/// This is the default return type of functions for which no explicit
+/// return type is specified.
 public typealias Void = ()
 
 //===----------------------------------------------------------------------===//
@@ -23,18 +27,27 @@ public typealias Void = ()
 // FIXME: it should be the other way round, Float = Float32, Double = Float64,
 // but the type checker loses sugar currently, and ends up displaying 'FloatXX'
 // in diagnostics.
+/// A 32-bit floating point type
 public typealias Float32 = Float
+/// A 64-bit floating point type
 public typealias Float64 = Double
 
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained literals
 //===----------------------------------------------------------------------===//
+/// The default type for an otherwise-unconstrained integer literal
 public typealias IntegerLiteralType = Int
+/// The default type for an otherwise-unconstrained floating point literal
 public typealias FloatLiteralType = Double
+/// The default type for an otherwise-unconstrained boolean literal
 public typealias BooleanLiteralType = Bool
 // typealias CharacterLiteralType = ?
+/// The default type for an otherwise-unconstrained unicode scalar literal
 public typealias UnicodeScalarType = String
+/// The default type for an otherwise-unconstrained unicode extended
+/// grapheme cluster literal
 public typealias ExtendedGraphemeClusterType = String
+/// The default type for an otherwise-unconstrained string literal
 public typealias StringLiteralType = String
 
 //===----------------------------------------------------------------------===//
@@ -227,6 +240,14 @@ public protocol Comparable : _Comparable, Equatable {
 /// A set type with O(1) standard bitwise operators.
 ///
 /// Each instance is a subset of `~Self.allZeros`
+///
+/// Axioms, where `x` is an instance of `Self`::
+///
+///   x | Self.allZeros == x
+///   x ^ Self.allZeros == x
+///   x & Self.allZeros == .allZeros
+///   x & ~Self.allZeros == x
+///   ~x == x ^ ~Self.allZeros
 public protocol BitwiseOperationsType {
   /// Returns the intersection of bits set in `lhs` and `rhs`.
   ///
@@ -248,16 +269,13 @@ public protocol BitwiseOperationsType {
   /// Complexity: O(1)
   prefix func ~(x: Self) -> Self
 
-  /// The identity value for "|" and "^", and the fixed point for "&".
+  /// The empty bitset.
   ///
-  /// ::
-  ///
-  ///   x | Self.allZeros == x
-  ///   x ^ Self.allZeros == x
-  ///   x & Self.allZeros == .allZeros
-  ///   x & ~Self.allZeros == x
-  ///   ~x == x ^ ~Self.allZeros
-  ///
+  /// Also the `identity element
+  /// <http://en.wikipedia.org/wiki/Identity_element>`_ for `|` and
+  /// `^`, and the `fixed point
+  /// <http://en.wikipedia.org/wiki/Fixed_point_(mathematics)>`_ for
+  /// `&`.
   class var allZeros: Self { get }
 }
 

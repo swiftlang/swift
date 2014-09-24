@@ -21,8 +21,14 @@ public enum ImplicitlyUnwrappedOptional<T>
   case None
   case Some(T)
 
+  /// Construct a `nil` instance.
   public init() { self = .None }
+  
+  /// Construct a non-\ `nil` instance that stores `some`.
   public init(_ some : T) { self = .Some(some) }
+  
+  /// Construct an instance from an explicitly unwrapped optional
+  /// (`T?`).
   public init(_ v : T?) {
     switch v {
     case .Some(let some):
@@ -32,14 +38,13 @@ public enum ImplicitlyUnwrappedOptional<T>
     }
   }
 
-  // Make nil work with ImplicitlyUnwrappedOptional
-  @transparent public
   /// Create an instance initialized with `nil`.
+  @transparent public
   init(nilLiteral: ()) {
     self = .None
   }
 
-  /// Haskell's fmap, which was mis-named
+  /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   public func map<U>(f: (T)->U) -> ImplicitlyUnwrappedOptional<U> {
     switch self {
     case .Some(let y):

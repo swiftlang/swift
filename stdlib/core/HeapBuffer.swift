@@ -37,6 +37,8 @@ func _swift_bufferAllocate(
 /// either in a derived class, or it can be in some manager object
 /// that owns the HeapBuffer.
 public class HeapBufferStorage<Value,Element> {
+  /// The type used to actually manage instances of
+  /// `HeapBufferStorage<Value,Element>`
   public typealias Buffer = HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()
@@ -75,6 +77,7 @@ public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
     unsafeBitCast(x, UnsafeMutablePointer<HeapObject>.self))
 }
 
+/// Management API for `HeapBufferStorage<Value, Element>`
 public struct HeapBuffer<Value, Element> : Equatable {
   public typealias Storage = HeapBufferStorage<Value, Element>
   let storage: Storage?
@@ -164,6 +167,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
     }
   }
 
+  /// True if storage is non-\ `nil`
   public var hasStorage: Bool {
     return storage != nil
   }

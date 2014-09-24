@@ -183,6 +183,7 @@ extension CGFloat : Reflectable {
 }
 
 @transparent extension CGFloat : AbsoluteValuable {
+  /// Returns the absolute value of `x`
   @transparent
   public static func abs(x: CGFloat) -> CGFloat {
     return CGFloat(NativeType.abs(x.native))

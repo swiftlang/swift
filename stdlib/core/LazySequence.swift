@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Augments `S` with lazy versions of various sequence algorithms.
+/// A sequence that forwards its implementation to an underlying
+/// sequence instance while exposing lazy computations as methods.
 public
 struct LazySequence<S: SequenceType> : SequenceType {
-  public
-  init(_ base: S) {
+  /// Construct an instance with `base` as its underlying sequence
+  /// instance.
+  public init(_ base: S) {
     self._base = base
   }
 

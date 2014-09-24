@@ -205,45 +205,81 @@ public func toDebugString<T>(x: T) -> String {
 // `debugPrint`
 //===----------------------------------------------------------------------===//
 
+/// Write to `target` the textual representation of `x` most suitable
+/// for debugging.
+///
+/// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `Printable`, write `x.description`
+/// * Otherwise, if `T` conforms to `Stramable`, write `x`
+/// * Otherwise, fall back to a default textual representation.
+///
+/// See also: `debugPrintln(x, &target)`
 public func debugPrint<T, TargetStream : OutputStreamType>(
-    object: T, inout target: TargetStream
+    x: T, inout target: TargetStream
 ) {
   if let debugPrintableObject =
-      _stdlib_dynamicCastToExistential1(object, DebugPrintable.self) {
+      _stdlib_dynamicCastToExistential1(x, DebugPrintable.self) {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
 
   if var printableObject =
-      _stdlib_dynamicCastToExistential1(object, Printable.self) {
+      _stdlib_dynamicCastToExistential1(x, Printable.self) {
     printableObject.description.writeTo(&target)
     return
   }
 
   if let streamableObject =
-      _stdlib_dynamicCastToExistential1(object, Streamable.self) {
+      _stdlib_dynamicCastToExistential1(x, Streamable.self) {
     streamableObject.writeTo(&target)
     return
   }
 
-  _adHocPrint(object, &target)
+  _adHocPrint(x, &target)
 }
 
+/// Write to `target` the textual representation of `x` most suitable
+/// for debugging, followed by a newline.
+///
+/// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `Printable`, write `x.description`
+/// * Otherwise, if `T` conforms to `Stramable`, write `x`
+/// * Otherwise, fall back to a default textual representation.
+///
+/// See also: `debugPrint(x, &target)`
 public func debugPrintln<T, TargetStream : OutputStreamType>(
-    object: T, inout target: TargetStream
+    x: T, inout target: TargetStream
 ) {
-  debugPrint(object, &target)
+  debugPrint(x, &target)
   target.write("\n")
 }
 
-public func debugPrint<T>(object: T) {
+/// Write to the console the textual representation of `x` most suitable
+/// for debugging.
+///
+/// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `Printable`, write `x.description`
+/// * Otherwise, if `T` conforms to `Stramable`, write `x`
+/// * Otherwise, fall back to a default textual representation.
+///
+/// See also: `debugPrintln(x)`
+public func debugPrint<T>(x: T) {
   var stdoutStream = _Stdout()
-  debugPrint(object, &stdoutStream)
+  debugPrint(x, &stdoutStream)
 }
 
-public func debugPrintln<T>(object: T) {
+/// Write to the console the textual representation of `x` most suitable
+/// for debugging, followed by a newline.
+///
+/// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `Printable`, write `x.description`
+/// * Otherwise, if `T` conforms to `Stramable`, write `x`
+/// * Otherwise, fall back to a default textual representation.
+///
+/// See also: `debugPrint(x)`
+public func debugPrintln<T>(x: T) {
   var stdoutStream = _Stdout()
-  debugPrint(object, &stdoutStream)
+  debugPrint(x, &stdoutStream)
   stdoutStream.write("\n")
 }
 

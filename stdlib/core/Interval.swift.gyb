@@ -48,8 +48,8 @@ public protocol IntervalType {
 public struct ${Self}<T: Comparable>
   : IntervalType, Equatable, Printable, DebugPrintable, Reflectable {
 
+  /// The type of the `Interval`\ 's endpoints
   public typealias Bound = T
-
   
   /// Construct a copy of `x`
   public init(_ x: ${Self}) {

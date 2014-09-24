@@ -43,7 +43,9 @@ def maskBits(n):
 
 }%
 
+/// The largest native signed integer type
 public typealias IntMax = Int${int_max_bits}
+/// The largest native unsigned integer type
 public typealias UIntMax = UInt${int_max_bits}
 
 /// This protocol is an implementation detail of `IntegerType`; do
@@ -104,24 +106,56 @@ public protocol _UnsignedIntegerType : _IntegerType {
 public protocol UnsignedIntegerType : _UnsignedIntegerType, IntegerType {
 }
 
+/// Convert `x` to type `U`, trapping on overflow in -Onone and -O
+/// builds.
+///
+/// Typically used to do conversion to any contextually-deduced
+/// integer type::
+///
+///   func f(x: Int32) {}
+///   func g(x: Int64) { f(numericCast(x)) }
 public func numericCast<
   T : _SignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
   return U(x.toIntMax())
 }
 
+/// Convert `x` to type `U`, trapping on overflow in -Onone and -O
+/// builds.
+///
+/// Typically used to do conversion to any contextually-deduced
+/// integer type::
+///
+///   func f(x: UInt32) {}
+///   func g(x: UInt64) { f(numericCast(x)) }
 public func numericCast<
   T : _UnsignedIntegerType, U : _UnsignedIntegerType
 >(x: T) -> U {
   return U(x.toUIntMax())
 }
 
+/// Convert `x` to type `U`, trapping on overflow in -Onone and -O
+/// builds.
+///
+/// Typically used to do conversion to any contextually-deduced
+/// integer type::
+///
+///   func f(x: UInt32) {}
+///   func g(x: Int64) { f(numericCast(x)) }
 public func numericCast<
   T : _SignedIntegerType, U : _UnsignedIntegerType
 >(x: T) -> U {
   return U(UIntMax(x.toIntMax()))
 }
 
+/// Convert `x` to type `U`, trapping on overflow in -Onone and -O
+/// builds.
+///
+/// Typically used to do conversion to any contextually-deduced
+/// integer type::
+///
+///   func f(x: Int32) {}
+///   func g(x: UInt64) { f(numericCast(x)) }
 public func numericCast<
 T : _UnsignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
@@ -136,6 +170,8 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
 %   BuiltinName = self_ty.builtin_name
 %   OtherSelf = self_ty.get_opposite_signedness().stdlib_name
 
+/// A ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
+/// type.
 public struct ${Self}
    : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'} {
   public var value: Builtin.${BuiltinName}
@@ -157,8 +193,8 @@ public struct ${Self}
   }
 
   @transparent public
-  init(_ v: Builtin.${BuiltinName}) {
-    value = v
+  init(_ _v: Builtin.${BuiltinName}) {
+    value = _v
   }
 
   /// Create an instance initialized to `value`.
@@ -542,6 +578,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // bitwise operations
 @transparent
 extension ${Self} : BitwiseOperationsType {
+  /// The empty bitset of type ${Self}.
   public static var allZeros: ${Self} { return 0 }
 }
 
@@ -587,7 +624,10 @@ public postfix func -- (inout x: ${Self}) -> ${Self} {
 
 % end  # for bits in allInts
 
+/// A signed integer type that occupies one machine word
 public typealias Word = Int
+
+/// An unsigned integer type that occupies one machine word
 public typealias UWord = UInt
 
 // ${'Local Variables'}:

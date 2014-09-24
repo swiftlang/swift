@@ -107,10 +107,14 @@ public struct FilterCollectionView<Base: CollectionType> : CollectionType {
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = FilterCollectionViewIndex<Base>
 
-  public
-  init(_ base: Base, includeElement: (Base.Generator.Element)->Bool) {
+  /// Construct an instance containing the elements of `base` that
+  /// satisfy `predicate`.
+  public init(
+    _ base: Base,
+    includeElement predicate: (Base.Generator.Element)->Bool
+  ) {
     self._base = base
-    self._include = includeElement
+    self._include = predicate
   }
 
   /// The position of the first element in a non-empty collection.

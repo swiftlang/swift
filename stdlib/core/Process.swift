@@ -22,9 +22,12 @@ public struct _Process {
     }
   }()
 
+  /// The list of command-line arguments with which the current
+  /// process was invoked.
   public var arguments : [String] {
     return _Process._arguments
   }
 }
 
+/// An instance that exposes API for interaction with processes
 public let Process = _Process()

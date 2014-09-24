@@ -16,13 +16,15 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
+  /// Construct a `nil` instance.
   @transparent
   public init() { self = .None }
 
+  /// Construct a non-\ `nil` instance that stores `some`.
   @transparent
   public init(_ some: T) { self = .Some(some) }
 
-  /// Haskell's fmap, which was mis-named
+  /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   public func map<U>(f: (T)->U) -> U? {
     switch self {
     case .Some(var y):

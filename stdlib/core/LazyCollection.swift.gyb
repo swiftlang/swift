@@ -14,11 +14,13 @@
 %  whereClause = 'where S.Index : %sIndexType' % traversal
 %  Self = 'Lazy%sCollection' % traversal
 
-/// Augments `S` with lazy versions of various collection algorithms.
-public
-struct ${Self}<S: CollectionType ${whereClause}> : CollectionType {
-  public
-  init(_ base: S) {
+/// A collection that forwards its implementation to an underlying
+/// collection instance while exposing lazy computations as methods.
+public struct ${Self}<S: CollectionType ${whereClause}> : CollectionType {
+  
+  /// Construct an instance with `base` as its underlying collection
+  /// instance.
+  public init(_ base: S) {
     self._base = base
   }
 
