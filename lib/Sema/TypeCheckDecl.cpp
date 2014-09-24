@@ -1639,8 +1639,6 @@ static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
                                     ArrayRef<TupleTypeElt> formalIndexTypes) {
   assert(params.size() == formalIndexTypes.size());
 
-  // FIXME: do we need to preserve labels in order to disambiguate
-  // subscripts?
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
   SmallVector<Expr *, 4> args;
@@ -1719,7 +1717,7 @@ static Expr *buildStorageReference(FuncDecl *accessor,
   }
 
   // If we should use a super access if applicable, and we have an
-  // overriden decl, then use ordinary access to it.
+  // overridden decl, then use ordinary access to it.
   if (selfAccessKind == SelfAccessKind::Super) {
     if (auto overridden = storage->getOverriddenDecl()) {
       storage = overridden;
@@ -3562,7 +3560,7 @@ public:
 
     // If this is a non-final stored property in a class, then synthesize getter
     // and setter accessors and change its storage kind.  This allows it to be
-    // overriden and provide objc entrypoints if needed.
+    // overridden and provide objc entrypoints if needed.
     if (VD->getStorageKind() == VarDecl::Stored && !VD->isStatic() &&
         !VD->isImplicit()) {
       // Variables in SIL mode don't get auto-synthesized getters.
