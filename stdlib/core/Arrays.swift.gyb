@@ -595,10 +595,10 @@ extension ${Self} {
   func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || count == 0) {
-      return (_owner, p.value)
+      return (_owner, p._rawValue)
     }
     let n = _extractOrCopyToNativeArrayBuffer(self._buffer)
-    return (n.owner, n.baseAddress.value)
+    return (n.owner, n.baseAddress._rawValue)
   }
   
 }

@@ -39,18 +39,18 @@ public struct ${Self}<T>
     NilLiteralConvertible, _PointerType {
 
   /// The underlying raw (untyped) pointer.
-  public var value : Builtin.RawPointer
+  public var _rawValue : Builtin.RawPointer
 
   /// Construct a null pointer.
   @transparent
   public init() {
-    self.value = Builtin.inttoptr_Word(0.value)
+    self._rawValue = Builtin.inttoptr_Word(0.value)
   }
 
   /// Construct ${a_Self} from a builtin raw pointer.
   @transparent
-  public init(_ value : Builtin.RawPointer) {
-    self.value = value
+  public init(_ _rawValue : Builtin.RawPointer) {
+    self._rawValue = _rawValue
   }
 
   /// Convert from an opaque C pointer to a typed pointer
@@ -58,7 +58,7 @@ public struct ${Self}<T>
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(_ other : COpaquePointer) {
-    value = other.value
+    _rawValue = other._rawValue
   }
 
   /// Construct ${a_Self} from a given address in memory.
@@ -66,7 +66,7 @@ public struct ${Self}<T>
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(bitPattern: Word) {
-    self.value = Builtin.inttoptr_Word(bitPattern.value)
+    self._rawValue = Builtin.inttoptr_Word(bitPattern.value)
   }
 
   /// Construct ${a_Self} from a given address in memory.
@@ -74,7 +74,7 @@ public struct ${Self}<T>
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(bitPattern: UWord) {
-    self.value = Builtin.inttoptr_Word(bitPattern.value)
+    self._rawValue = Builtin.inttoptr_Word(bitPattern.value)
   }
 
   /// Convert from an UnsafeMutablePointer of a different type.
@@ -82,7 +82,7 @@ public struct ${Self}<T>
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init<U>(_ from : UnsafeMutablePointer<U>) {
-    value = from.value
+    _rawValue = from._rawValue
   }
 
   /// Convert from a UnsafePointer of a different type.
@@ -90,7 +90,7 @@ public struct ${Self}<T>
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init<U>(_ from : UnsafePointer<U>) {
-    value = from.value
+    _rawValue = from._rawValue
   }
 
   /// Create an instance initialized with `nil`.
@@ -126,7 +126,7 @@ public struct ${Self}<T>
   public func dealloc(num: Int) {
     // Overflow checking is actually not required here.
     var size = strideof(T.self) * num
-    Builtin.deallocRaw(value, size.value, Builtin.alignof(T.self))
+    Builtin.deallocRaw(_rawValue, size.value, Builtin.alignof(T.self))
   }
 %  end
 
@@ -134,11 +134,11 @@ public struct ${Self}<T>
   /// setting values.
   public var memory : T {
     @transparent get {
-      return Builtin.load(value)
+      return Builtin.load(_rawValue)
     }
 %  if mutable:
     @transparent nonmutating set {
-      Builtin.assign(newValue, value)
+      Builtin.assign(newValue, _rawValue)
     }
 %  end
   }
@@ -152,7 +152,7 @@ public struct ${Self}<T>
   /// Postcondition: the memory is initalized; the value should eventually
   /// be destroyed or moved from to avoid leaks.
   public func initialize(newvalue: T) {
-    Builtin.initialize(newvalue, value)
+    Builtin.initialize(newvalue, _rawValue)
   }
 
   /// Retrieve the value the pointer points to, moving it away
@@ -166,7 +166,7 @@ public struct ${Self}<T>
   /// Postcondition: the value has been destroyed and the memory must
   /// be initialized before being used again.
   public func move() -> T {
-    return Builtin.take(value)
+    return Builtin.take(_rawValue)
   }
 
   /// Move count values beginning at source into uninitialized memory,
@@ -283,7 +283,7 @@ public struct ${Self}<T>
   /// Postcondition: the value has been destroyed and the memory must
   /// be initialized before being used again.
   public func destroy() {
-    Builtin.destroy(T.self, value)
+    Builtin.destroy(T.self, _rawValue)
   }
 
   /// Destroy the `count` objects the pointer points to.
@@ -293,7 +293,7 @@ public struct ${Self}<T>
   /// be initialized before being used again.
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
-    Builtin.destroyArray(T.self, value, count.value)
+    Builtin.destroyArray(T.self, _rawValue, count.value)
   }
 %  end
 
@@ -358,7 +358,7 @@ public struct ${Self}<T>
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(value))
+    return Int(Builtin.ptrtoint_Word(_rawValue))
   }
   /// Returns the next consecutive value after `self`.
   ///
@@ -394,7 +394,7 @@ public struct ${Self}<T>
 extension ${Self} : DebugPrintable {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return _rawPointerToString(value)
+    return _rawPointerToString(_rawValue)
   }
 }
 
@@ -404,7 +404,7 @@ ${MirrorDecl} {
   var count: Int { return 1 }
   
   func _getPointerValue() -> UInt64 {
-    return UInt64(Int(Builtin.ptrtoint_Word(_value.value)))
+    return UInt64(Int(Builtin.ptrtoint_Word(_value._rawValue)))
   }
 
   subscript(i: Int) -> (String, MirrorType) {
@@ -428,18 +428,18 @@ ${MirrorConformance}
 
 @transparent public
 func == <T> (lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
+  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @transparent public
 func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
-  return Bool(Builtin.cmp_ult_RawPointer(lhs.value, rhs.value))
+  return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @transparent public
 func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
   return ${Self}(
-    Builtin.gep_Word(lhs.value, (rhs &* strideof(T.self)).value))
+    Builtin.gep_Word(lhs._rawValue, (rhs &* strideof(T.self)).value))
 }
 
 @transparent public
@@ -456,8 +456,8 @@ func - <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
 @transparent public
 func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
   return
-    Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs.value),
-                         Builtin.ptrtoint_Word(rhs.value)))
+    Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
+                         Builtin.ptrtoint_Word(rhs._rawValue)))
     / strideof(T.self)
 }
 

@@ -122,7 +122,7 @@ public struct StaticString
     unicodeScalar: Builtin.Int32
   ) {
     self._startPtrOrData =
-      unsafeBitCast(UWord(UInt32(unicodeScalar)), COpaquePointer.self).value
+      unsafeBitCast(UWord(UInt32(unicodeScalar)), COpaquePointer.self)._rawValue
     self._byteSize = 0.value
     self._flags = 0.value
   }

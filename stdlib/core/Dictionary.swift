@@ -1788,7 +1788,7 @@ struct _CocoaFastEnumerationStackBuf {
   }
 
   init() {
-    item0 = UnsafeMutablePointer<RawByte>.null().value
+    item0 = UnsafeMutablePointer<RawByte>.null()._rawValue
     item1 = item0
     item2 = item0
     item3 = item0

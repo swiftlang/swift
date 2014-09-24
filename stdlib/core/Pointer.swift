@@ -15,10 +15,10 @@
 /// AutoreleasingUnsafeMutablePointer.
 public protocol _PointerType {
   /// The underlying raw pointer value.
-  var value: Builtin.RawPointer { get }
+  var _rawValue: Builtin.RawPointer { get }
 
   /// Construct a pointer from a raw value.
-  init(_ value: Builtin.RawPointer)
+  init(_ _rawValue: Builtin.RawPointer)
 }
 
 /// Derive a pointer argument from a convertible pointer type.
@@ -27,7 +27,7 @@ func _convertPointerToPointerArgument<
   FromPointer: _PointerType,
   ToPointer: _PointerType
 >(from: FromPointer) -> ToPointer {
-  return ToPointer(from.value)
+  return ToPointer(from._rawValue)
 }
 
 /// Derive a pointer argument from the address of an inout parameter.
@@ -51,7 +51,7 @@ func _convertMutableArrayToPointerArgument<
   a.reserveCapacity(0)
   _debugPrecondition(a._baseAddressIfContiguous != nil || a.count == 0)
 
-  return (a._owner, ToPointer(a._baseAddressIfContiguous.value))
+  return (a._owner, ToPointer(a._baseAddressIfContiguous._rawValue))
 }
 
 /// Derive a pointer argument from a value array parameter.

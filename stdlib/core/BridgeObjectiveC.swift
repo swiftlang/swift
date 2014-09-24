@@ -348,11 +348,11 @@ var _nilRawPointer: Builtin.RawPointer {
 /// already have writeback-scoped lifetime.
 public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   : Equatable, NilLiteralConvertible, _PointerType {
-  public let value: Builtin.RawPointer
+  public let _rawValue: Builtin.RawPointer
 
   @transparent public
-  init(_ value: Builtin.RawPointer) {
-    self.value = value
+  init(_ _rawValue: Builtin.RawPointer) {
+    self._rawValue = _rawValue
   }
 
   @transparent
@@ -406,7 +406,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
-    value = _nilRawPointer
+    _rawValue = _nilRawPointer
   }
 
   // FIXME: should this API be retired or internalized?
@@ -419,7 +419,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   /// Initialize to a null pointer.
   @transparent public
   init() {
-    self.value = _nilRawPointer
+    self._rawValue = _nilRawPointer
   }
   
   /// Explicit construction from an UnsafeMutablePointer.
@@ -429,7 +429,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
   @transparent public
   init<U>(_ ptr: UnsafeMutablePointer<U>) {
-    self.value = ptr.value
+    self._rawValue = ptr._rawValue
   }
 
   /// Explicit construction from a UnsafePointer.
@@ -438,14 +438,14 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   /// mutability.
   @transparent
   init<U>(_ ptr: UnsafePointer<U>) {
-    self.value = ptr.value
+    self._rawValue = ptr._rawValue
   }
 }
 
 extension AutoreleasingUnsafeMutablePointer : DebugPrintable {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return _rawPointerToString(value)
+    return _rawPointerToString(_rawValue)
   }
 }
 
@@ -454,6 +454,6 @@ func == <T> (
   lhs: AutoreleasingUnsafeMutablePointer<T>, 
   rhs: AutoreleasingUnsafeMutablePointer<T>
 ) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
+  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 

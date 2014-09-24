@@ -8,7 +8,7 @@ import Swift
 sil @test : $@thin (UnsafeMutablePointer<Optional<AnyObject>>) -> () {
 bb0(%0 : $UnsafeMutablePointer<Optional<AnyObject>>):
   %1 = function_ref @callee1 : $@thin (UnsafeMutablePointer<COpaquePointer>) -> COpaquePointer
-  %2 = struct_extract %0 : $UnsafeMutablePointer<Optional<AnyObject>>, #UnsafeMutablePointer.value
+  %2 = struct_extract %0 : $UnsafeMutablePointer<Optional<AnyObject>>, #UnsafeMutablePointer._rawValue
   %3 = struct $UnsafeMutablePointer<COpaquePointer> (%2 : $Builtin.RawPointer)
   %4 = apply %1(%3) : $@thin (UnsafeMutablePointer<COpaquePointer>) -> COpaquePointer
   %21 = function_ref @callee2 : $@cc(method) @thin <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0

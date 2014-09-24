@@ -77,17 +77,17 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
-  var value: Builtin.RawPointer
+  var _rawValue: Builtin.RawPointer
 
   /// Construct a `nil` instance.
   @transparent
   public init() {
-    value = _nilRawPointer
+    _rawValue = _nilRawPointer
   }
 
   @transparent
   init(_ v: Builtin.RawPointer) {
-    value = v
+    _rawValue = v
   }
 
   /// Construct a `COpaquePointer` from a given address in memory.
@@ -95,7 +95,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(bitPattern: Word) {
-    value = Builtin.inttoptr_Word(bitPattern.value)
+    _rawValue = Builtin.inttoptr_Word(bitPattern.value)
   }
 
   /// Construct a `COpaquePointer` from a given address in memory.
@@ -103,19 +103,19 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// This is a fundamentally unsafe conversion.
   @transparent
   public init(bitPattern: UWord) {
-    value = Builtin.inttoptr_Word(bitPattern.value)
+    _rawValue = Builtin.inttoptr_Word(bitPattern.value)
   }
 
   /// Convert a typed `UnsafePointer` to an opaque C pointer.
   @transparent
-  public init<T>(_ value: UnsafePointer<T>) {
-    self.value = value.value
+  public init<T>(_ source: UnsafePointer<T>) {
+    self._rawValue = source._rawValue
   }
 
   /// Convert a typed `UnsafeMutablePointer` to an opaque C pointer.
   @transparent
-  public init<T>(_ value: UnsafeMutablePointer<T>) {
-    self.value = value.value
+  public init<T>(_ source: UnsafeMutablePointer<T>) {
+    self._rawValue = source._rawValue
   }
 
   // FIXME: should this API be internalized or retired?
@@ -139,25 +139,25 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(value))
+    return Int(Builtin.ptrtoint_Word(_rawValue))
   }
   
   /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
-    value = _nilRawPointer
+    _rawValue = _nilRawPointer
   }
 }
 
 extension COpaquePointer : DebugPrintable {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return _rawPointerToString(value)
+    return _rawPointerToString(_rawValue)
   }
 }
 
 public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
+  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 /// The family of C function pointer types.
@@ -258,8 +258,8 @@ func _memcpy(
   #src: UnsafeMutablePointer<Void>,
   #size: UInt
 ) {
-  let dest = dest.value
-  let src = src.value
+  let dest = dest._rawValue
+  let src = src._rawValue
   let size = UInt64(size).value
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(dest, src, size,
                                                  /*alignment*/Int32().value,
