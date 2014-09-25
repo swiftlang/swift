@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "copy-forwarding"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
@@ -38,17 +37,10 @@ static bool isIdentifiedObject(SILValue Def, SILFunction *F) {
     // Check that the argument is passed as an in type. This means there are
     // no aliases accessible within this function scope. We may be able to just
     // assert this.
-    auto Params = F->getLoweredFunctionType()->getParameters();
-    ArrayRef<SILArgument*> FunctionArgs = F->begin()->getBBArgs();
-    for (unsigned ArgIdx = 0, ArgEnd = Params.size();
-         ArgIdx != ArgEnd; ++ArgIdx) {
-      if (FunctionArgs[ArgIdx] != Arg)
-        continue;
-
-      if (Params[ArgIdx].getConvention() != ParameterConvention::Indirect_In) {
-        DEBUG(llvm::dbgs() << "  Skipping Def: Not an @in argument!\n");
-        return false;
-      }
+    if (Arg->getParameterInfo().getConvention()
+        != ParameterConvention::Indirect_In) {
+      DEBUG(llvm::dbgs() << "  Skipping Def: Not an @in argument!\n");
+      return false;
     }
     return true;
   }
@@ -60,29 +52,122 @@ static bool isIdentifiedObject(SILValue Def, SILFunction *F) {
   return false;
 }
 
+/// \return true if this operand destroys its value, false if it does not
+/// destroy its value, and an empty Optional in cases that can't be determined.
+///
+/// We currently check for the following cases of deinit:
+/// - 'in' argument
+/// - copy_addr [take] src
+/// - copy_addr [!init] dest
+/// - destroy_addr
+static Optional<bool> isDeinit(Operand* Oper) {
+  SILInstruction *UserInst = Oper->getUser();
+  if (auto Apply = dyn_cast<ApplyInst>(UserInst)) {
+    auto Params = Apply->getSubstCalleeType()->getParameters();
+    // TODO: Provide and ApplyInst API for this.
+    assert(Oper->getOperandNumber() >= 1 && "calling copy_addr operand");
+    switch (Params[Oper->getOperandNumber()-1].getConvention()) {
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+      return true;
+    case ParameterConvention::Indirect_Out:
+      llvm_unreachable("copy_addr must be released before reinitialization");
+    default:
+      llvm_unreachable("unexpected calling convention for copy_addr user");
+    }
+  }
+  else if (auto *CopyInst = dyn_cast<CopyAddrInst>(UserInst)) {
+    if (CopyInst->getSrc() == Oper->get())
+      return CopyInst->isTakeOfSrc();
+
+    assert(!CopyInst->isInitializationOfDest() && "illegal reinitialization");
+    return true;
+  }
+  switch (UserInst->getKind()) {
+  case ValueKind::DestroyAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+    return true;
+  case ValueKind::ExistentialMetatypeInst:
+  case ValueKind::InjectEnumAddrInst:
+  case ValueKind::LoadInst:
+  case ValueKind::ProjectExistentialInst:
+  case ValueKind::ProtocolMethodInst:
+  case ValueKind::StoreInst:
+  case ValueKind::StructElementAddrInst:
+    return false;
+  case ValueKind::InitEnumDataAddrInst:
+    llvm_unreachable("illegal reinitialization");
+  default:
+    return Nothing;
+  }
+}
+
+static Optional<bool> isInit(Operand* Oper) {
+  SILInstruction *UserInst = Oper->getUser();
+  if (auto Apply = dyn_cast<ApplyInst>(UserInst)) {
+    auto Params = Apply->getSubstCalleeType()->getParameters();
+    // TODO: Provide and ApplyInst API for this.
+    assert(Oper->getOperandNumber() >= 1 && "calling copy_addr operand");
+    switch (Params[Oper->getOperandNumber()-1].getConvention()) {
+    case ParameterConvention::Indirect_Out:
+    case ParameterConvention::Indirect_Inout:
+      return true;
+    case ParameterConvention::Indirect_In:
+      llvm_unreachable("copy_addr location must be initialized before use");
+    default:
+      llvm_unreachable("unexpected calling convention for copy_addr user");
+    }
+  }
+  else if (auto *CopyInst = dyn_cast<CopyAddrInst>(UserInst)) {
+    if (CopyInst->getDest() == Oper->get())
+      return CopyInst->isInitializationOfDest();
+
+    assert(!CopyInst->isTakeOfSrc() && "illegal deinitialization");
+    return true;
+  }
+  switch (UserInst->getKind()) {
+  case ValueKind::InitEnumDataAddrInst:
+    return true;
+  case ValueKind::ExistentialMetatypeInst:
+  case ValueKind::InjectEnumAddrInst:
+  case ValueKind::LoadInst:
+  case ValueKind::ProjectExistentialInst:
+  case ValueKind::ProtocolMethodInst:
+  case ValueKind::StoreInst:
+  case ValueKind::StructElementAddrInst:
+    return false;
+  case ValueKind::DestroyAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+    llvm_unreachable("illegal deinitialization");
+  default:
+    return Nothing;
+  }
+}
+
 namespace {
 class CopyForwarding {
   // Per-function state.
   PostOrderAnalysis *PostOrder;
-  DominanceInfo *DomTree;
   bool HasChanged;
   bool HasChangedCFG;
 
   // Transient state for the current Def.
   SILValue CurrentDef;
   bool HasForwardedToCopy;
-  SmallPtrSet<SILInstruction*, 16> UserInsts;
+  SmallPtrSet<SILInstruction*, 16> SrcUserInsts;
+  SmallVector<CopyAddrInst*, 4> TakePoints;
   SmallVector<DestroyAddrInst*, 4> DestroyPoints;
   SmallPtrSet<SILBasicBlock*, 32> DeadInBlocks;
 public:
-  CopyForwarding(PostOrderAnalysis *PO, DominanceInfo *DT):
-    PostOrder(PO), DomTree(DT), HasChanged(false), HasChangedCFG(false),
+  CopyForwarding(PostOrderAnalysis *PO):
+    PostOrder(PO), HasChanged(false), HasChangedCFG(false),
     HasForwardedToCopy(false) {}
 
   void reset() {
     CurrentDef = SILValue();
     HasForwardedToCopy = false;
-    UserInsts.clear();
+    SrcUserInsts.clear();
+    TakePoints.clear();
     DestroyPoints.clear();
     DeadInBlocks.clear();
   }
@@ -98,25 +183,60 @@ public:
 
 protected:
   bool checkUsers();
-  void forwardCopy(CopyAddrInst *CopyInst);
+  bool propagateCopy(CopyAddrInst *CopyInst);
+  bool forwardPropagateCopy(CopyAddrInst *CopyInst);
+  bool backwardPropagateCopy(CopyAddrInst *CopyInst);
   bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc);
 };
 } // namespace
 
+/// Visit all uses of CurrentDef. Return false if any unsafe uses are found.
 /// Safe uses are those that access the CurrentDef without capturing or exposing
 /// it to any other instructions.
+///
+/// As a side-effect, record DestroyPoints and TakePoints.
+///
+/// TODO: This should be guaranteed to return true if we can assume that
+/// address-only types are always accessed by-value.
 bool CopyForwarding::checkUsers() {
   for (auto UI : CurrentDef.getUses()) {
     SILInstruction *UserInst = UI->getUser();
+    if (auto *Apply = dyn_cast<ApplyInst>(UserInst)) {
+      auto Params = Apply->getSubstCalleeType()->getParameters();
+      (void)Params;
+      // TODO: Provide and ApplyInst API for this.
+      assert(UI->getOperandNumber() >= 1 && "calling copy_addr operand");
+      assert(Params[UI->getOperandNumber()-1].isIndirect() &&
+             "copy_addr location should be passed as indeirect");
+      SrcUserInsts.insert(Apply);
+      continue;
+    }
+    if (auto *CopyInst = dyn_cast<CopyAddrInst>(UserInst)) {
+      if (CopyInst->getSrc() == UI->get() && CopyInst->isTakeOfSrc())
+        TakePoints.push_back(CopyInst);
+      else
+        SrcUserInsts.insert(CopyInst);
+      continue;
+    }
+    if (auto *Destroy = dyn_cast<DestroyAddrInst>(UserInst)) {
+      DestroyPoints.push_back(Destroy);
+      continue;
+    }
     switch (UserInst->getKind()) {
-    case ValueKind::CopyAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
+    case ValueKind::ExistentialMetatypeInst:
+    case ValueKind::InjectEnumAddrInst:
+    case ValueKind::LoadInst:
+    case ValueKind::ProtocolMethodInst:
+    case ValueKind::StoreInst:
+    case ValueKind::InitEnumDataAddrInst:
     case ValueKind::DebugValueAddrInst:
-      UserInsts.insert(UserInst);
-      break;
-    case ValueKind::DestroyAddrInst:
-      DestroyPoints.push_back(cast<DestroyAddrInst>(UserInst));
+      SrcUserInsts.insert(UserInst);
       break;
     default:
+      // TODO: we could peak through struct element users like COWArrayOpts.
+      // ProjectExistentialInst
+      // StructElementAddrInst
       DEBUG(llvm::dbgs() << "  Skipping copy: use exposes def " << *UserInst);
       return false;
     }
@@ -124,19 +244,148 @@ bool CopyForwarding::checkUsers() {
   return true;
 }
 
-/// Find a set of uses that the given copy can forward to and replace them with
-/// the copy's source.
-void CopyForwarding::forwardCopy(CopyAddrInst *CopyInst) {
-  SmallVector<Operand*, 16> Uses;
-  for (auto UI : CopyInst->getDest().getUses()) {
-    if (DomTree->properlyDominates(CopyInst, UI->getUser()))
-      Uses.push_back(&*UI);
+/// If the copy's dest is an @out argument, make no attempt to forward
+/// propagate, because it will fail.
+bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
+  SILValue CopyDest = CopyInst->getDest();
+  if (!isa<SILArgument>(CopyDest.getDef()))
+    if (forwardPropagateCopy(CopyInst))
+      return true;
+  return backwardPropagateCopy(CopyInst);
+}
+
+/// Perform copy-propagation. Find a set of uses that the given copy can forward
+/// to and replace them with the copy's source.
+///
+/// We must only replace uses of this copy's value. To do this, we search
+/// forward in the current block from the copy that initializes the value to the
+/// point of deinitialization. Typically, this will be a point at which the
+/// value is passed as an 'in' argument:
+/// \code
+/// %copy = alloc_stack $T
+/// ...
+/// CurrentBlock:
+/// copy_addr %arg to [initialization] %copy#1 : $*T
+/// ...
+/// %ret = apply %callee<T>(%copy#1) : $@thin <τ_0_0> (@in τ_0_0) -> ()
+/// \endcode
+///
+/// TODO: If the copy's dest is an @out argument, or if we fail to find a deinit
+/// in the local scan, then propagate backward instead of forward by rewriting
+/// the copy source's reaching "init" to initialize the copy's dest instead.
+bool CopyForwarding::forwardPropagateCopy(CopyAddrInst *CopyInst) {
+  SILValue CopyDest = CopyInst->getDest();
+  SILBasicBlock *BB = CopyInst->getParent();
+  // Gather a list of CopyDest users in this block.
+  SmallPtrSet<SILInstruction*, 16> DestUserInsts;
+  for (auto UI : CopyDest.getUses()) {
+    if (UI->getUser()->getParent() == BB)
+      DestUserInsts.insert(UI->getUser());
   }
-  for (auto *Oper : Uses) {
+  // Scan forward recording all operands that use CopyDest until we see the
+  // next deinit of CopyDest.
+  SmallVector<Operand*, 16> ValueUses;
+  bool seenDeinit = false;
+  SILBasicBlock::iterator SI = CopyInst, SE = CopyInst->getParent()->end();
+  for (++SI; SI != SE; ++SI) {
+    // If we see another use of Src, then the source location is reinitialized
+    // before the Dest location is deinitialized. So we really need the copy.
+    if (SrcUserInsts.count(&*SI)) {
+      DEBUG(llvm::dbgs() << "  Skipping copy " << *CopyInst
+            << ", source used by " << *SI);
+      return false;
+    }
+    // Early check to avoid scanning unrelated instructions.
+    if (!DestUserInsts.count(&*SI))
+      continue;
+
+    for (auto &Oper : SI->getAllOperands()) {
+      if (Oper.get() == CopyDest) {
+        ValueUses.push_back(&Oper);
+        // If we see a deinit we're done searching.
+        // If we can't be sure, then abort.
+        // Otherwise continue searching for uses.
+        if (Optional<bool> IsDeinit = isDeinit(&Oper))
+          seenDeinit |= *IsDeinit;
+        else
+          return false;
+      }
+    }
+    if (seenDeinit)
+      break;
+  }
+  if (!seenDeinit)
+    return false;
+
+  // Now that a deinit was found, it is safe to substitute all recorded uses
+  // with the copy's source.
+  for (auto *Oper : ValueUses) {
     Oper->set(CopyInst->getSrc());
     if (isa<CopyAddrInst>(Oper->getUser()))
       HasForwardedToCopy = true;
   }
+  return true;
+}
+
+bool CopyForwarding::backwardPropagateCopy(CopyAddrInst *CopyInst) {
+  // FIXME: unimplemented. scan backward until we find all reaching
+  // inits. Replace all references to the copy's source with the copy's dest.
+  DEBUG(llvm::dbgs() << "  Backward propagating " << *CopyInst);
+
+  SILValue CopySrc = CopyInst->getSrc();
+  SILValue CopyDest = CopyInst->getDest();
+  SILBasicBlock *BB = CopyInst->getParent();
+  // Gather a list of CopyDest users in this block.
+  SmallPtrSet<SILInstruction*, 16> DestUserInsts;
+  for (auto UI : CopyDest.getUses()) {
+    if (UI->getUser()->getParent() == BB)
+      DestUserInsts.insert(UI->getUser());
+  }
+
+  // Scan backward recording all operands that use CopySrc until we see the
+  // most recent init of CopySrc.
+  SmallVector<Operand*, 16> ValueUses;
+  bool seenInit = false;
+  SILBasicBlock::iterator SI = CopyInst, SE = CopyInst->getParent()->begin();
+  while (SI != SE) {
+    --SI;
+    // If we see another use of Dest, then the dest location is deinitialized
+    // after the Src location is initialized. So we really need the copy.
+    if (DestUserInsts.count(&*SI)) {
+      DEBUG(llvm::dbgs() << "  Skipping copy " << *CopyInst
+            << ", dest used by " << *SI);
+      return false;
+    }
+    // Early check to avoid scanning unrelated instructions.
+    if (!SrcUserInsts.count(&*SI))
+      continue;
+
+    for (auto &Oper : SI->getAllOperands()) {
+      if (Oper.get() == CopySrc) {
+        ValueUses.push_back(&Oper);
+        // If we see a deinit we're done searching.
+        // If we can't be sure, then abort.
+        // Otherwise continue searching for uses.
+        if (Optional<bool> IsInit = isInit(&Oper))
+          seenInit |= *IsInit;
+        else
+          return false;
+      }
+    }
+    if (seenInit)
+      break;
+  }
+  if (!seenInit)
+    return false;
+
+  // Now that a deinit was found, it is safe to substitute all recorded uses
+  // with the copy's source.
+  for (auto *Oper : ValueUses) {
+    Oper->set(CopyInst->getDest());
+    if (isa<CopyAddrInst>(Oper->getUser()))
+      HasForwardedToCopy = true;
+  }
+  return true;
 }
 
 /// Attempt to hoist a destroy point up to the last use. If the last use is a
@@ -155,7 +404,7 @@ void CopyForwarding::forwardCopy(CopyAddrInst *CopyInst) {
 /// block was marked dead-in.
 bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
                                   SILLocation DestroyLoc) {
-  assert(!UserInsts.count(DestroyPoint) && "caller should check terminator");
+  assert(!SrcUserInsts.count(DestroyPoint) && "caller should check terminator");
   SILBasicBlock *BB = DestroyPoint->getParent();
 
   // If DestroyPoint is a block terminator, we must hoist.
@@ -166,7 +415,7 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
   while (SI != SE) {
     --SI;
     SILInstruction *Inst = &*SI;
-    if (!UserInsts.count(Inst)) {
+    if (!SrcUserInsts.count(Inst)) {
       if (!IsWorthHoisting) {
         if (const ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
           if (!isa<BuiltinFunctionRefInst>(AI->getCallee()))
@@ -179,20 +428,22 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
     if (!IsWorthHoisting)
       return false;
 
-    HasChanged = true;
     if (auto *CopyInst = dyn_cast<CopyAddrInst>(Inst)) {
       if (!CopyInst->isTakeOfSrc() && CopyInst->isInitializationOfDest() &&
           CopyInst->getSrc() == CurrentDef) {
         // This use is a copy of CurrentDef. Attempt to forward CurrentDef to
-        // all dominated uses of the copy's dest.
-        DEBUG(llvm::dbgs() << "  Forwarding Copy: " << *CopyInst);
-        forwardCopy(CopyInst);
-        CopyInst->eraseFromParent();
-        return true;
+        // all uses of the copy's value.
+        if (propagateCopy(CopyInst)) {
+          DEBUG(llvm::dbgs() << "  Forwarding Copy: " << *CopyInst);
+          CopyInst->eraseFromParent();
+          HasChanged = true;
+          return true;
+        }
       }
     }
     DEBUG(llvm::dbgs() << "  Hoisting to Use: " << *Inst);
     SILBuilder(std::next(SI)).createDestroyAddr(DestroyLoc, CurrentDef);
+    HasChanged = true;
     return true;
   }
   DeadInBlocks.insert(BB);
@@ -207,6 +458,15 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   if (!checkUsers())
     return;
 
+  // First forward any copies that implicitly destroy CurrentDef. There is no
+  // need to hoist Destroy for these.
+  for (auto *CopyInst : TakePoints) {
+    if (propagateCopy(CopyInst)) {
+      DEBUG(llvm::dbgs() << "  Forwarding Copy: " << *CopyInst);
+      CopyInst->eraseFromParent();
+      HasChanged = true;
+    }
+  }
   SILInstruction *HoistedDestroy = nullptr;
   for (auto *Destroy : DestroyPoints) {
     // If hoistDestroy returns false, it was not worth hoisting.
@@ -243,7 +503,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
         DeadInSuccs.push_back(EdgeIdx);
     }
     if (DeadInSuccs.size() == Succs.size() &&
-        !UserInsts.count(BB->getTerminator())) {
+        !SrcUserInsts.count(BB->getTerminator())) {
       // All successors are dead, so continue hoisting.
       bool WasHoisted = hoistDestroy(BB->getTerminator(), DestroyLoc);
       (void)WasHoisted;
@@ -284,7 +544,7 @@ class CopyForwardingPass : public SILFunctionTransform
     for (auto &BB : *getFunction())
       for (auto II = BB.begin(), IE = BB.end(); II != IE; ++II)
         if (auto *CopyInst = dyn_cast<CopyAddrInst>(&*II))
-          if (!CopyInst->isTakeOfSrc() && CopyInst->isInitializationOfDest()) {
+          if (CopyInst->isInitializationOfDest()) {
             SILValue Def = CopyInst->getSrc();
             if (isIdentifiedObject(Def, getFunction()))
               CopiedDefs.insert(Def);
@@ -294,9 +554,7 @@ class CopyForwardingPass : public SILFunctionTransform
       return;
 
     auto *PO = getAnalysis<PostOrderAnalysis>();
-    auto *DA = getAnalysis<DominanceAnalysis>();
-    auto *DT = DA->getDomInfo(getFunction());
-    auto Forwarding = CopyForwarding(PO, DT);
+    auto Forwarding = CopyForwarding(PO);
 
     for (SILValue Def : CopiedDefs) {
       // Iterate to forward through chains of copies.
