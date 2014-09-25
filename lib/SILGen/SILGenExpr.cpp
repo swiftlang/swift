@@ -2146,18 +2146,26 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
   auto baseCanTy = baseTy->getCanonicalType();
   auto &baseTL = gen.getTypeLowering(baseAbstraction, baseCanTy);
   
+  // Allocate the array.
   SILValue numEltsVal = gen.B.createIntegerLiteral(loc,
-                      SILType::getBuiltinWordType(gen.F.getASTContext()),
-                      elements.size());
-  AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
-                                                  baseTL.getLoweredType(),
-                                                  numEltsVal);
-  // The first result is the owning NativeObject for the array.
-  ManagedValue objectPtr
-    = gen.emitManagedRValueWithCleanup(SILValue(allocArray, 0));
+                             SILType::getBuiltinWordType(gen.F.getASTContext()),
+                             elements.size());
+  // The first result is the array value.
+  ManagedValue array;
   // The second result is a RawPointer to the base address of the array.
-  SILValue basePtr(allocArray, 1);
-
+  SILValue basePtr;
+  std::tie(array, basePtr)
+    = gen.emitUninitializedArrayAllocation(arrayTy, numEltsVal, loc);
+  
+  // Turn the pointer into an address.
+  basePtr = gen.B.createPointerToAddress(loc, basePtr,
+                                     baseTL.getLoweredType().getAddressType());
+  
+  // Initialize the members.
+  // TODO: If we need to cleanly unwind at this point, we would need to arrange
+  // for the partially-initialized array to be cleaned up somehow, maybe by
+  // poking its count to the actually-initialized size at the point of failure.
+  
   for (size_t i = 0, size = elements.size(); i < size; ++i) {
     SILValue eltPtr = basePtr;
     if (i != 0) {
@@ -2169,9 +2177,8 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
     v = gen.emitSubstToOrigValue(loc, v, baseAbstraction, baseCanTy);
     v.forwardInto(gen, loc, eltPtr);
   }
-
-  return gen.emitArrayInjectionCall(objectPtr, basePtr,
-                                    numEltsVal, VarargsInjectionFn, loc);
+  
+  return array;
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {

@@ -2791,37 +2791,35 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                    transparent, Nothing, ctx);
 }
 
-/// emitArrayInjectionCall - Form an array "Array" out of an NativeObject
-/// (which represents the retain count), a base pointer to some elements, and a
-/// length.
-ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
-                                            SILValue BasePtr,
-                                            SILValue Length,
-                                            Expr *ArrayInjectionFunction,
-                                            SILLocation Loc) {
-  // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
-  if (BasePtr.getType() != SILType::getRawPointerType(F.getASTContext()))
-    BasePtr = B.createAddressToPointer(Loc,
-                              BasePtr,
-                              SILType::getRawPointerType(F.getASTContext()));
-
-  // Construct a call to the injection function.
-  CallEmission emission = prepareApplyExpr(*this, ArrayInjectionFunction);
-  auto *injectionFnTy
-    = ArrayInjectionFunction->getType()->getAs<FunctionType>();
+/// Allocate an uninitialized array of a given size, returning the array
+/// and a pointer to its uninitialized contents, which must be initialized
+/// before the array is valid.
+std::pair<ManagedValue, SILValue>
+SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
+                                                 SILValue Length,
+                                                 SILLocation Loc) {
+  auto &Ctx = getASTContext();
+  auto allocate = Ctx.getAllocateUninitializedArray(nullptr);
+  auto allocateArchetypes = allocate->getGenericParams()->getAllArchetypes();
   
-  auto injectionArgsTy = cast<TupleType>(injectionFnTy->getInput()->getCanonicalType());
-  RValue InjectionArgs(injectionArgsTy);
-  InjectionArgs.addElement(RValue(*this, Loc, injectionArgsTy.getElementType(0),
-                               ManagedValue::forUnmanaged(BasePtr)));
-  InjectionArgs.addElement(RValue(*this, Loc, injectionArgsTy.getElementType(1),
-                                  ObjectPtr));
-  InjectionArgs.addElement(RValue(*this, Loc, injectionArgsTy.getElementType(2),
-                                ManagedValue::forUnmanaged(Length)));
+  auto arrayElementTy = ArrayTy->castTo<BoundGenericType>()
+    ->getGenericArgs()[0];
   
-  emission.addCallSite(Loc, RValueSource(Loc, std::move(InjectionArgs)),
-                       injectionFnTy->getResult());
-  return emission.apply();
+  // Invoke the intrinsic, which returns a tuple.
+  Substitution sub{allocateArchetypes[0], arrayElementTy, {}};
+  auto result = emitApplyOfLibraryIntrinsic(Loc, allocate,
+                                            sub,
+                                            ManagedValue::forUnmanaged(Length),
+                                            SGFContext());
+  
+  // Explode the tuple.
+  TupleTypeElt elts[] = {ArrayTy, Ctx.TheRawPointerType};
+  auto tupleTy = TupleType::get(elts, Ctx)->getCanonicalType();
+  RValue resultTuple(*this, Loc, tupleTy, result);
+  SmallVector<ManagedValue, 2> resultElts;
+  std::move(resultTuple).getAll(resultElts);
+  
+  return {resultElts[0], resultElts[1].getUnmanagedValue()};
 }
 
 static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,

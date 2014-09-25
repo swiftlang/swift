@@ -95,6 +95,10 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
                                             ArraySliceType *sliceType,
                                             Type lenTy, SourceLoc Loc) {
+  // TODO: Hijack this entry point to require the new array literal intrinsic.
+  // Doing so should supplant the other logic here.
+  requireArrayLiteralIntrinsics(Loc);
+  
   // Build the expression "Array<T>".
   // FIXME: Bogus location info.
   Expr *sliceTypeRef = TypeExpr::createImplicitHack(Loc, sliceType, Context);
@@ -411,6 +415,13 @@ bool TypeChecker::requirePointerArgumentIntrinsics(SourceLoc loc) {
   if (Context.hasPointerArgumentIntrinsics(this)) return false;
 
   diagnose(loc, diag::pointer_argument_intrinsics_not_found);
+  return true;
+}
+
+bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
+  if (Context.hasArrayLiteralIntrinsics(this)) return false;
+  
+  diagnose(loc, diag::array_literal_intrinsics_not_found);
   return true;
 }
 

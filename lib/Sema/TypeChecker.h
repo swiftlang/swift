@@ -891,6 +891,10 @@ public:
   /// UnsafeMutablePointer<T> exist.
   bool requirePointerArgumentIntrinsics(SourceLoc loc);
 
+  /// Require that the library intrinsics for creating
+  /// array literals exist.
+  bool requireArrayLiteralIntrinsics(SourceLoc loc);
+
   /// \brief Retrieve the witness type with the given name.
   ///
   /// \param type The type that conforms to the given protocol.

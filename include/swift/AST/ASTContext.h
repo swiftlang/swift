@@ -421,18 +421,26 @@ public:
   FuncDecl *getInjectNothingIntoOptionalDecl(LazyResolver *resolver,
                                              OptionalTypeKind kind) const;
 
-  /// Check whether the standary library provides all the correct
+  /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
   ///
   /// If this is true, the four methods above all promise to return
   /// non-null.
   bool hasOptionalIntrinsics(LazyResolver *resolver) const;
 
-  /// Check whether the standary library provides all the correct
+  /// Check whether the standard library provides all the correct
   /// intrinsic support for UnsafeMutablePointer<T> function arguments.
   ///
-  /// If this is true, the methods to getConvert*ToPointerArgument
+  /// If this is true, the methods getConvert*ToPointerArgument
+  /// all promise to return non-null.
   bool hasPointerArgumentIntrinsics(LazyResolver *resolver) const;
+
+  /// Check whether the standard library provides all the correct
+  /// intrinsic support for array literals.
+  ///
+  /// If this is true, the method getAllocateUninitializedArray
+  /// promises to return non-null.
+  bool hasArrayLiteralIntrinsics(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of Swift._getBool.
   FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;

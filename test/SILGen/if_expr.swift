@@ -14,7 +14,7 @@ func fizzbuzz(i: Int) -> String {
   // CHECK: [[INNER_TRUE]]:
   // CHECK: br [[INNER_CONT:bb[0-9]+]]
   // CHECK: [[INNER_FALSE]]:
-  // CHECK: [[INNER_FALSE_TMP:%.*]] = alloc_array
+  // CHECK: [[INNER_FALSE_TMP:%.*]] = apply [transparent] {{%.*}}
   // CHECK: br [[INNER_CONT]]
   // CHECK: [[INNER_CONT]]({{.*}}):
   // CHECK: br [[OUTER_CONT]]

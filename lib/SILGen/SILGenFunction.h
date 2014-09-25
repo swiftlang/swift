@@ -632,12 +632,10 @@ public:
   /// it together into a single ManagedValue.
   ManagedValue emitRValueAsSingleValue(Expr *E, SGFContext C = SGFContext());
   
-  ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
-                                      SILValue BasePtr,
-                                      SILValue Length,
-                                      Expr *ArrayInjectionFunction,
-                                      SILLocation Loc);
-
+  std::pair<ManagedValue, SILValue>
+  emitUninitializedArrayAllocation(Type ArrayTy,
+                                   SILValue Length,
+                                   SILLocation Loc);
 
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);

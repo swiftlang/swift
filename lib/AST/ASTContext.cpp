@@ -942,6 +942,11 @@ bool ASTContext::hasPointerArgumentIntrinsics(LazyResolver *resolver) const {
     && getConvertInOutToPointerArgument(resolver);
 }
 
+bool ASTContext::hasArrayLiteralIntrinsics(LazyResolver *resolver) const {
+  return getArrayDecl()
+    && getAllocateUninitializedArray(resolver);
+}
+
 void ASTContext::addedExternalDecl(Decl *decl) {
   ExternalDefinitions.insert(decl);
 }

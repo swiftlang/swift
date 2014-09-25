@@ -319,6 +319,14 @@ extension ${Self} {
   }
 }
 
+// Referenced by the compiler to allocate array literals.
+@transparent
+public func _allocateUninitialized${Self}<T>(count: Builtin.Word)
+    -> (${Self}<T>, Builtin.RawPointer) {
+  let (array, ptr) = ${Self}<T>._allocateUninitialized(Int(count))
+  return (array, ptr._rawValue)
+}
+
 extension ${Self} : ArrayType {
   /// Construct an empty ${Self}
   @semantics("array.init")

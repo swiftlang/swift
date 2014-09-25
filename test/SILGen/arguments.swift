@@ -13,6 +13,11 @@ struct Array<T> {
   }
 }
 
+func _allocateUninitializedArray<T>(_: Builtin.Word)
+  -> (Array<T>, Builtin.RawPointer) {
+  Builtin.int_trap()
+}
+
 var i:Int, f:Float, c:UnicodeScalar
 
 func arg_tuple(#x: Int, #y: Float) {}
