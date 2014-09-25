@@ -1,4 +1,3 @@
-add_subdirectory(APINotes)
 add_subdirectory(AST)
 add_subdirectory(ASTSectionImporter)
 add_subdirectory(Basic)

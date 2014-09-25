@@ -17,9 +17,9 @@
 #ifndef SWIFT_AST_LAZYRESOLVER_H
 #define SWIFT_AST_LAZYRESOLVER_H
 
-#include "swift/Basic/Fixnum.h"
 #include "swift/Basic/Optional.h"
 #include "swift/AST/TypeLoc.h"
+#include "llvm/ADT/Fixnum.h"
 
 namespace swift {
 

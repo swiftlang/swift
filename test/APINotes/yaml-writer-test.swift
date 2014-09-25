@@ -1,6 +1,6 @@
 # RUN: %swift-ide-test -generate-api-annotation -o %t-AppKit.apinotes AppKit
 
-# RUN: %swift_driver_plain -apinotes -binary-to-yaml -o %t-AppKit.yaml %t-AppKit.apinotes 
+# RUN: %clang_apinotes -binary-to-yaml -o %t-AppKit.yaml %t-AppKit.apinotes 
 # RUN: FileCheck %s < %t-AppKit.yaml
 
 // CHECK: Name: AppKit

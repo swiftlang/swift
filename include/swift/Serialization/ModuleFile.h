@@ -22,10 +22,10 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleFormat.h"
-#include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: rm -rf %t/APINotes
 // RUN: mkdir -p %t/APINotes
-// RUN: %swift_driver_plain -apinotes -yaml-to-binary %S/Inputs/gizmo.apinotes -o %t/APINotes/gizmo.apinotesc
+// RUN: %clang_apinotes -yaml-to-binary %S/Inputs/gizmo.apinotes -o %t/APINotes/gizmo.apinotesc
 // RUN: %swift -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import %s | FileCheck -check-prefix=SILGEN %s
 // RUN: %swift -emit-sil -O -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import %s | FileCheck -check-prefix=OPT %s
 

@@ -20,7 +20,7 @@
 #define SWIFT_SERIALIZATION_MODULEFORMAT_H
 
 #include "swift/AST/Decl.h"
-#include "swift/Serialization/BCRecordLayout.h"
+#include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Bitcode/BitCodes.h"
 
 namespace swift {
