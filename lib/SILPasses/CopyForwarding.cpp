@@ -56,7 +56,7 @@ static bool isIdentifiedObject(SILValue Def, SILFunction *F) {
 /// destroy its value, and an empty Optional in cases that can't be determined.
 ///
 /// We currently check for the following cases of deinit:
-/// - 'in' argument
+/// - 'in' or 'inout' argument
 /// - copy_addr [take] src
 /// - copy_addr [!init] dest
 /// - destroy_addr
@@ -83,6 +83,10 @@ static Optional<bool> isDeinit(Operand* Oper) {
     assert(!CopyInst->isInitializationOfDest() && "illegal reinitialization");
     return true;
   }
+  else if (auto *Store = dyn_cast<StoreInst>(UserInst)) {
+    assert(Store->getSrc() == Oper->get() && "illegate reinitialization");
+    return false;
+  }
   switch (UserInst->getKind()) {
   case ValueKind::DestroyAddrInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
@@ -92,7 +96,6 @@ static Optional<bool> isDeinit(Operand* Oper) {
   case ValueKind::LoadInst:
   case ValueKind::ProjectExistentialInst:
   case ValueKind::ProtocolMethodInst:
-  case ValueKind::StoreInst:
   case ValueKind::StructElementAddrInst:
     return false;
   case ValueKind::InitEnumDataAddrInst:
@@ -102,6 +105,11 @@ static Optional<bool> isDeinit(Operand* Oper) {
   }
 }
 
+/// We currently check for the following cases of init:
+/// - 'out' or 'inout' argument
+/// - copy_addr [init] dest
+/// - store
+/// - init_enum_data_addr
 static Optional<bool> isInit(Operand* Oper) {
   SILInstruction *UserInst = Oper->getUser();
   if (auto Apply = dyn_cast<ApplyInst>(UserInst)) {
@@ -123,8 +131,11 @@ static Optional<bool> isInit(Operand* Oper) {
       return CopyInst->isInitializationOfDest();
 
     assert(!CopyInst->isTakeOfSrc() && "illegal deinitialization");
-    return true;
+    return false;
   }
+  else if (auto *Store = dyn_cast<StoreInst>(UserInst))
+    return Store->getSrc() == Oper->get();
+
   switch (UserInst->getKind()) {
   case ValueKind::InitEnumDataAddrInst:
     return true;
@@ -133,7 +144,6 @@ static Optional<bool> isInit(Operand* Oper) {
   case ValueKind::LoadInst:
   case ValueKind::ProjectExistentialInst:
   case ValueKind::ProtocolMethodInst:
-  case ValueKind::StoreInst:
   case ValueKind::StructElementAddrInst:
     return false;
   case ValueKind::DestroyAddrInst:
