@@ -200,14 +200,14 @@ public func count<I: RandomAccessIndexType>(r: Range<I>) -> I.Distance {
 
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
-@transparent public
-func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos) -> Range<Pos> {
+@transparent
+public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos) -> Range<Pos> {
   return Range(start: minimum, end: maximum)
 }
 
 /// Forms a closed range that contains both `minimum` and `maximum`.
-@transparent public
-func ... <Pos : ForwardIndexType> (
+@transparent
+public func ... <Pos : ForwardIndexType> (
   minimum: Pos, maximum: Pos
 ) -> Range<Pos> {
   return Range(start: minimum, end: maximum.successor())
@@ -217,8 +217,8 @@ func ... <Pos : ForwardIndexType> (
 
 /// Forms a half-open range that contains `start`, but not
 /// `end`.  Requires: `start <= end`
-@transparent public
-func ..< <Pos : ForwardIndexType where Pos: Comparable> (
+@transparent
+public func ..< <Pos : ForwardIndexType where Pos: Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
   _precondition(start <= end, "Can't form Range with end < start")
@@ -227,8 +227,8 @@ func ..< <Pos : ForwardIndexType where Pos: Comparable> (
 
 /// Forms a closed range that contains both `start` and `end`.
 /// Requres: `start <= end`
-@transparent public
-func ... <Pos : ForwardIndexType where Pos: Comparable> (
+@transparent
+public func ... <Pos : ForwardIndexType where Pos: Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
   _precondition(start <= end, "Can't form Range with end < start")

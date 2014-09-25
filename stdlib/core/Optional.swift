@@ -79,24 +79,24 @@ public func map<T, U>(x: T?, f: (T)->U) -> U? {
 }
 
 // Intrinsics for use by language features.
-@transparent public
-func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
+@transparent
+public func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
   return (v != nil).value
 }
 
-@transparent public
-func _doesOptionalHaveValueAsBool<T>(v: T?) -> Bool {
+@transparent
+public func _doesOptionalHaveValueAsBool<T>(v: T?) -> Bool {
   return v != nil
 }
 
-@transparent public
-func _preconditionOptionalHasValue<T>(inout v: T?) {
+@transparent
+public func _preconditionOptionalHasValue<T>(inout v: T?) {
   _precondition(v != nil,
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 
-@transparent public
-func _getOptionalValue<T>(v: T?) -> T {
+@transparent
+public func _getOptionalValue<T>(v: T?) -> T {
   switch v {
   case .Some(var x):
     return x
@@ -106,13 +106,13 @@ func _getOptionalValue<T>(v: T?) -> T {
   }
 }
 
-@transparent public
-func _injectValueIntoOptional<T>(v: T) -> Optional<T> {
+@transparent
+public func _injectValueIntoOptional<T>(v: T) -> Optional<T> {
   return .Some(v)
 }
 
-@transparent public
-func _injectNothingIntoOptional<T>() -> Optional<T> {
+@transparent
+public func _injectNothingIntoOptional<T>() -> Optional<T> {
   return .None
 }
 
@@ -140,8 +140,8 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
   public init(nilLiteral: ()) {
   }
 }
-@transparent public
-func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
+@transparent
+public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .Some(_):
     return false

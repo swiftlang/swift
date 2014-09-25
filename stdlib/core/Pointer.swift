@@ -22,8 +22,8 @@ public protocol _PointerType {
 }
 
 /// Derive a pointer argument from a convertible pointer type.
-@transparent public
-func _convertPointerToPointerArgument<
+@transparent
+public func _convertPointerToPointerArgument<
   FromPointer: _PointerType,
   ToPointer: _PointerType
 >(from: FromPointer) -> ToPointer {
@@ -31,16 +31,16 @@ func _convertPointerToPointerArgument<
 }
 
 /// Derive a pointer argument from the address of an inout parameter.
-@transparent public
-func _convertInOutToPointerArgument<
+@transparent
+public func _convertInOutToPointerArgument<
   ToPointer: _PointerType
 >(from: Builtin.RawPointer) -> ToPointer {
   return ToPointer(from)
 }
 
 /// Derive a pointer argument from an inout array parameter.
-@transparent public
-func _convertMutableArrayToPointerArgument<
+@transparent
+public func _convertMutableArrayToPointerArgument<
   FromElement,
   ToPointer: _PointerType
 >(inout a: Array<FromElement>) -> (AnyObject?, ToPointer) {
@@ -55,8 +55,8 @@ func _convertMutableArrayToPointerArgument<
 }
 
 /// Derive a pointer argument from a value array parameter.
-@transparent public
-func _convertConstArrayToPointerArgument<
+@transparent
+public func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _PointerType
 >(arr: Array<FromElement>) -> (AnyObject?, ToPointer) {
@@ -65,8 +65,8 @@ func _convertConstArrayToPointerArgument<
 }
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
-@transparent public
-func _convertConstStringToUTF8PointerArgument<
+@transparent
+public func _convertConstStringToUTF8PointerArgument<
   ToPointer: _PointerType
 >(str: String) -> (AnyObject?, ToPointer) {
   // Convert the UTF-8 representation to a null-terminated array.

@@ -17,8 +17,8 @@
 // FIXME: We could go farther with this simplification, e.g. avoiding
 // UnsafeMutablePointer
 
-@transparent internal
-func _isDebugAssertConfiguration() -> Bool {
+@transparent
+internal func _isDebugAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
   // 1: Release
@@ -26,8 +26,8 @@ func _isDebugAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 0
 }
 
-@transparent internal
-func _isReleaseAssertConfiguration() -> Bool {
+@transparent
+internal func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
   // 1: Release
@@ -35,8 +35,8 @@ func _isReleaseAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 1
 }
 
-@transparent internal
-func _isFastAssertConfiguration() -> Bool {
+@transparent
+internal func _isFastAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
   // 1: Release

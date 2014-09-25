@@ -83,6 +83,10 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
   else
     Module.functions.push_back(this);
 
+      if (Name.find("_TTWSbSs11BooleanTypeFS_g9boolValueSb") != StringRef::npos) {
+        int asdf = 1;
+      }
+      
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
   BlockList.Parent = this;

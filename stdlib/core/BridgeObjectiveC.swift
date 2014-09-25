@@ -317,12 +317,12 @@ func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-@transparent internal
-var _nilNativeObject: AnyObject? {
+@transparent
+internal var _nilNativeObject: AnyObject? {
   return nil
 }
-@transparent internal
-var _nilRawPointer: Builtin.RawPointer {
+@transparent
+internal var _nilRawPointer: Builtin.RawPointer {
   return Builtin.inttoptr_Word(0.value)
 }
 
@@ -449,8 +449,8 @@ extension AutoreleasingUnsafeMutablePointer : DebugPrintable {
   }
 }
 
-@transparent public
-func == <T> (
+@transparent
+public func == <T> (
   lhs: AutoreleasingUnsafeMutablePointer<T>, 
   rhs: AutoreleasingUnsafeMutablePointer<T>
 ) -> Bool {

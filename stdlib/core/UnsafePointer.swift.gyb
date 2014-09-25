@@ -428,48 +428,48 @@ ${MirrorDecl} {
 
 ${MirrorConformance}
 
-@transparent public
-func == <T> (lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+@transparent
+public func == <T> (lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-@transparent public
-func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+@transparent
+public func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-@transparent public
-func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
+@transparent
+public func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
   return ${Self}(
     Builtin.gep_Word(lhs._rawValue, (rhs &* strideof(T.self)).value))
 }
 
-@transparent public
-func + <T>(lhs: Int,
+@transparent
+public func + <T>(lhs: Int,
            rhs: ${Self}<T>) -> ${Self}<T> {
   return rhs + lhs
 }
 
-@transparent public
-func - <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
+@transparent
+public func - <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
   return lhs + -rhs
 }
 
-@transparent public
-func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
+@transparent
+public func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
                          Builtin.ptrtoint_Word(rhs._rawValue)))
     / strideof(T.self)
 }
 
-@transparent public
-func += <T>(inout lhs: ${Self}<T>, rhs: Int) {
+@transparent
+public func += <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs + rhs
 }
 
-@transparent public
-func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
+@transparent
+public func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs - rhs
 }
 % end # for mutable

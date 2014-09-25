@@ -113,8 +113,8 @@ def TypedBinaryFunctions():
 // Unary functions
 // Note these do not have a corresponding LLVM intrinsic
 % for T, CT, f, ufunc in TypedUnaryFunctions():
-@transparent public
-func ${ufunc}(x: ${T}) -> ${T} {
+@transparent
+public func ${ufunc}(x: ${T}) -> ${T} {
   return ${T}(${ufunc}${f}(${CT}(x)))
 }
 
@@ -123,8 +123,8 @@ func ${ufunc}(x: ${T}) -> ${T} {
 // Unary intrinsic functions
 // Note these have a corresponding LLVM intrinsic
 % for T, ufunc in TypedUnaryIntrinsicFunctions():
-@transparent public
-func ${ufunc}(x: ${T}) -> ${T} {
+@transparent
+public func ${ufunc}(x: ${T}) -> ${T} {
   return _${ufunc}(x)
 }
 
@@ -133,8 +133,8 @@ func ${ufunc}(x: ${T}) -> ${T} {
 // Binary functions
 
 % for T, CT, f, bfunc in TypedBinaryFunctions():
-@transparent public
-func ${bfunc}(lhs: ${T}, rhs: ${T}) -> ${T} {
+@transparent
+public func ${bfunc}(lhs: ${T}, rhs: ${T}) -> ${T} {
   return ${T}(${bfunc}${f}(${CT}(lhs), ${CT}(rhs)))
 }
 
@@ -146,8 +146,8 @@ func ${bfunc}(lhs: ${T}, rhs: ${T}) -> ${T} {
 % for T, CT, f in AllFloatTypes():
 %   if f == '':
 %     f = 'd'
-@transparent public
-func fpclassify(x: ${T}) -> Int {
+@transparent
+public func fpclassify(x: ${T}) -> Int {
   return Int(__fpclassify${f}(${CT}(x)))
 }
 
@@ -156,28 +156,28 @@ func fpclassify(x: ${T}) -> Int {
 % # These are AllFloatTypes not OverlayFloatTypes because we need to cover 
 % # them all because C's declarations are compiler builtins.
 % for T, CT, f in AllFloatTypes():
-@transparent public
-func isnormal(value: ${T}) -> Bool {
+@transparent
+public func isnormal(value: ${T}) -> Bool {
   return value.isNormal
 }
 
-@transparent public
-func isfinite(value: ${T}) -> Bool {
+@transparent
+public func isfinite(value: ${T}) -> Bool {
   return value.isFinite
 }
 
-@transparent public
-func isinf(value: ${T}) -> Bool {
+@transparent
+public func isinf(value: ${T}) -> Bool {
   return value.isInfinite
 }
 
-@transparent public
-func isnan(value: ${T}) -> Bool {
+@transparent
+public func isnan(value: ${T}) -> Bool {
   return value.isNaN
 }
 
-@transparent public
-func signbit(value: ${T}) -> Int {
+@transparent
+public func signbit(value: ${T}) -> Int {
   return value.isSignMinus ? 1 : 0
 }
 
@@ -185,8 +185,8 @@ func signbit(value: ${T}) -> Int {
 
 % # These are AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
-@transparent public
-func modf(value: ${T}) -> (${T}, ${T}) {
+@transparent
+public func modf(value: ${T}) -> (${T}, ${T}) {
   var ipart = ${CT}(0)
   let fpart = modf${f}(${CT}(value), &ipart)
   return (${T}(ipart), ${T}(fpart))
@@ -196,8 +196,8 @@ func modf(value: ${T}) -> (${T}, ${T}) {
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
 % for T, CT, f in AllFloatTypes():
-@transparent public
-func ldexp(x: ${T}, n: Int) -> ${T} {
+@transparent
+public func ldexp(x: ${T}, n: Int) -> ${T} {
   return ${T}(ldexp${f}(${CT}(x), CInt(n)))
 }
 
@@ -205,8 +205,8 @@ func ldexp(x: ${T}, n: Int) -> ${T} {
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
-@transparent public
-func frexp(value: ${T}) -> (${T}, Int) {
+@transparent
+public func frexp(value: ${T}) -> (${T}, Int) {
   var exp = CInt(0)
   let frac = frexp${f}(${CT}(value), &exp)
   return (${T}(frac), Int(exp))
@@ -217,24 +217,24 @@ func frexp(value: ${T}) -> (${T}, Int) {
 % # This would be AllFloatTypes not OverlayFloatTypes because of the Int return.
 % # ... except we need an asmname to avoid an overload ambiguity.
 % for T, CT, f in OverlayFloatTypes():
-@transparent public
-func ilogb(x: ${T}) -> Int {
+@transparent
+public func ilogb(x: ${T}) -> Int {
   return Int(ilogb${f}(${CT}(x)))
 }
 
 % end
 @asmname("ilogb") 
 func _swift_Darwin_ilogb(value: CDouble) -> CInt
-@transparent public
-func ilogb(x: Double) -> Int {
+@transparent
+public func ilogb(x: Double) -> Int {
   return Int(_swift_Darwin_ilogb(CDouble(x)))
 }
 
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
 % for T, CT, f in AllFloatTypes():
-@transparent public
-func scalbn(x: ${T}, n: Int) -> ${T} {
+@transparent
+public func scalbn(x: ${T}, n: Int) -> ${T} {
   return ${T}(scalbn${f}(${CT}(x), CInt(n)))
 }
 
@@ -245,8 +245,8 @@ func scalbn(x: ${T}, n: Int) -> ${T} {
 % # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
 @asmname("lgamma${f}_r") 
 func _swift_Darwin_lgamma${f}_r(${CT}, UnsafeMutablePointer<CInt>) -> ${CT}
-@transparent public
-func lgamma(x: ${T}) -> (${T}, Int) {
+@transparent
+public func lgamma(x: ${T}) -> (${T}, Int) {
   var sign = CInt(0)
   let value = withUnsafeMutablePointer(&sign) { 
     (signp: UnsafeMutablePointer<CInt>) -> ${CT} in
@@ -259,8 +259,8 @@ func lgamma(x: ${T}) -> (${T}, Int) {
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
-@transparent public
-func remquo(x: ${T}, y: ${T}) -> (${T}, Int) {
+@transparent
+public func remquo(x: ${T}, y: ${T}) -> (${T}, Int) {
   var quo = CInt(0)
   let rem = remquo${f}(${CT}(x), ${CT}(y), &quo)
   return (${T}(rem), Int(quo))
@@ -269,29 +269,29 @@ func remquo(x: ${T}, y: ${T}) -> (${T}, Int) {
 % end
 
 % for T, CT, f in OverlayFloatTypes():
-@transparent public
-func nan(tag: String) -> ${T} {
+@transparent
+public func nan(tag: String) -> ${T} {
   return ${T}(nan${f}(tag))
 }
 
 % end
 
 % for T, CT, f in OverlayFloatTypes():
-@transparent public
-func fma(x: ${T}, y: ${T}, z: ${T}) -> ${T} {
+@transparent
+public func fma(x: ${T}, y: ${T}, z: ${T}) -> ${T} {
   return ${T}(fma${f}(${CT}(x), ${CT}(y), ${CT}(z)))
 }
 
 % end
 
 % # These C functions only support double. The overlay fixes the Int parameter.
-@transparent public
-func jn(n: Int, x: Double) -> Double {
+@transparent
+public func jn(n: Int, x: Double) -> Double {
   return jn(CInt(n), x)
 }
 
-@transparent public
-func yn(n: Int, x: Double) -> Double {
+@transparent
+public func yn(n: Int, x: Double) -> Double {
   return yn(CInt(n), x)
 }
 

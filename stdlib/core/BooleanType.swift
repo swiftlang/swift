@@ -38,15 +38,15 @@ public func || <T: BooleanType, U: BooleanType>(
 // FIXME: We can't make the above @transparent due to
 // rdar://problem/17872402, so here are some @transparent overloads
 // for Bool.  We've done the same for ObjCBool
-@transparent public
-func && <T: BooleanType>(
+@transparent
+public func && <T: BooleanType>(
   lhs: T, rhs: @autoclosure () -> Bool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
-@transparent public
-func || <T: BooleanType>(
+@transparent
+public func || <T: BooleanType>(
   lhs: T, rhs: @autoclosure () -> Bool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue

@@ -18,8 +18,8 @@
 /// Does not include any dynamically-allocated or "remote" storage.
 /// In particular, `sizeof(X.self)`, when `X` is a class type, is the
 /// same regardless of how many stored properties `X` has.
-@transparent public
-func sizeof<T>(_:T.Type) -> Int {
+@transparent
+public func sizeof<T>(_:T.Type) -> Int {
   return Int(Builtin.sizeof(T.self))
 }
 
@@ -28,34 +28,34 @@ func sizeof<T>(_:T.Type) -> Int {
 /// Does not include any dynamically-allocated or "remote" storage.
 /// In particular, `sizeof(a)`, when `a` is a class instance, is the
 /// same regardless of how many stored properties `a` has.
-@transparent public
-func sizeofValue<T>(_:T) -> Int {
+@transparent
+public func sizeofValue<T>(_:T) -> Int {
   return sizeof(T.self)
 }
 
 /// Returns the minimum memory alignment of `T`.
-@transparent public
-func alignof<T>(_:T.Type) -> Int {
+@transparent
+public func alignof<T>(_:T.Type) -> Int {
   return Int(Builtin.alignof(T.self))
 }
 
 /// Returns the minimum memory alignment of `T`.
-@transparent public
-func alignofValue<T>(_:T) -> Int {
+@transparent
+public func alignofValue<T>(_:T) -> Int {
   return alignof(T.self)
 }
 
 /// Returns the least possible interval between distinct instances of
 /// `T` in memory.  The result is always positive.
-@transparent public
-func strideof<T>(_:T.Type) -> Int {
+@transparent
+public func strideof<T>(_:T.Type) -> Int {
   return Int(Builtin.strideof_nonzero(T.self))
 }
 
 /// Returns the least possible interval between distinct instances of
 /// `T` in memory.  The result is always positive.
-@transparent public
-func strideofValue<T>(_:T) -> Int {
+@transparent
+public func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
 }
 
@@ -78,8 +78,8 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 }
 
 @availability(*,unavailable,message="it has been renamed 'unsafeBitCast' and has acquired an explicit target type parameter")
-@transparent public
-func reinterpretCast<T, U>(var x: T) -> U {
+@transparent
+public func reinterpretCast<T, U>(var x: T) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
     "can't reinterpretCast values of different sizes")
   return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
@@ -91,16 +91,16 @@ func reinterpretCast<T, U>(var x: T) -> U {
 ///    with extreme care.  There's almost always a better way to do
 ///    anything.
 ///
-@transparent public
-func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
+@transparent
+public func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
     "can't unsafeBitCast between types of different sizes")
   return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
 }
 
 /// `unsafeBitCast` something to `AnyObject`
-@transparent public
-func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
+@transparent
+public func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
   return unsafeBitCast(x, AnyObject.self)
 }
 
@@ -127,8 +127,8 @@ func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 /// Tell the optimizer that this code is unreachable if condition is
 /// known at compile-time to be true.  If condition is false, or true
 /// but not a compile-time constant, this call has no effect.
-@transparent internal
-func _unreachable(condition: Bool = true) {
+@transparent
+internal func _unreachable(condition: Bool = true) {
   if condition {
     // FIXME: use a parameterized version of Builtin.unreachable when
     // <rdar://problem/16806232> is closed.

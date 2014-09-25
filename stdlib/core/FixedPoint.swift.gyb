@@ -513,8 +513,8 @@ extension ${Self} {
 // overflowChecked, pending <rdar://problem/16271923> so that we don't
 // foil static checking for numeric overflows.
 % for op,method in ('+','add'), ('*','mul'), ('-','sub'):
-@transparent public
-func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+@transparent
+public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   let (result, error) = Builtin.${sign}${method}_with_overflow_${BuiltinName}(
     lhs.value, rhs.value, true.value)
   // return overflowChecked((${Self}(result), Bool(error)))
@@ -524,8 +524,8 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % end
 
 % for op,inst in [('/', 'div'), ('%', 'rem')]:
-@transparent public
-func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+@transparent
+public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   Builtin.condfail((rhs == 0).value)
 % if signed:
   Builtin.condfail(((lhs == ${Self}.min) & (rhs == -1)).value)
@@ -538,8 +538,8 @@ func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 %end
 
 // Bitwise negate
-@transparent public
-prefix func ~(rhs: ${Self}) -> ${Self} {
+@transparent
+public prefix func ~(rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs.value, mask.value))
 }
@@ -548,15 +548,15 @@ prefix func ~(rhs: ${Self}) -> ${Self} {
 %  ('==','eq'), ('!=','ne'),
 %  ('<',sign+'lt'), ('<=',sign+'le'),
 %  ('>',sign+'gt'), ('>=',sign+'ge')):
-@transparent public
-func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
+@transparent
+public func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.cmp_${name}_${BuiltinName}(lhs.value, rhs.value))
 }
 % end
 
 % for op, name in (('<<','shl'), ('>>','ashr' if signed else 'lshr')):
-@transparent public
-func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+@transparent
+public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % if signed:
   _precondition(U${Self}(rhs) < U${Self}._sizeInBits,
       "shift amount is larger than type size in bits")
@@ -569,8 +569,8 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % end
 
 % for op, name in (('&','and'), ('^','xor'), ('|','or')):
-@transparent public
-func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+@transparent
+public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs.value, rhs.value))
 }
 % end
@@ -584,8 +584,8 @@ extension ${Self} : BitwiseOperationsType {
 
 // Compound assignments
 % for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
-@transparent public
-func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
+@transparent
+public func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 % end

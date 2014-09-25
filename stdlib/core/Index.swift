@@ -167,8 +167,8 @@ func ~> <T: _ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
 }
 
 /// Do not use this operator directly; call advance(start, n) instead
-@transparent public
-func ~> <T: _ForwardIndexType>(
+@transparent
+public func ~> <T: _ForwardIndexType>(
   start: T, rest: (_Advance, T.Distance)
 ) -> T {
   let n = rest.1
@@ -187,8 +187,8 @@ func _advanceForward<T: _ForwardIndexType>(start: T, n: T.Distance) -> T {
 }
 
 /// Do not use this operator directly; call advance(start, n, end) instead
-@transparent public
-func ~> <T: _ForwardIndexType>(
+@transparent
+public func ~> <T: _ForwardIndexType>(
   start:T, rest: ( _Advance, (T.Distance, T))
 ) -> T {
   return _advanceForward(start, rest.1.0, rest.1.1)
@@ -248,8 +248,8 @@ public postfix func -- <T: _BidirectionalIndexType> (inout x: T) -> T {
 // advance implementation
 
 /// Do not use this operator directly; call advance(start, n) instead
-@transparent public
-func ~> <T: _BidirectionalIndexType>(
+@transparent
+public func ~> <T: _BidirectionalIndexType>(
   start:T , rest: (_Advance, T.Distance)
 ) -> T {
   let n = rest.1
@@ -264,8 +264,8 @@ func ~> <T: _BidirectionalIndexType>(
 }
 
 /// Do not use this operator directly; call advance(start, n, end) instead
-@transparent public
-func ~> <T: _BidirectionalIndexType>(
+@transparent
+public func ~> <T: _BidirectionalIndexType>(
   start:T, rest: (_Advance, (T.Distance, T))
 ) -> T {
   let n = rest.1.0
@@ -328,16 +328,16 @@ public protocol RandomAccessIndexType
 // advance and distance implementations
 
 /// Do not use this operator directly; call distance(start, end) instead
-@transparent public
-func ~> <T: _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
+@transparent
+public func ~> <T: _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
 -> T.Distance {
   let end = rest.1
   return start.distanceTo(end)
 }
 
 /// Do not use this operator directly; call advance(start, n) instead
-@transparent public
-func ~> <T: _RandomAccessIndexType>(
+@transparent
+public func ~> <T: _RandomAccessIndexType>(
   start:T, rest:(_Advance, (T.Distance))
 ) -> T {
   let n = rest.1
@@ -345,8 +345,8 @@ func ~> <T: _RandomAccessIndexType>(
 }
 
 /// Do not use this operator directly; call advance(start, n, end) instead
-@transparent public
-func ~> <T: _RandomAccessIndexType>(
+@transparent
+public func ~> <T: _RandomAccessIndexType>(
   start:T, rest:(_Advance, (T.Distance, T))
 ) -> T {
   let n = rest.1.0

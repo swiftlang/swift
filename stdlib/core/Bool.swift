@@ -67,14 +67,14 @@ extension Bool : Printable {
 //===----------------------------------------------------------------------===//
 
 // Unary bitwise complement.
-@transparent prefix
-public func ~(a: Bool) -> Bool {
+@transparent
+public prefix func ~(a: Bool) -> Bool {
   return a ^ true
 }
 
 // Unary logical complement.
-@transparent prefix
-public func !(a: Bool) -> Bool {
+@transparent
+public prefix func !(a: Bool) -> Bool {
   return ~a
 }
 

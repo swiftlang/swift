@@ -363,13 +363,13 @@ extension ${Self} : FloatLiteralConvertible {
   }
 }
 
-@transparent public
-func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
+@transparent
+public func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
-@transparent public
-func <(lhs: ${Self}, rhs: ${Self}) -> Bool {
+@transparent
+public func <(lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_olt_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
@@ -406,13 +406,13 @@ extension ${Self} : AbsoluteValuable {
   }
 }
 
-@transparent public
-prefix func +(x: ${Self}) -> ${Self} {
+@transparent
+public prefix func +(x: ${Self}) -> ${Self} {
   return x
 }
 
-@transparent public
-prefix func -(x: ${Self}) -> ${Self} {
+@transparent
+public prefix func -(x: ${Self}) -> ${Self} {
   return ${Self}(Builtin.fneg_FPIEEE${bits}(x.value))
 }
 
@@ -465,14 +465,14 @@ extension ${Self} {
 // Standard Operator Table
 //===----------------------------------------------------------------------===//
 
-@transparent public
-prefix func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
-@transparent public
-prefix func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
-@transparent public
-postfix func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
-@transparent public
-postfix func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
+@transparent
+public prefix func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
+@transparent
+public prefix func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
+@transparent
+public postfix func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
+@transparent
+public postfix func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 
 
@@ -498,8 +498,8 @@ extension ${Self} : Strideable {
 }
 
 % for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
-@transparent public
-func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+@transparent
+public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_FPIEEE${bits}(lhs.value, rhs.value))
 }
 % end
@@ -520,8 +520,8 @@ func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 // In C, 90 is =, *=, += etc.
 
 % for op in '+', '-', '*', '/', '%':
-@transparent public
-func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
+@transparent
+public func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 % end
 
 % if bits == 80:
