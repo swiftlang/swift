@@ -37,6 +37,7 @@
 //===----------------------------------------------------------------------===//
 
 import Darwin
+import Foundation
 
 /// Race tests that need a fresh set of data for every trial should implement
 /// this protocol.
@@ -390,8 +391,10 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   let masterThreadBody: (_: ())->() = {
     (_: ())->() in
     for trial in 0..<trials {
-      println("trial \(trial)")
-      _masterThreadOneTrial(sharedState)
+      autoreleasepool {
+        println("trial \(trial)")
+        _masterThreadOneTrial(sharedState)
+      }
     }
   }
 
