@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrintOptions.h"
@@ -54,6 +55,8 @@ using namespace swift;
 using namespace ide;
 namespace api_notes = clang::api_notes;
 
+namespace {
+
 enum class ActionType {
   None,
   CodeCompletion,
@@ -75,6 +78,46 @@ enum class ActionType {
   CheckAPIAnnotation,
   TestCreateCompilerInvocation,
 };
+
+class NullDebuggerClient : public DebuggerClient {
+public:
+  using DebuggerClient::DebuggerClient;
+
+  bool shouldGlobalize(Identifier Name, DeclKind Kind) override {
+    return false;
+  }
+  void didGlobalize(Decl *D) override {}
+  bool lookupOverrides(Identifier Name, DeclContext *DC,
+                       SourceLoc Loc, bool IsTypeLookup,
+                       ResultVector &RV) override {
+    return false;
+  }
+
+  bool lookupAdditions(Identifier Name, DeclContext *DC,
+                       SourceLoc Loc, bool IsTypeLookup,
+                       ResultVector &RV) override {
+    return false;
+  }
+
+  SILDebuggerClient *getAsSILDebuggerClient() override {
+    return nullptr;
+  }
+};
+
+class PrivateDiscriminatorPreferenceClient : public NullDebuggerClient {
+  Identifier Discriminator;
+public:
+  PrivateDiscriminatorPreferenceClient(ASTContext &C,
+                                       StringRef DiscriminatorStr)
+      : NullDebuggerClient(C),
+        Discriminator(C.getIdentifier(DiscriminatorStr)) {}
+
+  Identifier getPreferredPrivateDiscriminator() override {
+    return Discriminator;
+  }
+};
+
+} // end anonymous namespace
 
 namespace options {
 
@@ -171,6 +214,10 @@ EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+DisableAccessControl("disable-access-control",
+    llvm::cl::desc("Disables access control, like a debugger"));
+
+static llvm::cl::opt<bool>
 ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::desc("Import Objective-C forward declarations when possible"),
     llvm::cl::init(false));
@@ -216,6 +263,10 @@ static llvm::cl::opt<bool>
 CodeCompletionKeywords("code-completion-keywords",
                        llvm::cl::desc("Include keywords in code completion results"),
                        llvm::cl::init(true));
+
+static llvm::cl::opt<std::string>
+DebugClientDiscriminator("debug-client-discriminator",
+  llvm::cl::desc("A discriminator to prefer in lookups"));
 
 // '-syntax-coloring' options.
 
@@ -1038,7 +1089,8 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
                       bool PrintAccessibility,
                       bool PrintUnavailableDecls,
                       Accessibility AccessibilityFilter,
-                      StringRef MangledNameToFind) {
+                      StringRef MangledNameToFind,
+                      StringRef DebugClientDiscriminator) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
 
@@ -1049,6 +1101,16 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+
+  std::unique_ptr<DebuggerClient> DebuggerClient;
+  if (!DebugClientDiscriminator.empty()) {
+    DebuggerClient.reset(
+      new PrivateDiscriminatorPreferenceClient(CI.getASTContext(),
+                                               DebugClientDiscriminator)
+    );
+    CI.getMainModule()->setDebugClient(DebuggerClient.get());
+  }
+
   if (!RunTypeChecker)
     CI.performParseOnly();
   else
@@ -2252,6 +2314,8 @@ int main(int argc, char *argv[]) {
   InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =
     options::ImportObjCHeader;
   InitInvok.getLangOptions().SplitPrepositions |= options::SplitObjCSelectors;
+  InitInvok.getLangOptions().EnableAccessControl =
+    !options::DisableAccessControl;
   InitInvok.getClangImporterOptions().InferImplicitProperties |=
     options::ImplicitProperties;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
@@ -2328,7 +2392,8 @@ int main(int argc, char *argv[]) {
                           options::PrintAccessibility,
                           !options::SkipUnavailable,
                           options::AccessibilityFilter,
-                          options::MangledNameToFind);
+                          options::MangledNameToFind,
+                          options::DebugClientDiscriminator);
     break;
   }
 
