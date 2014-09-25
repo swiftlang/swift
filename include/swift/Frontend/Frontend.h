@@ -335,9 +335,7 @@ public:
     return static_cast<bool>(TheSILModule);
   }
 
-  Module *getMainModule() {
-    return MainModule;
-  }
+  Module *getMainModule();
 
   SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
 

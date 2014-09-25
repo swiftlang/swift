@@ -200,11 +200,18 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   return false;
 }
 
+Module *CompilerInstance::getMainModule() {
+  if (!MainModule) {
+    Identifier ID = Context->getIdentifier(Invocation.getModuleName());
+    MainModule = Module::create(ID, *Context);
+  }
+  return MainModule;
+}
+
 void CompilerInstance::performSema() {
   const SourceFileKind Kind = Invocation.getInputKind();
-  Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-  MainModule = Module::create(ID, *Context);
-  Context->LoadedModules[ID] = MainModule;
+  Module *MainModule = getMainModule();
+  Context->LoadedModules[MainModule->Name] = MainModule;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
 
@@ -236,10 +243,11 @@ void CompilerInstance::performSema() {
   Module *underlying = nullptr;
   if (Invocation.getFrontendOptions().ImportUnderlyingModule) {
     underlying = clangImporter->loadModule(SourceLoc(),
-                                           std::make_pair(ID, SourceLoc()));
+                                           std::make_pair(MainModule->Name,
+                                                          SourceLoc()));
     if (!underlying) {
       Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
-                           ID);
+                           MainModule->Name);
     }
   }
 
@@ -403,9 +411,8 @@ void CompilerInstance::performSema() {
 
 void CompilerInstance::performParseOnly() {
   const SourceFileKind Kind = Invocation.getInputKind();
-  Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-  MainModule = Module::create(ID, *Context);
-  Context->LoadedModules[ID] = MainModule;
+  Module *MainModule = getMainModule();
+  Context->LoadedModules[MainModule->Name] = MainModule;
 
   assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::Library);
   assert(BufferIDs.size() == 1 && "only supports parsing a single file");
