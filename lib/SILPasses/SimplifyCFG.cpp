@@ -194,6 +194,59 @@ static bool getBranchTaken(CondBranchInst *CondBr, SILBasicBlock *BB) {
     return false;
 }
 
+static EnumElementDecl *
+getOtherElementOfTwoElementEnum(EnumDecl *E, EnumElementDecl *Element) {
+  assert(Element && "This should never be null");
+  if (!Element)
+    return nullptr;
+  EnumElementDecl *OtherElt = nullptr;
+
+  for (EnumElementDecl *Elt : E->getAllElements()) {
+    // Skip the case where we find the enum_is_tag element
+    if (Elt == Element)
+      continue;
+    // If we find another element, then we must have more than 2, so bail.
+    if (OtherElt)
+      return nullptr;
+    OtherElt = Elt;
+  }
+
+  return OtherElt;
+}
+
+/// If PredTerm is a (cond_br (enum_is_tag)) or a (switch_enum), return the decl
+/// that will yield DomBB.
+static EnumElementDecl *
+getEnumEltTaken(TermInst *PredTerm, SILBasicBlock *DomBB) {
+  // First check if we have a (cond_br (enum_is_tag)).
+  if (auto *CBI = dyn_cast<CondBranchInst>(PredTerm)) {
+    auto *EITI = dyn_cast<EnumIsTagInst>(CBI->getCondition());
+    if (!EITI)
+      return nullptr;
+
+    EnumElementDecl *Element = EITI->getElement();
+
+    // If DomBB is the taken branch, we know that the EnumElementDecl is the one
+    // checked for by enum is tag. Return it.
+    if (getBranchTaken(CBI, DomBB)) {
+      return Element;
+    }
+
+    // Ok, DomBB is not the taken branch. If we have an enum with only two
+    // cases, we can still infer the other case for the current branch.
+    EnumDecl *E = EITI->getOperand().getType().getEnumOrBoundGenericEnum();
+
+    // This will return nullptr if we have more than two cases in our decl.
+    return getOtherElementOfTwoElementEnum(E, Element);
+  }
+
+  auto *SWEI = dyn_cast<SwitchEnumInst>(PredTerm);
+  if (!SWEI)
+    return nullptr;
+
+  return SWEI->getUniqueCaseForDestination(DomBB);
+}
+
 static void simplifyCondBranchInst(CondBranchInst *BI, bool BranchTaken) {
   auto LiveArgs =  BranchTaken ?  BI->getTrueArgs(): BI->getFalseArgs();
   auto *LiveBlock =  BranchTaken ? BI->getTrueBB() : BI->getFalseBB();
@@ -259,7 +312,27 @@ static bool trySimplifySwitchEnumWithKnownElement(TermInst *Term,
   return false;
 }
 
-bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
+/// Returns true if C1, C2 represent equivalent conditions.
+///
+/// TODO: Could we use SILInstruction::isIdenticalTo here?
+static bool areEquivalentConditions(SILValue C1, SILValue C2) {
+  if (C1 == C2)
+    return true;
+
+  if (auto *EITI1 = dyn_cast<EnumIsTagInst>(C1)) {
+    if (auto *EITI2 = dyn_cast<EnumIsTagInst>(C2)) {
+      // Strip off casts for our comparison since casts do not change the
+      // underlying enum value.
+      SILValue Op1 = EITI1->getOperand().stripCasts();
+      SILValue Op2 = EITI2->getOperand().stripCasts();
+      return Op1 == Op2;
+    }
+  }
+
+  return false;
+}
+
+static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
   assert(isConditional(Term) && "Expected conditional terminator!");
 
   auto *BB = Term->getParent();
@@ -272,16 +345,11 @@ bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
     if (!Pred)
       continue;
 
+    // We assume that our predecessor terminator has operands like Term since
+    // otherwise it can not be "conditional".
     auto *PredTerm = Pred->getTerminator();
-
-    // First handle the case where a switch_enum is dominated by a known
-    // element try, ie, an enum_is_tag makes the element known here.
-    // The Kinds of those instructions differ which would make it messy to
-    // handle below.
-    if (trySimplifySwitchEnumWithKnownElement(Term, PredTerm, DomBB))
-      return true;
-
-    if (PredTerm->getKind() != Kind || PredTerm->getOperand(0) != Condition)
+    if (!PredTerm->getNumOperands() ||
+        !areEquivalentConditions(PredTerm->getOperand(0), Condition))
       continue;
 
     // Okay, DomBB dominates Term, has a single predecessor, and that
@@ -290,13 +358,10 @@ bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
     // from Pred to DomBB. Since the terminator kind and condition are
     // the same, we can use the knowledge of which edge gets us to
     // Inst to optimize Inst.
-
     switch (Kind) {
     case ValueKind::SwitchEnumInst: {
-      auto *SEI = cast<SwitchEnumInst>(PredTerm);
-      auto *Element = SEI->getUniqueCaseForDestination(DomBB);
-      if (Element) {
-        simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), Element, DomBB);
+      if (EnumElementDecl *EltDecl = getEnumEltTaken(PredTerm, DomBB)) {
+        simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), EltDecl, DomBB);
         return true;
       }
 
@@ -307,9 +372,22 @@ bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
       continue;
     }
     case ValueKind::CondBranchInst: {
-      auto *CondBrInst = cast<CondBranchInst>(PredTerm);
+      auto *CBI = cast<CondBranchInst>(Term);
+
+      // If this CBI has an 
+      if (auto *EITI = dyn_cast<EnumIsTagInst>(CBI->getCondition())) {
+        if (EnumElementDecl *Element = getEnumEltTaken(PredTerm, DomBB)) {
+          simplifyCondBranchInst(CBI, Element == EITI->getElement());
+          return true;
+        }
+      }
+
+      // Ok, we failed to determine an enum element decl.
+      auto *CondBrInst = dyn_cast<CondBranchInst>(PredTerm);
+      if (!CondBrInst)
+        continue;
       bool BranchTaken = getBranchTaken(CondBrInst, DomBB);
-      simplifyCondBranchInst(cast<CondBranchInst>(Term), BranchTaken);
+      simplifyCondBranchInst(CBI, BranchTaken);
       return true;
     }
     case ValueKind::SwitchIntInst:
@@ -319,7 +397,9 @@ bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
     case ValueKind::CheckedCastBranchInst: {
       // We need to verify that the result type is the same in the
       // dominating checked_cast_br.
-      auto *PredCCBI = cast<CheckedCastBranchInst>(PredTerm);
+      auto *PredCCBI = dyn_cast<CheckedCastBranchInst>(PredTerm);
+      if (!PredCCBI)
+        continue;
       auto *CCBI = cast<CheckedCastBranchInst>(Term);
       if (PredCCBI->getCastType() != CCBI->getCastType())
         continue;
