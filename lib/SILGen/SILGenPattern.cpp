@@ -1777,7 +1777,7 @@ void SwitchEmission::emitCaseBody(CaseStmt *caseBlock) {
 
   // Implicitly break out of the switch statement.
   if (SGF.B.hasValidInsertionPoint()) {
-    SGF.emitBreakOutOf(caseBlock, TheSwitch);
+    SGF.emitBreakOutOf(CleanupLocation(caseBlock), TheSwitch);
   }
 }
 

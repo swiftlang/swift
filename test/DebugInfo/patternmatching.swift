@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -emit-sil -emit-verbose-sil %s -o - | FileCheck %s --check-prefix=SIL-CHECK
 func classifyPoint2(p: (Double, Double)) {
     func return_same (var input : Double) -> Double
     {
@@ -25,6 +26,9 @@ func classifyPoint2(p: (Double, Double)) {
                             return_same(x) == return_same(y):
           // CHECK: ![[LOC2]] = metadata !{i32 [[@LINE+1]], i32
           println("(\(x), \(y)) is on the + diagonal")
+          // SIL-CHECK:  dealloc_stack{{.*}}line:[[@LINE-1]]:54:cleanup
+          // Verify that the branch has a location >= the cleanup.
+          // SIL-CHECK-NEXT:  br{{.*}}line:[[@LINE-3]]:54:cleanup
         case (var x, var y) where x == -y:
           println("on the - diagonal")
         case (var x, var y) where x >= -10 && x < 10 && y >= -10 && y < 10:
