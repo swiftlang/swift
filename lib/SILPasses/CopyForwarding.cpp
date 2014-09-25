@@ -192,23 +192,24 @@ public:
   void forwardCopiesOf(SILValue Def, SILFunction *F);
 
 protected:
-  bool checkUsers();
+  bool collectUsers();
   bool propagateCopy(CopyAddrInst *CopyInst);
-  bool forwardPropagateCopy(CopyAddrInst *CopyInst);
-  bool backwardPropagateCopy(CopyAddrInst *CopyInst);
+  bool forwardPropagateCopy(CopyAddrInst *CopyInst,
+                            SmallPtrSetImpl<SILInstruction*> &DestUserInsts);
+  bool backwardPropagateCopy(CopyAddrInst *CopyInst,
+                             SmallPtrSetImpl<SILInstruction*> &DestUserInsts);
   bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc);
 };
 } // namespace
 
-/// Visit all uses of CurrentDef. Return false if any unsafe uses are found.
-/// Safe uses are those that access the CurrentDef without capturing or exposing
-/// it to any other instructions.
+/// Gather all instructions that use CurrentDef.
+/// - DestroyPoints records 'destroy'
+/// - TakePoints records 'copy_addr [take] src'
+/// - SrcUserInsts records other users.
 ///
-/// As a side-effect, record DestroyPoints and TakePoints.
-///
-/// TODO: This should be guaranteed to return true if we can assume that
-/// address-only types are always accessed by-value.
-bool CopyForwarding::checkUsers() {
+/// If we are unable to find all uses, for example, because we don't look
+/// through struct_element_addr, then return false.
+bool CopyForwarding::collectUsers() {
   for (auto UI : CurrentDef.getUses()) {
     SILInstruction *UserInst = UI->getUser();
     if (auto *Apply = dyn_cast<ApplyInst>(UserInst)) {
@@ -254,18 +255,29 @@ bool CopyForwarding::checkUsers() {
   return true;
 }
 
-/// If the copy's dest is an @out argument, make no attempt to forward
-/// propagate, because it will fail.
+/// Attempt to forward, then backward propagation this copy.
 bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
   SILValue CopyDest = CopyInst->getDest();
-  if (!isa<SILArgument>(CopyDest.getDef()))
-    if (forwardPropagateCopy(CopyInst))
-      return true;
-  return backwardPropagateCopy(CopyInst);
+  SILBasicBlock *BB = CopyInst->getParent();
+
+  // Gather a list of CopyDest users in this block.
+  SmallPtrSet<SILInstruction*, 16> DestUserInsts;
+  for (auto UI : CopyDest.getUses()) {
+    SILInstruction *UserInst = UI->getUser();
+    if (UserInst != CopyInst && UI->getUser()->getParent() == BB)
+      DestUserInsts.insert(UI->getUser());
+  }
+  // Note that DestUserInsts is likely empty when the dest is an 'out' argument,
+  // allowing to go straight to backward propagation.
+  if (forwardPropagateCopy(CopyInst, DestUserInsts))
+    return true;
+
+  // Forward propagation failed. Attempt to backward propagate.
+  return backwardPropagateCopy(CopyInst, DestUserInsts);
 }
 
-/// Perform copy-propagation. Find a set of uses that the given copy can forward
-/// to and replace them with the copy's source.
+/// Perform forward copy-propagation. Find a set of uses that the given copy can
+/// forward to and replace them with the copy's source.
 ///
 /// We must only replace uses of this copy's value. To do this, we search
 /// forward in the current block from the copy that initializes the value to the
@@ -283,15 +295,15 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
 /// TODO: If the copy's dest is an @out argument, or if we fail to find a deinit
 /// in the local scan, then propagate backward instead of forward by rewriting
 /// the copy source's reaching "init" to initialize the copy's dest instead.
-bool CopyForwarding::forwardPropagateCopy(CopyAddrInst *CopyInst) {
+bool CopyForwarding::forwardPropagateCopy(
+  CopyAddrInst *CopyInst,
+  SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
+
+  if (DestUserInsts.empty())
+    return false;
+
   SILValue CopyDest = CopyInst->getDest();
-  SILBasicBlock *BB = CopyInst->getParent();
-  // Gather a list of CopyDest users in this block.
-  SmallPtrSet<SILInstruction*, 16> DestUserInsts;
-  for (auto UI : CopyDest.getUses()) {
-    if (UI->getUser()->getParent() == BB)
-      DestUserInsts.insert(UI->getUser());
-  }
+
   // Scan forward recording all operands that use CopyDest until we see the
   // next deinit of CopyDest.
   SmallVector<Operand*, 16> ValueUses;
@@ -337,20 +349,14 @@ bool CopyForwarding::forwardPropagateCopy(CopyAddrInst *CopyInst) {
   return true;
 }
 
-bool CopyForwarding::backwardPropagateCopy(CopyAddrInst *CopyInst) {
-  // FIXME: unimplemented. scan backward until we find all reaching
-  // inits. Replace all references to the copy's source with the copy's dest.
+bool CopyForwarding::backwardPropagateCopy(
+  CopyAddrInst *CopyInst,
+  SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
+
   DEBUG(llvm::dbgs() << "  Backward propagating " << *CopyInst);
 
   SILValue CopySrc = CopyInst->getSrc();
-  SILValue CopyDest = CopyInst->getDest();
-  SILBasicBlock *BB = CopyInst->getParent();
-  // Gather a list of CopyDest users in this block.
-  SmallPtrSet<SILInstruction*, 16> DestUserInsts;
-  for (auto UI : CopyDest.getUses()) {
-    if (UI->getUser()->getParent() == BB)
-      DestUserInsts.insert(UI->getUser());
-  }
+  ValueBase *CopyDestDef = CopyInst->getDest().getDef();
 
   // Scan backward recording all operands that use CopySrc until we see the
   // most recent init of CopySrc.
@@ -361,7 +367,7 @@ bool CopyForwarding::backwardPropagateCopy(CopyAddrInst *CopyInst) {
     --SI;
     // If we see another use of Dest, then the dest location is deinitialized
     // after the Src location is initialized. So we really need the copy.
-    if (DestUserInsts.count(&*SI)) {
+    if (DestUserInsts.count(&*SI) || &*SI == CopyDestDef) {
       DEBUG(llvm::dbgs() << "  Skipping copy " << *CopyInst
             << ", dest used by " << *SI);
       return false;
@@ -465,7 +471,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   reset();
   CurrentDef = Def;
   DEBUG(llvm::dbgs() << "Analyzing copies of Def: " << Def);
-  if (!checkUsers())
+  if (!collectUsers())
     return;
 
   // First forward any copies that implicitly destroy CurrentDef. There is no
