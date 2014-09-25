@@ -1013,7 +1013,7 @@ public:
     if (gen.LocalFunctions.count(constant)) {
       ManagedValue localFn =
         gen.emitRValueForDecl(e, e->getDeclRef(), e->getType(),
-                              AccessKind::Ordinary);
+                              AccessSemantics::Ordinary);
       auto type = cast<AnyFunctionType>(e->getType()->getCanonicalType());
       setCallee(Callee::forIndirect(localFn, type, type, false, e));
 

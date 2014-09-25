@@ -1079,11 +1079,11 @@ void Stmt::print(raw_ostream &OS, unsigned Indent) const {
 // Printing for Expr and all subclasses.
 //===----------------------------------------------------------------------===//
 
-static raw_ostream &operator<<(raw_ostream &os, AccessKind accessKind) {
+static raw_ostream &operator<<(raw_ostream &os, AccessSemantics accessKind) {
   switch (accessKind) {
-  case AccessKind::Ordinary: return os;
-  case AccessKind::DirectToStorage: return os << " direct_to_storage";
-  case AccessKind::DirectToAccessor: return os << " direct_to_accessor";
+  case AccessSemantics::Ordinary: return os;
+  case AccessSemantics::DirectToStorage: return os << " direct_to_storage";
+  case AccessSemantics::DirectToAccessor: return os << " direct_to_accessor";
   }
   llvm_unreachable("bad access kind");
 }
@@ -1225,7 +1225,7 @@ public:
     printCommon(E, "declref_expr")
       << " decl=";
     E->getDeclRef().dump(OS);
-    OS << E->getAccessKind();
+    OS << E->getAccessSemantics();
     OS << " specialized=" << (E->isSpecialized()? "yes" : "no");
 
     for (auto TR : E->getGenericArgs()) {
@@ -1301,7 +1301,7 @@ public:
       << " decl=";
     E->getMember().dump(OS);
     
-    OS << E->getAccessKind();
+    OS << E->getAccessSemantics();
     if (E->isSuper())
       OS << " super";
             
@@ -1374,7 +1374,7 @@ public:
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
-    OS << E->getAccessKind();
+    OS << E->getAccessSemantics();
     if (E->isSuper())
       OS << " super";
     OS << '\n';

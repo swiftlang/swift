@@ -102,7 +102,7 @@ enum class CheckedCastKind : unsigned {
   Last_CheckedCastKind = BridgeFromObjectiveC,
 };
 
-enum class AccessKind : unsigned char {
+enum class AccessSemantics : unsigned char {
   /// This is a direct access to the underlying storage of a stored
   /// property or subscript.
   DirectToStorage,
@@ -161,7 +161,7 @@ class alignas(8) Expr {
   class DeclRefExprBitfields {
     friend class DeclRefExpr;
     unsigned : NumExprBits;
-    unsigned Access : 2; // an AccessKind
+    unsigned Semantics : 2; // an AccessSemantics
   };
   enum { NumDeclRefExprBits = NumExprBits + 2 };
   static_assert(NumDeclRefExprBits <= 32, "fits in an unsigned");
@@ -169,7 +169,7 @@ class alignas(8) Expr {
   class MemberRefExprBitfields {
     friend class MemberRefExpr;
     unsigned : NumExprBits;
-    unsigned Access : 2; // an AccessKind
+    unsigned Semantics : 2; // an AccessSemantics
     unsigned IsSuper : 1;
   };
   enum { NumMemberRefExprBits = NumExprBits + 3 };
@@ -194,7 +194,7 @@ class alignas(8) Expr {
   class SubscriptExprBitfields {
     friend class SubscriptExpr;
     unsigned : NumExprBits;
-    unsigned Access : 2; // an AccessKind
+    unsigned Semantics : 2; // an AccessSemantics
     unsigned IsSuper : 1;
   };
   enum { NumSubscriptExprBits = NumExprBits + 3 };
@@ -747,9 +747,10 @@ class DeclRefExpr : public Expr {
 
 public:
   DeclRefExpr(ConcreteDeclRef D, SourceLoc Loc, bool Implicit,
-              AccessKind access = AccessKind::Ordinary, Type Ty = Type())
+              AccessSemantics semantics = AccessSemantics::Ordinary,
+              Type Ty = Type())
     : Expr(ExprKind::DeclRef, Implicit, Ty), DOrSpecialized(D), Loc(Loc) {
-    DeclRefExprBits.Access = (unsigned) access;
+    DeclRefExprBits.Semantics = (unsigned) semantics;
   }
 
   /// Retrieve the declaration to which this expression refers.
@@ -759,8 +760,8 @@ public:
 
   /// Return true if this access is direct, meaning that it does not call the
   /// getter or setter.
-  AccessKind getAccessKind() const {
-    return (AccessKind) DeclRefExprBits.Access;
+  AccessSemantics getAccessSemantics() const {
+    return (AccessSemantics) DeclRefExprBits.Semantics;
   }
 
   /// Retrieve the concrete declaration reference.
@@ -1064,7 +1065,7 @@ class MemberRefExpr : public Expr {
 public:
   MemberRefExpr(Expr *base, SourceLoc dotLoc, ConcreteDeclRef member,
                 SourceRange nameRange, bool Implicit,
-                AccessKind access = AccessKind::Ordinary);
+                AccessSemantics semantics = AccessSemantics::Ordinary);
   Expr *getBase() const { return Base; }
   ConcreteDeclRef getMember() const { return Member; }
   SourceLoc getNameLoc() const { return NameRange.Start; }
@@ -1074,8 +1075,8 @@ public:
   
   /// Return true if this member access is direct, meaning that it
   /// does not call the getter or setter.
-  AccessKind getAccessKind() const {
-    return (AccessKind) MemberRefExprBits.Access;
+  AccessSemantics getAccessSemantics() const {
+    return (AccessSemantics) MemberRefExprBits.Semantics;
   }
 
   /// Determine whether this member reference refers to the
@@ -1560,10 +1561,10 @@ public:
   SubscriptExpr(Expr *base, Expr *index,
                 ConcreteDeclRef decl = ConcreteDeclRef(),
                 bool implicit = false,
-                AccessKind access = AccessKind::Ordinary)
+                AccessSemantics semantics = AccessSemantics::Ordinary)
     : Expr(ExprKind::Subscript, implicit, Type()),
       TheDecl(decl), Base(base), Index(index) {
-    SubscriptExprBits.Access = (unsigned) access;
+    SubscriptExprBits.Semantics = (unsigned) semantics;
     SubscriptExprBits.IsSuper = false;
   }
   
@@ -1579,8 +1580,8 @@ public:
 
   /// Determine whether this subscript reference should bypass the
   /// ordinary accessors.
-  AccessKind getAccessKind() const {
-    return (AccessKind) SubscriptExprBits.Access;
+  AccessSemantics getAccessSemantics() const {
+    return (AccessSemantics) SubscriptExprBits.Semantics;
   }
   
   /// Determine whether this member reference refers to the

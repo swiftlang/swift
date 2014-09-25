@@ -678,20 +678,21 @@ public:
   ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
                                  CanType formalRValueType,
                                  ForMutation_t forMutation,
-                                 AccessKind accessKind = AccessKind::Ordinary);
+                                 AccessSemantics semantics
+                                   = AccessSemantics::Ordinary);
   
   /// Produce a singular RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified epxression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
   ManagedValue emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty,
-                                 AccessKind accessKind,
+                                 AccessSemantics semantics,
                                  SGFContext C = SGFContext());
 
   /// Produce a singular RValue for a load from the specified property.
   ManagedValue emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                                          bool isSuper, VarDecl *property,
                                          ArrayRef<Substitution> substitutions,
-                                         AccessKind accessKind,
+                                         AccessSemantics semantics,
                                          Type propTy, SGFContext C);
 
 
@@ -1060,7 +1061,7 @@ public:
   /// Emit a reference to a variable as an lvalue.
   LValue emitLValueForAddressedNonMemberVarDecl(SILLocation loc, VarDecl *var,
                                                 CanType formalRValueType,
-                                                AccessKind accessKind);
+                                                AccessSemantics semantics);
 
   /// Emit an lvalue that directly refers to the given instance
   /// variable (without going through getters or setters).

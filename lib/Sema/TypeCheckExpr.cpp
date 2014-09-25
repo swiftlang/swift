@@ -512,8 +512,8 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
                                        SourceLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
-  AccessKind accessKind = value->getAccessKindFromContext(UseDC);
-  return new (Context) DeclRefExpr(value, loc, Implicit, accessKind, type);
+  AccessSemantics semantics = value->getAccessSemanticsFromContext(UseDC);
+  return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
@@ -522,9 +522,9 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    AccessKind accessKind = Decls[0]->getAccessKindFromContext(UseDC);
+    AccessSemantics semantics = Decls[0]->getAccessSemanticsFromContext(UseDC);
     auto result = new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit,
-                                            accessKind);
+                                            semantics);
     if (isSpecialized)
       result->setSpecialized();
     return result;

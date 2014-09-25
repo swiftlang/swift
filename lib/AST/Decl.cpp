@@ -888,17 +888,17 @@ SourceRange IfConfigDecl::getSourceRange() const {
   return SourceRange(getLoc(), EndLoc);
 }
 
-/// Determines the kind of access that should be performed by a
-/// DeclRefExpr or MemberRefExpr use of this value in the specified
-/// context.
-AccessKind ValueDecl::getAccessKindFromContext(const DeclContext *UseDC) const {
+/// Determines the access semantics to use in a DeclRefExpr or
+/// MemberRefExpr use of this value in the specified context.
+AccessSemantics
+ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
   if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
     // Observing member are accessed directly from within their didSet/willSet
     // specifiers.  This prevents assignments from becoming infinite loops.
     if (auto *UseFD = dyn_cast<FuncDecl>(UseDC))
       if (var->hasStorage() && var->hasAccessorFunctions() &&
           UseFD->getAccessorStorageDecl() == var)
-        return AccessKind::DirectToStorage;
+        return AccessSemantics::DirectToStorage;
     
     // "StoredWithTrivialAccessors" are generally always accessed indirectly,
     // but if we know that the trivial accessor will always produce the same
@@ -911,15 +911,15 @@ AccessKind ValueDecl::getAccessKindFromContext(const DeclContext *UseDC) const {
         var->getStorageKind() == VarDecl::Stored) {
       if (auto ctx = var->getDeclContext()->getDeclaredTypeInContext())
         if (ctx->getStructOrBoundGenericStruct())
-          return AccessKind::DirectToStorage;
+          return AccessSemantics::DirectToStorage;
       
       // Final properties can always be direct, even in classes.
       if (var->isFinal())
-        return AccessKind::DirectToStorage;
+        return AccessSemantics::DirectToStorage;
     }
   }
 
-  return AccessKind::Ordinary;
+  return AccessSemantics::Ordinary;
 }
 
 

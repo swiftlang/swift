@@ -1706,14 +1706,14 @@ static Expr *buildSelfReference(VarDecl *selfDecl,
 /// Build an l-value for the storage of a declaration.
 static Expr *buildStorageReference(FuncDecl *accessor,
                                    AbstractStorageDecl *storage,
-                                   AccessKind accessKind,
+                                   AccessSemantics semantics,
                                    SelfAccessKind selfAccessKind,
                                    TypeChecker &TC) {
   ASTContext &ctx = TC.Context;
 
   VarDecl *selfDecl = accessor->getImplicitSelfDecl();
   if (!selfDecl) {
-    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit, accessKind);
+    return new (ctx) DeclRefExpr(storage, SourceLoc(), IsImplicit, semantics);
   }
 
   // If we should use a super access if applicable, and we have an
@@ -1721,7 +1721,7 @@ static Expr *buildStorageReference(FuncDecl *accessor,
   if (selfAccessKind == SelfAccessKind::Super) {
     if (auto overridden = storage->getOverriddenDecl()) {
       storage = overridden;
-      accessKind = AccessKind::Ordinary;
+      semantics = AccessSemantics::Ordinary;
     } else {
       selfAccessKind = SelfAccessKind::Peer;
     }
@@ -1732,14 +1732,14 @@ static Expr *buildStorageReference(FuncDecl *accessor,
   if (isa<SubscriptDecl>(storage)) {
     Expr *indices = buildSubscriptIndexReference(ctx, accessor);
     return new (ctx) SubscriptExpr(selfDRE, indices, ConcreteDeclRef(),
-                                   IsImplicit, accessKind);
+                                   IsImplicit, semantics);
   }
 
   // This is a potentially polymorphic access, which is unnecessary;
   // however, it shouldn't be problematic because any overrides
   // should also redefine materializeForSet.
   return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
-                                 SourceLoc(), IsImplicit, accessKind);
+                                 SourceLoc(), IsImplicit, semantics);
 }
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
@@ -1747,7 +1747,8 @@ static Expr *buildStorageReference(FuncDecl *accessor,
 static Expr *createPropertyLoadOrCallSuperclassGetter(FuncDecl *accessor,
                                               AbstractStorageDecl *storage,
                                                       TypeChecker &TC) {
-  return buildStorageReference(accessor, storage, AccessKind::DirectToStorage,
+  return buildStorageReference(accessor, storage,
+                               AccessSemantics::DirectToStorage,
                                SelfAccessKind::Super, TC);
 }
 
@@ -1859,7 +1860,7 @@ static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
   // or:
   //   (assign (member_ref_expr(decl_ref_expr(self), VD)), decl_ref_expr(value))
   Expr *dest = buildStorageReference(accessor, storage,
-                                     AccessKind::DirectToStorage,
+                                     AccessSemantics::DirectToStorage,
                                      SelfAccessKind::Super, TC);
 
   body.push_back(new (TC.Context) AssignExpr(dest, SourceLoc(), value,
@@ -1945,7 +1946,7 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
 
   // return (Builtin.addressof(&self.property), false)
   Expr *result = buildStorageReference(materializeForSet, storage,
-                                       AccessKind::DirectToStorage,
+                                       AccessSemantics::DirectToStorage,
                                        SelfAccessKind::Peer, TC);
   result = new (ctx) InOutExpr(SourceLoc(), result, Type(), IsImplicit);
   result = buildCallToBuiltin(ctx, "addressof", result);
@@ -2077,7 +2078,7 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
 
   // Builtin.initialize(self.property, buffer)
   Expr *curValue = buildStorageReference(materializeForSet, storage,
-                                         AccessKind::DirectToAccessor,
+                                         AccessSemantics::DirectToAccessor,
                                          SelfAccessKind::Peer, TC);
   Expr *bufferRef = new (ctx) DeclRefExpr(bufferDecl, SourceLoc(), IsImplicit);
   ASTNode assignment = buildCallToBuiltin(ctx, "initialize",
@@ -2342,14 +2343,14 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 
   // Build the early return inside the if.
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
-                                        AccessKind::DirectToStorage);
+                                        AccessSemantics::DirectToStorage);
   auto *EarlyReturnVal = new (Ctx) ForceValueExpr(Tmp1DRE, SourceLoc());
   auto *Return = new (Ctx) ReturnStmt(SourceLoc(), EarlyReturnVal,
                                       /*implicit*/true);
 
   // Build the "if" around the early return.
   Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
-                                  AccessKind::DirectToStorage);
+                                  AccessSemantics::DirectToStorage);
   
   // Call through "hasValue" on the decl ref.
   Tmp1DRE->setType(OptionalType::get(VD->getType()));
@@ -2398,12 +2399,12 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 
   // Assign tmp2 into storage.
   auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
-                                       AccessKind::DirectToStorage);
+                                       AccessSemantics::DirectToStorage);
   createPropertyStoreOrCallSuperclassSetter(Get, Tmp2DRE, Storage, Body, TC);
 
   // Return tmp2.
   Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
-                                  AccessKind::DirectToStorage);
+                                  AccessSemantics::DirectToStorage);
 
   Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
 

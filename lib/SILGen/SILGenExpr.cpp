@@ -442,7 +442,7 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
 ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
                                                CanType formalRValueType,
                                                ForMutation_t forMutation,
-                                               AccessKind accessKind) {
+                                               AccessSemantics semantics) {
   // For local decls, use the address we allocated or the value if we have it.
   auto It = VarLocs.find(var);
   if (It != VarLocs.end()) {
@@ -466,7 +466,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
 
   case AbstractStorageDecl::Observing:
     // TODO: emit a direct reference if not forMutation?
-    if (accessKind != AccessKind::DirectToStorage)
+    if (semantics != AccessSemantics::DirectToStorage)
       return ManagedValue();
     break;
 
@@ -477,7 +477,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
   if (var->hasAddressors()) {
     LValue lvalue =
       emitLValueForAddressedNonMemberVarDecl(loc, var, formalRValueType,
-                                             accessKind);
+                                             semantics);
     return emitAddressOfLValue(loc, lvalue, forMutation);
   }
   
@@ -489,7 +489,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
 
 ManagedValue SILGenFunction::
 emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
-                  AccessKind accessKind, SGFContext C) {
+                  AccessSemantics semantics, SGFContext C) {
   assert(!ncRefType->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   
@@ -518,7 +518,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     // If this VarDecl is represented as an address, emit it as an lvalue, then
     // perform a load to get the rvalue.
     if (auto Result = emitLValueForDecl(loc, var, refType,
-                                        NotForMutation, accessKind)) {
+                                        NotForMutation, semantics)) {
       IsTake_t takes;
       // 'self' may need to be taken during an 'init' delegation.
       if (var->getName() == getASTContext().Id_self) {
@@ -602,7 +602,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     return emitGetAccessor(loc, var,
                            ArrayRef<Substitution>(), std::move(selfSource),
                            /*isSuper=*/false,
-                           accessKind == AccessKind::DirectToAccessor,
+                           semantics == AccessSemantics::DirectToAccessor,
                            RValue(), C);
   }
   
@@ -678,11 +678,11 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                           bool isSuper,
                           VarDecl *FieldDecl,
                           ArrayRef<Substitution> substitutions,
-                          AccessKind accessKind,
+                          AccessSemantics semantics,
                           Type propTy, SGFContext C) {
   // If this is a non-direct access to a computed property, call the getter.
   if (FieldDecl->hasAccessorFunctions() &&
-      accessKind != AccessKind::DirectToStorage) {
+      semantics != AccessSemantics::DirectToStorage) {
     // If the base is +0, and this is a non-opaque-protocol/archetype base, emit
     // a retain_value to bring it to +1 since getters always take the base object
     // at +1.
@@ -694,7 +694,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                                                  FieldDecl->getGetter());
     return emitGetAccessor(loc, FieldDecl, substitutions,
                            std::move(baseRV), isSuper,
-                           accessKind == AccessKind::DirectToAccessor,
+                           semantics == AccessSemantics::DirectToAccessor,
                            RValue(), C);
   }
 
@@ -714,7 +714,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
             baseMeta->getEnumOrBoundGenericEnum()) &&
            "static stored properties for classes/protocols not implemented");
 
-    return emitRValueForDecl(loc, FieldDecl, propTy, accessKind, C);
+    return emitRValueForDecl(loc, FieldDecl, propTy, semantics, C);
   }
 
   // If the base is a reference type, just handle this as loading the lvalue.
@@ -786,7 +786,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   auto Val = SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(),
-                                   E->getAccessKind(), C);
+                                   E->getAccessSemantics(), C);
   return RValue(SGF, E, Val);
 }
 
@@ -803,7 +803,7 @@ RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
          "RValueEmitter shouldn't be called on lvalues");
   auto Self = SGF.emitRValueForDecl(E, E->getSelf(),
                                     E->getSelf()->getType(),
-                                    AccessKind::Ordinary);
+                                    AccessSemantics::Ordinary);
 
   // Perform an upcast to convert self to the indicated super type.
   auto Result = SGF.B.createUpcast(E, Self.getValue(),
@@ -2259,7 +2259,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, E->isSuper(), 
                                                    FieldDecl,
                                              E->getMember().getSubstitutions(),
-                                                   E->getAccessKind(),
+                                                   E->getAccessSemantics(),
                                                    E->getType(), C);
   return RValue(SGF, E, res);
 }
@@ -2280,11 +2280,11 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // operations.
   auto subscript = cast<SubscriptDecl>(E->getDecl().getDecl());
 
-  AccessKind accessKind = E->getAccessKind();
+  AccessSemantics semantics = E->getAccessSemantics();
 
   bool useAddressor = (!subscript->hasAccessorFunctions() ||
                        (subscript->hasAddressors() &&
-                        accessKind == AccessKind::DirectToStorage));
+                        semantics == AccessSemantics::DirectToStorage));
   FuncDecl *accessor =
     (useAddressor ? subscript->getAddressor() : subscript->getGetter());
 
@@ -2306,7 +2306,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
     ManagedValue MV =
       SGF.emitGetAccessor(E, subscript, E->getDecl().getSubstitutions(),
                           std::move(baseRV), E->isSuper(),
-                          accessKind == AccessKind::DirectToAccessor,
+                          semantics == AccessSemantics::DirectToAccessor,
                           std::move(subscriptRV), C);
     return RValue(SGF, E, MV);
   }
@@ -2321,7 +2321,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
     SGF.emitAddressorAccessor(E, subscript, NotForMutation,
                               E->getDecl().getSubstitutions(),
                               std::move(baseRV), E->isSuper(),
-                              accessKind == AccessKind::DirectToAccessor,
+                              semantics == AccessSemantics::DirectToAccessor,
                               std::move(subscriptRV), storageType)
     .getLValueAddress();
 
@@ -2793,7 +2793,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     case CaptureKind::LocalFunction: {
       // SILValue is a constant such as a local func. Pass on the reference.
       ManagedValue v = emitRValueForDecl(loc, vd, vd->getType(),
-                                         AccessKind::Ordinary);
+                                         AccessSemantics::Ordinary);
       capturedArgs.push_back(v.forward(*this));
       break;
     }
@@ -4165,7 +4165,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
       self = SGF.emitSelfForDirectPropertyInConstructor(loc, selfDecl);
     else
       self = SGF.emitLValueForDecl(loc, selfDecl, src.getType(), ForMutation,
-                                   AccessKind::DirectToStorage);
+                                   AccessSemantics::DirectToStorage);
 
     LValue memberRef = SGF.emitDirectIVarLValue(loc, self, named->getDecl());
 
@@ -4624,7 +4624,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   case MagicIdentifierLiteralExpr::DSOHandle: {
     auto Val = SGF.emitRValueForDecl(E, SGF.SGM.SwiftModule->getDSOHandle(), 
                                      E->getType(),
-                                     AccessKind::Ordinary,
+                                     AccessSemantics::Ordinary,
                                      C);
     return RValue(SGF, E, Val);
   }

@@ -49,7 +49,7 @@ namespace clang {
 }
 
 namespace swift {
-  enum class AccessKind : unsigned char;
+  enum class AccessSemantics : unsigned char;
   class ApplyExpr;
   class ArchetypeBuilder;
   class ArchetypeType;
@@ -2041,7 +2041,7 @@ public:
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
   /// context.
-  AccessKind getAccessKindFromContext(const DeclContext *DC) const;
+  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC) const;
   
   /// Dump a reference to the given declaration.
   void dumpRef(raw_ostream &os) const;

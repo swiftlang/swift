@@ -291,7 +291,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
     auto valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
     
     auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true,
-                                       AccessKind::DirectToStorage);
+                                       AccessSemantics::DirectToStorage);
 
     auto assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
                                          /*implicit*/ true);

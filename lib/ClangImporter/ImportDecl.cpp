@@ -613,7 +613,7 @@ static ConstructorDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
   auto *ctorCall = new (C) CallExpr(ctorRef, arg, /*implicit*/ true);
 
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true,
-                                     AccessKind::Ordinary,
+                                     AccessSemantics::Ordinary,
                                      selfDecl->getType());
 
   auto *assign = new (C) AssignExpr(selfRef, SourceLoc(), ctorCall,

@@ -1074,11 +1074,11 @@ getNonMemberVarDeclSubstitutions(SILGenFunction &gen, VarDecl *var) {
 static AddressorComponent *
 makeNonMemberVarDeclAddressorComponent(SILGenFunction &gen, VarDecl *var,
                                        const LValueTypeData &typeData,
-                                       AccessKind accessKind) {
+                                       AccessSemantics semantics) {
   assert(var->hasAddressors());
   SILType storageType = gen.getLoweredType(var->getType()).getAddressType();
   return new AddressorComponent(var, /*isSuper=*/ false,
-                                accessKind == AccessKind::DirectToAccessor,
+                                semantics == AccessSemantics::DirectToAccessor,
                                 getNonMemberVarDeclSubstitutions(gen, var),
                                 typeData, storageType);
 }
@@ -1087,35 +1087,35 @@ LValue
 SILGenFunction::emitLValueForAddressedNonMemberVarDecl(SILLocation loc,
                                                        VarDecl *var,
                                                        CanType formalRValueType,
-                                                       AccessKind accessKind) {
+                                                       AccessSemantics semantics) {
   auto typeData = getUnsubstitutedTypeData(*this, formalRValueType);
   LValue lv;
   lv.add(makeNonMemberVarDeclAddressorComponent(*this, var, typeData,
-                                                accessKind));
+                                                semantics));
   return lv;
 }
 
 static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
                                             SILLocation loc, VarDecl *var,
                                             CanType formalRValueType,
-                                            AccessKind accessKind) {
+                                            AccessSemantics semantics) {
   LValue lv;
   auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
 
   // If it's a computed variable, push a reference to the getter and setter.
   if (var->hasAccessorFunctions() &&
-      accessKind != AccessKind::DirectToStorage) {
+      semantics != AccessSemantics::DirectToStorage) {
     lv.add(new GetterSetterComponent(var, /*isSuper=*/false,
-                                     accessKind == AccessKind::DirectToAccessor,
+                                     semantics == AccessSemantics::DirectToAccessor,
                                      getNonMemberVarDeclSubstitutions(gen, var),
                                      typeData));
   } else if (var->hasAddressors()) {
-    lv.add(makeNonMemberVarDeclAddressorComponent(gen, var, typeData, accessKind));
+    lv.add(makeNonMemberVarDeclAddressorComponent(gen, var, typeData, semantics));
   } else {
     // If it's a physical value (e.g. a local variable in memory), push its
     // address.
     auto address = gen.emitLValueForDecl(loc, var, formalRValueType,
-                                         ForMutation, accessKind);
+                                         ForMutation, semantics);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
     lv.add(new ValueComponent(address, typeData));
@@ -1142,7 +1142,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   // The only non-member decl that can be an lvalue is VarDecl.
   return emitLValueForNonMemberVarDecl(gen, e, cast<VarDecl>(e->getDecl()),
                                        getSubstFormalRValueType(e),
-                                       e->getAccessKind());
+                                       e->getAccessSemantics());
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
@@ -1158,7 +1158,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
     // retain/release traffic that breaks brittle custom r/r implementations in
     // ObjC.
     if (gen.EmittingClassInitializer
-        && e->getAccessKind() == AccessKind::DirectToStorage) {
+        && e->getAccessSemantics() == AccessSemantics::DirectToStorage) {
       if (auto baseDeclRef = dyn_cast<DeclRefExpr>(e->getBase())) {
         if (baseDeclRef->getDecl()->getName() == gen.getASTContext().Id_self) {
           ManagedValue self = gen.emitSelfForDirectPropertyInConstructor(
@@ -1183,9 +1183,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // Use the property accessors if the variable has accessors and this isn't a
   // direct access to underlying storage.
   if (var->hasAccessorFunctions() &&
-      e->getAccessKind() != AccessKind::DirectToStorage) {
+      e->getAccessSemantics() != AccessSemantics::DirectToStorage) {
     lv.add(new GetterSetterComponent(var, e->isSuper(),
-                            e->getAccessKind() == AccessKind::DirectToAccessor,
+                            e->getAccessSemantics() == AccessSemantics::DirectToAccessor,
                                      e->getMember().getSubstitutions(),
                                      typeData));
     return std::move(lv);
@@ -1212,14 +1212,14 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
     
     return emitLValueForNonMemberVarDecl(gen, e, var,
                                          getSubstFormalRValueType(e),
-                                         e->getAccessKind());
+                                         e->getAccessSemantics());
   }
 
   // For member variables, this access is done w.r.t. a base computation that
   // was already emitted.  This member is accessed off of it.
   if (var->hasAddressors()) {
     lv.add(new AddressorComponent(var, e->isSuper(),
-                            e->getAccessKind() == AccessKind::DirectToAccessor,
+                            e->getAccessSemantics() == AccessSemantics::DirectToAccessor,
                                   e->getMember().getSubstitutions(),
                                   typeData, varStorageType));
   } else if (!e->getBase()->getType()->is<LValueType>()) {
@@ -1238,23 +1238,23 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
-  auto accessKind = e->getAccessKind();
+  auto semantics = e->getAccessSemantics();
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
   
   LValue lv = visitRec(e->getBase());
 
   if (decl->hasAccessorFunctions() &&
-      e->getAccessKind() != AccessKind::DirectToStorage) {
+      e->getAccessSemantics() != AccessSemantics::DirectToStorage) {
     lv.add(new GetterSetterComponent(decl, e->isSuper(),
-                                     accessKind == AccessKind::DirectToAccessor,
+                                     semantics == AccessSemantics::DirectToAccessor,
                                      e->getDecl().getSubstitutions(),
                                      typeData, e->getIndex()));
   } else {
     auto storageType = 
       gen.SGM.Types.getSubstitutedStorageType(decl, e->getType());
     lv.add(new AddressorComponent(decl, e->isSuper(),
-                            e->getAccessKind() == AccessKind::DirectToAccessor,
+                                  semantics == AccessSemantics::DirectToAccessor,
                                   e->getDecl().getSubstitutions(),
                                   typeData, storageType, e->getIndex()));
   }
