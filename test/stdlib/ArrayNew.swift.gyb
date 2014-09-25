@@ -8,10 +8,13 @@
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
 // RUN: %target-run %t/Array
 
-
 import Darwin
 import StdlibUnittest
 import Foundation
+
+%{
+all_array_types = [ 'ContiguousArray', 'Slice', 'Array' ]
+}%
 
 extension Array {
   var identity: UWord {
@@ -74,6 +77,45 @@ ArrayTestSuite.test("Native/isEmpty") {
   expectFalse(a.isEmpty)
 }
 
+enum EnumWithoutPayloads : Equatable {
+  case A, B, C, D
+}
+
+func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
+  switch (lhs, rhs) {
+  case (.A, .A), (.B, .B), (.C, .C), (.D, .D):
+    return true
+
+  default:
+    return false
+  }
+}
+
+% for array_self in all_array_types:
+
+ArrayTestSuite.test("${array_self}/Sliceable/Enums") {
+  typealias E = EnumWithoutPayloads
+
+  if true {
+    let expected = [ E.A, E.B, E.C, E.D ]
+    let sliceable = ${array_self}(expected)
+    checkSliceableWithBidirectionalIndex(
+      expected, sliceable, SourceLocStack().withCurrentLoc())
+  }
+
+  /*
+  FIXME: add this test when Array<T> can be conditionally Equatable.
+  if true {
+    let expected = [ [ E.A, E.B ], [ E.B, E.C ], [ E.D ], [ E.A, E.B, E.D ] ]
+    let sliceable = ${array_self}(expected)
+    checkSliceableWithBidirectionalIndex(
+      expected, sliceable, SourceLocStack().withCurrentLoc())
+  }
+  */
+}
+
+% end
+
 //===----------------------------------------------------------------------===//
 // COW tests
 // FIXME: incomplete.
@@ -87,7 +129,7 @@ func withInoutT<T>(inout x: T, body: (inout x: T) -> ()) {
   body(x: &x)
 }
 
-% for array_self in [ 'ContiguousArray', 'Slice', 'Array' ]:
+% for array_self in all_array_types:
 
 ArrayTestSuite.test("${array_self}/subscript(_: Int)/COW") {
   var a = ${array_self}([ [
