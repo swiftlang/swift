@@ -87,11 +87,6 @@ func withInoutT<T>(inout x: T, body: (inout x: T) -> ()) {
   body(x: &x)
 }
 
-func withInout<T>(inout x: T) {
-}
-
-
-
 % for array_self in [ 'ContiguousArray', 'Slice', 'Array' ]:
 
 ArrayTestSuite.test("${array_self}/subscript(_: Int)/COW") {
