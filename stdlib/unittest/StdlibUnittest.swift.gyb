@@ -1260,11 +1260,8 @@ where
 
   // First make an independent copy of the array that we can use for
   // comparison later.
-  var source = ContiguousArray<A.Generator.Element>()
-  for x in makeCollection() {
-    source.append(x)
-  }
-  
+  let source = ContiguousArray<A.Generator.Element>(makeCollection())
+
   for (ix, i) in enumerate(indices(source)) {
     for (jx_, j) in enumerate(i..<source.endIndex) {
       let jx = jx_ + ix
