@@ -137,19 +137,43 @@ ArrayTestSuite.test("${array_self}/subscript(_: Int)/COW") {
     TestValueTy(50), TestValueTy(60), TestValueTy(70)
   ] ])
   let identityOuter = a.identity
-  let identityInner = a[0].identity
+  var identityInner = a[0].identity
+
+  func checkIdentity() {
+    expectEqual(identityOuter, a.identity)
+
+%   if array_self == 'Array':
+    // Currently reallocates storage, but this is not what we want.
+    expectNotEqual(identityInner, a[0].identity)
+%   else:
+    // Should not reallocate storage.
+    expectEqual(identityInner, a[0].identity)
+    identityInner = a[0].identity
+%   end
+  }
 
   // Mutating through a subscript expression.
   a[0][0] = TestValueTy(1010)
+
+  checkIdentity()
+
   a[0][1].value = 1020
+
+  checkIdentity()
+
   withInoutT(&a) {
     (inout x: ${array_self}<[TestValueTy]>) in
     x[0][2].value += 1000
   }
+
+  checkIdentity()
+
   withInoutT(&a[0]) {
     (inout x: [TestValueTy]) in
     x[3].value += 1000
   }
+
+  checkIdentity()
 
   // This will reallocate storage unless Array uses addressors for subscript.
   //withInoutT(&a[0][4]) {
@@ -172,15 +196,6 @@ ArrayTestSuite.test("${array_self}/subscript(_: Int)/COW") {
   expectEqual(50, a[0][4].value)
   expectEqual(60, a[0][5].value)
   expectEqual(70, a[0][6].value)
-
-  expectEqual(identityOuter, a.identity)
-%   if array_self == 'Array':
-  // Currently reallocates storage, but this is not what we want.
-  expectNotEqual(identityInner, a[0].identity)
-%   else:
-  // Should not reallocate storage.
-  expectEqual(identityInner, a[0].identity)
-%   end
 }
 
 ArrayTestSuite.test("${array_self}/subscript(_: Range<Int>)/COW") {
@@ -192,40 +207,63 @@ ArrayTestSuite.test("${array_self}/subscript(_: Range<Int>)/COW") {
   let identityOuter = a.identity
   let identityInner = a[0].identity
 
+  func checkIdentity() {
+    expectEqual(identityOuter, a.identity)
+
+    // Currently reallocates storage, but how do we avoid this?..
+    expectNotEqual(identityInner, a[0].identity)
+  }
+
   // Mutating through a subscript expression.
   a[0..<1][0][0] = TestValueTy(1010)
 
+  checkIdentity()
+
   a[0..<1][0][1].value = 1020
+
+  checkIdentity()
 
   withInoutT(&a) {
     (inout x: ${array_self}<[TestValueTy]>) in
     x[0..<1][0][2].value += 1000
   }
 
+  checkIdentity()
+
   withInoutT(&a[0..<1]) {
     (inout x: Slice<[TestValueTy]>) in
     x[0][3].value += 1000
   }
+
+  checkIdentity()
 
   withInoutT(&a[0..<1][0]) {
     (inout x: [TestValueTy]) in
     x[4].value += 1000
   }
 
+  checkIdentity()
+
   withInoutT(&a[0..<1][0][5]) {
     (inout x: TestValueTy) in
     x.value += 1000
   }
+
+  checkIdentity()
 
   withInoutT(&a[0..<1][0][6].value) {
     (inout x: Int) in
     x += 1000
   }
 
+  checkIdentity()
+
   withInoutInt(&a[0..<1][0][7].value) {
     (inout x: Int) in
     x += 1000
   }
+
+  checkIdentity()
 
   // Don't change the last element.
 
@@ -238,11 +276,6 @@ ArrayTestSuite.test("${array_self}/subscript(_: Range<Int>)/COW") {
   expectEqual(1070, a[0][6].value)
   expectEqual(1080, a[0][7].value)
   expectEqual(90, a[0][8].value)
-
-  expectEqual(identityOuter, a.identity)
-
-  // Currently reallocates storage, but how do we avoid this?..
-  expectNotEqual(identityInner, a[0].identity)
 }
 
 % end
