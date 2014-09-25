@@ -42,6 +42,7 @@ using namespace swift;
 // Enumerates the optimization kinds that we do in SIL.
 enum OptimizationLevelKind {
   LowLevel,
+  MidLevel,
   HighLevel,
 };
 
@@ -164,10 +165,20 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.add(createGenericSpecializer());
   PM.add(createSILLinker());
 
-  // Use either the early inliner that does not inline functions with defined
-  // semantics or the late performance inliner that inlines everything.
-  PM.add(OpLevel == OptimizationLevelKind::HighLevel ? createEarlyInliner() :
-         createPerfInliner());
+  switch (OpLevel) {
+    case OptimizationLevelKind::HighLevel:
+      // Does not inline functions with defined semantics.
+      PM.add(createEarlyInliner());
+      break;
+    case OptimizationLevelKind::MidLevel:
+      // Does inline semantics-functions, but not global-init functions.
+      PM.add(createPerfInliner());
+      break;
+    case OptimizationLevelKind::LowLevel:
+      // Inlines everything
+      PM.add(createLateInliner());
+      break;
+  }
   PM.add(createSimplifyCFG());
   PM.add(createGlobalARCOpts());
 }
@@ -203,8 +214,8 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
-  // Run two iterations of the low-level SSA passes.
-  AddSSAPasses(PM, OptimizationLevelKind::LowLevel);
+  // Run two iterations of the mid-level SSA passes.
+  AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
   PM.runOneIteration();
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
@@ -214,6 +225,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   PM.add(createDeadObjectElimination());
 
   // Hoist globals out of loops.
+  // Global-init functions should not be inlined GlobalOpt is done.
   PM.add(createGlobalOpt());
 
   // Propagate constants into closures and convert to static dispatch.  This

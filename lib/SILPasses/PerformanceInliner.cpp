@@ -31,11 +31,12 @@ STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 
 namespace {
 
-  // Controls the decision to inline functions with @semantics and @effect
-  // attributes.
-  enum class InlineFuncWithAttrKind {
-    Inline,
-    DontInline
+  // Controls the decision to inline functions with @semantics, @effect and
+  // global_init attributes.
+  enum class InlineSelection {
+    Everything,
+    NoGlobalInit,
+    NoSemanticsAndGlobalInit
   };
 
   class SILPerformanceInliner {
@@ -43,15 +44,15 @@ namespace {
     const unsigned InlineCostThreshold;
     /// The linking mode.
     SILModule::LinkingMode LinkMode;
-    /// If set to true then the inliner is allowed to inline function calls
-    /// that are marked with the @semantics attribute.
-    InlineFuncWithAttrKind InlineFuncWithAttr;
+    /// Specifies which functions not to inline, based on @semantics and
+    /// global_init attributes.
+    InlineSelection WhatToInline;
 
   public:
     SILPerformanceInliner(unsigned threshold, SILModule::LinkingMode M,
-                          InlineFuncWithAttrKind InlineAttr)
+                          InlineSelection WhatToInline)
       : InlineCostThreshold(threshold), LinkMode(M),
-    InlineFuncWithAttr(InlineAttr) {}
+    WhatToInline(WhatToInline) {}
 
     bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA);
 
@@ -69,7 +70,7 @@ namespace {
 /// that is legal to inline.
 static SILFunction *getInlinableFunction(ApplyInst *AI,
                                          SILModule::LinkingMode Mode,
-                                         InlineFuncWithAttrKind InlineAttr) {
+                                         InlineSelection WhatToInline) {
   // Avoid substituion lists, we don't support them.
   if (AI->hasSubstitutions())
     return nullptr;
@@ -82,12 +83,19 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
 
   // Don't inline functions that are marked with the @semantics or @effects
   // attribute if the inliner is asked not to inline them.
-  if (InlineAttr == InlineFuncWithAttrKind::DontInline &&
-      (F->hasDefinedSemantics() || F->hasSpecifiedEffectsInfo())) {
+  if (F->hasDefinedSemantics() || F->hasSpecifiedEffectsInfo()) {
+    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
       DEBUG(llvm::dbgs() << " Function " << F->getName()
             << " has special semantics or effects attribute.\n");
       return nullptr;
     }
+  } else if (F->isGlobalInit()) {
+    if (WhatToInline != InlineSelection::Everything) {
+      DEBUG(llvm::dbgs() << " Function " << F->getName()
+            << " has the global-init attribute.\n");
+      return nullptr;
+    }
+  }
 
   // If F is an external declaration, we can't inline...
   if (F->empty() || F->isExternalDeclaration()) {
@@ -211,7 +219,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   for (auto AI : CallSites) {
     assert(AI && "Invalid AI");
     SILFunction *Callee = getInlinableFunction(AI, LinkMode,
-                                               InlineFuncWithAttr);
+                                               WhatToInline);
     if (Callee)
       CalleeCount[Callee]++;
   }
@@ -221,16 +229,9 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
     // Get the callee.
     SILFunction *Callee = getInlinableFunction(AI, LinkMode,
-                                               InlineFuncWithAttr);
+                                               WhatToInline);
     if (!Callee) {
       DEBUG(llvm::dbgs() << "        FAIL! Cannot find inlineable callee.\n");
-      continue;
-    }
-    
-    if (Callee->isGlobalInit()) {
-      // This is a workaround to prevent inlining of globalinit functions
-      // before the GlobalOpt did run.
-      // TODO: Prevent inlining of this functions only _before_ GlobalOpt.
       continue;
     }
     
@@ -277,12 +278,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
 namespace {
 class SILPerformanceInlinerPass : public SILModuleTransform {
-  /// If InlineSem is true then the inliner is free to inline functions with
-  /// defined semantics.
-  InlineFuncWithAttrKind InlineSem;
+  /// Specifies which functions not to inline, based on @semantics and
+  /// global_init attributes.
+  InlineSelection WhatToInline;
 public:
-  SILPerformanceInlinerPass(InlineFuncWithAttrKind InlineFunSem):
-      InlineSem(InlineFunSem) {}
+  SILPerformanceInlinerPass(InlineSelection WhatToInline):
+      WhatToInline(WhatToInline) {}
 
   void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
@@ -294,7 +295,8 @@ public:
     }
 
     SILPerformanceInliner inliner(getOptions().InlineThreshold,
-                                  SILModule::LinkingMode::LinkAll, InlineSem);
+                                  SILModule::LinkingMode::LinkAll,
+                                  WhatToInline);
 
     bool Changed = false;
     // Inline functions bottom up from the leafs.
@@ -316,12 +318,20 @@ public:
 };
 } // end anonymous namespace
 
-SILTransform *swift::createPerfInliner() {
-  return new SILPerformanceInlinerPass(InlineFuncWithAttrKind::Inline);
+/// Create an inliner pass that does not inline functions that are marked with
+/// the @semantics, @effects or global_init attributes.
+SILTransform *swift::createEarlyInliner() {
+  return new SILPerformanceInlinerPass(InlineSelection::NoSemanticsAndGlobalInit);
 }
 
 /// Create an inliner pass that does not inline functions that are marked with
-/// the @semantics or @effects attribute.
-SILTransform *swift::createEarlyInliner() {
-  return new SILPerformanceInlinerPass(InlineFuncWithAttrKind::DontInline);
+/// the global_init attribute.
+SILTransform *swift::createPerfInliner() {
+  return new SILPerformanceInlinerPass(InlineSelection::NoGlobalInit);
+}
+
+/// Create an inliner pass that inlines all functions that are marked with
+/// the @semantics, @effects or global_init attributes.
+SILTransform *swift::createLateInliner() {
+  return new SILPerformanceInlinerPass(InlineSelection::Everything);
 }
