@@ -343,6 +343,18 @@ namespace {
       return true;
     }
 
+    bool visitValueMetatypeInst(const ValueMetatypeInst *RHS) {
+      // We have already compared the operands/types, so we should have equality
+      // at this point.
+      return true;
+    }
+
+    bool visitExistentialMetatypeInst(const ExistentialMetatypeInst *RHS) {
+      // We have already compared the operands/types, so we should have equality
+      // at this point.
+      return true;
+    }
+
     bool visitIndexRawPointerInst(IndexRawPointerInst *RHS) {
       // We have already compared the operands/types, so we should have equality
       // at this point.
@@ -379,6 +391,13 @@ namespace {
       // We already checked operands and types. Only thing we need to check is
       // that the element is the same.
       auto *X = cast<UncheckedEnumDataInst>(LHS);
+      return X->getElement() == RHS->getElement();
+    }
+
+    bool visitEnumIsTagInst(const EnumIsTagInst *RHS) {
+      // We have already compared the operands/types, so we should have equality
+      // at this point.
+      auto *X = cast<EnumIsTagInst>(LHS);
       return X->getElement() == RHS->getElement();
     }
 
@@ -469,6 +488,9 @@ namespace {
       return true;
     }
 
+    bool visitIsNonnullInst(IsNonnullInst *RHS) {
+      return true;
+    }
   private:
     const SILInstruction *LHS;
   };

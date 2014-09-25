@@ -79,6 +79,9 @@ struct SimpleValue {
     case ValueKind::TupleExtractInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::MetatypeInst:
+    case ValueKind::ValueMetatypeInst:
+    case ValueKind::ExistentialMetatypeInst:
+    case ValueKind::ObjCProtocolInst:
     case ValueKind::RefElementAddrInst:
     case ValueKind::IndexRawPointerInst:
     case ValueKind::IndexAddrInst:
@@ -86,12 +89,24 @@ struct SimpleValue {
     case ValueKind::AddressToPointerInst:
     case ValueKind::CondFailInst:
     case ValueKind::EnumInst:
+    case ValueKind::EnumIsTagInst:
     case ValueKind::UncheckedEnumDataInst:
+    case ValueKind::IsNonnullInst:
     case ValueKind::UncheckedRefBitCastInst:
     case ValueKind::UncheckedTrivialBitCastInst:
     case ValueKind::RefToRawPointerInst:
+    case ValueKind::RawPointerToRefInst:
+    case ValueKind::RefToUnownedInst:
+    case ValueKind::UnownedToRefInst:
+    case ValueKind::RefToUnmanagedInst:
+    case ValueKind::UnmanagedToRefInst:
     case ValueKind::UpcastInst:
     case ValueKind::ThickToObjCMetatypeInst:
+    case ValueKind::ObjCToThickMetatypeInst:
+    case ValueKind::UncheckedRefCastInst:
+    case ValueKind::UncheckedAddrCastInst:
+    case ValueKind::ObjCMetatypeToObjectInst:
+    case ValueKind::ObjCExistentialMetatypeToObjectInst:
         return true;
     default:
         return false;
@@ -130,6 +145,10 @@ public:
     return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
 
+  hash_code visitUncheckedAddrCastInst(UncheckedAddrCastInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+  }
+
   hash_code visitFunctionRefInst(FunctionRefInst *X) {
     return llvm::hash_combine(X->getKind(), X->getReferencedFunction());
   }
@@ -159,6 +178,26 @@ public:
   }
 
   hash_code visitRefToRawPointerInst(RefToRawPointerInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
+  hash_code visitRawPointerToRefInst(RawPointerToRefInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
+  hash_code visitUnownedToRefInst(UnownedToRefInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
+  hash_code visitRefToUnownedInst(RefToUnownedInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
+  hash_code visitUnmanagedToRefInst(UnmanagedToRefInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
+  hash_code visitRefToUnmanagedInst(RefToUnmanagedInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand());
   }
 
@@ -212,6 +251,18 @@ public:
     return llvm::hash_combine(X->getKind(), X->getType());
   }
 
+  hash_code visitValueMetatypeInst(ValueMetatypeInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+  }
+
+  hash_code visitExistentialMetatypeInst(ExistentialMetatypeInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType());
+  }
+
+  hash_code visitObjCProtocolInst(ObjCProtocolInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getProtocol());
+  }
+
   hash_code visitIndexRawPointerInst(IndexRawPointerInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getBase(),
                               X->getIndex());
@@ -254,6 +305,32 @@ public:
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
   }
 
+  hash_code visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
+  }
+
+  hash_code visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
+  }
+
+  hash_code visitObjCExistentialMetatypeToObjectInst(
+      ObjCExistentialMetatypeToObjectInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
+  }
+
+  hash_code visitUncheckedRefCastInst(UncheckedRefCastInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
+  }
+
+  hash_code visitEnumIsTagInst(EnumIsTagInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand(),
+                              X->getType(), X->getElement());
+  }
+
+
+  hash_code visitIsNonnullInst(IsNonnullInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
+  }
 };
 } // end anonymous namespace
 

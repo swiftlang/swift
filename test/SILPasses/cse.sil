@@ -707,3 +707,234 @@ bb0(%0 : $*Builtin.Int8):
   %3 = tuple()
   return %3 : $()
 }
+
+// CHECK-LABEL: sil @cse_unchecked_ref_cast
+// CHECK: unchecked_ref_cast
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: return
+sil @cse_unchecked_ref_cast : $@thin (@owned B, Builtin.Int1) -> () {
+bb0(%0: $B, %1: $Builtin.Int1):
+  %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
+  strong_release %5 : $Builtin.NativeObject
+  %13 = cond_br %1, bb1, bb2
+bb1:
+  %22 = br bb2
+bb2:
+  %21 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
+  strong_release %21 : $Builtin.NativeObject
+  %32 = tuple ()
+  %33 = return %32 : $()
+}
+
+// CHECK-LABEL: sil @cse_value_metatype
+// CHECK: value_metatype $@objc_metatype
+// CHECK: objc_metatype_to_object
+// CHECK-NOT: value_metatype $@objc_metatype
+// CHECK: strong_release
+// CHECK: return
+sil @cse_value_metatype : $@thin <T where T : AnyObject> (@owned T) -> @owned (AnyObject,AnyObject) {
+bb0(%0 : $T):
+  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
+  %5 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
+  strong_release %0 : $T
+  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
+  return %9 : $(AnyObject, AnyObject)
+}
+
+
+@objc(XX) protocol XX {
+}
+
+// CHECK-LABEL: sil @cse_existential_metatype
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: objc_existential_metatype_to_object
+// CHECK-NOT: existential_metatype $@objc_metatype
+// CHECK: strong_release
+// CHECK: return
+sil @cse_existential_metatype : $@thin (@owned XX) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : $XX):
+  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
+  %5 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
+  strong_release %0 : $XX
+  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
+  return %7 : $(AnyObject, AnyObject)
+}
+
+// CHECK-LABEL: sil @cse_objc_metatype_to_object
+// CHECK: value_metatype $@objc_metatype
+// CHECK: objc_metatype_to_object
+// CHECK-NOT: value_metatype $@objc_metatype
+// CHECK-NOT: objc_metatype_to_object
+// CHECK: strong_release
+// CHECK: return
+sil @cse_objc_metatype_to_object : $@thin <T where T : AnyObject> (@owned T) -> @owned (AnyObject,AnyObject) {
+bb0(%0 : $T):
+  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
+  %5 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
+  strong_release %0 : $T
+  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
+  return %9 : $(AnyObject, AnyObject)
+}
+
+
+// CHECK-LABEL: sil @cse_objc_existential_metatype_to_object
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: objc_existential_metatype_to_object
+// CHECK-NOT: existential_metatype $@objc_metatype
+// CHECK-NOT: objc_existential_metatype_to_object
+// CHECK: strong_release
+// CHECK: return
+sil @cse_objc_existential_metatype_to_object : $@thin (@owned XX) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : $XX):
+  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
+  %5 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
+  strong_release %0 : $XX
+  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
+  return %7 : $(AnyObject, AnyObject)
+}
+
+
+// CHECK-LABEL: sil @cse_raw_pointer_to_ref
+// CHECK: raw_pointer_to_ref
+// CHECK-NOT: raw_pointer_to_ref
+// CHECK: tuple
+// CHECK: return
+sil @cse_raw_pointer_to_ref : $@thin (Builtin.RawPointer) -> @owned(C,C) {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
+  %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
+  %6 = tuple(%1: $C, %2: $C)
+  return %6 : $(C, C)
+}
+
+// CHECK-LABEL: sil @cse_unchecked_addr_cast
+// CHECK: unchecked_addr_cast
+// CHECK-NOT: unchecked_addr_cast
+// CHECK: struct_element_addr
+// CHECK: tuple
+// CHECK: return
+sil @cse_unchecked_addr_cast : $@thin () -> (Builtin.RawPointer, Builtin.RawPointer) {
+bb0:
+   %1 = alloc_stack $COpaquePointer
+   %2 = unchecked_addr_cast %1#1: $*COpaquePointer to $*UnsafeMutablePointer<AnyObject>
+   %3 = unchecked_addr_cast %1#1: $*COpaquePointer to $*UnsafeMutablePointer<AnyObject>
+   %4 = struct_element_addr %2 : $*UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+   %5 = load %4 : $*Builtin.RawPointer
+   %6 = struct_element_addr %3 : $*UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+   %7 = load %6 : $*Builtin.RawPointer
+   %8 = tuple (%5: $Builtin.RawPointer, %7: $Builtin.RawPointer)
+   dealloc_stack %1#0 : $*@local_storage COpaquePointer
+   return %8: $(Builtin.RawPointer, Builtin.RawPointer)
+}
+
+
+// CHECK-LABEL: sil @cse_ref_to_unowned
+// CHECK: ref_to_unowned
+// CHECK-NOT: ref_to_unowned
+// CHECK: tuple
+// CHECK: return
+sil @cse_ref_to_unowned : $@thin (C) -> (@sil_unowned C, @sil_unowned C) {
+bb0(%0 : $C):
+  %1 = ref_to_unowned %0 : $C to $@sil_unowned C
+  %2 = ref_to_unowned %0 : $C to $@sil_unowned C
+  %3 = tuple (%1: $@sil_unowned C, %2: $@sil_unowned C)
+  return %3: $(@sil_unowned C, @sil_unowned C)
+}
+
+// CHECK-LABEL: sil @cse_unowned_to_ref
+// CHECK: unowned_to_ref
+// CHECK-NOT: unowned_to_ref
+// CHECK: tuple
+// CHECK: return
+sil @cse_unowned_to_ref : $@thin (@sil_unowned C) -> (C, C) {
+bb0(%0 : $@sil_unowned C):
+  %1 = unowned_to_ref %0 : $@sil_unowned C to $C
+  %2 = unowned_to_ref %0 : $@sil_unowned C to $C
+  %3 = tuple (%1: $C, %2: $C)
+  return %3: $(C, C)
+}
+
+// CHECK-LABEL: sil @cse_ref_to_unmanaged
+// CHECK: ref_to_unmanaged
+// CHECK-NOT: ref_to_unmanaged
+// CHECK: tuple
+// CHECK: return
+sil @cse_ref_to_unmanaged : $@thin (C) -> (@sil_unmanaged C, @sil_unmanaged C) {
+bb0(%0 : $C):
+  %1 = ref_to_unmanaged %0 : $C to $@sil_unmanaged C
+  %2 = ref_to_unmanaged %0 : $C to $@sil_unmanaged C
+  %3 = tuple (%1: $@sil_unmanaged C, %2: $@sil_unmanaged C)
+  return %3: $(@sil_unmanaged C, @sil_unmanaged C)
+}
+
+// CHECK-LABEL: sil @cse_unmanaged_to_ref
+// CHECK: unmanaged_to_ref
+// CHECK-NOT: unmanaged_to_ref
+// CHECK: tuple
+// CHECK: return
+sil @cse_unmanaged_to_ref : $@thin (@sil_unmanaged C) -> (C, C) {
+bb0(%0 : $@sil_unmanaged C):
+  %1 = unmanaged_to_ref %0 : $@sil_unmanaged C to $C
+  %2 = unmanaged_to_ref %0 : $@sil_unmanaged C to $C
+  %3 = tuple (%1: $C, %2: $C)
+  return %3: $(C, C)
+}
+
+// CHECK-LABEL: sil @cse_is_nonnull
+// CHECK: is_nonnull
+// CHECK-NOT: is_nonnull
+// CHECK: tuple
+// CHECK: return
+sil @cse_is_nonnull : $@thin (C) -> (Builtin.Int1, Builtin.Int1) {
+bb0(%0 : $C):
+  %1 = is_nonnull %0 : $C
+  %2 = is_nonnull %0 : $C
+  %3 = tuple (%1: $Builtin.Int1, %2: $Builtin.Int1)
+  return %3: $(Builtin.Int1, Builtin.Int1)
+}
+
+enum Enum1 {
+    case Case1
+    case Case2
+}
+
+// CHECK-LABEL: sil @cse_enum_is_tag
+// CHECK: enum_is_tag
+// CHECK-NOT: enum_is_tag
+// CHECK: tuple
+// CHECK: return
+sil @cse_enum_is_tag : $@thin (Enum1) -> (Builtin.Int1, Builtin.Int1) {
+bb0(%0 : $Enum1):
+  %1 = enum_is_tag $Builtin.Int1, %0 : $Enum1, #Enum1.Case1!enumelt
+  %2 = enum_is_tag $Builtin.Int1, %0 : $Enum1, #Enum1.Case1!enumelt
+  %3 = tuple (%1: $Builtin.Int1, %2: $Builtin.Int1)
+  return %3: $(Builtin.Int1, Builtin.Int1)
+}
+
+
+@objc
+class XXX {
+}
+
+// CHECK-LABEL: sil @cse_objc_to_thick_metatype
+// CHECK: objc_to_thick_metatype
+// CHECK-NOT: objc_to_thick_metatype
+// CHECK: tuple
+// CHECK: return
+sil @cse_objc_to_thick_metatype : $@thin (@objc_metatype XXX.Type) -> (@thick XXX.Type, @thick XXX.Type) {
+bb0(%0 : $@objc_metatype XXX.Type):
+  %1 = objc_to_thick_metatype %0 : $@objc_metatype XXX.Type to $@thick XXX.Type
+  %2 = objc_to_thick_metatype %0 : $@objc_metatype XXX.Type to $@thick XXX.Type
+  %3 = tuple (%1: $@thick XXX.Type, %2: $@thick XXX.Type)
+  return %3: $(@thick XXX.Type, @thick XXX.Type)
+}
