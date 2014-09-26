@@ -35,24 +35,34 @@ class EOFCountingGenerator<T> : GeneratorType {
   }
 }
 
+struct ArraySinkOf<T> : SinkType {
+  init() {}
+
+  init(_ array: [T]) {
+    self.array = array
+  }
+
+  mutating func put(x: T) {
+    array.append(x)
+  }
+
+  var array: [T] = []
+}
+
 func checkDecodeUTF<Codec : UnicodeCodecType>(
     codec: Codec.Type, expectedHead: [UInt32],
     expectedRepairedTail: [UInt32], utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {
   if true {
-    var decoded: [UInt32] = []
+    var decoded = ArraySinkOf<UInt32>()
     var g = EOFCountingGenerator(utfStr)
-    transcode(codec, UTF32.self, g,
-        SinkOf {
-          decoded.append($0)
-        },
-        stopOnError: true)
+    transcode(codec, UTF32.self, g, &decoded, stopOnError: true)
     expectGE(1, g.numTimesReturnedEOF)
-    if expectedHead != decoded {
+    if expectedHead != decoded.array {
       return assertionFailure()
           .withDescription("\n")
           .withDescription("expectedHead: \(asHex(expectedHead))\n")
-          .withDescription("actual:       \(asHex(decoded))")
+          .withDescription("actual:       \(asHex(decoded.array))")
     }
   }
 
@@ -60,19 +70,15 @@ func checkDecodeUTF<Codec : UnicodeCodecType>(
     var expected = expectedHead
     expected += expectedRepairedTail
 
-    var decoded: [UInt32] = []
+    var decoded = ArraySinkOf<UInt32>()
     var g = EOFCountingGenerator(utfStr)
-    transcode(codec, UTF32.self, g,
-        SinkOf {
-          decoded.append($0)
-        },
-        stopOnError: false)
+    transcode(codec, UTF32.self, g, &decoded, stopOnError: false)
     expectEqual(1, g.numTimesReturnedEOF)
-    if expected != decoded {
+    if expected != decoded.array {
       return assertionFailure()
           .withDescription("\n")
           .withDescription("expected: \(asHex(expected))\n")
-          .withDescription("actual:   \(asHex(decoded))")
+          .withDescription("actual:   \(asHex(decoded.array))")
     }
   }
 
@@ -103,20 +109,17 @@ func checkDecodeUTF32(
 }
 
 func checkEncodeUTF8(expected: [UInt8], scalars: [UInt32]) -> AssertionResult {
-  var encoded: [UInt8] = []
+  var encoded = ArraySinkOf<UInt8>()
   var g = EOFCountingGenerator(scalars)
-  let hadError = transcode(UTF32.self, UTF8.self, g,
-      SinkOf {
-        encoded.append($0)
-      },
-      stopOnError: true)
+  let hadError =
+    transcode(UTF32.self, UTF8.self, g, &encoded, stopOnError: true)
   expectFalse(hadError)
   expectGE(1, g.numTimesReturnedEOF)
-  if expected != encoded {
+  if expected != encoded.array {
     return assertionFailure()
         .withDescription("\n")
         .withDescription("expected: \(asHex(expected))\n")
-        .withDescription("actual:   \(asHex(encoded))")
+        .withDescription("actual:   \(asHex(encoded.array))")
   }
 
   return assertionSuccess()
@@ -2009,6 +2012,35 @@ UTF8Encoder.test("SmokeTest") {
   }
 }
 
+struct ArraySinkStruct<T> : SinkType {
+  mutating func put(x: T) {
+    array.append(x)
+  }
+  var array: [T] = []
+}
+
+class ArraySinkClass<T> : SinkType {
+  func put(x: T) {
+    array.append(x)
+  }
+  var array: [T] = []
+}
+
+var UnicodeAPIs = TestSuite("UnicodeAPIs")
+
+UnicodeAPIs.test("transcode/MutableSink") {
+  var input: [UInt16] = [ 0x0041, 0x0042 ]
+  var sink = ArraySinkStruct<UInt16>()
+  transcode(UTF16.self, UTF16.self, input.generate(), &sink, stopOnError: true)
+  expectEqual(input, sink.array)
+}
+
+UnicodeAPIs.test("transcode/ReferenceTypedSink") {
+  var input: [UInt16] = [ 0x0041, 0x0042 ]
+  var sink = ArraySinkClass<UInt16>()
+  transcode(UTF16.self, UTF16.self, input.generate(), &sink, stopOnError: true)
+  expectEqual(input, sink.array)
+}
 
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
@@ -2023,15 +2055,12 @@ class NonContiguousNSString : NSString {
   }
 
   convenience init(_ utf8: [UInt8]) {
-    var encoded: [UInt16] = []
+    var encoded = ArraySinkOf<UInt16>()
     var g = utf8.generate()
-    let hadError = transcode(UTF8.self, UTF16.self, g,
-        SinkOf {
-          encoded.append($0)
-        },
-        stopOnError: true)
+    let hadError =
+      transcode(UTF8.self, UTF16.self, g, &encoded, stopOnError: true)
     expectFalse(hadError)
-    self.init(encoded)
+    self.init(encoded.array)
   }
 
   init(_ value: [UInt16]) {
@@ -2040,15 +2069,12 @@ class NonContiguousNSString : NSString {
   }
 
   convenience init(_ scalars: [UInt32]) {
-    var encoded: [UInt16] = []
+    var encoded = ArraySinkOf<UInt16>()
     var g = scalars.generate()
-    let hadError = transcode(UTF32.self, UTF16.self, g,
-        SinkOf {
-          encoded.append($0)
-        },
-        stopOnError: true)
+    let hadError =
+      transcode(UTF32.self, UTF16.self, g, &encoded, stopOnError: true)
     expectFalse(hadError)
-    self.init(encoded)
+    self.init(encoded.array)
   }
 
   @objc override func copyWithZone(zone: NSZone) -> AnyObject {
@@ -2097,20 +2123,16 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
     // CoreFoundation off the ASCII fast path.
     //
     // U+0283 LATIN SMALL LETTER ESH
-    var backingStorage: [UInt16] = [ 0x0283 ]
+    var backingStorage = ArraySinkOf<UInt16>([ 0x0283 ])
     let expected: [UInt8] = [ 0xca, 0x83 ] + test.encoded
 
     var g = test.scalars.generate()
-    transcode(UTF32.self, UTF16.self, g,
-        SinkOf {
-          backingStorage.append($0)
-        },
-        stopOnError: false)
+    transcode(UTF32.self, UTF16.self, g, &backingStorage, stopOnError: false)
 
-    backingStorage.withUnsafeBufferPointer {
+    backingStorage.array.withUnsafeBufferPointer {
       (ptr) -> () in
       let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
-          ptr.baseAddress, backingStorage.count, kCFAllocatorNull)
+          ptr.baseAddress, backingStorage.array.count, kCFAllocatorNull)
       expectFalse(CFStringGetCStringPtr(cfstring,
           CFStringBuiltInEncodings.ASCII.rawValue) != nil)
       expectTrue(CFStringGetCharactersPtr(cfstring) != nil)
@@ -2122,16 +2144,12 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
 
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> () in
-    var expected: [UInt8] = []
+    var expected = ArraySinkOf<UInt8>()
     var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
     var g = expectedScalars.generate()
-    transcode(UTF32.self, UTF8.self, g,
-        SinkOf {
-          expected.append($0)
-        },
-        stopOnError: false)
+    transcode(UTF32.self, UTF8.self, g, &expected, stopOnError: false)
 
-    checkUTF8View(expected, subject, test.loc.withCurrentLoc())
+    checkUTF8View(expected.array, subject, test.loc.withCurrentLoc())
   }
 }
 
@@ -2171,18 +2189,14 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
   for (name, batch) in UTF16Tests {
     println("Batch: \(name)")
     for test in batch {
-      var expected: [UInt8] = []
+      var expected = ArraySinkOf<UInt8>()
       var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
       var g = expectedScalars.generate()
-      transcode(UTF32.self, UTF8.self, g,
-          SinkOf {
-            expected.append($0)
-          },
-          stopOnError: false)
+      transcode(UTF32.self, UTF8.self, g, &expected, stopOnError: false)
 
       var nss = NonContiguousNSString(test.encoded)
       verifyThatStringIsOpaqueForCoreFoundation(nss)
-      checkUTF8View(expected, nss, test.loc.withCurrentLoc())
+      checkUTF8View(expected.array, nss, test.loc.withCurrentLoc())
     }
   }
 }
@@ -2242,31 +2256,23 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
 
 StringCookedViews.test("UTF16") {
   for test in UTF8TestsSmokeTest {
-    var expected: [UInt16] = []
+    var expected = ArraySinkOf<UInt16>()
     var expectedScalars = test.scalars
     var g = expectedScalars.generate()
-    transcode(UTF32.self, UTF16.self, g,
-        SinkOf {
-          expected.append($0)
-        },
-        stopOnError: false)
+    transcode(UTF32.self, UTF16.self, g, &expected, stopOnError: false)
 
     var nss = NonContiguousNSString(test.scalars)
-    checkUTF16View(expected, nss, test.loc.withCurrentLoc())
+    checkUTF16View(expected.array, nss, test.loc.withCurrentLoc())
   }
 
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> () in
-    var expected: [UInt16] = []
+    var expected = ArraySinkOf<UInt16>()
     var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
     var g = expectedScalars.generate()
-    transcode(UTF32.self, UTF16.self, g,
-        SinkOf {
-          expected.append($0)
-        },
-        stopOnError: false)
+    transcode(UTF32.self, UTF16.self, g, &expected, stopOnError: false)
 
-    checkUTF16View(expected, subject, test.loc.withCurrentLoc())
+    checkUTF16View(expected.array, subject, test.loc.withCurrentLoc())
   }
 }
 

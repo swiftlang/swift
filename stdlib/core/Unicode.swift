@@ -691,8 +691,8 @@ public func transcode<
   where InputEncoding.CodeUnit == Input.Element,
       OutputEncoding.CodeUnit == Output.Element>(
   inputEncoding: InputEncoding.Type, outputEncoding: OutputEncoding.Type,
-  var input: Input, var output: Output, #stopOnError: Bool
-) -> (Bool) {
+  var input: Input, inout output: Output, #stopOnError: Bool
+) -> Bool {
 
   // NB.  It is not possible to optimize this routine to a memcpy if
   // InputEncoding == OutputEncoding.  The reason is that memcpy will not
@@ -716,7 +716,7 @@ public func transcode<
       hadError = true
     }
   }
-  return (hadError: hadError)
+  return hadError
 }
 
 /// Transcode UTF-16 to UTF-8, replacing ill-formed sequences with U+FFFD.

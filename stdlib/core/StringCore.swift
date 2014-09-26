@@ -295,7 +295,7 @@ public struct _StringCore {
     Encoding: UnicodeCodecType,
     Output: SinkType
     where Encoding.CodeUnit == Output.Element
-  >(encoding: Encoding.Type, output: Output) 
+  >(encoding: Encoding.Type, inout output: Output)
   {
     if _fastPath(_baseAddress != .null()) {
       if _fastPath(elementWidth == 1) {
@@ -313,7 +313,7 @@ public struct _StringCore {
             start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
             count: count
           ).generate(),
-          output,
+          &output,
           stopOnError: true
         )
         _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
@@ -323,7 +323,7 @@ public struct _StringCore {
       _StringCore(
         _cocoaStringToContiguous(source: cocoaBuffer!, range: 0..<count,
                                  minimumCapacity: 0)
-      ).encode(encoding, output: output)
+      ).encode(encoding, output: &output)
     }
   }
 

@@ -134,9 +134,9 @@ public enum Character :
       _sanityCheck(count <= 4, "Character with more than 4 UTF16 code units")
       self.count = UInt16(count)
       data = 0
-      let dest = UnsafeMutablePointer<UTF16.CodeUnit>(Builtin.addressof(&data))
+      var dest = UnsafeMutablePointer<UTF16.CodeUnit>(Builtin.addressof(&data))
       transcode(
-        UTF8.self, UTF16.self, input.generate(), dest, stopOnError: false)
+        UTF8.self, UTF16.self, input.generate(), &dest, stopOnError: false)
       _fixLifetime(u8)
     }
     

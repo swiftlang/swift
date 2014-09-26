@@ -244,8 +244,8 @@ extension String {
     Encoding: UnicodeCodecType
   >(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
-    self._encode(
-      encoding, output: SinkOf<Encoding.CodeUnit>({ _ in ++codeUnitCount;() }))
+    var output = SinkOf<Encoding.CodeUnit> { _ in ++codeUnitCount;() }
+    self._encode(encoding, output: &output)
     return codeUnitCount
   }
 
@@ -260,9 +260,9 @@ extension String {
     Encoding: UnicodeCodecType,
     Output: SinkType
     where Encoding.CodeUnit == Output.Element
-  >(encoding: Encoding.Type, output: Output)
+  >(encoding: Encoding.Type, inout output: Output)
   {
-    return _core.encode(encoding, output: output)
+    return _core.encode(encoding, output: &output)
   }
 }
 

@@ -68,6 +68,20 @@ grapheme_cluster_break_tests = \
 
 }%
 
+struct ArraySinkOf<T> : SinkType {
+  init() {}
+
+  init(_ array: [T]) {
+    self.array = array
+  }
+
+  mutating func put(x: T) {
+    array.append(x)
+  }
+
+  var array: [T] = []
+}
+
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
 class NonContiguousNSString : NSString {
@@ -86,15 +100,12 @@ class NonContiguousNSString : NSString {
   }
 
   convenience init(_ scalars: [UInt32]) {
-    var encoded: [UInt16] = []
+    var encoded = ArraySinkOf<UInt16>()
     var g = scalars.generate()
-    let hadError = transcode(UTF32.self, UTF16.self, g,
-        SinkOf {
-          encoded.append($0)
-        },
-        stopOnError: true)
+    let hadError =
+      transcode(UTF32.self, UTF16.self, g, &encoded, stopOnError: true)
     expectFalse(hadError)
-    self.init(encoded)
+    self.init(encoded.array)
   }
 
   @objc override func copyWithZone(zone: NSZone) -> AnyObject {
