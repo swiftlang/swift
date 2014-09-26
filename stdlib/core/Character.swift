@@ -123,23 +123,40 @@ public enum Character :
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 
+  internal static func _makeSmallUTF8Generator(var u8: UInt64)
+    -> GeneratorOf<UTF8.CodeUnit> {
+    return GeneratorOf<UTF8.CodeUnit> {
+      let result = UInt8(truncatingBitPattern: u8)
+      if result == 0xFF {
+        return nil
+      }
+      u8 = u8 >> 8
+      return result
+    }
+  }
+
+  internal struct _SmallUTF16Sink : SinkType {
+    mutating func put(x: UTF16.CodeUnit) {
+      u16 = u16 << 16
+      u16 = u16 | UInt64(x)
+    }
+    var u16: UInt64 = 0
+  }
+
   struct _SmallUTF16 : CollectionType {
     init(var _ u8: UInt64) {
-      let input = UnsafeBufferPointer(
-        start: UnsafePointer<UTF8.CodeUnit>(Builtin.addressof(&u8)), 
-        count: Character._smallSize(u8)
-      )
       let count = UTF16.measure(
-          UTF8.self, input: input.generate(), repairIllFormedSequences: true)!.0
+        UTF8.self, input: Character._makeSmallUTF8Generator(u8),
+        repairIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF16 code units")
       self.count = UInt16(count)
-      data = 0
-      var dest = UnsafeMutablePointer<UTF16.CodeUnit>(Builtin.addressof(&data))
+      var output = _SmallUTF16Sink()
       transcode(
-        UTF8.self, UTF16.self, input.generate(), &dest, stopOnError: false)
-      _fixLifetime(u8)
+        UTF8.self, UTF16.self, Character._makeSmallUTF8Generator(u8), &output,
+        stopOnError: false)
+      self.data = output.u16
     }
-    
+
     /// The position of the first element in a non-empty collection.
     ///
     /// Identical to `endIndex` in an empty collection.
@@ -161,10 +178,14 @@ public enum Character :
     /// Requires: `position` is a valid position in `self` and
     /// `position != endIndex`.
     subscript(position: Int) -> UTF16.CodeUnit {
-      var d = data
-      return UnsafePointer<UTF16.CodeUnit>(Builtin.addressof(&d))[position]
+      _sanityCheck(position >= 0)
+      _sanityCheck(position < Int(count))
+      // Note: using unchecked arthmetic because overflow can not happen if the
+      // above sanity checks hold.
+      return UTF16.CodeUnit(
+        truncatingBitPattern: data >> (UInt64(position) &* 16))
     }
-    
+
     /// Return a *generator* over the elements of this *sequence*.
     ///
     /// Complexity: O(1)
