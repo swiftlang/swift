@@ -392,7 +392,6 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
     (_: ())->() in
     for trial in 0..<trials {
       autoreleasepool {
-        println("trial \(trial)")
         _masterThreadOneTrial(sharedState)
       }
     }
