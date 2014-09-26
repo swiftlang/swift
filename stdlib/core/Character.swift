@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal struct IntEncoder : SinkType {
+internal struct _SmallUTF8Sink : SinkType {
   var asInt: UInt64 = 0
   var shift: UInt64 = 0
   mutating func put(x: UTF8.CodeUnit) {
@@ -39,10 +39,10 @@ public enum Character :
 
   /// Construct a `Character` containing just the given `scalar`.
   public init(_ scalar: UnicodeScalar) {
-    var IE  = IntEncoder()
-    UTF8.encode(scalar, output: &IE)
-    IE.asInt |= (~0) << IE.shift
-    self = SmallRepresentation(Builtin.trunc_Int64_Int63(IE.asInt.value))
+    var output = _SmallUTF8Sink()
+    UTF8.encode(scalar, output: &output)
+    output.asInt |= (~0) << output.shift
+    self = SmallRepresentation(Builtin.trunc_Int64_Int63(output.asInt.value))
   }
 
   @effects(readonly)
