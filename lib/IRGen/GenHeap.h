@@ -54,59 +54,6 @@ public:
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
 };
 
-/// A class to manage allocating a reference-counted array on the heap.
-class HeapArrayInfo {
-  SILType ElementType;
-  const TypeInfo &ElementTI;
-  NecessaryBindings Bindings;
-
-public:
-  HeapArrayInfo(IRGenFunction &IGF, SILType T);
-
-  SILType getElementType() const { return ElementType; }
-  const TypeInfo &getElementTypeInfo() const { return ElementTI; }
-
-  struct Layout {
-    /// The offset from the allocation to the first element.
-    llvm::Value *HeaderSize;
-
-    /// The alignment requirement for the array allocation, as a
-    /// bitmask of the bits that cannot be set.
-    llvm::Value *AllocAlignMask;
-
-    /// The most aggressive statically-known alignment
-    /// requirement for the total allocation.
-    Alignment BestStaticAlignment;
-  };
-
-  /// Compute layout for this heap array.  The result is local to a
-  /// particular IGF.
-  Layout getLayout(IRGenFunction &IGF) const;
-
-  /// Returns the size required by the given length.  If 'canOverflow',
-  /// perform overflow checks and produce (size_t) -1 on overflow.
-  llvm::Value *getAllocationSize(IRGenFunction &IGF, const Layout &layout,
-                                 llvm::Value *&length,
-                                 bool canOverflow, bool updateLength) const;
-
-  /// Derive a pointer to the length field of the given allocation.
-  Address getLengthPointer(IRGenFunction &IGF, const Layout &layout,
-                           llvm::Value *alloc) const;
-
-  /// Derive a pointer to the first element of the given allocation.
-  llvm::Value *getBeginPointer(IRGenFunction &IGF, const Layout &layout,
-                               llvm::Value *alloc) const;
-
-  /// Allocate the array without a cleanup.
-  llvm::Value *emitUnmanagedAlloc(IRGenFunction &IGF,
-                                  llvm::Value *length,
-                                  Address &beginPtr,
-                                  const llvm::Twine &name) const;
-
-private:
-  llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
-};
-
 /// Emit a heap object deallocation.
 void emitDeallocateHeapObject(IRGenFunction &IGF,
                               llvm::Value *object,
