@@ -5,13 +5,7 @@ struct Float {}
 struct UnicodeScalar {}
 
 // Minimal implementation to support varargs.
-struct Array<T> {
-  static func convertFromHeapArray(base: Builtin.RawPointer,
-                                   owner: Builtin.NativeObject,
-                                   count: Builtin.Word) -> Array<T> {
-    return Array<T>()
-  }
-}
+struct Array<T> { }
 
 func _allocateUninitializedArray<T>(_: Builtin.Word)
   -> (Array<T>, Builtin.RawPointer) {

@@ -669,24 +669,6 @@ extension ${Self} {
 }
 %end
 
-extension Array {
-  /// This function "seeds" the ArrayLiteralConvertible protocol
-  @effects(readonly)
-  public static func convertFromHeapArray(
-    base: Builtin.RawPointer,
-    owner: Builtin.NativeObject,
-    count: Builtin.Word
-  ) -> Array {
-    let elements = UnsafeBufferPointer(
-      start: unsafeBitCast(base, UnsafeMutablePointer<T>.self),
-      count: unsafeBitCast(count, Int.self)
-    )
-    let r = Array(elements)
-    _fixLifetime(owner)
-    return r
-  }
-}
-
 struct _InitializeMemoryFromCollection<
   C: CollectionType
 > : _PointerFunctionType {
