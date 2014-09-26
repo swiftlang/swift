@@ -46,6 +46,16 @@ public:
 private:
   friend class SILBasicBlock;
   friend class SILModule;
+    
+  enum class InlineState : uint8_t {
+    // The function is not inlined.
+    NotInlined,
+    // The function is inlined (at least once).
+    Inlined,
+    // The function is inlined and dead.
+    // We just need to keep it for debug info generation.
+    Zombie
+  };
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -95,7 +105,8 @@ private:
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
 
-  /// This is the number of uses of this SILFunction.
+  /// This is the number of uses of this SILFunction inside the SIL.
+  /// It does not include references from debug scopes.
   unsigned RefCount = 0;
 
   /// The function's semantics attribute.
@@ -103,6 +114,9 @@ private:
 
   /// The function's effects attribute.
   EffectsKind EK;
+    
+  // The function's state regarding inlining and dead-function removal.
+  InlineState State;
 
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
@@ -164,6 +178,27 @@ public:
       BB.dropAllReferences();
   }
 
+  /// Notify that this function was inlined. This implies that it is still
+  /// needed for debug info generation, even if it is removed afterwards.
+  void markAsInlined() {
+    assert(State != InlineState::Zombie && "Can't inline a zombie function");
+    State = InlineState::Inlined;
+  }
+  
+  /// Returns true if this function was inlined.
+  bool isInlined() const { return State >= InlineState::Inlined; }
+  
+  /// Mark this function as removed from the module's function list, but kept
+  /// as "zombie" for debug info generation.
+  void markAsZombie() {
+    assert(State == InlineState::Inlined &&
+          "Not inlined function should be deleted instead of getting a zombie");
+    State = InlineState::Zombie;
+  }
+  
+  /// Returns true if this function is dead, but kept for debug info generation.
+  bool isZombie() const { return State == InlineState::Zombie; }
+    
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
     return getLoweredFunctionType()->getAbstractCC();

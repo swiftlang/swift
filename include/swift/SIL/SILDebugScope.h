@@ -61,8 +61,8 @@ public:
     : Loc(CalleeScope->Loc), Parent(CalleeScope->Parent),
       InlinedCallSite(CallSiteScope), SILFn(InlinedFn) {
     assert(CallSiteScope && CalleeScope);
-    assert(InlinedFn->getRefCount() > 0 &&
-           "Inlined function will be garbage collected");
+    assert(InlinedFn->isInlined() &&
+           "function of inlined debug scope is not inlined");
   }
 
   void setParent(SILDebugScope *P) { Parent = P; }

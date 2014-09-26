@@ -172,7 +172,7 @@ public:
     To.setDebugScope(ClonedScope);
 
     if (OrigScope->SILFn)
-      To.getModule().markFunctionAsInlined(OrigScope->SILFn);
+      OrigScope->SILFn->markAsInlined();
 }
 
 private:

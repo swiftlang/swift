@@ -104,9 +104,6 @@ SILModule::~SILModule() {
     if (v.getInitializer())
       v.getInitializer()->decrementRefCount();
 
-  for (SILFunction *F : InlinedFunctions)
-    F->decrementRefCount();
-
   // Drop everything functions in this module reference.
   //
   // This is necessary since the functions may reference each other.  We don't
@@ -680,6 +677,27 @@ void SILModule::linkAllVTables() {
 
 void SILModule::invalidateSILLoader() {
   getSILLoader()->invalidateEntry(nullptr);
+}
+
+/// Erase a function from the module.
+void SILModule::eraseFunction(SILFunction *F) {
+  
+  FunctionTable.erase(F->getName());
+
+  assert(! F->isZombie() && "zombie function is in list of alive functions");
+  if (F->isInlined()) {
+    // The function is dead, but as it is inlined we need it later (at IRGen)
+    // for debug info generation. So we move it into the zombie list.
+    getFunctionList().remove(F);
+    zombieFunctions.push_back(F);
+    F->markAsZombie();
+
+    // This opens dead-function-removal opportunities for called functions.
+    // (References are not needed for debug info generation.)
+    F->dropAllReferences();
+  } else {
+    getFunctionList().erase(F);
+  }
 }
 
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {

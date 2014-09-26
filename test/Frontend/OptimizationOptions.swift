@@ -47,8 +47,8 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 
 // In debug mode keep verbose fatal errors.
 // DEBUG-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
-// DEBUG: "Human nature ..."
-// DEBUG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// DEBUG-DAG: "Human nature ..."
+// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
 // DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
 // DEBUG: unreachable
 
@@ -70,8 +70,8 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 
 // In debug mode keep verbose library precondition checks.
 // DEBUG-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
-// DEBUG: "fatal error"
-// DEBUG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// DEBUG-DAG: "fatal error"
+// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
 // DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
 // DEBUG: unreachable
 // DEBUG: return
@@ -95,8 +95,8 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 
 // In debug mode keep verbose partial safety checks.
 // DEBUG-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
-// DEBUG: "fatal error"
-// DEBUG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// DEBUG-DAG: "fatal error"
+// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
 // DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
 // DEBUG: unreachable
 

@@ -461,12 +461,10 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     if (CachedScope != ScopeCache.end())
       return llvm::DIDescriptor(cast<llvm::MDNode>(CachedScope->second));
 
-    assert(DS->SILFn->getRefCount() > 0);
-
     // Force the debug info for the function to be emitted, even if it
     // is external or has been inlined.
     llvm::Function *Fn = nullptr;
-    if (!DS->SILFn->getName().empty())
+    if (!DS->SILFn->getName().empty() && !DS->SILFn->isZombie())
       Fn = IGM.getAddrOfSILFunction(DS->SILFn, NotForDefinition);
     llvm::DIDescriptor SP = emitFunction(*DS->SILFn, Fn, true);
 

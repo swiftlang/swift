@@ -108,12 +108,13 @@ private:
   /// functions so that the destructor of \p functions is called first.
   llvm::StringMap<SILFunction *> FunctionTable;
 
-  /// List of inlined functions referenced by the module.
-  llvm::DenseSet<SILFunction *> InlinedFunctions;
-
   /// The list of SILFunctions in the module.
   FunctionListType functions;
 
+  /// Functions, which are dead (and not in the functions list anymore),
+  /// but kept alive for debug info generation.
+  FunctionListType zombieFunctions;
+  
   /// Lookup table for SIL vtables from class decls.
   llvm::DenseMap<const ClassDecl *, SILVTable *> VTableLookupTable;
 
@@ -193,9 +194,7 @@ public:
   void invalidateSILLoader();
 
   /// Erase a function from the module.
-  void eraseFunction(SILFunction *F) {
-    getFunctionList().erase(F);
-  }
+  void eraseFunction(SILFunction *F);
 
   /// Construct a SIL module from an AST module.
   ///
@@ -362,11 +361,6 @@ public:
                                    IsBare_t isBareSILFunction,
                                    IsTransparent_t isTransparent,
                                    IsFragile_t isFragile);
-
-  void markFunctionAsInlined(SILFunction *Fn) {
-    if (InlinedFunctions.insert(Fn).second)
-      Fn->incrementRefCount();
-  }
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced

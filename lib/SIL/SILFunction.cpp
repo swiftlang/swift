@@ -77,7 +77,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Fragile(isFragile),
     GlobalInitFlag(false),
     InlineStrategy(inlineStrategy),
-    Linkage(unsigned(Linkage)), EK(E) {
+    Linkage(unsigned(Linkage)), EK(E), State(InlineState::NotInlined) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -97,8 +97,6 @@ SILFunction::~SILFunction() {
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
 #endif
-
-  getModule().FunctionTable.erase(Name);
 }
 
 void SILFunction::setDeclContext(Decl *D) {

@@ -499,7 +499,7 @@ class MandatoryInlining : public SILModuleTransform {
       if (isPossiblyUsedExternally(F.getLinkage())) continue;
 
       // Okay, just erase the function from the module.
-      M->getFunctionList().erase(&F);
+      M->eraseFunction(&F);
     }
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::All);
