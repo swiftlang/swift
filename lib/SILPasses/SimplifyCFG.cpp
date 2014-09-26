@@ -256,62 +256,6 @@ static void simplifyCondBranchInst(CondBranchInst *BI, bool BranchTaken) {
   BI->eraseFromParent();
 }
 
-/// Given Term, which is dominated by PredTerm, try simply them if
-/// they are the case where an enum_is_tag is conditionally branching to
-/// a switch_enum_inst on the same enum.
-static bool trySimplifySwitchEnumWithKnownElement(TermInst *Term,
-                                                  TermInst *PredTerm,
-                                                  SILBasicBlock *DomBB) {
-  SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(Term);
-  if (!SEI)
-    return false;
-  CondBranchInst *PredCondBr = dyn_cast<CondBranchInst>(PredTerm);
-  if (!PredCondBr)
-    return false;
-  EnumIsTagInst *EITI = dyn_cast<EnumIsTagInst>(PredCondBr->getCondition());
-  if (!EITI)
-    return false;
-  // Ensure the enum_is_tag and switch_enum are on the same enum
-  if (EITI->getOperand() != SEI->getOperand())
-    return false;
-
-  // We now have:
-  // bb1:
-  // %2 = enum_is_tag %1, EnumElt
-  // cond_br bb2, bb3
-  // ...
-  // bb2 (or 3):
-  // switch_enum_inst %1, ...
-
-  // Now we need to work out which switch case would be taken, based on whether
-  // the enum is of the given tag or not.
-  bool BranchTaken = getBranchTaken(PredCondBr, DomBB);
-  if (BranchTaken) {
-    // The switch is taken when the cond_br is true, ie, we know we matched
-    // a tag.
-    simplifySwitchEnumInst(SEI, EITI->getElement(), DomBB);
-    return true;
-  }
-  // We jump to the switch when we don't pass enum_is_tag.  It may be possible
-  // to work out which specific case this means for the switch.
-  if (SEI->getNumCases() == 2 && !SEI->hasDefault()) {
-    // For now, just handle the case where the enum has only 2 tags.  That way
-    // as we didn't match one of them, we must have matched the other one.
-    const auto &Case0 = SEI->getCase(0);
-    const auto &Case1 = SEI->getCase(1);
-    auto *OtherElt = Case0.first == EITI->getElement() ? Case1.first :
-                                                         Case0.first;
-    // This code assumes that the switch covers all cases.  If that was ever to
-    // change, then this assert will fire.
-    assert((OtherElt == Case0.first || OtherElt == Case1.first) &&
-           "Switches aren't covered");
-    simplifySwitchEnumInst(SEI, OtherElt, DomBB);
-    return true;
-  }
-  // TODO: Other cases.
-  return false;
-}
-
 /// Returns true if C1, C2 represent equivalent conditions.
 ///
 /// TODO: Could we use SILInstruction::isIdenticalTo here?

@@ -602,30 +602,6 @@ static bool recursivelyCollectARCUsers(UserListTy &Uses, SILInstruction *Inst) {
   return true;
 }
 
-/// \brief Returns a list of instructions that only write into
-// / the the array \p Inst.
-static bool recursivelyCollectArrayWritesInstr(UserListTy &Uses,
-                                               SILInstruction *Inst) {
-  Uses.push_back(Inst);
-  for (auto Op : Inst->getUses()) {
-    if (isa<RefCountingInst>(Op->getUser()) ||
-        // The store must not store the array but only to the array.
-        (isa<StoreInst>(Op->getUser()) &&
-         dyn_cast<StoreInst>(Op->getUser())->getSrc().getDef() != Inst) ||
-        isa<DebugValueInst>(Op->getUser())) {
-      Uses.push_back(Op->getUser());
-      continue;
-    }
-    if (auto SI = dyn_cast<IndexAddrInst>(Op->getUser()))
-      if (recursivelyCollectArrayWritesInstr(Uses, SI))
-        continue;
-
-    return false;
-  }
-
-  return true;
-}
-
 /// This is a helper class that performs optimization of string literals
 /// concatenation.
 class StringConcatenationOptimizer {
@@ -992,19 +968,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                             m_ValueBase(), m_IntegerLiteralInst()))) {
     AI->swapOperands(1, 2);
     return AI;
-  }
-
-  return nullptr;
-}
-
-SILInstruction *SILCombiner::visitAllocArrayInst(AllocArrayInst *AAI) {
-  UserListTy Users;
-  // If the array alloc is only written into then it can be removed.
-  if (recursivelyCollectArrayWritesInstr(Users, AAI)) {
-    // Erase all of the reference counting instructions and the array
-    // allocation instruction.
-    for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
-      eraseInstFromFunction(**rit);
   }
 
   return nullptr;

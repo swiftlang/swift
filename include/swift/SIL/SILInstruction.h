@@ -349,37 +349,6 @@ public:
   }
 };
 
-
-/// AllocArrayInst - This represents the allocation of an array of elements,
-/// whose element memory is left uninitialized.  This returns two values.  The
-/// first return element is the object pointer (pointer to the object
-/// header) with Builtin.NativeObject type.  The second element returned is an
-/// lvalue to the first array element.
-///
-class AllocArrayInst : public AllocationInst {
-  enum {
-    NumElements
-  };
-  FixedOperandList<1> Operands;
-public:
-
-  AllocArrayInst(SILLocation Loc, SILType ElementType, SILValue NumElements,
-                 SILFunction &F);
-
-  SILType getElementType() const {
-    return getType(1).getObjectType();
-  }
-  SILValue getNumElements() const { return Operands[NumElements].get(); }
-
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::AllocArrayInst;
-  }
-};
-
 /// ApplyInst - Represents the full application of a function value.
 class ApplyInst : public SILInstruction {
   enum {

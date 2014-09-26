@@ -1131,7 +1131,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("alloc_box", ValueKind::AllocBoxInst)
-    .Case("alloc_array", ValueKind::AllocArrayInst)
     .Case("address_to_pointer", ValueKind::AddressToPointerInst)
     .Case("alloc_stack", ValueKind::AllocStackInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
@@ -1484,15 +1483,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     if (parseSILType(Ty)) return true;
     ResultVal = B.createAllocBox(InstLoc, Ty);
-    break;
-  }
-  case ValueKind::AllocArrayInst: {
-    SILType Ty;
-    if (parseSILType(Ty) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseTypedValueRef(Val))
-      return true;
-    ResultVal = B.createAllocArray(InstLoc, Ty, Val);
     break;
   }
   case ValueKind::ApplyInst:

@@ -52,7 +52,7 @@
 		    font-lock-keyword-face)
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
-                    "alloc_array" "dealloc_stack" "dealloc_box" "dealloc_ref")
+                    "dealloc_stack" "dealloc_box" "dealloc_ref")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Debug Information.
    `(,(regexp-opt '("debug_value" "debug_value_addr")

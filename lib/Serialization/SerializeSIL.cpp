@@ -392,8 +392,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::DeallocBoxInst:
   case ValueKind::ValueMetatypeInst:
-  case ValueKind::ExistentialMetatypeInst:
-  case ValueKind::AllocArrayInst: {
+  case ValueKind::ExistentialMetatypeInst: {
     SILValue operand;
     SILType Ty;
     switch (SI.getKind()) {
@@ -409,10 +408,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::DeallocBoxInst:
       operand = cast<DeallocBoxInst>(&SI)->getOperand();
       Ty = cast<DeallocBoxInst>(&SI)->getElementType();
-      break;
-    case ValueKind::AllocArrayInst:
-      operand = cast<AllocArrayInst>(&SI)->getNumElements();
-      Ty = cast<AllocArrayInst>(&SI)->getElementType();
       break;
     }
     unsigned abbrCode = SILAbbrCodes[SILOneTypeOneOperandLayout::Code];

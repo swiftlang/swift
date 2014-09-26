@@ -178,7 +178,6 @@ public:
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
-  SILInstruction *visitAllocArrayInst(AllocArrayInst *AAI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);

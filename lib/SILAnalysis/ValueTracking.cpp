@@ -50,7 +50,6 @@ static bool isNoReadApplyInst(SILValue V) {
 /// escape?
 static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   switch (Inst->getKind()) {
-  case ValueKind::AllocArrayInst:
   case ValueKind::AllocBoxInst:
   case ValueKind::AllocRefInst:
   case ValueKind::AllocRefDynamicInst:

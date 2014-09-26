@@ -1383,8 +1383,8 @@ can be ``capture``-d and alias. Swift, however, is memory-safe and statically
 typed, so aliasing of classes is constrained by the type system as follows:
 
 * A ``Builtin.ObjectPointer`` may alias any native Swift heap object,
-  including a Swift class instance, a box allocated by ``alloc_box``, an array
-  allocated by ``alloc_array``, or a thick function's closure context.
+  including a Swift class instance, a box allocated by ``alloc_box``,
+  or a thick function's closure context.
   It may not alias natively Objective-C class instances.
 * A ``Builtin.ObjCPointer`` may alias any class instance, whether Swift or
   Objective-C, but may not alias non-class-instance heap objects.
@@ -1512,30 +1512,6 @@ count of zero destroys the contained value as if by ``destroy_addr``.
 Releasing a box is undefined behavior if the box's value is uninitialized.
 To deallocate a box whose value has not been initialized, ``dealloc_box``
 should be used.
-
-alloc_array
-```````````
-::
-  
-  sil-instruction ::= 'alloc_array' sil-type ',' sil-operand
-  
-  %1 = alloc_array $T, %0 : Builtin.Int<n>
-  // $T must be a type
-  // %0 must be of a builtin integer type
-  // %1 has two values:
-  //   %1#0 has type Builtin.ObjectPointer
-  //   %1#1 has type *T
-
-Allocates a box large enough to hold an array of ``%0`` values of type ``T``.
-The result of the instruction is a two-value operand; the first value is the
-reference-counted ``ObjectPointer`` that owns the box,
-and the second value is the address of the first value inside the box.
-The box will be initialized with a retain count of 1; the storage will be
-uninitialized. The box owns the contained array of values, and releasing it
-to a retain count of zero destroys all of the contained values as if by
-``destroy_addr``. Releasing the array is thus invalid unless all of the array's
-value have been uninitialized. To deallocate a box
-whose value has not been initialized, ``dealloc_box`` should be used.
 
 dealloc_stack
 `````````````
@@ -1844,13 +1820,12 @@ index_addr
 
 Given an address that references into an array of values, returns the address
 of the ``%1``-th element relative to ``%0``. The address must reference into
-a contiguous array, produced by ``alloc_array`` or by an external function. It
-is undefined to try to reference offsets within a non-array value, such as
-fields within a homogeneous struct or tuple type, or bytes within a value,
-using ``index_addr``. (``Int8`` address types have no special behavior in this
-regard, unlike ``char*`` or ``void*`` in C.) It is also undefined behavior to
-index out of bounds of an array, except to index the "past-the-end" address of
-the array.
+a contiguous array. It is undefined to try to reference offsets within a
+non-array value, such as fields within a homogeneous struct or tuple type, or
+bytes within a value, using ``index_addr``. (``Int8`` address types have no
+special behavior in this regard, unlike ``char*`` or ``void*`` in C.) It is
+also undefined behavior to index out of bounds of an array, except to index
+the "past-the-end" address of the array.
 
 index_raw_pointer
 `````````````````

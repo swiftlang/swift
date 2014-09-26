@@ -455,8 +455,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK: strong_release
 sil @release_can_decrement_other_releases  : $@thin () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Word, 0
-  %1 = alloc_array $Builtin.Int32, %0 : $Builtin.Word
+  %1 = alloc_box $Builtin.Int32
   %2 = alloc_stack $Builtin.NativeObject
   store %1#0 to %2#1 : $*Builtin.NativeObject
   %4 = function_ref @user : $@thin (Builtin.NativeObject) -> ()

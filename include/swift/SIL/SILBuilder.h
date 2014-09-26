@@ -188,13 +188,6 @@ public:
                     AllocBoxInst(Loc, ElementType, F));
   }
 
-  AllocArrayInst *createAllocArray(SILLocation Loc, SILType ElementType,
-                                   SILValue NumElements) {
-    Loc.markAsPrologue();
-    return insert(new (F.getModule())
-                    AllocArrayInst(Loc, ElementType, NumElements, F));
-  }
-
   ApplyInst *createApply(SILLocation Loc, SILValue Fn,
                          SILType SubstFnTy,
                          SILType Result,

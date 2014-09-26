@@ -612,11 +612,6 @@ public:
       OS << "  // " << (vd->isLet() ? "let " : "var ") << vd->getName();
   }
 
-  void visitAllocArrayInst(AllocArrayInst *AAI) {
-    OS << "alloc_array " << AAI->getElementType()
-       << ", " << getIDAndType(AAI->getNumElements());
-  }
-  
   void printSubstitutions(ArrayRef<Substitution> Subs) {
     if (Subs.empty())
       return;

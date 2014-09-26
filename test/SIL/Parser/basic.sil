@@ -48,8 +48,6 @@ bb0:                                  // CHECK: bb0:
 bb1:
   %b = alloc_box $Int               // CHECK:   %2 = alloc_box $Int
   %c = integer_literal $Builtin.Word, 1
-  // CHECK: alloc_array $String, %{{.*}} : $Builtin.Word
-  %d = alloc_array $String, %c : $Builtin.Word
   // CHECK: integer_literal $Builtin.Word, -1
   %e = integer_literal $Builtin.Word, -1
   return %0 : $()                     // CHECK:   return %0 : $()

@@ -300,7 +300,6 @@ static InlineCost instructionInlineCost(SILInstruction &I,
       return InlineCost::Expensive;
     }
 
-    case ValueKind::AllocArrayInst:
     case ValueKind::AllocBoxInst:
     case ValueKind::AllocRefInst:
     case ValueKind::AllocRefDynamicInst:

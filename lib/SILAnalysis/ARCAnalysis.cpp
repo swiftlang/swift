@@ -204,7 +204,6 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   case ValueKind::AllocRefInst:
   case ValueKind::AllocRefDynamicInst:
   case ValueKind::AllocBoxInst:
-  case ValueKind::AllocArrayInst:
   case ValueKind::MetatypeInst:
   case ValueKind::WitnessMethodInst:
     return true;

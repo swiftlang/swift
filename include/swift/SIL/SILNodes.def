@@ -68,8 +68,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(AllocRefInst, AllocationInst, None)
     INST(AllocRefDynamicInst, AllocationInst, None)
     INST(AllocBoxInst, AllocationInst, None)
-    INST(AllocArrayInst, AllocationInst, None)
-    VALUE_RANGE(AllocationInst, AllocStackInst, AllocArrayInst)
+    VALUE_RANGE(AllocationInst, AllocStackInst, AllocBoxInst)
 
   // Deallocation instructions.
   ABSTRACT_VALUE(DeallocationInst, SILInstruction)

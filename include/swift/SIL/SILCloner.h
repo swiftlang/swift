@@ -331,15 +331,6 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitAllocArrayInst(AllocArrayInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createAllocArray(getOpLocation(Inst->getLoc()),
-                                  getOpType(Inst->getElementType()),
-                                  getOpValue(Inst->getNumElements())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArguments());
   doPostProcess(Inst,

@@ -684,7 +684,6 @@ static bool isTypedAccessOracle(SILInstruction *I) {
   case ValueKind::StoreInst:
   case ValueKind::AllocStackInst:
   case ValueKind::AllocBoxInst:
-  case ValueKind::AllocArrayInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocBoxInst:
     return true;

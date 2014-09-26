@@ -561,7 +561,6 @@ public:
   void visitAllocRefInst(AllocRefInst *i);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
-  void visitAllocArrayInst(AllocArrayInst *i);
 
   void visitApplyInst(ApplyInst *i);
   void visitPartialApplyInst(PartialApplyInst *i);
@@ -2619,21 +2618,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
        emitShadowCopy(addr.getAddress(), Name), DebugTypeInfo(Decl, type),
        i->getDebugScope(), Name, Indirection);
   }
-}
-
-void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
-  SILValue boxValue(i, 0);
-  SILValue ptrValue(i, 1);
-  
-  Explosion lengthEx = getLoweredExplosion(i->getNumElements());
-  llvm::Value *lengthValue = lengthEx.claimNext();
-  HeapArrayInfo arrayInfo(*this, i->getElementType());
-  Address ptr;
-  llvm::Value *box = arrayInfo.emitUnmanagedAlloc(*this, lengthValue, ptr, "");
-  Explosion boxEx;
-  boxEx.add(box);
-  setLoweredExplosion(boxValue, boxEx);
-  setLoweredAddress(ptrValue, ptr);
 }
 
 void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
