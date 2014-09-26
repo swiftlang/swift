@@ -348,10 +348,6 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
 
-  Expr *buildArrayInjectionFnRef(DeclContext *dc,
-                                 ArraySliceType *sliceType,
-                                 Type lenTy, SourceLoc Loc);
-
   /// \brief Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
   Type resolveIdentifierType(DeclContext *DC,

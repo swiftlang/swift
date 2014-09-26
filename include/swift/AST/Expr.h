@@ -2104,9 +2104,8 @@ private:
   /// gets the default initializer for that tuple element value.
   ArrayRef<int> ElementMapping;
 
-  /// If we're doing a varargs shuffle, this is the function to build the
-  /// destination slice type.
-  Expr *InjectionFn;
+  /// If we're doing a varargs shuffle, this is the array type to build.
+  Type VarargsArrayTy;
 
   /// If there are any default arguments, the owning function
   /// declaration.
@@ -2119,21 +2118,21 @@ public:
                    ConcreteDeclRef defaultArgsOwner,
                    MutableArrayRef<Expr *> CallerDefaultArgs, Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
-      ElementMapping(elementMapping), InjectionFn(nullptr),
+      ElementMapping(elementMapping), VarargsArrayTy(),
       DefaultArgsOwner(defaultArgsOwner), CallerDefaultArgs(CallerDefaultArgs)
   {
   }
 
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
 
-  /// Set the injection function expression to use.
-  void setVarargsInjectionFunction(Expr *fn) { InjectionFn = fn; }
-  Expr *getVarargsInjectionFunction() const {
-    assert(InjectionFn != nullptr);
-    return InjectionFn;
+  /// Set the varargs array type to use.
+  void setVarargsArrayType(Type T) { VarargsArrayTy = T; }
+  Type getVarargsArrayType() const {
+    assert(!VarargsArrayTy.isNull());
+    return VarargsArrayTy;
   }
-  Expr *getVarargsInjectionFunctionOrNull() const {
-    return InjectionFn;
+  Type getVarargsArrayTypeOrNull() const {
+    return VarargsArrayTy;
   }
 
   /// Retrieve the owner of the default arguments.
@@ -2415,9 +2414,8 @@ public:
   typedef llvm::PointerUnion<Expr *, ConcreteDeclRef> Element;
 
 private:
-  /// If we're doing a varargs shuffle, this is the function to build the
-  /// destination slice type.
-  Expr *InjectionFn;
+  /// If we're doing a varargs shuffle, this is the array type to build.
+  Type VarargsArrayTy;
 
   /// The elements of the destination tuple.
   MutableArrayRef<Element> Elements;
@@ -2425,15 +2423,15 @@ private:
 public:
   ScalarToTupleExpr(Expr *subExpr, Type type,
                     MutableArrayRef<Element> elements,
-                    Expr *InjectionFn = nullptr)
+                    Type VarargsArrayTy = nullptr)
     : ImplicitConversionExpr(ExprKind::ScalarToTuple, subExpr, type),
-      InjectionFn(InjectionFn), Elements(elements) {}
+      VarargsArrayTy(VarargsArrayTy), Elements(elements) {}
 
   /// Retrieve the index of the scalar field within the destination tuple.
   unsigned getScalarField() const;
 
-  /// Retrieve the expression that refers to the injection function.
-  Expr *getVarargsInjectionFunction() { return InjectionFn; }
+  /// Retrieve the array type for the variadic part of the tuple.
+  Type getVarargsArrayType() { return VarargsArrayTy; }
 
   /// Retrieve the elements of the destination tuple.
   MutableArrayRef<Element> getElements() { return Elements; }

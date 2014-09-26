@@ -89,56 +89,6 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   return E;
 }
 
-/// Is the given expression a valid thing to use as the injection
-/// function from the data for a newly-allocated array into the
-/// given slice type?
-Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
-                                            ArraySliceType *sliceType,
-                                            Type lenTy, SourceLoc Loc) {
-  // TODO: Hijack this entry point to require the new array literal intrinsic.
-  // Doing so should supplant the other logic here.
-  requireArrayLiteralIntrinsics(Loc);
-  
-  // Build the expression "Array<T>".
-  // FIXME: Bogus location info.
-  Expr *sliceTypeRef = TypeExpr::createImplicitHack(Loc, sliceType, Context);
-
-  // Build the expression "Array<T>.convertFromHeapArray".
-  Expr *injectionFn = new (Context) UnresolvedDotExpr(
-                                      sliceTypeRef, Loc,
-                                  Context.getIdentifier("convertFromHeapArray"),
-                                      Loc, /*Implicit=*/true);
-  if (typeCheckExpressionShallow(injectionFn, dc))
-    return nullptr;
-
-  // The input is a tuple type:
-  TupleTypeElt argTypes[3] = {
-    // The first element is Builtin.RawPointer.
-    // FIXME: this should probably be UnsafeMutablePointer<T>.
-    Context.TheRawPointerType,
-
-    // The second element is the owner pointer, Builtin.NativeObject.
-    Context.TheNativeObjectType,
-
-    // The third element is the bound type.  Maybe this should be a
-    // target-specific size_t type?
-    lenTy
-  };
-
-  Type input = TupleType::get(argTypes, Context);
-
-  // The result is just the slice type.
-  Type result = sliceType;
-
-  FunctionType *fnTy = FunctionType::get(input, result);
-
-  // FIXME: this produces terrible diagnostics.
-  if (convertToType(injectionFn, fnTy, dc))
-    return nullptr;
-
-  return injectionFn;
-}
-
 /// Precedences for intrinsic operators.
 namespace {
   namespace IntrinsicPrecedences {

@@ -2136,10 +2136,8 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
                                 SILLocation loc,
                                 Type baseTy,
                                 ArrayRef<ManagedValue> elements,
-                                Expr *VarargsInjectionFn) {
+                                Type arrayTy) {
   // Reabstract the base type against the array element type.
-  Type arrayTy = VarargsInjectionFn->getType()->castTo<FunctionType>()
-                   ->getResult();
   AbstractionPattern baseAbstraction(
     arrayTy->getNominalOrBoundGenericNominal()
            ->getGenericParams()->getPrimaryArchetypes()[0]);
@@ -2446,8 +2444,8 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     // into the varargs portion of this, which is then constructed into an Array
     // through an informal protocol captured by the InjectionFn in the
     // TupleShuffleExpr.
-    assert(E->getVarargsInjectionFunction() &&
-           "no injection function for varargs tuple?!");
+    assert(E->getVarargsArrayTypeOrNull() &&
+           "no injection type for varargs tuple?!");
     SmallVector<ManagedValue, 4> variadicValues;
     
     while (shuffleIndexIterator != shuffleIndexEnd) {
@@ -2458,7 +2456,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     
     ManagedValue varargs = emitVarargs(SGF, E, field.getVarargBaseTy(),
                                        variadicValues,
-                                       E->getVarargsInjectionFunction());
+                                       E->getVarargsArrayType());
     result.addElement(RValue(SGF, E, field.getType()->getCanonicalType(),
                              varargs));
     break;
@@ -2492,7 +2490,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     // Otherwise, create the vararg and store it to the vararg field.
     ManagedValue scalar = gen.emitRValueAsSingleValue(E->getSubExpr());
     ManagedValue varargs = emitVarargs(gen, E, E->getSubExpr()->getType(),
-                                       scalar,E->getVarargsInjectionFunction());
+                                       scalar, E->getVarargsArrayType());
     varargs.forwardInto(gen, E, scalarInit->getAddress());
     scalarInit->finishInitialization(gen);
   }
@@ -2507,7 +2505,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
       assert(i == e - 1 && "vararg isn't last?!");
       ManagedValue varargs = emitVarargs(gen, E,
                                          outerFields[i].getVarargBaseTy(),
-                                         {}, E->getVarargsInjectionFunction());
+                                         {}, E->getVarargsArrayType());
       varargs.forwardInto(gen, E, subInitializations[i]->getAddress());
       subInitializations[i]->finishInitialization(gen);
       continue;
@@ -2565,10 +2563,10 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
       if (!scalar.isUsed())
         varargs = emitVarargs(SGF, E, outerFields[i].getVarargBaseTy(),
                               std::move(scalar).getAsSingleValue(SGF, E),
-                              E->getVarargsInjectionFunction());
+                              E->getVarargsArrayType());
       else
         varargs = emitVarargs(SGF, E, outerFields[i].getVarargBaseTy(),
-                              {}, E->getVarargsInjectionFunction());
+                              {}, E->getVarargsArrayType());
       result.addElement(RValue(SGF, E,
                                outerFields[i].getType()->getCanonicalType(),
                                varargs));

@@ -3278,7 +3278,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   }
 
   // Convert all of the variadic arguments to the destination type.
-  Expr *injectionFn = nullptr;
+  ArraySliceType *arrayType = nullptr;
   if (hasVarArg) {
     Type toEltType = toTuple->getFields().back().getVarargBaseTy();
     for (int fromFieldIdx : variadicArgs) {
@@ -3321,15 +3321,10 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     }
 
     // Find the appropriate injection function.
-    ArraySliceType *sliceType
-      = cast<ArraySliceType>(
-          toTuple->getFields().back().getType().getPointer());
-    Type boundType = BuiltinIntegerType::getWordType(tc.Context);
-    injectionFn = tc.buildArrayInjectionFnRef(dc,
-                                              sliceType, boundType,
-                                              expr->getStartLoc());
-    if (!injectionFn)
+    if (tc.requireArrayLiteralIntrinsics(expr->getStartLoc()))
       return nullptr;
+    arrayType = cast<ArraySliceType>(
+          toTuple->getFields().back().getType().getPointer());
   }
 
   // Compute the updated 'from' tuple type, since we may have
@@ -3363,7 +3358,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                                    defaultArgsOwner,
                                                    callerDefaultArgsCopy,
                                                    toSugarType);
-  shuffle->setVarargsInjectionFunction(injectionFn);
+  shuffle->setVarargsArrayType(arrayType);
   return shuffle;
 }
 
@@ -3375,18 +3370,13 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   auto &tc = solution.getConstraintSystem().getTypeChecker();
 
   // If the destination type is variadic, compute the injection function to use.
-  Expr *injectionFn = nullptr;
+  Type arrayType = nullptr;
   const auto &lastField = toTuple->getFields().back();
 
   if (lastField.isVararg()) {
     // Find the appropriate injection function.
-    ArraySliceType *sliceType
-      = cast<ArraySliceType>(lastField.getType().getPointer());
-    Type boundType = BuiltinIntegerType::getWordType(tc.Context);
-    injectionFn = tc.buildArrayInjectionFnRef(dc,
-                                              sliceType, boundType,
-                                              expr->getStartLoc());
-    if (!injectionFn)
+    arrayType = cast<ArraySliceType>(lastField.getType().getPointer());
+    if (tc.requireArrayLiteralIntrinsics(expr->getStartLoc()))
       return nullptr;
   }
 
@@ -3491,7 +3481,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
   return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy,
                                             tc.Context.AllocateCopy(elements),
-                                            injectionFn);
+                                            arrayType);
 }
 
 /// Collect the conformances for all the protocols of an existential type.
@@ -3736,7 +3726,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   SmallVector<ScalarToTupleExpr::Element, 4> scalarToTupleElements;
   SmallVector<Expr *, 2> callerDefaultArgs;
   ConcreteDeclRef defaultArgsOwner = nullptr;
-  Expr *injectionFn = nullptr;
+  Type sliceType = nullptr;
   SmallVector<int, 4> sources;
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx) {
@@ -3754,14 +3744,9 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
       }
 
       // Find the appropriate injection function.
-      ArraySliceType *sliceType
-        = cast<ArraySliceType>(param.getType().getPointer());
-      Type boundType = BuiltinIntegerType::getWordType(tc.Context);
-      injectionFn = tc.buildArrayInjectionFnRef(cs.DC,
-                                                sliceType, boundType,
-                                                arg->getStartLoc());
-      if (!injectionFn)
+      if (tc.requireArrayLiteralIntrinsics(arg->getStartLoc()))
         return nullptr;
+      sliceType = cast<ArraySliceType>(param.getType().getPointer());
 
       // Record this parameter.
       toSugarFields.push_back(param);
@@ -3887,7 +3872,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   if (!argTuple && isa<TupleType>(paramType.getPointer())) {
     auto elements = tc.Context.AllocateCopy(scalarToTupleElements);
     return new (tc.Context) ScalarToTupleExpr(arg, paramType, elements,
-                                              injectionFn);
+                                              sliceType);
   }
 
   // If we don't have to shuffle anything, we're done.
@@ -3901,7 +3886,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
                                                    defaultArgsOwner,
                                                    callerDefaultArgsCopy,
                                                    paramType);
-  shuffle->setVarargsInjectionFunction(injectionFn);
+  shuffle->setVarargsArrayType(sliceType);
   return shuffle;
 }
 
