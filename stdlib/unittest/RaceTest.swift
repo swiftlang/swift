@@ -204,6 +204,82 @@ public func == (lhs: Observation4Word, rhs: Observation4Word) -> Bool {
     lhs.w4 == rhs.w4
 }
 
+/// An observation result that consists of five `Word`\ s.
+public struct Observation5Word : Equatable, Printable {
+  public var w1: Word
+  public var w2: Word
+  public var w3: Word
+  public var w4: Word
+  public var w5: Word
+
+  public init(_ w1: Word, _ w2: Word, _ w3: Word, _ w4: Word, _ w5: Word) {
+    self.w1 = w1
+    self.w2 = w2
+    self.w3 = w3
+    self.w4 = w4
+    self.w5 = w5
+  }
+
+  public var description: String {
+    return "(\(w1), \(w2), \(w3), \(w4), \(w5))"
+  }
+}
+
+public func == (lhs: Observation5Word, rhs: Observation5Word) -> Bool {
+  return
+    lhs.w1 == rhs.w1 &&
+    lhs.w2 == rhs.w2 &&
+    lhs.w3 == rhs.w3 &&
+    lhs.w4 == rhs.w4 &&
+    lhs.w5 == rhs.w5
+}
+
+/// An observation result that consists of nine `Word`\ s.
+public struct Observation9Word : Equatable, Printable {
+  public var w1: Word
+  public var w2: Word
+  public var w3: Word
+  public var w4: Word
+  public var w5: Word
+  public var w6: Word
+  public var w7: Word
+  public var w8: Word
+  public var w9: Word
+
+  public init(
+    _ w1: Word, _ w2: Word, _ w3: Word, _ w4: Word,
+    _ w5: Word, _ w6: Word, _ w7: Word, _ w8: Word,
+    _ w9: Word
+  ) {
+    self.w1 = w1
+    self.w2 = w2
+    self.w3 = w3
+    self.w4 = w4
+    self.w5 = w5
+    self.w6 = w6
+    self.w7 = w7
+    self.w8 = w8
+    self.w9 = w9
+  }
+
+  public var description: String {
+    return "(\(w1), \(w2), \(w3), \(w4), \(w5), \(w6), \(w7), \(w8), \(w9))"
+  }
+}
+
+public func == (lhs: Observation9Word, rhs: Observation9Word) -> Bool {
+  return
+    lhs.w1 == rhs.w1 &&
+    lhs.w2 == rhs.w2 &&
+    lhs.w3 == rhs.w3 &&
+    lhs.w4 == rhs.w4 &&
+    lhs.w5 == rhs.w5 &&
+    lhs.w6 == rhs.w6 &&
+    lhs.w7 == rhs.w7 &&
+    lhs.w8 == rhs.w8 &&
+    lhs.w9 == rhs.w9
+}
+
 /// A helper that is useful to implement
 /// `RaceTestWithPerTrialDataType.evaluateObservations()` in race tests.
 public func evaluateObservationsAllEqual<T : Equatable>(observations: [T])
