@@ -149,33 +149,35 @@ static LValueTypeData getMemberTypeData(SILGenFunction &gen,
 
 /// SILGenLValue - An ASTVisitor for building logical lvalues.
 class LLVM_LIBRARY_VISIBILITY SILGenLValue
-  : public Lowering::ExprVisitor<SILGenLValue, LValue>
+  : public Lowering::ExprVisitor<SILGenLValue, LValue, AccessKind>
 {
 public:
   SILGenFunction &gen;
   SILGenLValue(SILGenFunction &gen) : gen(gen) {}
   
-  LValue visitRec(Expr *e);
+  LValue visitRec(Expr *e, AccessKind accessKind);
   
   /// Dummy handler to log unimplemented nodes.
-  LValue visitExpr(Expr *e);
+  LValue visitExpr(Expr *e, AccessKind accessKind);
 
   // Nodes that form the root of lvalue paths
-  LValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *e);
-  LValue visitDeclRefExpr(DeclRefExpr *e);
+  LValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
+                                    AccessKind accessKind);
+  LValue visitDeclRefExpr(DeclRefExpr *e, AccessKind accessKind);
 
   // Nodes that make up components of lvalue paths
   
-  LValue visitMemberRefExpr(MemberRefExpr *e);
-  LValue visitSubscriptExpr(SubscriptExpr *e);
-  LValue visitTupleElementExpr(TupleElementExpr *e);
-  LValue visitForceValueExpr(ForceValueExpr *e);
-  LValue visitBindOptionalExpr(BindOptionalExpr *e);
+  LValue visitMemberRefExpr(MemberRefExpr *e, AccessKind accessKind);
+  LValue visitSubscriptExpr(SubscriptExpr *e, AccessKind accessKind);
+  LValue visitTupleElementExpr(TupleElementExpr *e, AccessKind accessKind);
+  LValue visitForceValueExpr(ForceValueExpr *e, AccessKind accessKind);
+  LValue visitBindOptionalExpr(BindOptionalExpr *e, AccessKind accessKind);
   
   // Expressions that wrap lvalues
   
-  LValue visitInOutExpr(InOutExpr *e);
-  LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
+  LValue visitInOutExpr(InOutExpr *e, AccessKind accessKind);
+  LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
+                                       AccessKind accessKind);
 };
 
 SILValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
@@ -341,7 +343,7 @@ namespace {
         Field(field), SubstFieldType(substFieldType) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        ForMutation_t forMutation)
+                        AccessKind accessKind)
       const override {
       assert(base.getType().isObject() &&
              "base for ref element component must be an object");
@@ -365,7 +367,7 @@ namespace {
         ElementIndex(elementIndex) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        ForMutation_t forMutation) const override {
+                        AccessKind accessKind) const override {
       assert(base && "invalid value for element base");
       auto Res = gen.B.createTupleElementAddr(loc, base.getUnmanagedValue(),
                                               ElementIndex,
@@ -388,7 +390,7 @@ namespace {
         Field(field), SubstFieldType(substFieldType) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        ForMutation_t forMutation) const override {
+                        AccessKind accessKind) const override {
       assert(base && "invalid value for element base");
       auto Res = gen.B.createStructElementAddr(loc, base.getUnmanagedValue(),
                                                Field, SubstFieldType);
@@ -409,7 +411,7 @@ namespace {
     {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        ForMutation_t forMutation) const override {
+                        AccessKind accessKind) const override {
       // Assert that the optional value is present.
       gen.emitPreconditionOptionalHasValue(loc, base.getValue());
       // Project out the 'Some' payload.
@@ -463,7 +465,7 @@ namespace {
     using OptionalObjectComponent::OptionalObjectComponent;
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        ForMutation_t forMutation) const override {
+                        AccessKind accessKind) const override {
       // Assert that the optional value is present.
       gen.emitPreconditionOptionalHasValue(loc, base.getValue());
       // Project out the payload.
@@ -484,7 +486,7 @@ namespace {
     {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        ForMutation_t forMutation) const override {
+                        AccessKind accessKind) const override {
       // Check if the optional value is present.
       gen.emitBindOptional(loc, base.getUnmanagedValue(), Depth);
       
@@ -505,7 +507,7 @@ namespace {
     }
 
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        ForMutation_t forMutation) const override {
+                        AccessKind accessKind) const override {
       assert(!base && "value component must be root of lvalue path");
       return Value;
     }
@@ -893,11 +895,10 @@ namespace {
     }
 
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        ForMutation_t forMutation) const override {
-      auto addressor = (forMutation ? decl->getMutableAddressor()
-                                    : decl->getAddressor());
-      auto args = prepareAccessorArgs(gen, loc, base, addressor);
-      return gen.emitAddressorAccessor(loc, decl, forMutation, substitutions,
+                        AccessKind accessKind) const override {
+      auto args = prepareAccessorArgs(gen, loc, base,
+                                      decl->getAddressorForAccess(accessKind));
+      return gen.emitAddressorAccessor(loc, decl, accessKind, substitutions,
                                        std::move(args.base), IsSuper,
                                        IsDirectAccessorUse,
                                        std::move(args.subscripts),
@@ -1023,8 +1024,8 @@ namespace {
   };
 } // end anonymous namespace.
 
-LValue SILGenFunction::emitLValue(Expr *e) {
-  LValue r = SILGenLValue(*this).visit(e);
+LValue SILGenFunction::emitLValue(Expr *e, AccessKind accessKind) {
+  LValue r = SILGenLValue(*this).visit(e, accessKind);
   // If the final component is physical with an abstraction change, introduce a
   // reabstraction component.
   if (r.isLastComponentPhysical()
@@ -1036,7 +1037,7 @@ LValue SILGenFunction::emitLValue(Expr *e) {
   return r;
 }
 
-LValue SILGenLValue::visitRec(Expr *e) {
+LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
   // Non-lvalue types (references, values, metatypes, etc) form the root of a
   // logical l-value.
   if (!e->getType()->is<LValueType>() && !e->getType()->is<InOutType>()) {
@@ -1053,10 +1054,10 @@ LValue SILGenLValue::visitRec(Expr *e) {
     return lv;
   }
 
-  return visit(e);
+  return visit(e, accessKind);
 }
 
-LValue SILGenLValue::visitExpr(Expr *e) {
+LValue SILGenLValue::visitExpr(Expr *e, AccessKind accessKind) {
   e->dump(llvm::errs());
   llvm_unreachable("unimplemented lvalue expr");
 }
@@ -1071,14 +1072,15 @@ getNonMemberVarDeclSubstitutions(SILGenFunction &gen, VarDecl *var) {
   return substitutions;
 }
 
+// For now, we don't need either an AccessKind or an
+// AccessSemantics, because addressors are always directly
+// dispatched.
 static AddressorComponent *
 makeNonMemberVarDeclAddressorComponent(SILGenFunction &gen, VarDecl *var,
-                                       const LValueTypeData &typeData,
-                                       AccessSemantics semantics) {
+                                       const LValueTypeData &typeData) {
   assert(var->hasAddressors());
   SILType storageType = gen.getLoweredType(var->getType()).getAddressType();
-  return new AddressorComponent(var, /*isSuper=*/ false,
-                                semantics == AccessSemantics::DirectToAccessor,
+  return new AddressorComponent(var, /*isSuper=*/ false, /*direct*/ true,
                                 getNonMemberVarDeclSubstitutions(gen, var),
                                 typeData, storageType);
 }
@@ -1087,47 +1089,59 @@ LValue
 SILGenFunction::emitLValueForAddressedNonMemberVarDecl(SILLocation loc,
                                                        VarDecl *var,
                                                        CanType formalRValueType,
+                                                       AccessKind accessKind,
                                                        AccessSemantics semantics) {
   auto typeData = getUnsubstitutedTypeData(*this, formalRValueType);
   LValue lv;
-  lv.add(makeNonMemberVarDeclAddressorComponent(*this, var, typeData,
-                                                semantics));
+  lv.add(makeNonMemberVarDeclAddressorComponent(*this, var, typeData));
   return lv;
 }
 
 static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
                                             SILLocation loc, VarDecl *var,
                                             CanType formalRValueType,
+                                            AccessKind accessKind,
                                             AccessSemantics semantics) {
   LValue lv;
   auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
 
+  switch (var->getAccessStrategy(semantics, accessKind)) {
+
+  case AccessStrategy::DispatchToAccessor:
+    llvm_unreachable("can't polymorphically access non-member variable");
+
   // If it's a computed variable, push a reference to the getter and setter.
-  if (var->hasAccessorFunctions() &&
-      semantics != AccessSemantics::DirectToStorage) {
-    lv.add(new GetterSetterComponent(var, /*isSuper=*/false,
-                                     semantics == AccessSemantics::DirectToAccessor,
+  case AccessStrategy::DirectToAccessor:
+    lv.add(new GetterSetterComponent(var, /*isSuper=*/false, /*direct*/ true,
                                      getNonMemberVarDeclSubstitutions(gen, var),
                                      typeData));
-  } else if (var->hasAddressors()) {
-    lv.add(makeNonMemberVarDeclAddressorComponent(gen, var, typeData, semantics));
-  } else {
+    break;
+
+  case AccessStrategy::Addressor:
+    lv.add(makeNonMemberVarDeclAddressorComponent(gen, var, typeData));
+    break;
+
+  case AccessStrategy::Storage: {
     // If it's a physical value (e.g. a local variable in memory), push its
     // address.
     auto address = gen.emitLValueForDecl(loc, var, formalRValueType,
-                                         ForMutation, semantics);
+                                         accessKind, semantics);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
     lv.add(new ValueComponent(address, typeData));
 
     if (address.getType().is<ReferenceStorageType>())
       lv.add(new OwnershipComponent(typeData));
+    break;
   }
+  }
+
   return std::move(lv);
 }
 
 
-LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e) {
+LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
+                                                AccessKind accessKind) {
   auto formalRValueType = getSubstFormalRValueType(e);
   auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
 
@@ -1138,20 +1152,63 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e) {
 }
 
 
-LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
+LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, AccessKind accessKind) {
   // The only non-member decl that can be an lvalue is VarDecl.
   return emitLValueForNonMemberVarDecl(gen, e, cast<VarDecl>(e->getDecl()),
                                        getSubstFormalRValueType(e),
+                                       accessKind,
                                        e->getAccessSemantics());
 }
 
-LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
+LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
+                                                   AccessKind accessKind) {
   // If it is convenient to avoid loading the base, don't bother loading it.
   gen.emitRValue(e->getLHS(), SGFContext::AllowPlusZero);
-  return visitRec(e->getRHS());
+  return visitRec(e->getRHS(), accessKind);
 }
 
-LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
+static AccessKind getBaseAccessKindForAccessor(FuncDecl *accessor) {
+  if (accessor->isMutating()) {
+    return AccessKind::ReadWrite;
+  } else {
+    return AccessKind::Read;
+  }
+}
+
+/// Return the appropriate access kind for the base l-value of a
+/// particular member, which is being accessed in a particular way.
+static AccessKind getBaseAccessKind(AbstractStorageDecl *member,
+                                    AccessKind accessKind,
+                                    AccessStrategy strategy) {
+  switch (strategy) {
+  // Assume that the member only partially projects the enclosing value.
+  case AccessStrategy::Storage:
+    return (accessKind == AccessKind::Read
+              ? AccessKind::Read : AccessKind::ReadWrite);
+
+  case AccessStrategy::Addressor:
+    return getBaseAccessKindForAccessor(
+                           member->getAddressorForAccess(accessKind));
+
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor:
+    if (accessKind == AccessKind::Read) {
+      return getBaseAccessKindForAccessor(member->getGetter());
+    } else {
+      return getBaseAccessKindForAccessor(member->getSetter());
+    }
+  }
+  llvm_unreachable("bad access strategy");
+}
+
+LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
+                                        AccessKind accessKind) {
+  // MemberRefExpr can refer to type and function members, but the only case
+  // that can be an lvalue is a VarDecl.
+  VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
+  AccessStrategy strategy =
+    var->getAccessStrategy(e->getAccessSemantics(), accessKind);
+
   LValue lv = [&]{
     // If we're emitting an initializer, the base is a reference to 'self', and
     // we're doing direct property access, emit a +0 reference to self to avoid
@@ -1171,25 +1228,24 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
       }
     }
 
-    return visitRec(e->getBase());
+    return visitRec(e->getBase(), getBaseAccessKind(var, accessKind, strategy));
   }();
-
-  // MemberRefExpr can refer to type and function members, but the only case
-  // that can be an lvalue is a VarDecl.
-  VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
 
   LValueTypeData typeData = getMemberTypeData(gen, var->getType(), e);
 
   // Use the property accessors if the variable has accessors and this isn't a
   // direct access to underlying storage.
-  if (var->hasAccessorFunctions() &&
-      e->getAccessSemantics() != AccessSemantics::DirectToStorage) {
+  if (strategy == AccessStrategy::DirectToAccessor ||
+      strategy == AccessStrategy::DispatchToAccessor) {
     lv.add(new GetterSetterComponent(var, e->isSuper(),
-                            e->getAccessSemantics() == AccessSemantics::DirectToAccessor,
+                                 strategy == AccessStrategy::DirectToAccessor,
                                      e->getMember().getSubstitutions(),
                                      typeData));
     return std::move(lv);
   }
+
+  assert(strategy == AccessStrategy::Addressor ||
+         strategy == AccessStrategy::Storage);
 
   // Otherwise, the lvalue access is performed with a fragile element reference.
   // Find the substituted storage type.
@@ -1200,7 +1256,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // them.
   // FIXME: This has to be dynamically looked up for classes, and
   // dynamically instantiated for generics.
-  if (var->isStatic() && !var->hasAddressors()) {
+  if (strategy == AccessStrategy::Storage && var->isStatic()) {
     auto baseMeta = e->getBase()->getType()->castTo<MetatypeType>()
       ->getInstanceType();
     (void)baseMeta;
@@ -1212,17 +1268,17 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
     
     return emitLValueForNonMemberVarDecl(gen, e, var,
                                          getSubstFormalRValueType(e),
-                                         e->getAccessSemantics());
+                                         accessKind, e->getAccessSemantics());
   }
 
   // For member variables, this access is done w.r.t. a base computation that
   // was already emitted.  This member is accessed off of it.
-  if (var->hasAddressors()) {
-    lv.add(new AddressorComponent(var, e->isSuper(),
-                            e->getAccessSemantics() == AccessSemantics::DirectToAccessor,
+  if (strategy == AccessStrategy::Addressor) {
+    lv.add(new AddressorComponent(var, e->isSuper(), /*direct*/ true,
                                   e->getMember().getSubstitutions(),
                                   typeData, varStorageType));
-  } else if (!e->getBase()->getType()->is<LValueType>()) {
+  } else if (!e->getBase()->getType()->is<LValueType>() &&
+             !e->getBase()->getType()->is<InOutType>()) {
     assert(e->getBase()->getType()->hasReferenceSemantics());
     lv.add(new RefElementComponent(var, varStorageType, typeData));
   } else {
@@ -1237,24 +1293,28 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   return lv;
 }
 
-LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
-  auto semantics = e->getAccessSemantics();
+LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
+                                        AccessKind accessKind) {
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
-  
-  LValue lv = visitRec(e->getBase());
 
-  if (decl->hasAccessorFunctions() &&
-      e->getAccessSemantics() != AccessSemantics::DirectToStorage) {
+  AccessStrategy strategy =
+    decl->getAccessStrategy(e->getAccessSemantics(), accessKind);
+  
+  LValue lv = visitRec(e->getBase(),
+                       getBaseAccessKind(decl, accessKind, strategy));
+
+  if (strategy == AccessStrategy::DirectToAccessor ||
+      strategy == AccessStrategy::DispatchToAccessor) {
     lv.add(new GetterSetterComponent(decl, e->isSuper(),
-                                     semantics == AccessSemantics::DirectToAccessor,
+                                     strategy == AccessStrategy::DirectToAccessor,
                                      e->getDecl().getSubstitutions(),
                                      typeData, e->getIndex()));
   } else {
+    assert(strategy == AccessStrategy::Addressor);
     auto storageType = 
       gen.SGM.Types.getSubstitutedStorageType(decl, e->getType());
-    lv.add(new AddressorComponent(decl, e->isSuper(),
-                                  semantics == AccessSemantics::DirectToAccessor,
+    lv.add(new AddressorComponent(decl, e->isSuper(), /*direct*/ true,
                                   e->getDecl().getSubstitutions(),
                                   typeData, storageType, e->getIndex()));
   }
@@ -1262,9 +1322,12 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   return lv;
 }
 
-LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
+LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
+                                           AccessKind accessKind) {
   unsigned index = e->getFieldNumber();
-  LValue lv = visitRec(e->getBase());
+  LValue lv = visitRec(e->getBase(),
+                       accessKind == AccessKind::Read
+                         ? AccessKind::Read : AccessKind::ReadWrite);
 
   auto baseTypeData = lv.getTypeData();
   LValueTypeData typeData = {
@@ -1292,26 +1355,29 @@ getOptionalObjectTypeData(SILGenFunction &gen,
   };
 }
 
-LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e) {
-  LValue lv = visitRec(e->getSubExpr());
+LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
+                                         AccessKind accessKind) {
+  LValue lv = visitRec(e->getSubExpr(), accessKind);
   LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
   lv.add(new ForceOptionalObjectComponent(typeData));
   return lv;
 }
 
-LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e) {
-  LValue lv = visitRec(e->getSubExpr());
+LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
+                                           AccessKind accessKind) {
+  LValue lv = visitRec(e->getSubExpr(), accessKind);
   LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
   lv.add(new BindOptionalObjectComponent(typeData, e->getDepth()));
   return lv;
 }
 
-LValue SILGenLValue::visitInOutExpr(InOutExpr *e) {
-  return visitRec(e->getSubExpr());
+LValue SILGenLValue::visitInOutExpr(InOutExpr *e, AccessKind accessKind) {
+  return visitRec(e->getSubExpr(), accessKind);
 }
 
 LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
-                                            VarDecl *ivar) {
+                                            VarDecl *ivar,
+                                            AccessKind accessKind) {
   SILGenLValue sgl(*this);
   LValue lv;
   
@@ -1722,10 +1788,10 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
                                        SILLocation loc,
                                        const PathComponent &component,
                                        ManagedValue base,
-                                       ForMutation_t forMutation) {
+                                       AccessKind accessKind) {
   ManagedValue addr;
   if (component.isPhysical()) {
-    addr = component.asPhysical().offset(SGF, loc, base, forMutation);
+    addr = component.asPhysical().offset(SGF, loc, base, accessKind);
   } else {
     auto &lcomponent = component.asLogical();
     addr = ManagedValue::forLValue(lcomponent.getMaterialized(SGF, loc, base));
@@ -1740,14 +1806,14 @@ static const PathComponent &drillToLastComponent(SILGenFunction &SGF,
                                                  SILLocation loc,
                                                  const LValue &lv,
                                                  ManagedValue &addr,
-                                                 ForMutation_t forMutation) {
+                                                 AccessKind accessKind) {
   assert(lv.begin() != lv.end() &&
          "lvalue must have at least one component");
 
   auto component = lv.begin(), next = lv.begin(), end = lv.end();
   ++next;
   for (; next != end; component = next, ++next) {
-    addr = drillIntoComponent(SGF, loc, **component, addr, forMutation);
+    addr = drillIntoComponent(SGF, loc, **component, addr, accessKind);
   }
 
   return **component;
@@ -1760,11 +1826,12 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
   DisableWritebackScope scope(*this);
 
   ManagedValue addr;
-  auto &component = drillToLastComponent(*this, loc, src, addr, NotForMutation);
+  auto &component =
+    drillToLastComponent(*this, loc, src, addr, AccessKind::Read);
 
   // If the last component is physical, just drill down and load from it.
   if (component.isPhysical()) {
-    addr = component.asPhysical().offset(*this, loc, addr, NotForMutation);
+    addr = component.asPhysical().offset(*this, loc, addr, AccessKind::Read);
     return emitLoad(loc, addr.getValue(),
                     getTypeLowering(src.getTypeOfRValue()), C, IsNotTake);
   }
@@ -1775,10 +1842,10 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
                                                  const LValue &src,
-                                                 ForMutation_t forMutation) {
+                                                 AccessKind accessKind) {
   ManagedValue addr;
-  auto &component = drillToLastComponent(*this, loc, src, addr, forMutation);
-  addr = drillIntoComponent(*this, loc, component, addr, forMutation);
+  auto &component = drillToLastComponent(*this, loc, src, addr, accessKind);
+  addr = drillIntoComponent(*this, loc, component, addr, accessKind);
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
   return addr;
@@ -1791,13 +1858,13 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
   ManagedValue destAddr;
-  auto &component = drillToLastComponent(*this, loc, dest, destAddr,
-                                         ForMutation);
+  auto &component =
+    drillToLastComponent(*this, loc, dest, destAddr, AccessKind::ReadWrite);
   
   // Write to the tail component.
   if (component.isPhysical()) {
     auto finalDestAddr = component.asPhysical().offset(*this, loc, destAddr,
-                                                       ForMutation);
+                                                       AccessKind::Write);
     
     std::move(src).getAsSingleValue(*this, loc)
       .assignInto(*this, loc, finalDestAddr.getValue());
@@ -1831,7 +1898,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, const LValue &src,
     return skipPeephole();
   
   auto srcAddr =
-    emitAddressOfLValue(loc, src, NotForMutation).getUnmanagedValue();
+    emitAddressOfLValue(loc, src, AccessKind::Read).getUnmanagedValue();
   B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
   dest->finishInitialization(*this);
 }
@@ -1853,9 +1920,9 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
     return skipPeephole();
   
   auto srcAddr =
-    emitAddressOfLValue(loc, src, NotForMutation).getUnmanagedValue();
+    emitAddressOfLValue(loc, src, AccessKind::Read).getUnmanagedValue();
   auto destAddr =
-    emitAddressOfLValue(loc, dest, ForMutation).getUnmanagedValue();
+    emitAddressOfLValue(loc, dest, AccessKind::Write).getUnmanagedValue();
 
   if (srcAddr.getType() == destAddr.getType()) {
     B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsNotInitialization);

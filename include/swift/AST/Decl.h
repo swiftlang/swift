@@ -3273,6 +3273,35 @@ enum class AccessorKind {
   IsMutableAddressor = 6,
 };
 
+/// Whether an access to storage is for reading, writing, or both.
+enum class AccessKind : unsigned char {
+  /// The access is just to read the current value.
+  Read,
+
+  /// The access is just to overwrite the current value.
+  Write,
+
+  /// The access may require either reading or writing the current value.
+  ReadWrite
+};
+
+/// The way to actually evaluate an access to storage.
+enum class AccessStrategy : unsigned char {
+  /// The decl is a VarDecl with its own backing storage; evaluate its
+  /// address directly.
+  Storage,
+
+  /// The decl has addressors; call the appropriate addressor for the
+  /// access kind.  These calls are currently always direct.
+  Addressor,
+
+  /// Directly call the getter, setter, or materializeForSet accessor.
+  DirectToAccessor,
+
+  /// Indirectly call the getter, setter, or materializeForSet accessor.
+  DispatchToAccessor,
+};
+
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
@@ -3520,6 +3549,13 @@ public:
   FuncDecl *getMutableAddressor() const {
     return getAddressorInfo().MutableAddress;
   }
+
+  /// \brief Return the approproiate addressor for the given access kind.
+  FuncDecl *getAddressorForAccess(AccessKind accessKind) const {
+    if (accessKind == AccessKind::Read)
+      return getAddressor();
+    return getMutableAddressor();
+  }
   
   /// \brief Return the funcdecl for the willSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
@@ -3574,6 +3610,10 @@ public:
   ///
   /// If \p DC is null, returns true only if the setter is public.
   bool isSetterAccessibleFrom(const DeclContext *DC) const;
+
+  /// Determine how this storage declaration should actually be accessed.
+  AccessStrategy getAccessStrategy(AccessSemantics semantics,
+                                   AccessKind accessKind) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

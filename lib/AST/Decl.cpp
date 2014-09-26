@@ -31,6 +31,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Fallthrough.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/DeclObjC.h"
@@ -888,6 +889,31 @@ SourceRange IfConfigDecl::getSourceRange() const {
   return SourceRange(getLoc(), EndLoc);
 }
 
+static bool isPolymorphic(const AbstractStorageDecl *storage) {
+  auto ctx = storage->getDeclContext()->getDeclaredTypeInContext();
+  if (!ctx) return false;
+
+  auto nominal = ctx->getNominalOrBoundGenericNominal();
+  assert(nominal && "context wasn't a nominal type?");
+  switch (nominal->getKind()) {
+#define DECL(ID, BASE) case DeclKind::ID:
+#define NOMINAL_TYPE_DECL(ID, BASE)
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("not a nominal type!");
+
+  case DeclKind::Struct:
+  case DeclKind::Enum:
+    return false;
+
+  case DeclKind::Protocol:
+    return true;
+
+  case DeclKind::Class:
+    // Final properties can always be direct, even in classes.
+    return !storage->isFinal();
+  }
+}
+
 /// Determines the access semantics to use in a DeclRefExpr or
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
@@ -909,12 +935,7 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
     // TODO: What about static properties?
     if (var->getStorageKind() == VarDecl::StoredWithTrivialAccessors ||
         var->getStorageKind() == VarDecl::Stored) {
-      if (auto ctx = var->getDeclContext()->getDeclaredTypeInContext())
-        if (ctx->getStructOrBoundGenericStruct())
-          return AccessSemantics::DirectToStorage;
-      
-      // Final properties can always be direct, even in classes.
-      if (var->isFinal())
+      if (!isPolymorphic(var))
         return AccessSemantics::DirectToStorage;
     }
   }
@@ -922,6 +943,71 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
   return AccessSemantics::Ordinary;
 }
 
+static AccessStrategy
+getAccessStrategyForDirectStorage(const AbstractStorageDecl *storage) {
+  if (storage->hasAddressors())
+    return AccessStrategy::Addressor;
+  return AccessStrategy::Storage;
+}
+
+AccessStrategy
+AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
+                                       AccessKind accessKind) const {
+  switch (semantics) {
+  case AccessSemantics::DirectToStorage:
+    switch (getStorageKind()) {
+    case Stored:
+    case StoredWithTrivialAccessors:
+    case Observing:
+      return getAccessStrategyForDirectStorage(this);
+
+    case Computed:
+      llvm_unreachable("cannot have direct-to-storage access to "
+                       "computed storage");
+    }
+    llvm_unreachable("bad storage kind");
+
+  case AccessSemantics::DirectToAccessor:
+    assert(hasAccessorFunctions() &&
+           "direct-to-accessors access to storage without accessors?");
+    return AccessStrategy::DirectToAccessor;
+
+  case AccessSemantics::Ordinary:
+    switch (getStorageKind()) {
+    case Stored:
+      return getAccessStrategyForDirectStorage(this);
+
+    case Observing:
+      // An observing property backed by its own storage (i.e. which
+      // doesn't override anything) has a trivial getter implementation,
+      // but its setter is interesting.
+      if (accessKind != AccessKind::Read || getOverriddenDecl()) {
+        if (isPolymorphic(this))
+          return AccessStrategy::DispatchToAccessor;
+        return AccessStrategy::DirectToAccessor;
+      }
+
+      // Fall through to the trivial-implementation case.
+      SWIFT_FALLTHROUGH;
+
+    case StoredWithTrivialAccessors:
+      // If the storage is polymorphic, either the getter or the
+      // setter could be overridden by something more interesting.
+      if (isPolymorphic(this))
+        return AccessStrategy::DispatchToAccessor;
+
+      // Otherwise, just access the storage directly.
+      return getAccessStrategyForDirectStorage(this);
+
+    case Computed:
+      if (isPolymorphic(this))
+        return AccessStrategy::DispatchToAccessor;
+      return AccessStrategy::DirectToAccessor;
+    }
+    llvm_unreachable("bad storage kind");
+  }
+  llvm_unreachable("bad access semantics");
+}
 
 bool ValueDecl::isDefinition() const {
   switch (getKind()) {

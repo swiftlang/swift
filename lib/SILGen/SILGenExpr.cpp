@@ -111,7 +111,7 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
-    auto lv = emitLValue(load->getSubExpr());
+    auto lv = emitLValue(load->getSubExpr(), AccessKind::Read);
     emitCopyLValueInto(E, lv, I);
     return;
   }
@@ -140,9 +140,9 @@ namespace {
 
     // These always produce lvalues.
     RValue visitInOutExpr(InOutExpr *E, SGFContext C) {
-      LValue lv = SGF.emitLValue(E->getSubExpr());
+      LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::ReadWrite);
       return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv,
-                                                    ForMutation));
+                                                    AccessKind::ReadWrite));
     }
     
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
@@ -437,11 +437,11 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
   return ManagedValue::forLValue(addr);
 }
 
-/// Emit the specified declaration as an LValue if possible, otherwise return
-/// null.
+/// Emit the specified declaration as an address if possible,
+/// otherwise return null.
 ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
                                                CanType formalRValueType,
-                                               ForMutation_t forMutation,
+                                               AccessKind accessKind,
                                                AccessSemantics semantics) {
   // For local decls, use the address we allocated or the value if we have it.
   auto It = VarLocs.find(var);
@@ -457,33 +457,27 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
     // Otherwise, it is an RValue let.
     return ManagedValue();
   }
-  
-  // a getter produces an rvalue unless this is a direct access to storage.
-  switch (var->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-    break;
 
-  case AbstractStorageDecl::Observing:
-    // TODO: emit a direct reference if not forMutation?
-    if (semantics != AccessSemantics::DirectToStorage)
-      return ManagedValue();
-    break;
-
-  case AbstractStorageDecl::Computed:
-    return ManagedValue();
+  switch (var->getAccessStrategy(semantics, accessKind)) {
+  case AccessStrategy::Storage: {
+    // The only kind of stored variable that should make it to here is
+    // a global variable.  Just invoke its accessor function to get its
+    // address.
+    return emitGlobalVariableRef(*this, loc, var);
   }
 
-  if (var->hasAddressors()) {
+  case AccessStrategy::Addressor: {
     LValue lvalue =
       emitLValueForAddressedNonMemberVarDecl(loc, var, formalRValueType,
-                                             semantics);
-    return emitAddressOfLValue(loc, lvalue, forMutation);
+                                             accessKind, semantics);
+    return emitAddressOfLValue(loc, lvalue, accessKind);
   }
-  
-  // If this is a global variable, invoke its accessor function to get its
-  // address.
-  return emitGlobalVariableRef(*this, loc, var);
+
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor:
+    return ManagedValue();
+  }
+  llvm_unreachable("bad access strategy");
 }
 
 
@@ -518,7 +512,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     // If this VarDecl is represented as an address, emit it as an lvalue, then
     // perform a load to get the rvalue.
     if (auto Result = emitLValueForDecl(loc, var, refType,
-                                        NotForMutation, semantics)) {
+                                        AccessKind::Read, semantics)) {
       IsTake_t takes;
       // 'self' may need to be taken during an 'init' delegation.
       if (var->getName() == getASTContext().Id_self) {
@@ -723,7 +717,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     if (base.isPlusZeroRValueOrTrivial())
       base = base.copyUnmanaged(*this, loc);
 
-    LValue LV = emitDirectIVarLValue(loc, base, FieldDecl);
+    LValue LV = emitDirectIVarLValue(loc, base, FieldDecl, AccessKind::Read);
     return emitLoadOfLValue(loc, LV, C);
   }
 
@@ -920,7 +914,7 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
-  LValue lv = SGF.emitLValue(E->getSubExpr());
+  LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::Read);
   return RValue(SGF, E, SGF.emitLoadOfLValue(E, lv, C));
 }
 
@@ -2279,10 +2273,10 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   auto subscript = cast<SubscriptDecl>(E->getDecl().getDecl());
 
   AccessSemantics semantics = E->getAccessSemantics();
+  AccessStrategy strategy =
+    subscript->getAccessStrategy(semantics, AccessKind::Read);
 
-  bool useAddressor = (!subscript->hasAccessorFunctions() ||
-                       (subscript->hasAddressors() &&
-                        semantics == AccessSemantics::DirectToStorage));
+  bool useAddressor = (strategy == AccessStrategy::Addressor);
   FuncDecl *accessor =
     (useAddressor ? subscript->getAddressor() : subscript->getGetter());
 
@@ -2304,7 +2298,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
     ManagedValue MV =
       SGF.emitGetAccessor(E, subscript, E->getDecl().getSubstitutions(),
                           std::move(baseRV), E->isSuper(),
-                          semantics == AccessSemantics::DirectToAccessor,
+                          strategy == AccessStrategy::DirectToAccessor,
                           std::move(subscriptRV), C);
     return RValue(SGF, E, MV);
   }
@@ -2316,7 +2310,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   SILType storageType = storageTL.getLoweredType().getAddressType();
 
   SILValue address =
-    SGF.emitAddressorAccessor(E, subscript, NotForMutation,
+    SGF.emitAddressorAccessor(E, subscript, AccessKind::Read,
                               E->getDecl().getSubstitutions(),
                               std::move(baseRV), E->isSuper(),
                               semantics == AccessSemantics::DirectToAccessor,
@@ -4162,10 +4156,12 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     if (selfDecl->getType()->hasReferenceSemantics())
       self = SGF.emitSelfForDirectPropertyInConstructor(loc, selfDecl);
     else
-      self = SGF.emitLValueForDecl(loc, selfDecl, src.getType(), ForMutation,
+      self = SGF.emitLValueForDecl(loc, selfDecl, src.getType(),
+                                   AccessKind::Write,
                                    AccessSemantics::DirectToStorage);
 
-    LValue memberRef = SGF.emitDirectIVarLValue(loc, self, named->getDecl());
+    LValue memberRef =
+      SGF.emitDirectIVarLValue(loc, self, named->getDecl(), AccessKind::Write);
 
     // Assign to it.
     SGF.emitAssignToLValue(loc, std::move(src), memberRef);
@@ -4743,7 +4739,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   // We know that self is a box, so get its address.
   SILValue selfAddr =
     SGF.emitLValueForDecl(E, selfDecl, selfTy->getCanonicalType(),
-                          ForMutation).getLValueAddress();
+                          AccessKind::Write).getLValueAddress();
   // Forward or assign into the box depending on whether we actually consumed
   // 'self'.
   switch (SGF.SelfInitDelegationState) {
@@ -4924,8 +4920,9 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
 
 RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
                                                SGFContext C) {
-  LValue lv = SGF.emitLValue(E->getSubExpr());
-  SILValue address = SGF.emitAddressOfLValue(E->getSubExpr(), lv, ForMutation)
+  LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::ReadWrite);
+  SILValue address = SGF.emitAddressOfLValue(E->getSubExpr(), lv,
+                                             AccessKind::ReadWrite)
     .getUnmanagedValue();
   // TODO: Reabstract the lvalue to match the abstraction level expected by
   // the inout address conversion's InOutType. For now, just report cases where
@@ -5508,7 +5505,7 @@ static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src,
     return;
   
   // Otherwise, emit the scalar assignment.
-  LValue DstLV = Gen.emitLValue(Dest);
+  LValue DstLV = Gen.emitLValue(Dest, AccessKind::Write);
   Gen.emitAssignToLValue(S, std::move(Src), DstLV);
 }
 
@@ -5520,8 +5517,10 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   if (auto *LE = dyn_cast<LoadExpr>(E->getSrc())) {
     if (!isa<TupleExpr>(E->getDest())
         && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType())) {
-      auto SrcLV = SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr());
-      SGF.emitAssignLValueToLValue(E, SrcLV, SGF.emitLValue(E->getDest()));
+      auto SrcLV = SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr(),
+                                  AccessKind::Read);
+      SGF.emitAssignLValueToLValue(E, SrcLV,
+                             SGF.emitLValue(E->getDest(), AccessKind::Write));
       return SGF.emitEmptyTupleRValue(E);
     }
   }
@@ -5890,9 +5889,6 @@ public:
 
 RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
                                               SGFContext C) {
-  // Get the original lvalue.
-  LValue lv = SGF.emitLValue(cast<InOutExpr>(E->getSubExpr())->getSubExpr());
-  
   // If we're converting on the behalf of an
   // AutoreleasingUnsafeMutablePointer, convert the lvalue to
   // unowned(unsafe), so we can point at +0 storage.
@@ -5900,15 +5896,19 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   Type elt = E->getType()->getAnyPointerElementType(pointerKind);
   assert(elt && "not a pointer");
   (void)elt;
-  ForMutation_t forMutation = ForMutation;
+
+  AccessKind accessKind =
+    (pointerKind == PTK_UnsafePointer
+       ? AccessKind::Read : AccessKind::ReadWrite);
+
+  // Get the original lvalue.
+  LValue lv = SGF.emitLValue(cast<InOutExpr>(E->getSubExpr())->getSubExpr(),
+                             accessKind);
+  
   switch (pointerKind) {
   case PTK_UnsafeMutablePointer:
-    // +1 is fine.
-    break;
-
   case PTK_UnsafePointer:
-    // +1 is fine, but we don't need a mutable l-value.
-    forMutation = NotForMutation;
+    // +1 is fine.
     break;
 
   case PTK_AutoreleasingUnsafeMutablePointer: {
@@ -5926,7 +5926,7 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   
   // Get the lvalue address as a raw pointer.
   SILValue address =
-    SGF.emitAddressOfLValue(E, lv, forMutation).getUnmanagedValue();
+    SGF.emitAddressOfLValue(E, lv, accessKind).getUnmanagedValue();
   address = SGF.B.createAddressToPointer(E, address,
                                SILType::getRawPointerType(SGF.getASTContext()));
   
@@ -6069,7 +6069,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   FullExpr scope(Cleanups, CleanupLocation(E));
   // Evaluate the expression as an lvalue or rvalue, discarding the result.
   if (E->getType()->is<LValueType>()) {
-    emitLValue(E);
+    emitLValue(E, AccessKind::Read);
   } else {
     // If it is convenient to avoid loading the result, don't bother.
     emitRValue(E, SGFContext::AllowPlusZero);

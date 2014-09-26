@@ -24,7 +24,6 @@ namespace Lowering {
 
 class Condition;
 class ConsumableManagedValue;
-enum ForMutation_t : bool;
 class Initialization;
 class LogicalPathComponent;
 class LValue;
@@ -677,7 +676,7 @@ public:
   /// null.
   ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
                                  CanType formalRValueType,
-                                 ForMutation_t forMutation,
+                                 AccessKind accessKind,
                                  AccessSemantics semantics
                                    = AccessSemantics::Ordinary);
   
@@ -724,7 +723,7 @@ public:
                                 RValue &&optionalSubscripts,
                                 SILValue buffer);
   ManagedValue emitAddressorAccessor(SILLocation loc, AbstractStorageDecl *decl,
-                                     ForMutation_t forMutation,
+                                     AccessKind accessKind,
                                      ArrayRef<Substitution> substitutions,
                                      RValueSource &&optionalSelfValue,
                                      bool isSuper, bool isDirectAccessorUse,
@@ -778,7 +777,7 @@ public:
   void emitCopyLValueInto(SILLocation loc, const LValue &src,
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, const LValue &src,
-                                   ForMutation_t forMutation);
+                                   AccessKind accessKind);
   ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
                                 SGFContext C);
   
@@ -1056,16 +1055,18 @@ public:
   CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
 
   /// Evaluate an Expr as an lvalue.
-  LValue emitLValue(Expr *E);
+  LValue emitLValue(Expr *E, AccessKind accessKind);
 
   /// Emit a reference to a variable as an lvalue.
   LValue emitLValueForAddressedNonMemberVarDecl(SILLocation loc, VarDecl *var,
                                                 CanType formalRValueType,
+                                                AccessKind accessKind,
                                                 AccessSemantics semantics);
 
   /// Emit an lvalue that directly refers to the given instance
   /// variable (without going through getters or setters).
-  LValue emitDirectIVarLValue(SILLocation loc, ManagedValue base, VarDecl *var);
+  LValue emitDirectIVarLValue(SILLocation loc, ManagedValue base, VarDecl *var,
+                              AccessKind accessKind);
 
   /// Build an identity substitution map for the given generic parameter list.
   ArrayRef<Substitution>

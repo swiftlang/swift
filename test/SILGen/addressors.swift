@@ -97,6 +97,36 @@ func test_global() -> Int {
 // CHECK:   [[T4:%.*]] = load [[T3]] : $*Int
 // CHECK:   return [[T4]] : $Int
 
+// Test that having generated trivial accessors for something because
+// of protocol conformance doesn't force us down inefficient access paths.
+protocol Subscriptable {
+  subscript(i: Int) -> Int { get set }
+}
+
+struct B : Subscriptable {
+  subscript(i: Int) -> Int {
+    address { return nil }
+    mutableAddress { return nil }
+  }
+}
+
+// CHECK: sil hidden @_TF10addressors6test_BFRVS_1BT_ : $@thin (@inout B) -> () {
+// CHECK: bb0([[B:%.*]] : $*B):
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Ba9subscriptFSiSi
+// CHECK:   [[PTR:%.*]] = apply [[T0]]({{.*}}, [[B]])
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
+// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   integer_literal $Builtin.Word, 7
+// CHECK:   load
+// CHECK:   [[T0:%.*]] = builtin_function_ref "or_Word"
+// CHECK:   [[T1:%.*]] = apply [[T0]]
+// CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : $Builtin.Word)
+// CHECK:   store [[T2]] to [[ADDR]] : $*Int
+func test_B(inout b: B) {
+  b[0] |= 7
+}
+
+// Test that we handle abstraction difference.
 struct CArray<T> {
   var storage: UnsafeMutablePointer<T> = nil
   subscript(index: Int) -> T {

@@ -40,12 +40,6 @@ struct LValueTypeData {
       TypeOfRValue(typeOfRValue) {}
 };
 
-/// Whether an l-value result is going to be mutated.
-enum ForMutation_t : bool {
-  NotForMutation = false,
-  ForMutation = true,
-};
-
 /// An l-value path component represents a chunk of the access path to
 /// an object.  Path components may be either "physical" or "logical".
 /// A physical path involves elementary address manipulations; these
@@ -153,7 +147,7 @@ public:
   virtual ManagedValue offset(SILGenFunction &gen,
                               SILLocation loc,
                               ManagedValue base,
-                              ForMutation_t forMutation) const = 0;
+                              AccessKind accessKind) const = 0;
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {

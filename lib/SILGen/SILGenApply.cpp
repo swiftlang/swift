@@ -1927,8 +1927,9 @@ namespace {
         auto *e = cast<InOutExpr>(std::move(arg).asKnownExpr()->
                                      getSemanticsProvidingExpr());
 
-        LValue lv = SGF.emitLValue(e->getSubExpr());
-        address = SGF.emitAddressOfLValue(e->getSubExpr(), lv, ForMutation);
+        LValue lv = SGF.emitLValue(e->getSubExpr(), AccessKind::ReadWrite);
+        address = SGF.emitAddressOfLValue(e->getSubExpr(), lv,
+                                          AccessKind::ReadWrite);
       }
 
       if (hasAbstractionDifference(CC, loweredSubstParamType,
@@ -3125,12 +3126,13 @@ emitMaterializeForSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
 /// Emit a call to an addressor.
 ManagedValue SILGenFunction::
 emitAddressorAccessor(SILLocation loc, AbstractStorageDecl *decl,
-                      ForMutation_t forMutation,
+                      AccessKind accessKind,
                       ArrayRef<Substitution> substitutions,
                       RValueSource &&selfValue, bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {
-  FuncDecl *addressorFunc = (forMutation ? decl->getMutableAddressor()
-                                         : decl->getAddressor());
+  FuncDecl *addressorFunc =
+    (accessKind == AccessKind::Read ? decl->getAddressor()
+                                    : decl->getMutableAddressor());
 
   SILDeclRef addressor(addressorFunc, SILDeclRef::Kind::Func,
                        SILDeclRef::ConstructAtBestResilienceExpansion,
