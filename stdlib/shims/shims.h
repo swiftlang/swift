@@ -73,5 +73,16 @@ _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata;
 extern const uint16_t *
 _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
 
+//===--- Shims for API availability ---------------------------------------===//
+
+// This struct is layout-compatible with NSOperatingSystemVersion.
+typedef struct {
+  intptr_t majorVersion;
+  intptr_t minorVersion;
+  intptr_t patchVersion;
+} _SwiftNSOperatingSystemVersion;
+
+_SwiftNSOperatingSystemVersion _swift_stdlib_operatingSystemVersion();
+
 #endif
 

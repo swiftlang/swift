@@ -25,7 +25,8 @@ if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND SWIFT_RUNTIME_COMPILE_FLAGS "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
 
-add_swift_library(swiftRuntime 
+add_swift_library(swiftRuntime
+  Availability.mm
   Casting.cpp
   Demangle.cpp
   HeapObject.cpp

@@ -100,6 +100,7 @@ set(SWIFTLIB_ESSENTIAL
 set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
+  Availability.swift
   Bit.swift
   CollectionMirrors.swift.gyb
   CollectionOfOne.swift
