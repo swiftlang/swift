@@ -110,7 +110,7 @@ public enum Character :
   /// there is none
   static func _smallSize(value: UInt64) -> Int {
     var mask: UInt64 = 0xFF
-    for (var i = 0; i < 8; ++i) {
+    for var i = 0; i < 8; ++i {
       if (value & mask) == mask {
         return i
       }
