@@ -833,7 +833,6 @@ public:
     case MetadataKind::Metatype:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapArray:
       return false;
     }
     assert(false && "not a metadata kind");
@@ -1271,15 +1270,6 @@ public:
 ///
 /// Anyway, that's all something to consider later.
 struct HeapLocalVariableMetadata : public HeapMetadata {
-  // No extra fields for now.
-};
-
-/// The structure of metadata for heap-allocated arrays.
-/// This is non-type metadata.
-///
-/// The comments on HeapLocalVariableMetadata about tools wanting type
-/// discovery apply equally here.
-struct HeapArrayMetadata : public HeapMetadata {
   // No extra fields for now.
 };
 

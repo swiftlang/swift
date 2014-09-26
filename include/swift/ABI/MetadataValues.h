@@ -75,11 +75,8 @@ enum class MetadataKind : uintptr_t {
   /// A heap-allocated local variable.
   HeapLocalVariable = 64,
 
-  /// A heap-allocated array.
-  HeapArray = 65,
-  
   /// Anything greater than this is a class isa pointer.
-  MetadataKind_Last = HeapArray
+  MetadataKind_Last = HeapLocalVariable,
 };
   
 /// Kinds of Swift nominal type descriptor records.

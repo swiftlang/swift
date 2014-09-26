@@ -2012,7 +2012,6 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
   case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
     return nullptr;
   }

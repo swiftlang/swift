@@ -185,7 +185,6 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     case MetadataKind::ExistentialMetatype: // FIXME
     case MetadataKind::Function:
     case MetadataKind::Block: // FIXME
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
@@ -230,7 +229,6 @@ static bool _conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::ExistentialMetatype: // FIXME
   case MetadataKind::Function:
   case MetadataKind::Block: // FIXME
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
@@ -339,7 +337,6 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
   // Non-polymorphic types.
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
@@ -389,7 +386,6 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
@@ -457,7 +453,6 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Opaque:
     case MetadataKind::PolyFunction:
@@ -535,7 +530,6 @@ swift::swift_dynamicCastUnknownClass(const void *object,
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
@@ -574,7 +568,6 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
@@ -628,7 +621,6 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
@@ -659,7 +651,6 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
@@ -675,7 +666,6 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
@@ -732,7 +722,6 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
@@ -764,7 +753,6 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
@@ -779,7 +767,6 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
@@ -998,7 +985,6 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
 
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
@@ -1134,7 +1120,6 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   case MetadataKind::ForeignClass:
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
@@ -1194,7 +1179,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Opaque:
@@ -1241,7 +1225,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Opaque:
@@ -1256,7 +1239,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
   // The non-polymorphic types.
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Opaque:
   case MetadataKind::PolyFunction:
@@ -1307,7 +1289,6 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
@@ -1326,7 +1307,6 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
@@ -1367,7 +1347,6 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
-    case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
@@ -1390,7 +1369,6 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
-  case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
@@ -1510,7 +1488,6 @@ recur:
   // Values should never use these metadata kinds.
   case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapArray:
     assert(false);
     return nullptr;
   }
@@ -1574,7 +1551,6 @@ recur:
   // Values should never use these metadata kinds.
   case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapArray:
     assert(false);
     return nullptr;
   }
