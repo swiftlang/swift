@@ -16,6 +16,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cassert>
 
 namespace llvm {
   class raw_ostream;
