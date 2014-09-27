@@ -22,3 +22,10 @@ class FinalPropertyClass {
   final var foo = 50
   var bar = 55
 }
+
+final class ObservingPropertyFinalClass {
+  var foo: Int {
+    didSet {}
+  }
+  init(_ foo: Int) { self.foo = foo }
+}

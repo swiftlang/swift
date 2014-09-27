@@ -3778,21 +3778,17 @@ public:
 
     validateAttributes(TC, SD);
 
-    if (SD->hasAccessorFunctions()) {
-      maybeAddMaterializeForSet(SD, TC);
-    }
+    // Member subscripts need some special validation logic.
+    if (auto contextType = dc->getDeclaredTypeInContext()) {
+      // If this is a class member, mark it final if the class is final.
+      if (auto cls = contextType->getClassOrBoundGenericClass()) {
+        if (cls->isFinal() && !SD->isFinal()) {
+          makeFinal(TC.Context, SD);
+        }
+      }
 
-    // If this variable is marked final and has a getter or setter, mark the
-    // getter and setter as final as well.
-    if (SD->isFinal()) {
-      makeFinal(TC.Context, SD->getGetter());
-      makeFinal(TC.Context, SD->getSetter());
-      makeFinal(TC.Context, SD->getMaterializeForSetFunc());
-    }
-
-    // A subscript is ObjC-compatible if it's explicitly @objc, or a
-    // member of an ObjC-compatible class or protocol.
-    if (dc->getDeclaredTypeInContext()) {
+      // A subscript is ObjC-compatible if it's explicitly @objc, or a
+      // member of an ObjC-compatible class or protocol.
       ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
       ObjCReason reason = ObjCReason::DontDiagnose;
       if (SD->getAttrs().hasAttribute<ObjCAttr>())
@@ -3807,6 +3803,18 @@ public:
         isObjC = false;
       
       markAsObjC(SD, isObjC);
+    }
+
+    // If this variable is marked final and has a getter or setter, mark the
+    // getter and setter as final as well.
+    if (SD->isFinal()) {
+      makeFinal(TC.Context, SD->getGetter());
+      makeFinal(TC.Context, SD->getSetter());
+      makeFinal(TC.Context, SD->getMaterializeForSetFunc());
+    }
+
+    if (SD->hasAccessorFunctions()) {
+      maybeAddMaterializeForSet(SD, TC);
     }
 
     // Make sure the getter and setter have valid types, since they will be
@@ -4453,13 +4461,6 @@ public:
 
     TC.addImplicitDestructor(CD);
 
-    // Mark all members of final classes as final.
-    if (CD->isFinal())
-      for (Decl *Member : CD->getMembers())
-        if (isa<FuncDecl>(Member) || isa<VarDecl>(Member) ||
-            isa<SubscriptDecl>(Member))
-          makeFinal(TC.Context, cast<ValueDecl>(Member));
-
     for (Decl *Member : CD->getMembers())
       visit(Member);
     for (Decl *global : CD->getDerivedGlobalDecls())
@@ -5085,11 +5086,19 @@ public:
 
     validateAttributes(TC, FD);
 
-    // A method is ObjC-compatible if:
-    // - it's explicitly @objc or dynamic,
-    // - it's a member of an ObjC-compatible class, or
-    // - it's an accessor for an ObjC property.
-    if (FD->getDeclContext()->getDeclaredTypeInContext()) {
+    // Member functions need some special validation logic.
+    if (auto contextType = FD->getDeclContext()->getDeclaredTypeInContext()) {
+      // If this is a class member, mark it final if the class is final.
+      if (auto cls = contextType->getClassOrBoundGenericClass()) {
+        if (cls->isFinal() && !FD->isFinal()) {
+          makeFinal(TC.Context, FD);
+        }
+      }
+
+      // A method is ObjC-compatible if:
+      // - it's explicitly @objc or dynamic,
+      // - it's a member of an ObjC-compatible class, or
+      // - it's an accessor for an ObjC property.
       ProtocolDecl *protocolContext =
           dyn_cast<ProtocolDecl>(FD->getDeclContext());
       bool isMemberOfObjCProtocol =
@@ -6721,8 +6730,17 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // validation is a hack. It's necessary because properties can get types
       // before validateDecl is called.
 
-      // If this is a property, check if it needs to be exposed to Objective-C.
-      if (VD->getDeclContext()->getDeclaredTypeInContext()) {
+      // Properties need some special validation logic.
+      if (Type contextType = VD->getDeclContext()->getDeclaredTypeInContext()) {
+        // If this variable is a class member, mark it final if the
+        // class is final.
+        if (auto cls = contextType->getClassOrBoundGenericClass()) {
+          if (cls->isFinal() && !VD->isFinal()) {
+            makeFinal(Context, VD);
+          }
+        }
+
+        // If this is a property, check if it needs to be exposed to Objective-C.
         auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());
         ObjCReason reason = ObjCReason::DontDiagnose;
         if (VD->getAttrs().hasAttribute<ObjCAttr>())
@@ -6761,10 +6779,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         }
       }
 
-      if (VD->hasAccessorFunctions()) {
-        maybeAddMaterializeForSet(VD, *this);
-      }
-
       // If this variable is marked final and has a getter or setter, mark the
       // getter and setter as final as well.
       if (VD->isFinal()) {
@@ -6775,6 +6789,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         makeDynamic(Context, VD->getGetter());
         makeDynamic(Context, VD->getSetter());
         // Skip materializeForSet -- it won't be used with a dynamic property.
+      }
+
+      if (VD->hasAccessorFunctions()) {
+        maybeAddMaterializeForSet(VD, *this);
       }
     }
 

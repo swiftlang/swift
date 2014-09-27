@@ -26,3 +26,11 @@ func finalVarsAreDevirtualized(obj: FinalPropertyClass) {
   // CHECK: class_method %0 : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
   println(obj.bar)
 }
+
+// rdar://18448869
+// CHECK-LABEL: sil hidden @_TF10multi_file34finalVarsDontNeedMaterializeForSetFCS_27ObservingPropertyFinalClassT_
+func finalVarsDontNeedMaterializeForSet(obj: ObservingPropertyFinalClass) {
+  obj.foo++
+  // CHECK: function_ref @_TFC10multi_file27ObservingPropertyFinalClassg3fooSi
+  // CHECK: function_ref @_TFC10multi_file27ObservingPropertyFinalClasss3fooSi
+}
