@@ -162,8 +162,13 @@ done
 INSTALL_PREFIX="${PREFIX}"
 
 # Set these to the paths of the OS X SDK and toolchain.
-SYSROOT="$(xcrun --show-sdk-path --sdk macosx10.10internal)"
-TOOLCHAIN="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain"
+if [[ "$(uname -s)" == "Darwin" ]] ; then
+  SYSROOT="$(xcrun --show-sdk-path --sdk macosx10.10internal)"
+  TOOLCHAIN="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain"
+else
+  SYSROOT="/"
+  TOOLCHAIN="/"
+fi
 
 # WORKSPACE and BUILD_DIR must be absolute paths
 case "${WORKSPACE}" in
@@ -283,20 +288,27 @@ if [ ! -d "${CLANG_SOURCE_DIR}" ]; then
     ln -sf  "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
 fi
 
-CLANG="$TOOLCHAIN/usr/bin/clang"
+if [[ "$(uname -s)" == "Darwin" ]] ; then
+  HOST_CC="$TOOLCHAIN/usr/bin/clang"
+  HOST_CXX="$TOOLCHAIN/usr/bin/clang++"
+else
+  HOST_CC="cc"
+  HOST_CXX="c++"
+fi
+
 if [[ "$DISTCC" ]] ; then
     DISTCC_PUMP="$(which pump)"
     CMAKE_COMPILER_OPTIONS=(
         -DSWIFT_DISTCC="$(which distcc)"
         -DCMAKE_C_COMPILER="$(which distcc)"
-        -DCMAKE_C_COMPILER_ARG1="${CLANG}"
+        -DCMAKE_C_COMPILER_ARG1="${HOST_CC}"
         -DCMAKE_CXX_COMPILER="$(which distcc)"
-        -DCMAKE_CXX_COMPILER_ARG1="${CLANG}++"
+        -DCMAKE_CXX_COMPILER_ARG1="${HOST_CXX}"
     )
 else
     CMAKE_COMPILER_OPTIONS=(
-        -DCMAKE_C_COMPILER="${CLANG}"
-        -DCMAKE_CXX_COMPILER="${CLANG}++"
+        -DCMAKE_C_COMPILER="${HOST_CC}"
+        -DCMAKE_CXX_COMPILER="${HOST_CXX}"
     )
 fi
 
@@ -368,9 +380,6 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       (cd "${LLVM_BUILD_DIR}" &&
           "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
               -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-              -DCMAKE_CXX_FLAGS="-stdlib=libc++ ${CMAKE_CXX_FLAGS}" \
-              -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ ${CMAKE_EXE_LINKER_FLAGS}" \
-              -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++ ${CMAKE_SHARED_LINKER_FLAGS}" \
               -DLLVM_IMPLICIT_PROJECT_IGNORE="${LLVM_SOURCE_DIR}/tools/swift" \
               -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}" \
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
@@ -384,14 +393,23 @@ fi
 # Now build all the Swift products
 #
 
-SWIFT_CMAKE_OPTIONS=(
-    -DCMAKE_OSX_SYSROOT="${SYSROOT}"
-    -DMODULES_SDK="${SYSROOT}"
-    -DCMAKE_C_FLAGS="-isysroot${SYSROOT} ${CMAKE_C_FLAGS}"
-    -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT} ${CMAKE_CXX_FLAGS}"
-    -DSWIFT_RUN_LONG_TESTS="ON"
-    -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
-)
+if [[ "$(uname -s)" == "Darwin" ]] ; then
+  SWIFT_CMAKE_OPTIONS=(
+      -DCMAKE_OSX_SYSROOT="${SYSROOT}"
+      -DMODULES_SDK="${SYSROOT}"
+      -DCMAKE_C_FLAGS="-isysroot${SYSROOT} ${CMAKE_C_FLAGS}"
+      -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT} ${CMAKE_CXX_FLAGS}"
+      -DSWIFT_RUN_LONG_TESTS="ON"
+      -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
+  )
+else
+  SWIFT_CMAKE_OPTIONS=(
+      -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS}"
+      -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
+      -DSWIFT_RUN_LONG_TESTS="ON"
+      -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
+  )
+fi
 
 # set_ios_options options_var platform deployment_target internal_suffix arch
 function set_ios_options {
