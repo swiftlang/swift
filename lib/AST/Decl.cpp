@@ -73,6 +73,7 @@ StringRef Decl::getKindName(DeclKind K) {
 #define DECL(Id, Parent) case DeclKind::Id: return #Id;
 #include "swift/AST/DeclNodes.def"
   }
+  llvm_unreachable("bad DeclKind");
 }
 
 DescriptiveDeclKind Decl::getDescriptiveKind() const {
@@ -182,6 +183,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
    }
   }
 #undef TRIVIAL_KIND
+  llvm_unreachable("bad DescriptiveDeclKind");
 }
 
 StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
@@ -232,6 +234,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(EnumElement, "enum element");
   }
 #undef ENTRY
+  llvm_unreachable("bad DescriptiveDeclKind");
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
@@ -244,6 +247,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   case StaticSpellingKind::KeywordClass:
     return OS << "'class'";
   }
+  llvm_unreachable("bad StaticSpellingKind");
 }
 
 DeclContext *Decl::getInnermostDeclContext() {
@@ -691,6 +695,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::Var:
     return ImportKind::Var;
   }
+  llvm_unreachable("bad DeclKind");
 }
 
 Optional<ImportKind>
@@ -912,6 +917,7 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
     // Final properties can always be direct, even in classes.
     return !storage->isFinal();
   }
+  llvm_unreachable("bad DeclKind");
 }
 
 /// Determines the access semantics to use in a DeclRefExpr or
@@ -1040,6 +1046,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Protocol:
     return true;
   }
+  llvm_unreachable("bad DeclKind");
 }
 
 bool ValueDecl::isInstanceMember() const {
@@ -1095,6 +1102,7 @@ bool ValueDecl::isInstanceMember() const {
     // Non-static variables are instance members.
     return !cast<VarDecl>(this)->isStatic();
   }
+  llvm_unreachable("bad DeclKind");
 }
 
 bool ValueDecl::needsCapture() const {
@@ -2812,6 +2820,7 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   case BodyKind::Unparsed:
     return BodyRange;
   }
+  llvm_unreachable("bad BodyKind");
 }
 
 SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {

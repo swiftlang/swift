@@ -681,6 +681,7 @@ public:
     case DSOHandle:
       return false;
     }
+    llvm_unreachable("bad Kind");
   }
 
   bool isDSOHandle() const {

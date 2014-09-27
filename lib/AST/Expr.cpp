@@ -44,6 +44,7 @@ StringRef Expr::getKindName(ExprKind K) {
 #define EXPR(Id, Parent) case ExprKind::Id: return #Id;
 #include "swift/AST/ExprNodes.def"
   }
+  llvm_unreachable("bad ExprKind");
 }
 
 // Helper functions to verify statically whether the getSourceRange()

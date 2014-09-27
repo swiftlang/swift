@@ -1041,6 +1041,7 @@ static bool checkAccessibility(const DeclContext *useDC,
   case Accessibility::Public:
     return true;
   }
+  llvm_unreachable("bad Accessibility");
 }
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {

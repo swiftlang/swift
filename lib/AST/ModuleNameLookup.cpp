@@ -133,6 +133,7 @@ static ResolutionKind recordImportDecls(LazyResolver *typeResolver,
     return ResolutionKind::TypesOnly;
   }
 
+  llvm_unreachable("bad ResolutionKind");
 }
 
 /// Performs a qualified lookup into the given module and, if necessary, its

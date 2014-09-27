@@ -66,6 +66,7 @@ bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
 #define DECL(Id, Parent) case DeclKind::Id: return (Options & On##Id) != 0;
 #include "swift/AST/DeclNodes.def"
   }
+  llvm_unreachable("bad DeclKind");
 }
 
 const AvailabilityAttr *DeclAttributes::getUnavailable(
@@ -226,6 +227,7 @@ unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
   case DAK_##CLASS: return OPTIONS;
 #include "swift/AST/Attr.def"
   }
+  llvm_unreachable("bad DeclAttrKind");
 }
 
 StringRef DeclAttribute::getAttrName() const {
@@ -287,8 +289,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_ObjCBridged:
     return "<<ObjC bridged>>";
   }
+  llvm_unreachable("bad DeclAttrKind");
 }
-
 
 ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
                    Optional<ObjCSelector> name, SourceRange parenRange,

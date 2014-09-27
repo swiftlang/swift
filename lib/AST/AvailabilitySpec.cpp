@@ -32,6 +32,7 @@ StringRef VersionConstraintAvailabilitySpec::getComparisonAsString() const {
   case VersionComparison::GreaterThanEqual:
     return ">=";
   }
+  llvm_unreachable("bad VersionComparison");
 }
 
 SourceRange VersionConstraintAvailabilitySpec::getSourceRange() const {

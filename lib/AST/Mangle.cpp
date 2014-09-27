@@ -414,6 +414,7 @@ static OperatorFixity getDeclFixity(ValueDecl *decl) {
   case UnaryOperatorKind::Postfix: return OperatorFixity::Postfix;
   case UnaryOperatorKind::None: return OperatorFixity::Infix;
   }
+  llvm_unreachable("bad UnaryOperatorKind");
 }
 
 void Mangler::mangleDeclName(ValueDecl *decl) {

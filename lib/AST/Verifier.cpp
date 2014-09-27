@@ -478,6 +478,7 @@ struct ASTNodeBase {};
       case DeclContextKind::ExtensionDecl:
         return cast<ExtensionDecl>(dc)->getGenericParams();
       }
+      llvm_unreachable("bad DeclContextKind");
     }
 
     void pushScope(DeclContext *scope) {

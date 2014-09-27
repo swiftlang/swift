@@ -377,6 +377,7 @@ bool TypeBase::isUnspecializedGeneric() {
     return cast<SILBlockStorageType>(this)->getCaptureType()
         ->isUnspecializedGeneric();
   }
+  llvm_unreachable("bad TypeKind");
 }
 
 void

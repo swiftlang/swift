@@ -856,6 +856,7 @@ public:
     case SourceFileKind::SIL:
       return false;
     }
+    llvm_unreachable("bad SourceFileKind");
   }
   
   /// True if this source file contains the main class for the module.

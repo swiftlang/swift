@@ -2063,6 +2063,7 @@ private:
     case Node::Kind::WitnessTableOffset:
       return false;
     }
+    unreachable("bad node kind");
   }
 
   SugarType findSugar(NodePointer pointer) {

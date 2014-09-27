@@ -978,6 +978,7 @@ public:
     case IEEE128:
     case PPC128: return 128;
     }
+    llvm_unreachable("bad FPKind");
   }
 
   static bool classof(const TypeBase *T) {

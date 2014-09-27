@@ -49,7 +49,8 @@ switch (getKind()) {                                                         \
                     &InheritedProtocolConformance::Method,                   \
                   "Must override InheritedProtocolConformance::" #Method);   \
     return cast<InheritedProtocolConformance>(this)->Method Args;            \
-}
+}                                                                            \
+llvm_unreachable("bad ProtocolConformanceKind");
 
 /// Get the protocol being conformed to.
 ProtocolDecl *ProtocolConformance::getProtocol() const {
@@ -196,6 +197,7 @@ Type ProtocolConformance::getInterfaceType() const {
     // Assume a specialized conformance is fully applied.
     return getType();
   }
+  llvm_unreachable("bad ProtocolConformanceKind");
 }
 
 GenericSignature *ProtocolConformance::getGenericSignature() const {
@@ -391,6 +393,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
                                  ctxNewSubs);
   }
   }
+  llvm_unreachable("bad ProtocolConformanceKind");
 }
 
 ProtocolConformance *

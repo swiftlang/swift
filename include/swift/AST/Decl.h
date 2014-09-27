@@ -3439,6 +3439,7 @@ public:
     case Computed:
       return false;
     }
+    llvm_unreachable("bad StorageKindTy");
   }
 
   bool hasAccessorFunctions() const {
@@ -3450,6 +3451,7 @@ public:
     case Stored:
       return false;
     }
+    llvm_unreachable("bad StorageKindTy");
   }
 
   FuncDecl *getAccessorFunction(AccessorKind accessor) const;
@@ -4676,6 +4678,7 @@ public:
     case CtorInitializerKind::ConvenienceFactory:
       return true;
     }
+    llvm_unreachable("bad CtorInitializerKind");
   }
 
   /// Determine whether this initializer is inheritable.
@@ -4689,6 +4692,7 @@ public:
     case CtorInitializerKind::ConvenienceFactory:
       return true;
     }
+    llvm_unreachable("bad CtorInitializerKind");
   }
 
   /// Determine the failability of the initializer.

@@ -1361,5 +1361,6 @@ StringRef swift::getBuiltinName(BuiltinValueKind ID) {
     return Name;
 #include "swift/AST/Builtins.def"
   }
+  llvm_unreachable("bad BuiltinValueKind");
 }
 

@@ -17,6 +17,7 @@
 #include "swift/ReST/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace llvm {
 namespace rest {
@@ -109,6 +110,7 @@ static inline bool isBullet(LineKind K) {
   case LineKind::FieldList:
     return false;
   }
+  llvm_unreachable("bad LineKind");
 }
 
 static inline bool isEnumerated(LineKind K) {
@@ -134,6 +136,7 @@ static inline bool isEnumerated(LineKind K) {
   case LineKind::FieldList:
     return false;
   }
+  llvm_unreachable("bad LineKind");
 }
 
 enum class EnumeratorStyleKind {

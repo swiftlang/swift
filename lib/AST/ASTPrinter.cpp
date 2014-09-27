@@ -2179,6 +2179,7 @@ public:
       return std::max(getDepthOfType(req.getFirstType()),
                       getDepthOfType(req.getSecondType()));
     }
+    llvm_unreachable("bad RequirementKind");
   }
 
   void printGenericSignature(ArrayRef<GenericTypeParamType *> genericParams,

@@ -76,6 +76,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(this)->getDeclaredType();
   }
+  llvm_unreachable("bad DeclContextKind");
 }
 
 Type DeclContext::getDeclaredTypeInContext() const {
@@ -94,6 +95,7 @@ Type DeclContext::getDeclaredTypeInContext() const {
   case DeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(this)->getDeclaredTypeInContext();
   }
+  llvm_unreachable("bad DeclContextKind");
 }
 
 Type DeclContext::getDeclaredInterfaceType() const {
@@ -115,9 +117,8 @@ Type DeclContext::getDeclaredInterfaceType() const {
   case DeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(this)->getDeclaredInterfaceType();
   }
+  llvm_unreachable("bad DeclContextKind");
 }
-
-
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
   switch (getContextKind()) {
@@ -151,6 +152,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this)->getGenericParams();
   }
+  llvm_unreachable("bad DeclContextKind");
 }
 
 GenericSignature *DeclContext::getGenericSignatureOfContext() const {
@@ -179,6 +181,7 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this)->getGenericSignature();
   }
+  llvm_unreachable("bad DeclContextKind");
 }
 
 DeclContext *DeclContext::getLocalContext() {
@@ -320,8 +323,8 @@ bool DeclContext::isInnermostContextGeneric() const {
   default:
     return false;
   }
+  llvm_unreachable("bad DeclContextKind");
 }
-
 
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
@@ -343,6 +346,7 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     // Is there any point in trying to walk the expression?
     return false;
   }
+  llvm_unreachable("bad DeclContextKind");
 }
 
 void DeclContext::dumpContext() const {

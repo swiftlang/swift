@@ -46,6 +46,7 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
     return #Id;
 #include "swift/AST/KnownProtocols.def"
   }
+  llvm_unreachable("bad KnownProtocolKind");
 }
 
 struct ASTContext::Implementation {
@@ -265,6 +266,7 @@ struct ASTContext::Implementation {
       assert(CurrentConstraintSolverArena && "No constraint solver active?");
       return *CurrentConstraintSolverArena;
     }
+    llvm_unreachable("bad AllocationArena");
   }
 };
 
@@ -348,6 +350,7 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
     assert(Impl.CurrentConstraintSolverArena.get() != nullptr);
     return Impl.CurrentConstraintSolverArena->Allocator;
   }
+  llvm_unreachable("bad AllocationArena");
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
