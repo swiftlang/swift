@@ -518,19 +518,19 @@ public:
     return !P->isObjC();
   }
   
-  /// True if a type is passed at +0 when used as the "self" parameter of its
-  /// own methods.
+  /// True if a type is passed indirectly at +0 when used as the "self"
+  /// parameter of its own methods.
   ///
   /// TODO: We want this always to hold.
-  static bool isPlusZeroSelfParameter(Type T) {
+  static bool isIndirectPlusZeroSelfParameter(Type T) {
     // Calls through opaque protocols can be done with +0 rvalues.  This allows
     // us to avoid materializing copies of existentials.
     return !T->hasReferenceSemantics()
         && (T->isExistentialType() || T->is<ArchetypeType>());
   }
   
-  static bool isPlusZeroSelfParameter(SILType T) {
-    return isPlusZeroSelfParameter(T.getSwiftRValueType());
+  static bool isIndirectPlusZeroSelfParameter(SILType T) {
+    return isIndirectPlusZeroSelfParameter(T.getSwiftRValueType());
   }
   
   /// Is the given declaration resilient from the current context?

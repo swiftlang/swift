@@ -2970,6 +2970,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                     ManagedValue base,
                                                     AbstractFunctionDecl *decl){
+  auto accessorBaseTy
+    = decl->getDeclContext()->getDeclaredTypeInContext();
 
   if (base.isLValue()) {
     // inout bases get passed by their address.
@@ -2985,6 +2987,15 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
     base = emitLoad(loc, base.getValue(),
                     getTypeLowering(base.getType().getObjectType()),
                     SGFContext(), IsNotTake);
+  } else if (SGM.Types.isIndirectPlusZeroSelfParameter(accessorBaseTy)
+             && decl->isInstanceMember()) {
+    // When calling an opaque generic accessor, we need to pass the base
+    // indirectly at +0.
+    if (!base.getType().isAddress()) {
+      auto tmp = emitTemporaryAllocation(loc, base.getType());
+      B.createStore(loc, base.getValue(), tmp);
+      base = ManagedValue::forUnmanaged(tmp);
+    }
   }
 
   return RValueSource(loc, RValue(*this, loc,

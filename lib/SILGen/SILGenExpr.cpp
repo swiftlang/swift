@@ -677,11 +677,15 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   // If this is a non-direct access to a computed property, call the getter.
   if (FieldDecl->hasAccessorFunctions() &&
       semantics != AccessSemantics::DirectToStorage) {
+    
+    auto propertyBaseTy
+      = FieldDecl->getDeclContext()->getDeclaredTypeInContext();
+
     // If the base is +0, and this is a non-opaque-protocol/archetype base, emit
     // a retain_value to bring it to +1 since getters always take the base object
     // at +1.
     if (base.isPlusZeroRValueOrTrivial()
-        && !SGM.Types.isPlusZeroSelfParameter(base.getType()))
+        && !SGM.Types.isIndirectPlusZeroSelfParameter(propertyBaseTy))
       base = base.copyUnmanaged(*this, loc);
     
     RValueSource baseRV = prepareAccessorBaseArg(loc, base,

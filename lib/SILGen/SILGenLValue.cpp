@@ -1044,7 +1044,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     // Calls through opaque protocols can be done with +0 rvalues.  This allows
     // us to avoid materializing copies of existentials.
     SGFContext Ctx;
-    if (gen.SGM.Types.isPlusZeroSelfParameter(e->getType()))
+    if (gen.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()))
       Ctx = SGFContext::AllowPlusZero;
     
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
