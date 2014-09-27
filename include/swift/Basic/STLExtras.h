@@ -356,7 +356,7 @@ public:
 
   iterator begin() const { return iterator(Rng.begin(), Op); }
   iterator end() const { return iterator(Rng.end(), Op); }
-  bool empty() const { begin() == end(); }
+  bool empty() const { return begin() == end(); }
 
   typename std::iterator_traits<iterator>::value_type front() const { 
     assert(!empty() && "Front of empty range");
