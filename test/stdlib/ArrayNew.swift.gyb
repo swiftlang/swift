@@ -211,7 +211,9 @@ ArrayTestSuite.test("${array_self}/subscript(_: Range<Int>)/COW") {
     expectEqual(identityOuter, a.identity)
 
     // Currently reallocates storage, but how do we avoid this?..
-    expectNotEqual(identityInner, a[0].identity)
+    // TODO: We do avoid it now. This needs to be updated.
+    // rdar://problem/18461064
+    // expectNotEqual(identityInner, a[0].identity)
   }
 
   // Mutating through a subscript expression.
