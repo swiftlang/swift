@@ -774,7 +774,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleScopeContext()) {
     const ValueDecl *BaseDecl = nullptr;
-    const ValueDecl *MetaBaseDecl = nullptr;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     auto LS = LookupState::makeUnqalified();
@@ -806,7 +805,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       if (AFD->getExtensionType()) {
         ExtendedType = AFD->getExtensionType();
         BaseDecl = AFD->getImplicitSelfDecl();
-        MetaBaseDecl = ExtendedType->getAnyNominal();
         DC = DC->getParent();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
@@ -824,11 +822,9 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
       BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
-      MetaBaseDecl = BaseDecl;
     } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
       ExtendedType = ND->getDeclaredType();
       BaseDecl = ND;
-      MetaBaseDecl = BaseDecl;
     }
 
     if (BaseDecl) {
