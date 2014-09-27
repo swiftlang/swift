@@ -7,25 +7,30 @@ add_swift_executable(swift
   COMPONENT_DEPENDS bitreader bitwriter codegen ipo linker mcjit asmparser
                     selectiondag ${LLVM_TARGETS_TO_BUILD})
 
-find_library(CORE_FOUNDATION NAMES CoreFoundation)
-
-target_link_libraries(swift edit ${CORE_FOUNDATION})
+target_link_libraries(swift edit)
 
 # If building as part of clang, make sure the headers are installed.
 if(SWIFT_PATH_TO_CLANG_BUILD STREQUAL ${CMAKE_BINARY_DIR})
   add_dependencies(swift clang-headers)
 endif()
 
-execute_process(
-  COMMAND xcrun --toolchain default -f clang
-  OUTPUT_VARIABLE default_toolchain_compiler)
-get_filename_component(ARCLITE_BASE ${default_toolchain_compiler} PATH)
-get_filename_component(ARCLITE_BASE ${ARCLITE_BASE} PATH)
-set(SWIFT_REPL_ARCLITE "${ARCLITE_BASE}/lib/arc/libarclite_macosx.a")
-if (SWIFT_REPL_ARCLITE)
-  set_property(TARGET swift APPEND_STRING PROPERTY
-    LINK_FLAGS " -lobjc -Wl,-force_load,\"${SWIFT_REPL_ARCLITE}\"")
-endif (SWIFT_REPL_ARCLITE)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  # Link in CoreFoundation on Darwin.
+  find_library(CORE_FOUNDATION NAMES CoreFoundation)
+  target_link_libraries(swift ${CORE_FOUNDATION})
+
+  # Link in arclite on Darwin.
+  execute_process(
+    COMMAND xcrun --toolchain default -f clang
+    OUTPUT_VARIABLE default_toolchain_compiler)
+  get_filename_component(ARCLITE_BASE ${default_toolchain_compiler} PATH)
+  get_filename_component(ARCLITE_BASE ${ARCLITE_BASE} PATH)
+  set(SWIFT_REPL_ARCLITE "${ARCLITE_BASE}/lib/arc/libarclite_macosx.a")
+  if (SWIFT_REPL_ARCLITE)
+    set_property(TARGET swift APPEND_STRING PROPERTY
+      LINK_FLAGS " -lobjc -Wl,-force_load,\"${SWIFT_REPL_ARCLITE}\"")
+  endif()
+endif()
 
 if(MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )

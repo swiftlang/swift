@@ -31,19 +31,21 @@ add_custom_command(TARGET copy_shim_headers POST_BUILD
     "${SWIFTLIB_DIR}/clang"
   COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 
-# Symlink in arclite from the XcodeDefault toolchain.
-execute_process(COMMAND xcrun --toolchain XcodeDefault -find clang 
-  OUTPUT_VARIABLE toolchain_dir 
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-string(LENGTH "${toolchain_dir}" len)
-math(EXPR len "${len} - 14")  # "/usr/bin/clang"
-string(SUBSTRING "${toolchain_dir}" 0 ${len} toolchain_dir)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  # Symlink in arclite from the XcodeDefault toolchain.
+  execute_process(COMMAND xcrun --toolchain XcodeDefault -find clang 
+    OUTPUT_VARIABLE toolchain_dir 
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  string(LENGTH "${toolchain_dir}" len)
+  math(EXPR len "${len} - 14")  # "/usr/bin/clang"
+  string(SUBSTRING "${toolchain_dir}" 0 ${len} toolchain_dir)
 
-add_custom_command(TARGET copy_shim_headers POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E create_symlink
-    "${toolchain_dir}/usr/lib/arc"
-    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
-  COMMENT "Symlinking toolchain's arclite into ${SWIFTLIB_DIR}/arc")
+  add_custom_command(TARGET copy_shim_headers POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+      "${toolchain_dir}/usr/lib/arc"
+      "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
+    COMMENT "Symlinking toolchain's arclite into ${SWIFTLIB_DIR}/arc")
+endif()
 
 install(FILES ${sources} DESTINATION "lib/swift/shims")
 

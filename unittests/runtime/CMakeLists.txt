@@ -3,9 +3,11 @@ add_swift_unittest(SwiftRuntimeTests
   Enum.cpp
   )
 
-find_library(FOUNDATION_LIBRARY Foundation)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  find_library(FOUNDATION_LIBRARY Foundation)
+  target_link_libraries(SwiftRuntimeTests ${FOUNDATION_LIBRARY})
+endif()
 
 target_link_libraries(SwiftRuntimeTests
   swiftCore
-  ${FOUNDATION_LIBRARY}
   )
