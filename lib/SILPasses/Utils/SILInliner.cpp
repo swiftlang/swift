@@ -256,6 +256,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::RawPointerToRefInst:
     case ValueKind::RefToRawPointerInst:
 
+    case ValueKind::UpcastExistentialRefInst:
     case ValueKind::UpcastInst:
 
     case ValueKind::ThinToThickFunctionInst:
@@ -364,6 +365,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::UnownedReleaseInst:
     case ValueKind::UnownedRetainInst:
     case ValueKind::UnownedToRefInst:
+    case ValueKind::UpcastExistentialInst:
     case ValueKind::InitBlockStorageHeaderInst:
       return InlineCost::Expensive;
 

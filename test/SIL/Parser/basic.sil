@@ -278,6 +278,8 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   %4 = alloc_stack $protocol<Bendable, Runcible>
   // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
   %5 = copy_addr %2#1 to [initialization] %4#1 : $*protocol<Bendable, Runcible>
+  // CHECK: upcast_existential [take] {{.*}} : $*protocol<Bendable, Runcible> to {{.*}} : $*Runcible
+  %6 = upcast_existential [take] %4#1 : $*protocol<Bendable, Runcible> to %0 : $*Runcible
   %7 = tuple ()
   // CHECK: destroy_addr
   %8 = destroy_addr %4#1 : $*protocol<Bendable, Runcible>

@@ -661,6 +661,22 @@ public:
                                                  Conformances, &F));
   }
   
+  UpcastExistentialInst *createUpcastExistential(SILLocation Loc,
+                                 SILValue SrcExistential,
+                                 SILValue DestExistential,
+                                 IsTake_t isTakeOfSrc) {
+    return insert(new (F.getModule())
+                    UpcastExistentialInst(Loc, SrcExistential, DestExistential,
+                                          isTakeOfSrc));
+  }
+  
+  UpcastExistentialRefInst *createUpcastExistentialRef(SILLocation Loc,
+                                 SILValue Operand,
+                                 SILType Ty) {
+    return insert(new (F.getModule())
+                    UpcastExistentialRefInst(Loc, Operand, Ty));
+  }
+  
   DeinitExistentialInst *createDeinitExistential(SILLocation Loc,
                                                  SILValue Existential) {
     return insert(new (F.getModule()) DeinitExistentialInst(Loc, Existential));

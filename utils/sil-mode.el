@@ -95,9 +95,9 @@
                     "enum_is_tag")
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
-   `(,(regexp-opt '("init_existential" "deinit_existential"
+   `(,(regexp-opt '("init_existential" "upcast_existential" "deinit_existential"
                     "project_existential" "open_existential"
-                    "init_existential_ref"
+                    "init_existential_ref" "upcast_existential_ref"
                     "project_existential_ref" "open_existential_ref")
 		  'words) . font-lock-keyword-face)
    ;; Unchecked Conversions

@@ -2139,6 +2139,50 @@ public:
     : UnaryInstructionBase(Loc, Existential) {}
 };
 
+/// UpcastExistentialInst - Copies the concrete value from an existential
+/// container of a protocol type to another uninitialized existential container
+/// for a supertype of the original protocol type. The destination can be
+/// of a base protocol type or of a protocol composition that is a superset
+/// of the original type (or a protocol composition of base protocols).
+class UpcastExistentialInst : public SILInstruction {
+  unsigned IsTakeOfSrc : 1;
+  enum { SrcExistential, DestExistential };
+  FixedOperandList<2> Operands;
+public:
+  UpcastExistentialInst(SILLocation Loc,
+                        SILValue SrcExistential,
+                        SILValue DestExistential,
+                        IsTake_t isTakeOfSrc);
+
+  SILValue getSrcExistential() const { return Operands[SrcExistential].get(); }
+  SILValue getDestExistential() const { return Operands[DestExistential].get();}
+
+  /// True if the destination can take ownership of the concrete value from the
+  /// source.
+  IsTake_t isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::UpcastExistentialInst;
+  }
+};
+
+/// UpcastExistentialRefInst - Converts a value of class existential
+/// container to another, more general class existential container type.
+class UpcastExistentialRefInst
+  : public UnaryInstructionBase<ValueKind::UpcastExistentialRefInst,
+                                ConversionInst>
+{
+public:
+  UpcastExistentialRefInst(SILLocation Loc,
+                           SILValue Operand,
+                           SILType DestTy)
+    : UnaryInstructionBase(Loc, Operand, DestTy)
+  {}
+};
+
 /// Projects the capture storage address from a @block_storage address.
 class ProjectBlockStorageInst
   : public UnaryInstructionBase<ValueKind::ProjectBlockStorageInst,
