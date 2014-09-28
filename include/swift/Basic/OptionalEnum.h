@@ -13,13 +13,14 @@
 #ifndef SWIFT_BASIC_OPTIONALENUM_H
 #define SWIFT_BASIC_OPTIONALENUM_H
 
+#include "swift/Basic/type_traits.h"
 #include <type_traits>
 
 namespace swift {
   template<typename T>
   class OptionalEnum {
     using underlying_type = typename std::underlying_type<T>::type;
-    static_assert(std::is_trivially_copyable<T>::value, "type is not trivial");
+    static_assert(IsTriviallyCopyable<T>::value, "type is not trivial");
     static_assert(std::is_integral<underlying_type>::value,
                   "underlying type is not integral");
   public:
