@@ -1459,6 +1459,11 @@ public:
                     "init_existential result type must be the lowered "
                     "formal type at the right abstraction level");
 
+    require(isLoweringOf(AEI->getLoweredConcreteType(),
+                         AEI->getFormalConcreteType()),
+            "init_existential payload must be a lowering of the formal "
+            "concrete type");
+    
     for (ProtocolConformance *C : AEI->getConformances())
       // We allow for null conformances.
       require(!C || AEI->getModule().lookUpWitnessTable(C, false).first,
@@ -1483,6 +1488,11 @@ public:
     requireSameType(concreteType, loweredTy,
                     "init_existential_ref operand must be lowered to the right "
                     "abstraction level for the existential");
+    
+    require(isLoweringOf(IEI->getOperand().getType(),
+                         IEI->getFormalConcreteType()),
+            "init_existential_ref operand must be a lowering of the formal "
+            "concrete type");
     
     for (ProtocolConformance *C : IEI->getConformances())
       // We allow for null conformances.
