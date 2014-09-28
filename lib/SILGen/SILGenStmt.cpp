@@ -339,11 +339,10 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
 
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = createBasicBlock();
-  BreakContinueDestStack.push_back({
-    S,
-    JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-    JumpDest(LoopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
-  });
+  BreakContinueDestStack.push_back(std::make_tuple(
+      S,
+      JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+      JumpDest(LoopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))));
 
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
@@ -382,12 +381,11 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = createBasicBlock();
   SILBasicBlock *CondBB = createBasicBlock();
-  BreakContinueDestStack.push_back({
-    S,
-    JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-    JumpDest(CondBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
-  });
-  
+  BreakContinueDestStack.push_back(std::make_tuple(
+      S,
+      JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+      JumpDest(CondBB, getCleanupsDepth(), CleanupLocation(S->getBody()))));
+
   // Emit the body, which is always evaluated the first time around.
   visit(S->getBody());
 
@@ -437,12 +435,11 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *IncBB = createBasicBlock();
   SILBasicBlock *EndBB = createBasicBlock();
-  BreakContinueDestStack.push_back({
-    S,
-    JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-    JumpDest(IncBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
-  });
-  
+  BreakContinueDestStack.push_back(std::make_tuple(
+      S,
+      JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+      JumpDest(IncBB, getCleanupsDepth(), CleanupLocation(S->getBody()))));
+
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
   Condition Cond = S->getCond().isNonNull() ?
@@ -519,12 +516,11 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   
   // Set the destinations for 'break' and 'continue'.
   SILBasicBlock *EndBB = createBasicBlock();
-  BreakContinueDestStack.push_back({
-    S,
-    JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-    JumpDest(LoopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
-  });
-  
+  BreakContinueDestStack.push_back(std::make_tuple(
+      S,
+      JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+      JumpDest(LoopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))));
+
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
   {

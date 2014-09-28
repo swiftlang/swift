@@ -2027,8 +2027,9 @@ commit_to_conversions:
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
-    ConstraintRestrictions.push_back({type1, type2, *restriction});
-    
+    ConstraintRestrictions.push_back(
+        std::make_tuple(type1, type2, *restriction));
+
     if (flags & TMF_UnwrappingOptional) {
       subFlags |= TMF_UnwrappingOptional;
     }

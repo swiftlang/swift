@@ -1845,7 +1845,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Enter a break/continue scope.  If we wanted a continue
   // destination, it would probably be out here.
-  BreakContinueDestStack.push_back({ S, contDest, JumpDest(S) });
+  BreakContinueDestStack.push_back(std::make_tuple(S, contDest, JumpDest(S)));
 
   SwitchContext switchContext = { emission };
   SwitchStack.push_back(&switchContext);

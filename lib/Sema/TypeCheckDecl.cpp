@@ -5503,7 +5503,7 @@ public:
       }
 
       if (declTy->isEqual(parentDeclTy)) {
-        matches.push_back({parentDecl, true, parentDeclTy});
+        matches.push_back(std::make_tuple(parentDecl, true, parentDeclTy));
         hadExactMatch = true;
         continue;
       }
@@ -5512,14 +5512,15 @@ public:
       // the types don't line up, since you can't overload properties based on
       // types.
       if (isa<VarDecl>(parentDecl)) {
-        matches.push_back({parentDecl, false, parentDeclTy});
+        matches.push_back(std::make_tuple(parentDecl, false, parentDeclTy));
         continue;
       }
 
       // Failing that, check for subtyping.
       if (declTy->canOverride(parentDeclTy, parentDecl->isObjC(), &TC)) {
         // If the Objective-C selectors match, always call it exact.
-        matches.push_back({parentDecl, objCMatch, parentDeclTy});
+        matches.push_back(
+            std::make_tuple(parentDecl, objCMatch, parentDeclTy));
         hadExactMatch |= objCMatch;
         continue;
       }
