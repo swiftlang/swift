@@ -37,18 +37,6 @@ template <class T> static T *copy(T *dest, T *src, const Metadata *self) {
   return dest;
 }
 
-// Work around a Xcode 4.5 bug (rdar://12288058) by explicitly
-// instantiating this function template at the types we'll need.
-#define INSTANTIATE(TYPE) \
-  template TYPE *copy<TYPE>(TYPE*, TYPE*, const Metadata*);
-INSTANTIATE(bool);
-INSTANTIATE(uint8_t);
-INSTANTIATE(uint16_t);
-INSTANTIATE(uint32_t);
-INSTANTIATE(uint64_t);
-INSTANTIATE(uintptr_t);
-#undef INSTANTIATE
-
 #define POD_VALUE_WITNESS_TABLE(TYPE, SIZE) { \
   (value_witness_types::destroyBuffer*) &doNothing,                     \
   (value_witness_types::initializeBufferWithCopyOfBuffer*) &copy<TYPE>, \
