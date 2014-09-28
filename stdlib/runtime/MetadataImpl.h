@@ -40,6 +40,7 @@
 #define SWIFT_RUNTIME_METADATAIMPL_H
 
 #include "llvm/Support/Compiler.h"
+#include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 #include <cstring>
@@ -298,11 +299,19 @@ struct ObjCRetainableBox : RetainableBoxBase<ObjCRetainableBox, void*> {
 /// A box implementation class for unknown-retainable object pointers.
 struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
   static void *retain(void *obj) {
+#if SWIFT_OBJC_INTEROP
     return swift_unknownRetain(obj);
+#else
+    return swift_retain(static_cast<HeapObject *>(obj));
+#endif
   }
 
   static void release(void *obj) {
+#if SWIFT_OBJC_INTEROP
     swift_unknownRelease(obj);
+#else
+    swift_release(static_cast<HeapObject *>(obj));
+#endif
   }
 };
 

@@ -106,12 +106,14 @@ int swift::swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
   // probably won't need to.
   if (val >= LeastValidPointerValue)
     return -1;
-  
+
+#if SWIFT_OBJC_INTEROP
   // Return -1 for ObjC tagged pointers.
   // FIXME: This check is unnecessary for known-Swift types.
   if (isObjCTaggedPointer((const void*) val))
     return -1;
-  
+#endif
+
   return (int)(val >> ObjCReservedLowBits);
 }
 
