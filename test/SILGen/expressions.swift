@@ -375,13 +375,6 @@ func erasure(x: Spoon) -> Mincible {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_TF11expressions18erasure_from_proto
-func erasure_from_proto(x: protocol<Wibbleable, Bendable>) -> Bendable {
-  return x
-  // CHECK: upcast_existential
-  // CHECK: return
-}
-
 // CHECK-LABEL: sil hidden @_TF11expressions19declref_to_metatypeFT_MVS_5Spoon
 func declref_to_metatype() -> Spoon.Type {
   return Spoon.self
