@@ -20,14 +20,16 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <malloc/malloc.h>
-#include <asl.h>
 #include "Debug.h"
 
+#ifdef __APPLE__
+#include <asl.h>
+#endif
 
 #if SWIFT_HAVE_CRASHREPORTERCLIENT
 
 #include <CrashReporterClient.h>
+#include <malloc/malloc.h>
 
 // Report a message to any forthcoming crash log.
 static void
@@ -67,7 +69,9 @@ static void
 reportNow(const char *message)
 {
   write(STDERR_FILENO, message, strlen(message));
+#ifdef __APPLE__
   asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
+#endif
 }
 
 
