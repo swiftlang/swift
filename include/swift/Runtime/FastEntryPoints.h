@@ -19,7 +19,9 @@
 
 // Note: This file is #included in assembly files.
 
+#ifdef __APPLE__
 #include <TargetConditionals.h>
+#endif
 #include "../../../stdlib/shims/RefCount.h"
 
 #define RC_OFFSET 0x8
