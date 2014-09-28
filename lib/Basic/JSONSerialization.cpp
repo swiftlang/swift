@@ -197,7 +197,7 @@ void Output::scalarString(StringRef &S, bool MustQuote) {
         break;
       default:
         // Otherwise, check to see if the current byte is a control character.
-        if (c >= '\x00' && c <= '\x1F') {
+        if (c <= '\x1F') {
           // Since we have a control character, we need to escape it using
           // JSON's only valid escape sequence: \uxxxx (where x is a hex digit).
 
