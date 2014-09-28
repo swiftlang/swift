@@ -22,7 +22,7 @@
 
 namespace swift {
 
-/// \brief Describes the kind of a requirement that occurs within a requirements
+/// Describes the kind of a requirement that occurs within a requirements
 /// clause.
 enum class RequirementKind : unsigned int {
   /// A conformance requirement T : P, where T is a type that depends
@@ -37,6 +37,9 @@ enum class RequirementKind : unsigned int {
   /// FIXME: This is a crutch used to help us eliminate various walks over
   /// "all archetypes".
   WitnessMarker
+
+  // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
+  // when adding enumerators.
 };
 
 /// \brief A single requirement placed on the type parameters (or associated

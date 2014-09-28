@@ -828,7 +828,7 @@ public:
 /// never generated implicitly.
 class RequirementRepr {
   SourceLoc SeparatorLoc;
-  RequirementKind Kind : 1;
+  RequirementKind Kind : 2;
   bool Invalid : 1;
   TypeLoc Types[2];
 
