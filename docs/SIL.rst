@@ -2909,26 +2909,6 @@ initialized existential container can be destroyed with ``destroy_addr`` as
 usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
 existential container.
 
-upcast_existential
-``````````````````
-::
-
-  sil-instruction ::= 'upcast_existential' '[take]'? sil-operand
-                        'to' sil-operand
-
-  upcast_existential %0 : $*protocol<P, Q> to %1 : $*P
-  // %0 must be the address of a non-class protocol or protocol composition
-  //   type
-  // %1 must be the address of a non-class protocol or protocol composition
-  //   type that is a supertype of %0
-
-Initializes the memory referenced by the destination ``%1`` with the value
-contained in the existing existential container referenced by ``%0``. 
-The ``[take]`` attribute may be applied to the instruction, in which case,
-the source existential container is destroyed and ownership of the contained
-value is taken by the destination. Without the ``[take]`` attribute, the
-destination receives an independently-owned copy of the value.
-
 deinit_existential
 ``````````````````
 ::
@@ -3017,20 +2997,6 @@ init_existential_ref
 
 Creates a class existential container of type ``$P`` containing a reference to
 the class instance ``%0``.
-
-upcast_existential_ref
-``````````````````````
-::
-
-  sil-instruction ::= 'upcast_existential_ref' sil-operand 'to' sil-type
-
-  %1 = upcast_existential_ref %0 : $protocol<P, Q> to $P
-  // %0 must be of a class protocol or protocol composition type
-  // $P must be a class protocol or protocol composition type that is a
-  //   supertype of %0's type
-
-Converts a class existential container to a more general protocol or protocol
-composition type.
 
 project_existential_ref
 ```````````````````````

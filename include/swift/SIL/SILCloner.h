@@ -1029,26 +1029,6 @@ SILCloner<ImplClass>::visitDeinitExistentialInst(DeinitExistentialInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitUpcastExistentialInst(UpcastExistentialInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createUpcastExistential(getOpLocation(Inst->getLoc()),
-                                         getOpValue(Inst->getSrcExistential()),
-                                         getOpValue(Inst->getDestExistential()),
-                                         (IsTake_t)Inst->isTakeOfSrc()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::
-visitUpcastExistentialRefInst(UpcastExistentialRefInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createUpcastExistentialRef(getOpLocation(Inst->getLoc()),
-                                            getOpValue(Inst->getOperand()),
-                                            getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {
   doPostProcess(Inst,
     Builder.createCopyBlock(getOpLocation(Inst->getLoc()),

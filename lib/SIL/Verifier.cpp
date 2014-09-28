@@ -1500,34 +1500,6 @@ public:
               "Could not find witness table for conformance.");
   }
 
-  void checkUpcastExistentialInst(UpcastExistentialInst *UEI) {
-    SILType srcType = UEI->getSrcExistential().getType();
-    SILType destType = UEI->getDestExistential().getType();
-    require(srcType != destType,
-            "can't upcast_existential to same type");
-    require(srcType.isExistentialType(),
-            "upcast_existential source must be existential");
-    require(destType.isAddress(),
-            "upcast_existential dest must be an address");
-    require(destType.isExistentialType(),
-            "upcast_existential dest must be address of existential");
-    require(!destType.isClassExistentialType(),
-            "upcast_existential dest must be non-class existential");
-  }
-
-  void checkUpcastExistentialRefInst(UpcastExistentialRefInst *UEI) {
-    require(UEI->getOperand().getType() != UEI->getType(),
-            "can't upcast_existential_ref to same type");
-    require(UEI->getOperand().getType().isObject(),
-            "upcast_existential_ref operand must not be an address");
-    require(UEI->getOperand().getType().isClassExistentialType(),
-            "upcast_existential_ref operand must be class existential");
-    require(UEI->getType().isObject(),
-            "upcast_existential_ref result must not be an address");
-    require(UEI->getType().isClassExistentialType(),
-            "upcast_existential_ref result must be class existential");
-  }
-
   void checkDeinitExistentialInst(DeinitExistentialInst *DEI) {
     SILType exType = DEI->getOperand().getType();
     require(exType.isAddress(),

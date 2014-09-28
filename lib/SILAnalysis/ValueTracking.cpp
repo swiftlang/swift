@@ -94,7 +94,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::DynamicMethodBranchInst:
   case ValueKind::ReturnInst:
   case ValueKind::AutoreleaseReturnInst:
-  case ValueKind::UpcastExistentialInst:
   case ValueKind::FixLifetimeInst:
     return false;
 
@@ -154,7 +153,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::UnconditionalCheckedCastAddrInst:
   case ValueKind::UnmanagedToRefInst:
   case ValueKind::UnownedToRefInst:
-  case ValueKind::UpcastExistentialRefInst:
   case ValueKind::UpcastInst:
     return true;
 
