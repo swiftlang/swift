@@ -30,6 +30,7 @@ StringRef swift::platformString(PlatformKind platform) {
     return #X;
 #include "swift/AST/PlatformKinds.def"
   }
+  llvm_unreachable("bad PlatformKind");
 }
 
 StringRef swift::prettyPlatformString(PlatformKind platform) {
@@ -41,6 +42,7 @@ StringRef swift::prettyPlatformString(PlatformKind platform) {
     return PrettyName;
 #include "swift/AST/PlatformKinds.def"
   }
+  llvm_unreachable("bad PlatformKind");
 }
 
 Optional<PlatformKind> swift::platformFromString(StringRef Name) {
@@ -72,6 +74,7 @@ bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
     case PlatformKind::none:
       llvm_unreachable("handled above");
   }
+  llvm_unreachable("bad PlatformKind");
 }
 
 PlatformKind swift::targetPlatform(LangOptions &LangOpts) {

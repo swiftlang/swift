@@ -38,6 +38,7 @@ StringRef Stmt::getKindName(StmtKind K) {
 #define STMT(Id, Parent) case StmtKind::Id: return #Id;
 #include "swift/AST/StmtNodes.def"
   }
+  llvm_unreachable("bad StmtKind");
 }
 
 // Helper functions to verify statically whether the getSourceRange()

@@ -190,6 +190,7 @@ public:
     case TypeWalker::Action::Stop:
       return true;
     }
+    llvm_unreachable("bad TypeWalker::Action");
   }
 };
 

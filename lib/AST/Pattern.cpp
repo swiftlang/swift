@@ -45,6 +45,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
   case PatternKind::EnumElement:
     return OS << "enum case matching pattern";
   }
+  llvm_unreachable("bad PatternKind");
 }
 
 StringRef Pattern::getKindName(PatternKind K) {
@@ -52,6 +53,7 @@ StringRef Pattern::getKindName(PatternKind K) {
 #define PATTERN(Id, Parent) case PatternKind::Id: return #Id;
 #include "swift/AST/PatternNodes.def"
   }
+  llvm_unreachable("bad PatternKind");
 }
 
 // Metaprogram to verify that every concrete class implements
