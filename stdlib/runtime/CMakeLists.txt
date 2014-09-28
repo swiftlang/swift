@@ -25,22 +25,29 @@ if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND SWIFT_RUNTIME_COMPILE_FLAGS "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set(SWIFT_RUNTIME_OBJC_SOURCES
+    Availability.mm
+    SwiftObject.mm
+    NSSwiftXXXBase.mm.gyb
+    Reflection.mm)
+else()
+  set(SWIFT_RUNTIME_OBJC_SOURCES)
+endif()
+
 add_swift_library(swiftRuntime
-  Availability.mm
   Casting.cpp
   Demangle.cpp
   HeapObject.cpp
   KnownMetadata.cpp
   Metadata.cpp
   Stubs.cpp
-  SwiftObject.mm
-  NSSwiftXXXBase.mm.gyb
   Enum.cpp
   Once.cpp
-  Reflection.mm
   Heap.cpp
   Errors.cpp
   UnicodeExtendedGraphemeClusters.cpp.gyb
+  ${SWIFT_RUNTIME_OBJC_SOURCES}
   COMPILE_FLAGS ${SWIFT_RUNTIME_COMPILE_FLAGS}
   TARGET_LIBRARY INSTALL
   FRAMEWORK_DEPENDS Foundation)
