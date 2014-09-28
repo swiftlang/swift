@@ -58,7 +58,7 @@ std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
 UnimplementedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF,
                                                         SILType T) const {
   llvm::Value *undef = getUndefSize(IGF.IGM);
-  return {undef, undef, undef};
+  return std::make_tuple(undef, undef, undef);
 }
 
 llvm::Value *UnimplementedTypeInfo::getSize(IRGenFunction &IGF, SILType T)

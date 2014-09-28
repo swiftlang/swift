@@ -1808,7 +1808,7 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls) {
   auto classFields = builder.emitRODataFields(ForClass);
   auto metaclassFields = builder.emitRODataFields(ForMetaClass);
   Size size(IGM.DataLayout.getTypeAllocSize(classFields->getType()));
-  return {classFields, metaclassFields, size};
+  return std::make_tuple(classFields, metaclassFields, size);
 }
   
 /// Emit the metadata for an ObjC category.

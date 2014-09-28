@@ -747,7 +747,7 @@ SILModule::findFuncInWitnessTable(const ProtocolConformance *C,
   if (!Ret.first) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
           C->dump());
-    return {nullptr, nullptr, ArrayRef<Substitution>()};
+    return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
   }
 
   // Okay, we found the correct witness table. Now look for the method.
@@ -761,10 +761,10 @@ SILModule::findFuncInWitnessTable(const ProtocolConformance *C,
     if (MethodEntry.Requirement != Member)
       continue;
 
-    return {MethodEntry.Witness, Ret.first, Ret.second};
+    return std::make_tuple(MethodEntry.Witness, Ret.first, Ret.second);
   }
 
-  return {nullptr, nullptr, ArrayRef<Substitution>()};
+  return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
 }
 
 static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {
