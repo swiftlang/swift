@@ -28,6 +28,8 @@
 #endif
 
 #include <poll.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #if !defined(__APPLE__)
 extern char **environ;
