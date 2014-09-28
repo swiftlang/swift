@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <mach/mach_time.h>
 #include <sys/resource.h>
 #include <sys/errno.h>
 #include <unistd.h>

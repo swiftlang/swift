@@ -23,7 +23,6 @@
 #include "Private.h"
 #include "Debug.h"
 #include <algorithm>
-#include <malloc/malloc.h>
 #include <cassert>
 #include <cstring>
 #include <cstdio>
