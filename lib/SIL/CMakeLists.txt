@@ -22,7 +22,7 @@ add_swift_library(swiftSIL
   SILValue.cpp
   SILDeclRef.cpp
   LoopInfo.cpp
-  DEPENDS swiftAST)
+  DEPENDS swiftAST swiftSerialization)
 
 # Clang dependencies.
 # FIXME: remove this.  SIL should not depend on Clang.
