@@ -292,8 +292,8 @@ if [[ "$(uname -s)" == "Darwin" ]] ; then
   HOST_CC="$TOOLCHAIN/usr/bin/clang"
   HOST_CXX="$TOOLCHAIN/usr/bin/clang++"
 else
-  HOST_CC="cc"
-  HOST_CXX="c++"
+  HOST_CC="clang"
+  HOST_CXX="clang++"
 fi
 
 if [[ "$DISTCC" ]] ; then
