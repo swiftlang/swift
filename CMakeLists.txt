@@ -1409,10 +1409,12 @@ macro(add_swift_executable name)
       LINK_FLAGS " -Xlinker -rpath -Xlinker @executable_path/../lib/swift/${SWIFTLIB_SUBDIR}")
   endif()
  
-  # ASan does not play well with exported_symbol option. This should be fixed soon.
-  if(NOT SWIFT_ASAN_BUILD)
-    set_property(TARGET ${name} APPEND_STRING PROPERTY
-      LINK_FLAGS " -Xlinker -exported_symbol -Xlinker _main")
+  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    # ASan does not play well with exported_symbol option. This should be fixed soon.
+    if(NOT SWIFT_ASAN_BUILD)
+      set_property(TARGET ${name} APPEND_STRING PROPERTY
+        LINK_FLAGS " -Xlinker -exported_symbol -Xlinker _main")
+    endif()
   endif()
 endmacro(add_swift_executable)
 
