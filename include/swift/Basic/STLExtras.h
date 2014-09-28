@@ -432,7 +432,7 @@ public:
     : Current(current), End(end), Op(op) 
   { 
     // Assert that the iterators have already been primed.
-    assert(Current == End || Op(*Current) && "Not primed!");
+    assert((Current == End || Op(*Current)) && "Not primed!");
   }
 
   reference operator*() const {

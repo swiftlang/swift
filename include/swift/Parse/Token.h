@@ -129,7 +129,7 @@ public:
   bool isEscapedIdentifier() const { return EscapedIdentifier; }
   /// \brief Set whether this token is an escaped identifier token.
   void setEscapedIdentifier(bool value) {
-    assert(!value || Kind == tok::identifier &&
+    assert((!value || Kind == tok::identifier) &&
            "only identifiers can be escaped identifiers");
     EscapedIdentifier = value;
   }

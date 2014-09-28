@@ -2940,7 +2940,7 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
                          ? BodyParams[1]->numTopLevelVariables()
                          : BodyParams[0]->numTopLevelVariables();
   auto Name = getFullName();
-  assert(!Name || !Name.isSimpleName() && "Must have a simple name");
+  assert((!Name || !Name.isSimpleName()) && "Must have a simple name");
   assert(!Name || (Name.getArgumentNames().size() == NumParams));
 #endif
 
