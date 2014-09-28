@@ -14,6 +14,7 @@
 #define SWIFT_SIL_SILALLOCATED_H
 
 #include "swift/Basic/LLVM.h"
+#include <stddef.h>
 
 namespace swift {
   class SILModule;

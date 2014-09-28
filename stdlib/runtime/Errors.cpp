@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include "Debug.h"
 
 #ifdef __APPLE__

@@ -16,6 +16,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
