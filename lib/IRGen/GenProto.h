@@ -57,6 +57,24 @@ namespace irgen {
                                  SILType instanceLoweredType,
                                  ArrayRef<ProtocolConformance*> conformances);
 
+  /// Initialize an opaque existential container using the value and metadata
+  /// from an existing, more specific opaque existential container.
+  void emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
+                                  Address dest,
+                                  SILType destType,
+                                  Address src,
+                                  SILType srcType,
+                                  bool isTakeOfSrc);
+  
+  /// Initialize a class existential container using the value and
+  /// metadata from an existing, more specific class existential
+  /// container.
+  void emitClassExistentialContainerUpcast(IRGenFunction &IGF,
+                                  Explosion &dest,
+                                  SILType destType,
+                                  Explosion &src,
+                                  SILType srcType);
+  
   /// "Deinitialize" an existential container whose contained value is allocated
   /// but uninitialized, by deallocating the buffer owned by the container if any.
   void emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
