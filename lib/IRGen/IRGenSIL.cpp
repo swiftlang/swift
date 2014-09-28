@@ -646,8 +646,6 @@ public:
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
-  void visitUpcastExistentialInst(UpcastExistentialInst *i);
-  void visitUpcastExistentialRefInst(UpcastExistentialRefInst *i);
   void visitDeinitExistentialInst(DeinitExistentialInst *i);
   
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
@@ -3176,30 +3174,6 @@ void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
                                i->getOperand().getType(),
                                i->getConformances());
   setLoweredExplosion(SILValue(i, 0), result);
-}
-
-void IRGenSILFunction::visitUpcastExistentialInst(
-                                              swift::UpcastExistentialInst *i) {
-  /// FIXME: Handle source existential being class existential.
-  Address src = getLoweredAddress(i->getSrcExistential());
-  Address dest = getLoweredAddress(i->getDestExistential());
-  SILType srcType = i->getSrcExistential().getType();
-  SILType destType = i->getDestExistential().getType();
-  emitOpaqueExistentialContainerUpcast(*this, dest, destType, src, srcType,
-                                       i->isTakeOfSrc());
-}
-
-void IRGenSILFunction::visitUpcastExistentialRefInst(
-                                           swift::UpcastExistentialRefInst *i) {
-  Explosion src = getLoweredExplosion(i->getOperand());
-  Explosion dest;
-  SILType srcType = i->getOperand().getType();
-  SILType destType = i->getType();
-  
-  emitClassExistentialContainerUpcast(*this, dest, destType,
-                                             src, srcType);
-  
-  setLoweredExplosion(SILValue(i, 0), dest);
 }
 
 void IRGenSILFunction::visitDeinitExistentialInst(

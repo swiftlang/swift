@@ -1238,8 +1238,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("unowned_to_ref", ValueKind::UnownedToRefInst)
     .Case("unreachable", ValueKind::UnreachableInst)
     .Case("upcast", ValueKind::UpcastInst)
-    .Case("upcast_existential", ValueKind::UpcastExistentialInst)
-    .Case("upcast_existential_ref", ValueKind::UpcastExistentialRefInst)
     .Default(ValueKind::SILArgument);
 
   if (Opcode != ValueKind::SILArgument) {
@@ -1704,7 +1702,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ThickToObjCMetatypeInst:
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::ConvertFunctionInst:
-  case ValueKind::UpcastExistentialRefInst:
   case ValueKind::ObjCExistentialMetatypeToObjectInst:
   case ValueKind::ObjCMetatypeToObjectInst: {
     SILType Ty;
@@ -1773,9 +1770,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::ObjCToThickMetatypeInst:
       ResultVal = B.createObjCToThickMetatype(InstLoc, Val, Ty);
-      break;
-    case ValueKind::UpcastExistentialRefInst:
-      ResultVal = B.createUpcastExistentialRef(InstLoc, Val, Ty);
       break;
     case ValueKind::ObjCMetatypeToObjectInst:
       ResultVal = B.createObjCMetatypeToObject(InstLoc, Val, Ty);
@@ -2448,26 +2442,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createCopyAddr(InstLoc, SrcLVal, DestLVal,
                                  IsTake_t(IsTake),
                                  IsInitialization_t(IsInit));
-    break;
-  }
-  case ValueKind::UpcastExistentialInst: {
-    SILValue DestVal;
-    SourceLoc SrcLoc, DestLoc, ToLoc;
-    Identifier ToToken;
-    bool IsTake = false;
-    if (parseSILOptional(IsTake, *this, "take") ||
-        parseTypedValueRef(Val, SrcLoc) ||
-        parseSILIdentifier(ToToken, ToLoc,
-                           diag::expected_tok_in_sil_instr, "to") ||
-        parseTypedValueRef(DestVal, DestLoc))
-      return true;
-
-    if (ToToken.str() != "to") {
-      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
-      return true;
-    }
-    ResultVal = B.createUpcastExistential(InstLoc, Val, DestVal,
-                                          IsTake_t(IsTake));
     break;
   }
   case ValueKind::StructInst: {
