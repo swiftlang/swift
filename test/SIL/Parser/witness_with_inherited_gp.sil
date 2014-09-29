@@ -31,3 +31,22 @@ sil_witness_table <Base : SequenceType> mmEnumerateSequence<Base>: _Sequence_Typ
   associated_type Generator: mmEnumerateGenerator<Base.Generator>
   associated_type_protocol (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
 }
+
+public struct _mmArrayBuffer<T> : CollectionType {
+  public typealias Element = T
+  public var startIndex: Int { get }
+  public var endIndex: Int { get }
+  public subscript(i: Int) -> T { get }
+  public func generate() -> IndexingGenerator<_mmArrayBuffer>
+}
+
+sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithGP {
+  base_protocol _SequenceType: <T> _mmArrayBuffer<T>: _SequenceType module WitnessTableWithGP
+  associated_type Generator: IndexingGenerator<_mmArrayBuffer<T>>
+  associated_type_protocol (Generator: GeneratorType): IndexingGenerator<_mmArrayBuffer<T>>: specialize <C = _mmArrayBuffer<T>, C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C : _CollectionType> IndexingGenerator<C>: GeneratorType module Swift)
+}
+
+// CHECK: sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithGP {
+// CHECK: base_protocol _SequenceType: <T> _mmArrayBuffer<T>: _SequenceType module WitnessTableWithGP
+// CHECK: associated_type Generator: IndexingGenerator<_mmArrayBuffer<T>>
+// CHECK: associated_type_protocol (Generator: GeneratorType): IndexingGenerator<_mmArrayBuffer<T>>: specialize <C = _mmArrayBuffer<T>, C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C : _CollectionType> IndexingGenerator<C>: GeneratorType module Swift)

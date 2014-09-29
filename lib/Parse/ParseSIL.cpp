@@ -1309,6 +1309,83 @@ bool SILParser::parseApplySubstitutions(
   return false;
 }
 
+/// Get ProtocolConformance for a replacement type.
+static ProtocolConformance*
+getConformanceOfReplacement(Parser &P, Type subReplacement,
+                            ProtocolDecl *proto) {
+  auto conformance = P.SF.getParentModule()->lookupConformance(
+                       subReplacement, proto, nullptr);
+  if (conformance.getPointer())
+    return conformance.getPointer();
+
+  // Handle self conformance.
+  if (!conformance.getPointer() &&
+      conformance.getInt() != ConformanceKind::DoesNotConform &&
+      subReplacement->is<ProtocolType>())
+    return P.Context.getConformance(subReplacement, proto,
+                                    SourceLoc(), nullptr,
+                                    ProtocolConformanceState::Incomplete);
+  return nullptr;
+}
+
+/// Return true if B is derived from A.
+static bool isDerivedFrom(ArchetypeType *A, ArchetypeType *B) {
+  if (A == B)
+    return true;
+  auto *p = B;
+  while ((p = p->getParent())) {
+    if (p == A)
+      return true;
+  }
+  return false;
+}
+
+/// Collect conformances by looking up the conformance from replacement
+/// type and protocol decl in GenericParamList.
+static bool getConformancesForSubstitution(Parser &P,
+              GenericParamList *gp, ArchetypeType *subArchetype,
+              Type subReplacement, SourceLoc loc,
+              SmallVectorImpl<ProtocolConformance*> &conformances) {
+  for (auto params = gp; params; params = params->getOuterParameters()) {
+    for (auto param : *params) {
+      if (param->getInherited().empty())
+        continue;
+
+      auto *pArch = param->getArchetype();
+      if (!pArch || !isDerivedFrom(pArch, subArchetype))
+        continue;
+
+      // If subArchetype is C.Index and we have C inherits from P, we
+      // need to find the protocol conformance to P.Index. For now, we
+      // check if the replacement type conforms to subArchetype->getConformsTo.
+      for (auto *proto : subArchetype->getConformsTo())
+        if (auto *pConform =
+            getConformanceOfReplacement(P, subReplacement, proto))
+          conformances.push_back(pConform);
+    }
+
+    for (const auto &req : params->getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      if (req.getSubject().getPointer() != subArchetype)
+        continue;
+
+      if (auto *protoTy = req.getConstraint()->getAs<ProtocolType>())
+        if (auto *pConform =
+            getConformanceOfReplacement(P, subReplacement, protoTy->getDecl()))
+          conformances.push_back(pConform);
+    }
+  }
+
+  if (subArchetype && !subReplacement->is<ArchetypeType>() &&
+      conformances.size() != subArchetype->getConformsTo().size()) {
+    P.diagnose(loc, diag::sil_substitution_mismatch);
+    return true;
+  }
+  return false;
+}
+
 /// Reconstruct AST substitutions from parsed substitutions using archetypes
 /// from a SILFunctionType.
 bool getApplySubstitutionsFromParsed(
@@ -1321,36 +1398,12 @@ bool getApplySubstitutionsFromParsed(
     auto parsed = parses.front();
     parses = parses.slice(1);
 
-    // Collect conformances by looking up the conformance from replacement
-    // type and protocol decl in GenericParamList.
     SmallVector<ProtocolConformance*, 2> conformances;
-    for (auto params = gp; params; params = params->getOuterParameters())
-      for (const auto &req : params->getRequirements())
-        if (req.getKind() == RequirementKind::Conformance)
-          if (auto protoTy = req.getConstraint()->getAs<ProtocolType>()) {
-            auto proto = protoTy->getDecl();
-            auto conformance = SP.P.SF.getParentModule()->lookupConformance(
-                                 parsed.replacement, proto, nullptr);
-            if (conformance.getPointer() &&
-                req.getSubject().getPointer() == subArchetype)
-              conformances.push_back(conformance.getPointer());
-
-            // Handle self conformance.
-            if (!conformance.getPointer() &&
-                conformance.getInt() != ConformanceKind::DoesNotConform &&
-                parsed.replacement->is<ProtocolType>() &&
-                req.getSubject().getPointer() == subArchetype)
-              conformances.push_back(
-                SP.P.Context.getConformance(parsed.replacement, proto,
-                                      SourceLoc(), nullptr,
-                                      ProtocolConformanceState::Incomplete));
-          }
-
-    if (subArchetype && !parsed.replacement->is<ArchetypeType>() &&
-        conformances.size() != subArchetype->getConformsTo().size()) {
-      SP.P.diagnose(parsed.loc, diag::sil_substitution_mismatch);
+    if (getConformancesForSubstitution(SP.P, gp, subArchetype,
+                                       parsed.replacement,
+                                       parsed.loc, conformances))
       return true;
-    }
+
     subs.push_back({subArchetype, parsed.replacement,
                     SP.P.Context.AllocateCopy(conformances)});
   }
@@ -3445,7 +3498,13 @@ static bool getSpecConformanceSubstitutionsFromParsed(
       return true;
     }
     subReplacement = parsed.replacement;
-    subs.push_back({subArchetype, subReplacement, {}});
+    SmallVector<ProtocolConformance*, 2> conformances;
+    if (getConformancesForSubstitution(P, gp, subArchetype, subReplacement,
+                                       parsed.loc, conformances))
+      return true;
+
+    subs.push_back({subArchetype, subReplacement,
+                    P.Context.AllocateCopy(conformances)});
   }
   return false;
 }
