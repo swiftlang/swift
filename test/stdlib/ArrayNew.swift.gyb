@@ -91,14 +91,14 @@ func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
   }
 }
 
-% for array_self in all_array_types:
+% for array_type in all_array_types:
 
-ArrayTestSuite.test("${array_self}/Sliceable/Enums") {
+ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   typealias E = EnumWithoutPayloads
 
   if true {
     let expected = [ E.A, E.B, E.C, E.D ]
-    let sliceable = ${array_self}(expected)
+    let sliceable = ${array_type}(expected)
     checkSliceableWithBidirectionalIndex(
       expected, sliceable, SourceLocStack().withCurrentLoc())
   }
@@ -107,7 +107,7 @@ ArrayTestSuite.test("${array_self}/Sliceable/Enums") {
   FIXME: add this test when Array<T> can be conditionally Equatable.
   if true {
     let expected = [ [ E.A, E.B ], [ E.B, E.C ], [ E.D ], [ E.A, E.B, E.D ] ]
-    let sliceable = ${array_self}(expected)
+    let sliceable = ${array_type}(expected)
     checkSliceableWithBidirectionalIndex(
       expected, sliceable, SourceLocStack().withCurrentLoc())
   }
@@ -129,55 +129,73 @@ func withInoutT<T>(inout x: T, body: (inout x: T) -> ()) {
   body(x: &x)
 }
 
-% for array_self in all_array_types:
+% for element_type in [ 'TestValueTy', 'TestBridgedValueTy' ]:
+%   for array_type in all_array_types:
 
-ArrayTestSuite.test("${array_self}/subscript(_: Int)/COW") {
-  var a = ${array_self}([ [
-    TestValueTy(10), TestValueTy(20), TestValueTy(30), TestValueTy(40),
-    TestValueTy(50), TestValueTy(60), TestValueTy(70)
+ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
+  var a = ${array_type}([ [
+    ${element_type}(10), ${element_type}(20), ${element_type}(30),
+    ${element_type}(40), ${element_type}(50), ${element_type}(60),
+    ${element_type}(70)
   ] ])
   let identityOuter = a.identity
   var identityInner = a[0].identity
 
-  func checkIdentity() {
-    expectEqual(identityOuter, a.identity)
+  func checkIdentity(stackTrace: SourceLocStack) {
+%     if element_type == 'TestValueTy':
+    // Does not reallocate storage because we changed a property based on a
+    // reference; array storage was not changed.  Writeback of the inner array
+    // does not happen.
+    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
+    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+%     else:
+    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
 
-%   if array_self == 'Array':
+%       if array_type == 'Array':
     // Currently reallocates storage, but this is not what we want.
-    expectNotEqual(identityInner, a[0].identity)
-%   else:
-    // Should not reallocate storage.
-    expectEqual(identityInner, a[0].identity)
+    expectNotEqual(identityInner, a[0].identity, stackTrace: stackTrace)
     identityInner = a[0].identity
-%   end
+%       else:
+    // Should not reallocate storage.
+    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+%       end
+%     end
   }
 
   // Mutating through a subscript expression.
-  a[0][0] = TestValueTy(1010)
+  a[0][0] = ${element_type}(1010)
 
-  checkIdentity()
+  expectEqual(identityOuter, a.identity)
+%     if array_type == 'Array':
+  // Currently reallocates storage, but this is not what we want.
+  expectNotEqual(identityInner, a[0].identity)
+  identityInner = a[0].identity
+%     else:
+  // Should not reallocate storage.
+  expectEqual(identityInner, a[0].identity)
+%     end
 
   a[0][1].value = 1020
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a) {
-    (inout x: ${array_self}<[TestValueTy]>) in
+    (inout x: ${array_type}<[${element_type}]>) in
     x[0][2].value += 1000
   }
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0]) {
-    (inout x: [TestValueTy]) in
+    (inout x: [${element_type}]) in
     x[3].value += 1000
   }
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   // This will reallocate storage unless Array uses addressors for subscript.
   //withInoutT(&a[0][4]) {
-  //  (inout x: TestValueTy) in
+  //  (inout x: ${element_type}) in
   //  x.value += 1000
   //}
 
@@ -198,74 +216,90 @@ ArrayTestSuite.test("${array_self}/subscript(_: Int)/COW") {
   expectEqual(70, a[0][6].value)
 }
 
-ArrayTestSuite.test("${array_self}/subscript(_: Range<Int>)/COW") {
-  var a = ${array_self}([ [
-    TestValueTy(10), TestValueTy(20), TestValueTy(30), TestValueTy(40),
-    TestValueTy(50), TestValueTy(60), TestValueTy(70), TestValueTy(80),
-    TestValueTy(90),
+ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW") {
+  var a = ${array_type}([ [
+    ${element_type}(10), ${element_type}(20), ${element_type}(30),
+    ${element_type}(40), ${element_type}(50), ${element_type}(60),
+    ${element_type}(70), ${element_type}(80), ${element_type}(90),
   ] ])
   let identityOuter = a.identity
-  let identityInner = a[0].identity
+  var identityInner = a[0].identity
 
-  func checkIdentity() {
-    expectEqual(identityOuter, a.identity)
-
-    // Currently reallocates storage, but how do we avoid this?..
-    // TODO: We do avoid it now. This needs to be updated.
-    // rdar://problem/18461064
-    // expectNotEqual(identityInner, a[0].identity)
+  func checkIdentity(stackTrace: SourceLocStack) {
+%     if element_type == 'TestValueTy':
+    // Does not reallocate storage because we changed a property based on a
+    // reference; array storage was not changed.
+    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
+    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+%     else:
+    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
+    // Writeback happens in subscript(Range<Int>), but array notices that the new
+    // value did not change.
+    // Another writeback happens in Array.subscript(Int), but this is not what we
+    // want.
+    expectNotEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+    identityInner = a[0].identity
+%     end
   }
 
   // Mutating through a subscript expression.
-  a[0..<1][0][0] = TestValueTy(1010)
+  a[0..<1][0][0] = ${element_type}(1010)
 
-  checkIdentity()
+  // Reallocates storage because of the writeback in Array.subscript(Int).
+  expectEqual(identityOuter, a.identity)
+  expectNotEqual(identityInner, a[0].identity)
+  identityInner = a[0].identity
 
   a[0..<1][0][1].value = 1020
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a) {
-    (inout x: ${array_self}<[TestValueTy]>) in
+    (inout x: ${array_type}<[${element_type}]>) in
     x[0..<1][0][2].value += 1000
   }
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1]) {
-    (inout x: Slice<[TestValueTy]>) in
+    (inout x: Slice<[${element_type}]>) in
     x[0][3].value += 1000
   }
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1][0]) {
-    (inout x: [TestValueTy]) in
+    (inout x: [${element_type}]) in
     x[4].value += 1000
   }
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1][0][5]) {
-    (inout x: TestValueTy) in
+    (inout x: ${element_type}) in
     x.value += 1000
   }
 
-  checkIdentity()
+  // Reallocates storage because of the writeback in Array.subscript(Int)
+  // (writeback is being requested for the array element even though it is not
+  // needed).
+  expectEqual(identityOuter, a.identity)
+  expectNotEqual(identityInner, a[0].identity)
+  identityInner = a[0].identity
 
   withInoutT(&a[0..<1][0][6].value) {
     (inout x: Int) in
     x += 1000
   }
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutInt(&a[0..<1][0][7].value) {
     (inout x: Int) in
     x += 1000
   }
 
-  checkIdentity()
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   // Don't change the last element.
 
@@ -280,6 +314,7 @@ ArrayTestSuite.test("${array_self}/subscript(_: Range<Int>)/COW") {
   expectEqual(90, a[0][8].value)
 }
 
+%   end
 % end
 
 //===----------------------------------------------------------------------===//
