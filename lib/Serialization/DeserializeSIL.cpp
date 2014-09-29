@@ -340,7 +340,8 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
 SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                                               SILFunction *existingFn,
                                               StringRef name,
-                                              bool declarationOnly) {
+                                              bool declarationOnly,
+                                              bool errorIfEmptyBody) {
   if (FID == 0)
     return nullptr;
   assert(FID <= Funcs.size() && "invalid SILFunction ID");
@@ -546,7 +547,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   // If fn is empty, we failed to deserialize its body. Return nullptr to signal
   // error.
-  if (fn->empty())
+  if (fn->empty() && errorIfEmptyBody)
     return nullptr;
 
   if (Callback)
@@ -1645,7 +1646,13 @@ void SILDeserializer::getAllSILFunctions() {
     auto DI = FuncTable->find(*KI);
     assert(DI != FuncTable->end() && "There should never be a key without data.");
 
-    readSILFunction(*DI, nullptr, *KI, false);
+    SILFunction *fn = readSILFunction(*DI, nullptr, *KI, false,
+                                      false/*errorIfEmptyBody*/);
+
+    // Update linkage for global addressors to make it pass verifier.
+    if (fn && fn->isGlobalInit() && fn->isExternalDeclaration() &&
+        fn->getLinkage() == SILLinkage::Public)
+      fn->setLinkage(SILLinkage::PublicExternal);
   }
 }
 

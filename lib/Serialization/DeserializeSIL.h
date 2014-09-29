@@ -68,7 +68,8 @@ namespace swift {
 
     /// Read a SIL function.
     SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc,
-                                 StringRef Name, bool declarationOnly);
+                                 StringRef Name, bool declarationOnly,
+                                 bool errorIfEmptyBody = true);
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SmallVectorImpl<uint64_t> &scratch);
