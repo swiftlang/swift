@@ -58,7 +58,7 @@ void Condition::exitTrue(SILBuilder &B, ArrayRef<SILValue> Args) {
   }
   
   // Otherwise, resume into the continuation block.  This branch might
-  // be folded by exitFalse if it turns out that thapoint is
+  // be folded by exitFalse if it turns out that that point is
   // unreachable.
   B.createBranch(getContinuationLoc(*B.getInsertionBB(), Loc), ContBB, Args);
   
