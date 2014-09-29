@@ -831,8 +831,11 @@ private:
       return CurTRC;
     }
 
-    return TypeRefinementContext::createForIfStmtThen(AC, IS, CurTRC,
-                                                      rangeForSpec(Spec));
+    
+    VersionRange range = rangeForSpec(Spec);
+    E->setAvailableRange(range);
+    
+    return TypeRefinementContext::createForIfStmtThen(AC, IS, CurTRC, range);
   }
 
   /// Return the best active spec for the target platform or nullptr if no

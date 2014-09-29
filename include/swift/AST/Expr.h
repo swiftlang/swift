@@ -23,6 +23,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -3387,11 +3388,18 @@ class AvailabilityQueryExpr : public Expr {
 
   unsigned NumQueries;
 
+  /// The version range when this query will return true. This value is
+  /// filled in by Sema.
+  VersionRange AvailableRange;
+
   AvailabilityQueryExpr(SourceLoc PoundLoc,
                         ArrayRef<VersionConstraintAvailabilitySpec *> queries,
-                        SourceLoc RParenLoc, Type Ty = Type())
+                        SourceLoc RParenLoc,
+                        VersionRange AvailableRange = VersionRange::empty(),
+                        Type Ty = Type())
       : Expr(ExprKind::AvailabilityQuery, /*Implicit=*/false, Ty),
-        PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()) {
+        PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
+        AvailableRange(AvailableRange) {
     memcpy(getQueriesBuf(), queries.data(),
            queries.size() * sizeof(VersionConstraintAvailabilitySpec *));
   }
@@ -3409,6 +3417,9 @@ public:
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return PoundLoc; }
+
+  const VersionRange &getAvailableRange() const { return AvailableRange; }
+  void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::AvailabilityQuery;

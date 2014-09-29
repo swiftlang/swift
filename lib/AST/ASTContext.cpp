@@ -136,6 +136,10 @@ struct ASTContext::Implementation {
   /// func _unimplemented_initializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
+  /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
+  //    -> Builtin.Int1
+  FuncDecl *IsOSVersionAtLeastDecl = nullptr;
+  
   /// \brief The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -651,6 +655,13 @@ static bool isBuiltinInt1Type(CanType type) {
   return false;
 }
 
+/// Check whether the given type is Builtin.Word.
+static bool isBuiltinWordType(CanType type) {
+  if (auto intType = dyn_cast<BuiltinIntegerType>(type))
+    return intType->getWidth().isPointerWidth();
+  return false;
+}
+
 FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   if (Impl.GetBoolDecl)
     return Impl.GetBoolDecl;
@@ -691,6 +702,37 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
   // FIXME: Check inputs and outputs.
 
   Impl.UnimplementedInitializerDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
+  if (Impl.IsOSVersionAtLeastDecl)
+    return Impl.IsOSVersionAtLeastDecl;
+
+  // Look for the function.
+  CanType input, output;
+  auto decl =
+      findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast", resolver);
+  if (!decl || !isNonGenericIntrinsic(decl, input, output))
+    return nullptr;
+
+  // Input must be (Builtin.Word, Builtin.Word, Builtin.Word)
+  auto inputTuple = dyn_cast<TupleType>(input);
+  if (!inputTuple || inputTuple->getNumElements() != 3 ||
+      !isBuiltinWordType(
+          inputTuple->getElementType(0).getCanonicalTypeOrNull()) ||
+      !isBuiltinWordType(
+          inputTuple->getElementType(1).getCanonicalTypeOrNull()) ||
+      !isBuiltinWordType(
+          inputTuple->getElementType(2).getCanonicalTypeOrNull())) {
+    return nullptr;
+  }
+
+  // Output must be Builtin.Int1
+  if (!isBuiltinInt1Type(output))
+    return nullptr;
+
+  Impl.IsOSVersionAtLeastDecl = decl;
   return decl;
 }
 
