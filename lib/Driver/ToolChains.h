@@ -34,6 +34,14 @@ public:
   StringRef getDarwinArchName(const llvm::opt::ArgList &Args) const;
 };
 
+class LLVM_LIBRARY_VISIBILITY Linux : public ToolChain {
+protected:
+  virtual std::unique_ptr<Tool> buildLinker() const;
+public:
+  Linux(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  ~Linux() = default;
+};
+
 } // end namespace toolchains
 } // end namespace driver
 } // end namespace swift

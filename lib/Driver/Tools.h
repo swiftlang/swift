@@ -24,6 +24,7 @@ namespace driver {
 
 namespace toolchains {
   class Darwin;
+  class Linux;
 }
 
 namespace tools {
@@ -112,6 +113,23 @@ class LLVM_LIBRARY_VISIBILITY Linker : public DarwinTool {
 public:
   explicit Linker(const ToolChain &TC)
     : DarwinTool("darwin::Linker", "linker", TC) {}
+
+  virtual Job *constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            const OutputInfo &OI) const;
+};
+
+} // end namespace darwin
+
+namespace linux {
+
+class LLVM_LIBRARY_VISIBILITY Linker : public Tool {
+public:
+  explicit Linker(const ToolChain &TC)
+    : Tool("linux::Linker", "linker", TC) {}
 
   virtual Job *constructJob(const JobAction &JA,
                             std::unique_ptr<JobList> Inputs,

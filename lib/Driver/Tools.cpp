@@ -686,3 +686,24 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   return new Command(JA, *this, std::move(Inputs), std::move(Output),
                      Args.MakeArgString(Exec), Arguments);
 }
+
+/// Linux Tools
+
+Job *linux::Linker::constructJob(const JobAction &JA,
+                                  std::unique_ptr<JobList> Inputs,
+                                  std::unique_ptr<CommandOutput> Output,
+                                  const ActionList &InputActions,
+                                  const ArgList &Args,
+                                  const OutputInfo &OI) const {
+  assert(Output->getPrimaryOutputType() == types::TY_Image &&
+         "Invalid linker output type.");
+
+  ArgStringList Arguments;
+  addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
+  addInputsOfType(Arguments, InputActions, types::TY_Object);
+
+  std::string Exec = getToolChain().getProgramPath("ld");
+
+  return new Command(JA, *this, std::move(Inputs), std::move(Output),
+                     Args.MakeArgString(Exec), Arguments);
+}

@@ -67,6 +67,8 @@ static void updateTargetConfigurationOptions(LangOptions &LangOpts,
     LangOpts.addTargetConfigOption("os", "OSX");
   else if (triple.isiOS())
     LangOpts.addTargetConfigOption("os", "iOS");
+  else if (triple.isOSLinux())
+    LangOpts.addTargetConfigOption("os", "Linux");
   else
     llvm_unreachable("Unsupported target OS");
 
@@ -94,6 +96,8 @@ static void updateTargetConfigurationOptions(LangOptions &LangOpts,
     triple.getMacOSXVersion(major, minor, revision);
   } else if (triple.isiOS()) {
     triple.getiOSVersion(major, minor, revision);
+  } else if (triple.isOSLinux()) {
+    major = minor = revision = 0;
   } else {
     llvm_unreachable("Unsupported target OS");
   }

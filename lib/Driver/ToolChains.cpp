@@ -28,3 +28,9 @@ std::unique_ptr<Tool> Darwin::buildLinker() const {
 StringRef Darwin::getDarwinArchName(const ArgList &Args) const {
   return getArchName();
 }
+
+/// Linux
+
+std::unique_ptr<Tool> Linux::buildLinker() const {
+  return std::unique_ptr<Tool>(new tools::linux::Linker(*this));
+}

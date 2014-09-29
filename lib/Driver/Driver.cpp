@@ -1563,6 +1563,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
     case llvm::Triple::IOS:
       TC = new toolchains::Darwin(*this, Target);
       break;
+    case llvm::Triple::Linux:
+      TC = new toolchains::Linux(*this, Target);
+      break;
     default:
       llvm_unreachable("No tool chain available for Triple");
     }

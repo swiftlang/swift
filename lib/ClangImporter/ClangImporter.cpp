@@ -233,19 +233,21 @@ ClangImporter::create(ASTContext &ctx,
     "<swift-imported-modules>"
   };
 
-  std::string runtimeArgBuf{"-fobjc-runtime="};
-  llvm::raw_string_ostream runtimeArg{runtimeArgBuf};
-  unsigned major, minor, micro;
-  if (triple.isiOS()) {
-    runtimeArg << "ios";
-    triple.getiOSVersion(major, minor, micro);
-  } else {
-    assert(triple.isMacOSX());
-    runtimeArg << "macosx";
-    triple.getMacOSXVersion(major, minor, micro);
+  if (triple.isOSDarwin()) {
+    std::string runtimeArgBuf{"-fobjc-runtime="};
+    llvm::raw_string_ostream runtimeArg{runtimeArgBuf};
+    unsigned major, minor, micro;
+    if (triple.isiOS()) {
+      runtimeArg << "ios";
+      triple.getiOSVersion(major, minor, micro);
+    } else {
+      assert(triple.isMacOSX());
+      runtimeArg << "macosx";
+      triple.getMacOSXVersion(major, minor, micro);
+    }
+    runtimeArg << '-' << clang::VersionTuple(major, minor, micro);
+    invocationArgStrs.push_back(std::move(runtimeArg.str()));
   }
-  runtimeArg << '-' << clang::VersionTuple(major, minor, micro);
-  invocationArgStrs.push_back(std::move(runtimeArg.str()));
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
     invocationArgStrs.push_back("-fapplication-extension");
