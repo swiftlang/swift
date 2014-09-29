@@ -872,8 +872,9 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
     return ty;
   }
 
-  // Check the availability of the type.
-  if (diagnoseAvailability(result.get<Type>(), IdType,
+  // Check the availability of the type. Skip checking for SIL.
+  if (!(options & TR_SILType) &&
+      diagnoseAvailability(result.get<Type>(), IdType,
                            Components.back()->getIdLoc(), *this)) {
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
