@@ -1718,6 +1718,46 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
   Printer.printPattern(this);
 }
 
+void ProtocolConformance::printName(llvm::raw_ostream &os,
+                                    const PrintOptions &PO) const {
+  if (auto gp = getGenericParams()) {
+    StreamPrinter SPrinter(os);
+    PrintAST Printer(SPrinter, PO);
+    Printer.printGenericParams(gp);
+    os << ' ';
+  }
+ 
+  getType()->print(os, PO);
+  os << ": ";
+ 
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal: {
+    auto normal = cast<NormalProtocolConformance>(this);
+    os << normal->getProtocol()->getName()
+       << " module " << normal->getDeclContext()->getParentModule()->Name;
+    break;
+  }
+  case ProtocolConformanceKind::Specialized: {
+    auto spec = cast<SpecializedProtocolConformance>(this);
+    os << "specialize <";
+    interleave(spec->getGenericSubstitutions(),
+               [&](const Substitution &s) { s.print(os, PO); },
+               [&] { os << ", "; });
+    os << "> (";
+    spec->getGenericConformance()->printName(os);
+    os << ")";
+    break;
+  }
+  case ProtocolConformanceKind::Inherited: {
+    auto inherited = cast<InheritedProtocolConformance>(this);
+    os << "inherit (";
+    inherited->getInheritedConformance()->printName(os);
+    os << ")";
+    break;
+  }
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
