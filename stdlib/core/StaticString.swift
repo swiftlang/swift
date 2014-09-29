@@ -84,6 +84,9 @@ public struct StaticString
   /// `byteSize` is unspecified.
   @transparent
   public var byteSize: Word {
+    _precondition(
+      hasPointerRepresentation,
+      "StaticString should have pointer representation")
     return Word(_byteSize)
   }
 
@@ -99,7 +102,7 @@ public struct StaticString
   /// `isASCII` is unspecified.
   @transparent
   public var isASCII: Bool {
-    return (UWord(_flags) & 0x2) == 1
+    return (UWord(_flags) & 0x2) == 0x2
   }
 
   /// Invoke `body` with a buffer containing the UTF-8 code units of
@@ -146,7 +149,7 @@ public struct StaticString
   ) {
     self._startPtrOrData = start
     self._byteSize = byteSize
-    self._flags = Bool(isASCII) ? 0x2.value : 0.value
+    self._flags = Bool(isASCII) ? 0x2.value : 0x0.value
   }
 
   @transparent
@@ -156,7 +159,7 @@ public struct StaticString
     self._startPtrOrData =
       unsafeBitCast(UWord(UInt32(unicodeScalar)), COpaquePointer.self)._rawValue
     self._byteSize = 0.value
-    self._flags = 0.value
+    self._flags = UnicodeScalar(unicodeScalar).isASCII() ? 0x3.value : 0x1.value
   }
 
   @effects(readonly)
