@@ -1366,6 +1366,48 @@ public func expectEqualUnicodeScalars(
 
 }
 
+public func expectPrinted<T>(
+  #expectedOneOf: [String], object: T,
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  let actual = toString(object)
+  if !contains(expectedOneOf, actual) {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: any of \(expectedOneOf.debugDescription)")
+    println("actual: \"\(actual)\"")
+    println()
+  }
+}
+
+public func expectPrinted<T>(
+  expected: String, object: T,
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  expectPrinted(expectedOneOf: [expected], object, file: file, line: line)
+}
+
+public func expectDebugPrinted<T>(
+  #expectedOneOf: [String], object: T,
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  let actual = toDebugString(object)
+  if !contains(expectedOneOf, actual) {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: any of \(expectedOneOf.debugDescription)")
+    println("actual: \"\(actual)\"")
+    println()
+  }
+}
+
+public func expectDebugPrinted<T>(
+  expected: String, object: T,
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  expectDebugPrinted(expectedOneOf: [expected], object, file: file, line: line)
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

@@ -1,47 +1,32 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 
 import Foundation
+import StdlibUnittest
 
-func foundationOverlayTypesHaveDescription() {
+var FoundationPrinting = TestSuite("FoundationPrinting")
+
+FoundationPrinting.test("OverlayTypesHaveDescription") {
   func hasDescription(_: Printable) {}
 
   var a: ObjCBool = true
   hasDescription(a)
 }
 
-func printedIs<T>(
-    object: T, expected: String,
-    file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-  var actual = toString(object)
-  if expected != actual {
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    assert(expected == actual, file: file, line: line)
-  }
-}
-
-func test_ObjCBoolPrinting() {
+FoundationPrinting.test("ObjCBoolPrinting") {
   var true_: ObjCBool = true
   var false_: ObjCBool = false
-  printedIs(true_, "true")
-  printedIs(false_, "false")
-
-  println("test_ObjCBoolPrinting done")
+  expectPrinted("true", true_)
+  expectPrinted("false", false_)
 }
-test_ObjCBoolPrinting()
-// CHECK: test_ObjCBoolPrinting done
 
-func test_SelectorPrinting() {
-  printedIs(Selector(""), "")
-  printedIs(Selector(":"), ":")
-  printedIs(Selector("a"), "a")
-  printedIs(Selector("abc"), "abc")
-  printedIs(Selector("abc:"), "abc:")
-  printedIs(Selector("abc:def:"), "abc:def:")
-
-  println("test_SelectorPrinting done")
+FoundationPrinting.test("SelectorPrinting") {
+  expectPrinted("", Selector(""))
+  expectPrinted(":", Selector(":"))
+  expectPrinted("a", Selector("a"))
+  expectPrinted("abc", Selector("abc"))
+  expectPrinted("abc:", Selector("abc:"))
+  expectPrinted("abc:def:", Selector("abc:def:"))
 }
-test_SelectorPrinting()
-// CHECK: test_SelectorPrinting done
+
+runAllTests()
 
