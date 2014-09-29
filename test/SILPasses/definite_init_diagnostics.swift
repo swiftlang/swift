@@ -200,7 +200,7 @@ func existentials(i: Int, dp: DerivedProtocol) {
   var e : SomeProtocol  // expected-note {{variable defined here}}
   e.protoMe()           // expected-error {{variable 'e' used before being initialized}}
   
-  var f : SomeProtocol = dp  // ok, init'd by existential upcast.
+  var f : SomeProtocol = dp  // ok, init'd by upcast_existential.
   
   var g : DerivedProtocol   // expected-note {{variable defined here}}
   f = g                     // expected-error {{variable 'g' used before being initialized}}

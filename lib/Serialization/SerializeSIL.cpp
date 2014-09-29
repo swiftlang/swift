@@ -713,13 +713,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::IndexAddrInst:
-  case ValueKind::IndexRawPointerInst: {
+  case ValueKind::IndexRawPointerInst:
+  case ValueKind::UpcastExistentialInst: {
     SILValue operand, operand2;
     unsigned Attr = 0;
     if (SI.getKind() == ValueKind::IndexRawPointerInst) {
       const IndexRawPointerInst *IRP = cast<IndexRawPointerInst>(&SI);
       operand = IRP->getBase();
       operand2 = IRP->getIndex();
+    } else if (SI.getKind() == ValueKind::UpcastExistentialInst) {
+      Attr = cast<UpcastExistentialInst>(&SI)->isTakeOfSrc();
+      operand = cast<UpcastExistentialInst>(&SI)->getSrcExistential();
+      operand2 = cast<UpcastExistentialInst>(&SI)->getDestExistential();
     } else {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();
@@ -879,6 +884,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ThickToObjCMetatypeInst:
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::ConvertFunctionInst:
+  case ValueKind::UpcastExistentialRefInst:
   case ValueKind::ObjCMetatypeToObjectInst:
   case ValueKind::ObjCExistentialMetatypeToObjectInst:
   case ValueKind::ProjectBlockStorageInst: {
