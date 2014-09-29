@@ -690,11 +690,11 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
 /// Linux Tools
 
 Job *linux::Linker::constructJob(const JobAction &JA,
-                                  std::unique_ptr<JobList> Inputs,
-                                  std::unique_ptr<CommandOutput> Output,
-                                  const ActionList &InputActions,
-                                  const ArgList &Args,
-                                  const OutputInfo &OI) const {
+                                 std::unique_ptr<JobList> Inputs,
+                                 std::unique_ptr<CommandOutput> Output,
+                                 const ActionList &InputActions,
+                                 const ArgList &Args,
+                                 const OutputInfo &OI) const {
   assert(Output->getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
 
