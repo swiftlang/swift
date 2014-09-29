@@ -3660,13 +3660,14 @@ bool Parser::parseSILWitnessTable() {
             parseToken(tok::colon, diag::expected_sil_witness_colon))
           return true;
 
-        auto peek = peekToken();
         ProtocolConformance *conform = nullptr;
-        if (peek.getText() != "dependent") {
+        if (Tok.getText() != "dependent") {
           ArchetypeBuilder builder(*SF.getParentModule(), Diags);
           conform = WitnessState.parseProtocolConformance(builder);
           if (!conform) // Ignore this witness entry for now.
             continue;
+        } else {
+          consumeToken();
         }
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
