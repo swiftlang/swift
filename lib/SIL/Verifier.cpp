@@ -1128,14 +1128,14 @@ public:
               ->getDecl() == protocol,
             "method's Self parameter should be constrained by protocol");
 
-    if (AMI->getLookupType().is<ArchetypeType>()) {
+    if (isa<ArchetypeType>(AMI->getLookupType())) {
       require(AMI->getConformance() == nullptr,
               "archetype lookup should have null conformance");
     } else {
       require(AMI->getConformance(),
               "concrete type lookup requires conformance");
       require(AMI->getConformance()->getType()
-                ->isEqual(AMI->getLookupType().getSwiftRValueType()),
+                ->isEqual(AMI->getLookupType()),
               "concrete type lookup requires conformance that matches type");
       // We allow for null conformances.
       require(!AMI->getConformance() ||

@@ -4497,7 +4497,7 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
 
 /// Retrieve the protocol witness table for a conformance.
 static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
-                                            SILType srcType,
+                                            CanType srcType,
                                             const TypeInfo &srcTI,
                                             ProtocolEntry protoEntry,
                                             ProtocolConformance *conformance) {
@@ -4506,7 +4506,7 @@ static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
          && "protocol does not have witness tables?!");
   
   // If the source type is an archetype, look at what's locally bound.
-  if (auto archetype = srcType.getAs<ArchetypeType>()) {
+  if (auto archetype = dyn_cast<ArchetypeType>(srcType)) {
     assert(!conformance
            && "should not have concrete conformance info for archetype");
     auto &archTI = getArchetypeInfo(IGF, archetype, srcTI);
@@ -4521,7 +4521,7 @@ static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
   assert(conformance && "no conformance for concrete type?!");
   auto &protoI = protoEntry.getInfo();
   const ConformanceInfo &conformanceI
-    = protoI.getConformance(IGF.IGM, srcType.getSwiftRValueType(),
+    = protoI.getConformance(IGF.IGM, srcType,
                             srcTI, proto, *conformance);
   return conformanceI.getTable(IGF);
 }
@@ -4529,13 +4529,13 @@ static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(IRGenFunction &IGF,
-                          SILType srcType, SILType destType,
+                          CanType srcType, CanType destType,
                           ArrayRef<ProtocolEntry> protocols,
                           ArrayRef<ProtocolConformance*> conformances,
                           std::function<void (unsigned, llvm::Value*)> body) {
   // Collect the conformances that need witness tables.
   SmallVector<ProtocolDecl*, 2> destProtocols;
-  destType.getSwiftRValueType().getAnyExistentialTypeProtocols(destProtocols);
+  destType.getAnyExistentialTypeProtocols(destProtocols);
 
   SmallVector<ProtocolConformance*, 2> witnessConformances;
   assert(destProtocols.size() == conformances.size() &&
@@ -4547,7 +4547,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   assert(protocols.size() == witnessConformances.size() &&
          "mismatched protocol conformances");
   
-  auto &srcTI = IGF.getTypeInfo(srcType);
+  auto &srcTI = IGF.getTypeInfoForUnlowered(srcType);
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
     auto table = getProtocolWitnessTable(IGF, srcType, srcTI,
                                          protocols[i], witnessConformances[i]);
@@ -4678,7 +4678,8 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   out.add(opaqueInstance);
   
   // Emit the witness table pointers.
-  forEachProtocolWitnessTable(IGF, instanceLoweredType, outType,
+  forEachProtocolWitnessTable(IGF, instanceFormalType,
+                              outType.getSwiftRValueType(),
                               destTI.getProtocols(),
                               conformances,
                               [&](unsigned i, llvm::Value *ptable) {
@@ -4719,7 +4720,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   }
   
   // Next, write the protocol witness tables.
-  forEachProtocolWitnessTable(IGF, loweredSrcType, destType,
+  forEachProtocolWitnessTable(IGF, formalSrcType, destType.getSwiftRValueType(),
                               destTI.getProtocols(), conformances,
                               [&](unsigned i, llvm::Value *ptable) {
     Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
@@ -4773,17 +4774,17 @@ static void getWitnessMethodValue(IRGenFunction &IGF,
 
 void
 irgen::emitWitnessMethodValue(IRGenFunction &IGF,
-                                SILType baseTy,
-                                SILDeclRef member,
-                                ProtocolConformance *conformance,
-                                Explosion &out) {
+                              CanType baseTy,
+                              SILDeclRef member,
+                              ProtocolConformance *conformance,
+                              Explosion &out) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   
   // The protocol we're calling on.
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
   
   // Find the witness table.
-  auto &baseTI = IGF.getTypeInfo(baseTy);
+  auto &baseTI = IGF.getTypeInfoForUnlowered(baseTy);
   llvm::Value *wtable = getProtocolWitnessTable(IGF, baseTy, baseTI,
                       ProtocolEntry(fnProto, IGF.IGM.getProtocolInfo(fnProto)),
                       conformance); // FIXME conformance for concrete type

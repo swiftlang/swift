@@ -1429,7 +1429,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(ListOfValues.size() >= NextValueIndex &&
            "Out of entries for MethodInst");
 
-    SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    CanType Ty = MF->getType(TyID)->getCanonicalType();
     SILType OperandTy = getSILType(MF->getType(TyID2),
                                    (SILValueCategory)TyCategory2);
 

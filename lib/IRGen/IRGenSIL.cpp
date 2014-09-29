@@ -3332,7 +3332,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
     return;
   }
 
-  SILType baseTy = i->getLookupType();
+  CanType baseTy = i->getLookupType();
   ProtocolConformance *conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 

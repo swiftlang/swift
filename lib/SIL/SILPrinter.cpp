@@ -1007,6 +1007,7 @@ public:
     OS << "witness_method ";
     if (AMI->isVolatile())
       OS << "[volatile] ";
+    OS << "$";
     AMI->getLookupType().print(OS);
     OS << ", ";
     AMI->getMember().print(OS);

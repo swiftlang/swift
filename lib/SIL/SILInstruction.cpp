@@ -1395,7 +1395,7 @@ static void declareWitnessTable(SILModule &Mod,
 /// function_ref. There we always just create a declaration and then later
 /// deserialize the actual function definition if we need to.
 WitnessMethodInst *
-WitnessMethodInst::create(SILLocation Loc, SILType LookupType,
+WitnessMethodInst::create(SILLocation Loc, CanType LookupType,
                           ProtocolConformance *Conformance, SILDeclRef Member,
                           SILType Ty, SILFunction *F, bool Volatile) {
   SILModule &Mod = F->getModule();

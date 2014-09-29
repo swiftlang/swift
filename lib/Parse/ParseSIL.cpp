@@ -2387,11 +2387,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     bool IsVolatile = false;
     if (parseSILOptional(IsVolatile, *this, "volatile"))
       return true;
-    SILType LookupTy;
+    CanType LookupTy;
     SILDeclRef Member;
     SILType MethodTy;
     SourceLoc TyLoc;
-    if (parseSILType(LookupTy, TyLoc) ||
+    if (P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTType(LookupTy) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILDeclRef(Member) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
@@ -2407,9 +2408,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     ProtocolConformance *Conformance = nullptr;
-    if (!LookupTy.is<ArchetypeType>()) {
+    if (!isa<ArchetypeType>(LookupTy)) {
       auto lookup = P.SF.getParentModule()->lookupConformance(
-                                LookupTy.getSwiftRValueType(), proto, nullptr);
+                                                      LookupTy, proto, nullptr);
       if (lookup.getInt() != ConformanceKind::Conforms) {
         P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;

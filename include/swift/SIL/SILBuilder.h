@@ -585,7 +585,7 @@ public:
                     SuperMethodInst(Loc, Operand, Member, MethodTy, Volatile));
   }
 
-  WitnessMethodInst *createWitnessMethod(SILLocation Loc, SILType LookupTy,
+  WitnessMethodInst *createWitnessMethod(SILLocation Loc, CanType LookupTy,
                                          ProtocolConformance *Conformance,
                                          SILDeclRef Member,
                                          SILType MethodTy,

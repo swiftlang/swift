@@ -1945,10 +1945,10 @@ public:
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.
 class WitnessMethodInst : public MethodInst {
-  SILType LookupType;
+  CanType LookupType;
   ProtocolConformance *Conformance;
 
-  WitnessMethodInst(SILLocation Loc, SILType LookupType,
+  WitnessMethodInst(SILLocation Loc, CanType LookupType,
                     ProtocolConformance *Conformance,
                     SILDeclRef Member,
                     SILType Ty, bool Volatile = false)
@@ -1957,13 +1957,13 @@ class WitnessMethodInst : public MethodInst {
   {}
 
 public:
-  static WitnessMethodInst *create(SILLocation Loc, SILType LookupType,
+  static WitnessMethodInst *create(SILLocation Loc, CanType LookupType,
                                    ProtocolConformance *Conformance,
                                    SILDeclRef Member,
                                    SILType Ty, SILFunction *Parent,
                                    bool Volatile=false);
 
-  SILType getLookupType() const { return LookupType; }
+  CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
     return cast<ProtocolDecl>(getMember().getDecl()->getDeclContext());
   }
@@ -1973,7 +1973,7 @@ public:
   /// protocol's Self archetype.
   Substitution getSelfSubstitution() const {
     return Substitution{getLookupProtocol()->getSelf()->getArchetype(),
-                        getLookupType().getSwiftRValueType(),
+                        getLookupType(),
                         Conformance};
   }
 

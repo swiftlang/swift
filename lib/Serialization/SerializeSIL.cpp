@@ -1119,7 +1119,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and a type.
     const WitnessMethodInst *AMI = cast<WitnessMethodInst>(&SI);
-    SILType Ty = AMI->getLookupType();
+    CanType Ty = AMI->getLookupType();
     SILType Ty2 = AMI->getType(0);
 
     SmallVector<ValueID, 8> ListOfValues;
@@ -1142,7 +1142,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     SILInstWitnessMethodLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstWitnessMethodLayout::Code],
-        S.addTypeRef(Ty.getSwiftRValueType()), (unsigned)Ty.getCategory(),
+        S.addTypeRef(Ty), 0,
         AMI->isVolatile(),
         S.addTypeRef(Ty2.getSwiftRValueType()), (unsigned)Ty2.getCategory(),
         ConformanceProto, AdopterTy, ConformanceModule,

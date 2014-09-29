@@ -65,16 +65,16 @@ protected:
     return ty.subst(SwiftMod, SubsMap, false, nullptr)->getCanonicalType();
   }
 
-  ProtocolConformance *remapConformance(SILType Ty, ProtocolConformance *C) {
+  ProtocolConformance *remapConformance(CanType Ty, ProtocolConformance *C) {
     // If Ty does not have unbound generic types, we did not specialize it so
     // just return C. This relies on the fact that we do not partially
     // specialize.
-    if (!Ty.hasArchetype())
+    if (!Ty->hasArchetype())
       return C;
 
     // Otherwise we need to create a specialized conformance for C. Remap the
     // type...
-    CanType Type = remapType(Ty).getSwiftRValueType()->getCanonicalType();
+    CanType Type = remapASTType(Ty).getSwiftRValueType()->getCanonicalType();
 
     // And create the new specialized conformance.
     ASTContext &AST = SwiftMod->getASTContext();
@@ -189,18 +189,16 @@ protected:
       OtherMod.createWitnessTableDeclaration(Conformance, linkage);
     }
 
-    auto newLookupType = getOpType(Inst->getLookupType());
+    auto newLookupType = getOpASTType(Inst->getLookupType());
     if (Conformance) {
       CanType Ty = Conformance->getType()->getCanonicalType();
-      SILType SILTy = SILType::getPrimitiveType(Ty,
-                                                newLookupType.getCategory());
 
-      if (SILTy != newLookupType) {
-        assert(SILTy.isSuperclassOf(newLookupType) &&
+      if (Ty != newLookupType) {
+        assert(Ty->isSuperclassOf(newLookupType, nullptr) &&
                "Should only create upcasts for sub class.");
 
         // We use the super class as the new look up type.
-        newLookupType = SILTy;
+        newLookupType = Ty;
       }
     }
 

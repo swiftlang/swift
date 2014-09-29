@@ -73,7 +73,7 @@ protected:
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   SILType remapType(SILType Ty) { return Ty; }
   CanType remapASTType(CanType Ty) { return Ty; }
-  ProtocolConformance *remapConformance(SILType Ty, ProtocolConformance *C) {
+  ProtocolConformance *remapConformance(CanType Ty, ProtocolConformance *C) {
     return C;
   }
   SILValue remapValue(SILValue Value);
@@ -106,7 +106,7 @@ protected:
 
     return asImpl().remapASTType(ty);
   }
-  ProtocolConformance *getOpConformance(SILType Ty,
+  ProtocolConformance *getOpConformance(CanType Ty,
                                         ProtocolConformance *Conformance) {
     return asImpl().remapConformance(Ty, Conformance);
   }
@@ -913,7 +913,7 @@ void
 SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createWitnessMethod(getOpLocation(Inst->getLoc()),
-                                     getOpType(Inst->getLookupType()),
+                                     getOpASTType(Inst->getLookupType()),
                                      getOpConformance(Inst->getLookupType(),
                                                       Inst->getConformance()),
                                      Inst->getMember(),
