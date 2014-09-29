@@ -683,6 +683,10 @@ void SILModule::invalidateSILLoader() {
 void SILModule::eraseFunction(SILFunction *F) {
   
   FunctionTable.erase(F->getName());
+  
+  // The owner of the function's Name was the FunctionTable key. Avoid a
+  // dangling pointer.
+  F->Name = StringRef();
 
   assert(! F->isZombie() && "zombie function is in list of alive functions");
   if (F->isInlined()) {

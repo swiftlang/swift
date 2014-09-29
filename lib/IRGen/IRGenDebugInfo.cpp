@@ -689,10 +689,12 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   Location L = {};
   unsigned ScopeLine = 0; // The source line used for the function prologue.
   if (DS) {
-    if (DS->Loc.getKind() == SILLocation::SILFileKind)
+    if (DS->Loc.getKind() == SILLocation::SILFileKind &&
+        !DS->SILFn->isZombie()) {
       Name = DS->SILFn->getName();
-    else
+    } else {
       Name = getName(DS->Loc);
+    }
 
     auto FL = getLocation(SM, DS->Loc);
     L = FL.Loc;
