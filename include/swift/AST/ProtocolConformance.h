@@ -231,7 +231,8 @@ public:
   
   /// Print a parsable and human-readable description of the identifying
   /// information of the protocol conformance.
-  void printName(raw_ostream &os) const;
+  void printName(raw_ostream &os,
+                 const PrintOptions &PO = PrintOptions()) const;
   
   void dump() const;
 

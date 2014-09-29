@@ -1581,9 +1581,10 @@ void SILVTable::dump() const {
 }
 
 void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
+  PrintOptions Options = PrintOptions::printSIL();
   OS << "sil_witness_table ";
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
-  getConformance()->printName(OS);
+  getConformance()->printName(OS, Options);
 
   if (isDeclaration()) {
     OS << "\n\n";
@@ -1623,7 +1624,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
          << assocProtoWitness.Requirement->getName() << ": "
          << assocProtoWitness.Protocol->getName() << "): ";
       if (assocProtoWitness.Witness)
-        assocProtoWitness.Witness->printName(OS);
+        assocProtoWitness.Witness->printName(OS, Options);
       else
         OS << "dependent";
       break;
@@ -1633,7 +1634,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       auto &baseProtoWitness = witness.getBaseProtocolWitness();
       OS << "base_protocol "
          << baseProtoWitness.Requirement->getName() << ": ";
-      baseProtoWitness.Witness->printName(OS);
+      baseProtoWitness.Witness->printName(OS, Options);
       break;
     }
     case MissingOptional: {

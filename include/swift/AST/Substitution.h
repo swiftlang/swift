@@ -77,7 +77,8 @@ public:
 
   bool operator!=(const Substitution &other) const { return !(*this == other); }
   bool operator==(const Substitution &other) const;
-  void print(llvm::raw_ostream &os) const;
+  void print(llvm::raw_ostream &os,
+             const PrintOptions &PO = PrintOptions()) const;
   void dump() const;
   
   /// Substitute the replacement and conformance types with the given

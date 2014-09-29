@@ -1926,10 +1926,11 @@ void TypeRepr::dump() const {
   llvm::errs() << '\n';
 }
 
-void Substitution::print(llvm::raw_ostream &os) const {
-  Archetype->print(os);
+void Substitution::print(llvm::raw_ostream &os,
+                         const PrintOptions &PO) const {
+  Archetype->print(os, PO);
   os << " = ";
-  Replacement->print(os);
+  Replacement->print(os, PO);
 }
 
 void Substitution::dump() const {
@@ -1937,13 +1938,14 @@ void Substitution::dump() const {
   llvm::errs() << '\n';
 }
 
-void ProtocolConformance::printName(llvm::raw_ostream &os) const {
+void ProtocolConformance::printName(llvm::raw_ostream &os,
+                                    const PrintOptions &PO) const {
   if (auto gp = getGenericParams()) {
     gp->print(os);
     os << ' ';
   }
   
-  getType()->print(os);
+  getType()->print(os, PO);
   os << ": ";
   
   switch (getKind()) {
@@ -1957,7 +1959,7 @@ void ProtocolConformance::printName(llvm::raw_ostream &os) const {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";
     interleave(spec->getGenericSubstitutions(),
-               [&](const Substitution &s) { s.print(os); },
+               [&](const Substitution &s) { s.print(os, PO); },
                [&] { os << ", "; });
     os << "> (";
     spec->getGenericConformance()->printName(os);
