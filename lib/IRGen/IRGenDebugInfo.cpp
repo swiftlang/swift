@@ -1171,7 +1171,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
   // won't get confused with addressors.
   auto File = getOrCreateFile(L.Filename);
   llvm::DIScope Context = IsLibrary ? MainModule : EntryPointFn;
-  DBuilder.createStaticVariable(Context, Name, LinkageName, File, L.Line, Ty,
+  DBuilder.createGlobalVariable(Context, Name, LinkageName, File, L.Line, Ty,
                                 Var->hasInternalLinkage(), Var, nullptr);
 }
 
