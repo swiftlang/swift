@@ -84,6 +84,60 @@ protected:
   SILLocation getOpLocation(SILLocation Loc) {
     return asImpl().remapLocation(Loc);
   }
+  Substitution getOpSubstitution(Substitution Sub) {
+    CanType newReplacement = asImpl()
+      .getOpASTType(Sub.getReplacement()->getCanonicalType());
+    auto &C = newReplacement->getASTContext();
+    
+    ArrayRef<ProtocolConformance*> conformances = Sub.getConformances();
+    MutableArrayRef<ProtocolConformance*> newConformancesBuf;
+    
+    auto copyConformances = [&]{
+      if (!newConformancesBuf.empty())
+        return;
+      newConformancesBuf = C.Allocate<ProtocolConformance*>(conformances.size());
+      memcpy(newConformancesBuf.data(), conformances.data(),
+             sizeof(ProtocolConformance*) * conformances.size());
+      conformances = newConformancesBuf;
+    };
+    
+    for (unsigned i = 0, e = conformances.size(); i < e; ++i) {
+      ProtocolConformance *newConformance = asImpl().getOpConformance(
+                                      Sub.getReplacement()->getCanonicalType(),
+                                      conformances[i]);
+      if (newConformance != conformances[i]) {
+        copyConformances();
+        newConformancesBuf[i] = newConformance;
+      }
+    }
+    
+    return Substitution(Sub.getArchetype(),
+                        newReplacement,
+                        conformances);
+  }
+  ArrayRef<Substitution> getOpSubstitutions(ArrayRef<Substitution> Subs) {
+    MutableArrayRef<Substitution> newSubsBuf;
+    
+    auto copySubs = [&]{
+      if (!newSubsBuf.empty())
+        return;
+      newSubsBuf = Subs[0].getArchetype()->getASTContext()
+        .Allocate<Substitution>(Subs.size());
+      memcpy(newSubsBuf.data(), Subs.data(),
+             sizeof(Substitution) * Subs.size());
+      Subs = newSubsBuf;
+    };
+    
+    for (unsigned i = 0, e = Subs.size(); i < e; ++i) {
+      Substitution newSub = asImpl().getOpSubstitution(Subs[i]);
+      if (newSub != Subs[i]) {
+        copySubs();
+        newSubsBuf[i] = newSub;
+      }
+    }
+    
+    return Subs;
+  }
   SILType getOpType(SILType Ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
@@ -338,7 +392,8 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
                              getOpValue(Inst->getCallee()),
                              getOpType(Inst->getSubstCalleeSILType()),
                              getOpType(Inst->getType()),
-                             Inst->getSubstitutions(), Args,
+                             getOpSubstitutions(Inst->getSubstitutions()),
+                             Args,
                              Inst->isTransparent()));
 }
 
@@ -350,7 +405,8 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
     getBuilder().createPartialApply(getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getCallee()),
                                     getOpType(Inst->getSubstCalleeSILType()),
-                                    Inst->getSubstitutions(), Args,
+                                    getOpSubstitutions(Inst->getSubstitutions()),
+                                    Args,
                                     getOpType(Inst->getType())));
 }
 
