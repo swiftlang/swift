@@ -21,6 +21,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
 #include <algorithm>
+#include <condition_variable>
 #include <new>
 #include <mutex>
 #include <cctype>
