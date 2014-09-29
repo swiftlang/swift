@@ -419,8 +419,10 @@ public:
   ///        the SIL module depends on.
   /// \param ShouldSort If set to true sorts functions, vtables, sil global
   ///        variables, and witness tables by name to ease diffing.
+  /// \param PrintASTDecls If set to true print AST decls.
   void print(raw_ostream &OS, bool Verbose = false,
-             Module *M = nullptr, bool ShouldSort = false) const;
+             Module *M = nullptr, bool ShouldSort = false,
+             bool PrintASTDecls = true) const;
 
   /// Allocate memory using the module's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {

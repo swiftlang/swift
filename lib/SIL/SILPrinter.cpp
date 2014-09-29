@@ -1504,7 +1504,7 @@ printSILWitnessTables(llvm::raw_ostream &OS, bool Verbose,
 
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
-                      Module *M, bool ShouldSort) const {
+                      Module *M, bool ShouldSort, bool PrintASTDecls) const {
   OS << "sil_stage ";
   switch (Stage) {
   case SILStage::Raw:
@@ -1527,7 +1527,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
 
   // Print the declarations and types from the origin module, unless we're not
   // in whole-module mode.
-  if (M && AssociatedDeclContext == M) {
+  if (M && AssociatedDeclContext == M && PrintASTDecls) {
     PrintOptions Options = PrintOptions::printSIL();
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;

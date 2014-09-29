@@ -321,6 +321,11 @@ EnableSILSortOutput("sil-sort-output", llvm::cl::Hidden,
                     llvm::cl::desc("Sort Functions, VTables, Globals, "
                                    "WitnessTables by name to ease diffing."));
 
+static llvm::cl::opt<bool>
+DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
+               llvm::cl::init(false),
+               llvm::cl::desc("Do not dump AST."));
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          const SILOptions &Options) {
   SILPassManager PM(Module, Options);
@@ -592,7 +597,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                           EnableSILSortOutput);
+                           EnableSILSortOutput, !DisableASTDump);
 
   bool HadError = CI.getASTContext().hadError();
 
