@@ -1524,23 +1524,17 @@ static RValue emitClassBoundedErasure(SILGenFunction &gen, ErasureExpr *E) {
   
   SILValue v;
   
-  Type subType = E->getSubExpr()->getType();
-  
-  if (subType->isExistentialType()) {
-    // If the source value is already of protocol type, open the value so we can
-    // take it.
-    subType = ArchetypeType::getOpened(E->getSubExpr()->getType());
-    auto openedTy = gen.getLoweredLoadableType(subType);
-    SILValue openedVal
-      = gen.B.createOpenExistentialRef(E, sub.forward(gen), openedTy);
-    sub = gen.emitManagedRValueWithCleanup(openedVal);
-  }
-  
-  // Create a new existential container value around the class
-  // instance.
-  v = gen.B.createInitExistentialRef(E, resultTy,
-                               subType->getCanonicalType(),
-                               sub.getValue(), E->getConformances());
+  if (E->getSubExpr()->getType()->isExistentialType())
+    // If the source value is already of protocol type, we can use
+    // upcast_existential_ref to steal the already-initialized witness tables
+    // and concrete value.
+    v = gen.B.createUpcastExistentialRef(E, sub.getValue(), resultTy);
+  else
+    // Otherwise, create a new existential container value around the class
+    // instance.
+    v = gen.B.createInitExistentialRef(E, resultTy,
+                                 E->getSubExpr()->getType()->getCanonicalType(),
+                                 sub.getValue(), E->getConformances());
 
   return RValue(gen, E, ManagedValue(v, sub.getCleanup()));
 }
@@ -1556,36 +1550,19 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
   SILValue existential =
     gen.getBufferForExprResult(E, existentialTL.getLoweredType(), C);
   
-  Type subType = E->getSubExpr()->getType();
-  
-  if (subType->isExistentialType()) {
-    // If the source value is already of a protocol type, open the existential
-    // container so we can steal its value.
-    // TODO: Have a way to represent this operation in-place. The supertype
-    // should be able to fit in the memory of the subtype existential.
+  if (E->getSubExpr()->getType()->isExistentialType()) {
+    // If the source value is already of a protocol type, we can use
+    // upcast_existential to steal its already-initialized witness tables and
+    // concrete value.
     ManagedValue subExistential = gen.emitRValueAsSingleValue(E->getSubExpr());
-    Type subFormalTy = ArchetypeType::getOpened(subType);
-    SILType subLoweredTy = gen.getLoweredType(subFormalTy);
-    bool isTake = subExistential.hasCleanup();
-    SILValue subPayload;
-    if (subExistential.getValue().getType().isAddress()) {
-      subPayload = gen.B.createOpenExistential(E, subExistential.forward(gen),
-                                               subLoweredTy);
-    } else {
-      subPayload = gen.B.createOpenExistentialRef(E,subExistential.forward(gen),
-                                                  subLoweredTy);
-    }
-    ManagedValue subMV = isTake
-      ? gen.emitManagedRValueWithCleanup(subPayload)
-      : ManagedValue::forUnmanaged(subPayload);
-    
-    // Set up the destination existential, and forward the payload into it.
-    SILValue destAddr = gen.B.createInitExistential(E, existential,
-                                                subFormalTy->getCanonicalType(),
-                                                subLoweredTy,
-                                                E->getConformances());
-    
-    subMV.forwardInto(gen, E, destAddr);
+
+    IsTake_t isTake = IsTake_t(subExistential.hasCleanup());
+
+    gen.B.createUpcastExistential(E,
+                                  isTake ? subExistential.forward(gen)
+                                         : subExistential.getValue(),
+                                  existential,
+                                  isTake);
   } else {
     // Otherwise, we need to initialize a new existential container from
     // scratch.

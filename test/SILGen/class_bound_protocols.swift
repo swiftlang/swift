@@ -78,8 +78,7 @@ func class_bound_erasure(x: ConcreteClass) -> ClassBound {
 func class_bound_existential_upcast(x: protocol<ClassBound,ClassBound2>)
 -> ClassBound {
   return x
-  // CHECK: [[OPENED:%.*]] = open_existential_ref {{%.*}} : $protocol<ClassBound, ClassBound2> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, ClassBound2>]]
-  // CHECK: [[PROTO:%.*]] = init_existential_ref [[OPENED]] : [[OPENED_TYPE]] : [[OPENED_TYPE]], $ClassBound
+  // CHECK: [[PROTO:%.*]] = upcast_existential_ref {{%.*}} to $ClassBound
   // CHECK: return [[PROTO]]
 }
 
@@ -88,9 +87,7 @@ func class_bound_to_unbound_existential_upcast
 (var x:protocol<ClassBound,NotClassBound>) -> NotClassBound {
   return x
   // CHECK: [[X:%.*]] = load {{%.*}} : $*protocol<ClassBound, NotClassBound>
-  // CHECK: [[X_OPENED:%.*]] = open_existential_ref [[X]] : $protocol<ClassBound, NotClassBound> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, NotClassBound>]]
-  // CHECK: [[PAYLOAD_ADDR:%.*]] = init_existential %0 : $*NotClassBound, [[OPENED_TYPE]]
-  // CHECK: store [[X_OPENED]] to [[PAYLOAD_ADDR]]
+  // CHECK: upcast_existential [take] [[X]] : $protocol<ClassBound, NotClassBound> to {{%.*}}
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols18class_bound_method
