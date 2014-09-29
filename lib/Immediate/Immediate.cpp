@@ -63,6 +63,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#if defined(__APPLE__)
 // FIXME: We need a more library-neutral way for frameworks to take ownership of
 // the main loop.
 #include <CoreFoundation/CoreFoundation.h>
@@ -1487,3 +1488,14 @@ void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   CFRelease(replInputPort);
   CFRelease(portName);
 }
+#else
+void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+                        bool ParseStdlib) {
+  llvm::report_fatal_error("REPL Unimplemented for this platform");
+}
+
+void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+                           IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
+  llvm::report_fatal_error("RunImmediately Unimplemented for this platform");
+}
+#endif
