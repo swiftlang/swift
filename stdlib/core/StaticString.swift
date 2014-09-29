@@ -102,7 +102,7 @@ public struct StaticString
   /// `isASCII` is unspecified.
   @transparent
   public var isASCII: Bool {
-    return (UWord(_flags) & 0x2) == 0x2
+    return (UWord(_flags) & 0x2) != 0
   }
 
   /// Invoke `body` with a buffer containing the UTF-8 code units of
