@@ -40,7 +40,7 @@ Optional<UUID> UUID::fromString(const char *s) {
 }
 
 void UUID::toString(llvm::SmallVectorImpl<char> &out) const {
-  out.resize(sizeof(uuid_string_t));
+  out.resize(UUID::StringBufferSize);
   uuid_unparse(Value, out.data());
   // Pop off the null terminator.
   assert(out.back() == '\0' && "did not null-terminate?!");
