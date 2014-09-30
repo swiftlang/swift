@@ -35,7 +35,7 @@ func isCocoaNSDictionary(d: NSDictionary) -> Bool {
 
 func isNativeNSArray(d: NSArray) -> Bool {
   var className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("_NSSwiftArrayImpl").length > 0
+  return className.rangeOfString("_NSSwiftArray").length > 0
 }
 
 // Compare two arrays as sets.

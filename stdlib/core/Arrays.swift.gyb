@@ -1151,7 +1151,7 @@ extension Array {
   public static func _bridgeFromObjectiveCAdoptingNativeStorage(
     source: AnyObject
   ) -> Array? {
-    if let nsSwiftArray = source as? _NSSwiftArrayImpl {
+    if let nsSwiftArray = source as? _NSSwiftArray {
       if let nativeStorage =
         nsSwiftArray._nativeStorage as? _ContiguousArrayStorage<T> {
         return Array(_ContiguousArrayBuffer(nativeStorage))
