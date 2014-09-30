@@ -2981,11 +2981,23 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // as the getter is nonmutating.
       if (auto storage = dyn_cast<AbstractStorageDecl>(result)) {
         auto isGetterMutating = [](AbstractStorageDecl *storage) {
-          if (storage->hasAccessorFunctions())
+          switch (storage->getStorageKind()) {
+          case AbstractStorageDecl::Stored:
+            return false;
+
+          case AbstractStorageDecl::StoredWithObservers:
+          case AbstractStorageDecl::StoredWithTrivialAccessors:
+          case AbstractStorageDecl::InheritedWithObservers:
+          case AbstractStorageDecl::ComputedWithMutableAddress:
+          case AbstractStorageDecl::Computed:
+          case AbstractStorageDecl::AddressedWithTrivialAccessors:
+          case AbstractStorageDecl::AddressedWithObservers:
             return storage->getGetter()->isMutating();
-          if (storage->hasAddressors())
+
+          case AbstractStorageDecl::Addressed:
             return storage->getAddressor()->isMutating();
-          return false;
+          }
+          llvm_unreachable("bad storage kind");
         };
 
         if (isGetterMutating(storage)) {

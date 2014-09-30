@@ -1078,7 +1078,6 @@ getNonMemberVarDeclSubstitutions(SILGenFunction &gen, VarDecl *var) {
 static AddressorComponent *
 makeNonMemberVarDeclAddressorComponent(SILGenFunction &gen, VarDecl *var,
                                        const LValueTypeData &typeData) {
-  assert(var->hasAddressors());
   SILType storageType = gen.getLoweredType(var->getType()).getAddressType();
   return new AddressorComponent(var, /*isSuper=*/ false, /*direct*/ true,
                                 getNonMemberVarDeclSubstitutions(gen, var),

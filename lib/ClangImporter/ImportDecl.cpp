@@ -1503,7 +1503,7 @@ namespace {
             NewDecls.push_back(makeNilLiteralConformance(structDecl, var));
             auto rawGetter = makeOptionSetRawTrivialGetter(structDecl, var);
             NewDecls.push_back(rawGetter);
-            var->makeStoredWithTrivialAccessors(rawGetter, nullptr, nullptr);
+            var->addTrivialAccessors(rawGetter, nullptr, nullptr);
           }
         };
         

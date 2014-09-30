@@ -477,20 +477,31 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   else {
     assert(requirement->isAccessor());
     auto storage = cast<AbstractStorageDecl>(witnessDecl);
-    assert(storage->getStorageKind() == AbstractStorageDecl::Stored &&
-           "missing witness reference for non-stored property?");
-
-    // For an addressed property, consider the appropriate addressor.
-    if (storage->hasAddressors()) {
-      auto addressor =
-        getAddressorForRequirement(storage, requirement->getAccessorKind());
-      witnessMutating = addressor->isMutating();
+    switch (storage->getStorageKind()) {
 
     // A stored property on a value type will have a mutating setter
     // and a non-mutating getter.
-    } else {
-      witnessMutating =
+    case AbstractStorageDecl::Stored:
+      witnessMutating = 
         shouldUseSetterRequirements(requirement->getAccessorKind());
+      break;
+
+    // For an addressed property, consider the appropriate addressor.
+    case AbstractStorageDecl::Addressed: {
+      FuncDecl *addressor =
+        getAddressorForRequirement(storage, requirement->getAccessorKind());
+      witnessMutating = addressor->isMutating();
+      break;
+    }
+
+    case AbstractStorageDecl::StoredWithObservers:
+    case AbstractStorageDecl::StoredWithTrivialAccessors:
+    case AbstractStorageDecl::InheritedWithObservers:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors:
+    case AbstractStorageDecl::AddressedWithObservers:
+    case AbstractStorageDecl::ComputedWithMutableAddress:
+    case AbstractStorageDecl::Computed:
+      llvm_unreachable("missing witness reference for kind with accessors");
     }
   }
   

@@ -53,8 +53,8 @@ class Sub : Base {
   }
 }
 
-class ObservingOverrider : Base { // expected-error {{class 'ObservingOverrider' has no initializers}}
-  override var value: Int { // expected-error {{cannot observe read-only property 'value'; it can't change}} expected-note {{stored property 'value' without initial value prevents synthesized initializers}}
+class ObservingOverrider : Base {
+  override var value: Int { // expected-error {{cannot observe read-only property 'value'; it can't change}}
     willSet { println(newValue) }
   }
 }

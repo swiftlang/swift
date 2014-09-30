@@ -1471,28 +1471,71 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
   // We currently don't serialize these locations.
   SourceLoc beginLoc, endLoc;
 
-  assert(addressor || !mutableAddressor);
-  bool hasAddressors = (addressor != 0);
+  auto makeAddressed = [&] {
+    decl->makeAddressed(beginLoc,
+                        cast_or_null<FuncDecl>(getDecl(addressor)),
+                        cast_or_null<FuncDecl>(getDecl(mutableAddressor)),
+                        endLoc);
+  };
 
-  switch ((StorageKind) rawStorageKind) {
-  case StorageKind::Stored:
-  case StorageKind::StoredWithTrivialAccessors:
-    if (hasAddressors) {
-      decl->makeAddressed(beginLoc,
-                          cast<FuncDecl>(getDecl(addressor)),
-                          cast_or_null<FuncDecl>(getDecl(mutableAddressor)),
-                          endLoc);      
-    }
-    if (rawStorageKind == (unsigned) StorageKind::StoredWithTrivialAccessors) {
-      decl->makeStoredWithTrivialAccessors(
+  auto addTrivialAccessors = [&] {
+    decl->addTrivialAccessors(
                        cast_or_null<FuncDecl>(getDecl(getter)),
                        cast_or_null<FuncDecl>(getDecl(setter)),
                        cast_or_null<FuncDecl>(getDecl(materializeForSet)));
-    }
+  };
+
+  auto setObservingAccessors = [&] {
+    decl->setObservingAccessors(
+                       cast_or_null<FuncDecl>(getDecl(getter)),
+                       cast_or_null<FuncDecl>(getDecl(setter)),
+                       cast_or_null<FuncDecl>(getDecl(materializeForSet)));
+  };
+
+  switch ((StorageKind) rawStorageKind) {
+  case StorageKind::Stored:
+    return;
+
+  case StorageKind::StoredWithTrivialAccessors:
+    addTrivialAccessors();
+    return;
+
+  case StorageKind::StoredWithObservers:
+    decl->makeStoredWithObservers(beginLoc,
+                       cast_or_null<FuncDecl>(getDecl(willSet)),
+                       cast_or_null<FuncDecl>(getDecl(didSet)),
+                       endLoc);
+    setObservingAccessors();
+    return;
+
+  case StorageKind::InheritedWithObservers:
+    decl->makeInheritedWithObservers(beginLoc,
+                       cast_or_null<FuncDecl>(getDecl(willSet)),
+                       cast_or_null<FuncDecl>(getDecl(didSet)),
+                       endLoc);
+    setObservingAccessors();
+    return;
+
+  case StorageKind::Addressed:
+    makeAddressed();
+    return;
+
+  case StorageKind::AddressedWithTrivialAccessors:
+    makeAddressed();
+    addTrivialAccessors();
+    return;
+
+  case StorageKind::AddressedWithObservers:
+    decl->makeAddressedWithObservers(beginLoc,
+                       cast_or_null<FuncDecl>(getDecl(addressor)),
+                       cast_or_null<FuncDecl>(getDecl(mutableAddressor)),
+                       cast_or_null<FuncDecl>(getDecl(willSet)),
+                       cast_or_null<FuncDecl>(getDecl(didSet)),
+                       endLoc);
+    setObservingAccessors();
     return;
 
   case StorageKind::Computed:
-    assert(!hasAddressors && "computed storage with addressors?");
     decl->makeComputed(beginLoc,
                        cast_or_null<FuncDecl>(getDecl(getter)),
                        cast_or_null<FuncDecl>(getDecl(setter)),
@@ -1500,24 +1543,13 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                        endLoc);
     return;
 
-  case StorageKind::Observing:
-    if (hasAddressors) {
-      decl->makeAddressedObserving(beginLoc,
-                       cast_or_null<FuncDecl>(getDecl(addressor)),
-                       cast_or_null<FuncDecl>(getDecl(mutableAddressor)),
-                       cast_or_null<FuncDecl>(getDecl(willSet)),
-                       cast_or_null<FuncDecl>(getDecl(didSet)),
-                       endLoc);
-    } else {
-      decl->makeObserving(beginLoc,
-                       cast_or_null<FuncDecl>(getDecl(willSet)),
-                       cast_or_null<FuncDecl>(getDecl(didSet)),
-                       endLoc);
-    }
-    decl->setObservingAccessors(
+  case StorageKind::ComputedWithMutableAddress:
+    decl->makeComputedWithMutableAddress(beginLoc,
                        cast_or_null<FuncDecl>(getDecl(getter)),
                        cast_or_null<FuncDecl>(getDecl(setter)),
-                       cast_or_null<FuncDecl>(getDecl(materializeForSet)));
+                       cast_or_null<FuncDecl>(getDecl(materializeForSet)),
+                       cast_or_null<FuncDecl>(getDecl(mutableAddressor)),
+                       endLoc);
     return;
   }
   llvm_unreachable("bad storage kind");

@@ -143,17 +143,29 @@ CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
     switch (var->getStorageKind()) {
     case VarDecl::StoredWithTrivialAccessors:
       llvm_unreachable("stored local variable with trivial accessors?");
+
+    case VarDecl::InheritedWithObservers:
+      llvm_unreachable("inherited local variable?");
+
     case VarDecl::Computed:
       return var->getSetter()
         ? CaptureKind::GetterSetter : CaptureKind::Getter;
-    case VarDecl::Observing:
+
+    case VarDecl::StoredWithObservers:
+    case VarDecl::Addressed:
+    case VarDecl::AddressedWithTrivialAccessors:
+    case VarDecl::AddressedWithObservers:
+    case VarDecl::ComputedWithMutableAddress:
+      // FIXME: do we need a different capture kind for addressed
+      // local vars?
       return CaptureKind::GetterSetter;
+
     case VarDecl::Stored:
       if (var->isLet())
         return CaptureKind::Constant;
-
       return CaptureKind::Box;
     }
+    llvm_unreachable("bad storage kind");
   }
   
   // "Captured" local types require no context.

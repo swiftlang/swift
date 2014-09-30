@@ -324,8 +324,11 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether we are overridden later
     unsigned Overridden : 1;
+
+    /// The storage kind.
+    unsigned StorageKind;
   };
-  enum { NumAbstractStorageDeclBits = NumValueDeclBits + 1 };
+  enum { NumAbstractStorageDeclBits = NumValueDeclBits + 5 };
   static_assert(NumAbstractStorageDeclBits <= 32, "fits in an unsigned");
 
   class VarDeclBitfields {
@@ -3308,12 +3311,11 @@ class AbstractStorageDecl : public ValueDecl {
 public:
   enum StorageKindTy {
     /// There are bits stored in memory for this object, and they are accessed
-    /// directly.
+    /// directly.  This is not valid for a SubscriptDecl.
     Stored,
     
     /// This is a stored property with trivial accessors which simply get and
-    /// set the underlying storage.  This is not valid for a SubscriptDecl,
-    /// since they never have storage.
+    /// set the underlying storage.  This is not valid for a SubscriptDecl.
     ///
     /// These accessors are used for several different purposes:
     ///   1) In an @objc variable, these accessors are dynamically dispatched
@@ -3325,23 +3327,58 @@ public:
     ///
     StoredWithTrivialAccessors,
 
-    /// There is no memory associated with this decl anywhere.  It is accessed
-    /// by calling a getter and setter.  If the setter is absent, then the value
-    /// is only loadable, but not storable.
+    /// This is a stored property with either a didSet specifier or a
+    /// willSet specifier (or both).  Sema synthesizes a setter which
+    /// calls them at the appropriate points.
+    StoredWithObservers,
+
+    /// There are bits stored in memory for this object, but they are
+    /// not allocated directly within the container; instead, there
+    /// are accessors which return the address of the memory.  The
+    /// value is accessed directly through the returned address.
+    ///
+    /// This is legal on both VarDecls and SubscriptDecls.
+    ///
+    /// There is always at least an 'address' accessor; if the object
+    /// is mutable, there will also be a 'mutableAddress' accessor.
+    Addressed,
+    
+    /// Like Addressed, this object has address accessors.  Like
+    /// StoredWithTrivialAccessors, accessors have been synthesized
+    /// which simply read and write through the addresses returned by
+    /// the addressors.
+    AddressedWithTrivialAccessors,
+
+    /// Like Addressed, this object has address accessors.  Like
+    /// StoredWithObservers, it also has either a willSet specifier or
+    /// a didSet specifier.  Accessors have been synthesized, like
+    /// with StoredWithObservers but using the address returned from
+    /// the appropriate accessor instead.
+    AddressedWithObservers,
+
+    /// This is an override of an object which adds either a didSet
+    /// specifier or a willSet specifier (or both).  Sema synthesizes
+    /// a setter which calls them at the appropriate points around
+    /// delegating to the superclass's setter.
+    InheritedWithObservers,
+
+    /// There is no memory associated with this decl anywhere.  It is
+    /// accessed by calling a getter and setter.  If the setter is
+    /// absent, then the value is only loadable, but not storable.
     Computed,
 
-    /// This property has storage, a didSet specifier, a willSet specifier, or
-    /// both.  Sema synthesizes a getter and setter that use these.
-    Observing
+    /// This object was specified with non-trivial getter and
+    /// mutableAddress accessors.  If it is accessed in a read-only
+    /// manner, the getter is called; otherwise, mutableAddress is
+    /// called.
+    ///
+    /// This turns out to the be the right thing for certain core data
+    /// structures which, when they store a bridged object, cannot
+    /// return the address at which the object is stored.
+    ComputedWithMutableAddress,
   };
 private:
-  enum {
-    StorageKindMask = 0x3,
-    HasAddressors = 0x4,
-  };
-
-  /// The low bits are (1) the StorageKind and (2) whether it has addressors.
-  llvm::PointerIntPair<AbstractStorageDecl*, 3, unsigned> OverriddenDecl;
+  AbstractStorageDecl *OverriddenDecl;
 
   struct GetSetRecord;
 
@@ -3372,6 +3409,9 @@ private:
   void configureGetSetRecord(GetSetRecord *getSetRecord,
                              FuncDecl *getter, FuncDecl *setter,
                              FuncDecl *materializeForSet);
+  void configureSetRecord(GetSetRecord *getSetInfo,
+                          FuncDecl *setter,
+                          FuncDecl *materializeForSet);
 
   struct ObservingRecord : GetSetRecord {
     FuncDecl *WillSet = nullptr;   // willSet(value):
@@ -3386,7 +3426,7 @@ private:
   llvm::PointerIntPair<GetSetRecord*, 2, OptionalEnum<Accessibility>> GetSetInfo;
 
   ObservingRecord &getDidSetInfo() const {
-    assert(getStorageKind() == Observing);
+    assert(hasObservers());
     return *static_cast<ObservingRecord*>(GetSetInfo.getPointer());
   }
   AddressorRecord &getAddressorInfo() const {
@@ -3394,15 +3434,15 @@ private:
     return *GetSetInfo.getPointer()->getAddressors();
   }
 
-  void setStorageKind(StorageKindTy K, bool hasAddressors) {
-    OverriddenDecl.setInt(unsigned(K) |
-                          (hasAddressors ? HasAddressors : 0));
+  void setStorageKind(StorageKindTy K) {
+    AbstractStorageDeclBits.StorageKind = unsigned(K);
   }
+
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
                       SourceLoc NameLoc)
-    : ValueDecl(Kind, DC, Name, NameLoc) {
-    OverriddenDecl.setInt(Stored);
+    : ValueDecl(Kind, DC, Name, NameLoc), OverriddenDecl(nullptr) {
+    AbstractStorageDeclBits.StorageKind = Stored;
     AbstractStorageDeclBits.Overridden = false;
   }
 public:
@@ -3411,47 +3451,90 @@ public:
   /// has no storage but does have a user-defined getter or setter.
   ///
   StorageKindTy getStorageKind() const {
-    return (StorageKindTy) (OverriddenDecl.getInt() & StorageKindMask);
-  }
-
-  /// \brief Determine whether this property has addressors.
-  ///
-  /// Only Stored, StoredWithTrivialAccessors, and Observing
-  /// properties can have addressors.
-  bool hasAddressors() const {
-    return OverriddenDecl.getInt() & HasAddressors;
+    return (StorageKindTy) AbstractStorageDeclBits.StorageKind;
   }
 
   /// \brief Return true if this is a VarDecl that has storage associated with
   /// it.
   bool hasStorage() const {
-    // Nothing with an addressor has independent storage.
-    if (hasAddressors()) return false;
-
     switch (getStorageKind()) {
     case Stored:
     case StoredWithTrivialAccessors:
+    case StoredWithObservers:
       return true;
-    case Observing:
-      // Observing properties and stored properties with synthesized accessors
-      // have storage, unless they're @override'ing a value in a base class.
-      return getOverriddenDecl() == nullptr;
+    case InheritedWithObservers:
     case Computed:
+    case ComputedWithMutableAddress:
+    case Addressed:
+    case AddressedWithTrivialAccessors:
+    case AddressedWithObservers:
       return false;
     }
-    llvm_unreachable("bad StorageKindTy");
+    llvm_unreachable("bad storage kind");
   }
 
+  /// \brief Return true if this object has a getter (and, if mutable,
+  /// a setter and a materializeForSet).
   bool hasAccessorFunctions() const {
     switch (getStorageKind()) {
-    case Computed:
-    case StoredWithTrivialAccessors:
-    case Observing:
-      return true;
+    case Addressed:
     case Stored:
       return false;
+    case StoredWithTrivialAccessors:
+    case StoredWithObservers:
+    case InheritedWithObservers:
+    case Computed:
+    case ComputedWithMutableAddress:
+    case AddressedWithTrivialAccessors:
+    case AddressedWithObservers:
+      return true;
     }
-    llvm_unreachable("bad StorageKindTy");
+    llvm_unreachable("bad storage kind");
+  }
+
+  /// \brief Return true if this object has observing accessors.
+  ///
+  /// It's generally not appropriate to use this predicate directly in
+  /// a condition; instead, you should be switching on the storage kind.
+  bool hasObservers() const {
+    switch (getStorageKind()) {
+    case Stored:
+    case StoredWithTrivialAccessors:
+    case Computed:
+    case ComputedWithMutableAddress:
+    case Addressed:
+    case AddressedWithTrivialAccessors:
+      return false;
+    case StoredWithObservers:
+    case InheritedWithObservers:
+    case AddressedWithObservers:
+      return true;
+    }
+    llvm_unreachable("bad storage kind");
+  }
+
+  /// \brief Return true if this object has either an addressor or a
+  /// mutable addressor.
+  ///
+  /// It's generally not appropriate to use this predicate directly in
+  /// a condition; instead, you should be switching on the storage
+  /// kind.  Only use this for diagnostic, AST exploration, or
+  /// assertion purposes.
+  bool hasAddressors() const {
+    switch (getStorageKind()) {
+    case Stored:
+    case StoredWithTrivialAccessors:
+    case StoredWithObservers:
+    case InheritedWithObservers:
+    case Computed:
+      return false;
+    case ComputedWithMutableAddress:
+    case Addressed:
+    case AddressedWithTrivialAccessors:
+    case AddressedWithObservers:
+      return true;
+    }
+    llvm_unreachable("bad storage kind");
   }
 
   FuncDecl *getAccessorFunction(AccessorKind accessor) const;
@@ -3460,15 +3543,27 @@ public:
   void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
                     FuncDecl *MaterializeForSet, SourceLoc RBraceLoc);
 
-  /// \brief Turn this into a StoredWithTrivialAccessors var, specifying the
-  /// accessors (getter and setter) that go with it.
-  void makeStoredWithTrivialAccessors(FuncDecl *Get, FuncDecl *Set,
-                                      FuncDecl *MaterializeForSet);
+  /// \brief Turn this into a computed object, providing a getter and a mutable
+  /// addressor.
+  void makeComputedWithMutableAddress(SourceLoc lbraceLoc,
+                                      FuncDecl *getter, FuncDecl *setter,
+                                      FuncDecl *materializeForSet,
+                                      FuncDecl *mutableAddressor,
+                                      SourceLoc rbraceLoc);
 
-  /// \brief Turn this into a Observing var, providing the didSet/willSet
-  /// specifiers.
-  void makeObserving(SourceLoc LBraceLoc, FuncDecl *WillSet, FuncDecl *DidSet,
-                     SourceLoc RBraceLoc);
+  /// \brief Add trivial accessors to this Stored or Addressed object.
+  void addTrivialAccessors(FuncDecl *Get, FuncDecl *Set,
+                           FuncDecl *MaterializeForSet);
+
+  /// \brief Turn this into a stored-with-observers var, providing the
+  /// didSet/willSet specifiers.
+  void makeStoredWithObservers(SourceLoc LBraceLoc, FuncDecl *WillSet,
+                               FuncDecl *DidSet, SourceLoc RBraceLoc);
+
+  /// \brief Turn this into an inherited-with-observers var, providing
+  /// the didSet/willSet specifiers.
+  void makeInheritedWithObservers(SourceLoc LBraceLoc, FuncDecl *WillSet,
+                                  FuncDecl *DidSet, SourceLoc RBraceLoc);
 
   /// \brief Turn this into an addressed var.
   void makeAddressed(SourceLoc LBraceLoc, FuncDecl *Addressor,
@@ -3476,13 +3571,13 @@ public:
                      SourceLoc RBraceLoc);
 
   /// \brief Turn this into an addressed var with observing accessors.
-  void makeAddressedObserving(SourceLoc LBraceLoc, FuncDecl *Addressor,
-                              FuncDecl *MutableAddressor,
-                              FuncDecl *WillSet, FuncDecl *DidSet,
-                              SourceLoc RBraceLoc);
+  void makeAddressedWithObservers(SourceLoc LBraceLoc, FuncDecl *Addressor,
+                                  FuncDecl *MutableAddressor,
+                                  FuncDecl *WillSet, FuncDecl *DidSet,
+                                  SourceLoc RBraceLoc);
 
-  /// \brief Specify the synthesized get/set functions for a Observing var.
-  /// This is used by Sema.
+  /// \brief Specify the synthesized get/set functions for a
+  /// StoredWithObservers or AddressedWithObservers var.  This is used by Sema.
   void setObservingAccessors(FuncDecl *Get, FuncDecl *Set,
                              FuncDecl *MaterializeForSet);
 
@@ -3584,10 +3679,10 @@ public:
   ObjCSelector getObjCSetterSelector() const;
 
   AbstractStorageDecl *getOverriddenDecl() const {
-    return OverriddenDecl.getPointer();
+    return OverriddenDecl;
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
-    OverriddenDecl.setPointer(over);
+    OverriddenDecl = over;
     over->setIsOverridden();
   }
 

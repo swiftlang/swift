@@ -48,7 +48,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 147;
+const uint16_t VERSION_MINOR = 148;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -77,9 +77,12 @@ using FileSizeField = BCVBR<16>;
 using FileModTimeField = BCVBR<16>;
 
 enum class StorageKind : uint8_t {
-  Stored, StoredWithTrivialAccessors, Computed, Observing
+  Stored, StoredWithTrivialAccessors, StoredWithObservers,
+  InheritedWithObservers,
+  Computed, ComputedWithMutableAddress,
+  Addressed, AddressedWithTrivialAccessors, AddressedWithObservers,
 };
-using StorageKindField = BCFixed<2>;
+using StorageKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.

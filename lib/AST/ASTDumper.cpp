@@ -109,6 +109,31 @@ static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
 //  Decl printing.
 //===----------------------------------------------------------------------===//
 
+static StringRef
+getStorageKindName(AbstractStorageDecl::StorageKindTy storageKind) {
+  switch (storageKind) {
+  case AbstractStorageDecl::Stored:
+    return "stored";
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    return "stored_with_trivial_accessors";
+  case AbstractStorageDecl::StoredWithObservers:
+    return "stored_with_observers";
+  case AbstractStorageDecl::InheritedWithObservers:
+    return "inherited_with_observers";
+  case AbstractStorageDecl::Addressed:
+    return "addressed";
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+    return "addressed_with_trivial_accessors";
+  case AbstractStorageDecl::AddressedWithObservers:
+    return "addressed_with_observers";
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+    return "computed_with_mutable_address";
+  case AbstractStorageDecl::Computed:
+    return "computed";
+  }
+  llvm_unreachable("bad storage kind");
+}
+
 // Print a name.
 static void printName(raw_ostream &os, Identifier name) {
   if (name.empty())
@@ -486,21 +511,7 @@ namespace {
         OS << " type";
       if (VD->isLet())
         OS << " let";
-      OS << " storage_kind=";
-      switch (VD->getStorageKind()) {
-      case VarDecl::Computed:
-        OS << "'computed'";
-        break;
-      case VarDecl::Stored:
-        OS << "'stored'";
-        break;
-      case VarDecl::StoredWithTrivialAccessors:
-        OS << "'stored_trivial_accessors'";
-        break;
-      case VarDecl::Observing:
-        OS << "'observing'";
-        break;
-      }
+      OS << " storage_kind=" << getStorageKindName(VD->getStorageKind());
       if (VD->getAttrs().hasAttribute<LazyAttr>())
         OS << " lazy";
 
@@ -521,7 +532,7 @@ namespace {
         OS << "\n";
         printRec(MaterializeForSet);
       }
-      if (D->getStorageKind() == VarDecl::Observing) {
+      if (D->hasObservers()) {
         if (FuncDecl *WillSet = D->getWillSetFunc()) {
           OS << "\n";
           printRec(WillSet);
@@ -529,6 +540,16 @@ namespace {
         if (FuncDecl *DidSet = D->getDidSetFunc()) {
           OS << "\n";
           printRec(DidSet);
+        }
+      }
+      if (D->hasAddressors()) {
+        if (FuncDecl *addressor = D->getAddressor()) {
+          OS << "\n";
+          printRec(addressor);
+        }
+        if (FuncDecl *mutableAddressor = D->getMutableAddressor()) {
+          OS << "\n";
+          printRec(mutableAddressor);
         }
       }
     }
@@ -592,6 +613,7 @@ namespace {
 
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
+      OS << " storage_kind=" << getStorageKindName(SD->getStorageKind());
       printAccessors(SD);
       OS << ')';
     }

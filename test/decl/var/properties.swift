@@ -1040,7 +1040,7 @@ class rdar17391625derived :  rdar17391625 {
 
 extension rdar17391625derived {
   // Not a stored property, computed because it is an override.
-  override var prop: Int { // expected-error {{declarations in extensions cannot override yet}} expected-error {{extensions may not contain stored properties}}
+  override var prop: Int { // expected-error {{declarations in extensions cannot override yet}}
   didSet {
   }
   }

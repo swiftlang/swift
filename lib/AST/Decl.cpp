@@ -939,21 +939,25 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
     //
     // This is true in structs and for final properties.
     // TODO: What about static properties?
-    if (var->getStorageKind() == VarDecl::StoredWithTrivialAccessors ||
-        var->getStorageKind() == VarDecl::Stored) {
+    switch (var->getStorageKind()) {
+    case AbstractStorageDecl::Stored:
+    case AbstractStorageDecl::StoredWithTrivialAccessors:
+    case AbstractStorageDecl::Addressed:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors:
       if (!isPolymorphic(var))
         return AccessSemantics::DirectToStorage;
+      break;
+
+    case AbstractStorageDecl::StoredWithObservers:
+    case AbstractStorageDecl::InheritedWithObservers:
+    case AbstractStorageDecl::Computed:
+    case AbstractStorageDecl::ComputedWithMutableAddress:
+    case AbstractStorageDecl::AddressedWithObservers:
+      break;
     }
   }
 
   return AccessSemantics::Ordinary;
-}
-
-static AccessStrategy
-getAccessStrategyForDirectStorage(const AbstractStorageDecl *storage) {
-  if (storage->hasAddressors())
-    return AccessStrategy::Addressor;
-  return AccessStrategy::Storage;
 }
 
 AccessStrategy
@@ -964,10 +968,17 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     switch (getStorageKind()) {
     case Stored:
     case StoredWithTrivialAccessors:
-    case Observing:
-      return getAccessStrategyForDirectStorage(this);
+    case StoredWithObservers:
+      return AccessStrategy::Storage;
 
+    case Addressed:
+    case AddressedWithTrivialAccessors:
+    case AddressedWithObservers:
+      return AccessStrategy::Addressor;
+
+    case InheritedWithObservers:
     case Computed:
+    case ComputedWithMutableAddress:
       llvm_unreachable("cannot have direct-to-storage access to "
                        "computed storage");
     }
@@ -979,15 +990,20 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     return AccessStrategy::DirectToAccessor;
 
   case AccessSemantics::Ordinary:
-    switch (getStorageKind()) {
+    switch (auto storageKind = getStorageKind()) {
     case Stored:
-      return getAccessStrategyForDirectStorage(this);
+      return AccessStrategy::Storage;
+    case Addressed:
+      return AccessStrategy::Addressor;
 
-    case Observing:
+    case StoredWithObservers:
+    case InheritedWithObservers:
+    case AddressedWithObservers:
       // An observing property backed by its own storage (i.e. which
       // doesn't override anything) has a trivial getter implementation,
       // but its setter is interesting.
-      if (accessKind != AccessKind::Read || getOverriddenDecl()) {
+      if (accessKind != AccessKind::Read ||
+          storageKind == InheritedWithObservers) {
         if (isPolymorphic(this))
           return AccessStrategy::DispatchToAccessor;
         return AccessStrategy::DirectToAccessor;
@@ -997,13 +1013,28 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       SWIFT_FALLTHROUGH;
 
     case StoredWithTrivialAccessors:
+    case AddressedWithTrivialAccessors:
       // If the storage is polymorphic, either the getter or the
       // setter could be overridden by something more interesting.
       if (isPolymorphic(this))
         return AccessStrategy::DispatchToAccessor;
 
       // Otherwise, just access the storage directly.
-      return getAccessStrategyForDirectStorage(this);
+      if (storageKind == StoredWithObservers ||
+          storageKind == StoredWithTrivialAccessors) {
+        return AccessStrategy::Storage;
+      } else {
+        assert(storageKind == AddressedWithObservers ||
+               storageKind == AddressedWithTrivialAccessors);
+        return AccessStrategy::Addressor;
+      }
+
+    case ComputedWithMutableAddress:
+      if (isPolymorphic(this))
+        return AccessStrategy::DispatchToAccessor;
+      if (accessKind == AccessKind::Read)
+        return AccessStrategy::DirectToAccessor;
+      return AccessStrategy::Addressor;
 
     case Computed:
       if (isPolymorphic(this))
@@ -2041,6 +2072,16 @@ void AbstractStorageDecl::configureGetSetRecord(GetSetRecord *getSetInfo,
                                                 FuncDecl *setter,
                                                 FuncDecl *materializeForSet) {
   getSetInfo->Get = getter;
+  if (getter) {
+    getter->makeAccessor(this, AccessorKind::IsGetter);
+  }
+
+  configureSetRecord(getSetInfo, setter, materializeForSet);
+}
+
+void AbstractStorageDecl::configureSetRecord(GetSetRecord *getSetInfo,
+                                             FuncDecl *setter,
+                                             FuncDecl *materializeForSet) {
   getSetInfo->Set = setter;
   getSetInfo->MaterializeForSet = materializeForSet;
 
@@ -2051,10 +2092,6 @@ void AbstractStorageDecl::configureGetSetRecord(GetSetRecord *getSetInfo,
       fn->overwriteAccessibility(setterAccess.getValue());
     }    
   };
-
-  if (getter) {
-    getter->makeAccessor(this, AccessorKind::IsGetter);
-  }
 
   if (setter) {
     setter->makeAccessor(this, AccessorKind::IsSetter);
@@ -2101,8 +2138,7 @@ void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
                                        FuncDecl *Get, FuncDecl *Set,
                                        FuncDecl *MaterializeForSet,
                                        SourceLoc RBraceLoc) {
-  assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
-  assert(!hasAddressors() && "can't be computed with addressors!");
+  assert(getStorageKind() == Stored && "StorageKind already set");
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   auto *getSetInfo = new (Mem) GetSetRecord();
@@ -2111,7 +2147,7 @@ void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
   configureGetSetRecord(getSetInfo, Get, Set, MaterializeForSet);
 
   // Mark that this is a computed property.
-  setStorageKind(Computed, false);
+  setStorageKind(Computed);
 }
 
 void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
@@ -2129,6 +2165,27 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
   }
 }
 
+void AbstractStorageDecl::makeComputedWithMutableAddress(SourceLoc lbraceLoc,
+                                                FuncDecl *get, FuncDecl *set,
+                                                FuncDecl *materializeForSet,
+                                                FuncDecl *mutableAddressor,
+                                                SourceLoc rbraceLoc) {
+  assert(getStorageKind() == Stored && "StorageKind already set");
+  assert(get);
+  assert(mutableAddressor);
+  auto &ctx = getASTContext();
+
+  void *mem = ctx.Allocate(sizeof(GetSetRecordWithAddressors),
+                           alignof(GetSetRecordWithAddressors));
+  auto info = new (mem) GetSetRecordWithAddressors();
+  info->Braces = SourceRange(lbraceLoc, rbraceLoc);
+  GetSetInfo.setPointer(info);
+  setStorageKind(ComputedWithMutableAddress);
+
+  configureAddressorRecord(info, nullptr, mutableAddressor);
+  configureGetSetRecord(info, get, set, materializeForSet);
+}
+
 void AbstractStorageDecl::setMaterializeForSetFunc(FuncDecl *accessor) {
   assert(hasAccessorFunctions() && "No accessors for declaration!");
   assert(getSetter() && "declaration is not settable");
@@ -2144,22 +2201,23 @@ void AbstractStorageDecl::setMaterializeForSetFunc(FuncDecl *accessor) {
 
 /// \brief Turn this into a StoredWithTrivialAccessors var, specifying the
 /// accessors (getter and setter) that go with it.
-void AbstractStorageDecl::makeStoredWithTrivialAccessors(FuncDecl *Get,
+void AbstractStorageDecl::addTrivialAccessors(FuncDecl *Get,
                                  FuncDecl *Set, FuncDecl *MaterializeForSet) {
-  assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
+  assert((getStorageKind() == Stored ||
+          getStorageKind() == Addressed) && "StorageKind already set");
   assert(Get);
 
   auto &ctx = getASTContext();
   GetSetRecord *getSetInfo;
-  if (hasAddressors()) {
+  if (getStorageKind() == Addressed) {
     getSetInfo = GetSetInfo.getPointer();
-    setStorageKind(StoredWithTrivialAccessors, true);
+    setStorageKind(AddressedWithTrivialAccessors);
   } else {
     void *mem = ctx.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
     getSetInfo = new (mem) GetSetRecord();
     getSetInfo->Braces = SourceRange();
     GetSetInfo.setPointer(getSetInfo);
-    setStorageKind(StoredWithTrivialAccessors, false);
+    setStorageKind(StoredWithTrivialAccessors);
   }
   configureGetSetRecord(getSetInfo, Get, Set, MaterializeForSet);
 }
@@ -2167,8 +2225,7 @@ void AbstractStorageDecl::makeStoredWithTrivialAccessors(FuncDecl *Get,
 void AbstractStorageDecl::makeAddressed(SourceLoc lbraceLoc, FuncDecl *addressor,
                                         FuncDecl *mutableAddressor,
                                         SourceLoc rbraceLoc) {
-  assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
-  assert(!hasAddressors() && "already has addressors!");
+  assert(getStorageKind() == Stored && "StorageKind already set");
   assert(addressor && "addressed mode, but no addressor function?");
 
   auto &ctx = getASTContext();
@@ -2178,16 +2235,16 @@ void AbstractStorageDecl::makeAddressed(SourceLoc lbraceLoc, FuncDecl *addressor
   auto info = new (mem) GetSetRecordWithAddressors();
   info->Braces = SourceRange(lbraceLoc, rbraceLoc);
   GetSetInfo.setPointer(info);
-  setStorageKind(Stored, true);
+  setStorageKind(Addressed);
 
   configureAddressorRecord(info, addressor, mutableAddressor);
 }
 
-void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
-                                        FuncDecl *WillSet, FuncDecl *DidSet,
-                                        SourceLoc RBraceLoc) {
+void AbstractStorageDecl::makeStoredWithObservers(SourceLoc LBraceLoc,
+                                                  FuncDecl *WillSet,
+                                                  FuncDecl *DidSet,
+                                                  SourceLoc RBraceLoc) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
-  assert(!hasAddressors() && "can't be observing with addressors!");
   assert((WillSet || DidSet) &&
          "Can't be Observing without one or the other");
   auto &Context = getASTContext();
@@ -2197,20 +2254,38 @@ void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
   observingInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
   GetSetInfo.setPointer(observingInfo);
 
-  // Mark that this is a Observing property.
-  setStorageKind(Observing, false);
+  // Mark that this is an observing property.
+  setStorageKind(StoredWithObservers);
 
   configureObservingRecord(observingInfo, WillSet, DidSet);
 }
 
-void AbstractStorageDecl::makeAddressedObserving(SourceLoc lbraceLoc,
-                                                 FuncDecl *addressor,
-                                                 FuncDecl *mutableAddressor,
-                                                 FuncDecl *willSet,
-                                                 FuncDecl *didSet,
-                                                 SourceLoc rbraceLoc) {
+void AbstractStorageDecl::makeInheritedWithObservers(SourceLoc lbraceLoc,
+                                                     FuncDecl *willSet,
+                                                     FuncDecl *didSet,
+                                                     SourceLoc rbraceLoc) {
+  assert(getStorageKind() == Stored && "StorageKind already set");
+  assert((willSet || didSet) &&
+         "Can't be Observing without one or the other");
+  auto &ctx = getASTContext();
+  void *mem = ctx.Allocate(sizeof(ObservingRecord), alignof(ObservingRecord));
+  auto *observingInfo = new (mem) ObservingRecord;
+  observingInfo->Braces = SourceRange(lbraceLoc, rbraceLoc);
+  GetSetInfo.setPointer(observingInfo);
+
+  // Mark that this is an observing property.
+  setStorageKind(InheritedWithObservers);
+
+  configureObservingRecord(observingInfo, willSet, didSet);
+}
+
+void AbstractStorageDecl::makeAddressedWithObservers(SourceLoc lbraceLoc,
+                                                     FuncDecl *addressor,
+                                                     FuncDecl *mutableAddressor,
+                                                     FuncDecl *willSet,
+                                                     FuncDecl *didSet,
+                                                     SourceLoc rbraceLoc) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
-  assert(!hasAddressors() && "already has addressors!");
   assert(addressor);
   assert(mutableAddressor && "observing but immutable?");
   assert((willSet || didSet) &&
@@ -2222,7 +2297,7 @@ void AbstractStorageDecl::makeAddressedObserving(SourceLoc lbraceLoc,
   auto info = new (mem) ObservingRecordWithAddressors();
   info->Braces = SourceRange(lbraceLoc, rbraceLoc);
   GetSetInfo.setPointer(info);
-  setStorageKind(Observing, true);
+  setStorageKind(AddressedWithObservers);
 
   configureAddressorRecord(info, addressor, mutableAddressor);
   configureObservingRecord(info, willSet, didSet);
@@ -2233,7 +2308,7 @@ void AbstractStorageDecl::makeAddressedObserving(SourceLoc lbraceLoc,
 void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
                                                 FuncDecl *Set,
                                                 FuncDecl *MaterializeForSet) {
-  assert(getStorageKind() == Observing && "VarDecl is wrong type");
+  assert(hasObservers() && "VarDecl is wrong type");
   assert(!getGetter() && !getSetter() && "getter and setter already set");
   assert(Get && Set && "Must specify getter and setter");
   configureGetSetRecord(GetSetInfo.getPointer(), Get, Set, MaterializeForSet);
@@ -2330,11 +2405,16 @@ static bool isSettable(const AbstractStorageDecl *decl) {
   switch (decl->getStorageKind()) {
   case AbstractStorageDecl::Stored:
   case AbstractStorageDecl::StoredWithTrivialAccessors:
-    if (decl->hasAddressors())
-      return decl->getMutableAddressor() != nullptr;
     return true;
 
-  case AbstractStorageDecl::Observing:
+    case AbstractStorageDecl::Addressed:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors:
+    return decl->getMutableAddressor() != nullptr;
+
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::AddressedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
     return true;
 
   case AbstractStorageDecl::Computed:

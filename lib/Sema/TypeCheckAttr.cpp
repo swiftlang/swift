@@ -284,6 +284,11 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   if (VD->isLet())
     return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_let_property);
 
+  auto diagnoseNotStored = [&](unsigned kind) {
+    TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_stored, kind);
+    return attr->setInvalid();
+  };
+
   // @NSManaged properties must be written as stored.
   switch (VD->getStorageKind()) {
   case AbstractStorageDecl::Stored:
@@ -300,11 +305,16 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   case AbstractStorageDecl::StoredWithTrivialAccessors:
     llvm_unreachable("Already created accessors?");
 
+  case AbstractStorageDecl::ComputedWithMutableAddress:
   case AbstractStorageDecl::Computed:
-  case AbstractStorageDecl::Observing:
-    TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_stored,
-                VD->getStorageKind() == AbstractStorageDecl::Observing);
-    return attr->setInvalid();
+    return diagnoseNotStored(/*computed*/ 0);
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+    return diagnoseNotStored(/*observing*/ 1);
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+    return diagnoseNotStored(/*addressed*/ 2);
   }
 
   // @NSManaged properties cannot be @NSCopying
@@ -341,7 +351,7 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_in_protocol);
 
   // It only works with stored properties.
-  if (!VD->hasStorage() && VD->getGetter() && !VD->getGetter()->isImplicit())
+  if (!VD->hasStorage())
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
 
   // lazy is not allowed on a lazily initiailized global variable or on a
@@ -365,8 +375,22 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
     return diagnoseAndRemoveAttr(attr, diag::lazy_must_be_property);
 
   // TODO: Lazy properties can't yet be observed.
-  if (VD->getStorageKind() == VarDecl::Observing)
+  switch (VD->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    break;
+
+  case AbstractStorageDecl::StoredWithObservers:
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
+
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+  case AbstractStorageDecl::Computed:
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+    llvm_unreachable("non-stored variable not filtered out?");
+  }
 }
 
 bool AttributeEarlyChecker::visitAbstractAccessibilityAttr(

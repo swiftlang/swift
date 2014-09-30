@@ -2874,10 +2874,12 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
           createImplicitAccessor(AccessorKind::IsMutableAddressor, nullptr);
       }
 
-      storage->makeAddressedObserving(LBLoc, Addressor, MutableAddressor,
-                                      WillSet, DidSet, RBLoc);
+      storage->makeAddressedWithObservers(LBLoc, Addressor, MutableAddressor,
+                                          WillSet, DidSet, RBLoc);
+    } else if (attrs.hasAttribute<OverrideAttr>()) {
+      storage->makeInheritedWithObservers(LBLoc, WillSet, DidSet, RBLoc);
     } else {
-      storage->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
+      storage->makeStoredWithObservers(LBLoc, WillSet, DidSet, RBLoc);
     }
 
     // Observing properties will have getters and setters synthesized by sema.
@@ -2924,7 +2926,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   if (Set || Get) {
     if (attrs.hasAttribute<SILStoredAttr>())
       // Turn this into a stored property with trivial accessors.
-      storage->makeStoredWithTrivialAccessors(Get, Set, nullptr);
+      storage->addTrivialAccessors(Get, Set, nullptr);
     else
       // Turn this into a computed variable.
       storage->makeComputed(LBLoc, Get, Set, nullptr, RBLoc);

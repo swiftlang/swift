@@ -584,7 +584,8 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   // If we are printing StoredWithTrivialAccessors in sil, print get|set
   // to differentiate from stored property. FIXME: Parser can't handle
   // "let {get}", so do not print it.
-  if (!ASD->hasAccessorFunctions() ||
+  // FIXME: addressors?
+  if (ASD->getStorageKind() == AbstractStorageDecl::Stored ||
       (Options.PrintForSIL &&
        ASD->getStorageKind() == AbstractStorageDecl::StoredWithTrivialAccessors
        && isa<VarDecl>(ASD) && cast<VarDecl>(ASD)->isLet() &&
@@ -650,12 +651,37 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   };
 
   Printer << " {";
-  if (ASD->getStorageKind() == VarDecl::Observing) {
-    PrintAccessor(ASD->getWillSetFunc(), "willSet");
-    PrintAccessor(ASD->getDidSetFunc(), "didSet");
-  } else {
+  switch (ASD->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+    llvm_unreachable("filtered out above!");
+    
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  case AbstractStorageDecl::Computed:
     PrintAccessor(ASD->getGetter(), "get");
     PrintAccessor(ASD->getSetter(), "set");
+    break;
+
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+    PrintAccessor(ASD->getWillSetFunc(), "willSet");
+    PrintAccessor(ASD->getDidSetFunc(), "didSet");
+    break;
+
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+    PrintAccessor(ASD->getAddressor(), "address");
+    PrintAccessor(ASD->getMutableAddressor(), "mutableAddress");
+    if (ASD->hasObservers()) {
+      PrintAccessor(ASD->getWillSetFunc(), "willSet");
+      PrintAccessor(ASD->getDidSetFunc(), "didSet");
+    }
+    break;
+
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+    PrintAccessor(ASD->getGetter(), "get");
+    PrintAccessor(ASD->getMutableAddressor(), "mutableAddress");
+    break;
   }
   if (PrintAccessorBody) {
     Printer.printNewline();
@@ -1686,7 +1712,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // PatternBindingDecl.
     if (auto *VD = dyn_cast<VarDecl>(this)) {
       if (!VD->hasClangNode() && VD->hasStorage() &&
-          VD->getStorageKind() != VarDecl::Observing)
+          VD->getStorageKind() != VarDecl::StoredWithObservers)
         return false;
     }
 
@@ -1696,7 +1722,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
       if (auto named = dyn_cast<NamedPattern>(pattern)) {
         auto StorageKind = named->getDecl()->getStorageKind();
         if (StorageKind == VarDecl::Computed ||
-            StorageKind == VarDecl::Observing)
+            StorageKind == VarDecl::StoredWithObservers)
           return false;
       }
     }

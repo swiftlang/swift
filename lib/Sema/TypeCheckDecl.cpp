@@ -1365,6 +1365,12 @@ done:
 
 const bool IsImplicit = true;
 
+static VarDecl *getFirstParamDecl(FuncDecl *fn) {
+  auto params = cast<TuplePattern>(fn->getBodyParamPatterns().back());
+  auto firstParamPattern = params->getFields().front().getPattern();
+  return firstParamPattern->getSingleVar();    
+};
+
 /// \brief Build an implicit 'self' parameter for the specified DeclContext.
 static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC) {
   ASTContext &Ctx = DC->getASTContext();
@@ -1513,7 +1519,29 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   // Getters for truly stored properties default to non-mutating.
   // Getters for addressed properties follow the ordinary addressor.
-  if (storage->hasAddressors() && storage->getAddressor()->isMutating()) {
+  auto requiresMutatingGetter = [](const AbstractStorageDecl *storage) {
+    switch (storage->getStorageKind()) {
+    case AbstractStorageDecl::Stored:
+    case AbstractStorageDecl::StoredWithObservers:
+      return false;
+
+    case AbstractStorageDecl::InheritedWithObservers:
+      return storage->getOverriddenDecl()->getGetter()->isMutating();
+
+    case AbstractStorageDecl::Addressed:
+    case AbstractStorageDecl::AddressedWithObservers:
+      return storage->getAddressor()->isMutating();
+
+    case AbstractStorageDecl::ComputedWithMutableAddress:
+    case AbstractStorageDecl::StoredWithTrivialAccessors:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors:
+    case AbstractStorageDecl::Computed:      
+      llvm_unreachable("shouldn't be synthesizing getter for storage"
+                       " already in this state");
+    }
+    llvm_unreachable("bad storage kind!");
+  };
+  if (requiresMutatingGetter(storage)) {
     getter->setMutating();
   }
 
@@ -1551,8 +1579,29 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   
   // Setters for truly stored properties default to mutating.
   // Setters for addressed properties follow the mutable addressor.
-  if (!storage->hasAddressors() ||
-      storage->getMutableAddressor()->isMutating()) {
+  auto requiresMutatingSetter = [](const AbstractStorageDecl *storage) {
+    switch (storage->getStorageKind()) {
+    case AbstractStorageDecl::Stored:
+    case AbstractStorageDecl::StoredWithObservers:
+      return true;
+
+    case AbstractStorageDecl::InheritedWithObservers:
+      return storage->getOverriddenDecl()->getSetter()->isMutating();
+
+    case AbstractStorageDecl::Addressed:
+    case AbstractStorageDecl::AddressedWithObservers:
+      return storage->getMutableAddressor()->isMutating();
+
+    case AbstractStorageDecl::ComputedWithMutableAddress:
+    case AbstractStorageDecl::StoredWithTrivialAccessors:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors:
+    case AbstractStorageDecl::Computed:      
+      llvm_unreachable("shouldn't be synthesizing setter for storage"
+                       " already in this state");
+    }
+    llvm_unreachable("bad storage kind!");
+  };
+  if (requiresMutatingSetter(storage)) {
     setter->setMutating();
   }
 
@@ -1970,24 +2019,38 @@ static void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
                                         AbstractStorageDecl *storage,
                                         TypeChecker &TC);
 
-static bool doesStoredPropertyNeedSetter(AbstractStorageDecl *storage) {
+/// Does a storage decl currently lacking accessor functions require a
+/// setter to be synthesized?
+static bool doesStorageNeedSetter(AbstractStorageDecl *storage) {
+  assert(!storage->hasAccessorFunctions());
+  switch (storage->getStorageKind()) {
+  // Add a setter to a stored variable unless it's a let.
+  case AbstractStorageDecl::Stored:
+    return !cast<VarDecl>(storage)->isLet();
+
   // Addressed storage gets a setter if it has a mutable addressor.
-  if (storage->hasAddressors())
+  case AbstractStorageDecl::Addressed:
     return storage->getMutableAddressor() != nullptr;
 
-  // Non-addressed subscripts can't be stored, so this must be a var.
-  // Add a setter unless it's a let.
-  auto var = cast<VarDecl>(storage);
-  return !var->isLet();
+  // These should already have accessor functions.
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+    llvm_unreachable("already has accessor functions");
+
+  case AbstractStorageDecl::Computed:
+    llvm_unreachable("not stored");
+  }
+  llvm_unreachable("bad storage kind");
 }
 
-/// Given a "Stored" property that needs to be converted to
-/// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
-/// the storage kind.
-static void addAccessorsToStoredVar(AbstractStorageDecl *storage,
-                                    TypeChecker &TC) {
-  assert(storage->getStorageKind() == AbstractStorageDecl::Stored &&
-         "Isn't a stored decl");
+/// Add trivial accessors to a Stored or Addressed property.
+static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
+                                         TypeChecker &TC) {
+  assert(!storage->hasAccessorFunctions() && "already has accessors?");
 
   // Create the getter.
   auto *getter = createGetterPrototype(storage, TC);
@@ -1995,12 +2058,12 @@ static void addAccessorsToStoredVar(AbstractStorageDecl *storage,
   // Create the setter.
   FuncDecl *setter = nullptr;
   VarDecl *setterValueParam = nullptr;
-  if (doesStoredPropertyNeedSetter(storage)) {
+  if (doesStorageNeedSetter(storage)) {
     setter = createSetterPrototype(storage, setterValueParam, TC);
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  storage->makeStoredWithTrivialAccessors(getter, setter, nullptr);
+  storage->addTrivialAccessors(getter, setter, nullptr);
 
   bool isDynamic = (storage->isDynamic() && storage->isObjC());
   if (isDynamic)
@@ -2039,6 +2102,28 @@ static void addAccessorsToStoredVar(AbstractStorageDecl *storage,
   }
 }
 
+/// Add a trivial setter and materializeForSet to a
+/// ComputedWithMutableAddress storage decl.
+static void
+synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
+                                           TypeChecker &TC) {
+  auto setter = storage->getSetter();
+  assert(setter);
+  assert(!storage->getSetter()->getBody());
+  assert(storage->getStorageKind() ==
+           AbstractStorageDecl::ComputedWithMutableAddress);
+
+  // Synthesize and type-check the body of the setter.
+  VarDecl *valueParamDecl = getFirstParamDecl(setter);
+  synthesizeTrivialSetter(setter, storage, valueParamDecl, TC);
+  TC.typeCheckDecl(setter, true);
+  TC.typeCheckDecl(setter, false);
+
+  // We've added some members to our containing type, add them to the
+  // members list.
+  addMemberToContextIfNeeded(setter, storage->getDeclContext());
+}
+
 
 /// The specified AbstractStorageDecl was just found to satisfy a
 /// protocol property requirement.  Ensure that it has the full
@@ -2048,7 +2133,7 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
   // If the decl is stored, convert it to StoredWithTrivialAccessors
   // by synthesizing the full set of accessors.
   if (!storage->hasAccessorFunctions()) {
-    addAccessorsToStoredVar(storage, *this);
+    addTrivialAccessorsToStorage(storage, *this);
     return;
   }
 
@@ -2060,13 +2145,8 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
     typeCheckDecl(materializeForSet, true);
     typeCheckDecl(materializeForSet, false);
   }
+  return;
 }
-
-static VarDecl *getFirstParamDecl(FuncDecl *fn) {
-  auto params = cast<TuplePattern>(fn->getBodyParamPatterns().back());
-  auto firstParamPattern = params->getFields().front().getPattern();
-  return firstParamPattern->getSingleVar();    
-};
 
 /// Synthesize the body of a materializeForSet accessor for a
 /// computed property.
@@ -2106,10 +2186,12 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
 static bool isLValueDirectAccess(AbstractStorageDecl *storage) {
   switch (storage->getStorageKind()) {
   case AbstractStorageDecl::Stored:
+  case AbstractStorageDecl::Addressed:
     llvm_unreachable("no accessors");
 
   // We can't use direct access to weak or unowned variables.
   case AbstractStorageDecl::StoredWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
     if (isa<SubscriptDecl>(storage)) {
       // Subscripts can't be weak/unowned.
       return true;
@@ -2117,9 +2199,17 @@ static bool isLValueDirectAccess(AbstractStorageDecl *storage) {
       return !cast<VarDecl>(storage)->getType()->is<ReferenceStorageType>();
     }
 
-  // Computed or observing accessors can't provide direct access.
+  // For the purpose of materializeForSet, we can directly access
+  // these via the mutableAddress accessor.
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+    return true;
+
+  // Computed or observing accessors can't provide direct access
+  // on 'set' paths.
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::AddressedWithObservers:
   case AbstractStorageDecl::Computed:
-  case AbstractStorageDecl::Observing:
     return false;
   }
   llvm_unreachable("bad abstract storage kind");
@@ -2142,7 +2232,7 @@ static void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
 /// (trivial) getter and the setter, which calls these.
 static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
-  assert(VD->getStorageKind() == VarDecl::Observing);
+  assert(VD->hasObservers());
   assert(VD->getGetter() && VD->getSetter() &&
          !VD->getGetter()->hasBody() && !VD->getSetter()->hasBody() &&
          "willSet/didSet var already has a getter or setter");
@@ -3553,9 +3643,14 @@ public:
 
     // If this is a willSet/didSet property, synthesize the getter and setter
     // decl.
-    if (VD->getStorageKind() == VarDecl::Observing &&
-        !VD->getGetter()->getBody())
+    if (VD->hasObservers() && !VD->getGetter()->getBody())
       synthesizeObservingAccessors(VD, TC);
+
+    // If this is a get+mutableAddress property, synthesize the setter body.
+    if (VD->getStorageKind() == VarDecl::ComputedWithMutableAddress &&
+        !VD->getSetter()->getBody()) {
+      synthesizeSetterForMutableAddressedStorage(VD, TC);
+    }
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
@@ -3672,7 +3767,8 @@ public:
         }
         
         // Non-member observing properties need an initializer.
-        if (var->getStorageKind() == VarDecl::Observing && !isTypeContext) {
+        if (var->getStorageKind() == VarDecl::StoredWithObservers &&
+            !isTypeContext) {
           TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
@@ -3800,6 +3896,12 @@ public:
       TC.validateDecl(getter);
     if (auto setter = SD->getSetter())
       TC.validateDecl(setter);
+
+    // If this is a get+mutableAddress property, synthesize the setter body.
+    if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
+        !SD->getSetter()->getBody()) {
+      synthesizeSetterForMutableAddressedStorage(SD, TC);
+    }
 
     if (!checkOverrides(TC, SD)) {
       // If a subscript has an override attribute but does not override
@@ -5840,8 +5942,7 @@ public:
       auto *overrideASD = cast<AbstractStorageDecl>(override);
       
       // Make sure that the overriding property doesn't have storage.
-      if (overrideASD->hasStorage() &&
-          overrideASD->getStorageKind() != VarDecl::Observing) {
+      if (overrideASD->hasStorage() && !overrideASD->hasObservers()) {
         TC.diagnose(overrideASD, diag::override_with_stored_property,
                     overrideASD->getName());
         TC.diagnose(baseASD, diag::property_override_here);
@@ -5856,8 +5957,7 @@ public:
         baseIsSettable =
            baseASD->isSetterAccessibleFrom(overrideASD->getDeclContext());
       }
-      if (overrideASD->getStorageKind() == VarDecl::Observing &&
-          !baseIsSettable) {
+      if (overrideASD->hasObservers() && !baseIsSettable) {
         TC.diagnose(overrideASD, diag::observing_readonly_property,
                     overrideASD->getName());
         TC.diagnose(baseASD, diag::property_override_here);
@@ -5936,7 +6036,7 @@ public:
 
       // Make sure we get consistent overrides for the accessors as well.
       if (!baseASD->hasAccessorFunctions())
-        addAccessorsToStoredVar(cast<VarDecl>(baseASD), TC);
+        addTrivialAccessorsToStorage(baseASD, TC);
       maybeAddMaterializeForSet(overridingASD, TC);
 
       auto recordAccessorOverride = [&](AccessorKind kind) {
@@ -6716,7 +6816,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
           if (!isInSILMode) {
             VD->setIsBeingTypeChecked();
-            addAccessorsToStoredVar(VD, *this);
+            addTrivialAccessorsToStorage(VD, *this);
             VD->setIsBeingTypeChecked(false);
           }
         }

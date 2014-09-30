@@ -135,6 +135,66 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
   }
 }
 
+namespace {
+  struct Accessors {
+    StorageKind Kind;
+    FuncDecl *Get = nullptr, *Set = nullptr, *MaterializeForSet = nullptr;
+    FuncDecl *Address = nullptr, *MutableAddress = nullptr;
+    FuncDecl *WillSet = nullptr, *DidSet = nullptr;
+  };
+}
+
+static StorageKind getRawStorageKind(AbstractStorageDecl::StorageKindTy kind) {
+  switch (kind) {
+#define CASE(KIND) case AbstractStorageDecl::KIND: return StorageKind::KIND
+  CASE(Stored);
+  CASE(StoredWithTrivialAccessors);
+  CASE(StoredWithObservers);
+  CASE(InheritedWithObservers);
+  CASE(Computed);
+  CASE(ComputedWithMutableAddress);
+  CASE(Addressed);
+  CASE(AddressedWithTrivialAccessors);
+  CASE(AddressedWithObservers);
+#undef CASE
+  }
+  llvm_unreachable("bad storage kind");
+}
+
+static Accessors getAccessors(const AbstractStorageDecl *storage) {
+  Accessors accessors;
+  accessors.Kind = getRawStorageKind(storage->getStorageKind());
+  switch (auto storageKind = storage->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+    return accessors;
+
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+    accessors.Address = storage->getAddressor();
+    accessors.MutableAddress = storage->getMutableAddressor();
+    if (storageKind == AbstractStorageDecl::Addressed)
+      return accessors;
+    goto getset;
+
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::AddressedWithObservers:
+    accessors.WillSet = storage->getWillSetFunc();
+    accessors.DidSet = storage->getDidSetFunc();
+    goto getset;
+
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  case AbstractStorageDecl::Computed:
+  getset:
+    accessors.Get = storage->getGetter();
+    accessors.Set = storage->getSetter();
+    accessors.MaterializeForSet = storage->getMaterializeForSetFunc();
+    return accessors;
+  }
+  llvm_unreachable("bad storage kind");
+}
+
 DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   if (!D)
     return 0;
@@ -1782,31 +1842,7 @@ void Serializer::writeDecl(const Decl *D) {
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
 
-    FuncDecl *willSet = nullptr, *didSet = nullptr;
-    StorageKind storageKind;
-    switch (var->getStorageKind()) {
-    case VarDecl::Stored:
-      storageKind = StorageKind::Stored;
-      break;
-    case VarDecl::StoredWithTrivialAccessors:
-      storageKind = StorageKind::StoredWithTrivialAccessors;
-      break;
-    case VarDecl::Computed:
-      storageKind = StorageKind::Computed;
-      break;
-    case VarDecl::Observing:
-      storageKind = StorageKind::Observing;
-      willSet = var->getWillSetFunc();
-      didSet = var->getDidSetFunc();
-      break;
-    }
-
-    FuncDecl *addressor = nullptr, *mutableAddressor = nullptr;
-    if (var->hasAddressors()) {
-      addressor = var->getAddressor();
-      mutableAddressor = var->getMutableAddressor();
-    }
-
+    Accessors accessors = getAccessors(var);
     uint8_t rawAccessLevel =
       getRawStableAccessibility(var->getAccessibility());
     uint8_t rawSetterAccessLevel = rawAccessLevel;
@@ -1822,16 +1858,16 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isObjC(),
                           var->isStatic(),
                           var->isLet(),
-                          uint8_t(storageKind),
+                          (unsigned) accessors.Kind,
                           addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
-                          addDeclRef(var->getGetter()),
-                          addDeclRef(var->getSetter()),
-                          addDeclRef(var->getMaterializeForSetFunc()),
-                          addDeclRef(addressor),
-                          addDeclRef(mutableAddressor),
-                          addDeclRef(willSet),
-                          addDeclRef(didSet),
+                          addDeclRef(accessors.Get),
+                          addDeclRef(accessors.Set),
+                          addDeclRef(accessors.MaterializeForSet),
+                          addDeclRef(accessors.Address),
+                          addDeclRef(accessors.MutableAddress),
+                          addDeclRef(accessors.WillSet),
+                          addDeclRef(accessors.DidSet),
                           addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel);
     break;
@@ -1922,31 +1958,7 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto argName : subscript->getFullName().getArgumentNames())
       nameComponents.push_back(addIdentifierRef(argName));
 
-    FuncDecl *willSet = nullptr, *didSet = nullptr;
-    StorageKind storageKind;
-    switch (subscript->getStorageKind()) {
-    case VarDecl::Stored:
-      storageKind = StorageKind::Stored;
-      break;
-    case VarDecl::StoredWithTrivialAccessors:
-      storageKind = StorageKind::StoredWithTrivialAccessors;
-      break;
-    case VarDecl::Computed:
-      storageKind = StorageKind::Computed;
-      break;
-    case VarDecl::Observing:
-      storageKind = StorageKind::Observing;
-      willSet = subscript->getWillSetFunc();
-      didSet = subscript->getDidSetFunc();
-      break;
-    }
-
-    FuncDecl *addressor = nullptr, *mutableAddressor = nullptr;
-    if (subscript->hasAddressors()) {
-      addressor = subscript->getAddressor();
-      mutableAddressor = subscript->getMutableAddressor();
-    }
-
+    Accessors accessors = getAccessors(subscript);
     uint8_t rawAccessLevel =
       getRawStableAccessibility(subscript->getAccessibility());
     uint8_t rawSetterAccessLevel = rawAccessLevel;
@@ -1959,17 +1971,17 @@ void Serializer::writeDecl(const Decl *D) {
                                 addDeclRef(DC),
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
-                                (unsigned) storageKind,
+                                (unsigned) accessors.Kind,
                                 addTypeRef(subscript->getType()),
                                 addTypeRef(subscript->getElementType()),
                                 addTypeRef(subscript->getInterfaceType()),
-                                addDeclRef(subscript->getGetter()),
-                                addDeclRef(subscript->getSetter()),
-                                addDeclRef(subscript->getMaterializeForSetFunc()),
-                                addDeclRef(addressor),
-                                addDeclRef(mutableAddressor),
-                                addDeclRef(willSet),
-                                addDeclRef(didSet),
+                                addDeclRef(accessors.Get),
+                                addDeclRef(accessors.Set),
+                                addDeclRef(accessors.MaterializeForSet),
+                                addDeclRef(accessors.Address),
+                                addDeclRef(accessors.MutableAddress),
+                                addDeclRef(accessors.WillSet),
+                                addDeclRef(accessors.DidSet),
                                 addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
