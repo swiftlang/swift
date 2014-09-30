@@ -82,3 +82,17 @@ bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
 
   return true;
 }
+
+bool SILArgument::isSelf() const {
+  // First make sure that we are actually a function argument. We use an assert
+  // boolean return here since in release builds we want to conservatively
+  // return false and in debug builds assert since this is a logic error.
+  bool isArg = isFunctionArg();
+  assert(isArg && "Only function arguments can be self");
+  if (!isArg)
+    return false;
+
+  // Return true if we are the last argument of our BB and that our parent
+  // function has a call signature with self.
+  return getFunction()->hasSelfArgument() && getParent()->getBBArgs().back();
+}

@@ -69,6 +69,12 @@ public:
   /// of this arguments basic block. The found values are stored in OutArray.
   bool getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray);
 
+  /// Returns true if this SILArgument is the self argument of its
+  /// function. This means that this will return false always for SILArguments
+  /// of SILFunctions that do not have self argument and for non-function
+  /// argument SILArguments.
+  bool isSelf() const;
+
 private:
   // A special constructor, only intended for use in SILBasicBlock::replaceBBArg.
   explicit SILArgument(SILType Ty, const ValueDecl *D =nullptr) :
