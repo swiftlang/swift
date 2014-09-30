@@ -326,7 +326,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned Overridden : 1;
 
     /// The storage kind.
-    unsigned StorageKind;
+    unsigned StorageKind : 4;
   };
   enum { NumAbstractStorageDeclBits = NumValueDeclBits + 5 };
   static_assert(NumAbstractStorageDeclBits <= 32, "fits in an unsigned");
