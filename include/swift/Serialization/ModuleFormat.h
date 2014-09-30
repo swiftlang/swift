@@ -48,7 +48,10 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 149;
+/// To ensure that two separate changes don't silently get merged into one
+/// in source control, you should also update the comment to briefly
+/// describe what change you made.
+const uint16_t VERSION_MINOR = 149; // Last change: storage kind field
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
