@@ -521,7 +521,7 @@ public:
         // to deserialize everything, add the function to the list of functions
         // to deserialize.
         performFuncDeserialization = true;
-        addFunctionToWorklist(E.getMethodWitness().Witness);        
+        addFunctionToWorklist(E.getMethodWitness().Witness);
       }
     }
 
@@ -681,9 +681,9 @@ void SILModule::invalidateSILLoader() {
 
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
-  
+
   FunctionTable.erase(F->getName());
-  
+
   // The owner of the function's Name was the FunctionTable key. Avoid a
   // dangling pointer.
   F->Name = StringRef();
