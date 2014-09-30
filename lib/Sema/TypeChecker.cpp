@@ -386,11 +386,23 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       llvm_unreachable("Unhandled external definition kind");
     }
 
-    // Type-check any referenced nominal types.
+    // Validate the contents of any referenced nominal types for SIL's purposes.
+    // Note: if we ever start putting extension members in vtables, we'll need
+    // to validate those members too.
+    // FIXME: If we're not planning to run SILGen, this is wasted effort.
     while (!TC.ValidatedTypes.empty()) {
-      auto nominal = TC.ValidatedTypes.back();
-      TC.ValidatedTypes.pop_back();
-      TC.typeCheckDecl(nominal, /*isFirstPass=*/true);
+      auto nominal = TC.ValidatedTypes.pop_back_val();
+
+      for (auto *D : nominal->getMembers()) {
+        if (auto VD = dyn_cast<ValueDecl>(D))
+          TC.validateDecl(VD);
+      }
+
+      if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+        SmallVector<Decl *, 4> ignoredCtors;
+        TC.addImplicitConstructors(CD, ignoredCtors);
+        TC.addImplicitDestructor(CD);
+      }
     }
 
     TC.definedFunctions.insert(TC.definedFunctions.end(),
