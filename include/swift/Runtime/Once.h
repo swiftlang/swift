@@ -29,7 +29,7 @@ typedef long swift_once_t;
 #else
 
 // On other platforms swift_once_t is pointer-sized.
-typedef int swift_once_t;
+typedef void *swift_once_t;
 
 #endif
 
