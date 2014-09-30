@@ -136,7 +136,7 @@ public func ~> <T: _SequenceType>(s: T,_:(_UnderestimateCount, ())) -> Int {
 
 /// Return an underestimate of the number of elements in the given
 /// sequence, without consuming the sequence.  For Sequences that are
-/// actually Collections, this will return countElements(x)
+/// actually Collections, this will return count(x)
 public func underestimateCount<T: SequenceType>(x: T) -> Int {
   return x~>_underestimateCount()
 }

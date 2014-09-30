@@ -192,12 +192,6 @@ public func ==<T>(lhs: Range<T>, rhs: Range<T>) -> Bool {
       lhs._endIndex == rhs._endIndex
 }
 
-/// Equivalent to countElements(r)
-public func count<I: RandomAccessIndexType>(r: Range<I>) -> I.Distance {
-  return r.startIndex.distanceTo(r.endIndex)
-}
-
-
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
 @transparent

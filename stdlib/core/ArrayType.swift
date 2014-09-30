@@ -73,7 +73,7 @@ internal protocol ArrayType
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `countElements(self)`\ ).
+  /// Complexity: O(\ `count(self)`\ ).
   ///
   /// Requires: `atIndex` <= `count`
   mutating func insert(newElement: Self.Generator.Element, atIndex i: Int)

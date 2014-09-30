@@ -494,7 +494,7 @@ extension ${Self} : ArrayType {
   ///
   /// Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
   ///
-  /// Complexity: O(\ `countElements(self)`\ ).
+  /// Complexity: O(\ `count(self)`\ ).
   public mutating func removeAll(keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
@@ -695,7 +695,7 @@ func _arrayOutOfPlaceReplace<
 >(
   inout source: B, subRange: Range<Int>, newValues: C, insertCount: Int
 ) {
-  let growth = insertCount - countElements(subRange)
+  let growth = insertCount - count(subRange)
   let newCount = source.count + growth
   var newBuffer = Optional(
     _forceCreateUniqueMutableBuffer(&source, newCount, newCount))
@@ -724,7 +724,7 @@ func _arrayNonSliceInPlaceReplace<
   where C.Generator.Element == B.Element, B.Index == Int
 >(inout target: B, subRange: Range<Int>, insertCount: Int, newValues: C) {
   let oldCount = target.count
-  let eraseCount = countElements(subRange)
+  let eraseCount = count(subRange)
 
   let growth = insertCount - eraseCount
   target.count = oldCount + growth
@@ -798,7 +798,7 @@ func _growArrayCapacity(capacity: Int) -> Int {
 extension ${Self} {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
-  /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
+  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
   /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
   @semantics("array.mutate_unknown")
   public mutating func replaceRange<
@@ -813,8 +813,8 @@ extension ${Self} {
       "${Self} replace: subRange extends past the end")
 
     let oldCount = self._buffer.count
-    let eraseCount = countElements(subRange)
-    let insertCount = numericCast(countElements(newElements)) as Int
+    let eraseCount = Swift.count(subRange)
+    let insertCount = numericCast(Swift.count(newElements)) as Int
     let growth = insertCount - eraseCount
 
     if self._buffer.requestUniqueMutableBackingBuffer(oldCount + growth) != nil {
@@ -828,7 +828,7 @@ extension ${Self} {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count + countElements(newElements)`\ ).
+  /// Complexity: O(\ `count + count(newElements)`\ ).
   public mutating func splice<
     S: CollectionType where S.Generator.Element == T
   >(newElements: S, atIndex i: Int) {
@@ -868,7 +868,7 @@ func += <
   T, C: CollectionType
 where C.Generator.Element == T
 >(inout lhs: ${Self}<T>, rhs: C) {
-  let rhsCount = numericCast(countElements(rhs)) as Int
+  let rhsCount = numericCast(count(rhs)) as Int
   
   let oldCount = lhs.count
   let capacity = lhs.capacity

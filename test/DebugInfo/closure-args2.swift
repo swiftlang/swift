@@ -15,7 +15,7 @@ func main () -> Void
     // CHECK: [ DW_TAG_arg_variable ] [random_int]
 
             if rhs == random_string
-            || countElements(rhs.unicodeScalars) == random_int {
+            || count(rhs.unicodeScalars) == random_int {
                 var local_var : Int = 10
                 print ("I have an int here \(local_var).\n")
                 return false

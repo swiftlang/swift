@@ -178,7 +178,7 @@ extension String {
   /// `withUnsafeBufferPointer` on the `ContiguousArray`.
   public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
     var result = ContiguousArray<UTF8.CodeUnit>()
-    result.reserveCapacity(countElements(utf8) + 1)
+    result.reserveCapacity(count(utf8) + 1)
     result += utf8
     result.append(0)
     return result

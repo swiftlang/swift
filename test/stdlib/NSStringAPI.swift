@@ -918,17 +918,17 @@ NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
 NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
   if true {
     let s = "abc"
-    expectLE(countElements(s.utf8),
+    expectLE(count(s.utf8),
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
   if true {
     let s = "abc абв"
-    expectLE(countElements(s.utf8),
+    expectLE(count(s.utf8),
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
   if true {
     let s = "\u{1F60A}"
-    expectLE(countElements(s.utf8),
+    expectLE(count(s.utf8),
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
 }
@@ -1725,7 +1725,7 @@ func checkCharacterComparison(
 
 NSStringAPIs.test("Character.{Equatable,Hashable,Comparable}") {
   for test in comparisonTests {
-    if countElements(test.lhs) == 1 && countElements(test.rhs) == 1 {
+    if count(test.lhs) == 1 && count(test.rhs) == 1 {
       let lhsCharacter = Character(test.lhs)
       let rhsCharacter = Character(test.rhs)
       checkCharacterComparison(

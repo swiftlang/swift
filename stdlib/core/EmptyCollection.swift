@@ -69,7 +69,7 @@ public struct EmptyCollection<T> : CollectionType {
   }
 }
 
-// Specialization of countElements for EmptyCollection<T>
-public func ~> <T>(x:EmptyCollection<T>, _:(_CountElements, ())) -> Int {
+// Specialization of count for EmptyCollection<T>
+public func ~> <T>(x:EmptyCollection<T>, _:(_Count, ())) -> Int {
   return 0
 }

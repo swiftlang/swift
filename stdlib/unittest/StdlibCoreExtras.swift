@@ -85,7 +85,7 @@ func withArrayOfCStrings<R>(
   args: [String], body: (Array<UnsafeMutablePointer<CChar>>) -> R
 ) -> R {
 
-  let argsLengths = Array(map(args) { countElements($0.utf8) + 1 })
+  let argsLengths = Array(map(args) { count($0.utf8) + 1 })
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 
@@ -155,7 +155,7 @@ public func createTemporaryFile(
   var fileName = NSTemporaryDirectory().stringByAppendingPathComponent(
     fileNamePrefix + "XXXXXX" + fileNameSuffix)
   let fd = _stdlib_mkstemps(
-    &fileName, CInt(countElements(fileNameSuffix.utf8)))
+    &fileName, CInt(count(fileNameSuffix.utf8)))
   if fd < 0 {
     fatalError("mkstemps() returned an error")
   }

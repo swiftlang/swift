@@ -82,7 +82,7 @@ public struct CollectionOfOne<T> : CollectionType {
   let element: T
 }
 
-// Specialization of countElements for CollectionOfOne<T>
-public func ~> <T>(x:CollectionOfOne<T>, _:(_CountElements, ())) -> Int {
+// Specialization of count for CollectionOfOne<T>
+public func ~> <T>(x:CollectionOfOne<T>, _:(_Count, ())) -> Int {
   return 1
 }

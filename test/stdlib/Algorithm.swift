@@ -177,7 +177,7 @@ Algorithm.test("sorted/strings") {
     sorted([ "apple", "Banana", "cherry" ]))
 
   let s = sorted(["apple", "Banana", "cherry"]) {
-    countElements($0) > countElements($1)
+    count($0) > count($1)
   }
   expectEqual([ "Banana", "cherry", "apple" ], s)
 }

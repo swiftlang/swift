@@ -53,7 +53,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
   /// 
   /// A possible implementation::
   ///
-  ///   reserveCapacity(countElements(self) + underestimateCount(newElements))
+  ///   reserveCapacity(count(self) + underestimateCount(newElements))
   ///   for x in newElements {
   ///     newElements.append(x)
   ///   }
@@ -111,7 +111,7 @@ public func +<
 >(lhs: S, rhs: C) -> C {
   var result = C()
   result.reserveCapacity(
-    countElements(rhs) + numericCast(underestimateCount(lhs)))
+    count(rhs) + numericCast(underestimateCount(lhs)))
   result.extend(lhs)
   result.extend(rhs)
   return result
@@ -123,7 +123,7 @@ public func +<
     where S.Generator.Element == C.Generator.Element
 >(var lhs: C, rhs: S) -> C {
   // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(countElements(lhs) + numericCast(countElements(rhs)))
+  lhs.reserveCapacity(count(lhs) + numericCast(count(rhs)))
   lhs.extend(rhs)
   return lhs
 }
@@ -134,7 +134,7 @@ public func +<
     where EC1.Generator.Element == EC2.Generator.Element
 >(var lhs: EC1, rhs: EC2) -> EC1 {
   // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(countElements(lhs) + numericCast(countElements(rhs)))
+  lhs.reserveCapacity(count(lhs) + numericCast(count(rhs)))
   lhs.extend(rhs)
   return lhs
 }
@@ -154,11 +154,11 @@ public func join<
   separator: C, elements: S
 ) -> C {
   var result = C()
-  let separatorSize = countElements(separator)
+  let separatorSize = count(separator)
 
   // FIXME: include separator
   let reservation = elements~>_preprocessingPass {
-    reduce($0, 0, { $0 + separatorSize + countElements($1) }) - separatorSize
+    reduce($0, 0, { $0 + separatorSize + count($1) }) - separatorSize
   }
 
   if let n = reservation {

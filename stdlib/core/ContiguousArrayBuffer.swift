@@ -390,7 +390,7 @@ public func += <
   inout lhs: _ContiguousArrayBuffer<T>, rhs: C
 ) {
   let oldCount = lhs.count
-  let newCount = oldCount + numericCast(countElements(rhs))
+  let newCount = oldCount + numericCast(count(rhs))
 
   if _fastPath(newCount <= lhs.capacity) {
     lhs.count = newCount
@@ -484,7 +484,7 @@ func _copyCollectionToNativeArrayBuffer<
     where C.Generator.Element == C._Element
 >(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
 {
-  let count = Int(countElements(source).toIntMax())
+  let count: Int = numericCast(Swift.count(source))
   if count == 0 {
     return _ContiguousArrayBuffer()
   }

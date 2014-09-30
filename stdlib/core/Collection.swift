@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct _CountElements {}
-internal func _countElements<Args>(a: Args) -> (_CountElements, Args) {
-  return (_CountElements(), a)
+public struct _Count {}
+internal func _count<Args>(a: Args) -> (_Count, Args) {
+  return (_Count(), a)
 }
 
-// Default implementation of countElements for Collections
-// Do not use this operator directly; call countElements(x) instead
-public func ~> <T: _CollectionType>(x:T, _:(_CountElements,()))
+// Default implementation of count for Collections
+// Do not use this operator directly; call count(x) instead
+public func ~> <T: _CollectionType>(x:T, _:(_Count,()))
   -> T.Index.Distance
 {
   return distance(x.startIndex, x.endIndex)
@@ -26,8 +26,13 @@ public func ~> <T: _CollectionType>(x:T, _:(_CountElements,()))
 /// Return the number of elements in x.
 ///
 /// O(1) if T.Index is RandomAccessIndexType; O(N) otherwise.
+public func count <T: _CollectionType>(x: T) -> T.Index.Distance {
+  return x~>_count()
+}
+
+@availability(*, unavailable, renamed="count")
 public func countElements <T: _CollectionType>(x: T) -> T.Index.Distance {
-  return x~>_countElements()
+  return count(x)
 }
 
 /// This protocol is an implementation detail of `CollectionType`; do
@@ -87,14 +92,14 @@ public protocol CollectionType : _CollectionType, SequenceType {
   /// `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
   
-  // Do not use this operator directly; call `countElements(x)` instead
-  func ~> (_:Self, _:(_CountElements, ())) -> Index.Distance
+  // Do not use this operator directly; call `count(x)` instead
+  func ~> (_:Self, _:(_Count, ())) -> Index.Distance
 }
 
 // Default implementation of underestimateCount for *collections*.  Do not
 // use this operator directly; call `underestimateCount(s)` instead
 public func ~> <T: _CollectionType>(x:T,_:(_UnderestimateCount,())) -> Int {
-  return numericCast(x~>_countElements())
+  return numericCast(x~>_count())
 }
 
 // Default implementation of `preprocessingPass` for *collections*.  Do not
@@ -304,7 +309,7 @@ public func dropLast<
 /// Return a slice, up to `maxLength` in length, containing the
 /// initial elements of `s`.
 ///
-/// If `maxLength` exceeds `countElements(s)`, the result contains all
+/// If `maxLength` exceeds `count(s)`, the result contains all
 /// the elements of `s`.
 /// 
 /// Complexity: O(1)+K when `S.Index` conforms to
@@ -320,7 +325,7 @@ public func prefix<S: Sliceable>(s: S, maxLength: Int) -> S.SubSlice {
 /// Return a slice, up to `maxLength` in length, containing the
 /// final elements of `s`.
 ///
-/// If `maxLength` exceeds `countElements(s)`, the result contains all
+/// If `maxLength` exceeds `count(s)`, the result contains all
 /// the elements of `s`.
 /// 
 /// Complexity: O(1)+K when `S.Index` conforms to

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Returns the minimum element in `elements`.  Requires:
-/// `elements` is non-empty. O(countElements(elements))
+/// `elements` is non-empty. O(count(elements))
 public func minElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
@@ -25,7 +25,7 @@ public func minElement<
 }
 
 /// Returns the maximum element in `elements`.  Requires:
-/// `elements` is non-empty. O(countElements(elements))
+/// `elements` is non-empty. O(count(elements))
 public func maxElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
@@ -41,7 +41,7 @@ public func maxElement<
 /// Returns the first index where `value` appears in `domain` or `nil` if
 /// `value` is not found.
 ///
-/// Complexity: O(\ `countElements(domain)`\ )
+/// Complexity: O(\ `count(domain)`\ )
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, value: C.Generator.Element) -> C.Index? {

@@ -1177,7 +1177,7 @@ public func checkCollection<
     checkSequence(expected, collection, stackTrace.withCurrentLoc())
   }
 
-  expectEqual(expected.count.toIntMax(), countElements(collection).toIntMax(),
+  expectEqual(expected.count.toIntMax(), count(collection).toIntMax(),
       stackTrace: stackTrace.withCurrentLoc())
 
   for i in 0..<3 {
@@ -1284,7 +1284,7 @@ where
         let growth = newCount - oldCount
         
         let expectedCount = source.count + growth
-        let actualCount = numericCast(countElements(a)) as Int
+        let actualCount = numericCast(count(a)) as Int
         if actualCount != expectedCount {
           reportFailure(
             &a, "\(actualCount) != expected count \(expectedCount)")

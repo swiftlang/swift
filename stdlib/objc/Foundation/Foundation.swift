@@ -200,11 +200,11 @@ func _cocoaStringSliceImpl(
   let buffer = _NSOpaqueString(
     owner: String(target), 
     subRange:
-      NSRange(location: subRange.startIndex, length: countElements(subRange)))
+      NSRange(location: subRange.startIndex, length: count(subRange)))
   
   return _StringCore(
     baseAddress: nil,
-    count: countElements(subRange),
+    count: count(subRange),
     elementShift: 1,
     hasCocoaBuffer: true,
     owner: buffer)
@@ -994,7 +994,7 @@ extension NSDictionary : SequenceType {
 extension NSRange {
   public init(_ x: Range<Int>) {
     location = x.startIndex
-    length = countElements(x)
+    length = count(x)
   }
 
   public func toRange() -> Range<Int>? {

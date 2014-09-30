@@ -157,15 +157,15 @@ func isPalindrome4<
 let array = [1, 2, 3, 4]
 let dict = [0:0, 1:1, 2:2, 3:3, 4:4]
 
-func testCountElements() {
-  // CHECK: testing countElements
-  println("testing countElements")
+func testCount() {
+  // CHECK: testing count
+  println("testing count")
   // CHECK-NEXT: random access: 4
-  println("random access: \(countElements(array))")
+  println("random access: \(count(array))")
   // CHECK-NEXT: bidirectional: 5
-  println("bidirectional: \(countElements(dict))")
+  println("bidirectional: \(count(dict))")
 }
-testCountElements()
+testCount()
 
 func testUnderestimateCount() {
   // CHECK: testing underestimateCount

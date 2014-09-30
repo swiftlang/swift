@@ -602,7 +602,7 @@ var _emptyStringBase: COpaquePointer {
 extension _StringCore : RangeReplaceableCollectionType {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
-  /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
+  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
   /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UTF16.CodeUnit
@@ -618,8 +618,8 @@ extension _StringCore : RangeReplaceableCollectionType {
       "replaceRange: subRange extends past String end")
     
     let width = elementWidth == 2 || contains(newElements) { $0 > 0x7f } ? 2 : 1
-    let replacementCount = numericCast(countElements(newElements)) as Int
-    let replacedCount = countElements(subRange)
+    let replacementCount = numericCast(Swift.count(newElements)) as Int
+    let replacedCount = Swift.count(subRange)
     let tailCount = count - subRange.endIndex
     let growth = replacementCount - replacedCount
     let newCount = count + growth

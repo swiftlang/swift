@@ -69,7 +69,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// Requires: this buffer is backed by a uniquely-referenced
   /// _ContiguousArrayBuffer,
   ///
-  /// Requires: insertCount <= numericCast(countElements(newValues))
+  /// Requires: insertCount <= numericCast(count(newValues))
   ///
   public
   mutating func replace<C: CollectionType where C.Generator.Element == T>(
@@ -79,13 +79,13 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     // FIXME: <rdar://problem/17464946> with
     // -DSWIFT_STDLIB_INTERNAL_CHECKS=OFF, enabling this sanityCheck
     // actually causes leaks in the stdlib/NewArray.swift.gyb test
-    /* _sanityCheck(insertCount <= numericCast(countElements(newValues))) */
+    /* _sanityCheck(insertCount <= numericCast(count(newValues))) */
     
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
     
     var native = unsafeBitCast(owner, NativeBuffer.self)
     let offset = start - native.baseAddress
-    let eraseCount = countElements(subRange)
+    let eraseCount = Swift.count(subRange)
     let growth = insertCount - eraseCount
     
     let oldCount = count

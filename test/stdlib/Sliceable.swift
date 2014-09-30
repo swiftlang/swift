@@ -21,7 +21,7 @@ SliceableTests.test("dropFirstLast") {
 SliceableTests.test("prefixSuffix") {
   if true {
     let a = [2, 3, 5, 7, 11]
-    let count = countElements(a)
+    let count = Swift.count(a)
     expectEqualSequence([], prefix(a, -10))
     expectEqualSequence([], suffix(a, -10))
     expectEqualSequence(a, prefix(a, count + 1))
@@ -37,7 +37,7 @@ SliceableTests.test("prefixSuffix") {
 
   if true {
     let a = "bird in the hand"
-    let count = countElements(a)
+    let count = Swift.count(a)
     expectEqualSequence("", prefix(a, -10))
     expectEqualSequence("", suffix(a, -10))
     expectEqualSequence(a, prefix(a, count + 1))
