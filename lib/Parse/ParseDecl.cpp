@@ -1109,7 +1109,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
         UUID openedID;
         idLoc = Tok.getLoc();
         auto literalText = Tok.getText().slice(1, Tok.getText().size() - 1);
-        llvm::SmallString<sizeof(uuid_string_t)> text(literalText);
+        llvm::SmallString<UUID::StringBufferSize> text(literalText);
         if (auto openedID = UUID::fromString(text.c_str())) {
           Attributes.OpenedID = openedID;
         } else {

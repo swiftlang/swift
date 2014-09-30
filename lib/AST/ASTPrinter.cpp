@@ -86,7 +86,7 @@ ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
 }
 
 ASTPrinter &ASTPrinter::operator<<(UUID UU) {
-  llvm::SmallString<sizeof(uuid_string_t)> Str;
+  llvm::SmallString<UUID::StringBufferSize> Str;
   UU.toString(Str);
   printTextImpl(Str);
   return *this;

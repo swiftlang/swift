@@ -19,7 +19,6 @@
 #define SWIFT_BASIC_UUID_H
 
 #include <array>
-#include <uuid/uuid.h>
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/DenseMap.h"
@@ -29,23 +28,35 @@
 namespace swift {
   
 class UUID {
-  uuid_t Value;
+public:
+  enum {
+    /// The number of bytes in a UUID's binary representation.
+    Size = 16,
+    
+    /// The number of characters in a UUID's string representation.
+    StringSize = 36,
+    
+    /// The number of bytes necessary to store a null-terminated UUID's string
+    /// representation.
+    StringBufferSize = StringSize + 1,
+  };
   
+  unsigned char Value[Size];
+
+private:
   enum FromRandom_t { FromRandom };
   enum FromTime_t { FromTime };
 
-  UUID(FromRandom_t) { uuid_generate_random(Value); }
+  UUID(FromRandom_t);
   
-  UUID(FromTime_t) { uuid_generate_time(Value); }
+  UUID(FromTime_t);
   
 public:
   /// Default constructor.
-  UUID() {
-    uuid_clear(Value);
-  }
+  UUID();
   
-  UUID(std::array<unsigned char, 16> bytes) {
-    memcpy(Value, &bytes, 16);
+  UUID(std::array<unsigned char, Size> bytes) {
+    memcpy(Value, &bytes, Size);
   }
   
   /// Create a new random UUID from entropy (/dev/random).
@@ -55,24 +66,15 @@ public:
   static UUID fromTime() { return UUID(FromTime); }
   
   /// Parse a UUID from a C string.
-  static Optional<UUID> fromString(const char *s) {
-    UUID result;
-    if (uuid_parse(s, result.Value))
-      return Nothing;
-    return result;
-  }
+  static Optional<UUID> fromString(const char *s);
   
   /// Convert a UUID to its string representation.
-  void toString(SmallVectorImpl<char> &out) {
-    out.resize(sizeof(uuid_string_t));
-    uuid_unparse(Value, out.data());
-    // Pop off the null terminator.
-    assert(out.back() == '\0' && "did not null-terminate?!");
-    out.pop_back();
-  }
+  void toString(llvm::SmallVectorImpl<char> &out) const;
+  
+  int compare(UUID y) const;
   
 #define COMPARE_UUID(op) \
-  bool operator op(UUID y) { return uuid_compare(Value, y.Value) op 0; }
+  bool operator op(UUID y) { return compare(y) op 0; }
   
   COMPARE_UUID(==)
   COMPARE_UUID(!=)
@@ -83,12 +85,7 @@ public:
 #undef COMPARE_UUID
 };
   
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, UUID uuid) {
-  llvm::SmallString<sizeof(uuid_string_t)> buf;
-  uuid.toString(buf);
-  os << buf;
-  return os;
-}
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, UUID uuid);
   
 }
 
