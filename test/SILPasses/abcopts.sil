@@ -562,6 +562,58 @@ bb3:
   return %23 : $Int
 }
 
+/// Don't hoist arrays that are variant.
+// HOIST-LABEL: dont_hoist_variant_array
+// HOIST: bb0
+// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb1
+// HOIST: bb1:
+// HOIST-NOT:   function_ref @checkbounds
+// HOIST:   br bb2{{.*}}
+// HOIST: bb2{{.*}}:
+// HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
+// HOIST:  apply [[CB]]
+// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
+// HOIST: bb3{{.*}}:
+// HOIST: return
+
+sil @dont_hoist_variant_array: $@thin (Int, @inout ArrayInt) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  %60 = builtin_function_ref "cmp_sle_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %61 = apply %60(%2, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %62 = builtin_function_ref "xor_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %14 = apply %62(%61, %3) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  cond_fail %14 : $Builtin.Int1
+  br bb1(%2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = apply %7(%4, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %36 = alloc_stack $ArrayInt
+  %37 = struct $Int(%4 : $Builtin.Word)
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %53 = load %36#1 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %10 = integer_literal $Builtin.Word, 1
+  %18 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = apply %18(%4, %10, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  dealloc_stack %36 :  $*@local_storage ArrayInt
+  br bb1(%21 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
 sil public_external [semantics "array.check_subscript"] @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> () {
   bb0(%0: $Int, %1: $ArrayInt):
     unreachable

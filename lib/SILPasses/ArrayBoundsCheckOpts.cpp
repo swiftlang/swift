@@ -740,7 +740,7 @@ private:
     }
 
     // Make sure our end value is loop invariant.
-    if (!dominates(DT, End, Header))
+    if (!dominates(DT, End, Preheader))
       return nullptr;
 
     DEBUG(llvm::dbgs() << " found an induction variable (ICMP_EQ): "
@@ -877,8 +877,8 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     // Get the underlying array pointer.
     SILValue Array = getArrayStructPointer(Kind, ArrayVal);
 
-    // The array must dominate the header.
-    if (!dominates(DT, Array.getDef(), Header)) {
+    // The array must strictly dominate the header.
+    if (!dominates(DT, Array.getDef(), Preheader)) {
       DEBUG(llvm::dbgs() << " does not dominated header" << *Array.getDef());
       continue;
     }
