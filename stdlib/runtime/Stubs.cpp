@@ -91,6 +91,28 @@ extern "C" uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
                             /*Negative=*/false);
 }
 
+#if defined(__APPLE__)
+#define swift_snprintf_l snprintf_l
+#else
+static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
+                            const char *Format, ...) {
+  if (Locale == nullptr) {
+    static locale_t CLocale = newlocale(LC_ALL_MASK, NULL, NULL);
+    Locale = CLocale;
+  }
+  locale_t OldLocale = uselocale(Locale);
+
+  va_list Args;
+  va_start(Args, Format);
+  int Result = std::vsnprintf(Str, StrSize, Format, Args);
+  va_end(Args);
+
+  uselocale(OldLocale);
+
+  return Result;
+}
+#endif
+
 template <typename T>
 static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
                                             T Value, const char *Format) {
@@ -100,8 +122,9 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
   const int Precision = std::numeric_limits<T>::digits10;
 
   // Pass a null locale to use the C locale.
-  int i = snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
-                     Precision, Value);
+  int i = swift_snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
+                           Precision, Value);
+
   if (i < 0)
     swift::crash(
         "swift_floatingPointToString: unexpected return value from sprintf");
