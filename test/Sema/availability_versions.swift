@@ -70,3 +70,22 @@ if #os(iOS >= 9.0) {  // expected-error {{condition required for target platform
 // Multiple unavailable references in a single statement
 
 let ignored4: (Int, Int) = (globalAvailableOn10_10, globalAvailableOn10_11) // expected-error {{'globalAvailableOn10_10' is only available on OS X version 10.10 or greater}}  expected-error {{'globalAvailableOn10_11' is only available on OS X version 10.11 or greater}}
+
+// Global functions
+
+@availability(OSX, introduced=10.9)
+func funcAvailableOn10_9() {}
+
+@availability(OSX, introduced=10.10)
+func funcAvailableOn10_10() {}
+
+funcAvailableOn10_9()
+
+let ignored5 = funcAvailableOn10_10 // expected-error {{'funcAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+
+funcAvailableOn10_10() // expected-error {{'funcAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+
+if #os(OSX >= 10.10) {
+  funcAvailableOn10_10()
+}
+

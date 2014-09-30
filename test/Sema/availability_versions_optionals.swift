@@ -38,3 +38,29 @@ func referencesToGlobalVariables() {
 // Multiple unavailable references in a single statement
 
 let ignored1: (Int, Int) = (globalAvailableOn10_10, globalAvailableOn10_11) // expected-error 2{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
+
+// Global functions
+
+@availability(OSX, introduced=10.9)
+func funcAvailableOn10_9() -> Int { return 9 }
+
+@availability(OSX, introduced=10.10)
+func funcAvailableOn10_10() -> Int { return 10 }
+
+func referToFunctions() {
+  let _: () -> Int = funcAvailableOn10_9
+  
+  let _: () -> Int = funcAvailableOn10_10 // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+}
+
+func callFunctions() {
+  funcAvailableOn10_9()
+  
+  funcAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int = funcAvailableOn10_10!()
+  
+  let _: Int? = funcAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int? = funcAvailableOn10_10?()
+}
