@@ -619,7 +619,7 @@ public struct UTF16 : UnicodeCodecType {
       output.put(UInt16(scalarValue))
     }
     else {
-      var lead_offset = UInt32(0xd800) - (0x10000 >> 10)
+      var lead_offset = UInt32(0xd800) - UInt32(0x10000 >> 10)
       output.put(UInt16(lead_offset + (scalarValue >> 10)))
       output.put(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }

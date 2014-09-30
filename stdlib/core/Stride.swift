@@ -79,6 +79,33 @@ public func -= <T: Strideable> (inout lhs: T, rhs: T.Stride) {
   lhs = lhs.advancedBy(-rhs)
 }
 
+//===--- Deliberately-ambiguous operators for UnsignedIntegerTypes --------===//
+// The UnsignedIntegerTypes all have a signed Stride type.  Without these     //
+// overloads, expressions such as UInt(2) + Int(3) would compile.             //
+//===----------------------------------------------------------------------===//
+
+public func + <T: UnsignedIntegerType> (lhs: T, rhs: T._DisallowMixedSignArithmetic) -> T {
+  return lhs.advancedBy(numericCast(rhs))
+}
+
+public func + <T: UnsignedIntegerType> (lhs: T._DisallowMixedSignArithmetic, rhs: T) -> T {
+  return rhs.advancedBy(numericCast(lhs))
+}
+
+public func - <T: UnsignedIntegerType> (lhs: T, rhs: T._DisallowMixedSignArithmetic) -> T {
+  return lhs.advancedBy(numericCast(-rhs))
+}
+
+public func += <T: UnsignedIntegerType> (inout lhs: T, rhs: T._DisallowMixedSignArithmetic) {
+  lhs = lhs.advancedBy(numericCast(rhs))
+}
+
+public func -= <T: UnsignedIntegerType> (inout lhs: T, rhs: T._DisallowMixedSignArithmetic) {
+  lhs = lhs.advancedBy(numericCast(-rhs))
+}
+
+//===----------------------------------------------------------------------===//
+
 /// A GeneratorType for StrideTo<T>
 public struct StrideToGenerator<T: Strideable> : GeneratorType {
   var current: T

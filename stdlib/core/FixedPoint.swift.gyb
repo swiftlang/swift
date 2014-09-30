@@ -104,6 +104,11 @@ public protocol _UnsignedIntegerType : _IntegerType {
 
 /// A set of common requirements for Swift's unsigned integer types.
 public protocol UnsignedIntegerType : _UnsignedIntegerType, IntegerType {
+  // Used to create a deliberate ambiguity in cases like UInt(1) +
+  // Int(1), which would otherwise compile due to the arithmetic
+  // operators defined for Strideable types (unsigned types are
+  // Strideable).
+  typealias _DisallowMixedSignArithmetic : SignedIntegerType = Int
 }
 
 /// Convert `x` to type `U`, trapping on overflow in -Onone and -O
