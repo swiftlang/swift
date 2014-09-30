@@ -48,7 +48,8 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
   assert(gpDecl && "Missing generic parameter declaration");
 
   auto archetype = gpDecl->getArchetype();
-  assert(archetype && "Missing archetype for generic parameter");
+  if (!archetype)
+    return ErrorType::get(gp->getASTContext());
 
   return archetype;
 }
@@ -103,7 +104,6 @@ Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
   // FIXME: When generic parameters can map down to specific types, do so
   // here.
   auto pa = Builder.resolveArchetype(gp);
-  assert(pa && "Missing archetype for generic type parameter");
   (void)pa;
 
   return gp;
