@@ -208,8 +208,9 @@ public:
   /// Erase a specific argument from the arg list.
   void eraseArgument(int idx) { BBArgList.erase(BBArgList.begin() + idx); }
 
-  /// Allocate a new argument of type \p Ty.
-  SILArgument *createArgument(SILType Ty);
+  /// Allocate a new argument of type \p Ty. Optionally you can pass in a value
+  /// decl parameter.
+  SILArgument *createArgument(SILType Ty, const ValueDecl *D=nullptr);
 
 private:
   friend class SILArgument;

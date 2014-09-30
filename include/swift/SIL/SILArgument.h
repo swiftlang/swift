@@ -27,7 +27,7 @@ class SILArgument : public ValueBase {
   SILBasicBlock *ParentBB;
   const ValueDecl *Decl;
 public:
-  SILArgument(SILType Ty, SILBasicBlock *ParentBB, const ValueDecl *D =nullptr);
+  SILArgument(SILType Ty, SILBasicBlock *ParentBB, const ValueDecl *D=nullptr);
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
