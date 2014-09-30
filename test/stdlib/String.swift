@@ -822,7 +822,7 @@ StringTests.test("toInt") {
   // Test values greater than min.
   if true {
     let base = UInt(Int.max)
-    for i in 0..<20 {
+    for i in UInt(0)..<20 {
       expectOptionalEqual(-Int(base - i) , "-\(base - i)".toInt())
     }
   }
@@ -838,9 +838,9 @@ StringTests.test("toInt") {
 
   // Test values lower than max.
   if true {
-    let base = UInt(Int.max)
+    let base = Int.max
     for i in 0..<20 {
-      expectOptionalEqual(base - UInt(i), "\(base - UInt(i))".toInt())
+      expectOptionalEqual(base - i, "\(base - i)".toInt())
     }
   }
 }

@@ -51,7 +51,7 @@ public func _stdlib_randomShuffle<T>(a: [T]) -> [T] {
   var result = a
   for var i = a.count - 1; i != 0; --i {
     // FIXME: 32 bits are not enough in general case!
-    let j = Int(rand32(exclusiveUpperBound: i + 1))
+    let j = Int(rand32(exclusiveUpperBound: UInt32(i + 1)))
     swap(&result[i], &result[j])
   }
   return result
@@ -131,7 +131,7 @@ struct _FDOutputStream : OutputStreamType {
         if result < 0 {
           fatalError("write() returned an error")
         }
-        writtenBytes += result
+        writtenBytes += size_t(result)
       }
     }
   }
