@@ -318,22 +318,72 @@ extern "C" void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object.
 extern "C" void *swift_unknownRetain(void *value);
-  
+
+#else
+
+static inline void swift_unknownRetain(void *value) {
+  swift_retain(static_cast<HeapObject *>(value));
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
+
 /// Decrement the strong retain count of an object which might not be a native
 /// Swift object.
 extern "C" void swift_unknownRelease(void *value);
+
+#else
+
+static inline void swift_unknownRelease(void *value) {
+  swift_release(static_cast<HeapObject *>(value));
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
   
 /// Increment the strong retain count of an object which may have been
 /// deallocated and which might not be a native Swift object.
 extern "C" void swift_unknownRetainUnowned(void *value);
 
+#else
+
+static inline void swift_unknownRetainUnowned(void *value) {
+  swift_retainUnowned(static_cast<HeapObject *>(value));
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
+
 /// Increment the weak-reference count of an object that might not be
 /// a native Swift object.
 extern "C" void swift_unknownWeakRetain(void *value);
 
+#else
+
+static inline void swift_unknownWeakRetain(void *value) {
+  swift_weakRetain(static_cast<HeapObject *>(value));
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
+
 /// Decrement the weak-reference count of an object that might not be
 /// a native Swift object.
 extern "C" void swift_unknownWeakRelease(void *value);
+
+#else
+
+static inline void swift_unknownWeakRelease(void *value) {
+  swift_weakRelease(static_cast<HeapObject *>(value));
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
 
 /// Initialize a weak reference.
 ///
@@ -341,11 +391,31 @@ extern "C" void swift_unknownWeakRelease(void *value);
 /// \param value - not necessarily a native Swift object; can be null
 extern "C" void swift_unknownWeakInit(WeakReference *ref, void *value);
 
+#else
+
+static inline void swift_unknownWeakInit(WeakReference *ref, void *value) {
+  swift_weakInit(ref, static_cast<HeapObject *>(value));
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
+
 /// Assign a new value to a weak reference.
 ///
 /// \param ref - never null
 /// \param value - not necessarily a native Swift object; can be null
 extern "C" void swift_unknownWeakAssign(WeakReference *ref, void *value);
+
+#else
+
+static inline void swift_unknownWeakAssign(WeakReference *ref, void *value) {
+  swift_weakAssign(ref, static_cast<HeapObject *>(value));
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
 
 /// Load a value from a weak reference, much like swift_weakLoadStrong
 /// but without requiring the variable to refer to a native Swift object.
@@ -353,6 +423,16 @@ extern "C" void swift_unknownWeakAssign(WeakReference *ref, void *value);
 /// \param ref - never null
 /// \return can be null
 extern "C" void *swift_unknownWeakLoadStrong(WeakReference *ref);
+
+#else
+
+static inline void swift_unknownWeakLoadStrong(WeakReference *ref) {
+  swift_weakLoadStrong(ref);
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
 
 /// Load a value from a weak reference as if by
 /// swift_unknownWeakLoadStrong, but leaving the reference in an
@@ -362,27 +442,83 @@ extern "C" void *swift_unknownWeakLoadStrong(WeakReference *ref);
 /// \return can be null
 extern "C" void *swift_unknownWeakTakeStrong(WeakReference *ref);
 
+#else
+
+static inline void swift_unknownWeakTakeStrong(WeakReference *ref) {
+  swift_weakTakeStrong(ref);
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
+
 /// Destroy a weak reference variable that might not refer to a native
 /// Swift object.
 extern "C" void swift_unknownWeakDestroy(WeakReference *object);
+
+#else
+
+static inline void swift_unknownWeakDestroy(WeakReference *object) {
+  swift_weakDestroy(object);
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
 
 /// Copy-initialize a weak reference variable from one that might not
 /// refer to a native Swift object.
 extern "C" void swift_unknownWeakCopyInit(WeakReference *dest, WeakReference *src);
 
+#else
+
+static inline void swift_unknownWeakCopyInit(WeakReference *dest, WeakReference *src) {
+  swift_weakCopyInit(dest, src);
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
+
 /// Take-initialize a weak reference variable from one that might not
 /// refer to a native Swift object.
 extern "C" void swift_unknownWeakTakeInit(WeakReference *dest, WeakReference *src);
+
+#else
+
+static inline void swift_unknownWeakTakeInit(WeakReference *dest, WeakReference *src) {
+  swift_weakTakeInit(dest, src);
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
 
 /// Copy-assign a weak reference variable from another when either
 /// or both variables might not refer to a native Swift object.
 extern "C" void swift_unknownWeakCopyAssign(WeakReference *dest, WeakReference *src);
 
+#else
+
+static inline void swift_unknownWeakCopyAssign(WeakReference *dest, WeakReference *src) {
+  swift_weakCopyAssign(dest, src);
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
+
 /// Take-assign a weak reference variable from another when either
 /// or both variables might not refer to a native Swift object.
 extern "C" void swift_unknownWeakTakeAssign(WeakReference *dest, WeakReference *src);
 
-#endif
+#else
+
+static inline void swift_unknownWeakTakeAssign(WeakReference *dest, WeakReference *src) {
+  swift_weakTakeAssign(dest, src);
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
 
 } // end namespace swift
 

@@ -797,11 +797,7 @@ static bool _dynamicCastUnknownClass(OpaqueValue *dest,
     *destSlot = result;
 
     if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
-#if SWIFT_OBJC_INTEROP
       swift_unknownRetain(result);
-#else
-      swift_retain(result);
-#endif
     }
     return true;
   }
@@ -814,11 +810,7 @@ static bool _dynamicCastUnknownClass(OpaqueValue *dest,
   // If the cast failed, destroy the input and return false.
   if (!result) {
     if (flags & DynamicCastFlags::DestroyOnFailure) {
-#if SWIFT_OBJC_INTEROP
       swift_unknownRelease(object);
-#else
-      swift_release(object);
-#endif
     }
     return false;
   }
@@ -826,11 +818,7 @@ static bool _dynamicCastUnknownClass(OpaqueValue *dest,
   // Otherwise, store to the destination and return true.
   *destSlot = result;
   if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
-#if SWIFT_OBJC_INTEROP
     swift_unknownRetain(result);
-#else
-    swift_retain(result);
-#endif
   }
   return true;
 }
