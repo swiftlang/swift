@@ -33,7 +33,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     Reflection.mm)
 else()
   set(SWIFT_RUNTIME_OBJC_SOURCES)
-  list(APPEND SWIFT_RUNTIME_COMPILE_FLAGS "-fblocks")
 endif()
 
 add_swift_library(swiftRuntime
