@@ -74,27 +74,36 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   }
 
   internal func _getBridgedUnsafeBuffer() -> UnsafeBufferPointer<AnyObject> {
+    // If we've already got a buffer of bridged objects, just return it.
     if let bridgedStorage = _heapBufferBridged {
       let heapBuffer = HeapBuffer(bridgedStorage)
       return UnsafeBufferPointer(
         start: heapBuffer.baseAddress, count: heapBuffer.value)
     }
 
-    // Check if elements are bridged verbatim.
+    // If elements are bridged verbatim, the native buffer is all we
+    // need, so return that.
     let maybeNewDataUnsafeBuffer =
       _nativeStorage._tryGetVerbatimBridgedUnsafeBuffer()
     if maybeNewDataUnsafeBuffer.baseAddress != nil {
       return maybeNewDataUnsafeBuffer
     }
 
+    // Create buffer of bridged objects.
     let bridgedHeapBuffer = _nativeStorage._getNonVerbatimBridgedHeapBuffer()
-    // Atomically put the bridged elements in place.
+    
+    // Atomically store a reference to that buffer in self.
     if !_stdlib_atomicInitializeARCRef(
       object: _heapBufferBridgedPtr, desired: bridgedHeapBuffer.storage!) {
-      // Other thread won the race.
+      // Another thread won the race.  Throw out our buffer and try again.
       _destroyBridgedStorage(bridgedHeapBuffer.storage!)
       return _getBridgedUnsafeBuffer()
     }
+
+    // Now that we're bridged, we don't need the native storage any
+    // longer... but we can't let it go without causing a race against
+    // another thread that may already be building its own buffer of
+    // bridged objects.
     return UnsafeBufferPointer(
       start: bridgedHeapBuffer.baseAddress, count: bridgedHeapBuffer.value)
   }
@@ -175,8 +184,6 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
 
 /// Base class of the heap buffer backing arrays.
 class _ContiguousArrayStorageBase {
-  typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
-
   internal func _tryGetVerbatimBridgedUnsafeBuffer(
     dummy: Void
   ) -> UnsafeBufferPointer<AnyObject> {
