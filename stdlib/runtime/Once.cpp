@@ -15,18 +15,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Once.h"
-#include <dispatch/dispatch.h>
+#include "Debug.h"
 #include <type_traits>
 
 using namespace swift;
 
+#ifdef __APPLE__
+
+// On OS X and and iOS, swift_once is implemented using GCD.
+
+#include <dispatch/dispatch.h>
 static_assert(std::is_same<swift_once_t, dispatch_once_t>::value,
               "swift_once_t and dispatch_once_t must stay in sync");
 
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must point to a global or static variable of static
 /// extent of type swift_once_t.
-
 void swift::swift_once(swift_once_t *predicate, void (*fn)(HeapObject *ctx),
                        HeapObject *ctx) {
   // Swift convention passes ctx +1, but 'fn' may or may not be called.
@@ -35,5 +39,18 @@ void swift::swift_once(swift_once_t *predicate, void (*fn)(HeapObject *ctx),
     fn(ctx);
     ctx2 = nullptr;
   });
-  if (ctx2) swift_release(ctx);
+  if (ctx2)
+    swift_release(ctx);
 }
+
+#else
+
+void swift::swift_once(swift_once_t *predicate, void (*fn)(HeapObject *ctx),
+                       HeapObject *ctx) {
+  // FIXME: can not use pthread_once because there is no way to pass context.
+  // Either re-implement pthread_once, or change 'fn' to be a thin closure.
+  swift::crash("swift_once not implemented");
+}
+
+#endif
+

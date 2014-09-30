@@ -21,8 +21,18 @@
 
 namespace swift {
 
+#ifdef __APPLE__
+
+// On OS X and iOS, swift_once_t matches dispatch_once_t.
 typedef long swift_once_t;
-  
+
+#else
+
+// On other platforms swift_once_t is pointer-sized.
+typedef int swift_once_t;
+
+#endif
+
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must point to a global or static variable of static
 /// extent of type swift_once_t.
