@@ -2774,7 +2774,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         continue;
 
       choices.push_back(OverloadChoice(baseTy, constructor,
-                                       /*isSpecialized=*/false));
+                                       /*isSpecialized=*/false, *this));
     }
 
 
@@ -3029,7 +3029,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                                                                     result));
     } else {
       choices.push_back(OverloadChoice(ovlBaseTy, result,
-                                       /*isSpecialized=*/false));
+                                       /*isSpecialized=*/false, *this));
     }
   };
 

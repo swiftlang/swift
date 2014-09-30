@@ -92,7 +92,7 @@ namespace {
       auto memberLocator =
         CS.getConstraintLocator(expr, ConstraintLocator::Member);
       auto tv = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
-      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false);
+      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false, CS);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator);
       return tv;
@@ -249,7 +249,7 @@ namespace {
       auto locator = CS.getConstraintLocator(E);
       
       LangOptions &langOpts = CS.getASTContext().LangOpts;
-      bool IsPotentiallyUnavailable = false;
+      Optional<UnavailabilityReason> reason;
       // We only check availability if this reference is in a source file.
       // We will not check in other kinds of FileUnits.
       if (langOpts.EnableExperimentalAvailabilityChecking &&
@@ -266,7 +266,8 @@ namespace {
             // currently not very helpful.
             // FIXME: When reporting a fix for an optional, we should include
             // the version range when the declaration is available.
-            IsPotentiallyUnavailable = true;
+            reason = UnavailabilityReason::requiresVersionRange(
+                safeRangeUnderApprox);
           } else {
             // Diagnose directly.
             CS.TC.diagnose(E->getLoc(),
@@ -284,7 +285,8 @@ namespace {
       CS.resolveOverload(locator, tv,
                          OverloadChoice(Type(), E->getDecl(),
                                         E->isSpecialized(),
-                                        IsPotentiallyUnavailable));
+                                        CS,
+                                        reason));
 
       return tv;
     }
@@ -373,7 +375,8 @@ namespace {
           continue;
 
         choices.push_back(OverloadChoice(Type(), decls[i],
-                                         expr->isSpecialized()));
+                                         expr->isSpecialized(),
+                                         CS));
       }
 
       // If there are no valid overloads, give up.
@@ -403,7 +406,8 @@ namespace {
           continue;
 
         choices.push_back(OverloadChoice(baseTy, decls[i],
-                                         /*isSpecialized=*/false));
+                                         /*isSpecialized=*/false,
+                                         CS));
       }
 
       // If there are no valid overloads, give up.
@@ -979,7 +983,7 @@ namespace {
         return;
 
       OverloadChoice choice{
-        Type(), witness.getDecl(), /*specialized=*/false
+        Type(), witness.getDecl(), /*specialized=*/false, CS
       };
       auto overload =
         Constraint::createBindOverload(CS, tyvarType, choice, csLoc);

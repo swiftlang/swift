@@ -23,7 +23,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/AST/TypeRefinementContext.h"
+#include "swift/AST/Availability.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -1991,16 +1991,25 @@ public:
     return E->getKind() == ExprKind::InjectIntoOptional;
   }
 };
-  
+
 /// Conversion from a potentially unavailable declaration reference to an
 /// optional.
 class UnavailableToOptionalExpr : public ImplicitConversionExpr {
+
+  /// The reason the referenced declaration is potentially unavailable.
+  UnavailabilityReason Reason;
+
 public:
-  UnavailableToOptionalExpr(DeclRefExpr *ref, Type ty)
-      : ImplicitConversionExpr(ExprKind::UnavailableToOptional, ref, ty) {}
+  UnavailableToOptionalExpr(DeclRefExpr *ref, UnavailabilityReason Reason,
+                            Type ty)
+      : ImplicitConversionExpr(ExprKind::UnavailableToOptional, ref, ty),
+        Reason(Reason) {}
 
   DeclRefExpr *getRef() const { return cast<DeclRefExpr>(getSubExpr()); }
 
+  /// Returns the reason the reference is potentially unavailable.
+  const UnavailabilityReason &getReason() const { return Reason; }
+  
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnavailableToOptional;
   }

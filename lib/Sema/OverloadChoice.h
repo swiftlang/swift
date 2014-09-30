@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 
@@ -29,6 +30,7 @@ class TypeDecl;
 class ValueDecl;
 
 namespace constraints {
+  class ConstraintSystem;
 
 /// \brief The kind of overload choice.
 enum class OverloadChoiceKind : int {
@@ -89,23 +91,29 @@ class OverloadChoice {
   /// overload choice kind shifted by 1 with the low bit set.
   uintptr_t DeclOrKind;
 
-  unsigned IsPotentiallyUnavailable : 1;
+  /// \brief A value representing whether and why the overload choice
+  /// would choose a potentially unavailable declaration.
+  ///
+  /// A value of 0 indicates this symbol is definitely available.
+  /// A value of n + 1 indicates that the symbol may be unavailable, and the
+  /// reason for unavailability is stored in the constraint system's
+  /// UnavailabilityReasons vector at index n.
+  ///
+  /// We play this dance rather than store the reason itself in order to keep
+  /// OverloadChoice as small as possible.
+  uint16_t UnavailableReasonData;
+
 public:
-  OverloadChoice() : BaseAndBits(nullptr, 0), DeclOrKind(),
-      IsPotentiallyUnavailable(false) { }
+  OverloadChoice()
+      : BaseAndBits(nullptr, 0), DeclOrKind(), UnavailableReasonData(0) {}
 
-  OverloadChoice(Type base, ValueDecl *value, bool isSpecialized,
-                 bool isPotentiallyUnavailable = false)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
-      IsPotentiallyUnavailable(isPotentiallyUnavailable) {
-    assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0
-           && "Badly aligned decl");
-    DeclOrKind = reinterpret_cast<uintptr_t>(value);
-  }
-
+  OverloadChoice(
+      Type base, ValueDecl *value, bool isSpecialized, ConstraintSystem &CS,
+      const Optional<UnavailabilityReason> &reasonUnavailable = Nothing);
+  
   OverloadChoice(Type base, TypeDecl *type, bool isSpecialized)
     : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
-      IsPotentiallyUnavailable(false) {
+      UnavailableReasonData(0) {
     assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
@@ -114,7 +122,7 @@ public:
   OverloadChoice(Type base, OverloadChoiceKind kind)
     : BaseAndBits(base, 0),
       DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03),
-      IsPotentiallyUnavailable(false) {
+      UnavailableReasonData(0) {
     assert(base && "Must have a base type for overload choice");
     assert(kind != OverloadChoiceKind::Decl &&
            kind != OverloadChoiceKind::DeclViaDynamic &&
@@ -129,7 +137,7 @@ public:
       DeclOrKind(((uintptr_t)index
                   + (uintptr_t)OverloadChoiceKind::TupleIndex) << 2
                  | (uintptr_t)0x03),
-      IsPotentiallyUnavailable(false) {
+      UnavailableReasonData(0) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
@@ -236,8 +244,19 @@ public:
   /// \brief Returns true if the overload choice would result in a
   /// a reference to a potentially unavailable declaration.
   bool isPotentiallyUnavailable() const {
-    return IsPotentiallyUnavailable;
+    return UnavailableReasonData != 0;
   }
+
+  /// \brief Returns the reason an overload choice would reference a potentially
+  /// unavailable declaration.
+  const UnavailabilityReason &getReasonUnavailable(ConstraintSystem &CS) const;
+  
+private:
+  /// \brief Returns a compact representation of whether the overload choice
+  /// is potentially unavailable and, if so, why it is unavailable.
+  uint16_t
+  compactUnavailableReasonData(ConstraintSystem &CS,
+                               const Optional<UnavailabilityReason> &reason);
 };
 
 } } // end namespace swift::constraints

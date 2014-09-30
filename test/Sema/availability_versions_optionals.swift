@@ -6,6 +6,9 @@ var globalAvailableOn10_9: Int = 9
 @availability(OSX, introduced=10.10)
 var globalAvailableOn10_10: Int = 10
 
+@availability(OSX, introduced=10.11)
+var globalAvailableOn10_11: Int = 11
+
 @availability(OSX, introduced=10.10)
 var globalOptionalAvailableOn10_10: Int? = 10
 
@@ -31,3 +34,7 @@ func referencesToGlobalVariables() {
     if let _:   Int = level1 {}
   } 
 }
+
+// Multiple unavailable references in a single statement
+
+let ignored1: (Int, Int) = (globalAvailableOn10_10, globalAvailableOn10_11) // expected-error 2{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}

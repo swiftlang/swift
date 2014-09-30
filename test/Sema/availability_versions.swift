@@ -66,3 +66,7 @@ if #os(OSX >= 10.10, OSX >= 10.11) {  // expected-error {{conditions for 'OSX' a
 if #os(iOS >= 9.0) {  // expected-error {{condition required for target platform 'OSX'}}
   let _: Int = globalAvailableOnOSX10_10AndiOS8_0 // expected-error {{'globalAvailableOnOSX10_10AndiOS8_0' is only available on OS X version 10.10 or greater}}
 }
+
+// Multiple unavailable references in a single statement
+
+let ignored4: (Int, Int) = (globalAvailableOn10_10, globalAvailableOn10_11) // expected-error {{'globalAvailableOn10_10' is only available on OS X version 10.10 or greater}}  expected-error {{'globalAvailableOn10_11' is only available on OS X version 10.11 or greater}}

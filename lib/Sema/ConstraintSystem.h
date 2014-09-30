@@ -1085,6 +1085,7 @@ public:
   ConstraintSystemOptions Options;
   
   friend class Fix;
+  friend class OverloadChoice;
   class SolverScope;
 
 private:
@@ -1163,6 +1164,9 @@ private:
 
   /// Types used in fixes.
   std::vector<Type> FixedTypes;
+  
+  /// Unavailability reasons used in overload choices.
+  std::vector<UnavailabilityReason> UnavailabilityReasons;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.

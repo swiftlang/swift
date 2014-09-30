@@ -1829,7 +1829,10 @@ namespace {
       // If the chosen overload is potentially unavailable, wrap the
       // declaration reference in an UnavailableToOptionalExpr conversion.
       Type unavailTy = cs.getTypeWhenUnavailable(selected.openedFullType);
+      
+      UnavailabilityReason reason = choice.getReasonUnavailable(cs);
       return new (cs.getASTContext()) UnavailableToOptionalExpr(newDeclRef,
+                                                                reason,
                                                                 unavailTy);
     }
 
