@@ -235,6 +235,11 @@ takes precedence for files in the Swift project"
             (auto-insert-query (if (eq auto-insert-query 'function) nil auto-insert-query)))
         ad-do-it)
     ad-do-it))
+
+(push 'swift-stdlibunittest compilation-error-regexp-alist)
+(push `(swift-stdlibunittest "^out>>> check failed at \\(.+?\\), line \\([0-9]+\\)$"
+              1 2 ,(not :column) ,(not :just-a-warning))
+      compilation-error-regexp-alist-alist)
     
 (provide 'swift-project-settings)
 ;; end of swift-project-settings.el
