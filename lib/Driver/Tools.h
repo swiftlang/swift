@@ -139,7 +139,7 @@ public:
                             const OutputInfo &OI) const;
 };
 
-} // end namespace darwin
+} // end namespace linux
 
 } // end namespace tools
 
