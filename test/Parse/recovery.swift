@@ -494,3 +494,6 @@ class WrongDeclIntroducerKeyword1 {
   class func bar() {}
 }
 
+// <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
+Base=1 as Base=1  // expected-error {{cannot assign to the result of this expression}}
+

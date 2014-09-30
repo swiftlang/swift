@@ -246,15 +246,16 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   S = S.slice(2);
   
   while (!S.empty()) {
-    assert(!S.empty());
     assert((S.size() & 1) == 0);
+    assert(Op1.infixData.isValid() && "Not a valid operator to fold");
     assert(Op1.infixData.getPrecedence() >= MinPrecedence);
-    
+
     // If the operator is a cast operator, the RHS can't extend past the type
     // that's part of the cast production.
     if (isa<ExplicitCastExpr>(Op1.op)) {
       LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
       Op1 = getNextOperator();
+      if (!Op1) return LHS;
       RHS = S[1];
       S = S.slice(2);
       continue;
