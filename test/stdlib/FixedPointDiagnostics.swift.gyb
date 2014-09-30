@@ -1,5 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/UnsafePointer.swift
-// RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %swift -verify -parse %t/UnsafePointer.swift
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
+// RUN: %S/../../utils/line-directive %t/main.swift -- %swift -verify -parse %t/main.swift
 
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
@@ -81,25 +81,30 @@ func testMixedSignArithmetic() {
   // ambiguity in these cases.
 % for T in "UInt UWord UInt64 UInt32 UInt16 UInt8".split():
   if true {
-    ${T}(1) + 0      // OK
-    0 + ${T}(1)      // OK
-    ${T}(1) + Int(0) // expected-error {{ambiguous use of operator '+'}}
-    Int(1) + ${T}(0) // expected-error {{ambiguous use of operator '+'}}
-    ${T}(1) - Int(0) // expected-error {{ambiguous use of operator '-'}}
+    typealias Stride = ${T}.Stride
+    ${T}(1) + 0          // OK
+    0 + ${T}(1)         // OK
+    ${T}(1) + Stride(0) // expected-error {{ambiguous use of operator '+'}}
+    Stride(1) + ${T}(0) // expected-error {{ambiguous use of operator '+'}}
+    ${T}(1) - Stride(0) // expected-error {{ambiguous use of operator '-'}}
     var x: ${T} = 0
-    x += 1           // OK
-    x += Int(1)      // expected-error {{ambiguous use of operator '+='}}
-    x -= Int(1)      // expected-error {{ambiguous use of operator '-='}}
+    x += 1              // OK
+    x += Stride(1)      // expected-error {{ambiguous use of operator '+='}}
+    x -= Stride(1)      // expected-error {{ambiguous use of operator '-='}}
 
+    (x - x) as Stride   // expected-error {{ambiguous use of operator '-'}}
+
+    //===------------------------------------------------------------------===//
     // The following errors are different because they're not being
     // disabled by the ambiguity trick.
+    //===------------------------------------------------------------------===//
 
-    Int(1) - ${T}(0) // expected-error {{cannot invoke '-' with an argument list of type '($T}}
-    var y: Int = 0
+    Stride(1) - ${T}(0) // expected-error {{cannot invoke '-' with an argument list of type '($T}}
 
     // These tests are expected to start failing when we get improved diagnostics.
-    y += ${T}(1)     // expected-error {{'Int' is not identical to 'UInt8'}}
-    y -= ${T}(1)     // expected-error {{'Int' is not identical to 'UInt8'}}
+    var y: Stride = 0
+    y += ${T}(1)        // expected-error {{'Stride' is not identical to 'UInt8'}}
+    y -= ${T}(1)        // expected-error {{'Stride' is not identical to 'UInt8'}}
   }
 % end
 }

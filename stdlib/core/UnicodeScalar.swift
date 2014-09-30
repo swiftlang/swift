@@ -97,7 +97,9 @@ public struct UnicodeScalar :
       if nibble < 10 {
         return String(UnicodeScalar(nibble+48))    // 48 = '0'
       } else {
-        return String(UnicodeScalar(nibble-10+65)) // 65 = 'A'
+        // FIXME: was UnicodeScalar(nibble-10+65), which is now
+        // ambiguous.  
+        return String(UnicodeScalar(nibble+65-10)) // 65 = 'A'
       }
     }
 

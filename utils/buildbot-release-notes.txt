@@ -1,6 +1,10 @@
 Latest
 ------
 
+* Mixed-sign addition and subtraction operations, that were
+  unintentionally allowed in previous versions, now cause a
+  compilation error.
+
 * OS X apps can now apply the @NSApplicationMain attribute to their app delegate
   class in order to generate an implicit "main" for the app. This works like
   the @UIApplicationMain attribute for iOS apps.
