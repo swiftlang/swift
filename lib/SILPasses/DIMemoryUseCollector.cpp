@@ -666,15 +666,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // upcast_existential is modeled as a load or initialization depending on
-    // which operand we're looking at.
-    if (isa<UpcastExistentialInst>(User)) {
-      auto Kind = UI->getOperandNumber() == 1 ?
-        DIUseKind::Initialization : DIUseKind::Load;
-      Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
-      continue;
-    }
-    
     // project_existential and open_existential are uses of the protocol value,
     // so it is modeled as a load.
     if (isa<ProjectExistentialInst>(User) || isa<ProtocolMethodInst>(User)

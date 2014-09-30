@@ -472,10 +472,6 @@ namespace {
       return true;
     }
 
-    bool visitUpcastExistentialRefInst(UpcastExistentialRefInst *RHS) {
-      return true;
-    }
-
     bool visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *RHS) {
       return true;
     }
@@ -1027,17 +1023,6 @@ OpenExistentialRefInst::OpenExistentialRefInst(SILLocation Loc,
                                                SILType Ty)
   : UnaryInstructionBase(Loc, Operand, Ty)
 {}
-
-UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
-                                 SILValue SrcExistential,
-                                 SILValue DestExistential,
-                                 IsTake_t isTakeOfSrc)
-  : SILInstruction(ValueKind::UpcastExistentialInst, Loc),
-    IsTakeOfSrc(isTakeOfSrc),
-    Operands(this, SrcExistential, DestExistential)
-{
-}
-
 
 //===----------------------------------------------------------------------===//
 // Instructions representing terminators

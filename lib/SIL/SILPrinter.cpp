@@ -850,9 +850,6 @@ public:
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"objc_to_thick_metatype");
   }
-  void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),"upcast_existential_ref");
-  }
   void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),
                                  "objc_metatype_to_object");
@@ -1047,13 +1044,6 @@ public:
     OS << "init_existential_ref " << getIDAndType(AEI->getOperand())
        << " : $" << AEI->getFormalConcreteType()
        << ", " << AEI->getType();
-  }
-  void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {
-    OS << "upcast_existential ";
-    if (UEI->isTakeOfSrc())
-      OS << "[take] ";
-    OS << getIDAndType(UEI->getSrcExistential())
-       << " to " << getIDAndType(UEI->getDestExistential());
   }
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getIDAndType(DEI->getOperand());
