@@ -1101,17 +1101,19 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     break;
       
   case TAK_opened: {
-    // Parse the opened existential ID in parens
+    // Parse the opened existential ID string in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
     Attributes.setAttr(TAK_opened, beginLoc);
     if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (Tok.is(tok::integer_literal)) {
-        unsigned openedID = 0;
+      if (Tok.is(tok::string_literal)) {
+        UUID openedID;
         idLoc = Tok.getLoc();
-        if (Tok.getText().getAsInteger(0, openedID)) {
-          diagnose(Tok, diag::opened_attribute_id_value);
-        } else {
+        auto literalText = Tok.getText().slice(1, Tok.getText().size() - 1);
+        llvm::SmallString<sizeof(uuid_string_t)> text(literalText);
+        if (auto openedID = UUID::fromString(text.c_str())) {
           Attributes.OpenedID = openedID;
+        } else {
+          diagnose(Tok, diag::opened_attribute_id_value);
         }
         consumeToken();
       } else {

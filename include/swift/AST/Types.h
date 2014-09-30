@@ -25,6 +25,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Optional.h"
+#include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Fixnum.h"
@@ -2912,10 +2913,17 @@ private:
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
   AssocTypeOrProtocolType AssocTypeOrProto;
   Identifier Name;
-  unsigned IndexIfPrimaryOrExistentialID: 31;
+  unsigned IndexIfPrimary: 31;
   unsigned isRecursive: 1;
   ArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
-  
+
+  /// Set the ID number of this opened existential.
+  void setOpenedExistentialID(UUID value) {
+    assert(getOpenedExistentialType() && "Not an opened existential archetype");
+    // The UUID is tail-allocated at the end of opened existential archetypes.
+    *reinterpret_cast<UUID *>(this + 1) = value;
+  }
+
 public:
   /// getNew - Create a new archetype with the given name.
   ///
@@ -2947,7 +2955,7 @@ public:
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
   static ArchetypeType *getOpened(Type existential, 
-                                  Optional<unsigned> knownID = Nothing);
+                                  Optional<UUID> knownID = Nothing);
 
   /// \brief Retrieve the name of this archetype.
   Identifier getName() const { return Name; }
@@ -3025,20 +3033,21 @@ public:
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., 
   bool isPrimary() const { 
-    return IndexIfPrimaryOrExistentialID > 0 && 
+    return IndexIfPrimary > 0 && 
            getOpenedExistentialType().isNull();
   }
 
   // getPrimaryIndex - For a primary archetype, return the zero-based index.
   unsigned getPrimaryIndex() const {
     assert(isPrimary() && "Non-primary archetype does not have index");
-    return IndexIfPrimaryOrExistentialID - 1;
+    return IndexIfPrimary - 1;
   }
 
   /// Retrieve the ID number of this opened existential.
-  unsigned getOpenedExistentialID() const {
+  UUID getOpenedExistentialID() const {
     assert(getOpenedExistentialType() && "Not an opened existential archetype");
-    return IndexIfPrimaryOrExistentialID;
+    // The UUID is tail-allocated at the end of opened existential archetypes.
+    return *reinterpret_cast<const UUID *>(this + 1);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -3064,19 +3073,18 @@ private:
                         RecursiveTypeProperties::HasArchetype,
                         ConformsTo, Superclass),
       ParentOrOpened(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
-      IndexIfPrimaryOrExistentialID(Index? *Index + 1 : 0),
+      IndexIfPrimary(Index? *Index + 1 : 0),
       isRecursive(isRecursive) { }
 
   ArchetypeType(const ASTContext &Ctx, 
                 Type Existential,
-                unsigned ID,
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, bool isRecursive = false)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype,
                         ConformsTo, Superclass),
       ParentOrOpened(Existential.getPointer()), 
-      IndexIfPrimaryOrExistentialID(ID),
+      IndexIfPrimary(0),
       isRecursive(isRecursive) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)

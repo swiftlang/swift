@@ -235,7 +235,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
-  std::vector<ArchetypeType *> OpenedExistentialArchetypes;
+  llvm::DenseMap<UUID, ArchetypeType *> OpenedExistentialArchetypes;
 
   /// \brief The permanent arena.
   Arena Permanent;
@@ -1352,7 +1352,7 @@ size_t ASTContext::getTotalMemory() const {
     // Impl.BuiltinVectorTypes ?
     // Impl.GenericSignatures ?
     // Impl.CompoundNames ?
-    Impl.OpenedExistentialArchetypes.capacity() +
+    Impl.OpenedExistentialArchetypes.getMemorySize() +
     Impl.Permanent.getTotalMemory();
 
     Size += getSolverMemory();
@@ -2298,28 +2298,23 @@ DependentMemberType *DependentMemberType::get(Type base,
 }
 
 ArchetypeType *ArchetypeType::getOpened(Type existential,
-                                        Optional<unsigned> knownID) {
+                                        Optional<UUID> knownID) {
   auto &ctx = existential->getASTContext();
   auto &openedExistentialArchetypes = ctx.Impl.OpenedExistentialArchetypes;
   // If we know the ID already...
   if (knownID) {
     // ... and we already have an archetype for that ID, return it.
-    if (*knownID < openedExistentialArchetypes.size()) {
-      if (auto result = openedExistentialArchetypes[*knownID]) {
-        assert(result->getOpenedExistentialType()->isEqual(existential) &&
-               "Retrieved the wrong opened existential type?");
-        return result;
-      }
-
-      // No archetype exists, but we've allocated the slot for it.
-    } else {
-      // Allocate enough space for this ID.
-      openedExistentialArchetypes.resize(*knownID + 1);
+    auto found = openedExistentialArchetypes.find(*knownID);
+    
+    if (found != openedExistentialArchetypes.end()) {
+      auto result = found->second;
+      assert(result->getOpenedExistentialType()->isEqual(existential) &&
+             "Retrieved the wrong opened existential type?");
+      return result;
     }
   } else {
-    // Allocate a new ID at the end.
-    knownID = openedExistentialArchetypes.size();
-    openedExistentialArchetypes.push_back(nullptr);
+    // Create a new ID.
+    knownID = UUID::fromTime();
   }
 
   auto arena = AllocationArena::Permanent;
@@ -2327,9 +2322,14 @@ ArchetypeType *ArchetypeType::getOpened(Type existential,
   assert(existential->isExistentialType());
   existential->getAnyExistentialTypeProtocols(conformsTo);
 
-  auto result = new (ctx, arena) ArchetypeType(ctx, existential, *knownID,
-                                               ctx.AllocateCopy(conformsTo),
-                                        existential->getSuperclass(nullptr));
+  // Tail-allocate space for the UUID.
+  void *archetypeBuf = ctx.Allocate(sizeof(ArchetypeType) + sizeof(UUID),
+                                    alignof(ArchetypeType), arena);
+  
+  auto result = ::new (archetypeBuf) ArchetypeType(ctx, existential,
+                                       ctx.AllocateCopy(conformsTo),
+                                       existential->getSuperclass(nullptr));
+  result->setOpenedExistentialID(*knownID);
   openedExistentialArchetypes[*knownID] = result;
   return result;
 }

@@ -19,6 +19,7 @@
 
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
@@ -196,7 +197,7 @@ public:
   Optional<AbstractCC> cc = Nothing;
 
   // For an opened existential type, the known ID.
-  Optional<unsigned> OpenedID;
+  Optional<UUID> OpenedID;
 
   TypeAttributes() {}
   
@@ -255,7 +256,7 @@ public:
   }
 
   bool hasOpenedID() const { return OpenedID.hasValue(); }
-  unsigned getOpenedID() const { return *OpenedID; }
+  UUID getOpenedID() const { return *OpenedID; }
 
   /// Given a name like "autoclosure", return the type attribute ID that
   /// corresponds to it.  This returns TAK_Count on failure.

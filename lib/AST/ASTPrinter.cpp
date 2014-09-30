@@ -85,6 +85,13 @@ ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
   return *this;
 }
 
+ASTPrinter &ASTPrinter::operator<<(UUID UU) {
+  llvm::SmallString<sizeof(uuid_string_t)> Str;
+  UU.toString(Str);
+  printTextImpl(Str);
+  return *this;
+}
+
 void ASTPrinter::printName(Identifier Name) {
   if (Name.empty()) {
     *this << "_";
@@ -2449,7 +2456,7 @@ public:
       }
     }
     if (auto existentialTy = T->getOpenedExistentialType()) {
-      Printer << "@opened(" << T->getOpenedExistentialID() << ") ";
+      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
       visit(existentialTy);
     } else {
       Printer << T->getFullName();

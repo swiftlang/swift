@@ -14,6 +14,7 @@
 #define SWIFT_AST_ASTPRINTER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -64,6 +65,7 @@ public:
   }
 
   ASTPrinter &operator<<(unsigned long long N);
+  ASTPrinter &operator<<(UUID UU);
 
   void printName(Identifier Name);
 

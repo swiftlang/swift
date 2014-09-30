@@ -178,12 +178,12 @@ extension InformallyFunging: NSFunging { }
 func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
 // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box $Initializable
-// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_ref [[META]] : $@thick Initializable.Type to $@thick @opened(0) Initializable.Type
-// CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick @opened(0) Initializable.Type to $@objc_metatype @opened(0) Initializable.Type
-// CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype @opened(0) Initializable.Type, $@opened(0) Initializable
-// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method [volatile] $@opened(0) Initializable, #Initializable.init!initializer.1.foreign : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
-// CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened(0) Initializable>([[I]], [[I2_ALLOC]]) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
-// CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened(0) Initializable : $@opened(0) Initializable, $Initializable
+// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_ref [[META]] : $@thick Initializable.Type to $@thick @opened([[N:".*"]]) Initializable.Type
+// CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick @opened([[N]]) Initializable.Type to $@objc_metatype @opened([[N]]) Initializable.Type
+// CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype @opened([[N]]) Initializable.Type, $@opened([[N]]) Initializable
+// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method [volatile] $@opened([[N]]) Initializable, #Initializable.init!initializer.1.foreign : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
+// CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[I]], [[I2_ALLOC]]) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
+// CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
 // CHECK:   store [[I2_EXIST_CONTAINER]] to [[I2_BOX]]#1 : $*Initializable
 // CHECK:   [[I2:%[0-9]+]] = load [[I2_BOX]]#1 : $*Initializable
 // CHECK:   strong_retain [[I2]] : $Initializable

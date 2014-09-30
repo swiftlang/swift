@@ -192,11 +192,11 @@ func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
 // CHECK: sil hidden @_TF9protocols29use_initializable_existential
 func use_initializable_existential(im: Initializable.Type, i: Int) {
 // CHECK: bb0([[IM:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
-// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_ref [[IM]] : $@thick Initializable.Type to $@thick @opened(0) Initializable.Type
+// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_ref [[IM]] : $@thick Initializable.Type to $@thick @opened([[N:".*"]]) Initializable.Type
 // CHECK:   [[TEMP_VALUE:%[0-9]+]] = alloc_stack $Initializable
-// CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential [[TEMP_VALUE]]#1 : $*Initializable, $@opened(0) Initializable
-// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened(0) Initializable, #Initializable.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
-// CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened(0) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+// CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential [[TEMP_VALUE]]#1 : $*Initializable, $@opened([[N]]) Initializable
+// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]]) Initializable, #Initializable.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+// CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
 // CHECK:   destroy_addr [[TEMP_VALUE]]#1 : $*Initializable
 // CHECK:   dealloc_stack [[TEMP_VALUE]]#0 : $*@local_storage Initializable
   im(int: i)

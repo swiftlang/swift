@@ -984,7 +984,7 @@ ERROR(attr_objc_empty_name,attribute_parsing,none,
 ERROR(opened_attribute_expected_lparen,attribute_parsing,none,
       "expected '(' after 'opened' attribute", ())
 ERROR(opened_attribute_id_value,attribute_parsing,none,
-      "known id for 'opened' attribute must be a non-negative integer", ())
+      "known id for 'opened' attribute must be a UUID string", ())
 ERROR(opened_attribute_expected_rparen,attribute_parsing,none,
       "expected ')' after id value for 'opened' attribute", ())
 

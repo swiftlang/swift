@@ -569,7 +569,7 @@ bb0:
 sil [transparent] @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@thin (@owned CP) -> () {
 bb0(%0 : $CP):
   strong_retain %0 : $CP                          // id: %2
-  %3 = open_existential_ref %0 : $CP to $@opened(0) CP // user: %5
+  %3 = open_existential_ref %0 : $CP to $@opened("01234567-89ab-cdef-0123-000000000000") CP // user: %5
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
 }
@@ -579,11 +579,11 @@ sil @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ : $@thin (@owned CP
 bb0(%0 : $CP, %1 : $CP):
   %4 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@thin (@owned CP) -> () // user: %6
   strong_retain %0 : $CP                          // id: %5
-  // CHECK: open_existential_ref %0 : $CP to $@opened(1) CP
+  // CHECK: open_existential_ref %0 : $CP to $@opened([[N1:".*"]]) CP
   %6 = apply [transparent] %4(%0) : $@thin (@owned CP) -> ()
   %7 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@thin (@owned CP) -> () // user: %9
   strong_retain %1 : $CP                          // id: %8
-  // CHECK: open_existential_ref %1 : $CP to $@opened(2) CP
+  // CHECK: open_existential_ref %1 : $CP to $@opened([[N2:".*"]]) CP
   %9 = apply [transparent] %7(%1) : $@thin (@owned CP) -> ()
   strong_release %1 : $CP                         // id: %10
   strong_release %0 : $CP                         // id: %11

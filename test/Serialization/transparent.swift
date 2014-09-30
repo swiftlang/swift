@@ -71,8 +71,8 @@ func test_wrapper() {
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent17open_existentialsFT1pPS_1P_2cpPS_2CP__T_
 func test_open_existentials(p: P, cp: CP) {
-  // SIL: open_existential [[EXIST:%[0-9]+]]#1 : $*P to $*@opened([[N:[0-9]+]]) P
-  // SIL: open_existential_ref [[EXIST:%[0-9]+]] : $CP to $@opened([[M:[0-9]+]]) CP
+  // SIL: open_existential [[EXIST:%[0-9]+]]#1 : $*P to $*@opened([[N:".*"]]) P
+  // SIL: open_existential_ref [[EXIST:%[0-9]+]] : $CP to $@opened([[M:".*"]]) CP
   open_existentials(p: p, cp: cp)
 }
 
