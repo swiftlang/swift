@@ -3511,6 +3511,10 @@ public:
 
     TC.validateDecl(VD);
 
+    // WARNING: Anything you put in this function will only be run when the
+    // VarDecl is fully type-checked within its own file. It will NOT be run
+    // when the VarDecl is merely used from another file.
+
     if (VD->isObjC())
       checkBridgedFunctions();
 
@@ -3540,39 +3544,12 @@ public:
         VD->setInvalid();
         VD->overwriteType(ErrorType::get(TC.Context));
       }
-
-      // If this is a 'let' property in a class, mark it implicitly final, since
-      // it cannot be overridden.
-      if (VD->isLet() && !VD->isFinal() && !VD->isDynamic() &&
-          VD->getDeclContext()->isClassOrClassExtensionContext())
-        makeFinal(TC.Context, VD);
     }
-
-
-    // Synthesize accessors for @NSManaged, all checking has already been
-    // performed.
-    if (VD->getAttrs().hasAttribute<NSManagedAttr>() && !VD->getGetter())
-      convertNSManagedStoredVarToComputed(VD, TC);
 
     // Synthesize accessors for lazy, all checking already been performed.
     if (VD->getAttrs().hasAttribute<LazyAttr>() && !VD->isStatic() &&
         !VD->getGetter()->hasBody())
       completeLazyVarImplementation(VD, TC);
-
-    // If this is a non-final stored property in a class, then synthesize getter
-    // and setter accessors and change its storage kind.  This allows it to be
-    // overridden and provide objc entrypoints if needed.
-    if (VD->getStorageKind() == VarDecl::Stored && !VD->isStatic() &&
-        !VD->isImplicit()) {
-      // Variables in SIL mode don't get auto-synthesized getters.
-      bool isInSILMode = false;
-      if (auto sourceFile = VD->getDeclContext()->getParentSourceFile())
-        isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
-
-      if (VD->getDeclContext()->isClassOrClassExtensionContext() &&
-          !isInSILMode)
-        addAccessorsToStoredVar(VD, TC);
-    }
 
     // If this is a willSet/didSet property, synthesize the getter and setter
     // decl.
@@ -6703,24 +6680,47 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
     }
 
-    // Synthesize accessors for lazy.
-    if (!VD->getGetter() && VD->getAttrs().hasAttribute<LazyAttr>() &&
-        !VD->isStatic() && !VD->isBeingTypeChecked()) {
-      VD->setIsBeingTypeChecked();
+    // Synthesize accessors as necessary.
+    if (!VD->getGetter() && !VD->isStatic() && !VD->isBeingTypeChecked()) {
+      if (VD->getAttrs().hasAttribute<LazyAttr>()) {
+        // Lazy variables need accessors.
+        VD->setIsBeingTypeChecked();
 
-      auto *getter = createGetterPrototype(VD, *this);
-      // lazy getters are mutating on an enclosing struct.
-      getter->setMutating();
-      getter->setAccessibility(VD->getAccessibility());
+        auto *getter = createGetterPrototype(VD, *this);
+        // lazy getters are mutating on an enclosing struct.
+        getter->setMutating();
+        getter->setAccessibility(VD->getAccessibility());
 
-      VarDecl *newValueParam = nullptr;
-      auto *setter = createSetterPrototype(VD, newValueParam, *this);
-      VD->makeComputed(VD->getLoc(), getter, setter, nullptr, VD->getLoc());
-      VD->setIsBeingTypeChecked(false);
-      computeAccessibility(*this, setter);
+        VarDecl *newValueParam = nullptr;
+        auto *setter = createSetterPrototype(VD, newValueParam, *this);
+        VD->makeComputed(VD->getLoc(), getter, setter, nullptr, VD->getLoc());
+        VD->setIsBeingTypeChecked(false);
+        computeAccessibility(*this, setter);
 
-      addMemberToContextIfNeeded(getter, VD->getDeclContext());
-      addMemberToContextIfNeeded(setter, VD->getDeclContext());
+        addMemberToContextIfNeeded(getter, VD->getDeclContext());
+        addMemberToContextIfNeeded(setter, VD->getDeclContext());
+
+      } else if (VD->hasStorage() && !VD->isImplicit() &&
+                 VD->getDeclContext()->isClassOrClassExtensionContext()) {
+        // Class instance variables also need accessors, because it affects
+        // vtable layout.
+        if (VD->getAttrs().hasAttribute<NSManagedAttr>()) {
+          VD->setIsBeingTypeChecked();
+          convertNSManagedStoredVarToComputed(VD, *this);
+          VD->setIsBeingTypeChecked(false);
+        } else {
+          // Variables in SIL mode don't get auto-synthesized getters.
+          bool isInSILMode = false;
+          if (auto sourceFile = VD->getDeclContext()->getParentSourceFile())
+            isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
+
+          if (!isInSILMode) {
+            VD->setIsBeingTypeChecked();
+            addAccessorsToStoredVar(VD, *this);
+            VD->setIsBeingTypeChecked(false);
+          }
+        }
+      }
     }
 
     if (!VD->didEarlyAttrValidation()) {
@@ -6734,9 +6734,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // Properties need some special validation logic.
       if (Type contextType = VD->getDeclContext()->getDeclaredTypeInContext()) {
         // If this variable is a class member, mark it final if the
-        // class is final.
+        // class is final, or if it was declared with 'let'.
         if (auto cls = contextType->getClassOrBoundGenericClass()) {
-          if (cls->isFinal() && !VD->isFinal()) {
+          if (!VD->isFinal() && !VD->isDynamic() &&
+              (cls->isFinal() || VD->isLet())) {
             makeFinal(Context, VD);
           }
         }
