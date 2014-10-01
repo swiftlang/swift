@@ -181,7 +181,9 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   }
 }
 
-/// Base class of the heap buffer backing arrays.
+/// Base class of the heap buffer backing arrays.  The only reason
+/// this is not a class protocol instead, is that instances of class
+/// protocols are fatter than plain object references.
 class _ContiguousArrayStorageBase {
   internal func _tryGetVerbatimBridgedUnsafeBuffer(
     dummy: Void
