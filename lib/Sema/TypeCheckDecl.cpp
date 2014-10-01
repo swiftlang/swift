@@ -2118,12 +2118,7 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
   synthesizeTrivialSetter(setter, storage, valueParamDecl, TC);
   TC.typeCheckDecl(setter, true);
   TC.typeCheckDecl(setter, false);
-
-  // We've added some members to our containing type, add them to the
-  // members list.
-  addMemberToContextIfNeeded(setter, storage->getDeclContext());
 }
-
 
 /// The specified AbstractStorageDecl was just found to satisfy a
 /// protocol property requirement.  Ensure that it has the full

@@ -2335,6 +2335,32 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   return D;
 }
 
+static TypedPattern *createSetterAccessorArgument(SourceLoc nameLoc,
+                                                  Identifier name,
+                                                  TypeLoc elementTy,
+                                                  AccessorKind accessorKind,
+                                                  Parser &P) {
+  // Add the parameter. If no name was specified, the name defaults to
+  // 'value'.
+  bool isNameImplicit = name.empty();
+  if (isNameImplicit) {
+    const char *implName =
+      accessorKind == AccessorKind::IsDidSet ? "oldValue" : "newValue";
+    name = P.Context.getIdentifier(implName);
+  }
+
+  VarDecl *value = new (P.Context) ParamDecl(/*IsLet*/true,
+                                             nameLoc, name,
+                                             nameLoc, name,
+                                             Type(), P.CurDeclContext);
+  if (isNameImplicit)
+    value->setImplicit();
+
+  Pattern *namedPat = new (P.Context) NamedPattern(value, isNameImplicit);
+  return new (P.Context) TypedPattern(namedPat, elementTy.clone(P.Context),
+                                      /*Implicit*/true);
+}
+
 /// Parse a "(value)" specifier for "set" or "willSet" if present.  Create a
 /// pattern to represent the spelled argument or the implicit one if it is
 /// missing.
@@ -2349,7 +2375,6 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
 
   SourceLoc StartLoc, NameLoc, EndLoc;
   Identifier Name;
-  ASTContext &Context = P.Context;
 
   // If the SpecifierLoc is invalid, then the caller just wants us to synthesize
   // the default, not actually try to parse something.
@@ -2376,27 +2401,8 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
     }
   }
 
-  bool IsNameImplicit = EndLoc.isInvalid();
-
-  // Add the parameter. If no name was specified, the name defaults to
-  // 'value'.
-  if (IsNameImplicit) {
-    const char *ImplName =
-      Kind == AccessorKind::IsDidSet ? "oldValue" : "newValue";
-    Name = P.Context.getIdentifier(ImplName);
-    NameLoc = SpecifierLoc;
-    StartLoc = SourceLoc();
-  }
-
-  VarDecl *Value = new (Context) ParamDecl(/*IsLet*/true,
-                                           NameLoc, Name,
-                                           NameLoc, Name,
-                                           Type(), P.CurDeclContext);
-  if (IsNameImplicit)
-    Value->setImplicit();
-  auto *namedPat = new (Context) NamedPattern(Value, IsNameImplicit);
-  return new (Context) TypedPattern(namedPat, ElementTy.clone(Context),
-                                    /*Implicit*/true);
+  if (Name.empty()) NameLoc = SpecifierLoc;
+  return createSetterAccessorArgument(NameLoc, Name, ElementTy, Kind, P);
 }
 
 static unsigned skipUntilMatchingRBrace(Parser &P) {
@@ -2829,23 +2835,42 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     return accessor;
   };
 
-  // Addressors are incompatible with getters and setters.
-  // Prefer the addressor.
+  // 'address' is exclusive with 'get', and 'mutableAddress' is
+  // exclusive with 'set'.
   if (Addressor || MutableAddressor) {
-    // Require an 'address' accessor if there's a 'mutableAddress' accessor.
-    // This is in principle an unnnecessary restriction, but enforce it for now.
-    if (!Addressor) {
-      P.diagnose(MutableAddressor->getLoc(), diag::mutableaddress_without_address,
+    // Require either a 'get' or an 'address' accessor if there's
+    // a 'mutableAddress' accessor.  In principle, we could synthesize
+    // 'address' from 'mutableAddress', but for now we'll enforce this.
+    if (!Addressor && !Get) {
+      P.diagnose(MutableAddressor->getLoc(),
+                 diag::mutableaddressor_without_address,
                  isa<SubscriptDecl>(storage));
 
       Addressor = createImplicitAccessor(AccessorKind::IsAddressor, nullptr);
+
+    // Don't allow both.
+    } else if (Addressor && Get) {
+      P.diagnose(Addressor->getLoc(), diag::addressor_with_getter,
+                 isa<SubscriptDecl>(storage));      
+      ignoreInvalidAccessor(Get);
     }
 
-    if (Get || Set) {
-      P.diagnose(Get ? Get->getLoc() : Set->getLoc(),
-                 diag::addressor_with_getset,
-                 isa<SubscriptDecl>(storage));
-      ignoreInvalidAccessor(Get);
+    // Disallow mutableAddress+set.
+    //
+    // Currently we don't allow the address+set combination either.
+    // In principle, this is an unnecessary restriction, and you can
+    // imagine caches that might want to vend this combination of
+    // accessors.  But we assume that in-place gets aren't all that
+    // important.  (For example, we don't make any effort to optimize
+    // them for polymorphic accesses.)
+    if (Set) {
+      if (MutableAddressor) {
+        P.diagnose(MutableAddressor->getLoc(), diag::mutableaddressor_with_setter,
+                   isa<SubscriptDecl>(storage));
+      } else {
+        P.diagnose(Set->getLoc(), diag::addressor_with_setter,
+                   isa<SubscriptDecl>(storage));
+      }
       ignoreInvalidAccessor(Set);
     }
   }
@@ -2888,8 +2913,11 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     // Create their prototypes now.
     Get = createImplicitAccessor(AccessorKind::IsGetter, nullptr);
 
-    auto argPattern = parseOptionalAccessorArgument(SourceLoc(), elementTy, P,
-                                                    AccessorKind::IsSetter);
+    auto argFunc = (WillSet ? WillSet : DidSet);
+    auto argLoc = argFunc->getBodyParamPatterns().back()->getLoc();
+
+    auto argPattern = createSetterAccessorArgument(argLoc, Identifier(),
+                                        elementTy, AccessorKind::IsSetter, P);
     Set = createImplicitAccessor(AccessorKind::IsSetter, argPattern);
 
     storage->setObservingAccessors(Get, Set, nullptr);
@@ -2911,6 +2939,20 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     storage->makeAddressed(LBLoc, Addressor, MutableAddressor, RBLoc);
     return;
   }
+
+  // If this is a get+mutableAddress property, synthesize an implicit
+  // setter and record what we've got.
+  if (MutableAddressor) {
+    assert(Get && !Set);
+    auto argPattern =
+      createSetterAccessorArgument(MutableAddressor->getLoc(), Identifier(),
+                                   elementTy, AccessorKind::IsSetter, P);
+    Set = createImplicitAccessor(AccessorKind::IsSetter, argPattern);
+
+    storage->makeComputedWithMutableAddress(LBLoc, Get, Set, nullptr,
+                                            MutableAddressor, RBLoc);
+    return;
+  } 
 
   // Otherwise, this must be a get/set property.  The set is optional,
   // but get is not.

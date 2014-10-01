@@ -27,7 +27,7 @@ struct OnlyMutable {
   var base: UnsafeMutablePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    mutableAddress { // expected-error {{subscript must provide 'address' if it provides 'mutableAddress'}}
+    mutableAddress { // expected-error {{subscript must provide either a getter or 'address' if it provides 'mutableAddress'}}
       return base
     }
   }
@@ -66,10 +66,10 @@ struct AddressorAndGet {
   var base: UnsafePointer<Int> = nil
 
   subscript(index: Int) -> Int {
-    address {
+    address { // expected-error {{subscript cannot provide both 'address' and a getter}}
       return UnsafePointer(base)
     }
-    get { // expected-error {{subscript cannot provide both an addressor and a getter/setter}}
+    get {
       return base.get()
     }
   }
@@ -82,7 +82,20 @@ struct AddressorAndSet {
     address {
       return UnsafePointer(base)
     }
-    set { // expected-error {{subscript cannot provide both an addressor and a getter/setter}}
+    set { // expected-error {{subscript cannot provide both 'address' and a setter; use an ordinary getter instead}}
+    }
+  }
+}
+
+struct MutableAddressorAndGet {
+  var base: UnsafeMutablePointer<Int> = nil
+
+  subscript(index: Int) -> Int {
+    mutableAddress {
+      return base
+    }
+    get {
+      return base.memory
     }
   }
 }

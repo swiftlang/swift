@@ -155,3 +155,61 @@ func test_carray(inout array: CArray<Int -> Int>) -> Int {
 // CHECK:   [[T5:%.*]] = load [[T4]]
   return array[1](5)
 }
+
+// rdar://17270560, redux
+struct D : Subscriptable {
+  subscript(i: Int) -> Int {
+    get { return i }
+    mutableAddress { return nil }
+  }
+}
+// Setter.
+// CHECK: sil hidden [transparent] @_TFV10addressors1Ds9subscriptFSiSi
+// CHECK: bb0([[VALUE:%.*]] : $Int, [[I:%.*]] : $Int, [[SELF:%.*]] : $*D):
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Da9subscriptFSiSi
+// CHECK:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF]])
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
+// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   store [[VALUE]] to [[ADDR]] : $*Int
+
+// materializeForSet.
+// CHECK: sil hidden [transparent] @_TFV10addressors1Dm9subscriptFSiSi
+// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Int, [[SELF:%.*]] : $*D):
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Da9subscriptFSiSi
+// CHECK:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF]])
+// CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int>,
+// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
+// CHECK:   [[T0:%.*]] = address_to_pointer [[ADDR]] : $*Int to $Builtin.RawPointer
+// CHECK:   [[T1:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:   [[T2:%.*]] = tuple ([[T0]] : $Builtin.RawPointer, [[T1]] : $Builtin.Int1)
+// CHECK:   return [[T2]] :
+
+func make_int() -> Int { return 0 }
+func take_int_inout(inout value: Int) {}
+
+// CHECK: sil hidden @_TF10addressors6test_dFRVS_1DSi : $@thin (@inout D) -> Int
+// CHECK: bb0([[ARRAY:%.*]] : $*D):
+func test_d(inout array: D) -> Int {
+// CHECK:   [[T0:%.*]] = function_ref @_TF10addressors8make_intFT_Si
+// CHECK:   [[V:%.*]] = apply [[T0]]()
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Da9subscriptFSiSi
+// CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[ARRAY]])
+// CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int>,
+// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int
+// CHECK:   store [[V]] to [[ADDR]] : $*Int
+  array[0] = make_int()
+
+// CHECK:   [[FN:%.*]] = function_ref @_TF10addressors14take_int_inoutFRSiT_
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Da9subscriptFSiSi
+// CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[ARRAY]])
+// CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int>,
+// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int
+// CHECK:   apply [[FN]]([[ADDR]])
+  take_int_inout(&array[1])
+
+// CHECK:   [[T0:%.*]] = load [[ARRAY]]
+// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors1Dg9subscriptFSiSi 
+// CHECK:   [[T2:%.*]] = apply [[T1]]({{%.*}}, [[T0]])
+// CHECK:   return [[T2]]
+  return array[2]
+}

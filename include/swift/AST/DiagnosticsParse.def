@@ -238,12 +238,18 @@ ERROR(getset_init,decl_parsing,none,
       "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,decl_parsing,none,
       "variable with implied type cannot have implied getter/setter", ())
-ERROR(mutableaddress_without_address,decl_parsing,none,
-      "%select{variable|subscript}0 must provide 'address' if it provides "
-      "'mutableAddress'", (unsigned))
-ERROR(addressor_with_getset,decl_parsing,none,
-      "%select{variable|subscript}0 cannot provide both an addressor and "
-      "a getter/setter", (unsigned))
+ERROR(mutableaddressor_without_address,decl_parsing,none,
+      "%select{variable|subscript}0 must provide either a getter or "
+      "'address' if it provides 'mutableAddress'", (unsigned))
+ERROR(mutableaddressor_with_setter,decl_parsing,none,
+      "%select{variable|subscript}0 cannot provide both 'mutableAddress' "
+      " and a setter", (unsigned))
+ERROR(addressor_with_getter,decl_parsing,none,
+      "%select{variable|subscript}0 cannot provide both 'address' and "
+      "a getter", (unsigned))
+ERROR(addressor_with_setter,decl_parsing,none,
+      "%select{variable|subscript}0 cannot provide both 'address' and "
+      "a setter; use an ordinary getter instead", (unsigned))
 
 // Import
 ERROR(decl_expected_module_name,decl_parsing,none,

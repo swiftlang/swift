@@ -974,11 +974,11 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     case Addressed:
     case AddressedWithTrivialAccessors:
     case AddressedWithObservers:
+    case ComputedWithMutableAddress:
       return AccessStrategy::Addressor;
 
     case InheritedWithObservers:
     case Computed:
-    case ComputedWithMutableAddress:
       llvm_unreachable("cannot have direct-to-storage access to "
                        "computed storage");
     }
