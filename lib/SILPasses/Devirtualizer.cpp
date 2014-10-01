@@ -955,8 +955,15 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
 
   // Check if it is legal to insert inline caches.
-  if (!CD || CMI->isVolatile() || ClassInstance.getType() != InstanceType)
+  if (!CD || CMI->isVolatile())
     return false;
+
+  if (ClassInstance.getType() != InstanceType) {
+    // The implementation of a method to be invoked may actually
+    // be defined by one of the superclasses.
+    if(!ClassInstance.getType().isSuperclassOf(InstanceType))
+          return false;
+  }
 
   if (!CHA->hasKnownSubclasses(CD)) {
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
