@@ -134,13 +134,17 @@ public struct ${Self}<T>
   /// Access the underlying raw memory, getting and
   /// setting values.
   public var memory : T {
-    @transparent get {
-      return Builtin.load(_rawValue)
-    }
 %  if mutable:
-    @transparent nonmutating set {
-      Builtin.assign(newValue, _rawValue)
+    @transparent address {
+      return UnsafePointer(self)
     }
+    @transparent nonmutating mutableAddress {
+      return self
+    }
+%  else:
+    @transparent address {
+      return self
+    }    
 %  end
   }
 
@@ -305,14 +309,19 @@ public struct ${Self}<T>
 
   /// Access the `i`\ th element of the raw array starting at `self`.
   public subscript (i : Int) -> T {
-    @transparent
-    get {
-      return (self + i).memory
-    }
 %  if mutable:
     @transparent
-    nonmutating set {
-      (self + i).memory = newValue
+    address {
+      return UnsafePointer(self + i)
+    }
+    @transparent
+    nonmutating mutableAddress {
+      return self + i
+    }
+%  else:
+    @transparent
+    address {
+      return self + i
     }
 %  end
   }
