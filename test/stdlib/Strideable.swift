@@ -14,7 +14,7 @@
 
 import StdlibUnittest
 
-var strideTestSuite = TestSuite("Strideable")
+var StrideTestSuite = TestSuite("Strideable")
 
 struct R : RandomAccessIndexType {
   var x: Int
@@ -37,12 +37,12 @@ struct R : RandomAccessIndexType {
   }
 }
 
-strideTestSuite.test("Double") {
+StrideTestSuite.test("Double") {
   // Doubles are not yet ready for testing, since they still conform
   // to RandomAccessIndexType
 }
 
-strideTestSuite.test("HalfOpen") {
+StrideTestSuite.test("HalfOpen") {
   func check(from start: Int, to end: Int, by stepSize: Int, #sum: Int) {
     // Work on Ints
     expectEqual(
@@ -67,7 +67,7 @@ strideTestSuite.test("HalfOpen") {
   check(from: 1, to: -16, by: 3, sum: 0)
 }
 
-strideTestSuite.test("Closed") {
+StrideTestSuite.test("Closed") {
   func check(from start: Int, through end: Int, by stepSize: Int, #sum: Int) {
     // Work on Ints
     expectEqual(
@@ -91,6 +91,45 @@ strideTestSuite.test("Closed") {
   
   check(from: 4, through: 16, by: -3, sum: 0)
   check(from: 1, through: -16, by: 3, sum: 0)
+}
+
+StrideTestSuite.test("OperatorOverloads") {
+  var r1 = R(50)
+  var r2 = R(70)
+  var stride: Int = 5
+
+  if true {
+    var result = r1 + stride
+    expectType(R.self, &result)
+    expectEqual(55, result.x)
+  }
+  if true {
+    var result = stride + r1
+    expectType(R.self, &result)
+    expectEqual(55, result.x)
+  }
+  if true {
+    var result = r1 - stride
+    expectType(R.self, &result)
+    expectEqual(45, result.x)
+  }
+  if true {
+    var result = r1 - r2
+    expectType(Int.self, &result)
+    expectEqual(-20, result)
+  }
+  if true {
+    var result = r1
+    result += stride
+    expectType(R.self, &result)
+    expectEqual(55, result.x)
+  }
+  if true {
+    var result = r1
+    result -= stride
+    expectType(R.self, &result)
+    expectEqual(45, result.x)
+  }
 }
 
 runAllTests()
