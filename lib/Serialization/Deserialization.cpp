@@ -2657,7 +2657,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                SourceLoc(), elemTy, DC);
     declOrOffset = subscript;
 
-    assert(addressorID || !mutableAddressorID);
     configureStorage(subscript, rawStorageKind,
                      getterID, setterID, materializeForSetID,
                      addressorID, mutableAddressorID, willSetID, didSetID);
