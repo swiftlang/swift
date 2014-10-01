@@ -666,6 +666,57 @@ static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
 }
 
 
+static ManagedValue
+emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
+                       AbstractStorageDecl *storage,
+                       ArrayRef<Substitution> substitutions,
+                       RValueSource &&baseRV, RValue &&subscriptRV,
+                       bool isSuper, AccessStrategy strategy,
+                       AbstractionPattern origFormalType,
+                       CanType substFormalType,
+                       SGFContext C) {
+
+  switch (strategy) {
+  case AccessStrategy::Storage:
+    llvm_unreachable("should already have been filtered out!");
+
+  // The easy path here is if we don't need to use an addressor.
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor: {
+    return SGF.emitGetAccessor(loc, storage, substitutions,
+                               std::move(baseRV), isSuper,
+                               strategy == AccessStrategy::DirectToAccessor,
+                               std::move(subscriptRV), C);
+  }
+
+  case AccessStrategy::Addressor:
+    break;
+  }
+
+  auto &storageTL = SGF.getTypeLowering(origFormalType, substFormalType);
+  SILType storageType = storageTL.getLoweredType().getAddressType();
+
+  SILValue address =
+    SGF.emitAddressorAccessor(loc, storage, AccessKind::Read, substitutions,
+                              std::move(baseRV), isSuper,
+                              strategy == AccessStrategy::DirectToAccessor,
+                              std::move(subscriptRV), storageType)
+    .getLValueAddress();
+
+  SILType loweredSubstType =
+    SGF.getLoweredType(substFormalType).getAddressType();
+  bool hasAbstraction = (loweredSubstType != storageType);
+
+  ManagedValue result =
+    SGF.emitLoad(loc, address, storageTL,
+                 (hasAbstraction ? SGFContext() : C), IsNotTake);
+  if (hasAbstraction) {
+    result = SGF.emitOrigToSubstValue(loc, result, origFormalType,
+                                      substFormalType, C);
+  }
+  return result;
+}
+
 /// Produce a singular RValue for a load from the specified property.  This
 /// is designed to work with RValue ManagedValue bases that are either +0 or +1.
 ManagedValue SILGenFunction::
@@ -675,10 +726,11 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                           ArrayRef<Substitution> substitutions,
                           AccessSemantics semantics,
                           Type propTy, SGFContext C) {
-  // If this is a non-direct access to a computed property, call the getter.
-  if (FieldDecl->hasAccessorFunctions() &&
-      semantics != AccessSemantics::DirectToStorage) {
-    
+  AccessStrategy strategy =
+    FieldDecl->getAccessStrategy(semantics, AccessKind::Read);
+
+  // If we should call an accessor of some kind, do so.
+  if (strategy != AccessStrategy::Storage) {
     auto propertyBaseTy
       = FieldDecl->getDeclContext()->getDeclaredTypeInContext();
 
@@ -688,13 +740,20 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     if (base.isPlusZeroRValueOrTrivial()
         && !SGM.Types.isIndirectPlusZeroSelfParameter(propertyBaseTy))
       base = base.copyUnmanaged(*this, loc);
-    
-    RValueSource baseRV = prepareAccessorBaseArg(loc, base,
-                                                 FieldDecl->getGetter());
-    return emitGetAccessor(loc, FieldDecl, substitutions,
-                           std::move(baseRV), isSuper,
-                           semantics == AccessSemantics::DirectToAccessor,
-                           RValue(), C);
+
+    auto accessor =
+      (strategy == AccessStrategy::Addressor
+         ? FieldDecl->getAddressor() : FieldDecl->getGetter());
+    RValueSource baseRV = prepareAccessorBaseArg(loc, base, accessor);
+
+    AbstractionPattern origFormalType =
+      getOrigFormalRValueType(FieldDecl->getType());
+    auto substFormalType = propTy->getCanonicalType();
+
+    return emitRValueWithAccessor(*this, loc, FieldDecl, substitutions,
+                                  std::move(baseRV), RValue(),
+                                  isSuper, strategy,
+                                  origFormalType, substFormalType, C);
   }
 
   assert(FieldDecl->hasStorage() &&
@@ -2321,39 +2380,15 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // Emit the indices.
   RValue subscriptRV = SGF.emitRValue(E->getIndex());
 
-  // The easy path here is if we don't need to use an addressor.
-  if (!useAddressor) {
-    ManagedValue MV =
-      SGF.emitGetAccessor(E, subscript, E->getDecl().getSubstitutions(),
-                          std::move(baseRV), E->isSuper(),
-                          strategy == AccessStrategy::DirectToAccessor,
-                          std::move(subscriptRV), C);
-    return RValue(SGF, E, MV);
-  }
+  AbstractionPattern origFormalType(subscript->getElementType());
+  CanType substFormalType = E->getType()->getCanonicalType();
 
-  AbstractionPattern abstraction(subscript->getElementType());
-  CanType substType = E->getType()->getCanonicalType();
-
-  auto &storageTL = SGF.getTypeLowering(abstraction, substType);
-  SILType storageType = storageTL.getLoweredType().getAddressType();
-
-  SILValue address =
-    SGF.emitAddressorAccessor(E, subscript, AccessKind::Read,
-                              E->getDecl().getSubstitutions(),
-                              std::move(baseRV), E->isSuper(),
-                              semantics == AccessSemantics::DirectToAccessor,
-                              std::move(subscriptRV), storageType)
-    .getLValueAddress();
-
-  SILType loweredSubstType = SGF.getLoweredType(substType).getAddressType();
-  bool hasAbstraction = (loweredSubstType != storageType);
-
-  ManagedValue result =
-    SGF.emitLoad(E, address, storageTL,
-                 (hasAbstraction ? SGFContext() : C), IsNotTake);
-  if (hasAbstraction) {
-    result = SGF.emitOrigToSubstValue(E, result, abstraction, substType, C);
-  }
+  auto result = emitRValueWithAccessor(SGF, E, subscript,
+                                       E->getDecl().getSubstitutions(),
+                                       std::move(baseRV),
+                                       std::move(subscriptRV),
+                                       E->isSuper(), strategy,
+                                       origFormalType, substFormalType, C);
   return RValue(SGF, E, result);
 }
 

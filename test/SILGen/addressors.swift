@@ -213,3 +213,21 @@ func test_d(inout array: D) -> Int {
 // CHECK:   return [[T2]]
   return array[2]
 }
+
+struct E {
+  var value: Int {
+    address { return nil }
+    nonmutating mutableAddress { return nil }
+  }
+}
+
+// CHECK: sil hidden @_TF10addressors6test_eFVS_1ET_
+// CHECK: bb0([[E:%.*]] : $E):
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Ea5valueSi
+// CHECK:   [[T1:%.*]] = apply [[T0]]([[E]])
+// CHECK:   [[T2:%.*]] = struct_extract [[T1]]
+// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]]
+// CHECK:   store {{%.*}} to [[T3]] : $*Int
+func test_e(e: E) {
+  e.value = 0
+}

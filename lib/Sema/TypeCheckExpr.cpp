@@ -376,58 +376,58 @@ bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
   return true;
 }
 
-/// doesVarDeclMemberProduceLValue - Return true if a reference to the specified
-/// VarDecl should produce an lvalue.  If present, baseType indicates the base
-/// type of a member reference.
-static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType,
-                                           DeclContext *UseDC) {
-  // Get-only VarDecls always produce rvalues.
-  if (!VD->isSettable(UseDC))
+/// Does a var or subscript produce an l-value?
+///
+/// \param baseType - the type of the base on which this object
+///   is being accessed; must be null if and only if this is not
+///   a type member
+static bool doesStorageProduceLValue(TypeChecker &TC,
+                                     AbstractStorageDecl *storage,
+                                     Type baseType, DeclContext *useDC) {
+  // Unsettable storage decls always produce rvalues.
+  if (!storage->isSettable(useDC))
     return false;
-  if (UseDC->getASTContext().LangOpts.EnableAccessControl &&
-      !VD->isSetterAccessibleFrom(UseDC))
+  if (TC.Context.LangOpts.EnableAccessControl &&
+      !storage->isSetterAccessibleFrom(useDC))
     return false;
 
   // If there is no base, or if the base isn't being used, it is settable.
-  if (!baseType || VD->isStatic())
-    return true;
-
-  // If the base is a reference type, or if the base is mutable, then a
-  // reference produces an lvalue.
-  if (baseType->hasReferenceSemantics() || baseType->is<LValueType>())
-    return true;
-
-  // If the base is an rvalue, then we only produce an lvalue if the vardecl
-  // is a computed property, whose setter is nonmutating.
-  return VD->getSetter() && !VD->getSetter()->isMutating();
-}
-
-/// doesSubscriptDeclProduceLValue - Return true if a reference to the specified
-/// SubscriptDecl should produce an lvalue.
-static bool doesSubscriptDeclProduceLValue(SubscriptDecl *SD, Type baseType,
-                                           const DeclContext *UseDC) {
-  assert(baseType && "Subscript without a base expression?");
-  // Get-only SubscriptDecls always produce rvalues.
-  if (!SD->isSettable())
-    return false;
-  if (UseDC->getASTContext().LangOpts.EnableAccessControl &&
-      !SD->isSetterAccessibleFrom(UseDC))
-    return false;
-
-  // If the base is a reference type, or if the base is mutable, then a
-  // reference produces an lvalue.
-  if (baseType->hasReferenceSemantics() || baseType->is<LValueType>())
-    return true;
-
-  // If the base is an rvalue, then we only produce an lvalue if both the getter
-  // and setter are nonmutating.
-  if (SD->hasAccessorFunctions()) {
-    return !SD->getGetter()->isMutating() && !SD->getSetter()->isMutating();
-  } else {
-    assert(SD->hasAddressors());
-    return !SD->getAddressor()->isMutating() &&
-           !SD->getMutableAddressor()->isMutating();
+  // This is only possible for vars.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (!baseType || var->isStatic())
+      return true;
   }
+
+  // If the base is a reference type, or if the base is mutable, then a
+  // reference produces an lvalue.
+  if (baseType->hasReferenceSemantics() || baseType->is<LValueType>())
+    return true;
+
+  // If the base is an rvalue, then we only produce an lvalue if both
+  // the getter and setter are nonmutating.
+
+  switch (storage->getStorageKind()) {
+  // The setter of a stored decl is implicitly mutating.
+  case AbstractStorageDecl::Stored:
+    return false;
+
+  // For pure-addressed storage, just consider the addressors.
+  case AbstractStorageDecl::Addressed:
+    return !storage->getAddressor()->isMutating() &&
+           !storage->getMutableAddressor()->isMutating();
+
+  // Otherwise, consider the getter and setter.
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+  case AbstractStorageDecl::Computed:
+    return !storage->getGetter()->isMutating() &&
+           !storage->getSetter()->isMutating();
+  }
+  llvm_unreachable("bad storage kind");
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
@@ -437,25 +437,25 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   if (value->isInvalid())
     return ErrorType::get(Context);
 
-  // Qualify 'var' declarations with an lvalue if the base is a reference or
-  // has lvalue type.  If we are accessing a var member on an rvalue, it is
-  // returned as an rvalue (and the access must be a load).
-  if (auto *VD = dyn_cast<VarDecl>(value))
-    if (doesVarDeclMemberProduceLValue(VD, baseType, UseDC))
-      return LValueType::get(getTypeOfRValue(value, wantInterfaceType));
-
   Type requestedType = getTypeOfRValue(value, wantInterfaceType);
 
-  // Check to see if the subscript-decl produces an lvalue.
-  if (auto *SD = dyn_cast<SubscriptDecl>(value))
-    if (doesSubscriptDeclProduceLValue(SD, baseType, UseDC)) {
+  // Qualify storage declarations with an lvalue when appropriate.
+  // Otherwise, they yield rvalues (and the access must be a load).
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(value)) {
+    if (doesStorageProduceLValue(*this, storage, baseType, UseDC)) {
+      // Vars are simply lvalues of their rvalue type.
+      if (isa<VarDecl>(storage))
+        return LValueType::get(requestedType);
+
       // Subscript decls have function type.  For the purposes of later type
       // checker consumption, model this as returning an lvalue.
+      assert(isa<SubscriptDecl>(storage));
       auto *RFT = requestedType->castTo<FunctionType>();
       return FunctionType::get(RFT->getInput(),
                                LValueType::get(RFT->getResult()),
                                RFT->getExtInfo());
     }
+  }
 
   return requestedType;
 }
