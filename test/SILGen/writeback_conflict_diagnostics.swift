@@ -68,12 +68,12 @@ func testComputedStructWithProperty() {
 var global_array : [[Int]]
 
 func testMultiArray(i : Int, j : Int, var array : [[Int]]) {
-  swap(&array[i][j],  // expected-note  {{concurrent writeback occurred here}}
-       &array[i][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
-  swap(&array[0][j],  // expected-note  {{concurrent writeback occurred here}}
-       &array[0][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
-  swap(&global_array[0][j],   // expected-note  {{concurrent writeback occurred here}}
-       &global_array[0][i])   // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
+  swap(&array[i][j],
+       &array[i][i])
+  swap(&array[0][j],
+       &array[0][i])
+  swap(&global_array[0][j],
+       &global_array[0][i])
   
   // TODO: This is obviously the same writeback problem, but isn't detectable
   // with the current level of sophisitication in SILGen.

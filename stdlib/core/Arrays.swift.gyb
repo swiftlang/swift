@@ -189,22 +189,17 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
       _checkSubscript(index)
       return _getElement(index)
     }
-    set {
-      _makeMutableAndUnique()
-      _checkSubscript(index)
-      _setElement(index, newValue: newValue)
-    }
 %else:
     address {
       _checkSubscript(index)
       return UnsafePointer(_buffer.baseAddress + index)
     }
+%end
     mutableAddress {
       _makeMutableAndUnique()
       _checkSubscript(index)
-      return _buffer.baseAddress + index
+      return _buffer.baseAddress + index;
     }
-%end
   }
 
   /// Return a *generator* over the elements.
