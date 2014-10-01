@@ -15,8 +15,8 @@ protocol ProtocolB {
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolA_Si
 // CHECK:         strong_retain %0
-// CHECK:         [[PROJECTION:%.*]] = project_existential_ref %0
-// CHECK:         apply {{%.*}}([[PROJECTION]])
+// CHECK:         [[PROJECTION:%.*]] = open_existential_ref %0
+// CHECK:         apply {{%.*}}<@opened{{.*}}>([[PROJECTION]])
 // CHECK:         strong_release %0
 func getIntPropExistential(a: ProtocolA) -> Int {
   return a.intProp
@@ -24,8 +24,8 @@ func getIntPropExistential(a: ProtocolA) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21setIntPropExistentialFPS_9ProtocolA_T_
 // CHECK:         strong_retain %0
-// CHECK:         [[PROJECTION:%.*]] = project_existential_ref %0
-// CHECK:         apply {{%.*}}({{%.*}}, [[PROJECTION]])
+// CHECK:         [[PROJECTION:%.*]] = open_existential_ref %0
+// CHECK:         apply {{%.*}}<@opened{{.*}}>({{%.*}}, [[PROJECTION]])
 // CHECK:         strong_release %0
 func setIntPropExistential(a: ProtocolA) {
   a.intProp = 0
@@ -48,7 +48,7 @@ func setIntPropGeneric<T: ProtocolA>(a: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolB_Si
-// CHECK:         [[PROJECTION:%.*]] = project_existential %0
+// CHECK:         [[PROJECTION:%.*]] = open_existential %0
 // CHECK:         apply {{%.*}}([[PROJECTION]])
 // CHECK:         destroy_addr %0
 func getIntPropExistential(a: ProtocolB) -> Int {
@@ -64,8 +64,8 @@ func getIntPropGeneric<T: ProtocolB>(a: T) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolO_Si
 // CHECK:         strong_retain %0
-// CHECK:         [[PROJECTION:%.*]] = project_existential_ref %0
-// CHECK:         apply {{%.*}}([[PROJECTION]])
+// CHECK:         [[PROJECTION:%.*]] = open_existential_ref %0
+// CHECK:         apply {{%.*}}<@opened{{.*}}>([[PROJECTION]])
 // CHECK:         strong_release %0
 // CHECK:         strong_release %0
 func getIntPropExistential(a: ProtocolO) -> Int {
@@ -74,8 +74,8 @@ func getIntPropExistential(a: ProtocolO) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21setIntPropExistentialFPS_9ProtocolO_T_
 // CHECK:         strong_retain %0
-// CHECK:         [[PROJECTION:%.*]] = project_existential_ref %0
-// CHECK:         apply {{%.*}}({{%.*}}, [[PROJECTION]])
+// CHECK:         [[PROJECTION:%.*]] = open_existential_ref %0
+// CHECK:         apply {{%.*}}<@opened{{.*}}>({{%.*}}, [[PROJECTION]])
 // CHECK:         strong_release %0
 // CHECK:         strong_release %0
 func setIntPropExistential(a: ProtocolO) {

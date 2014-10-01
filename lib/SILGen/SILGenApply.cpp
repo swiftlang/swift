@@ -144,6 +144,51 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
+/// Remap all of the 'Self'-related substitutions within the given set of
+/// substitutions to an opened archetype.
+///
+/// TODO: This should be done by the type checker.
+static void remapSelfSubstitutions(SILGenFunction &gen,
+                                   ArrayRef<Substitution> &subs,
+                                   Type newSelfArchetype) {
+  MutableArrayRef<Substitution> replacementBuf;
+  
+  auto copySubstitutions = [&]{
+    if (!replacementBuf.empty())
+      return;
+    replacementBuf = gen.getASTContext().Allocate<Substitution>(subs.size());
+    memcpy(replacementBuf.data(), subs.data(),
+           sizeof(Substitution) * subs.size());
+    subs = replacementBuf;
+  };
+  
+  unsigned i = 0, n = subs.size();
+  for (; i != n; ++i) {
+    auto archetype = subs[i].getArchetype();
+    auto rootArchetype = archetype;
+    while (rootArchetype->getParent())
+      rootArchetype = rootArchetype->getParent();
+    if (!rootArchetype->getSelfProtocol())
+      continue;
+    
+    copySubstitutions();
+    
+    TypeSubstitutionMap map;
+    map[rootArchetype] = newSelfArchetype;
+    
+    auto substType = Type(archetype)
+      .subst(gen.SGM.SwiftModule, map, /*ignoreMissing*/false,
+             nullptr);
+    assert(substType && "could not substitute?!");
+    
+    replacementBuf[i] = Substitution(archetype,
+                                          substType,
+                                          subs[i].getConformances());
+  }
+
+}
+
+
 namespace {
 
 /// Abstractly represents a callee, and knows how to emit the entry point
@@ -1062,49 +1107,6 @@ public:
     return subs.slice(innerIdx);
   }
   
-  /// Remap all of the 'Self'-related substitutions within the given set of
-  /// substitutions to an opened archetype.
-  ///
-  /// TODO: This should be done by the type checker.
-  void remapSelfSubstitutions(ArrayRef<Substitution> &subs,
-                              Type newSelfArchetype) {
-    MutableArrayRef<Substitution> replacementBuf;
-    
-    auto copySubstitutions = [&]{
-      if (!replacementBuf.empty())
-        return;
-      replacementBuf = gen.getASTContext().Allocate<Substitution>(subs.size());
-      memcpy(replacementBuf.data(), subs.data(),
-             sizeof(Substitution) * subs.size());
-      subs = replacementBuf;
-    };
-    
-    unsigned i = 0, n = subs.size();
-    for (; i != n; ++i) {
-      auto archetype = subs[i].getArchetype();
-      auto rootArchetype = archetype;
-      while (rootArchetype->getParent())
-        rootArchetype = rootArchetype->getParent();
-      if (!rootArchetype->getSelfProtocol())
-        continue;
-      
-      copySubstitutions();
-      
-      TypeSubstitutionMap map;
-      map[rootArchetype] = newSelfArchetype;
-      
-      auto substType = Type(archetype)
-        .subst(gen.SGM.SwiftModule, map, /*ignoreMissing*/false,
-               nullptr);
-      assert(substType && "could not substitute?!");
-      
-      replacementBuf[i] = Substitution(archetype,
-                                            substType,
-                                            subs[i].getConformances());
-    }
-
-  }
-
   void visitMemberRefExpr(MemberRefExpr *e) {
     auto *fd = dyn_cast<AbstractFunctionDecl>(e->getMember().getDecl());
 
@@ -1190,7 +1192,7 @@ public:
       }
       
       // Remap substitutions from the protocol type to the opened archetype.
-      remapSelfSubstitutions(subs, baseOpenedTy);
+      remapSelfSubstitutions(gen, subs, baseOpenedTy);
       baseTy = baseOpenedTy;
     }
     
@@ -2891,7 +2893,8 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                            ->castTo<AnyFunctionType>());
 
     // If this is an archetype case, construct an archetype call.
-    if (!selfValue.getSubstType()->getInOutObjectType()->isAnyExistentialType()) {
+    auto selfTy = selfValue.getSubstType()->getInOutObjectType();
+    if (!selfTy->isAnyExistentialType()) {
       SILValue baseVal =
         selfValue.forceAndPeekRValue(gen).peekScalarValue();
     
@@ -2899,40 +2902,38 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                   substAccessorType, loc);
     }
     
-    // If this is a protocol (not archetype) use, project out the underlying
-    // existential.
+    // If this is a protocol (not archetype) use, open the contained type.
     ManagedValue baseVal =
       std::move(selfValue).getAsSingleValue(gen, SGFContext::AllowPlusZero);
     
-    SILType protoSelfTy =
-      gen.getLoweredType(protoDecl->getSelf()->getArchetype());
+    Type openedTy = ArchetypeType::getOpened(selfTy);
+    SILType loweredOpenedTy = gen.getLoweredType(openedTy);
     auto selfLoc = selfValue.getLocation();
 
     ManagedValue projVal;
     if (baseVal.getType().isClassExistentialType()) {
       // Attach the existential cleanup to the projection so that it gets
       // consumed (or not) when the call is applied to it (or isn't).
-      SILValue val = gen.B.createProjectExistentialRef(loc,
-                                                       baseVal.getValue(),
-                                                       protoSelfTy);
+      SILValue val = gen.B.createOpenExistentialRef(loc,
+                                                    baseVal.getValue(),
+                                                    loweredOpenedTy);
       projVal = ManagedValue(val, baseVal.getCleanup());
     } else {
-      assert(protoSelfTy.isAddress() && "Self should be address-only");
-      SILValue val = gen.B.createProjectExistential(selfLoc,
-                                                    baseVal.getValue(),
-                                                    protoSelfTy);
+      assert(loweredOpenedTy.isAddress() && "Self should be address-only");
+      SILValue val = gen.B.createOpenExistential(selfLoc,
+                                                 baseVal.getValue(),
+                                                 loweredOpenedTy);
       projVal = ManagedValue::forUnmanaged(val);
     }
 
     // Update the self value to use the projection.
     selfValue = RValueSource(selfLoc, RValue(gen, selfLoc,
-                                             protoSelfTy.getSwiftType(),
+                                             loweredOpenedTy.getSwiftType(),
                                              projVal));
-    assert(substitutions.size() >= 1);
-    substitutions = substitutions.slice(1);
+    remapSelfSubstitutions(gen, substitutions, openedTy);
     
-    return Callee::forProtocol(gen, baseVal.getValue(), constant,
-                               substAccessorType, loc);
+    return Callee::forArchetype(gen, projVal.getValue(), constant,
+                                substAccessorType, loc);
   }
 
   bool isClassDispatch = false;

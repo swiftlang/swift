@@ -22,9 +22,9 @@ func use_subscript_rvalue_get(i : Int) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_rvalue_get
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols16subscriptableGetPS_16SubscriptableGet_ : $*SubscriptableGet
-// CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*SubscriptableGet to $*@sil_self SubscriptableGet
-// CHECK-NEXT: [[METH:%[0-9]+]] = protocol_method [[GLOB]] : $*SubscriptableGet, #SubscriptableGet.subscript!getter.1
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]](%0, [[PROJ]])
+// CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
+// CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
 // CHECK-NEXT: return [[RESULT]]
 
 func use_subscript_lvalue_get(i : Int) -> Int {
@@ -34,9 +34,9 @@ func use_subscript_lvalue_get(i : Int) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_get
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
-// CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*SubscriptableGetSet to $*@sil_self SubscriptableGetSet
-// CHECK-NEXT: [[METH:%[0-9]+]] = protocol_method [[GLOB]] : $*SubscriptableGetSet, #SubscriptableGetSet.subscript!getter.1
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]](%0, [[PROJ]])
+// CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
+// CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!getter.1
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
 // CHECK-NEXT: return [[RESULT]]
 
 func use_subscript_lvalue_set(i : Int) {
@@ -46,9 +46,9 @@ func use_subscript_lvalue_set(i : Int) {
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_set
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
-// CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*SubscriptableGetSet to $*@sil_self SubscriptableGetSet
-// CHECK-NEXT: [[METH:%[0-9]+]] = protocol_method [[GLOB]] : $*SubscriptableGetSet, #SubscriptableGetSet.subscript!setter.1
-// CHECK-NEXT: apply [[METH]](%0, %0, [[PROJ]])
+// CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
+// CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!setter.1
+// CHECK-NEXT: apply [[METH]]<[[OPENED]]>(%0, %0, [[PROJ]])
 
 
 //===----------------------------------------------------------------------===//
@@ -108,18 +108,18 @@ func use_property_rvalue_get() -> Int {
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_rvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols11propertyGetPS_18PropertyWithGetter_ : $*PropertyWithGetter
-// CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*PropertyWithGetter to $*@sil_self PropertyWithGetter
-// CHECK-NEXT: [[METH:%[0-9]+]] = protocol_method [[GLOB]] : $*PropertyWithGetter, #PropertyWithGetter.a!getter.1
-// CHECK-NEXT: apply [[METH]]([[PROJ]])
+// CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
+// CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
+// CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[PROJ]])
 
 func use_property_lvalue_get() -> Int {
   return propertyGetSet.b
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
-// CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*PropertyWithGetterSetter to $*@sil_self PropertyWithGetterSetter
-// CHECK-NEXT: [[METH:%[0-9]+]] = protocol_method [[GLOB]] : $*PropertyWithGetterSetter, #PropertyWithGetterSetter.b!getter.1
-// CHECK-NEXT: apply [[METH]]([[PROJ]])
+// CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
+// CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetterSetter.b!getter.1
+// CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[PROJ]])
 
 func use_property_lvalue_set(x : Int) {
   propertyGetSet.b = x
@@ -128,9 +128,9 @@ func use_property_lvalue_set(x : Int) {
 // CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_set
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
-// CHECK: [[PROJ:%[0-9]+]] = project_existential [[GLOB]] : $*PropertyWithGetterSetter to $*@sil_self PropertyWithGetterSetter
-// CHECK-NEXT: [[METH:%[0-9]+]] = protocol_method [[GLOB]] : $*PropertyWithGetterSetter, #PropertyWithGetterSetter.b!setter.1
-// CHECK-NEXT: apply [[METH]](%0, [[PROJ]])
+// CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
+// CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetterSetter.b!setter.1
+// CHECK-NEXT: apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
 
 //===----------------------------------------------------------------------===//
 // Calling Archetype Properties
