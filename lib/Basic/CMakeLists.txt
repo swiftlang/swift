@@ -1,3 +1,5 @@
+find_package(UUID REQUIRED)
+
 set(UNICODE_TABLES UnicodeExtendedGraphemeClusters.cpp.gyb)
 
 add_swift_library(swiftBasic
@@ -30,6 +32,9 @@ add_swift_library(swiftBasic
   Default/TaskQueue.inc
 
   ${UNICODE_TABLES}
+
+  COMPILE_FLAGS "-I${UUID_INCLUDE_DIRS}"
+  DEPENDS ${UUID_LIBRARIES}
   )
 
 set(SWIFT_VERSION "1.1")
