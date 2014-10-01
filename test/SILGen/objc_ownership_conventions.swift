@@ -108,7 +108,7 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK:      strong_retain [[G]]
   // CHECK-NEXT: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.classProp!getter.1.foreign : NSObject -> () -> AnyClass! , $@cc(objc_method) @thin (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.classProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@cc(objc_method) @thin (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@cc(objc_method) @thin (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK:      store [[OPT_OBJC]] to [[OPT_OBJC_BUF:%.*]]#1
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
@@ -191,7 +191,7 @@ func useInnerPointer(p: UnsafeMutablePointer<Void>) {}
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions18innerPointerMethod
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
 // CHECK:         strong_retain %0
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.getBytes!1.foreign : Gizmo -> () -> UnsafeMutablePointer<Void> , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.getBytes!1.foreign : Gizmo -> () -> UnsafeMutablePointer<()> , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
 // CHECK:         autorelease_value %0
 // CHECK:         apply [[USE]]([[PTR]])
@@ -203,7 +203,7 @@ func innerPointerMethod(g: Gizmo) {
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions20innerPointerProperty
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
 // CHECK:         strong_retain %0
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : Gizmo -> () -> UnsafeMutablePointer<Void> , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : Gizmo -> () -> UnsafeMutablePointer<()> , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
 // CHECK:         autorelease_value %0
 // CHECK:         apply [[USE]]([[PTR]])

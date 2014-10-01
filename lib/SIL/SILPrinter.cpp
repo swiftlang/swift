@@ -990,14 +990,24 @@ public:
     I->getMember().print(OS);
   }
   
+  void printASTType(swift::Type Ty) {
+    PrintOptions SubPrinter;
+    SubPrinter.PrintForSIL = true;
+    Ty.print(OS, SubPrinter);
+  }
+
   void visitClassMethodInst(ClassMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "class_method");
-    OS << " : " << AMI->getMember().getDecl()->getType() << " , ";
+    OS << " : ";
+    printASTType(AMI->getMember().getDecl()->getType());
+    OS << " , ";
     OS << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "super_method");
-    OS << " : " << AMI->getMember().getDecl()->getType() << " , ";
+    OS << " : ";
+    printASTType(AMI->getMember().getDecl()->getType());
+    OS << " , ";
     OS << AMI->getType();
   }
   void visitWitnessMethodInst(WitnessMethodInst *AMI) {
@@ -1012,12 +1022,16 @@ public:
   }
   void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "protocol_method");
-    OS << " : " << AMI->getMember().getDecl()->getType() << ", ";
+    OS << " : ";
+    printASTType(AMI->getMember().getDecl()->getType());
+    OS << ", ";
     OS << AMI->getType();
   }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {
     printMethodInst(DMI, DMI->getOperand(), "dynamic_method");
-    OS << " : " << DMI->getMember().getDecl()->getType() << ", ";
+    OS << " : ";
+    printASTType(DMI->getMember().getDecl()->getType());
+    OS << ", ";
     OS << DMI->getType();
   }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
