@@ -198,7 +198,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
     mutableAddress {
       _makeMutableAndUnique()
       _checkSubscript(index)
-      return _buffer.baseAddress + index;
+      return _buffer.baseAddress + index
     }
   }
 
