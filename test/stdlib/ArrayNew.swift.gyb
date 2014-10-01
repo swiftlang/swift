@@ -159,9 +159,7 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
   // Mutating through a subscript expression.
   a[0][0] = ${element_type}(1010)
 
-  expectEqual(identityOuter, a.identity)
-  // Should not reallocate storage.
-  expectEqual(identityInner, a[0].identity)
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   a[0][1].value = 1020
 
