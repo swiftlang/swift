@@ -352,7 +352,11 @@ extension ${Self} : ArrayType {
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     _buffer = _Buffer()
-    reserveCapacity(count)
+
+    // Performance optimization: avoid reserveCapacity call if not needed.
+    if count > 0 {
+      reserveCapacity(count)
+    }
     _buffer.count = count
   }
   
