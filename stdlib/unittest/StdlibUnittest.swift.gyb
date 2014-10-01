@@ -203,6 +203,8 @@ public func expectGE(
 
 %end
 
+public func expectType<T>(_: T.Type, inout x: T) {}
+
 public struct AssertionResult : Printable, BooleanType {
   init(isPass: Bool) {
     self._isPass = isPass

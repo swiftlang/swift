@@ -16,8 +16,6 @@ extension String {
   }
 }
 
-func expectType<T>(_: T.Type, inout x: T) {}
-
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
