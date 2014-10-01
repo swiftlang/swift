@@ -16,6 +16,10 @@ add_swift_library(swiftClangImporter
 # Clang dependencies.
 # FIXME: Clang should really export these in some reasonable manner.
 target_link_libraries(swiftClangImporter
+  clangIndex
+  clangFormat
+  clangTooling
+  clangFormat
   clangFrontendTool
   clangFrontend
   clangDriver

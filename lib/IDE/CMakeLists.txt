@@ -8,5 +8,5 @@ add_swift_library(swiftIDE
   Utils.cpp
   DEPENDS
   swiftAST swiftParse swiftSema swiftClangImporter
-  clangIndex clangFormat clangTooling)
+  )
 
