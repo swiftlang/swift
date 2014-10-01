@@ -3462,6 +3462,9 @@ Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
 }
 
 Type ConstraintSystem::getTypeWhenUnavailable(Type declType) {
+  if (!TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
+    return declType;
+  }
   // Drop lvalue-ness and make optional.
   return OptionalType::get(declType->getRValueType());
 }

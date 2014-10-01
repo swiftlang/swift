@@ -928,6 +928,44 @@ bool TypeChecker::isDeclAvailable(Decl *D, SourceLoc referenceLoc,
   return true;
 }
 
+Optional<UnavailabilityReason>
+TypeChecker::checkDeclarationAvailability(ValueDecl *D, SourceLoc referenceLoc,
+                                          DeclContext *referenceDC) {
+  if (!Context.LangOpts.EnableExperimentalAvailabilityChecking) {
+    return Nothing;
+  }
+
+  if (!referenceDC->getParentSourceFile()) {
+    // We only check availability if this reference is in a source file; we do
+    // not check in other kinds of FileUnits.
+    return Nothing;
+  }
+
+  VersionRange safeRangeUnderApprox = VersionRange::empty();
+  if (isDeclAvailable(D, referenceLoc, referenceDC, safeRangeUnderApprox)) {
+    return Nothing;
+  }
+
+  // safeRangeUnderApprox now holds the safe range.
+  return UnavailabilityReason::requiresVersionRange(safeRangeUnderApprox);
+}
+
+void TypeChecker::diagnosePotentialUnavailability(
+    ValueDecl *D, SourceLoc referenceLoc, const UnavailabilityReason &Reason) {
+
+  // We only emit diagnostics for API unavailability, not for explicitly
+  // weak-linked symbols.
+  if (Reason.getReasonKind() !=
+      UnavailabilityReason::Kind::RequiresOSVersionRange) {
+    return;
+  }
+
+  diagnose(referenceLoc, diag::availability_decl_only_version_greater,
+           D->getFullName(),
+           prettyPlatformString(targetPlatform(Context.LangOpts)),
+           Reason.getRequiredOSVersionRange().getLowerEndpoint());
+}
+
 // checkForForbiddenPrefix is for testing purposes.
 
 void TypeChecker::checkForForbiddenPrefix(const Decl *D) {

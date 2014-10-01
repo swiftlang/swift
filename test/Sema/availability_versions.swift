@@ -89,3 +89,12 @@ if #os(OSX >= 10.10) {
   funcAvailableOn10_10()
 }
 
+// Overloaded global functions
+@availability(OSX, introduced=10.9)
+func overloadedFunction() {}
+
+@availability(OSX, introduced=10.10)
+func overloadedFunction(on1010: Int) {}
+
+overloadedFunction()
+overloadedFunction(0) // expected-error {{'overloadedFunction' is only available on OS X version 10.10 or greater}}

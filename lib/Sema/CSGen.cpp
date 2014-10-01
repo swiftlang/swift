@@ -248,37 +248,18 @@ namespace {
 
       auto locator = CS.getConstraintLocator(E);
       
-      LangOptions &langOpts = CS.getASTContext().LangOpts;
-      Optional<UnavailabilityReason> reason;
-      // We only check availability if this reference is in a source file.
-      // We will not check in other kinds of FileUnits.
-      if (langOpts.EnableExperimentalAvailabilityChecking &&
-          CS.DC->getParentSourceFile()) {
-        
-        VersionRange safeRangeUnderApprox = VersionRange::empty();
-        
-        if (!CS.TC.isDeclAvailable(E->getDecl(), E->getLoc(), CS.DC,
-                                  safeRangeUnderApprox)) {
-          if (langOpts.EnableExperimentalUnavailableAsOptional) {
-            // The type system will report the reference as having an optional
-            // type when the reference is resolved.
-            // The diagnostic for when this optional does not type check is
-            // currently not very helpful.
-            // FIXME: When reporting a fix for an optional, we should include
-            // the version range when the declaration is available.
-            reason = UnavailabilityReason::requiresVersionRange(
-                safeRangeUnderApprox);
-          } else {
-            // Diagnose directly.
-            CS.TC.diagnose(E->getLoc(),
-                           diag::availability_decl_only_version_greater,
-                           E->getDecl()->getFullName(),
-                           prettyPlatformString(targetPlatform(langOpts)),
-                           safeRangeUnderApprox.getLowerEndpoint());
-          }
-        }
-      }
-
+      Optional<UnavailabilityReason> reason =
+          CS.TC.checkDeclarationAvailability(E->getDecl(),E->getLoc(), CS.DC);
+      
+      // If reason is not Nothing and EnableExperimentalUnavailableAsOptional
+      // is turned on, the type system will report the reference
+      // as having an optional type when the it is resolved.
+      // The diagnostic for when this optional does not type check is
+      // currently not very helpful.
+      // FIXME: When reporting a fix for an optional, we should include
+      // the version range when the declaration is available.
+      
+      
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
@@ -374,9 +355,14 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
+        // If the overload is potentially unavailable, record the reason
+        // in the overload choice.
+        auto unavailReason =
+            CS.TC.checkDeclarationAvailability(decls[i], expr->getLoc(), CS.DC);
+        
         choices.push_back(OverloadChoice(Type(), decls[i],
                                          expr->isSpecialized(),
-                                         CS));
+                                         CS, unavailReason));
       }
 
       // If there are no valid overloads, give up.

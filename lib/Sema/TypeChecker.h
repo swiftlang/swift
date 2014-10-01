@@ -1139,6 +1139,18 @@ public:
                        DeclContext *referenceDC,
                         VersionRange &OutAvailableRange);
 
+  /// Checks whether a declaration should be considered unavailable when
+  /// referred to at the given location and, if so, returns the reason why the
+  /// declaration is unavailable. Returns Nothing is the declaration is
+  /// definitely available.
+  Optional<UnavailabilityReason>
+  checkDeclarationAvailability(ValueDecl *D, SourceLoc referenceLoc,
+                               DeclContext *referenceDC);
+
+  // Emits a diagnostic, if necessary, for a reference to declaration
+  // that is potentially unavailable at the given source location.
+  void diagnosePotentialUnavailability(ValueDecl *D, SourceLoc referenceLoc,
+                                       const UnavailabilityReason &Reason);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl

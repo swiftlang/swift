@@ -377,6 +377,10 @@ namespace {
     Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
                                          ConstraintLocatorBuilder locator);
 
+    /// \brief Convert an expression that references a potentially unavailable
+    /// declaration to an optional reflecting the potential unavailability.
+    Expr *convertUnavailableToOptional(Expr *expr,
+                                       const UnavailabilityReason &reason);
   public:
     /// \brief Build a reference to the given declaration.
     Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
@@ -1817,23 +1821,17 @@ namespace {
 
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
-      auto newDeclRef = dyn_cast<DeclRefExpr>(buildDeclRef(decl, expr->getLoc(),
-                          selected.openedFullType,
-                          locator, expr->isSpecialized(), expr->isImplicit(),
-                          expr->getAccessSemantics()));
+      Expr *newRef = buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
+                                  locator, expr->isSpecialized(),
+                                  expr->isImplicit(),
+                                  expr->getAccessSemantics());
       
-      if (!choice.isPotentiallyUnavailable()) {
-        return newDeclRef;
+      if (choice.isPotentiallyUnavailable()) {
+        newRef = convertUnavailableToOptional(newRef,
+                                              choice.getReasonUnavailable(cs));
       }
       
-      // If the chosen overload is potentially unavailable, wrap the
-      // declaration reference in an UnavailableToOptionalExpr conversion.
-      Type unavailTy = cs.getTypeWhenUnavailable(selected.openedFullType);
-      
-      UnavailabilityReason reason = choice.getReasonUnavailable(cs);
-      return new (cs.getASTContext()) UnavailableToOptionalExpr(newDeclRef,
-                                                                reason,
-                                                                unavailTy);
+      return newRef;
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -1942,9 +1940,17 @@ namespace {
       auto choice = selected.choice;
       auto decl = choice.getDecl();
 
-      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
-                          locator, expr->isSpecialized(), expr->isImplicit(),
-                          AccessSemantics::Ordinary);
+      Expr *newRef = buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
+                                  locator, expr->isSpecialized(),
+                                  expr->isImplicit(),
+                                  AccessSemantics::Ordinary);
+      
+      if (choice.isPotentiallyUnavailable()) {
+        newRef = convertUnavailableToOptional(newRef,
+                                              choice.getReasonUnavailable(cs));
+      }
+      
+      return newRef;
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
@@ -4419,6 +4425,32 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     literal->setType(type);
   return literal;
 }
+
+Expr *
+ExprRewriter::convertUnavailableToOptional(Expr *expr,
+                                           const UnavailabilityReason &reason) {
+  assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
+
+  // For the moment, we only work with DeclRefExprs. In the future we will
+  // need to support additional reference expressions.
+  DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(expr);
+  assert(declRef);
+
+  if (!cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
+    // If feature is not enabled, do not perform a conversion and instead
+    // diagnose immediately.
+    cs.TC.diagnosePotentialUnavailability(declRef->getDecl(), declRef->getLoc(),
+                                          reason);
+    return expr;
+  }
+
+  // Lift the type to optional.
+  Type unavailTy = cs.getTypeWhenUnavailable(expr->getType());
+
+  return new (cs.getASTContext())
+      UnavailableToOptionalExpr(declRef, reason, unavailTy);
+}
+
 
 /// Determine whether the given type refers to a non-final class (or
 /// dynamic self of one).

@@ -64,3 +64,18 @@ func callFunctions() {
   
   let _: Int? = funcAvailableOn10_10?()
 }
+
+@availability(OSX, introduced=10.9)
+func overloadedFunction() -> Int { return 42 }
+
+@availability(OSX, introduced=10.10)
+func overloadedFunction(on1010: Int) -> Int { return 43 }
+
+func callOverloadedFunctions() {
+  overloadedFunction()
+  overloadedFunction(0) // expected-error {{value of optional type '((Int) -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int = overloadedFunction()
+  let _: Int = overloadedFunction!(0)
+  let _: Int? = overloadedFunction?(0)
+}
