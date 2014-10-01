@@ -341,23 +341,23 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: [[PADDR:%[0-9]+]] = alloc_box $SomeProtocol
   var p : SomeProtocol = ConformsToSomeProtocol()
 
-  // CHECK: [[PVALUE:%[0-9]+]] = project_existential [[PADDR]]
-  // CHECK: [[PMETHOD:%[0-9]+]] = protocol_method [[PADDR]]#1 : {{.*}}, #SomeProtocol.method!1
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential [[PADDR]]#1 : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: apply [[PMETHOD]]([[I]], [[PVALUE]])
+  // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   p.method(i)
 
-  // CHECK: [[PVALUE:%[0-9]+]] = project_existential [[PADDR:%.*]] :
-  // CHECK: [[PMETHOD:%[0-9]+]] = protocol_method [[PADDR]] : {{.*}}, #SomeProtocol.method!1
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: apply [[PMETHOD]]([[I]], [[PVALUE]])
+  // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   var sp : SomeProtocol = ConformsToSomeProtocol()
   sp.method(i)
 
-  // FIXME: [[PMETHOD:%[0-9]+]] = protocol_method [[PMETA:%[0-9]+]] : {{.*}}, #SomeProtocol.static_method!1
+  // FIXME: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED:@opened(.*) SomeProtocol]], #SomeProtocol.static_method!1
   // FIXME: [[I:%[0-9]+]] = load [[IADDR]]
   // FIXME: apply [[PMETHOD]]([[I]], [[PMETA]])
-  // Either this shouldn't type-check, or we need to change the representation of existential metatypes
+  // Needs existential metatypes
   //p.dynamicType.static_method(i)
 
   // -- Use an apply or partial_apply instruction to bind type parameters of a generic.

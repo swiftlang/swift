@@ -19,9 +19,9 @@ func gen<T: Fooable>(foo: T) {
 
 // CHECK-LABEL: sil hidden @_TF15witnesses_class2exFPS_7Fooable_T_
 // CHECK:         strong_retain [[SELF:%.*]] : $
-// CHECK:         [[SELF_PROJ:%.*]] = project_existential_ref [[SELF]]
-// CHECK:         [[METHOD:%.*]] = protocol_method
-// CHECK:         apply [[METHOD]]([[SELF_PROJ]])
+// CHECK:         [[SELF_PROJ:%.*]] = open_existential_ref [[SELF]]
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Fooable]],
+// CHECK:         apply [[METHOD]]<[[OPENED]]>([[SELF_PROJ]])
 // CHECK:         return
 func ex(foo: Fooable) {
   foo.foo()

@@ -1061,6 +1061,49 @@ public:
 
     return subs.slice(innerIdx);
   }
+  
+  /// Remap all of the 'Self'-related substitutions within the given set of
+  /// substitutions to an opened archetype.
+  ///
+  /// TODO: This should be done by the type checker.
+  void remapSelfSubstitutions(ArrayRef<Substitution> &subs,
+                              Type newSelfArchetype) {
+    MutableArrayRef<Substitution> replacementBuf;
+    
+    auto copySubstitutions = [&]{
+      if (!replacementBuf.empty())
+        return;
+      replacementBuf = gen.getASTContext().Allocate<Substitution>(subs.size());
+      memcpy(replacementBuf.data(), subs.data(),
+             sizeof(Substitution) * subs.size());
+      subs = replacementBuf;
+    };
+    
+    unsigned i = 0, n = subs.size();
+    for (; i != n; ++i) {
+      auto archetype = subs[i].getArchetype();
+      auto rootArchetype = archetype;
+      while (rootArchetype->getParent())
+        rootArchetype = rootArchetype->getParent();
+      if (!rootArchetype->getSelfProtocol())
+        continue;
+      
+      copySubstitutions();
+      
+      TypeSubstitutionMap map;
+      map[rootArchetype] = newSelfArchetype;
+      
+      auto substType = Type(archetype)
+        .subst(gen.SGM.SwiftModule, map, /*ignoreMissing*/false,
+               nullptr);
+      assert(substType && "could not substitute?!");
+      
+      replacementBuf[i] = Substitution(archetype,
+                                            substType,
+                                            subs[i].getConformances());
+    }
+
+  }
 
   void visitMemberRefExpr(MemberRefExpr *e) {
     auto *fd = dyn_cast<AbstractFunctionDecl>(e->getMember().getDecl());
@@ -1096,6 +1139,8 @@ public:
 
     auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
 
+    ArrayRef<Substitution> subs = e->getMember().getSubstitutions();
+    
     // Figure out the kind of declaration reference we're working with.
     SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
     if (isa<ConstructorDecl>(fd)) {
@@ -1112,72 +1157,72 @@ public:
       }
     }
 
-    if (!baseTy->isExistentialType()) {
-      // If we're calling a non-class-constrained protocol member through a
-      // refinement of the protocol that is class-constrained, then we have to
-      // materialize the value in order to pass it indirectly.
-      if (fd->isInstanceMember()
-          && !proto->requiresClass()
-          && !baseVal.getType().isAddress()) {
-        auto temp = gen.emitTemporaryAllocation(e, baseVal.getType());
-        gen.B.createStore(e, baseVal.getValue(), temp);
-        baseVal = ManagedValue(temp, baseVal.getCleanup());
+    // Open existential types to get at the value and witnesses inside.
+    //
+    // FIXME: The AST could do this for us better.
+    if (baseTy->isExistentialType()) {
+      // TODO: Existential type methods ideally wouldn't be a special case.
+      if (!fd->isInstanceMember()) {
+        assert(baseVal.getType().is<ExistentialMetatypeType>() &&
+               "non-existential-metatype for existential static method?!");
+        // FIXME: It is impossible to invoke a class method on a protocol
+        // directly, it must be done through an archetype.
+        setSelfParam(RValue(gen, e, baseVal.getType().getSwiftRValueType(),
+                            baseVal), e);
+        goto did_set_self_param;
       }
-
-      setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
-                          baseVal), e);
       
-    } else if (fd->isInstanceMember()) {
+      CanType baseOpenedTy = ArchetypeType::getOpened(baseTy)
+        ->getCanonicalType();
+      SILType loweredOpenedTy = gen.getLoweredType(baseOpenedTy);
+      
       // Attach the existential cleanup to the projection so that it gets
       // consumed (or not) when the call is applied to it (or isn't).
-      ManagedValue proj;
-      SILType protoSelfTy
-        = gen.getLoweredType(proto->getSelf()->getArchetype());
       if (baseVal.getType().isClassExistentialType()) {
-        SILValue val = gen.B.createProjectExistentialRef(e,
-                                           baseVal.getValue(), protoSelfTy);
-        proj = ManagedValue(val, baseVal.getCleanup());
+        SILValue val = gen.B.createOpenExistentialRef(e,
+                                          baseVal.getValue(), loweredOpenedTy);
+        baseVal = ManagedValue(val, baseVal.getCleanup());
       } else {
-        assert(protoSelfTy.isAddress() && "Self should be address-only");
-        SILValue val = gen.B.createProjectExistential(e, baseVal.getValue(),
-                                                      protoSelfTy);
-        proj = ManagedValue::forUnmanaged(val);
+        assert(loweredOpenedTy.isAddress() && "Self should be address-only");
+        SILValue val = gen.B.createOpenExistential(e, baseVal.getValue(),
+                                                   loweredOpenedTy);
+        baseVal = ManagedValue::forUnmanaged(val);
       }
-
-      setSelfParam(RValue(gen, e, protoSelfTy.getSwiftType(), proj), e);
-    } else {
-      assert(baseVal.getType().is<ExistentialMetatypeType>() &&
-             "non-existential-metatype for existential static method?!");
-      // FIXME: It is impossible to invoke a class method on a protocol
-      // directly, it must be done through an archetype.
-      setSelfParam(RValue(gen, e, baseVal.getType().getSwiftRValueType(),
-                          baseVal), e);
+      
+      // Remap substitutions from the protocol type to the opened archetype.
+      remapSelfSubstitutions(subs, baseOpenedTy);
+      baseTy = baseOpenedTy;
+    }
+    
+    // If we're calling a non-class-constrained protocol member through a
+    // refinement of the protocol that is class-constrained, then we have to
+    // materialize the value in order to pass it indirectly.
+    if (fd->isInstanceMember()
+        && !proto->requiresClass()
+        && !baseVal.getType().isAddress()) {
+      auto temp = gen.emitTemporaryAllocation(e, baseVal.getType());
+      gen.B.createStore(e, baseVal.getValue(), temp);
+      baseVal = ManagedValue(temp, baseVal.getCleanup());
     }
 
+    setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
+                        baseVal), e);
+    
+  did_set_self_param:
     // Method calls through ObjC protocols require ObjC dispatch.
     bool isObjC = proto->isObjC();
     
-    ArrayRef<Substitution> subs = e->getMember().getSubstitutions();
-
-    if (!baseTy->getRValueInstanceType()->isExistentialType()) {
-      setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
-                                     SILDeclRef(fd, kind).asForeign(isObjC),
-                                     getSubstFnType(), e));
-
-    } else {
-      // The declaration is always specialized (due to Self); ignore the
-      // substitutions related to Self. Skip the substitutions involving Self.
-      subs = getNonSelfSubstitutions(subs);
-
-      setCallee(Callee::forProtocol(gen, baseVal.getValue(),
-                                    SILDeclRef(fd, kind).asForeign(isObjC),
-                                    getSubstFnType(), e));
-    }
+    assert(!baseTy->getRValueInstanceType()->isExistentialType()
+           && "did not open existential type?!");
+    setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
+                                   SILDeclRef(fd, kind).asForeign(isObjC),
+                                   getSubstFnType(), e));
 
     // If there are substitutions, add them now.
     if (!subs.empty()) {
       callee->setSubstitutions(gen, e, subs, callDepth);
     }
+    
   }
 
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {

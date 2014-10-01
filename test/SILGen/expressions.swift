@@ -320,8 +320,8 @@ func archetype_member_ref<T : Runcible>(var x: T) {
 // CHECK-LABEL: sil hidden @_TF11expressions22existential_member_ref
 func existential_member_ref(x: Mincible) {
   x.free_method()
-  // CHECK: project_existential
-  // CHECK-NEXT: protocol_method
+  // CHECK: open_existential
+  // CHECK-NEXT: witness_method
   // CHECK-NEXT: apply
 }
 

@@ -10,7 +10,7 @@ import def_objc
 
 // SIL: sil hidden @_TF4objc9testProtoFT3objP8def_objc9ObjCProto__T_ : $@thin (@owned ObjCProto) -> () {
 func testProto(#obj: ObjCProto) {
-  // SIL: = protocol_method [volatile] %{{.+}} : $ObjCProto, #ObjCProto.doSomething!1.foreign
+  // SIL: = witness_method [volatile] $@opened({{.*}}) ObjCProto, #ObjCProto.doSomething!1.foreign
   obj.doSomething()
 }
 

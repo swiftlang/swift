@@ -42,15 +42,15 @@ func objc_generic<T : NSRuncing>(x: T) -> (NSObject, NSObject) {
 func objc_protocol(x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
   // -- Result of runce is retain_autoreleased according to default objc conv
-  // CHECK: [[THIS1:%.*]] = project_existential_ref [[THIS1_ORIG:%.*]] :
-  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS1_ORIG]] : {{.*}}, #NSRuncing.runce!1.foreign
-  // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]([[THIS1]]) : $@cc(objc_method) @thin (@sil_self NSRuncing) -> @autoreleased NSObject
+  // CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS1_ORIG:%.*]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
+  // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSRuncing.runce!1.foreign
+  // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<[[OPENED]]>([[THIS1]])
   // CHECK: retain_autoreleased [[RESULT1]] : $NSObject
 
   // -- Result of copyRuncing is received retained according to -copy family
-  // CHECK: [[THIS2:%.*]] = project_existential_ref [[THIS2_ORIG:%.*]] :
-  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS2_ORIG]] : {{.*}}, #NSRuncing.copyRuncing!1.foreign
-  // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]([[THIS2:%.*]]) : $@cc(objc_method) @thin (@sil_self NSRuncing) -> @owned NSObject
+  // CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS2_ORIG:%.*]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
+  // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED2]], #NSRuncing.copyRuncing!1.foreign
+  // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<[[OPENED2]]>([[THIS2:%.*]])
   // CHECK-NOT: retain_autoreleased
 
   // -- Arguments are not consumed by objc calls
@@ -59,14 +59,14 @@ func objc_protocol(x: NSRuncing) -> (NSObject, NSObject) {
 
 // CHECK-LABEL: sil hidden  @_TF14objc_protocols25objc_protocol_composition
 func objc_protocol_composition(x: protocol<NSRuncing, NSFunging>) {
-  // CHECK: [[THIS:%.*]] = project_existential_ref [[THIS_ORIG:%.*]] : $protocol<NSFunging, NSRuncing>
-  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS_ORIG]] : {{.*}}, #NSRuncing.runce!1.foreign
-  // CHECK: apply [[METHOD]]([[THIS]]) : $@cc(objc_method) @thin (@sil_self NSRuncing) -> @autoreleased NSObject
+  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $protocol<NSFunging, NSRuncing> to $[[OPENED:@opened(.*) protocol<NSFunging, NSRuncing>]]
+  // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSRuncing.runce!1.foreign
+  // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])
   x.runce()
 
-  // CHECK: [[THIS:%.*]] = project_existential_ref [[THIS_ORIG:%.*]] : $protocol<NSFunging, NSRuncing>
-  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS_ORIG]] : {{.*}}, #NSFunging.funge!1.foreign
-  // CHECK: apply [[METHOD]]([[THIS]]) : $@cc(objc_method) @thin (@sil_self NSFunging) -> ()
+  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $protocol<NSFunging, NSRuncing> to $[[OPENED:@opened(.*) protocol<NSFunging, NSRuncing>]]
+  // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSFunging.funge!1.foreign
+  // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])
   x.funge()
 }
 // -- ObjC thunks get emitted for ObjC protocol conformances

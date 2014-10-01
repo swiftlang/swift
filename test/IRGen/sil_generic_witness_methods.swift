@@ -39,19 +39,19 @@ func call_methods<T: P, U>(x: T, y: S, z: U) {
 func call_existential_methods(var x: P, var y: S) {
   // CHECK: [[X:%.*]] = alloca %P27sil_generic_witness_methods1P_, align 8
   // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_* [[X]], i32 0, i32 2
-  // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_* [[X]], i32 0, i32 2
-  // CHECK: [[WTABLE:%.*]] = load i8*** [[WTABLE_ADDR]], align 8
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_* [[X]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type** [[METADATA_ADDR]], align 8
+  // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_* [[X]], i32 0, i32 2
+  // CHECK: [[WTABLE:%.*]] = load i8*** [[WTABLE_ADDR]], align 8
   // CHECK: [[CONCRETE_METHOD_PTR:%.*]] = load i8** [[WTABLE]], align 8
   // CHECK: [[CONCRETE_METHOD:%.*]] = bitcast i8* [[CONCRETE_METHOD_PTR]] to void (%swift.opaque*, %swift.type*)*
   // CHECK: call void [[CONCRETE_METHOD]](%swift.opaque* {{%.*}}, %swift.type* [[METADATA]])
   x.concrete_method()
 
-  // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_* [[X:%.*]], i32 0, i32 2
-  // CHECK: [[WTABLE:%.*]] = load i8*** [[WTABLE_ADDR]], align 8
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_* [[X]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type** [[METADATA_ADDR]], align 8
+  // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_* [[X:%.*]], i32 0, i32 2
+  // CHECK: [[WTABLE:%.*]] = load i8*** [[WTABLE_ADDR]], align 8
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8** [[WTABLE]], i32 2
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8** [[GENERIC_METHOD_ADDR]], align 8
   // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, %swift.type*)*
