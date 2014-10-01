@@ -3346,9 +3346,9 @@ retry:
   // For a metatype, perform a construction.
   if (auto meta2 = dyn_cast<AnyMetatypeType>(desugar2)) {
     // Construct the instance from the input arguments.
-    addConstraint(ConstraintKind::Construction, func1, meta2->getInstanceType(),
-                  getConstraintLocator(outerLocator));
-    return SolutionKind::Solved;
+    return simplifyConstructionConstraint(meta2->getInstanceType(), func1,
+                                          flags, 
+                                          getConstraintLocator(outerLocator));
   }
 
   // If we're coming from an optional type, unwrap the optional and try again.
@@ -3421,9 +3421,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
 
   case ConstraintKind::BindOverload:
     llvm_unreachable("Overload binding constraints don't involve type matches");
-
-  case ConstraintKind::Construction:
-    llvm_unreachable("Construction constraints don't involve type matches");
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -4155,13 +4152,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
                     constraint.getOverloadChoice());
     return SolutionKind::Solved;
-
-  case ConstraintKind::Construction:
-    return simplifyConstructionConstraint(constraint.getSecondType(),
-                                          constraint.getFirstType()
-                                            ->castTo<FunctionType>(),
-                                          TMF_None,
-                                          constraint.getLocator());
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:

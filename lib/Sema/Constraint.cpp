@@ -53,7 +53,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::Construction:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -151,7 +150,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::Construction:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
@@ -231,7 +229,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::ArgumentTupleConversion: Out << " <ac "; break;
   case ConstraintKind::OperatorArgumentTupleConversion: Out << " <oac "; break;
   case ConstraintKind::OperatorArgumentConversion: Out << " <oc "; break;
-  case ConstraintKind::Construction: Out << " <C "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
   case ConstraintKind::CheckedCast: Out << " checked cast to "; break;
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
@@ -480,7 +477,6 @@ gatherReferencedTypeVars(Constraint *constraint,
 
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::Bind:
-  case ConstraintKind::Construction:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentTupleConversion:

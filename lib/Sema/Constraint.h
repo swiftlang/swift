@@ -67,11 +67,6 @@ enum class ConstraintKind : char {
   OperatorArgumentTupleConversion,
   /// \brief The first type is convertible to the second type, including inout.
   OperatorArgumentConversion,
-  /// \brief The first type is a function that whose input type is an
-  /// input to an initializer and whose result type is the result type
-  /// of that initialization, and the second type is the type being
-  /// constructed.
-  Construction,
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
@@ -496,7 +491,6 @@ public:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
-    case ConstraintKind::Construction:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:

@@ -604,26 +604,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // than the default.
       break;
 
-    case ConstraintKind::Construction:
-      // Can't infer anything from a construction constraint.
-      if (result.InvolvesTypeVariables)
-        continue;
-
-      // Check whether the left-hand side involves any other type variables.
-      // FIXME: Can we avoid simplification here?
-      typeVarOccursInType(cs, typeVar, 
-                          cs.simplifyType(constraint->getFirstType()),
-                          result.InvolvesTypeVariables);
-      if (result.InvolvesTypeVariables)
-        continue;
-
-      // Check whether the right-hand side involves any other type variables.
-      // FIXME: Can we avoid simplification here?
-      typeVarOccursInType(cs, typeVar, 
-                          cs.simplifyType(constraint->getSecondType()),
-                          result.InvolvesTypeVariables);
-      continue;
-
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Archetype:
     case ConstraintKind::Class:
