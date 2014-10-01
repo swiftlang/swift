@@ -90,6 +90,23 @@ static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
   return Array;
 }
 
+/// Check whether the store is to the address obtained from a getElementAddress
+/// semantic call.
+///  %40 = function_ref @getElementAddress
+///  %42 = apply %40(%28, %37)
+///  %43 = struct_extract %42
+///  %44 = pointer_to_address %43
+///  store %1 to %44 : $*Int
+static bool isArrayEltStore(StoreInst *SI) {
+  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(SI->getDest()))
+    if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
+      ArraySemanticsCall Call(SEI->getOperand().getDef());
+      if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
+        return true;
+    }
+  return false;
+}
+
 /// Determines the kind of array bounds effect the instruction can have.
 static ArrayBoundsEffect mayChangeArraySize(SILInstruction *I,
                                             ArrayCallKind &Kind,
@@ -125,8 +142,9 @@ static ArrayBoundsEffect mayChangeArraySize(SILInstruction *I,
   // stored in a runtime allocated object sub field of an alloca.
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     auto Ptr = SI->getDest();
-    return isa<AllocStackInst>(Ptr.getDef()) ? ArrayBoundsEffect::kNone
-                                             : ArrayBoundsEffect::kMayChangeAny;
+    return isa<AllocStackInst>(Ptr.getDef()) || isArrayEltStore(SI)
+               ? ArrayBoundsEffect::kNone
+               : ArrayBoundsEffect::kMayChangeAny;
   }
 
   return ArrayBoundsEffect::kMayChangeAny;

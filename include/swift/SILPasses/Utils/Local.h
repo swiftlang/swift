@@ -102,6 +102,7 @@ namespace swift {
     kGetCount,
     kGetCapacity,
     kGetElement,
+    kGetElementAddress,
     kMakeMutable,
     kSetElement,
     kMutateUnknown,

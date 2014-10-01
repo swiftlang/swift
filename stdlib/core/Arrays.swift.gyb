@@ -198,7 +198,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
     mutableAddress {
       _makeMutableAndUnique()
       _checkSubscript(index)
-      return _buffer.baseAddress + index
+      return _getElementAddress(index)
     }
   }
 
@@ -278,6 +278,11 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
     index: Int, newValue: Element
   ) {
     _buffer[index] = newValue
+  }
+
+  @semantics("array.get_element_address")
+  func _getElementAddress(index: Int) -> UnsafeMutablePointer<Element> {
+    return _buffer.baseAddress + index
   }
 
   public

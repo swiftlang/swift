@@ -14,6 +14,10 @@ struct ArrayInt{
   var buffer : ArrayIntBuffer
 }
 
+struct UnsafeMutablePointerInt {
+  var _rawValue : Builtin.RawPointer
+}
+
 // CHECK-LABEL: sil @abcopt_singleblock
 sil @abcopt_singleblock : $@thin(@inout ArrayInt, @inout ArrayInt) -> () {
 bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
@@ -496,6 +500,13 @@ bb4:
   %19 = integer_literal $Builtin.Int1, -1
   %20 = apply %18(%4, %10, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+
+  %40 = function_ref @getElementAddr : $@cc(method) @thin (Int, @owned ArrayInt) -> UnsafeMutablePointerInt
+  retain_value %55 : $Builtin.NativeObject
+  %42 = apply %40(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> UnsafeMutablePointerInt
+  %43 = struct_extract %42 : $UnsafeMutablePointerInt, #UnsafeMutablePointerInt._rawValue
+  %44 = pointer_to_address %43 : $Builtin.RawPointer to $*Int // user: %45
+  store %0 to %44 : $*Int
   br bb1(%21 : $Builtin.Word)
 
 bb3:
@@ -629,6 +640,10 @@ sil public_external [semantics "array.set_element"] @set : $@cc(method) @thin (I
     unreachable
 }
 
+sil public_external [semantics "array.get_element_address"] @getElementAddr : $@cc(method) @thin (Int, @owned ArrayInt) -> UnsafeMutablePointerInt {
+  bb0(%0: $Int, %1: $ArrayInt):
+    unreachable
+}
 
 sil @unknown_func : $@thin () -> () {
   bb0:
