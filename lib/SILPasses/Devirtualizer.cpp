@@ -862,6 +862,18 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   SILValue ClassInstance = CMI->getOperand();
   ClassDecl *CD = SubClassTy.getClassOrBoundGenericClass();
 
+  // If method implementation for a SubClassTy is not known,
+  // bail out early as we won't be able to devirtualize it.
+  // This may happen e.g in case of a -primary-file
+  // compilations, where information about methods implemented
+  // in other files is unavailable.
+  // Early exit guarantees that we do not create two
+  // basic blocks which both perform virtual calls of a method.
+  auto &Mod = AI->getModule();
+  auto *Method = Mod.lookUpSILFunctionFromVTable(CD, CMI->getMember());
+  if (!Method)
+    return nullptr;
+
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
   // This cast selects between two paths: one that calls the slow dynamic
