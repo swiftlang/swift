@@ -114,7 +114,21 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   */
 }
 
+ArrayTestSuite.test("${array_type}/emptyAllocation") {
+
+	// Test if an empty array does not allocate a buffer
+	let arr = ${array_type}<TestValueTy>(count: 0, repeatedValue: TestValueTy(0))
+	expectEqual(0, arr._buffer.identity)
+}
+
 % end
+
+ArrayTestSuite.test("Array/emptyLiteral") {
+
+	// Test if an empty array literal does not allocate a buffer
+	let arr : [TestValueTy] = []
+	expectEqual(0, arr._buffer.identity)
+}
 
 //===----------------------------------------------------------------------===//
 // COW tests
