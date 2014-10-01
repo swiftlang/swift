@@ -73,80 +73,6 @@ static void addPrimaryInputsOfType(ArgStringList &Arguments, const Job *J,
   }
 }
 
-// FIXME: This should use the logic in clang::driver::Clang::ConstructJob.
-static void configureDefaultCPU(const llvm::Triple &triple,
-                                ArgStringList &args) {
-  switch (triple.getArch()) {
-  case llvm::Triple::aarch64:
-  case llvm::Triple::aarch64_be:
-    if (!triple.isOSDarwin())
-      return;
-    args.push_back("-target-cpu");
-    args.push_back("cyclone");
-    args.push_back("-target-feature");
-    args.push_back("+neon");
-    break;
-
-  case llvm::Triple::arm:
-  case llvm::Triple::armeb:
-  case llvm::Triple::thumb:
-  case llvm::Triple::thumbeb:
-    if (auto CPUStr = triple.getARMCPUForArch()) {
-      args.push_back("-target-cpu");
-      args.push_back(CPUStr);
-    }
-    break;
-
-  case llvm::Triple::x86:
-  case llvm::Triple::x86_64:
-    if (triple.isOSDarwin()) {
-      args.push_back("-target-cpu");
-      if (triple.getArchName() == "x86_64h") {
-        args.push_back("core-avx2");
-        args.push_back("-target-feature");
-        args.push_back("-rdrnd,-aes,-pclmul,-rtm,-hle,-fsgsbase");
-      } else {
-        bool is64Bit = (triple.getArch() == llvm::Triple::x86_64);
-        args.push_back(is64Bit ? "core2" : "yonah");
-      }
-    }
-    break;
-  default:
-    break;
-  }
-}
-
-// Configure the ABI default
-static void configureDefaultABI(const llvm::Triple &triple,
-                                ArgStringList &args) {
-  if (!triple.isOSDarwin())
-    return;
-
-  const char *ABIName = nullptr;
-
-  switch (triple.getArch()) {
-  case llvm::Triple::aarch64:
-    ABIName = "darwinpcs";
-    break;
-  case llvm::Triple::arm:
-  case llvm::Triple::armeb:
-  case llvm::Triple::thumb:
-  case llvm::Triple::thumbeb:
-    // FIXME: We should use aapcs for M-class processors, EABI,
-    //        etc. See Clang's driver. For current targets we just
-    //        need to support apcs-gnu.
-    ABIName = "apcs-gnu";
-    break;
-  default:
-    // We do not need to specify a -target-abi for other architectures
-    // we currently care about.
-    return;
-  }
-
-  args.push_back("-target-abi");
-  args.push_back(ABIName);
-}
-
 /// Handle arguments common to all invocations of the frontend (compilation,
 /// module-merging, LLDB's REPL, etc).
 static void addCommonFrontendArgs(const ToolChain &TC,
@@ -168,12 +94,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   // Handle the CPU and its preferences.
   if (auto arg = inputArgs.getLastArg(options::OPT_target_cpu))
     arg->render(inputArgs, arguments);
-  else
-    configureDefaultCPU(Triple, arguments);
-  inputArgs.AddAllArgs(arguments, options::OPT_target_feature);
-
-  // Default the ABI based on the triple.
-  configureDefaultABI(Triple, arguments);
 
   if (!OI.SDKPath.empty()) {
     arguments.push_back("-sdk");

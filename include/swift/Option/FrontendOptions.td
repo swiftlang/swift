@@ -18,9 +18,6 @@ let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
 
-def target_abi : Separate<["-"], "target-abi">,
-  HelpText<"Target a particular ABI">;
-
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   HelpText<"Print diagnostics in color">;
 

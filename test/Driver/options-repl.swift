@@ -17,7 +17,7 @@
 
 // LLDB: lldb{{"?}} "--repl=
 // LLDB-NOT: -module-name
-// LLDB: -target {{[^ ]+}}
+// LLDB: -target {{[^ "]+}}
 // LLDB-NOT: -module-name
 // LLDB: "
 

@@ -339,9 +339,5 @@ def target_legacy_spelling : Joined<["--"], "target=">,
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption]>,
   HelpText<"Generate code for a particular CPU variant">;
-def target_feature : Separate<["-"], "target-feature">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Generate code with a particular CPU feature enabled or disabled">,
-  MetaVarName<"[+-]<feature-name>">;
 
 include "FrontendOptions.td"

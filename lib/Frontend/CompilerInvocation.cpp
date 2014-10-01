@@ -668,6 +668,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ModuleCachePath = A->getValue();
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_target_cpu))
+    Opts.TargetCPU = A->getValue();
+
   for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
                                  Args.filtered_end())) {
     Opts.ExtraArgs.push_back(A->getValue());
@@ -904,16 +907,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
 
     Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_target_cpu))
-    Opts.TargetCPU = A->getValue();
-  if (const Arg *A = Args.getLastArg(OPT_target_abi))
-    Opts.TargetABI = A->getValue();
-
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_target_feature),
-                                 Args.filtered_end())) {
-    Opts.TargetFeatures.push_back(A->getValue());
   }
 
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);

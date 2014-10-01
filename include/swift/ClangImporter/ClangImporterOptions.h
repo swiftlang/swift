@@ -30,6 +30,11 @@ public:
   /// A directory for overriding Clang's resource directory.
   std::string OverrideResourceDir;
 
+  /// The target CPU to compile for.
+  ///
+  /// Equivalent to Clang's -mcpu=.
+  std::string TargetCPU;
+
   /// If true, matched getter-like and setter-like methods will be imported as
   /// properties.
   bool InferImplicitProperties = false;

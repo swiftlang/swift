@@ -51,10 +51,6 @@ public:
   std::string Triple;
   // The command line string that is to be stored in the DWARF debug info.
   std::string DWARFDebugFlags;
-  // The CPU and features.
-  std::string TargetCPU;
-  std::vector<std::string> TargetFeatures;
-  std::string TargetABI;
 
   /// The libraries and frameworks specified on the command line.
   SmallVector<LinkLibrary, 4> LinkLibraries;

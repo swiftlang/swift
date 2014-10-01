@@ -218,8 +218,6 @@ ClangImporter::create(ASTContext &ctx,
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
     "-fsyntax-only", "-w", "-femit-all-decls",
     "-target", irGenOpts.Triple,
-//    "-target-cpu", irGenOpts.TargetCPU,
-//    "-target-abi", irGenOpts.TargetABI,
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
     "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
@@ -258,6 +256,18 @@ ClangImporter::create(ASTContext &ctx,
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
     invocationArgStrs.push_back("-fapplication-extension");
+  }
+
+  if (!importerOpts.TargetCPU.empty()) {
+    invocationArgStrs.push_back("-mcpu=" + importerOpts.TargetCPU);
+
+  } else if (triple.isOSDarwin()) {
+    // Special case: arm64 defaults to the "cyclone" CPU for Darwin,
+    // but Clang only detects this if we use -arch.
+    if (triple.getArch() == llvm::Triple::aarch64 ||
+        triple.getArch() == llvm::Triple::aarch64_be) {
+      invocationArgStrs.push_back("-mcpu=cyclone");
+    }
   }
 
   if (searchPathOpts.SDKPath.empty()) {
@@ -310,11 +320,6 @@ ClangImporter::create(ASTContext &ctx,
   } else {
     invocationArgStrs.push_back("-resource-dir");
     invocationArgStrs.push_back(overrideResourceDir);
-  }
-
-  for (auto &feature : irGenOpts.TargetFeatures) {
-    invocationArgStrs.push_back("-target-feature");
-    invocationArgStrs.push_back(feature);
   }
 
   for (auto extraArg : importerOpts.ExtraArgs) {

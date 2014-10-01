@@ -23,6 +23,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/LLVMPasses/PassesFwd.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/IR/DataLayout.h"
@@ -93,25 +94,29 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   CodeGenOpt::Level OptLevel = Opts.Optimize ? CodeGenOpt::Aggressive
                                              : CodeGenOpt::None;
 
+  auto *Clang = static_cast<ClangImporter *>(M->Ctx.getClangModuleLoader());
+  clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
+
   // Set up TargetOptions.
   // Things that maybe we should collect from the command line:
   //   - relocation model
   //   - code model
+  // FIXME: We should do this entirely through Clang, for consistency.
   TargetOptions TargetOpts;
   TargetOpts.NoFramePointerElim = Opts.DisableFPElim;
 
   // Create the target features string.
   std::string targetFeatures;
-  if (!Opts.TargetFeatures.empty()) {
+  if (!ClangOpts.Features.empty()) {
     llvm::SubtargetFeatures features;
-    for (std::string &feature : Opts.TargetFeatures)
+    for (std::string &feature : ClangOpts.Features)
       features.AddFeature(feature);
     targetFeatures = features.getString();
   }
 
   // Create a target machine.
   llvm::TargetMachine *TargetMachine
-    = Target->createTargetMachine(Opts.Triple, Opts.TargetCPU,
+    = Target->createTargetMachine(Opts.Triple, ClangOpts.CPU,
                                   std::move(targetFeatures),
                                   TargetOpts, Reloc::PIC_,
                                   CodeModel::Default, OptLevel);
