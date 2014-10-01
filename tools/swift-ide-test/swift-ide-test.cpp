@@ -1775,10 +1775,11 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
+
   // FIXME: Arggh, we need to get rid of this thing.
-  Invocation.getClangImporterOptions().ExtraArgs = {
-    "-detailed-preprocessing-record"
-  };
+  ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
+  ImporterOpts.ExtraArgs.push_back("-Xclang");
+  ImporterOpts.ExtraArgs.push_back("-detailed-preprocessing-record");
 
   CompilerInstance CI;
   // Display diagnostics to stderr.

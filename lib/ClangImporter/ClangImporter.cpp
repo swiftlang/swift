@@ -27,6 +27,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
@@ -37,6 +38,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/Utils.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Parse/Parser.h"
@@ -215,8 +217,9 @@ ClangImporter::create(ASTContext &ctx,
   std::vector<std::string> invocationArgStrs = {
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
     "-fsyntax-only", "-w", "-femit-all-decls",
-    "-triple", irGenOpts.Triple, "-target-cpu", irGenOpts.TargetCPU,
-    "-target-abi", irGenOpts.TargetABI,
+    "-target", irGenOpts.Triple,
+//    "-target-cpu", irGenOpts.TargetCPU,
+//    "-target-abi", irGenOpts.TargetABI,
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
     "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
@@ -234,19 +237,23 @@ ClangImporter::create(ASTContext &ctx,
   };
 
   if (triple.isOSDarwin()) {
-    std::string runtimeArgBuf{"-fobjc-runtime="};
-    llvm::raw_string_ostream runtimeArg{runtimeArgBuf};
+    std::string minVersionBuf;
+    llvm::raw_string_ostream minVersionOpt{minVersionBuf};
     unsigned major, minor, micro;
     if (triple.isiOS()) {
-      runtimeArg << "ios";
+      if (swift::tripleIsiOSSimulator(triple))
+        minVersionOpt << "-mios-simulator-version-min=";
+      else
+        minVersionOpt << "-mios-version-min=";
+
       triple.getiOSVersion(major, minor, micro);
     } else {
       assert(triple.isMacOSX());
-      runtimeArg << "macosx";
+      minVersionOpt << "-mmacosx-version-min=";
       triple.getMacOSXVersion(major, minor, micro);
     }
-    runtimeArg << '-' << clang::VersionTuple(major, minor, micro);
-    invocationArgStrs.push_back(std::move(runtimeArg.str()));
+    minVersionOpt << clang::VersionTuple(major, minor, micro);
+    invocationArgStrs.push_back(std::move(minVersionOpt.str()));
   }
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
@@ -254,6 +261,7 @@ ClangImporter::create(ASTContext &ctx,
   }
 
   if (searchPathOpts.SDKPath.empty()) {
+    invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
   } else {
     invocationArgStrs.push_back("-isysroot");
@@ -313,21 +321,37 @@ ClangImporter::create(ASTContext &ctx,
     invocationArgStrs.push_back(extraArg);
   }
 
+  if (importerOpts.DumpClangDiagnostics) {
+    llvm::errs() << "clang '";
+    interleave(invocationArgStrs,
+               [](StringRef arg) { llvm::errs() << arg; },
+               [] { llvm::errs() << "' '"; });
+    llvm::errs() << "'\n";
+  }
+
   std::vector<const char *> invocationArgs;
   for (auto &argStr : invocationArgStrs)
     invocationArgs.push_back(argStr.c_str());
 
-  // Create a new Clang compiler invocation.
-  llvm::IntrusiveRefCntPtr<CompilerInvocation> invocation{
-    new CompilerInvocation
+  // FIXME: These can't be controlled from the command line.
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagnosticOpts{
+    new clang::DiagnosticOptions
   };
+
   std::unique_ptr<ClangDiagnosticConsumer> diagClient{
-    new ClangDiagnosticConsumer(importer->Impl, invocation->getDiagnosticOpts(),
+    new ClangDiagnosticConsumer(importer->Impl, *diagnosticOpts,
                                 importerOpts.DumpClangDiagnostics)
   };
-  auto clangDiags =
-    CompilerInstance::createDiagnostics(&invocation->getDiagnosticOpts(),
-                                        diagClient.release());
+  auto clangDiags = CompilerInstance::createDiagnostics(diagnosticOpts.get(),
+                                                        diagClient.release());
+
+  // Create a new Clang compiler invocation.
+  llvm::IntrusiveRefCntPtr<CompilerInvocation> invocation{
+    clang::createInvocationFromCommandLine(invocationArgs, clangDiags)
+  };
+  if (!invocation)
+    return nullptr;
+  importer->Impl.Invocation = invocation;
 
   // Don't stop emitting messages if we ever can't load a module.
   // FIXME: This is actually a general problem: any "fatal" error could mess up
@@ -338,14 +362,6 @@ ClangImporter::create(ASTContext &ctx,
   clangDiags->setSeverity(clang::diag::err_module_not_built,
                           clang::diag::Severity::Error,
                           clang::SourceLocation());
-
-  if (!CompilerInvocation::CreateFromArgs(*invocation,
-                                          invocationArgs.data(),
-                                          (invocationArgs.data() +
-                                           invocationArgs.size()),
-                                          *clangDiags))
-    return nullptr;
-  importer->Impl.Invocation = invocation;
 
   // Create an almost-empty memory buffer.
   auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
