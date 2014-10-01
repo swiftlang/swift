@@ -2147,6 +2147,7 @@ namespace {
         for (auto &site : uncurriedSites) {
           AbstractionPattern origParamType =
             claimNextParamClause(origFormalType);
+          claimNextParamClause(formalType);
           uncurriedLoc = site.Loc;
           args.push_back({});
           std::move(site).emit(gen, origParamType, paramLowering, args.back());
@@ -2189,7 +2190,6 @@ namespace {
       
       // If there are remaining call sites, apply them to the result function.
       // Each chained call gets its own writeback scope.
-      claimNextParamClause(formalType);
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
         WritebackScope scope(gen);
 
@@ -2199,7 +2199,8 @@ namespace {
         uncurriedArgs.clear();
 
         // The result function has already been reabstracted to the substituted
-        // type.
+        // type, so use the substituted formal type as the abstraction pattern
+        // for argument passing now.
         AbstractionPattern origParamType(claimNextParamClause(formalType));
         std::move(extraSites[i]).emit(gen, origParamType, paramLowering,
                                       uncurriedArgs);
