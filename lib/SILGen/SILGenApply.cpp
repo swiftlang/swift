@@ -211,8 +211,6 @@ public:
     GenericMethod_First,
       /// A method call using archetype dispatch.
       WitnessMethod = GenericMethod_First,
-      /// A method call using protocol dispatch.
-      ProtocolMethod,
       /// A method call using dynamic lookup.
       DynamicMethod,
     GenericMethod_Last = DynamicMethod
@@ -367,14 +365,7 @@ private:
 
   /// Return the value being passed as 'self' for this protocol callee.
   CanType getProtocolSelfType(SILGenModule &SGM) const {
-    if (kind == Kind::ProtocolMethod) {
-      auto member = method.methodName.getDecl();
-      auto proto = cast<ProtocolDecl>(member->getDeclContext());
-      auto type = proto->getSelf()->getArchetype()->getCanonicalType();
-      if (!member->isInstanceMember())
-        type = CanMetatypeType::get(type);
-      return type;
-    } else if (kind == Kind::WitnessMethod) {
+    if (kind == Kind::WitnessMethod) {
       return method.selfValue.getType().getSwiftRValueType();
     } else {
       llvm_unreachable("bad callee kind for protocol method");
@@ -538,14 +529,6 @@ public:
     callee.addProtocolSelfToFormalType(gen.SGM, name);
     return callee;
   }
-  static Callee forProtocol(SILGenFunction &gen, SILValue proto,
-                            SILDeclRef name, CanAnyFunctionType substFormalType,
-                            SILLocation l) {
-    Callee callee(Kind::ProtocolMethod, gen, proto, name,
-                  substFormalType, l);
-    callee.addProtocolSelfToFormalType(gen.SGM, name);
-    return callee;
-  }
   static Callee forDynamic(SILGenFunction &gen, SILValue proto,
                            SILDeclRef name, CanAnyFunctionType substFormalType,
                            SILLocation l) {
@@ -594,7 +577,6 @@ public:
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
-    case Kind::ProtocolMethod:
     case Kind::DynamicMethod:
       return method.methodName.uncurryLevel;
     }
@@ -688,27 +670,6 @@ public:
       mv = ManagedValue::forUnmanaged(fn);
       break;
     }
-    case Kind::ProtocolMethod: {
-      assert(level >= 1
-             && "currying 'self' of generic method dispatch not yet supported");
-      assert(level <= method.methodName.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      
-      auto constant = method.methodName.atUncurryLevel(level);
-      constantInfo = gen.getConstantInfo(constant);
-
-      CanArchetypeType archetype; // not used
-      SILType closureType =
-        getProtocolClosureType(gen.SGM, constant, constantInfo, archetype);
-
-      SILValue fn = gen.B.createProtocolMethod(Loc,
-                                               method.selfValue,
-                                               constant,
-                                               closureType,
-                                               /*volatile*/ constant.isForeign);
-      mv = ManagedValue::forUnmanaged(fn);
-      break;
-    }
     case Kind::DynamicMethod: {
       assert(level >= 1
              && "currying 'self' of dynamic method dispatch not yet supported");
@@ -766,7 +727,6 @@ public:
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
-    case Kind::ProtocolMethod:
     case Kind::DynamicMethod:
       return Nothing;
     }
