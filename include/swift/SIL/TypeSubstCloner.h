@@ -39,7 +39,9 @@ public:
   using SILClonerWithScopes<ImplClass>::getBuilder;
   using SILClonerWithScopes<ImplClass>::getOpLocation;
   using SILClonerWithScopes<ImplClass>::getOpValue;
+  using SILClonerWithScopes<ImplClass>::getASTTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpASTType;
+  using SILClonerWithScopes<ImplClass>::getTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpType;
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::doPostProcess;
@@ -115,10 +117,17 @@ protected:
     }
 
     SmallVector<Substitution, 16> TempSubstList;
-    for (auto &Sub : Inst->getSubstitutions())
-      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
-                                        Original.getContextGenericParams(),
-                                        ApplySubs));
+    for (auto &Sub : Inst->getSubstitutions()) {
+      auto newSub = Sub.subst(Inst->getModule().getSwiftModule(),
+                              Original.getContextGenericParams(),
+                              ApplySubs);
+      // Remap opened archetypes into the cloned context.
+      newSub = Substitution(newSub.getArchetype(),
+                            getASTTypeInClonedContext(newSub.getReplacement()
+                                                        ->getCanonicalType()),
+                            newSub.getConformances());
+      TempSubstList.push_back(newSub);
+    }
 
     ApplyInst *N = Builder.createApply(
       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
@@ -149,11 +158,18 @@ protected:
     }
 
     SmallVector<Substitution, 16> TempSubstList;
-    for (auto &Sub : Inst->getSubstitutions())
-      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
-                                        Original.getContextGenericParams(),
-                                        ApplySubs));
-
+    for (auto &Sub : Inst->getSubstitutions()) {
+      auto newSub = Sub.subst(Inst->getModule().getSwiftModule(),
+                              Original.getContextGenericParams(),
+                              ApplySubs);
+      // Remap opened archetypes into the cloned context.
+      newSub = Substitution(newSub.getArchetype(),
+                            getASTTypeInClonedContext(newSub.getReplacement()
+                                                        ->getCanonicalType()),
+                            newSub.getConformances());
+      TempSubstList.push_back(newSub);
+    }
+    
     PartialApplyInst *N = Builder.createPartialApply(
       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
         getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,

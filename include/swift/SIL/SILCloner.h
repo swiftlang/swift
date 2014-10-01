@@ -138,28 +138,38 @@ protected:
     
     return Subs;
   }
-  SILType getOpType(SILType Ty) {
+  
+  SILType getTypeInClonedContext(SILType Ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
       auto &F = getBuilder().getFunction();
-      Ty = SILType::substType(F.getModule(), 
+      Ty = SILType::substType(F.getModule(),
                               F.getModule().getSwiftModule(),
                               OpenedExistentialSubs,
                               Ty);
     }
 
+    return Ty;
+  }
+  SILType getOpType(SILType Ty) {
+    Ty = getTypeInClonedContext(Ty);
     return asImpl().remapType(Ty);
   }
-  CanType getOpASTType(CanType ty) {
+  
+  CanType getASTTypeInClonedContext(CanType ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
       auto &F = getBuilder().getFunction();
       ty = ty.subst(F.getModule().getSwiftModule(), OpenedExistentialSubs,
                     /*ignore missing*/ false, nullptr)->getCanonicalType();
     }
-
+    return ty;
+  }
+  CanType getOpASTType(CanType ty) {
+    ty = getASTTypeInClonedContext(ty);
     return asImpl().remapASTType(ty);
   }
+  
   ProtocolConformance *getOpConformance(CanType Ty,
                                         ProtocolConformance *Conformance) {
     return asImpl().remapConformance(Ty, Conformance);
