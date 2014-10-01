@@ -25,11 +25,11 @@
 #include <new>
 #include <mutex>
 #include <cctype>
-#include <dispatch/dispatch.h>
 #include <pthread.h>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "ExistentialMetadataImpl.h"
+#include "Lazy.h"
 #include "Debug.h"
 
 
@@ -445,25 +445,7 @@ namespace {
       return result;
     }
   };
-
-  /// A template for lazily-constructed, zero-initialized global objects.
-  template <class T> class Lazy {
-    T Value;
-    dispatch_once_t OnceToken;
-
-  public:
-    T &get() {
-      dispatch_once_f(&OnceToken, this, lazyInitCallback);
-      return Value;
-    }
-
-  private:
-    static void lazyInitCallback(void *argument) {
-      auto self = reinterpret_cast<Lazy*>(argument);
-      ::new (&self->Value) T();
-    }
-  };
-}
+} // unnamed namespace
 
 namespace {
   struct GenericCacheEntry;
