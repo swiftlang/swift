@@ -1170,52 +1170,6 @@ public:
     return !archetype->getOpenedExistentialType().isNull();
   }
 
-  void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
-    auto methodType = requireObjectType(SILFunctionType, EMI,
-                                        "result of protocol_method");
-
-    auto proto = dyn_cast<ProtocolDecl>(EMI->getMember().getDecl()
-                                        ->getDeclContext());
-    require(proto, "protocol_method must take a method of a protocol");
-    SILType operandType = EMI->getOperand().getType();
-
-    require(methodType->getAbstractCC()
-              == F.getModule().Types.getProtocolWitnessCC(proto),
-            "result of protocol_method must have correct @cc for protocol");
-    
-    if (EMI->getMember().isForeign) {
-      require(methodType->getRepresentation() == FunctionType::Representation::Thin,
-              "result of foreign protocol_method must be thin");
-    } else {
-      require(methodType->getRepresentation() == FunctionType::Representation::Thick,
-              "result of native protocol_method must be thick");
-    }
-    
-    if (EMI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.isExistentialType(),
-              "instance protocol_method must apply to an existential");
-      SILType selfType = getMethodSelfType(methodType);
-      if (!operandType.isClassExistentialType()) {
-        require(selfType.isAddress(),
-                "protocol_method result must take its self parameter "
-                "by address");
-      }
-      CanType selfObjType = selfType.getSwiftRValueType();
-      require(isSelfArchetype(selfObjType, proto),
-              "result must be a method of protocol's Self archetype");
-    } else {
-      require(operandType.isObject(),
-              "static protocol_method cannot apply to an address");
-      require(operandType.is<ExistentialMetatypeType>(),
-              "static protocol_method must apply to an existential metatype");
-      require(operandType.castTo<ExistentialMetatypeType>()
-                .getInstanceType().isExistentialType(),
-              "static protocol_method must apply to an existential metatype");
-      require(getMethodSelfType(methodType) == EMI->getOperand().getType(),
-              "result must be a method of the existential metatype");
-    }
-  }
-  
   // Get the expected type of a dynamic method reference.
   SILType getDynamicMethodType(SILType selfType, SILDeclRef method) {
     auto &C = F.getASTContext();

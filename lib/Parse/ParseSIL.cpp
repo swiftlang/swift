@@ -1196,7 +1196,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("project_existential", ValueKind::ProjectExistentialInst)
     .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
-    .Case("protocol_method", ValueKind::ProtocolMethodInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
@@ -2332,7 +2331,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createUnreachable(InstLoc);
     break;
     
-  case ValueKind::ProtocolMethodInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst:
   case ValueKind::DynamicMethodInst: {
@@ -2411,10 +2409,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::ProtocolMethodInst:
-      ResultVal = B.createProtocolMethod(InstLoc, Val, Member, MethodTy,
-                                         IsVolatile);
-      break;
     case ValueKind::ClassMethodInst:
       ResultVal = B.createClassMethod(InstLoc, Val, Member, MethodTy,
                                       IsVolatile);

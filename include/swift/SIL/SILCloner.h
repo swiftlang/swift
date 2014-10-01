@@ -989,17 +989,6 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitProtocolMethodInst(ProtocolMethodInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createProtocolMethod(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      Inst->getMember(),
-                                      getOpType(Inst->getType()),
-                                      Inst->isVolatile()));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitDynamicMethodInst(DynamicMethodInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createDynamicMethod(getOpLocation(Inst->getLoc()),

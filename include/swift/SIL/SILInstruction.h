@@ -1985,21 +1985,6 @@ public:
   }
 };
 
-/// ProtocolMethodInst - Given the address of an existential and a method
-/// constant, extracts the implementation of that method for the existential.
-/// The result will be of the type Self -> F for a method of function type
-/// F. The "self" argument can be derived from the same existential
-/// using a ProjectExistentialInst.
-class ProtocolMethodInst
-  : public UnaryInstructionBase<ValueKind::ProtocolMethodInst,
-                                MethodInst>
-{
-public:
-  ProtocolMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
-                     SILType Ty, bool Volatile = false)
-    : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
-};
-
 /// Given the address of a value of AnyObject protocol type and a method
 /// constant referring to some Objective-C method, performs dynamic method
 /// lookup to extract the implementation of that method. This method lookup

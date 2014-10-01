@@ -2215,46 +2215,6 @@ archetype of the original protocol and have the ``witness_method`` calling
 convention. If the referenced protocol is an ``@objc`` protocol, the
 resulting type has the ``objc`` calling convention.
 
-protocol_method
-```````````````
-::
-
-  sil-instruction ::= 'protocol_method' sil-method-attributes?
-                        sil-operand ',' sil-decl-ref ':' sil-type
-
-  %1 = protocol_method %0 : $P, #P.method!1 : $@thick @cc(witness_method) U -> V
-  // %0 must be of a protocol or protocol composition type $P,
-  //   address of address-only protocol type $*P,
-  //   or metatype of protocol type $P.metatype
-  // #P.method!1 must be a reference to a method of one of the protocols of P
-  //
-  // If %0 is an address-only protocol address, then the "self" argument of
-  //   the method type must be $*@sil_self P, the Self archetype of P
-  // If %0 is a class protocol value, then the "self" argument of
-  //   the method type must be $@sil_self P, the Self archetype of P
-  // If %0 is a protocol metatype, then the "self" argument of
-  //   the method type must be P.metatype
-
-Looks up the implementation of a protocol method for the dynamic type of the
-value inside an existential container. The "self" operand of the result
-function value is represented using an opaque type, the value for which must
-be projected out of the same existential container as the ``protocol_method``
-operand:
-
-- If the operand is the address of an address-only protocol type, then the
-  "self" argument of the method is of type ``$*@sil_self P``, the ``Self`` archetype
-  of the method's protocol, and can be projected using the
-  ``project_existential`` instruction.
-- If the operand is a value of a class protocol type, then the "self"
-  argument of the method is of type ``$@sil_self P`` and can be
-  projected using the ``project_existential_ref`` instruction.
-- If the operand is a protocol metatype, it does not need to be projected, and
-  the "self" argument of the method is the protocol metatype itself.
-
-It is undefined behavior if the ``protocol_method`` function value is invoked
-with a "self" argument not derived from the same existential container as the
-method itself.
-
 dynamic_method
 ``````````````
 ::
@@ -2939,31 +2899,8 @@ project_existential
   // %1 will be of type $*@sil_self P
 
 Obtains the address of the concrete value inside the
-existential container referenced by ``%0``. This pointer can be passed to
-protocol instance methods obtained by ``protocol_method`` from the same
-existential container. A method call on a protocol-type value in Swift::
-
-  protocol Foo {
-    func bar(x:Int)
-  }
-
-  var foo:Foo
-  // ... initialize foo
-  foo.bar(123)
-
-compiles to this SIL sequence::
-
-  // ... initialize %foo
-  %bar = protocol_method %foo : $*Foo, #Foo.bar!1
-  %foo_p = project_existential %foo : $*Foo
-  %one_two_three = integer_literal $Int, 123
-  apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.OpaquePointer) -> ()
-
-It is undefined behavior for the address to be passed as the
-"self" argument to a method value obtained by ``protocol_method`` from
-a different existential container. It is also undefined behavior if the
-``OpaquePointer`` value is dereferenced, cast, or passed to a method after
-the originating existential container has been mutated.
+existential container referenced by ``%0``.
+Deprecated in favor of open_existential.
 
 open_existential
 ````````````````
@@ -3011,31 +2948,7 @@ project_existential_ref
   // %1 will be of type $@sil_self P
 
 Extracts the class instance reference from a class existential container.
-This value can be passed to protocol instance methods obtained by
-``protocol_method`` from the same existential container. A method call on a
-class-protocol-type value in Swift::
-
-  @class_protocol protocol Foo {
-    func bar(x:Int)
-  }
-
-  var foo:Foo
-  // ... initialize foo
-  foo.bar(123)
-
-compiles to this SIL sequence::
-
-  // ... initialize %foo
-  %bar = protocol_method %foo : $Foo, #Foo.bar!1
-  %foo_p = project_existential_ref %foo : $Foo
-  %one_two_three = integer_literal $Int, 123
-  apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.ObjCPointer) -> ()
-
-It is undefined behavior for the ``Self``-typed value to be passed as the
-"self" argument to a method value obtained by ``protocol_method`` from
-a different existential container. It is also undefined behavior if the
-``ObjCPointer`` value is dereferenced, cast, or passed to a method after the
-originating existential container has been mutated.
+Deprecated in favor of open_existential_ref.
 
 open_existential_ref
 ````````````````````

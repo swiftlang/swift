@@ -30,12 +30,12 @@ bb0(%0 : $*P):           // CHECK: bb0(%0 : $*P):
   %1 = alloc_stack $P
   copy_addr %0 to [initialization] %1#1 : $*P
   
-  // CHECK-NEXT: project_existential %0 : $*P
-  %3 = project_existential %1#1 : $*P to $*@sil_self P
-  %4 = protocol_method %1#1 : $*P, #P.foo!1 : <Self : P> inout Self -> () -> (), $@cc(witness_method) @callee_owned (@inout @sil_self P) -> ()
+  // CHECK-NEXT: open_existential %0 : $*P
+  %3 = open_existential %1#1 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
+  %4 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1 : $@thin @cc(witness_method) @callee_owned <T: P> (@inout T) -> ()
   
   // CHECK: apply
-  %5 = apply %4(%3) : $@cc(witness_method) @callee_owned (@inout @sil_self P) -> ()
+  %5 = apply %4<@opened("01234567-89ab-cdef-0123-000000000000") P>(%3) : $@thin @cc(witness_method) @callee_owned <T: P> (@inout T) -> ()
   
   copy_addr [take] %1#1 to %0 : $*P
   dealloc_stack %1#0 : $*@local_storage P

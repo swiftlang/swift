@@ -1020,13 +1020,6 @@ public:
     AMI->getMember().print(OS);
     OS << " : " << AMI->getType(0);
   }
-  void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
-    printMethodInst(AMI, AMI->getOperand(), "protocol_method");
-    OS << " : ";
-    printASTType(AMI->getMember().getDecl()->getType());
-    OS << ", ";
-    OS << AMI->getType();
-  }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {
     printMethodInst(DMI, DMI->getOperand(), "dynamic_method");
     OS << " : ";

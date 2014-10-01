@@ -9,11 +9,11 @@
 // CHECK: function_ref unknown2a
 // CHECK-NEXT: function_ref @unknown2a : $@thin () -> ()
 // CHECK-NEXT: apply
-// CHECK: protocol_method
+// CHECK: witness_method
 // CHECK: function_ref unknown3a
 // CHECK-NEXT: function_ref @unknown3a : $@thin () -> ()
 // CHECK-NEXT: apply
-// CHECK: protocol_method
+// CHECK: witness_method
 // CHECK: sil_vtable B {
 
 @asmname("unknown1a")

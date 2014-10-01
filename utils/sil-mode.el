@@ -75,7 +75,7 @@
                     ) 'words) . font-lock-keyword-face)
    ;; Dynamic Dispatch
    `(,(regexp-opt '("class_method" "super_method" "witness_method"
-                    "protocol_method" "dynamic_method")
+                    "dynamic_method")
                   'words) . font-lock-keyword-face)
    ;; Function Application
    `(,(regexp-opt '("apply" "partial_apply")

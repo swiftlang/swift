@@ -1151,21 +1151,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
-  case ValueKind::ProtocolMethodInst: {
-    // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
-    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
-    // and an operand.
-    const ProtocolMethodInst *PMI = cast<ProtocolMethodInst>(&SI);
-    SILType Ty = PMI->getType();
-    SmallVector<ValueID, 9> ListOfValues;
-    handleMethodInst(PMI, PMI->getOperand(), ListOfValues);
-
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-        S.addTypeRef(Ty.getSwiftRValueType()),
-        (unsigned)Ty.getCategory(), ListOfValues);
-    break;
-  }
   case ValueKind::ClassMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),

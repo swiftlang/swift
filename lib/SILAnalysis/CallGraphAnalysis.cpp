@@ -132,7 +132,6 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
 
   case ValueKind::PartialApplyInst:
   case ValueKind::ClassMethodInst:
-  case ValueKind::ProtocolMethodInst:
   case ValueKind::WitnessMethodInst:
   case ValueKind::SuperMethodInst:
     // TODO: Each of these requires specific handling.

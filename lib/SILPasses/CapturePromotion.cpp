@@ -557,7 +557,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   }
   // These remaining instructions are ok and don't count as mutations.
   if (isa<StrongRetainInst>(U) || isa<StrongReleaseInst>(U) ||
-      isa<LoadInst>(U) || isa<ProtocolMethodInst>(U))
+      isa<LoadInst>(U))
     return true;
   return false;
 }

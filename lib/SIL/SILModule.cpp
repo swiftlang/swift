@@ -539,7 +539,8 @@ public:
     // causes the witness table to be brought in as a declaration and then the
     // protocol method inst causes the actual deserialization. For now we are
     // not going to be smart about this to enable avoiding any issues with
-    // visiting the protocol_method before the init_existential_inst.
+    // visiting the open_existential/witness_method before the
+    // init_existential_inst.
     bool performFuncDeserialization = false;
     for (ProtocolConformance *C : IEI->getConformances()) {
       performFuncDeserialization |=

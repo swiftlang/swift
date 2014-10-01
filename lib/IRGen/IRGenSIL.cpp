@@ -637,7 +637,6 @@ public:
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
-  void visitProtocolMethodInst(ProtocolMethodInst *i);
   void visitDynamicMethodInst(DynamicMethodInst *i);
 
   void visitProjectExistentialInst(ProjectExistentialInst *i);
@@ -3267,29 +3266,6 @@ void IRGenSILFunction::visitInitBlockStorageHeaderInst(
   Explosion e;
   e.add(asBlock);
   setLoweredExplosion(SILValue(i, 0), e);
-}
-
-void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
-  // For Objective-C classes we need to arrange for a msgSend
-  // to happen when the method is called.
-  if (i->getMember().isForeign) {
-    setLoweredObjCMethod(SILValue(i, 0), i->getMember());
-    return;
-  }
-
-  SILType baseTy = i->getOperand().getType();
-  SILDeclRef member = i->getMember();
-  
-  Explosion lowered;
-  if (baseTy.isClassExistentialType()) {
-    Explosion base = getLoweredExplosion(i->getOperand());
-    emitClassProtocolMethodValue(*this, base, baseTy, member, lowered);
-  } else {
-    Address base = getLoweredAddress(i->getOperand());
-    emitOpaqueProtocolMethodValue(*this, base, baseTy, member, lowered);
-  }
-  
-  setLoweredExplosion(SILValue(i, 0), lowered);
 }
 
 void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {

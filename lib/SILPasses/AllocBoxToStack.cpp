@@ -156,7 +156,6 @@ static bool useCaptured(Operand *UI) {
   // These instructions do not cause the address to escape.
   if (isa<CopyAddrInst>(User) ||
       isa<LoadInst>(User) ||
-      isa<ProtocolMethodInst>(User) ||
       isa<DebugValueInst>(User) ||
       isa<DebugValueAddrInst>(User) ||
       isa<StrongReleaseInst>(User) ||

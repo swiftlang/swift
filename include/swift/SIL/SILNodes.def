@@ -126,7 +126,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(ClassMethodInst, MethodInst, None)
     INST(SuperMethodInst, MethodInst, None)
     INST(WitnessMethodInst, MethodInst, None)
-    INST(ProtocolMethodInst, MethodInst, None)
     INST(DynamicMethodInst, MethodInst, None)
     VALUE_RANGE(MethodInst, ClassMethodInst, DynamicMethodInst)
 

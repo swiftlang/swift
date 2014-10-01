@@ -1365,7 +1365,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                              ResultTy);
     break;
   }
-  case ValueKind::ProtocolMethodInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst:
   case ValueKind::DynamicMethodInst: {
@@ -1384,12 +1383,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::ProtocolMethodInst:
-      ResultVal = Builder.createProtocolMethod(Loc,
-                    getLocalValue(ListOfValues[NextValueIndex],
-                                  ListOfValues[NextValueIndex+1], operandTy),
-                    DRef, Ty, IsVolatile);
-      break;
     case ValueKind::ClassMethodInst:
       ResultVal = Builder.createClassMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex],

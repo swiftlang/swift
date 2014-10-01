@@ -163,12 +163,15 @@ protocol P {
 // CHECK-LABEL: @existentials : $@thin (@in P) -> () {
 sil [fragile] @existentials : $@thin (@in P) -> () {
 bb0(%0 : $*P):
-  %1 = project_existential %0 : $*P to $*@sil_self P // CHECK: project_existential %0
+  %1 = open_existential %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P // CHECK: open_existential %0
 
-  // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
-  %2 = protocol_method %0 : $*P, #P.doIt!1 : <Self : P> inout Self -> () -> (), $@cc(witness_method) (@inout @sil_self P) -> ()
+  // CHECK: witness_method ${{.*}}, #P.doIt!1
+  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1 : $@thin @cc(witness_method) <T: P> (@inout T) -> ()
+  // Make sure we have the correct scope for generic parameters.
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.doIt!1
+  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1 : $@thin @cc(witness_method) <T: P> (@inout T) -> ()
   // CHECK: apply
-  %3 = apply %2(%1) : $@cc(witness_method) (@inout @sil_self P) -> ()
+  %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@thin @cc(witness_method) <T: P> (@inout T) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   %6 = return %4 : $()                // CHECK: return
@@ -275,11 +278,11 @@ bb0(%0 : $ClassBound):
   %2 = store %0 to %1#1 : $*ClassBound
   %3 = load %1#1 : $*ClassBound
   %4 = strong_retain %3 : $ClassBound              // CHECK: strong_retain
-  // CHECK: project_existential_ref {{%.*}} : $ClassBound to $@sil_self ClassBound
-  %5 = project_existential_ref %3 : $ClassBound to $@sil_self ClassBound
-  // CHECK: protocol_method
-  %6 = protocol_method %3 : $ClassBound, #ClassBound.classBoundMethod!1 : <Self : ClassBound> Self -> () -> (), $@cc(witness_method) (@sil_self ClassBound) -> ()
-  %7 = apply %6(%5) : $@cc(witness_method) (@sil_self ClassBound) -> ()
+  // CHECK: open_existential_ref {{%.*}} : $ClassBound to $@opened({{.*}}) ClassBound
+  %5 = open_existential_ref %3 : $ClassBound to $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound
+  // CHECK: witness_method
+  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod!1 : $@thin @cc(witness_method) <T: ClassBound> (T) -> ()
+  %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@thin @cc(witness_method) <T: ClassBound> (T) -> ()
   %8 = tuple ()
   %9 = strong_release %1#0 : $Builtin.NativeObject
   %10 = return %8 : $()

@@ -95,7 +95,6 @@ static Optional<bool> isDeinit(Operand* Oper) {
   case ValueKind::InjectEnumAddrInst:
   case ValueKind::LoadInst:
   case ValueKind::ProjectExistentialInst:
-  case ValueKind::ProtocolMethodInst:
   case ValueKind::StructElementAddrInst:
     return false;
   case ValueKind::InitEnumDataAddrInst:
@@ -143,7 +142,6 @@ static Optional<bool> isInit(Operand* Oper) {
   case ValueKind::InjectEnumAddrInst:
   case ValueKind::LoadInst:
   case ValueKind::ProjectExistentialInst:
-  case ValueKind::ProtocolMethodInst:
   case ValueKind::StructElementAddrInst:
     return false;
   case ValueKind::DestroyAddrInst:
@@ -238,7 +236,6 @@ bool CopyForwarding::collectUsers() {
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::LoadInst:
-    case ValueKind::ProtocolMethodInst:
     case ValueKind::StoreInst:
     case ValueKind::InitEnumDataAddrInst:
     case ValueKind::DebugValueAddrInst:
