@@ -1674,6 +1674,10 @@ public:
 
     if (!D->hasType())
       TypeResolver->resolveDeclSignature(D);
+    else if (isa<TypeAliasDecl>(D)) {
+      // A TypeAliasDecl might have type set, but not the underlying type.
+      TypeResolver->resolveDeclSignature(D);
+    }
 
     switch (Kind) {
     case LookupKind::ValueExpr:
