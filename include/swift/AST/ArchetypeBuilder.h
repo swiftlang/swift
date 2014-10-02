@@ -23,7 +23,6 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SetVector.h"

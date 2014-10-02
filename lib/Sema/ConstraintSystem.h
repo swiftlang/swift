@@ -25,7 +25,6 @@
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Optional.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/NameLookup.h"

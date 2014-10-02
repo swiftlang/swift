@@ -22,7 +22,6 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
-#include "swift/Basic/Optional.h"
 #include "IRGen.h"
 
 namespace llvm {

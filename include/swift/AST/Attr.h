@@ -17,7 +17,6 @@
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
 
-#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"

@@ -25,7 +25,6 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
-#include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"

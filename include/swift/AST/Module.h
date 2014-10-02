@@ -21,7 +21,6 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/ArrayRef.h"

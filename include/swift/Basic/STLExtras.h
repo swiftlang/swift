@@ -17,7 +17,8 @@
 #ifndef SWIFT_BASIC_INTERLEAVE_H
 #define SWIFT_BASIC_INTERLEAVE_H
 
-#include "swift/Basic/Optional.h"
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/Casting.h"
 #include <cassert>
 #include <functional>

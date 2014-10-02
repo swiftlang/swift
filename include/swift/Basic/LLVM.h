@@ -18,7 +18,13 @@
 #ifndef SWIFT_AST_LLVM_H
 #define SWIFT_AST_LLVM_H
 
+// Do not proliferate #includes here, require clients to #include their
+// dependencies.
+// Casting.h has complex templates that cannot be easily forward declared.
 #include "llvm/Support/Casting.h"
+// None.h includes an enumerator that is desired & cannot be forward declared
+// without a definition of NoneType.
+#include "llvm/ADT/None.h"
 
 // Forward declarations.
 namespace llvm {
@@ -33,6 +39,7 @@ namespace llvm {
   template<typename T> class ArrayRef;
   template<typename T> class MutableArrayRef;
   template<typename T> class TinyPtrVector;
+  template<typename T> class Optional;
   template <typename PT1, typename PT2> class PointerUnion;
 
   // Other common classes.
@@ -51,6 +58,8 @@ namespace swift {
   using llvm::cast_or_null;
 
   // Containers
+  using llvm::None;
+  using llvm::Optional;
   using llvm::SmallPtrSetImpl;
   using llvm::SmallPtrSet;
   using llvm::SmallString;

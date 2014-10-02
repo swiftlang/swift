@@ -14,7 +14,6 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/AST/Module.h"
-#include "swift/Basic/Optional.h"
 
 #include <string>
 #include <vector>

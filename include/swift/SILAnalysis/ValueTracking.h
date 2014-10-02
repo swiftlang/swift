@@ -13,7 +13,6 @@
 #ifndef SWIFT_SILANALYSIS_VALUETRACKING_H
 #define SWIFT_SILANALYSIS_VALUETRACKING_H
 
-#include "swift/Basic/Optional.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {

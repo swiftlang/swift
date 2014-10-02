@@ -23,7 +23,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Optional.h"
 #include "clang/APINotes/APINotesReader.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"

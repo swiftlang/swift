@@ -19,7 +19,6 @@
 #define SWIFT_SEMA_CONSTRAINTLOCATOR_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Optional.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Fixnum.h"

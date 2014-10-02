@@ -15,7 +15,6 @@
 #include "ReferenceCountState.h"
 #include "GlobalARCSequenceDataflow.h"
 #include "swift/Basic/BlotMapVector.h"
-#include "swift/Basic/Optional.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"

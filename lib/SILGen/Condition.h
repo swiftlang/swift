@@ -18,7 +18,6 @@
 #define SWIFT_SIL_LOWERING_CONDITION_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "swift/Basic/Optional.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
 #include "SILGenFunction.h"

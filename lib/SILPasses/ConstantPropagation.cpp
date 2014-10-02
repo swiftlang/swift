@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "constant-propagation"
 #include "swift/SILPasses/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Optional.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILPasses/Utils/Local.h"

@@ -18,12 +18,13 @@
 #ifndef SWIFT_BASIC_UUID_H
 #define SWIFT_BASIC_UUID_H
 
-#include <array>
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/SmallString.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
-#include "swift/Basic/Optional.h"
+#include <array>
 
 namespace swift {
   

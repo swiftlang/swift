@@ -16,7 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Optional.h"
 #include "swift/AST/Pattern.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILGlobalVariable.h"

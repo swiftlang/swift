@@ -18,7 +18,6 @@
 #define SWIFT_AST_PLATFORM_KIND_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {

@@ -21,7 +21,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 
 namespace swift {

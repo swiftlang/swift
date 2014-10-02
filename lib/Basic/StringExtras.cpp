@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Optional.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"

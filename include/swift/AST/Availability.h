@@ -17,8 +17,9 @@
 #ifndef SWIFT_AST_AVAILABILITY_H
 #define SWIFT_AST_AVAILABILITY_H
 
-#include "swift/Basic/Optional.h"
+#include "swift/Basic/LLVM.h"
 #include "clang/Basic/VersionTuple.h"
+#include "llvm/ADT/Optional.h"
 
 namespace swift {
 

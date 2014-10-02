@@ -21,7 +21,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Optional.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"

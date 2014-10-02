@@ -21,7 +21,6 @@
 #define SWIFT_BASIC_JSONSERIALIZATION_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"

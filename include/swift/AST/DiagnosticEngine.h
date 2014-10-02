@@ -23,7 +23,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/DiagnosticConsumer.h"
-#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"

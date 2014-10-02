@@ -23,7 +23,8 @@
 #ifndef SWIFT_BASIC_SUCCESSORMAP_H
 #define SWIFT_BASIC_SUCCESSORMAP_H
 
-#include "swift/Basic/Optional.h"
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 

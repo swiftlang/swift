@@ -14,7 +14,6 @@
 #define SIL_TypeLowering_h
 
 #include "swift/AST/ArchetypeBuilder.h"
-#include "swift/Basic/Optional.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILDeclRef.h"

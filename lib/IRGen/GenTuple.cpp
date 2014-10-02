@@ -24,7 +24,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
 #include "swift/SIL/SILType.h"
-#include "swift/Basic/Optional.h"
 #include "llvm/IR/DerivedTypes.h"
 
 #include "GenHeap.h"

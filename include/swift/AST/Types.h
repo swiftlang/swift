@@ -24,7 +24,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/ArrayRefView.h"
-#include "swift/Basic/Optional.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
