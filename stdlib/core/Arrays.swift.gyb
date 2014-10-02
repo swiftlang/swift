@@ -273,6 +273,12 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   func _getElement(index: Int) -> Element {
     return _buffer[index]
   }
+  @semantics("array.set_element")
+  mutating func _setElement(
+    index: Int, newValue: Element
+  ) {
+    _buffer[index] = newValue
+  }
 
   @semantics("array.get_element_address")
   func _getElementAddress(index: Int) -> UnsafeMutablePointer<Element> {
