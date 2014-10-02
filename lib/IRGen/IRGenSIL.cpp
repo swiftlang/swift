@@ -1644,8 +1644,6 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
         extraData = ExtraData::None;
       else if (calleeData->getType() == IGF.IGM.RefCountedPtrTy)
         extraData = ExtraData::Retainable;
-      else if (calleeData->getType() == IGF.IGM.TypeMetadataPtrTy)
-        extraData = ExtraData::Metatype;
       else
         llvm_unreachable("unexpected extra data for function value");
         

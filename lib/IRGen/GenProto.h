@@ -90,22 +90,6 @@ namespace irgen {
                               ProtocolConformance *conformance,
                               Explosion &out);
   
-  /// Extract the method pointer and metadata from an opaque existential
-  /// container's protocol witness table as a function value.
-  void emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
-                                     Address existAddr,
-                                     SILType baseTy,
-                                     SILDeclRef member,
-                                     Explosion &out);
-  
-  /// Extract the method pointer and metadata from a class existential
-  /// container's protocol witness table as a function value.
-  void emitClassProtocolMethodValue(IRGenFunction &IGF,
-                                    Explosion &in,
-                                    SILType baseTy,
-                                    SILDeclRef member,
-                                    Explosion &out);
-  
   /// Add the witness arguments necessary for calling a function with
   /// the given generics clause.
   void expandPolymorphicSignature(IRGenModule &IGM,

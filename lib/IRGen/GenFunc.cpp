@@ -302,15 +302,12 @@ namespace {
         return ExtraData::Retainable;
 
       case AbstractCC::WitnessMethod:
-        // A 'thick' witness is partially applied to its Self archetype binding.
-        //
-        // TODO: This requires extra data only if the necessary metadata is not
-        // already available through a metatype or class 'self' parameter.
-        //
-        // TODO: For default implementations, the witness table needs to be
-        // supplied too.
-        return ExtraData::Metatype;
-      
+        // TODO: This should fall into the "retainable" bucket, but we
+        // historically abused thick witness methods for other purposes.
+        // Fail here as a safety against miscompiling code that tries to
+        // work the old way.
+        llvm_unreachable("thick witness method not supported");
+          
       case AbstractCC::C:
       case AbstractCC::ObjCMethod:
         llvm_unreachable("thick foreign functions should be lowered to a "
@@ -370,7 +367,6 @@ namespace {
       switch (getExtraDataKind()) {
       case ExtraData::None:
         return false;
-      case ExtraData::Metatype:
       case ExtraData::Retainable:
         return true;
       case ExtraData::Block:
@@ -446,11 +442,6 @@ namespace {
         IGF.emitLoadAndRetain(dataAddr, e);
         break;
       }
-      case ExtraData::Metatype: {
-        Address dataAddr = projectData(IGF, address);
-        e.add(IGF.Builder.CreateLoad(dataAddr));
-        break;
-      }
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
@@ -482,11 +473,6 @@ namespace {
         IGF.emitAssignRetained(e.claimNext(), dataAddr);
         break;
       }
-      case ExtraData::Metatype: {
-        Address dataAddr = projectData(IGF, address);
-        IGF.Builder.CreateStore(e.claimNext(), dataAddr);
-        break;
-      }
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
@@ -506,11 +492,6 @@ namespace {
         IGF.emitInitializeRetained(e.claimNext(), dataAddr);
         break;
       }
-      case ExtraData::Metatype: {
-        Address dataAddr = projectData(IGF, address);
-        IGF.Builder.CreateStore(e.claimNext(), dataAddr);
-        break;
-      }
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
@@ -525,9 +506,6 @@ namespace {
         break;
       case ExtraData::Retainable:
         IGF.emitRetain(src.claimNext(), dest);
-        break;
-      case ExtraData::Metatype:
-        src.transferInto(dest, 1);
         break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
@@ -544,9 +522,6 @@ namespace {
       case ExtraData::Retainable:
         IGF.emitRelease(src.claimNext());
         break;
-      case ExtraData::Metatype:
-        src.claimNext();
-        break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
@@ -559,9 +534,6 @@ namespace {
         break;
       case ExtraData::Retainable:
         IGF.emitFixLifetime(src.claimNext());
-        break;
-      case ExtraData::Metatype:
-        src.claimNext();
         break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
@@ -577,9 +549,6 @@ namespace {
       case ExtraData::Retainable:
         IGF.emitRetainCall(e.claimNext());
         break;
-      case ExtraData::Metatype:
-        e.claimNext();
-        break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
@@ -592,9 +561,6 @@ namespace {
         break;
       case ExtraData::Retainable:
         IGF.emitRelease(e.claimNext());
-        break;
-      case ExtraData::Metatype:
-        e.claimNext();
         break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
@@ -609,9 +575,6 @@ namespace {
       case ExtraData::Retainable:
         IGF.emitRetainUnowned(e.claimNext());
         break;
-      case ExtraData::Metatype:
-        e.claimNext();
-        break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
@@ -624,9 +587,6 @@ namespace {
         break;
       case ExtraData::Retainable:
         IGF.emitUnownedRetain(e.claimNext());
-        break;
-      case ExtraData::Metatype:
-        e.claimNext();
         break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
@@ -641,9 +601,6 @@ namespace {
       case ExtraData::Retainable:
         IGF.emitUnownedRelease(e.claimNext());
         break;
-      case ExtraData::Metatype:
-        e.claimNext();
-        break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
@@ -655,8 +612,6 @@ namespace {
         break;
       case ExtraData::Retainable:
         IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
-        break;
-      case ExtraData::Metatype:
         break;
       case ExtraData::Block:
         llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
@@ -819,11 +774,8 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     case ExtraData::Retainable:
       ty = IGM.FunctionPairTy;
       break;
-    case ExtraData::Metatype:
-      ty = IGM.WitnessFunctionPairTy;
-      break;
-      case ExtraData::Block:
-        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
+    case ExtraData::Block:
+      llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
     }
     
     return FuncTypeInfo::create(ct, ty,
@@ -1185,9 +1137,6 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM,
     break;
   case ExtraData::Retainable:
     expansion.ParamIRTypes.push_back(IGM.RefCountedPtrTy);
-    break;
-  case ExtraData::Metatype:
-    expansion.ParamIRTypes.push_back(IGM.TypeMetadataPtrTy);
     break;
   }
 

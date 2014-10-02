@@ -81,9 +81,6 @@ enum class ExtraData : unsigned char {
 
   /// The function requires a retainable object pointer of extra data.
   Retainable,
-
-  /// The function requires a metatype object as extra data.
-  Metatype,
   
   /// The function takes its block object as extra data.
   Block,
