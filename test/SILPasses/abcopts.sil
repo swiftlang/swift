@@ -635,11 +635,6 @@ sil public_external [semantics "array.mutate_unknown"] @append : $@cc(method) @t
     unreachable
 }
 
-sil public_external [semantics "array.set_element"] @set : $@cc(method) @thin (Int, @in Int, @inout ArrayInt) -> () {
-  bb0(%0: $Int, %1: $*Int, %2: $*ArrayInt):
-    unreachable
-}
-
 sil public_external [semantics "array.get_element_address"] @getElementAddr : $@cc(method) @thin (Int, @owned ArrayInt) -> UnsafeMutablePointerInt {
   bb0(%0: $Int, %1: $ArrayInt):
     unreachable

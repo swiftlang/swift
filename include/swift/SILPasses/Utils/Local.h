@@ -104,7 +104,6 @@ namespace swift {
     kGetElement,
     kGetElementAddress,
     kMakeMutable,
-    kSetElement,
     kMutateUnknown,
     kArrayInit
   };

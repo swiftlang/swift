@@ -363,7 +363,6 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() {
       .Case("array.get_element", ArrayCallKind::kGetElement)
       .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
       .Case("array.get_element_address", ArrayCallKind::kGetElementAddress)
-      .Case("array.set_element", ArrayCallKind::kSetElement)
       .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
       .Default(ArrayCallKind::kNone);
 
@@ -382,7 +381,7 @@ SILValue swift::ArraySemanticsCall::getIndex() {
   assert(getKind() == ArrayCallKind::kCheckSubscript ||
          getKind() == ArrayCallKind::kCheckIndex ||
          getKind() == ArrayCallKind::kGetElement ||
-         getKind() == ArrayCallKind::kSetElement);
+         getKind() == ArrayCallKind::kGetElementAddress);
 
   return SemanticsCall->getArgument(0);
 }
