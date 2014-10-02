@@ -82,3 +82,30 @@ func testMultiArray(i : Int, j : Int, var array : [[Int]]) {
   swap(&global_array[0][j], &array[j][i])  // ok
 }
 
+struct ArrayWithoutAddressors<T> {
+  subscript(i: Int) -> T {
+    get { return value }
+    set {}
+  }
+  var value: T
+}
+
+var global_array_without_addressors: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
+
+func testMultiArrayWithoutAddressors(
+  i: Int, j: Int, var array: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
+) {
+  swap(&array[i][j],  // expected-note  {{concurrent writeback occurred here}}
+       &array[i][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
+  swap(&array[0][j],  // expected-note  {{concurrent writeback occurred here}}
+       &array[0][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
+  swap(&global_array_without_addressors[0][j],   // expected-note  {{concurrent writeback occurred here}}
+       &global_array_without_addressors[0][i])   // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
+
+  // TODO: This is obviously the same writeback problem, but isn't detectable
+  // with the current level of sophisitication in SILGen.
+  swap(&array[1+0][j], &array[1+0][i])
+
+  swap(&global_array_without_addressors[0][j], &array[j][i])  // ok
+}
+
