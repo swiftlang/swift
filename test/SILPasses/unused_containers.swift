@@ -1,6 +1,4 @@
-// RUN: %swift %s -O -emit-sil | not FileCheck %s
-// TODO: update for intrinsic-based array literal implementation
-// rdar://problem/18463435
+// RUN: %swift %s -O -emit-sil | FileCheck %s
 
 //CHECK-LABEL: @_TF17unused_containers16empty_array_testFT_T_
 //CHECK: bb0:

@@ -270,7 +270,7 @@ func containers() -> ([Int], Dictionary<String, Int>) {
   // CHECK: tuple ({{%.*}} : $String, {{%.*}} : $Int)                      {{.*}} line:[[@LINE-8]]:22
   // CHECK: tuple ({{%.*}} : $String, {{%.*}} : $Int)                      {{.*}} line:[[@LINE-9]]:22
   // CHECK: tuple ({{%.*}} : $String, {{%.*}} : $Int)                      {{.*}} line:[[@LINE-10]]:22
-  // CHECK: apply [transparent] {{%.*}}<(String, Int)>({{%.*}})            {{.*}} line:[[@LINE-11]]:22
+  // CHECK: apply {{%.*}}<(String, Int)>({{%.*}})            {{.*}} line:[[@LINE-11]]:22
   
   
 }
