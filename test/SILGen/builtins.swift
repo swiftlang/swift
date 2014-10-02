@@ -167,8 +167,8 @@ func class_archetype_to_native_object<T : C>(t: T) -> Builtin.NativeObject {
 
 // CHECK-LABEL: sil hidden @_TF8builtins34class_existential_to_native_object
 func class_existential_to_native_object(t:ClassProto) -> Builtin.NativeObject {
-  // CHECK: [[REF:%[0-9]+]] = project_existential_ref [[T:%[0-9]+]] : $ClassProto to $@sil_self ClassProto
-  // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@sil_self ClassProto to $Builtin.NativeObject
+  // CHECK: [[REF:%[0-9]+]] = open_existential_ref [[T:%[0-9]+]] : $ClassProto
+  // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
   return Builtin.castToNativeObject(t)
 }
 

@@ -21,17 +21,17 @@ class X {
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15direct_to_class
 func direct_to_class(obj: AnyObject) {
-  // CHECK: [[OBJ_SELF:%[0-9]+]] = project_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@sil_self AnyObject
-  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@sil_self AnyObject, #X.f!1.foreign : X -> () -> (), $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
-  // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
+  // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : X -> () -> (), $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> ()
   obj.f!()
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup18direct_to_protocol
 func direct_to_protocol(obj: AnyObject) {
-  // CHECK: [[OBJ_SELF:%[0-9]+]] = project_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@sil_self AnyObject
-  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@sil_self AnyObject, #P.g!1.foreign : <`Self` : P> Self -> () -> (), $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
-  // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
+  // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <`Self` : P> Self -> () -> (), $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> ()
   obj.g!()
 }
 
@@ -56,14 +56,14 @@ func opt_to_class(var obj: AnyObject) {
   // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: [[EXISTVAL:%[0-9]+]] = load [[EXISTBOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[EXISTVAL]] : $AnyObject
-  // CHECK-NEXT: [[OBJ_SELF:%[0-9]*]] = project_existential_ref [[EXIST:%[0-9]+]]
+  // CHECK-NEXT: [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXIST:%[0-9]+]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<() -> ()>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_SELF]] : $@sil_self AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
+  // CHECK-NEXT: dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
 
   // Has method BB:
-  // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@cc(objc_method) @thin (@sil_self AnyObject) -> ()):
+  // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> ()):
   // CHECK-NEXT: strong_retain [[OBJ_SELF]]
-  // CHECK-NEXT: [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> ()
+  // CHECK-NEXT: [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> ()
   // CHECK-NEXT: [[THUNKTEMP:%.*]] = alloc_stack $@callee_owned (@out (), @in ()) -> ()
   // CHECK:      [[THUNKFN:%.*]] = function_ref @{{.*}} : $@thin (@out (), @in (), @owned @callee_owned () -> ()) -> ()
   // CHECK-NEXT: [[THUNK:%.*]] = partial_apply [[THUNKFN]]([[PARTIAL]])
@@ -124,12 +124,12 @@ func opt_to_property(var obj: AnyObject) {
   // CHECK-NEXT: [[UNKNOWN_USE:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[RAWOBJ_SELF:%[0-9]+]] = project_existential_ref [[OBJ]] : $AnyObject
+  // CHECK-NEXT: [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
-  // CHECK-NEXT: dynamic_method_br [[RAWOBJ_SELF]] : $@sil_self AnyObject, #X.value!getter.1.foreign, bb1, bb2
-  // CHECK: bb1([[METHOD:%[0-9]+]] : $@cc(objc_method) @thin (@sil_self AnyObject) -> Int):
+  // CHECK-NEXT: dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
+  // CHECK: bb1([[METHOD:%[0-9]+]] : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> Int):
   // CHECK-NEXT: strong_retain [[RAWOBJ_SELF]]
-  // CHECK-NEXT: [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF]]) : $@cc(objc_method) @thin (@sil_self AnyObject) -> Int
+  // CHECK-NEXT: [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF]]) : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[BOUND_METHOD]]() : $@callee_owned () -> Int
   // CHECK-NEXT: [[VALUETEMP:%.*]] = alloc_stack $Int
   // CHECK-NEXT: store [[VALUE]] to [[VALUETEMP]]
@@ -151,14 +151,14 @@ func direct_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: [[UNKNOWN_USE:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = project_existential_ref [[OBJ]] : $AnyObject to $@sil_self AnyObject
+  // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK-NEXT: [[I:%[0-9]+]] = load [[I_BOX]]#1 : $*Int
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@sil_self AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-  // CHECK: bb1([[GETTER:%[0-9]+]] : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int):
+  // CHECK: bb1([[GETTER:%[0-9]+]] : $@cc(objc_method) @thin (Int, @opened({{.*}}) AnyObject) -> Int):
   // CHECK-NEXT: strong_retain [[OBJ_REF]]
-  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int
+  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@cc(objc_method) @thin (Int, @opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
   // CHECK-NEXT: [[RESULTTEMP:%.*]] = alloc_stack $Int
   // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]
@@ -178,14 +178,14 @@ func opt_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: store [[I]] to [[I_BOX]]#1 : $*Int
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = project_existential_ref [[OBJ]] : $AnyObject to $@sil_self AnyObject
+  // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK-NEXT: [[I:%[0-9]+]] = load [[I_BOX]]#1 : $*Int
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@sil_self AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-  // CHECK: bb1([[GETTER:%[0-9]+]] : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int):
+  // CHECK: bb1([[GETTER:%[0-9]+]] : $@cc(objc_method) @thin (Int, @opened({{.*}}) AnyObject) -> Int):
   // CHECK-NEXT: strong_retain [[OBJ_REF]]
-  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@cc(objc_method) @thin (Int, @sil_self AnyObject) -> Int
+  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@cc(objc_method) @thin (Int, @opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
   // CHECK-NEXT: [[RESULTTEMP:%.*]] = alloc_stack $Int
   // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]

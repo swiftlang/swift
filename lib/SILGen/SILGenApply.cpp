@@ -118,13 +118,6 @@ static Type getExistentialArchetype(SILValue existential) {
   return cast<ProtocolType>(ty)->getDecl()->getSelf()->getArchetype();
 }
 
-/// Get the 'Self' type of an AnyObject operand to use as the result type of
-/// projecting the object instance handle.
-static SILType getSelfTypeForDynamicLookup(SILGenFunction &gen,
-                                           SILValue existential) {
-  return gen.getLoweredType(getExistentialArchetype(existential));
-}
-
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
                                                       SILValue proto,
@@ -1400,11 +1393,15 @@ public:
     if (fd->isInstanceMember()) {
       assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
 
+      Type openedType = ArchetypeType::getOpened(
+                                    existential.getType().getSwiftRValueType());
+      SILType loweredOpenedType = gen.getLoweredLoadableType(openedType);
+      
       // Attach the existential cleanup to the projection so that it gets
       // consumed (or not) when the call is applied to it (or isn't).
-      val = gen.B.createProjectExistentialRef(dynamicMemberRef,
+      val = gen.B.createOpenExistentialRef(dynamicMemberRef,
                       existential.getValue(),
-                      getSelfTypeForDynamicLookup(gen, existential.getValue()));
+                      loweredOpenedType);
       ManagedValue proj(val, existential.getCleanup());
       setSelfParam(RValue(gen, dynamicMemberRef,
                           proj.getType().getSwiftRValueType(), proj),
@@ -2431,17 +2428,12 @@ namespace {
     SILType objPointerType = SILType::getNativeObjectType(gen.F.getASTContext());
     SILValue arg = args[0].getValue();
 
-    // If the argument is existential, project it.
+    // If the argument is existential, open it.
     if (substitutions[0].getReplacement()->isClassExistentialType()) {
-      SmallVector<ProtocolDecl *, 4> protocols;
-      substitutions[0].getReplacement()->getAnyExistentialTypeProtocols(protocols);
-      ProtocolDecl *proto = *std::find_if(protocols.begin(), protocols.end(),
-                                          [](ProtocolDecl *proto) {
-                                            return proto->requiresClass();
-                                          });
-      SILType protoSelfTy = gen.getLoweredType(
-                              proto->getSelf()->getArchetype());
-      arg = gen.B.createProjectExistentialRef(loc, arg, protoSelfTy);
+      Type openedTy
+        = ArchetypeType::getOpened(substitutions[0].getReplacement());
+      SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
+      arg = gen.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
     }
 
     SILValue result = gen.B.createUncheckedRefCast(loc, arg, objPointerType);
@@ -3272,14 +3264,16 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // Attach the existential cleanup to the projection so that it gets
     // consumed (or not) when the call is applied to it (or isn't).
     ManagedValue proj;
-    SILType protoSelfTy = getSelfTypeForDynamicLookup(*this, operand);
+    Type openedType = ArchetypeType::getOpened(operand.getType()
+                                                         .getSwiftRValueType());
+    SILType loweredOpenedType = getLoweredType(openedType);
+    
     if (operand.getType().isClassExistentialType()) {
-      SILValue val = B.createProjectExistentialRef(e, operand,
-                                                   protoSelfTy);
+      SILValue val = B.createOpenExistentialRef(e, operand, loweredOpenedType);
       proj = ManagedValue(val, existential.getCleanup());
     } else {
-      assert(protoSelfTy.isAddress() && "Self should be address-only");
-      SILValue val = B.createProjectExistential(e, operand, protoSelfTy);
+      assert(loweredOpenedType.isAddress() && "Self should be address-only");
+      SILValue val = B.createOpenExistential(e, operand, loweredOpenedType);
       proj = ManagedValue::forUnmanaged(val);
     }
     
@@ -3380,9 +3374,12 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   // Emit the base operand.
   ManagedValue existential = emitRValueAsSingleValue(e->getBase());
 
+  Type openedType = ArchetypeType::getOpened(
+                                   existential.getType().getSwiftRValueType());
+  SILType loweredOpenedType = getLoweredLoadableType(openedType);
+  
   SILValue base = existential.getValue();
-  base = B.createProjectExistentialRef(e, base, 
-           getSelfTypeForDynamicLookup(*this, base));
+  base = B.createOpenExistentialRef(e, base, loweredOpenedType);
 
   // Emit the index.
   RValue index = emitRValue(e->getIndex());
