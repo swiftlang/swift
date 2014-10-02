@@ -170,24 +170,27 @@ Module *TypeChecker::getStdlibModule(const DeclContext *dc) {
 }
 
 Type TypeChecker::lookupBoolType(const DeclContext *dc) {
-  return boolType.cache([&]{
-    UnqualifiedLookup boolLookup(Context.getIdentifier("Bool"),
-                                 getStdlibModule(dc), nullptr,
-                                 SourceLoc(),
-                                 /*IsTypeLookup=*/true);
-    if (!boolLookup.isSuccess()) {
-      diagnose(SourceLoc(), diag::bool_type_broken);
-      return Type();
-    }
-    TypeDecl *tyDecl = boolLookup.getSingleTypeResult();
-    
-    if (!tyDecl) {
-      diagnose(SourceLoc(), diag::bool_type_broken);
-      return Type();
-    }
-    
-    return tyDecl->getDeclaredType();
-  });
+  if (!boolType) {
+    boolType = ([&] {
+      UnqualifiedLookup boolLookup(Context.getIdentifier("Bool"),
+                                   getStdlibModule(dc), nullptr,
+                                   SourceLoc(),
+                                   /*IsTypeLookup=*/true);
+      if (!boolLookup.isSuccess()) {
+        diagnose(SourceLoc(), diag::bool_type_broken);
+        return Type();
+      }
+      TypeDecl *tyDecl = boolLookup.getSingleTypeResult();
+
+      if (!tyDecl) {
+        diagnose(SourceLoc(), diag::bool_type_broken);
+        return Type();
+      }
+
+      return tyDecl->getDeclaredType();
+    })();
+  }
+  return *boolType;
 }
 
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {

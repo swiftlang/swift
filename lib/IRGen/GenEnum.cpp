@@ -4631,13 +4631,12 @@ static void setAlignmentBits(llvm::BitVector &v, Alignment align) {
 
 const llvm::BitVector &
 IRGenModule::getHeapObjectSpareBits() const {
-  return HeapPointerSpareBits.cache([&]{
+  if (!HeapPointerSpareBits) {
     // Start with the spare bit mask for all pointers.
-    llvm::BitVector r = TargetInfo.PointerSpareBits;
+    HeapPointerSpareBits = TargetInfo.PointerSpareBits;
 
     // Low bits are made available by heap object alignment.
-    setAlignmentBits(r, TargetInfo.HeapObjectAlignment);
-    
-    return r;
-  });
+    setAlignmentBits(*HeapPointerSpareBits, TargetInfo.HeapObjectAlignment);
+  }
+  return *HeapPointerSpareBits;
 }

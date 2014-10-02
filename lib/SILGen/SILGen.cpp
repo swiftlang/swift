@@ -75,7 +75,7 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
   // are hacks for cases where coming up with those types is complicated, i.e.,
   // when dealing with generic bridging functions.
 
-  SILDeclRef fn = cacheSlot.cache([&] {
+  if (!cacheSlot) {
     Optional<UnqualifiedLookup> lookup
       = UnqualifiedLookup::forModuleAndName(SGM.M.getASTContext(),
                                             moduleName,
@@ -138,15 +138,15 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     
-    return c;
-  });
+    cacheSlot = c;
+  }
   
   DEBUG(llvm::dbgs() << "bridging function "
           << moduleName << '.' << functionName
           << " mapped to ";
-        fn.print(llvm::dbgs()));
+        cacheSlot->print(llvm::dbgs()));
   
-  return fn;
+  return *cacheSlot;
 }
 
 static SILType getStringTy(SILGenModule &SGM) {

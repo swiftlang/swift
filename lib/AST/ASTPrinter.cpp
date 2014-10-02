@@ -2465,16 +2465,16 @@ public:
 
   GenericParamList *getGenericParamListAtDepth(unsigned depth) {
     assert(Options.ContextGenericParams);
-    auto &paramLists = UnwrappedGenericParams.cache([&]{
+    if (!UnwrappedGenericParams) {
       std::vector<GenericParamList *> paramLists;
       for (auto *params = Options.ContextGenericParams;
            params;
            params = params->getOuterParameters()) {
         paramLists.push_back(params);
       }
-      return paramLists;
-    });
-    return paramLists.rbegin()[depth];
+      UnwrappedGenericParams = std::move(paramLists);
+    }
+    return UnwrappedGenericParams->rbegin()[depth];
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

@@ -85,18 +85,21 @@ static bool hasSingletonMetatype(CanType instanceType) {
 
 static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
                             StringRef moduleName, StringRef typeName) {
-  CanType t = cacheSlot.cache([&] {
-    Optional<UnqualifiedLookup> lookup
-      = UnqualifiedLookup::forModuleAndName(C, moduleName, typeName);
-    if (!lookup)
+  if (!cacheSlot) {
+    cacheSlot = ([&] {
+      Optional<UnqualifiedLookup> lookup
+        = UnqualifiedLookup::forModuleAndName(C, moduleName, typeName);
+      if (!lookup)
+        return CanType();
+      if (TypeDecl *typeDecl = lookup->getSingleTypeResult()) {
+        assert(typeDecl->getDeclaredType() &&
+               "bridged type must be type-checked");
+        return typeDecl->getDeclaredType()->getCanonicalType();
+      }
       return CanType();
-    if (TypeDecl *typeDecl = lookup->getSingleTypeResult()) {
-      assert(typeDecl->getDeclaredType() &&
-             "bridged type must be type-checked");
-      return typeDecl->getDeclaredType()->getCanonicalType();
-    }
-    return CanType();
-  });
+    })();
+  }
+  CanType t = *cacheSlot;
 
   // It is possible that we won't find a briding type (e.g. String) when we're
   // parsing the stdlib itself.
