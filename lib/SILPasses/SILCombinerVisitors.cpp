@@ -856,6 +856,35 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   return SLConcatenationOptimizer.optimize();
 }
 
+/// \brief Returns a list of instructions that only write into the uninitialized
+/// array \p Inst.
+static bool recursivelyCollectArrayWritesInstr(UserListTy &Uses,
+                                               SILInstruction *Inst) {
+  Uses.push_back(Inst);
+  for (auto Op : Inst->getUses()) {
+    if (isa<RefCountingInst>(Op->getUser()) ||
+        // The store must not store the array but only to the array.
+        (isa<StoreInst>(Op->getUser()) &&
+         dyn_cast<StoreInst>(Op->getUser())->getSrc().getDef() != Inst) ||
+        isa<DebugValueInst>(Op->getUser())) {
+      Uses.push_back(Op->getUser());
+      continue;
+    }
+
+    SILInstruction *Proj;
+    if ((Proj = dyn_cast<TupleExtractInst>(Op->getUser())) ||
+        (Proj = dyn_cast<StructExtractInst>(Op->getUser())) ||
+        (Proj = dyn_cast<IndexAddrInst>(Op->getUser())) ||
+        (Proj = dyn_cast<PointerToAddressInst>(Op->getUser())))
+      if (recursivelyCollectArrayWritesInstr(Uses, Proj))
+        continue;
+
+    return false;
+  }
+
+  return true;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
@@ -906,6 +935,16 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       // Try to optimize string concatenation.
       if (auto I = optimizeConcatenationOfStringLiterals(AI)) {
         return I;
+      }
+    }
+    if (SF->hasSemanticsString("array.uninitialized")) {
+      UserListTy Users;
+      // If the uninitialized array is only written into then it can be removed.
+      if (recursivelyCollectArrayWritesInstr(Users, AI)) {
+        // Erase all of the reference counting instructions and the array
+        // allocation instruction.
+        for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
+          eraseInstFromFunction(**rit);
       }
     }
   }
