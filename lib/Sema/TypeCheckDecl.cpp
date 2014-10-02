@@ -7555,10 +7555,10 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     auto type = pattern->getType();
 
     // For literal-convertible types, form the corresponding literal.
-#define CHECK_LITERAL_PROTOCOL(Kind, String)                            \
+#define CHECK_LITERAL_PROTOCOL(Kind, String) \
     if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) { \
-      if (tc.conformsToProtocol(type, proto, dc))                       \
-        return String;                                                  \
+      if (tc.conformsToProtocol(type, proto, dc)) \
+        return std::string(String); \
     }
     CHECK_LITERAL_PROTOCOL(ArrayLiteralConvertible, "[]")
     CHECK_LITERAL_PROTOCOL(DictionaryLiteralConvertible, "[]")
@@ -7571,7 +7571,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 
     // For optional types, use 'nil'.
     if (type->getAnyOptionalObjectType())
-      return "nil";
+      return std::string("nil");
 
     return Nothing;
   }

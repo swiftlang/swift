@@ -614,8 +614,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   
   auto *f = 
     SILFunction::create(M, SILLinkage::Private, funcName,
-                        initSILType, nullptr,
-                        binding, IsNotBare, IsNotTransparent,
+                        initSILType, nullptr, SILLocation(binding),
+                        IsNotBare, IsNotTransparent,
                         IsNotFragile,
                         InlineDefault);
   f->setDebugScope(new (M)

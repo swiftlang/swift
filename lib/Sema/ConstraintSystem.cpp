@@ -692,7 +692,7 @@ Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
       return Nothing;
 
     auto genericArgs = boundStruct->getGenericArgs();
-    return { genericArgs[0], genericArgs[1] };
+    return std::make_pair(genericArgs[0], genericArgs[1]);
   }
 
   return Nothing;

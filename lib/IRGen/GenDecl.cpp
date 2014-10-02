@@ -1065,7 +1065,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (var->getDecl()) {
     // If we have the VarDecl, use it for more accurate debugging information.
     DebugTypeInfo DbgTy(var->getDecl(), ti);
-    gvar = link.createVariable(*this, ti.StorageType, DbgTy, var->getDecl(),
+    gvar = link.createVariable(*this, ti.StorageType, DbgTy,
+                               SILLocation(var->getDecl()),
                                var->getDecl()->getName().str());
   } else {
     // There is no VarDecl for a SILGlobalVariable, and thus also no context.
@@ -1106,7 +1107,8 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   DebugTypeInfo DbgTy(var, type);
   auto addr = link.createVariable(*this, type.StorageType,
-                                  DbgTy, var, var->getName().str());
+                                  DbgTy, SILLocation(var),
+                                  var->getName().str());
   // Ask the type to give us an Address.
   Address result = type.getAddressForPointer(addr);
 
