@@ -189,20 +189,20 @@ void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
 static Optional<Diag<bool,Type>>
 isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
   if (type->isObjCExistentialType())
-    return {}; // @objc existential types are okay
+    return Nothing; // @objc existential types are okay
 
   auto nominal = type->getAnyNominal();
 
   if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
     if (classDecl->isObjC())
-      return {}; // @objc class types are okay.
+      return Nothing; // @objc class types are okay.
     return diag::iboutlet_nonobjc_class;
   }
 
   if (nominal == TC.Context.getStringDecl()) {
     // String is okay because it is bridged to NSString.
     // FIXME: BridgesTypes.def is almost sufficient for this.
-    return {};
+    return Nothing;
   }
 
   if (nominal == TC.Context.getArrayDecl()) {

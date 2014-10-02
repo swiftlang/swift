@@ -281,7 +281,7 @@ void CompilerInstance::performSema() {
 
   if (Kind == SourceFileKind::REPL) {
     auto *SingleInputFile =
-      new (*Context) SourceFile(*MainModule, Kind, {}, modImpKind);
+      new (*Context) SourceFile(*MainModule, Kind, Nothing, modImpKind);
     MainModule->addFile(*SingleInputFile);
     addAdditionalInitialImports(SingleInputFile);
     return;

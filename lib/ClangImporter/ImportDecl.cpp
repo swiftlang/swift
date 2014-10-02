@@ -5248,6 +5248,6 @@ Optional<MappedTypeNameKind>
 ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *decl) {
   auto iter = SpecialTypedefNames.find(decl->getCanonicalDecl());
   if (iter == SpecialTypedefNames.end())
-    return {};
+    return Nothing;
   return iter->second;
 }

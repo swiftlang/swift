@@ -201,7 +201,7 @@ public:
   }
 
   StringRef extractText(CharSourceRange Range,
-                        Optional<unsigned> BufferID = {}) const;
+                        Optional<unsigned> BufferID = Nothing) const;
 
   llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                 const Twine &Msg,

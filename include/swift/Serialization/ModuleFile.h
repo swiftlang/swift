@@ -520,7 +520,7 @@ public:
   ///                      kinds of decls, used to avoid re-entrant
   ///                      deserialization.
   Decl *getDecl(serialization::DeclID DID,
-                Optional<DeclContext *> ForcedContext = {});
+                Optional<DeclContext *> ForcedContext = Nothing);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
