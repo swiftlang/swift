@@ -148,8 +148,16 @@ array.get_element(index: Int) -> Element
    guarded by ``check_subscript``. Any ``check_subscript`` may act as a
    guard, regardless of the index being checked [#f1]_.
 
+array.get_element_address(index: Int) -> UnsafeMutablePointer<Element>
+
+   Get the address of an element of the array. No state is written. The storage
+   descriptor is not read. The resulting pointer may be used to access elements
+   in the array. This operation is not control dependent, but may be guarded by
+   ``check_subscript``. Any ``check_subscript``, ``make_mutable`` or
+   ``mutate_unknown`` may act as a guard.
+
 array.set_element(index: Int, e: Element)
-   
+
   Write an element into the array at the specified index. No state is
   read. No other elements are written. The storage descriptor is not
   written. This operation is control dependent and may be guarded by
@@ -219,20 +227,22 @@ guards
   sequence originally appears.
 
 An operation can only interfere-with or guard another if they may operate on the same Array.
+``get_element_address`` is abbreviated with ``get_elt_addr`` in the table below.
 
 ================ =============== ==========================================
 semantic op      relation        semantic ops
 ================ =============== ==========================================
-make_mutable     guards          set_element
-check_subscript  guards          get_element, set_element
-set_element(i)   interferes-with get_element(i)
+make_mutable     guards          set_element, get_elt_addr
+check_subscript  guards          get_element, set_element, get_elt_addr
+set_element(i)   interferes-with get_element(i), get_elt_addr, set_element(i)
+get_elt_addr     interferes-with get_element, set_element
 mutate_unknown   itereferes-with get_element, set_element, check_subscript,
-                                 get_count, get_capacity
+                                 get_count, get_capacity, get_elt_addr
 ================ =============== ==========================================
 
 .. [#f1] Any check_subscript(N) may act as a guard for
-         ``get/set_element(i)`` as long as it can be shown that ``N >=
-         i``.
+         ``get/set_element(i)/get_element_address(i)`` as long as it can be
+         shown that ``N >= i``.
 
 In addition to preserving these semantics, the optimizer must
 conservatively handle any unknown access to the array object. For
