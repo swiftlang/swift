@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_GENOBJC_H
 #define SWIFT_IRGEN_GENOBJC_H
 
+#include "swift/Basic/Optional.h"
+
 namespace llvm {
   class Type;
   class Value;

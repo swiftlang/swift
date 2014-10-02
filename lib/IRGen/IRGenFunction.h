@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGENFUNCTION_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Optional.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILLocation.h"
 #include "llvm/ADT/DenseMap.h"
@@ -42,7 +43,6 @@ namespace swift {
   class FuncDecl;
   class EnumElementDecl;
   class EnumType;
-  template<typename T> class Optional;
   class Pattern;
   class PatternBindingDecl;
   class SILDebugScope;

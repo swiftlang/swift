@@ -23,7 +23,6 @@
 namespace swift {
   class ApplyInst;
   class FuncDecl;
-  template <class T> class Optional;
   enum class ResilienceExpansion : unsigned;
   class Substitution;
   class SILType;
