@@ -145,20 +145,20 @@ private:
   PotentialArchetype *addGenericParameter(ProtocolDecl *RootProtocol,
                            Identifier ParamName,
                            unsigned ParamDepth, unsigned ParamIndex,
-                           Optional<unsigned> Index = Nothing);
+                           Optional<unsigned> Index = None);
 
 public:
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool addGenericParameter(GenericTypeParamDecl *GenericParam,
-                           Optional<unsigned> Index = Nothing);
+                           Optional<unsigned> Index = None);
 
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool addGenericParameter(GenericTypeParamType *GenericParam,
-                           Optional<unsigned> Index = Nothing);
+                           Optional<unsigned> Index = None);
   
   /// \brief Add a new requirement.
   ///
@@ -327,7 +327,7 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name,
-                     Optional<unsigned> Index = Nothing)
+                     Optional<unsigned> Index = None)
     : Parent(Parent), Name(Name), Index(Index), Representative(this),
       ArchetypeOrConcreteType() { }
 

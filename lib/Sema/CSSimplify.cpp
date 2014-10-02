@@ -74,7 +74,7 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 
   // If the edit distance would be too long, we're done.
   if (maxScore != 0 && dist > maxScore)
-    return Nothing;
+    return None;
 
   // The distance can be zero due to the "with" transformation above.
   if (dist == 0)
@@ -83,7 +83,7 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   // Only allow about one typo for every two properly-typed characters, which
   // prevents completely-wacky suggestions in many cases.
   if (dist > (argName.size() + 1) / 3)
-    return Nothing;
+    return None;
 
   return dist;
 }
@@ -206,7 +206,7 @@ bool constraints::matchCallArguments(
 
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
-      return Nothing;
+      return None;
 
     // When the expected name is empty, we claim the next argument if it has
     // no name.
@@ -215,7 +215,7 @@ bool constraints::matchCallArguments(
       if (nextArgIdx == numArgs ||
           claimedArgs[nextArgIdx] ||
           (argTuple[nextArgIdx].hasName() && !ignoreNameMismatch))
-        return Nothing;
+        return None;
 
       return claim(name, nextArgIdx);
     }
@@ -263,7 +263,7 @@ bool constraints::matchCallArguments(
 
     // If we're not supposed to attempt any fixes, we're done.
     if (!allowFixes)
-      return Nothing;
+      return None;
 
     // Several things could have gone wrong here, and we'll check for each
     // of them at some point:
@@ -277,7 +277,7 @@ bool constraints::matchCallArguments(
     // Redundant keyword arguments.
     if (claimedWithSameName) {
       // FIXME: We can provide better diagnostics here.
-      return Nothing;
+      return None;
     }
 
     // Missing a keyword argument name.
@@ -287,7 +287,7 @@ bool constraints::matchCallArguments(
     }
 
     // Typo correction is handled in a later pass.
-    return Nothing;
+    return None;
   };
 
   // Local function that attempts to bind the given parameter to arguments in
@@ -2575,7 +2575,7 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 2> parts;
   Expr *anchor = locator.getLocatorParts(parts);
   if (!anchor)
-    return Nothing;
+    return None;
 
   while (!parts.empty()) {
     if (parts.back().getKind() == ConstraintLocator::Member ||
@@ -2603,11 +2603,11 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   }
   
   if (!parts.empty())
-    return Nothing;
+    return None;
 
   auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
   if (known == cs.ArgumentLabels.end())
-    return Nothing;
+    return None;
 
   return known->second;
 }

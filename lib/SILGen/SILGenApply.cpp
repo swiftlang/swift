@@ -706,7 +706,7 @@ public:
   getSpecializedEmitter(SILGenModule &SGM, unsigned uncurryLevel) const {
     // Currently we have no curried known functions.
     if (uncurryLevel != 0)
-      return Nothing;
+      return None;
     
     switch (kind) {
     case Kind::StandaloneFunction: {
@@ -721,7 +721,7 @@ public:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
-      return Nothing;
+      return None;
     }
     llvm_unreachable("bad callee kind");
   }
@@ -2186,7 +2186,7 @@ namespace {
                            substFnType,
                            origFormalType,
                            uncurriedSites.back().getSubstResultType(),
-                           transparent, Nothing,
+                           transparent, None,
                            uncurriedContext);
       
       // End the initial writeback scope, if any.
@@ -2214,7 +2214,7 @@ namespace {
                            substFnType,
                            origFormalType,
                            extraSites[i].getSubstResultType(),
-                           false, Nothing, context);
+                           false, None, context);
       }
       
       return result;
@@ -2789,7 +2789,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   return emitApply(loc, mv, subs, args, substFnType,
                    AbstractionPattern(origFormalType.getResult()),
                    substFormalType.getResult(),
-                   transparent, Nothing, ctx);
+                   transparent, None, ctx);
 }
 
 /// Allocate an uninitialized array of a given size, returning the array

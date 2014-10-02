@@ -35,7 +35,7 @@ UUID::UUID() {
 Optional<UUID> UUID::fromString(const char *s) {
   UUID result;
   if (uuid_parse(s, result.Value))
-    return Nothing;
+    return None;
   return result;
 }
 

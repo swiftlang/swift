@@ -129,7 +129,7 @@ public:
   unsigned addMemBufferCopy(StringRef InputData, StringRef BufIdentifier = "");
 
   /// Returns a buffer ID for a previously added buffer with the given
-  /// buffer identifier, or Nothing if there is no such buffer.
+  /// buffer identifier, or None if there is no such buffer.
   Optional<unsigned> getIDForBufferIdentifier(StringRef BufIdentifier);
 
   /// Returns the identifier for the buffer with the given ID.
@@ -201,7 +201,7 @@ public:
   }
 
   StringRef extractText(CharSourceRange Range,
-                        Optional<unsigned> BufferID = Nothing) const;
+                        Optional<unsigned> BufferID = None) const;
 
   llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                 const Twine &Msg,

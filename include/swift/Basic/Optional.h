@@ -27,11 +27,8 @@
 #include "llvm/ADT/Optional.h"
 
 namespace swift {
-  static auto Nothing = llvm::None;
-  using Nothing_t = decltype(Nothing);
-
-  template <typename T>
-  using Optional = llvm::Optional<T>;
+  using llvm::None;
+  using llvm::Optional;
 }
 
 #endif

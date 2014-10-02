@@ -883,7 +883,7 @@ static unsigned getConstructorPrefix(const ClauseMatrix &matrix,
 /// Select the "necessary column", Maranget's term for the column
 /// most likely to give an optimal decision tree.
 ///
-/// \return Nothing if we didn't find a meaningful necessary column
+/// \return None if we didn't find a meaningful necessary column
 static Optional<unsigned>
 chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
   assert(firstRow < matrix.rows() &&
@@ -896,7 +896,7 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
     if (numColumns == 1 && !isWildcardPattern(matrix[firstRow][0])) {
       return 0;
     }
-    return Nothing;
+    return None;
   }
 
   // Use the "constructor prefix" heuristic from Maranget to pick the

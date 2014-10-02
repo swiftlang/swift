@@ -888,7 +888,7 @@ namespace {
       if (known != solution.overloadChoices.end())
         return known->second;
 
-      return Nothing;
+      return None;
     }
 
     /// \brief Simplify the given type by substituting all occurrences of
@@ -3075,7 +3075,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
             [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
               auto known = solution.overloadChoices.find(locator);
               if (known == solution.overloadChoices.end()) {
-                return Nothing;
+                return None;
               }
 
               return known->second;

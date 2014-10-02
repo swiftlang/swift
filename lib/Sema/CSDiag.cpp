@@ -585,7 +585,7 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
                                       Type()};
           }
 
-          return Nothing;
+          return None;
         },
         [&](ValueDecl *decl,
             Type openedType) -> ConcreteDeclRef {

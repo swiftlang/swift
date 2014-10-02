@@ -691,7 +691,7 @@ UnqualifiedLookup::forModuleAndName(ASTContext &C,
                                     StringRef Mod, StringRef Name) {
   if (Module *m = C.getLoadedModule(C.getIdentifier(Mod)))
     return UnqualifiedLookup(C.getIdentifier(Name), m, nullptr);
-  return Nothing;
+  return None;
 }
 
 TypeDecl* UnqualifiedLookup::getSingleTypeResult() {

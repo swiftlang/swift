@@ -433,19 +433,19 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
   case tok::l_brace:
     P.StructureMarkers.push_back({tok.getLoc(),
                                   StructureMarkerKind::OpenBrace,
-                                  Nothing});
+                                  None});
     break;
 
   case tok::l_paren:
     P.StructureMarkers.push_back({tok.getLoc(),
                                   StructureMarkerKind::OpenParen,
-                                  Nothing});
+                                  None});
     break;
 
   case tok::l_square:
     P.StructureMarkers.push_back({tok.getLoc(),
                                   StructureMarkerKind::OpenSquare,
-                                  Nothing});
+                                  None});
     break;
 
   default:

@@ -960,7 +960,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   std::map<const NominalTypeDecl *, DeducedAssociatedTypes>
       DeducedAssociatedTypeCache;
 
-  Optional<SemanticContextKind> ForcedSemanticContext = Nothing;
+  Optional<SemanticContextKind> ForcedSemanticContext = None;
 
 public:
   bool FoundFunctionCalls = false;

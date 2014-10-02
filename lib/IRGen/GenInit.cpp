@@ -111,7 +111,7 @@ OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF, SILType T,
   llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name + ".alloc");
 
   // FIXME: provide non-fixed offsets
-  NonFixedOffsets offsets = Nothing;
+  NonFixedOffsets offsets = None;
 
   // Cast and GEP down to the element.
   Address rawAddr = layout.emitCastTo(IGF, allocation);

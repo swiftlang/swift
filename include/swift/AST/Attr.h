@@ -194,7 +194,7 @@ public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
-  Optional<AbstractCC> cc = Nothing;
+  Optional<AbstractCC> cc = None;
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
@@ -766,7 +766,7 @@ public:
   /// Retrieve the name of this entity, if specified.
   Optional<ObjCSelector> getName() const {
     if (!hasName())
-      return Nothing;
+      return None;
 
     return ObjCSelector::getFromOpaqueValue(NameData);
   }

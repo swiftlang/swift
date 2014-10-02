@@ -895,7 +895,7 @@ Optional<unsigned>
 ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
                                    bool minimize) {
   if (viable.empty())
-    return Nothing;
+    return None;
   if (viable.size() == 1)
     return 0;
 
@@ -946,7 +946,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     case SolutionCompareResult::Incomparable:
       // If we're not supposed to minimize the result set, just return eagerly.
       if (!minimize)
-        return Nothing;
+        return None;
 
       ambiguous = true;
       break;
@@ -1009,7 +1009,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   viable.erase(viable.begin() + outIndex, viable.end());
   NumDiscardedSolutions += viable.size() - outIndex;
 
-  return Nothing;
+  return None;
 }
 
 SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {

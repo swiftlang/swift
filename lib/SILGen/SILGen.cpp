@@ -189,7 +189,7 @@ SILDeclRef SILGenModule::getNSArrayToArrayFn() {
                        FOUNDATION_MODULE_NAME,
                        "_convertNSArrayToArray",
                        { getNSArrayTy(*this) },
-                       Nothing /*FIXME: Array<T>*/);
+                       None /*FIXME: Array<T>*/);
 }
 
 static SILType getNSDictionaryTy(SILGenModule &SGM) {
@@ -210,7 +210,7 @@ SILDeclRef SILGenModule::getNSDictionaryToDictionaryFn() {
                        FOUNDATION_MODULE_NAME,
                        "_convertNSDictionaryToDictionary",
                        { getNSDictionaryTy(*this) },
-                       Nothing /*FIXME: Dictionary<K, V>*/);
+                       None /*FIXME: Dictionary<K, V>*/);
 }
 
 #define STANDARD_GET_BRIDGING_FN(Module, FromTy, ToTy) \
@@ -298,7 +298,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
-                                Nothing, IsNotBare, IsTrans, IsFrag,
+                                None, IsNotBare, IsTrans, IsFrag,
                                 inlineStrategy, EK);
 
   F->setGlobalInit(constant.isGlobal());
@@ -891,7 +891,7 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
 
 std::unique_ptr<SILModule> swift::performSILGeneration(Module *mod,
                                                        bool makeModuleFragile) {
-  return SILModule::constructSIL(mod, nullptr, Nothing, makeModuleFragile);
+  return SILModule::constructSIL(mod, nullptr, None, makeModuleFragile);
 }
 
 std::unique_ptr<SILModule>

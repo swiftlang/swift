@@ -170,7 +170,7 @@ namespace swift {
   /// If \p makeModuleFragile is true, all functions and global variables of
   /// the module are marked as fragile. This is used for compiling the stdlib.
   std::unique_ptr<SILModule>
-  performSILGeneration(SourceFile &SF, Optional<unsigned> StartElem = Nothing,
+  performSILGeneration(SourceFile &SF, Optional<unsigned> StartElem = None,
                        bool makeModuleFragile = false);
 
   using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;

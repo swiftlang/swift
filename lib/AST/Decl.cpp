@@ -707,11 +707,11 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   if (Decls.size() == 1)
     return FirstKind;
   if (FirstKind != ImportKind::Func)
-    return Nothing;
+    return None;
 
   for (auto NextDecl : Decls.slice(1)) {
     if (ImportDecl::getBestImportKind(NextDecl) != FirstKind)
-      return Nothing;
+      return None;
   }
 
   return FirstKind;

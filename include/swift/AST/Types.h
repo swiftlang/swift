@@ -1599,7 +1599,7 @@ public:
   ///
   /// This leaves the 'representation' property unavailable.
   static MetatypeType *get(Type T, const ASTContext &C) {
-    return get(T, Nothing, C);
+    return get(T, None, C);
   }
   
   /// Return the MetatypeType for the specified type declaration with
@@ -1608,7 +1608,7 @@ public:
   /// Metatype representation is a SIL-only property. Thin metatypes
   /// can be lowered away to empty types in IR.
   static MetatypeType *get(Type T,
-                           Optional<MetatypeRepresentation> repr = Nothing) {
+                           Optional<MetatypeRepresentation> repr = None) {
     return get(T, repr, T->getASTContext());
   }
 
@@ -1656,7 +1656,7 @@ public:
   /// metatypes cannot be thin.
   static ExistentialMetatypeType *get(Type T,
                                       Optional<MetatypeRepresentation> repr
-                                        = Nothing) {
+                                        = None) {
     return get(T, repr, T->getASTContext());
   }
 
@@ -2955,7 +2955,7 @@ public:
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
   static ArchetypeType *getOpened(Type existential, 
-                                  Optional<UUID> knownID = Nothing);
+                                  Optional<UUID> knownID = None);
 
   /// \brief Retrieve the name of this archetype.
   Identifier getName() const { return Name; }

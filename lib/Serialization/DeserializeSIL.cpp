@@ -38,7 +38,7 @@ fromStableStringEncoding(unsigned value) {
   switch (value) {
   case SIL_UTF8: return StringLiteralInst::Encoding::UTF8;
   case SIL_UTF16: return StringLiteralInst::Encoding::UTF16;
-  default: return Nothing;
+  default: return None;
   }
 }
 
@@ -53,7 +53,7 @@ fromStableSILLinkage(unsigned value) {
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
   case SIL_LINKAGE_SHARED_EXTERNAL: return SILLinkage::SharedExternal;
   case SIL_LINKAGE_PRIVATE_EXTERNAL: return SILLinkage::PrivateExternal;
-  default: return Nothing;
+  default: return None;
   }
 }
 
@@ -1600,7 +1600,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   SILGlobalVariable *v = SILGlobalVariable::create(
                            SILMod, linkage.getValue(), (IsFragile_t)isFragile,
                            Name.str(), getSILType(Ty, SILValueCategory::Object),
-                           Nothing,
+                           None,
                            dID ? cast<VarDecl>(MF->getDecl(dID)): nullptr);
   globalVarOrOffset = v;
   v->setDeclaration(IsDeclaration);

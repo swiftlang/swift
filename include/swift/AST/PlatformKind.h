@@ -37,7 +37,7 @@ enum class PlatformKind {
 StringRef platformString(PlatformKind platform);
   
 /// Returns the platform kind corresponding to the passed-in short platform name
-/// or Nothing if such a platform kind does not exist.
+/// or None if such a platform kind does not exist.
 Optional<PlatformKind> platformFromString(StringRef Name);
 
 /// Returns a human-readiable version of the platform name as a string, suitable

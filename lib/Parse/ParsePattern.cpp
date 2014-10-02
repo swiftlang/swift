@@ -845,9 +845,9 @@ Parser::parsePatternTupleElement(bool isLet) {
   // Parse the pattern.
   ParserResult<Pattern>  pattern = parsePattern(isLet);
   if (pattern.hasCodeCompletion())
-    return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
+    return std::make_pair(makeParserCodeCompletionStatus(), None);
   if (pattern.isNull())
-    return std::make_pair(makeParserError(), Nothing);
+    return std::make_pair(makeParserError(), None);
 
   // We don't accept initializers here, but parse one if it's there
   // for recovery purposes.

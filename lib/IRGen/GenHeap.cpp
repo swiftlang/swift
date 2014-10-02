@@ -86,7 +86,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
   Address structAddr = layout.emitCastTo(IGF, fn->arg_begin());
 
   // FIXME: provide non-fixed offsets
-  NonFixedOffsets offsets = Nothing;
+  NonFixedOffsets offsets = None;
 
   for (unsigned i : indices(layout.getElements())) {
     auto &field = layout.getElements()[i];

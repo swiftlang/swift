@@ -186,7 +186,7 @@ namespace {
     Optional<DIKind> getConditional(unsigned Elt) const {
       bool V1 = Data[Elt*2], V2 = Data[Elt*2+1];
       if (V1 == V2)
-        return V1 ? Optional<DIKind>(Nothing) : DIKind::No;
+        return V1 ? Optional<DIKind>(None) : DIKind::No;
       return V2 ? DIKind::Yes : DIKind::Partial;
     }
 
@@ -1513,7 +1513,7 @@ Optional<DIKind> LifetimeChecker::getLiveOut1(SILBasicBlock *BB) {
   case LiveOutBlockState::IsComputingLiveOut:
     // In cyclic cases we contribute no information, allow other nodes feeding
     // in to define the successors liveness.
-    return Nothing;
+    return None;
   case LiveOutBlockState::IsUnknown:
     // Otherwise, process this block.
     break;
@@ -1669,7 +1669,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
       }
     }
 
-    Optional<DIKind> ResultVal = Nothing;
+    Optional<DIKind> ResultVal = None;
     getPredsLiveOut1(InstBB, ResultVal);
 
     // If the result element wasn't computed, we must be analyzing code within

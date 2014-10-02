@@ -515,7 +515,7 @@ public:
   ///
   /// \param TopLevelLoc The location of the top level AST node for which we are
   ///            constructing the epilog, such as a AbstractClosureExpr.
-  /// \returns Nothing if the epilog block is unreachable. Otherwise, returns
+  /// \returns None if the epilog block is unreachable. Otherwise, returns
   ///          the epilog block's return value argument, or a null SILValue if
   ///          the epilog doesn't take a return value. Also returns the location
   ///          of the return instrcution if the epilog block is supposed to host
@@ -875,7 +875,7 @@ public:
                                     ArrayRef<ManagedValue> args,
                                     CanType resultType,
                                     bool transparent = false,
-                                    Optional<AbstractCC> overrideCC = Nothing);
+                                    Optional<AbstractCC> overrideCC = None);
 
   ManagedValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                            FuncDecl *fn,

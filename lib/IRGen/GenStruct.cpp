@@ -258,11 +258,11 @@ namespace {
       ClangRecordTypeInfo::initialize(IGF, params, addr);
     }
 
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return Nothing;
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return None;
     }
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const {
-      return Nothing;
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
     }
   };
 
@@ -287,11 +287,11 @@ namespace {
                               Address addr, SILType T) const override {
       LoadableStructTypeInfo::initialize(IGF, params, addr);
     }
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return Nothing;
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return None;
     }
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const {
-      return Nothing;
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
     }
   };
 
@@ -309,10 +309,12 @@ namespace {
                            fields, T, size, std::move(spareBits), align,
                            isPOD, isBT)
     {}
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return Nothing;
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return None;
     }
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
+    }
   };
   
   /// Find the beginning of the field offset vector in a struct's metadata.

@@ -1133,7 +1133,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
     auto linkage = fnRef.getLinkage(forDefinition);
     auto type = SILMod->Types.getConstantType(fnRef).castTo<SILFunctionType>();
     fn = SILFunction::create(*SILMod, linkage, name, type, nullptr,
-                             Nothing, IsNotBare, IsNotTransparent, IsNotFragile);
+                             None, IsNotBare, IsNotTransparent, IsNotFragile);
   }
   return getAddrOfSILFunction(fn, forDefinition);
 }
@@ -1544,7 +1544,7 @@ Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarInitDestroy(
     return getAddrOfSILFunction(silFn, forDefinition);
   }
 
-  return Nothing;
+  return None;
 }
 
 /// Returns the address of a value-witness function.

@@ -741,7 +741,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Value *context = params.takeLast();
   Address dataAddr = layout.emitCastTo(subIGF, context);
   auto &fieldLayout = layout.getElements()[0];
-  Address selfAddr = fieldLayout.project(subIGF, dataAddr, Nothing);
+  Address selfAddr = fieldLayout.project(subIGF, dataAddr, None);
   Explosion selfParams;
   if (retainsSelf)
     cast<LoadableTypeInfo>(selfTI).loadAsCopy(subIGF, selfAddr, selfParams);
@@ -812,7 +812,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
                     selfType, selfTypeInfo);
   llvm::Value *data = IGF.emitUnmanagedAlloc(layout, "closure");
   // FIXME: non-fixed offsets
-  NonFixedOffsets offsets = Nothing;
+  NonFixedOffsets offsets = None;
   Address dataAddr = layout.emitCastTo(IGF, data);
   auto &fieldLayout = layout.getElements()[0];
   auto &fieldType = layout.getElementTypes()[0];
@@ -1183,7 +1183,7 @@ irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
   Optional<llvm::Function*> objcImpl 
     = IGM.getAddrOfObjCIVarInitDestroy(cd, isDestroyer, NotForDefinition);
   if (!objcImpl)
-    return Nothing;
+    return None;
 
   /// The first element is the selector.
   SILDeclRef declRef = SILDeclRef(cd, 

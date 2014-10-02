@@ -7543,13 +7543,13 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #define PATTERN(Id, Parent)
 #include "swift/AST/PatternNodes.def"
-    return Nothing;
+    return None;
   case PatternKind::Any:
-    return Nothing;
+    return None;
 
   case PatternKind::Named: {
     if (!pattern->hasType())
-      return Nothing;
+      return None;
 
     // Special-case the various types we might see here.
     auto type = pattern->getType();
@@ -7573,7 +7573,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     if (type->getAnyOptionalObjectType())
       return std::string("nil");
 
-    return Nothing;
+    return None;
   }
 
   case PatternKind::Paren: {
@@ -7582,7 +7582,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
       return "(" + *sub + ")";
     }
 
-    return Nothing;
+    return None;
   }
 
   case PatternKind::Tuple: {
@@ -7598,7 +7598,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 
         result += *sub;
       } else {
-        return Nothing;
+        return None;
       }
     }
     result += ")";

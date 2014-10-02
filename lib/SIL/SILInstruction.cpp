@@ -38,7 +38,7 @@ Optional<SILLocation> SILValue::getLoc() const {
   if (auto I = dyn_cast<SILInstruction>(*this)) {
     return I->getLoc();
   }
-  return Nothing;
+  return None;
 }
 
 //===----------------------------------------------------------------------===//

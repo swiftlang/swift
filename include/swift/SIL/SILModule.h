@@ -208,7 +208,7 @@ public:
   /// the module are marked as fragile. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
   constructSIL(Module *M, SourceFile *sf = nullptr,
-               Optional<unsigned> startElem = Nothing,
+               Optional<unsigned> startElem = None,
                bool makeModuleFragile = false);
 
   /// \brief Create and return an empty SIL module that we can

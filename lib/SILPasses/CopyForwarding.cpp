@@ -99,7 +99,7 @@ static Optional<bool> isDeinit(Operand* Oper) {
   case ValueKind::InitEnumDataAddrInst:
     llvm_unreachable("illegal reinitialization");
   default:
-    return Nothing;
+    return None;
   }
 }
 
@@ -146,7 +146,7 @@ static Optional<bool> isInit(Operand* Oper) {
   case ValueKind::UncheckedTakeEnumDataAddrInst:
     llvm_unreachable("illegal deinitialization");
   default:
-    return Nothing;
+    return None;
   }
 }
 

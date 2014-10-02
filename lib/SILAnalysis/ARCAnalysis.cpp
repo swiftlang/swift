@@ -331,7 +331,7 @@ bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
 //===----------------------------------------------------------------------===//
 
 /// If \p Op has arc uses in the instruction range [Start, End), return the
-/// first such instruction. Otherwise return Nothing. We assume that
+/// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.
 Optional<SILBasicBlock::iterator>
 swift::arc::
@@ -344,7 +344,7 @@ valueHasARCUsesInInstructionRange(SILValue Op,
 
   // If Start == End, then we have an empty range, return false.
   if (Start == End)
-    return Nothing;
+    return None;
 
   // Otherwise, until Start != End.
   while (Start != End) {
@@ -357,11 +357,11 @@ valueHasARCUsesInInstructionRange(SILValue Op,
   }
 
   // If all such instructions can not use Op, return false.
-  return Nothing;
+  return None;
 }
 
 /// If \p Op has instructions in the instruction range (Start, End] which may
-/// decrement it, return the first such instruction. Returns Nothing
+/// decrement it, return the first such instruction. Returns None
 /// if no such instruction exists. We assume that Start and End are both in the
 /// same basic block.
 Optional<SILBasicBlock::iterator>
@@ -375,7 +375,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 
   // If Start == End, then we have an empty range, return nothing.
   if (Start == End)
-    return Nothing;
+    return None;
 
   // Otherwise, until Start != End.
   while (Start != End) {
@@ -389,7 +389,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
   }
 
   // If all such instructions can not decrement Op, return nothing.
-  return Nothing;
+  return None;
 }
 
 //===----------------------------------------------------------------------===//

@@ -2644,7 +2644,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   SmallVector<AddressToDeallocate, 4> addressesToDeallocate;
 
   // FIXME: support
-  NonFixedOffsets offsets = Nothing;
+  NonFixedOffsets offsets = None;
   
   // If there's a data pointer required, grab it (it's always the
   // last parameter) and load out the extra, previously-curried
@@ -2858,7 +2858,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     Address dataAddr = layout.emitCastTo(IGF, data);
 
     // FIXME: preserve non-fixed offsets
-    NonFixedOffsets offsets = Nothing;
+    NonFixedOffsets offsets = None;
     
     // Perform the store.
     for (unsigned i : indices(layout.getElements())) {

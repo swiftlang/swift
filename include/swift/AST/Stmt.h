@@ -53,7 +53,7 @@ class alignas(8) Stmt {
   unsigned Implicit : 1;
 
 protected:
-  /// Return the given value for the 'implicit' flag if present, or if Nothing,
+  /// Return the given value for the 'implicit' flag if present, or if None,
   /// return true if the location is invalid.
   bool getDefaultImplicitFlag(Optional<bool> implicit, SourceLoc keyLoc) {
     return implicit.hasValue() ? *implicit : keyLoc.isInvalid();
@@ -126,7 +126,7 @@ public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
                            ArrayRef<ASTNode> elements,
                            SourceLoc rbloc,
-                           Optional<bool> implicit = Nothing);
+                           Optional<bool> implicit = None);
 
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
@@ -161,7 +161,7 @@ class ReturnStmt : public Stmt {
   
 public:
   ReturnStmt(SourceLoc ReturnLoc, Expr *Result,
-             Optional<bool> implicit = Nothing)
+             Optional<bool> implicit = None)
     : Stmt(StmtKind::Return, getDefaultImplicitFlag(implicit, ReturnLoc)),
       ReturnLoc(ReturnLoc), Result(Result) {}
 
@@ -194,7 +194,7 @@ class IfStmt : public Stmt {
   
 public:
   IfStmt(SourceLoc IfLoc, StmtCondition Cond, Stmt *Then, SourceLoc ElseLoc,
-         Stmt *Else, Optional<bool> implicit = Nothing)
+         Stmt *Else, Optional<bool> implicit = None)
   : Stmt(StmtKind::If, getDefaultImplicitFlag(implicit, IfLoc)),
     IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
 
@@ -316,7 +316,7 @@ class WhileStmt : public LabeledStmt {
   
 public:
   WhileStmt(LabeledStmtInfo LabelInfo, SourceLoc WhileLoc, StmtCondition Cond,
-            Stmt *Body, Optional<bool> implicit = Nothing)
+            Stmt *Body, Optional<bool> implicit = None)
   : LabeledStmt(StmtKind::While, getDefaultImplicitFlag(implicit, WhileLoc),
                 LabelInfo),
     WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
@@ -341,7 +341,7 @@ class DoWhileStmt : public LabeledStmt {
   
 public:
   DoWhileStmt(LabeledStmtInfo LabelInfo, SourceLoc DoLoc, Expr *Cond,
-              SourceLoc WhileLoc, Stmt *Body, Optional<bool> implicit = Nothing)
+              SourceLoc WhileLoc, Stmt *Body, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::DoWhile, getDefaultImplicitFlag(implicit, DoLoc),
                   LabelInfo),
       DoLoc(DoLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
@@ -376,7 +376,7 @@ public:
           SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
           NullablePtr<Expr> Increment,
           Stmt *Body,
-          Optional<bool> implicit = Nothing)
+          Optional<bool> implicit = None)
   : LabeledStmt(StmtKind::For, getDefaultImplicitFlag(implicit, ForLoc),
                 LabelInfo),
     ForLoc(ForLoc), Semi1Loc(Semi1Loc),
@@ -430,7 +430,7 @@ class ForEachStmt : public LabeledStmt {
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
               SourceLoc InLoc,  Expr *Sequence, BraceStmt *Body,
-              Optional<bool> implicit = Nothing)
+              Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
       ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
@@ -543,7 +543,7 @@ public:
   static CaseStmt *create(ASTContext &C, SourceLoc CaseLoc,
                           ArrayRef<CaseLabelItem> CaseLabelItems,
                           bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
-                          Optional<bool> Implicit = Nothing);
+                          Optional<bool> Implicit = None);
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return { getCaseLabelItemsBuffer(), NumPatterns };
@@ -586,7 +586,7 @@ class SwitchStmt : public LabeledStmt {
   
   SwitchStmt(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc, Expr *SubjectExpr,
              SourceLoc LBraceLoc, unsigned CaseCount, SourceLoc RBraceLoc,
-             Optional<bool> implicit = Nothing)
+             Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::Switch, getDefaultImplicitFlag(implicit, SwitchLoc),
                   LabelInfo),
       SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
@@ -634,7 +634,7 @@ class BreakStmt : public Stmt {
   LabeledStmt *Target;  // Target stmt, wired up by Sema.
 public:
   BreakStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,
-            Optional<bool> implicit = Nothing)
+            Optional<bool> implicit = None)
     : Stmt(StmtKind::Break, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc),
       TargetName(TargetName), TargetLoc(TargetLoc) {
   }
@@ -669,7 +669,7 @@ class ContinueStmt : public Stmt {
 
 public:
   ContinueStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,
-               Optional<bool> implicit = Nothing)
+               Optional<bool> implicit = None)
     : Stmt(StmtKind::Continue, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc),
       TargetName(TargetName), TargetLoc(TargetLoc) {
   }
@@ -701,7 +701,7 @@ class FallthroughStmt : public Stmt {
   CaseStmt *FallthroughDest;
   
 public:
-  FallthroughStmt(SourceLoc Loc, Optional<bool> implicit = Nothing)
+  FallthroughStmt(SourceLoc Loc, Optional<bool> implicit = None)
     : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
       Loc(Loc), FallthroughDest(nullptr)
   {}
@@ -734,7 +734,7 @@ class FailStmt : public Stmt {
 
 public:
   FailStmt(SourceLoc returnLoc, SourceLoc nilLoc,
-           Optional<bool> implicit = Nothing)
+           Optional<bool> implicit = None)
     : Stmt(StmtKind::Fail, getDefaultImplicitFlag(implicit, returnLoc)),
       ReturnLoc(returnLoc), NilLoc(nilLoc)
   {}

@@ -659,7 +659,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   auto *silGlobal = SILGlobalVariable::create(M, link,
                                               makeModuleFragile ? IsFragile : IsNotFragile,
                                               mangledName, silTy,
-                                              Nothing, gDecl);
+                                              None, gDecl);
   silGlobal->setDeclaration(!forDef);
 
   return silGlobal;

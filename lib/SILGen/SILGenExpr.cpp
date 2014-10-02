@@ -2471,7 +2471,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
                                  {}, substFnType,
                                  origResultType, resultType,
                                  generator.isTransparent(),
-                                 Nothing,
+                                 None,
                                  SGFContext());
       
       result.addElement(SGF, apply, resultType, E);
@@ -2660,7 +2660,7 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
                                  {}, substFnType,
                                  origResultType, resultType,
                                  generator.isTransparent(),
-                                 Nothing,
+                                 None,
                                  SGFContext());
 
       result.addElement(SGF, apply, resultType, E);
@@ -3179,7 +3179,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   SILLocation ImplicitReturnFromTopLevel =
     ImplicitReturnLocation::getImplicitReturnLoc(TopLevel);
   SILValue returnValue;
-  Optional<SILLocation> returnLoc = Nothing;
+  Optional<SILLocation> returnLoc = None;
 
   // If the current BB isn't terminated, and we require a return, then we
   // are not allowed to fall off the end of the function and can't reach here.
@@ -3196,7 +3196,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
 
     // If the current bb is terminated then the epilog is just unreachable.
     if (!B.hasValidInsertionPoint())
-      return { Nothing, TopLevel };
+      return { None, TopLevel };
     // We emit the epilog at the current insertion point.
     assert(!hadArg && "NeedsReturn is false but epilog had argument?!");
     (void)hadArg;

@@ -80,7 +80,7 @@ public:
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
                                    bool IsFragile,
                                    StringRef MangledName, SILType LoweredType,
-                                   Optional<SILLocation> Loc = Nothing,
+                                   Optional<SILLocation> Loc = None,
                                    VarDecl *Decl = nullptr);
 
   ~SILGlobalVariable();

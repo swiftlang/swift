@@ -1001,7 +1001,7 @@ static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP);
 
-// Returns Nothing on error, Optional(nullptr) if no operator decl found, or
+// Returns None on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
 template<typename OP_DECL>
 static Optional<OP_DECL *>
@@ -1041,7 +1041,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
     Optional<OP_DECL *> maybeOp
       = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
     if (!maybeOp)
-      return Nothing;
+      return None;
     
     if (OP_DECL *op = *maybeOp)
       importedOperators[op] |= imported.second;
@@ -1062,7 +1062,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
                            diag::found_this_operator_decl);
           C.Diags.diagnose(i->first->getLoc(), diag::found_this_operator_decl);
         }
-        return Nothing;
+        return None;
       }
     }
     result = { start->first, start->second };
@@ -1095,7 +1095,7 @@ lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
 
     // FIXME: Diagnose ambiguity.
     if (*next && result)
-      return Nothing;
+      return None;
     if (*next)
       result = *next;
   }

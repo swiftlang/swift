@@ -1232,7 +1232,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     for (auto i : FunctionAttrs)
       attrs.clearAttribute(i);
-    attrs.cc = Nothing;
+    attrs.cc = None;
 
   } else if (hasFunctionAttr) {
     for (auto i : FunctionAttrs) {

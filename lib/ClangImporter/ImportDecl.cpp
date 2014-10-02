@@ -2102,12 +2102,12 @@ namespace {
                                      DeclContext *dc) {
       // Only class methods can be mapped to constructors.
       if (!decl->isClassMethod())
-        return Nothing;
+        return None;
 
       // Said class methods must be in an actual class.
       auto objcClass = decl->getClassInterface();
       if (!objcClass)
-        return Nothing;
+        return None;
 
       // Check whether we're allowed to try.
       switch (Impl.getFactoryAsInit(objcClass, decl)) {
@@ -2121,7 +2121,7 @@ namespace {
         break;
           
       case FactoryAsInitKind::AsClassMethod:
-        return Nothing;
+        return None;
       }
 
       // Check whether the name fits the pattern.
@@ -2129,7 +2129,7 @@ namespace {
         = Impl.mapFactorySelectorToInitializerName(selector,
                                                    objcClass->getName());
       if (!initName)
-        return Nothing;
+        return None;
 
       // Check the result type to determine what kind of initializer we can
       // create (if any).
@@ -2146,12 +2146,12 @@ namespace {
           // isn't prepared for that yet.
           // Not a factory method.
           ++NumFactoryMethodsWrongResult;
-          return Nothing;
+          return None;
         }
       } else {
         // Not a factory method.
         ++NumFactoryMethodsWrongResult;
-        return Nothing;
+        return None;
       }
 
       bool redundant = false;
@@ -2191,7 +2191,7 @@ namespace {
         if (forceClassMethod)
           return nullptr;
 
-        return importConstructor(decl, dc, /*isImplicit=*/false, Nothing,
+        return importConstructor(decl, dc, /*isImplicit=*/false, None,
                                  /*required=*/false);
       }
 
@@ -3246,7 +3246,7 @@ namespace {
 
       subscript->setType(FunctionType::get(indicesType,
                                            subscript->getElementType()));
-      addObjCAttribute(subscript, Nothing);
+      addObjCAttribute(subscript, None);
 
       // Optional subscripts in protocols.
       if (optionalMethods && isa<ProtocolDecl>(dc))
@@ -3554,7 +3554,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
-      addObjCAttribute(result, Nothing);
+      addObjCAttribute(result, None);
 
       if (overridden)
         result->setOverriddenDecl(overridden);
@@ -4412,7 +4412,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
-      addObjCAttribute(result, Nothing);
+      addObjCAttribute(result, None);
       applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
 
       // Handle attributes.
@@ -4661,7 +4661,7 @@ void ClangImporter::Implementation::importAttributes(
           .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
           .Case("macosx_app_extension",
                 PlatformKind::OSXApplicationExtension)
-          .Default(Nothing);
+          .Default(None);
       if (!platformK)
         continue;
 
@@ -5248,6 +5248,6 @@ Optional<MappedTypeNameKind>
 ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *decl) {
   auto iter = SpecialTypedefNames.find(decl->getCanonicalDecl());
   if (iter == SpecialTypedefNames.end())
-    return Nothing;
+    return None;
   return iter->second;
 }

@@ -251,7 +251,7 @@ namespace {
       Optional<UnavailabilityReason> reason =
           CS.TC.checkDeclarationAvailability(E->getDecl(),E->getLoc(), CS.DC);
       
-      // If reason is not Nothing and EnableExperimentalUnavailableAsOptional
+      // If reason is not None and EnableExperimentalUnavailableAsOptional
       // is turned on, the type system will report the reference
       // as having an optional type when the it is resolved.
       // The diagnostic for when this optional does not type check is

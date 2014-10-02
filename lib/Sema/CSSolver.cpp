@@ -49,7 +49,7 @@ STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs, 
                                          TypeVariableType *typeVar, Type type) {
   if (!type)
-    return Nothing;
+    return None;
 
   // Simplify the type.
   type = cs.simplifyType(type);
@@ -58,13 +58,13 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   SmallVector<TypeVariableType *, 4> referencedTypeVars;
   type->getTypeVariables(referencedTypeVars);
   if (std::count(referencedTypeVars.begin(), referencedTypeVars.end(), typeVar))
-    return Nothing;
+    return None;
 
   // If the type is a type variable itself, don't permit the binding.
   // FIXME: This is a hack. We need to be smarter about whether there's enough
   // structure in the type to produce an interesting binding, or not.
   if (type->getRValueType()->is<TypeVariableType>())
-    return Nothing;
+    return None;
 
   // Okay, allow the binding (with the simplified type).
   return type;
@@ -783,7 +783,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
 
     if (exactTypes.insert(type->getCanonicalType()))
-      result.Bindings.push_back({type, kind, Nothing});
+      result.Bindings.push_back({type, kind, None});
   }
 
   // If we have any literal constraints, check whether there is already a
@@ -991,7 +991,7 @@ static bool tryTypeVariableBindings(
         // Try lvalue qualification in addition to rvalue qualification.
         auto subtype = LValueType::get(type);
         if (exploredTypes.insert(subtype->getCanonicalType()))
-          newBindings.push_back({subtype, binding.Kind, Nothing});
+          newBindings.push_back({subtype, binding.Kind, None});
       }
 
       if (binding.Kind == AllowedBindingKind::Subtypes) {
@@ -1000,7 +1000,7 @@ static bool tryTypeVariableBindings(
           if (scalarIdx >= 0) {
             auto eltType = tupleTy->getElementType(scalarIdx);
             if (exploredTypes.insert(eltType->getCanonicalType()))
-              newBindings.push_back({eltType, binding.Kind, Nothing});
+              newBindings.push_back({eltType, binding.Kind, None});
           }
         }
       }
@@ -1017,7 +1017,7 @@ static bool tryTypeVariableBindings(
 
         // If we haven't seen this supertype, add it.
         if (exploredTypes.insert((*simpleSuper)->getCanonicalType()))
-          newBindings.push_back({*simpleSuper, binding.Kind, Nothing});
+          newBindings.push_back({*simpleSuper, binding.Kind, None});
       }
     }
 

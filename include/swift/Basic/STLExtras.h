@@ -522,7 +522,7 @@ struct DowncastAsOptional {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
-    return Nothing;
+    return None;
   }
 
   template<typename Superclass>
@@ -532,7 +532,7 @@ struct DowncastAsOptional {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
-    return Nothing;
+    return None;
   }
 };
 

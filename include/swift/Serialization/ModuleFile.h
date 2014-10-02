@@ -350,7 +350,7 @@ private:
   /// Reads members of a DeclContext from \c DeclTypeCursor.
   ///
   /// The returned array is owned by the ASTContext.
-  /// Returns Nothing if there is an error.
+  /// Returns None if there is an error.
   ///
   /// Note: this destroys the cursor's position in the stream. Furthermore,
   /// because it reads from the cursor, it is not possible to reset the cursor
@@ -520,7 +520,7 @@ public:
   ///                      kinds of decls, used to avoid re-entrant
   ///                      deserialization.
   Decl *getDecl(serialization::DeclID DID,
-                Optional<DeclContext *> ForcedContext = Nothing);
+                Optional<DeclContext *> ForcedContext = None);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
@@ -536,7 +536,7 @@ public:
 
   /// Reads a substitution record from \c DeclTypeCursor.
   ///
-  /// If the record at the cursor is not a substitution, returns Nothing.
+  /// If the record at the cursor is not a substitution, returns None.
   Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
 
   /// Recursively reads a protocol conformance from \c DeclTypeCursor.
@@ -545,7 +545,7 @@ public:
   /// in the AST, and will need to be canonicalized.
   ///
   /// If the record at the cursor is not a protocol conformance, returns
-  /// Nothing. Note that a null pointer is a valid conformance value.
+  /// None. Note that a null pointer is a valid conformance value.
   Optional<ProtocolConformance *>
   maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
 

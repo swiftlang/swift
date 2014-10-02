@@ -527,7 +527,7 @@ public:
   /// \c Decl::getRawComment() or \c Decl::getBriefComment().
   virtual Optional<BriefAndRawComment>
   getCommentForDecl(const Decl *D) const {
-    return Nothing;
+    return None;
   }
 
   /// Returns an implementation-defined "discriminator" for \p D, which
@@ -816,11 +816,11 @@ public:
                                              SourceLoc diagLoc = {});
   /// @}
 
-  /// \brief The buffer ID for the file that was imported, or Nothing if there
+  /// \brief The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
   Optional<unsigned> getBufferID() const {
     if (BufferID == -1)
-      return Nothing;
+      return None;
     return BufferID;
   }
 

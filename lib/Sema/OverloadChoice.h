@@ -109,7 +109,7 @@ public:
 
   OverloadChoice(
       Type base, ValueDecl *value, bool isSpecialized, ConstraintSystem &CS,
-      const Optional<UnavailabilityReason> &reasonUnavailable = Nothing);
+      const Optional<UnavailabilityReason> &reasonUnavailable = None);
   
   OverloadChoice(Type base, TypeDecl *type, bool isSpecialized)
     : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),

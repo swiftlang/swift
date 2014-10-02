@@ -261,7 +261,7 @@ getActualDefaultArgKind(uint8_t raw) {
   case serialization::DefaultArgumentKind::DSOHandle:
     return swift::DefaultArgumentKind::DSOHandle;
   }
-  return Nothing;
+  return None;
 }
 
 Pattern *ModuleFile::maybeReadPattern() {
@@ -454,7 +454,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
 
   auto next = Cursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
-    return Nothing;
+    return None;
 
   unsigned kind = Cursor.readRecord(next.ID, scratch);
   switch (kind) {
@@ -525,7 +525,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
 
   // Not a protocol conformance.
   default:
-    return Nothing;
+    return None;
   }
 
   lastRecordOffset.reset();
@@ -645,13 +645,13 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
 
   auto entry = cursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind != llvm::BitstreamEntry::Record)
-    return Nothing;
+    return None;
 
   StringRef blobData;
   SmallVector<uint64_t, 2> scratch;
   unsigned recordID = cursor.readRecord(entry.ID, scratch, &blobData);
   if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
-    return Nothing;
+    return None;
 
 
   TypeID archetypeID, replacementID;
@@ -956,7 +956,7 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
 
   auto entry = DeclTypeCursor.advance();
   if (entry.Kind != llvm::BitstreamEntry::Record)
-    return Nothing;
+    return None;
 
   SmallVector<uint64_t, 16> memberIDBuffer;
 
@@ -992,7 +992,7 @@ getActualCtorInitializerKind(uint8_t raw) {
   case serialization::Convenience:
     return swift::CtorInitializerKind::Convenience;
   }
-  return Nothing;
+  return None;
 }
 
 /// Remove values from \p values that don't match the expected type or module.
@@ -1069,7 +1069,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
     M->lookupQualified(ModuleType::get(M), name, NL_QualifiedDefault,
                        /*typeResolver=*/nullptr, values);
-    filterValues(getType(TID), nullptr, isType, Nothing, values);
+    filterValues(getType(TID), nullptr, isType, None, values);
     break;
   }
 
@@ -1405,7 +1405,7 @@ static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
   case serialization::Associativity::NonAssociative:
     return swift::Associativity::None;
   default:
-    return Nothing;
+    return None;
   }
 }
 
@@ -1419,7 +1419,7 @@ getActualStaticSpellingKind(uint8_t raw) {
   case serialization::StaticSpellingKind::KeywordClass:
     return swift::StaticSpellingKind::KeywordClass;
   }
-  return Nothing;
+  return None;
 }
 
 static bool isDeclAttrRecord(unsigned ID) {
@@ -1442,7 +1442,7 @@ getActualAccessibility(uint8_t raw) {
   CASE(Public)
 #undef CASE
   }
-  return Nothing;
+  return None;
 }
 
 static Optional<swift::OptionalTypeKind>
@@ -1456,7 +1456,7 @@ getActualOptionalTypeKind(uint8_t raw) {
     return OTK_ImplicitlyUnwrappedOptional;
   }
 
-  return Nothing;
+  return None;
 }
 
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
@@ -1720,7 +1720,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
           pieces.push_back(getIdentifier(pieceID));
 
         if (numArgs == 0)
-          Attr = ObjCAttr::create(ctx, Nothing);
+          Attr = ObjCAttr::create(ctx, None);
         else
           Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces));
         Attr->setImplicit(isImplicit);
@@ -2807,7 +2807,7 @@ static Optional<swift::AbstractCC> getActualCC(uint8_t cc) {
   CASE(WitnessMethod)
 #undef CASE
   default:
-    return Nothing;
+    return None;
   }
 }
 
@@ -2821,7 +2821,7 @@ Optional<swift::Ownership> getActualOwnership(serialization::Ownership raw) {
   case serialization::Ownership::Unowned:  return swift::Ownership::Unowned;
   case serialization::Ownership::Weak:     return swift::Ownership::Weak;
   }
-  return Nothing;
+  return None;
 }
 
 /// Translate from the serialization ParameterConvention enumerators,
@@ -2840,7 +2840,7 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Direct_Guaranteed)
 #undef CASE
   }
-  return Nothing;
+  return None;
 }
 
 /// Translate from the serialization ResultConvention enumerators,
@@ -2856,7 +2856,7 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   CASE(Autoreleased)
 #undef CASE
   }
-  return Nothing;
+  return None;
 }
 
 static AnyFunctionType::Representation

@@ -153,7 +153,7 @@ public:
   };
 
 private:
-  // A value of Nothing indicates the declaration is potentially unavailable
+  // A value of None indicates the declaration is potentially unavailable
   // because it is explicitly weak linked.
   Optional<VersionRange> RequiredDeploymentRange;
 
@@ -162,7 +162,7 @@ private:
 
 public:
   static UnavailabilityReason explicitlyWeaklyLinked() {
-    return UnavailabilityReason(Nothing);
+    return UnavailabilityReason(None);
   }
 
   static UnavailabilityReason requiresVersionRange(const VersionRange Range) {

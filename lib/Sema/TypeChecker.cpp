@@ -935,18 +935,18 @@ Optional<UnavailabilityReason>
 TypeChecker::checkDeclarationAvailability(ValueDecl *D, SourceLoc referenceLoc,
                                           DeclContext *referenceDC) {
   if (!Context.LangOpts.EnableExperimentalAvailabilityChecking) {
-    return Nothing;
+    return None;
   }
 
   if (!referenceDC->getParentSourceFile()) {
     // We only check availability if this reference is in a source file; we do
     // not check in other kinds of FileUnits.
-    return Nothing;
+    return None;
   }
 
   VersionRange safeRangeUnderApprox = VersionRange::empty();
   if (isDeclAvailable(D, referenceLoc, referenceDC, safeRangeUnderApprox)) {
-    return Nothing;
+    return None;
   }
 
   // safeRangeUnderApprox now holds the safe range.

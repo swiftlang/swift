@@ -133,7 +133,7 @@ Optional<unsigned> SourceManager::getIDForBufferIdentifier(
     StringRef BufIdentifier) {
   auto It = BufIdentIDMap.find(BufIdentifier);
   if (It == BufIdentIDMap.end())
-    return Nothing;
+    return None;
   return It->second;
 }
 

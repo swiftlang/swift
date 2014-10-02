@@ -87,7 +87,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
       llvm::StringSwitch<Optional<DriverKind>>(Value)
       .Case("swift", DriverKind::Interactive)
       .Case("swiftc", DriverKind::Batch)
-      .Default(Nothing);
+      .Default(None);
 
       if (Kind.hasValue())
         driverKind = Kind.getValue();

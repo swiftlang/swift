@@ -143,7 +143,7 @@ emitStmtCondition(SILGenFunction &gen, StmtCondition C,
                   std::unique_ptr<TemporaryInitialization> temp,
                    bool hasFalseCode) {
   if (auto E = C.dyn_cast<Expr*>()) {
-    return {gen.emitCondition(E, hasFalseCode), Nothing};
+    return {gen.emitCondition(E, hasFalseCode), None};
   }
   if (auto CB = C.dyn_cast<PatternBindingDecl*>()) {
     return emitConditionalBinding(gen, CB, std::move(temp), hasFalseCode);

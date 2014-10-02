@@ -120,7 +120,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
     if (BURefCountState == BUMap.end()) {
       DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
             "increment!\n");
-      return Nothing;
+      return None;
     }
 
     DEBUG(llvm::dbgs() << "        SUCCESS! Found state for increment.\n");
@@ -152,7 +152,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
       if (TDRefCountState == TDMap.end()) {
         DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
               "decrement.\n");
-        return Nothing;
+        return None;
       }
       DEBUG(llvm::dbgs() << "        SUCCESS! Found state for decrement.\n");
 
@@ -162,7 +162,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
           !TDRefCountState->second.containsInstruction(Increment)) {
         DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
               "found increment that did not match.\n");
-        return Nothing;
+        return None;
       }
 
       // Add the decrement to the decrement to move set. If we don't insert
@@ -198,7 +198,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
     if (TDRefCountState == TDMap.end()) {
       DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
             "increment!\n");
-      return Nothing;
+      return None;
     }
 
     DEBUG(llvm::dbgs() << "        SUCCESS! Found state for decrement.\n");
@@ -230,7 +230,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
       if (BURefCountState == BUMap.end()) {
         DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
               "increment.\n");
-        return Nothing;
+        return None;
       }
 
       DEBUG(llvm::dbgs() << "        SUCCESS! Found state for increment.\n");
@@ -241,7 +241,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
           !BURefCountState->second.containsInstruction(Decrement)) {
         DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
               "found increment that did not match.\n");
-        return Nothing;
+        return None;
       }
 
       // Add the decrement to the decrement to move set. If we don't insert

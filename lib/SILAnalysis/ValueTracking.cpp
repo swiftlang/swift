@@ -397,7 +397,7 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
 }
 
 /// Check if the sign bit of the value \p V is known to be:
-/// set (true), not set (false) or unknown (Nothing).
+/// set (true), not set (false) or unknown (None).
 Optional<bool> swift::computeSignBit(SILValue V) {
   SILValue Value = V;
   while (true) {
@@ -421,7 +421,7 @@ Optional<bool> swift::computeSignBit(SILValue V) {
     if (auto *AI = dyn_cast<ApplyInst>(Def)) {
       auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
       if (!FR)
-        return Nothing;
+        return None;
       switch (FR->getBuiltinInfo().ID) {
       // Sizeof always returns non-negative results.
       case BuiltinValueKind::Sizeof:
@@ -494,11 +494,11 @@ Optional<bool> swift::computeSignBit(SILValue V) {
         Value = AI->getArgument(0);
         continue;
       default:
-        return Nothing;
+        return None;
       }
     }
 
-    return Nothing;
+    return None;
   }
 }
 

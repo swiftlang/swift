@@ -2252,7 +2252,7 @@ bool Parser::parseVersionComparison(VersionComparison &Comparison,
   Optional<VersionComparison> ParsedComparison =
       llvm::StringSwitch<Optional<VersionComparison>>(Tok.getText())
           .Case(">=", VersionComparison::GreaterThanEqual)
-          .Default(Nothing);
+          .Default(None);
 
   if (!ParsedComparison.hasValue()) {
     diagnose(Tok, diag::avail_query_config_expected_comparison);

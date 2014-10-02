@@ -282,7 +282,7 @@ getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
   if (Segments.size() != 1 ||
       Segments.front().Kind == Lexer::StringSegment::Expr) {
    P.diagnose(Loc, diag::attr_interpolated_string, DiagText);
-   return Nothing;
+   return None;
   }
 
   return P.SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
@@ -1171,7 +1171,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
         .Case("cdecl", AbstractCC::C)
         .Case("objc_method", AbstractCC::ObjCMethod)
         .Case("witness_method", AbstractCC::WitnessMethod)
-        .Default(Nothing);
+        .Default(None);
       if (!Attributes.cc) {
         diagnose(nameLoc, diag::cc_attribute_unknown_cc_name, name);
         Attributes.clearAttribute(attr);
@@ -4361,7 +4361,7 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
           .Case("none", Associativity::None)
           .Case("left", Associativity::Left)
           .Case("right", Associativity::Right)
-          .Default(Nothing);
+          .Default(None);
       if (!parsedAssociativity) {
         diagnose(Tok, diag::unknown_infix_operator_associativity, Tok.getText());
         skipUntilDeclRBrace();

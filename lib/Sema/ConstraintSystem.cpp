@@ -198,7 +198,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
     return *knownMember->second;
 
   // Lookup the member.
-  MemberLookups[{base, name}] = Nothing;
+  MemberLookups[{base, name}] = None;
   auto lookup = TC.lookupMember(base, name, DC);
   auto &result = MemberLookups[{base, name}];
   result = std::move(lookup);
@@ -689,13 +689,13 @@ bool ConstraintSystem::isArrayType(Type t) {
 Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
     if (boundStruct->getDecl() != TC.Context.getDictionaryDecl())
-      return Nothing;
+      return None;
 
     auto genericArgs = boundStruct->getGenericArgs();
     return std::make_pair(genericArgs[0], genericArgs[1]);
   }
 
-  return Nothing;
+  return None;
 }
 
 Type ConstraintSystem::openBindingType(Type type, 

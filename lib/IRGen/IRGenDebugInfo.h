@@ -112,7 +112,7 @@ public:
   /// Update the IRBuilder's current debug location to the location
   /// Loc and the lexical scope DS.
   void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
-                     Optional<SILLocation> Loc = Nothing);
+                     Optional<SILLocation> Loc = None);
 
   void clearLoc(IRBuilder &Builder) {
     LastLoc = {};

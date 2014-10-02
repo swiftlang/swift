@@ -215,7 +215,7 @@ class ParenPattern : public Pattern {
   Pattern *SubPattern;
 public:
   ParenPattern(SourceLoc lp, Pattern *sub, SourceLoc rp,
-               Optional<bool> implicit = Nothing)
+               Optional<bool> implicit = None)
     : Pattern(PatternKind::Paren),
       LPLoc(lp), RPLoc(rp), SubPattern(sub) {
     assert(lp.isValid() == rp.isValid());
@@ -300,7 +300,7 @@ public:
                               ArrayRef<TuplePatternElt> elements, SourceLoc rp,
                               bool hasVararg = false,
                               SourceLoc ellipsis = SourceLoc(),
-                              Optional<bool> implicit = Nothing);
+                              Optional<bool> implicit = None);
 
   /// \brief Create either a tuple pattern or a paren pattern, depending
   /// on the elements.
@@ -342,7 +342,7 @@ class NamedPattern : public Pattern {
   VarDecl *const Var;
 
 public:
-  explicit NamedPattern(VarDecl *Var, Optional<bool> implicit = Nothing)
+  explicit NamedPattern(VarDecl *Var, Optional<bool> implicit = None)
       : Pattern(PatternKind::Named), Var(Var) {
     if (implicit.hasValue() ? *implicit : !Var->getLoc().isValid())
       setImplicit();
@@ -366,7 +366,7 @@ class AnyPattern : public Pattern {
   SourceLoc Loc;
 
 public:
-  explicit AnyPattern(SourceLoc Loc, Optional<bool> implicit = Nothing)
+  explicit AnyPattern(SourceLoc Loc, Optional<bool> implicit = None)
       : Pattern(PatternKind::Any), Loc(Loc) {
     if (implicit.hasValue() ? *implicit : !Loc.isValid())
       setImplicit();
@@ -389,7 +389,7 @@ class TypedPattern : public Pattern {
   TypeLoc PatType;
 
 public:
-  TypedPattern(Pattern *pattern, TypeLoc tl, Optional<bool> implicit = Nothing)
+  TypedPattern(Pattern *pattern, TypeLoc tl, Optional<bool> implicit = None)
     : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {
     if (implicit.hasValue() ? *implicit : !tl.hasLocation())
       setImplicit();
@@ -451,7 +451,7 @@ public:
   IsaPattern(SourceLoc IsLoc, TypeLoc CastTy,
              Pattern *SubPattern,
              CheckedCastKind Kind = CheckedCastKind::Unresolved,
-             Optional<bool> implicit = Nothing)
+             Optional<bool> implicit = None)
     : Pattern(PatternKind::Isa),
       IsLoc(IsLoc),
       SubPattern(SubPattern),
@@ -539,7 +539,7 @@ private:
   NominalTypePattern(TypeLoc CastTy, SourceLoc LParenLoc,
                      ArrayRef<Element> Elements,
                      SourceLoc RParenLoc,
-                     Optional<bool> implicit = Nothing)
+                     Optional<bool> implicit = None)
     : Pattern(PatternKind::NominalType), CastType(CastTy),
       LParenLoc(LParenLoc), RParenLoc(RParenLoc),
       NumElements(Elements.size())
@@ -557,7 +557,7 @@ public:
                                     ArrayRef<Element> Elements,
                                     SourceLoc RParenLoc,
                                     ASTContext &C,
-                                    Optional<bool> implicit = Nothing);
+                                    Optional<bool> implicit = None);
 
   TypeLoc &getCastTypeLoc() { return CastType; }
   TypeLoc getCastTypeLoc() const { return CastType; }
@@ -595,7 +595,7 @@ class EnumElementPattern : public Pattern {
 public:
   EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
                      Identifier Name, EnumElementDecl *Element,
-                     Pattern *SubPattern, Optional<bool> Implicit = Nothing)
+                     Pattern *SubPattern, Optional<bool> Implicit = None)
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
       ElementDecl(Element), SubPattern(SubPattern) {
@@ -656,7 +656,7 @@ class ExprPattern : public Pattern {
 public:
   /// Construct an ExprPattern.
   ExprPattern(Expr *e, bool isResolved, Expr *matchExpr, VarDecl *matchVar,
-              Optional<bool> implicit = Nothing)
+              Optional<bool> implicit = None)
     : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
       MatchExpr(matchExpr), MatchVar(matchVar) {
     assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
@@ -709,7 +709,7 @@ class VarPattern : public Pattern {
   SourceLoc VarLoc;
   Pattern *SubPattern;
 public:
-  VarPattern(SourceLoc loc, Pattern *sub, Optional<bool> implicit = Nothing)
+  VarPattern(SourceLoc loc, Pattern *sub, Optional<bool> implicit = None)
     : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
     if (implicit.hasValue() ? *implicit : !loc.isValid())
       setImplicit();

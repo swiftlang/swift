@@ -1385,7 +1385,7 @@ public:
   /// Returns the most appropriate import kind for the given list of decls.
   ///
   /// If the list is non-homogenous, or if there is more than one decl that
-  /// cannot be overloaded, returns Nothing.
+  /// cannot be overloaded, returns None.
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
@@ -3175,7 +3175,7 @@ public:
     if (ProtocolDeclBits.ExistentialConformsToSelfValid)
       return ProtocolDeclBits.ExistentialConformsToSelf;
 
-    return Nothing;
+    return None;
   }
 
   /// Set whether the existential of this protocol type conforms to this
@@ -3186,12 +3186,12 @@ public:
   }
 
   /// If this is known to be a compiler-known protocol, returns the kind.
-  /// Otherwise returns Nothing.
+  /// Otherwise returns None.
   ///
   /// Note that this is only valid after type-checking.
   Optional<KnownProtocolKind> getKnownProtocolKind() const {
     if (ProtocolDeclBits.KnownProtocol == 0)
-      return Nothing;
+      return None;
     return static_cast<KnownProtocolKind>(ProtocolDeclBits.KnownProtocol - 1);
   }
 
@@ -5069,7 +5069,7 @@ NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
       return var;
   }
 
-  return Nothing;
+  return None;
 }
 
 inline void

@@ -446,7 +446,7 @@ public:
   /// Retrieve the restriction placed on this constraint.
   Optional<ConversionRestrictionKind> getRestriction() const {
     if (!HasRestriction)
-      return Nothing;
+      return None;
 
     return Restriction;
   }
@@ -454,7 +454,7 @@ public:
   /// Retrieve the fix associated with this constraint.
   Optional<Fix> getFix() const {
     if (!HasFix)
-      return Nothing;
+      return None;
 
     return Fix(TheFix, FixData);
   }

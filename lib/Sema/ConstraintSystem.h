@@ -101,14 +101,14 @@ public:
     if (IsRestriction)
       return Restriction;
 
-    return Nothing;
+    return None;
   }
 
   Optional<Fix> getFix() const {
     if (!IsRestriction)
       return TheFix;
 
-    return Nothing;
+    return None;
   }
 };
 

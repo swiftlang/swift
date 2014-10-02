@@ -868,7 +868,7 @@ ClangImporter::Implementation::getDefinitionForClangTypeDecl(
   if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D))
     return OPD->getDefinition();
 
-  return Nothing;
+  return None;
 }
 
 Optional<clang::Module *>
@@ -882,7 +882,7 @@ ClangImporter::Implementation::getClangSubmoduleForDecl(
   if (auto maybeDefinition = getDefinitionForClangTypeDecl(D)) {
     actual = maybeDefinition.getValue();
     if (!actual && !allowForwardDeclaration)
-      return Nothing;
+      return None;
   }
 
   if (!actual)
@@ -1072,7 +1072,7 @@ splitFirstSelectorPiece(StringRef selector,
                                 scratch);
   }
 
-  // We did not find a preposition. Nothing to split.
+  // We did not find a preposition. None to split.
   ++NumSelectorsNotSplit;
   return { selector, "" };
 }
@@ -1594,7 +1594,7 @@ ClangImporter::Implementation::getKnownObjCMethod(
     }
   }
 
-  return Nothing;
+  return None;
 }
 
 Optional<api_notes::ObjCContextInfo>
@@ -1618,7 +1618,7 @@ ClangImporter::Implementation::getKnownObjCContext(
 
   // If neither place had information about this class, we're done.
   if (!primaryInfo && !secondaryInfo)
-    return Nothing;
+    return None;
 
   api_notes::ObjCContextInfo info;
 
@@ -1689,7 +1689,7 @@ ClangImporter::Implementation::getKnownObjCProperty(
     }
   }
 
-  return Nothing;
+  return None;
 }
 
 Optional<api_notes::GlobalVariableInfo>
@@ -1698,7 +1698,7 @@ ClangImporter::Implementation::getKnownGlobalVariable(
   if (auto notesReader = getAPINotesForDecl(global))
     return notesReader->lookupGlobalVariable(global->getName());
   
-  return Nothing;
+  return None;
 }
 
 Optional<api_notes::GlobalFunctionInfo>
@@ -1707,7 +1707,7 @@ ClangImporter::Implementation::getKnownGlobalFunction(
   if (auto notesReader = getAPINotesForDecl(fn))
     return notesReader->lookupGlobalFunction(fn->getName());
   
-  return Nothing;
+  return None;
 }
 
 bool ClangImporter::Implementation::hasDesignatedInitializers(

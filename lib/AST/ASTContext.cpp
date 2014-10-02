@@ -1041,7 +1041,7 @@ ASTContext::getSubstitutions(BoundGenericType* bound) const {
       bound->getDecl() == getOptionalDecl())
     return createTrivialSubstitutions(bound);
 
-  return Nothing;
+  return None;
 }
 
 void ASTContext::setSubstitutions(BoundGenericType* Bound,
@@ -1167,7 +1167,7 @@ Module *ASTContext::getStdlibModule(bool loadIfAbsent) {
 Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
   auto Known = Impl.RawComments.find(D);
   if (Known == Impl.RawComments.end())
-    return Nothing;
+    return None;
 
   return Known->second;
 }
@@ -1179,7 +1179,7 @@ void ASTContext::setRawComment(const Decl *D, RawComment RC) {
 Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {
   auto Known = Impl.BriefComments.find(D);
   if (Known == Impl.BriefComments.end())
-    return Nothing;
+    return None;
 
   return Known->second;
 }
@@ -1244,7 +1244,7 @@ Optional<ConformanceEntry> ASTContext::getConformsTo(CanType type,
   auto &conformsTo = Impl.getArena(arena).ConformsTo;
   auto known = conformsTo.find({type, proto});
   if (known == conformsTo.end())
-    return Nothing;
+    return None;
 
   return known->second;
 }

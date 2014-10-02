@@ -502,7 +502,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 
     Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
     auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
-    Address memberAddr = element.project(IGF, baseAddr, Nothing);
+    Address memberAddr = element.project(IGF, baseAddr, None);
     return OwnedAddress(memberAddr, base);
   }
     

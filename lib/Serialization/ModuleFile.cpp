@@ -443,7 +443,7 @@ bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
 static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
   auto stableKind = static_cast<serialization::LibraryKind>(rawKind);
   if (stableKind != rawKind)
-    return Nothing;
+    return None;
 
   switch (stableKind) {
   case serialization::LibraryKind::Library:
@@ -453,7 +453,7 @@ static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
   }
 
   // If there's a new case value in the module file, ignore it.
-  return Nothing;
+  return None;
 }
 
 static const uint8_t *getStartBytePtr(llvm::MemoryBuffer *buffer) {
@@ -1139,21 +1139,21 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
          "Decl is from a different serialized file");
 
   if (!DeclCommentTable)
-    return Nothing;
+    return None;
 
   if (D->isImplicit())
-    return Nothing;
+    return None;
 
   auto *VD = dyn_cast<ValueDecl>(D);
   if (!VD)
-    return Nothing;
+    return None;
 
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
   {
     llvm::raw_svector_ostream OS(USRBuffer);
     if (ide::printDeclUSR(VD, OS))
-      return Nothing;
+      return None;
   }
 
   return getCommentForDeclByUSR(USRBuffer.str());
@@ -1161,11 +1161,11 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
 
 Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
   if (!DeclCommentTable)
-    return Nothing;
+    return None;
 
   auto I = DeclCommentTable->find(USR);
   if (I == DeclCommentTable->end())
-    return Nothing;
+    return None;
 
   return *I;
 }

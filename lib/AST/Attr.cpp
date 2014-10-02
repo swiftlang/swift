@@ -320,12 +320,12 @@ ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name) {
 
 ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc ObjCLoc) {
-  return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc), Nothing,
+  return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc), None,
                             SourceRange(), { });
 }
 
 ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
-  return new (Ctx) ObjCAttr(Nothing);
+  return new (Ctx) ObjCAttr(None);
 }
 
 ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 

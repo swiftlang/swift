@@ -205,9 +205,12 @@ namespace {
                           ty, size, std::move(spareBits), align, isPOD)
       {}
 
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
-                                 SILType T) const { return Nothing; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return None;
+    }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
+    }
   };
 
   /// Type implementation for fixed-size but non-loadable tuples.
@@ -225,9 +228,12 @@ namespace {
                           isPOD, isBT)
     {}
 
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
-    Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
-                                 SILType T) const { return Nothing; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return None;
+    }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
+    }
   };
 
   /// An accessor for the non-fixed offsets for a tuple type.

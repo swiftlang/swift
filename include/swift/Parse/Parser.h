@@ -245,7 +245,7 @@ public:
     StructureMarkerRAII(Parser &parser, SourceLoc loc,
                                StructureMarkerKind kind)
       : P(parser) {
-      P.StructureMarkers.push_back({loc, kind, Nothing});
+      P.StructureMarkers.push_back({loc, kind, None});
     }
 
     StructureMarkerRAII(Parser &parser, const Token &tok);

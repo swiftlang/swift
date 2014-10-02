@@ -627,7 +627,7 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
     Result = SILLinkage::Private;
     P.consumeToken();
   } else if (P.Tok.isNot(tok::identifier)) {
-    Result = Nothing;
+    Result = None;
   } else if (P.Tok.getText() == "hidden") {
     Result = SILLinkage::Hidden;
     P.consumeToken(tok::identifier);
@@ -644,7 +644,7 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
     Result = SILLinkage::SharedExternal;
     P.consumeToken(tok::identifier);
   } else {
-    Result = Nothing;
+    Result = None;
   }
   return false;
 }
@@ -1509,7 +1509,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       .Case("take_always", CastConsumptionKind::TakeAlways)
       .Case("take_on_success", CastConsumptionKind::TakeOnSuccess)
       .Case("copy_on_success", CastConsumptionKind::CopyOnSuccess)
-      .Default(Nothing);
+      .Default(None);
 
     if (kind) {
       out = kind.getValue();

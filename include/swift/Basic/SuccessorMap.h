@@ -154,7 +154,7 @@ public:
   /// Validate the well-formedness of this data structure.
   void validate() const {
 #ifndef NDEBUG
-    if (Root) validateNode(Root, Nothing, Nothing);
+    if (Root) validateNode(Root, None, None);
 #endif
   }
 

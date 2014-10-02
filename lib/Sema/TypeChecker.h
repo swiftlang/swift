@@ -1141,7 +1141,7 @@ public:
 
   /// Checks whether a declaration should be considered unavailable when
   /// referred to at the given location and, if so, returns the reason why the
-  /// declaration is unavailable. Returns Nothing is the declaration is
+  /// declaration is unavailable. Returns None is the declaration is
   /// definitely available.
   Optional<UnavailabilityReason>
   checkDeclarationAvailability(ValueDecl *D, SourceLoc referenceLoc,
