@@ -213,41 +213,62 @@ ClangImporter::create(ASTContext &ctx,
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
   // Construct the invocation arguments for the current target.
-  std::vector<std::string> invocationArgStrs;
+  // Add target-independent options first.
+  std::vector<std::string> invocationArgStrs = {
+    // Enable modules.
+    "-fmodules",
 
-  // Set C language options.
-  if (triple.isOSDarwin()) {
-    // Darwin uses Objective-C ARC.
-    for (std::string arg : {"-x", "objective-c", "-std=gnu11", "-fobjc-arc",
-                            "-fmodules", "-fblocks"})
-      invocationArgStrs.push_back(arg);
-  } else {
-    // We can not assume an Objective-C environment on other platforms.
-    for (std::string arg : {"-x", "c", "-std=gnu11", "-fmodules"})
-      invocationArgStrs.push_back(arg);
-  }
+    // Don't emit LLVM IR.
+    "-fsyntax-only",
 
-  // Add target-independent options.
-  std::vector<std::string> extraSwiftArgs = {
-    "-fsyntax-only", "-w", "-femit-all-decls",
+    // Silence warnings from imported headers.
+    "-w",
+
+    "-femit-all-decls",
     "-target", irGenOpts.Triple,
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
-    "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
-      SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-    "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
-      SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-    "-DSWIFT_EXTENSION_EXTRA=__attribute__((annotate(\""
-      SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-    "-DCF_ENABLE_BRIDGED_TYPES_SO_YOU_CAN_FIX_BUILD_FAILURES",
-    "-DCF_ENABLE_BRIDGED_TYPES",
-    "-D_ISO646_H_", "-D__ISO646_H",
     "-fretain-comments-from-system-headers",
     "-fmodules-validate-system-headers",
     "-Werror=non-modular-include-in-framework-module",
-    "<swift-imported-modules>"
   };
-  invocationArgStrs.insert(invocationArgStrs.end(), extraSwiftArgs.begin(),
-                           extraSwiftArgs.end());
+
+  // Set C language options.
+  if (triple.isOSDarwin()) {
+    std::vector<std::string> extraArgs = {
+      // Darwin uses Objective-C ARC.
+      "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fblocks",
+
+      // Define macros that Swift bridging headers use.
+      "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
+        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+      "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
+        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+      "-DSWIFT_EXTENSION_EXTRA=__attribute__((annotate(\""
+        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+
+      // Tell CoreFoundation to mark toll-free bridged types with attributes.
+      "-DCF_ENABLE_BRIDGED_TYPES_SO_YOU_CAN_FIX_BUILD_FAILURES",
+      "-DCF_ENABLE_BRIDGED_TYPES",
+
+      // Avoid including the iso646.h header because some headers from OS X
+      // frameworks are broken by it.
+      "-D_ISO646_H_", "-D__ISO646_H",
+    };
+    invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
+                             extraArgs.end());
+  } else {
+    std::vector<std::string> extraArgs = {
+      // Non-Darwin platforms don't use the Objective-C runtime, so they can
+      // not import Objective-C modules.
+      //
+      // Just use the most feature-rich C language mode.
+      "-x", "c", "-std=gnu11",
+    };
+    invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
+                             extraArgs.end());
+  }
+
+  invocationArgStrs.push_back("<swift-imported-modules>");
 
   if (triple.isOSDarwin()) {
     std::string minVersionBuf;
