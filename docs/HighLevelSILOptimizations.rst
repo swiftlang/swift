@@ -137,8 +137,8 @@ array.init
   semantically writes to every array element and the array's storage
   descriptor. ``init`` also implies the guarding semantics of
   ``make_mutable``. It is not itself guarded by ``make_mutable`` and
-  may act as a guard to other mutating operations, such as
-  ``set_element``.
+  may act as a guard to other potentially mutating operations, such as
+  ``get_element_address``.
 
 array.get_element(index: Int) -> Element
 
@@ -155,13 +155,6 @@ array.get_element_address(index: Int) -> UnsafeMutablePointer<Element>
    in the array. This operation is not control dependent, but may be guarded by
    ``check_subscript``. Any ``check_subscript``, ``make_mutable`` or
    ``mutate_unknown`` may act as a guard.
-
-array.set_element(index: Int, e: Element)
-
-  Write an element into the array at the specified index. No state is
-  read. No other elements are written. The storage descriptor is not
-  written. This operation is control dependent and may be guarded by
-  ``check_subscript`` and ``make_mutable`` or ``mutate_unknown``.
 
 array.check_subscript(index: Int)
 
@@ -184,7 +177,7 @@ array.make_mutable()
 
   This operation guards mutating operations that don't already imply
   ``make_mutable`` semantics. (Currently, the only guarded operation
-  is ``set_element``.) ``make_mutable`` may create a copy of the array
+  is ``get_element_address``.) ``make_mutable`` may create a copy of the array
   storage; however, semantically it neither reads nor writes the array
   state. It does not write state simply because the copy's state is
   identical to the original. It does not read state because no other
@@ -203,7 +196,7 @@ array.mutate_unknown
   dependent. ``mutate_unknown`` also implies the guarding semantics of
   ``make_mutable``. It is not itself guarded by ``make_mutable`` and
   may act as a guard to other mutating operations, such as
-  ``set_element``. Combining semantics allows the flexbility in how
+  ``get_element_address``. Combining semantics allows the flexbility in how
   the array copy is implemented in conjunction with implementing
   mutating functionality. This may be more efficient than cleanly
   isolating the copy and mutation code.
@@ -232,16 +225,15 @@ An operation can only interfere-with or guard another if they may operate on the
 ================ =============== ==========================================
 semantic op      relation        semantic ops
 ================ =============== ==========================================
-make_mutable     guards          set_element, get_elt_addr
-check_subscript  guards          get_element, set_element, get_elt_addr
-set_element(i)   interferes-with get_element(i), get_elt_addr, set_element(i)
-get_elt_addr     interferes-with get_element, set_element
-mutate_unknown   itereferes-with get_element, set_element, check_subscript,
-                                 get_count, get_capacity, get_elt_addr
+make_mutable     guards          get_element_address
+check_subscript  guards          get_element, get_element_address
+get_elt_addr     interferes-with get_element, get_element_address
+mutate_unknown   itereferes-with get_element, check_subscript, get_count,
+                                 get_capacity, get_element_address
 ================ =============== ==========================================
 
 .. [#f1] Any check_subscript(N) may act as a guard for
-         ``get/set_element(i)/get_element_address(i)`` as long as it can be
+         ``get_element(i)/get_element_address(i)`` as long as it can be
          shown that ``N >= i``.
 
 In addition to preserving these semantics, the optimizer must

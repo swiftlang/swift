@@ -363,7 +363,6 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() {
       .Case("array.get_element", ArrayCallKind::kGetElement)
       .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
       .Case("array.get_element_address", ArrayCallKind::kGetElementAddress)
-      .Case("array.set_element", ArrayCallKind::kSetElement)
       .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
       .Default(ArrayCallKind::kNone);
 
