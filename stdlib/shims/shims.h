@@ -36,12 +36,14 @@ typedef struct {
   intptr_t length;
 } _SwiftNSRange;
 
+#ifdef __OBJC2__
 typedef struct {
     unsigned long state;
     id __unsafe_unretained *itemsPtr;
     unsigned long *mutationsPtr;
     unsigned long extra[5];
 } _SwiftNSFastEnumerationState;
+#endif
 
 extern const uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie;
 
