@@ -3381,6 +3381,8 @@ static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
 
   computeAccessibility(TC, materializeForSet);
 
+  TC.validateDecl(materializeForSet);
+
   return materializeForSet;
 }
 

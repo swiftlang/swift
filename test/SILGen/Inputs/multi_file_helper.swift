@@ -29,3 +29,7 @@ final class ObservingPropertyFinalClass {
   }
   init(_ foo: Int) { self.foo = foo }
 }
+
+protocol ProtocolWithProperty {
+  var foo: Int { get set }
+}

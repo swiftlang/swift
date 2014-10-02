@@ -34,3 +34,14 @@ func finalVarsDontNeedMaterializeForSet(obj: ObservingPropertyFinalClass) {
   // CHECK: function_ref @_TFC10multi_file27ObservingPropertyFinalClassg3fooSi
   // CHECK: function_ref @_TFC10multi_file27ObservingPropertyFinalClasss3fooSi
 }
+
+// rdar://18503960
+// Ensure that we type-check the materializeForSet accessor from the protocol.
+class HasComputedProperty: ProtocolWithProperty {
+  var foo: Int {
+    get { return 1 }
+    set {}
+  }
+}
+// CHECK-LABEL: sil hidden [transparent] @_TFC10multi_file19HasComputedPropertym3fooSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasComputedProperty) -> (Builtin.RawPointer, Builtin.Int1) {
+// CHECK-LABEL: sil @_TTWC10multi_file19HasComputedPropertyS_20ProtocolWithPropertyFS1_m3fooSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout HasComputedProperty) -> (Builtin.RawPointer, Builtin.Int1) {
