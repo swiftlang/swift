@@ -15,7 +15,7 @@ func f() {
 // CHECK: define hidden void  @_TFV4self11stuffStructCfMS0_FT_S0_(%V4self11stuffStruct* noalias sret) {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %V4self11stuffStruct, align 8
-// CHECK:  call void @llvm.dbg.declare(metadata !{%V4self11stuffStruct* %[[ALLOCA]]}, metadata ![[SELF:.*]]), !dbg
+// CHECK:  call void @llvm.dbg.declare(metadata !{%V4self11stuffStruct* %[[ALLOCA]]}, metadata ![[SELF:.*]], metadata !{{[0-9]+}}), !dbg
 // CHECK: null, null, metadata ![[STUFFSTRUCT:.*]]} ; [ DW_TAG_structure_type ] [stuffStruct]
 // CHECK: ![[SELF]] = {{.*}}, metadata ![[STUFFSTRUCT]], i32 0, i32 0} ; [ DW_TAG_auto_variable ] [self]
 

@@ -5,7 +5,7 @@ func peek() -> Symbol? { return Symbol() }
 
 func foo() {
 // CHECK: define {{.*}}foo
-// CHECK: call void @llvm.dbg.declare(metadata ![[UNDEF:.*]], metadata ![[S:.*]])
+// CHECK: call void @llvm.dbg.declare(metadata ![[UNDEF:.*]], metadata ![[S:.*]], metadata !{{[0-9]+}})
 // CHECK: ![[UNDEF]] = metadata !{void undef}
 // CHECK: ![[S]] = {{.*}}[ DW_TAG_auto_variable ] [s] [line [[@LINE+1]]]
   while let s = peek() {

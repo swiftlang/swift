@@ -7,7 +7,7 @@ struct CErrorOr<T>
     // CHECK: define hidden void @_TFV20generic_enum_closure8CErrorOrCU__fMGS0_Q__FT1xVS_14__CurrentErrno_GS0_Q__
     // CHECK-NOT: define
     // This is a SIL-level debug_value_addr instruction.
-    // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[SELF:.*]])
+    // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[SELF:.*]], metadata !{{[0-9]+}})
     // CHECK-DAG: ![[SELFTY:.*]] = {{.*}}_TtGV20generic_enum_closure8CErrorOrQq_S0__
     // CHECK-DAG: ![[SELF]] = {{.*}}_TtGV20generic_enum_closure8CErrorOrQq_S0__{{.*}} ; [ DW_TAG_auto_variable ] [self]
     value = .None

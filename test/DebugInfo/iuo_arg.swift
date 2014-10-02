@@ -18,7 +18,7 @@ class MyClass {
 	{
     // Test that image is in an alloca, but not an indirect location.
     // CHECK: store i64 %0, i64* %[[ALLOCA:.*]],
-    // CHECK: call void @llvm.dbg.declare(metadata !{i64* %[[ALLOCA]]}, metadata ![[IMAGE:.*]])
+    // CHECK: call void @llvm.dbg.declare(metadata !{i64* %[[ALLOCA]]}, metadata ![[IMAGE:.*]], metadata !{{[0-9]+}})
     // CHECK: ![[IMAGE]] = {{.*}} i32 0} ; [ DW_TAG_arg_variable ] [image] [line [[@LINE-5]]]
 		let filter = CIFilter(name: "CIGaussianBlur")
 		return image

@@ -188,7 +188,8 @@ public:
 
   /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
   void emitDbgIntrinsic(llvm::BasicBlock *BB,
-                        llvm::Value* Storage, llvm::DIVariable Var,
+                        llvm::Value* Storage,
+                        llvm::DIVariable Var, llvm::DIExpression Expr,
                         unsigned Line, unsigned Col, llvm::DIDescriptor Scope,
                         SILDebugScope *DS);
 

@@ -1033,8 +1033,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
   // FIXME: this should be the scope of the type's declaration.
   llvm::DIType DITy = getOrCreateType(DbgTy);
 
-  unsigned Derefs = Indirection ? 1 : 0;
-
   // If there is no debug info for this type then do not emit debug info
   // for this variable.
   assert(DITy);
@@ -1047,26 +1045,22 @@ void IRGenDebugInfo::emitVariableDeclaration(
     Flags |= llvm::DIDescriptor::FlagArtificial;
 
   // Create the descriptor for the variable.
-  llvm::DIVariable Descriptor;
+  llvm::DIVariable Var;
+  llvm::DIExpression Expr = DBuilder.createExpression();
 
-  if (Derefs) {
+  if (Indirection) {
     // Classes are always passed by reference.
-    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
-    SmallVector<llvm::Value *, 1> Addr;
-    while (Derefs--)
-      Addr.push_back(llvm::ConstantInt::get(Int64Ty, llvm::DIBuilder::OpDeref));
+    int64_t Addr[] = { llvm::dwarf::DW_OP_deref };
+    Expr = DBuilder.createExpression(Addr);
     // FIXME: assert(Flags == 0 && "Complex variables cannot have flags");
-    Descriptor = DBuilder.createComplexVariable(Tag, Scope, Name, Unit, Line,
-                                                DITy, Addr, ArgNo);
-  } else {
-    Descriptor = DBuilder.createLocalVariable(
-        Tag, Scope, Name, Unit, Line, DITy, Opts.Optimize, Flags, ArgNo);
   }
+  Var = DBuilder.createLocalVariable(
+        Tag, Scope, Name, Unit, Line, DITy, Opts.Optimize, Flags, ArgNo);
 
   // Create inlined variables.
   if (DS && DS->InlinedCallSite) {
     auto InlinedAt = createInlinedAt(DS);
-    Descriptor = createInlinedVariable(Descriptor, InlinedAt, M.getContext());
+    Var = createInlinedVariable(Var, InlinedAt, M.getContext());
   }
 
   // Insert a debug intrinsic into the current block.
@@ -1086,8 +1080,8 @@ void IRGenDebugInfo::emitVariableDeclaration(
     if (isa<llvm::UndefValue>(Piece))
       Piece = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
 
-    llvm::DIVariable Var = Descriptor;
     if (IsPiece) {
+      assert(!Indirection && "indirect pieces are not supported");
       // Try to get the size from the type if possible.
       auto Dim = EltSizes.getNext();
       auto StorageSize = getSizeFromExplosionValue(CI.getTargetInfo(), Piece);
@@ -1108,7 +1102,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(VarSizeInBits > 0 && "zero-sized variable");
       if ((OffsetInBytes+SizeInBytes)*SizeOfByte > VarSizeInBits)
         break;
-      if ((OffsetInBytes==0) &&
+      if ((OffsetInBytes == 0) &&
           SizeInBytes*SizeOfByte == VarSizeInBits)
         break;
       if (SizeInBytes == 0)
@@ -1118,28 +1112,28 @@ void IRGenDebugInfo::emitVariableDeclaration(
              && "piece covers entire var");
       assert((OffsetInBytes+SizeInBytes)*SizeOfByte<=VarSizeInBits
              && "pars > totum");
-      Var = DBuilder.
-        createVariablePiece(Descriptor, OffsetInBytes, SizeInBytes);
+      Expr = DBuilder.createPieceExpression(OffsetInBytes, SizeInBytes);
       OffsetInBytes += SizeInBytes;
     }
-    emitDbgIntrinsic(BB, Piece, Var, Line, Loc.Col, Scope, DS);
+    emitDbgIntrinsic(BB, Piece, Var, Expr, Line, Loc.Col, Scope, DS);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.size() == 0) {
     auto undef = llvm::UndefValue::get(llvm::Type::getVoidTy(M.getContext()));
-    emitDbgIntrinsic(BB, undef, Descriptor, Line, Loc.Col, Scope, DS);
+    emitDbgIntrinsic(BB, undef, Var, Expr, Line, Loc.Col, Scope, DS);
   }
 }
 
 void IRGenDebugInfo::
 emitDbgIntrinsic(llvm::BasicBlock *BB,
                  llvm::Value* Storage, llvm::DIVariable Var,
+                 llvm::DIExpression Expr,
                  unsigned Line, unsigned Col, llvm::DIDescriptor Scope,
                  SILDebugScope *DS) {
   auto Call = (isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage))
-    ? DBuilder.insertDeclare(Storage, Var, BB)
-    : DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, BB);
+    ? DBuilder.insertDeclare(Storage, Var, Expr, BB)
+    : DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, BB);
 
   // Set the location/scope of the intrinsic.
   llvm::MDNode *InlinedAt = nullptr;

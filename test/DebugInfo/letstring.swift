@@ -6,13 +6,13 @@ class AppDelegate {
   // CHECK: define hidden i1 {{.*}}11AppDelegate1f
   func f() -> Bool {
     // Test for -O0 shadow copies.
-    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[B:.*]])
-    // CHECK-NOT: call void @llvm.dbg.value({{.*}}, metadata ![[B]])
-    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[SELF:.*]])
+    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[B:.*]], metadata !{{[0-9]+}})
+    // CHECK-NOT: call void @llvm.dbg.value({{.*}}, metadata ![[B]], metadata !{{[0-9]+}})
+    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[SELF:.*]], metadata !{{[0-9]+}})
     let a = "let"
-    // CHECK-NOT: call void @llvm.dbg.value({{.*}}, metadata ![[SELF]])
-    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[A:.*]])
-    // CHECK-NOT: call void @llvm.dbg.value({{.*}}, metadata ![[A]])
+    // CHECK-NOT: call void @llvm.dbg.value({{.*}}, metadata ![[SELF]], metadata !{{[0-9]+}})
+    // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[A:.*]], metadata !{{[0-9]+}})
+    // CHECK-NOT: call void @llvm.dbg.value({{.*}}, metadata ![[A]], metadata !{{[0-9]+}})
     // CHECK-DAG: ![[A]] = {{.*}}; [ DW_TAG_auto_variable ] [a] [line [[@LINE-4]]]
     // CHECK-DAG: ![[SELF]] = {{.*}}; [ DW_TAG_arg_variable ] [self] [line [[@LINE-10]]]
     // CHECK-DAG: ![[B]] = {{.*}}; [ DW_TAG_auto_variable ] [b] [line [[@LINE+1]]]

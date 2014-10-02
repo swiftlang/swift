@@ -8,7 +8,7 @@ typealias MyFloat = Float
 // CHECK: %[[ALLOCB:.*]] = alloca
 // CHECK: %[[ALLOCA:.*]] = alloca
 // CHECK: %[[ALLOCABOX:.*]] = alloca
-// CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCB]]}, metadata ![[B:.*]])
+// CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCB]]}, metadata ![[B:.*]], metadata !{{[0-9]+}})
 // CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCA]]}, metadata
 // CHECK: ![[REFINT:.*]] = {{.*}}[ DW_TAG_structure_type ] [_TtRSi]
 // CHECK: ![[B]] = {{.*}}metadata ![[MYFLOAT:.*]], i32 0, i32 0} ; [ DW_TAG_arg_variable ] [b] [line [[@LINE+4]]]
