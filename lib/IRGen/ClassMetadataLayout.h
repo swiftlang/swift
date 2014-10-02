@@ -134,6 +134,10 @@ private:
           continue;
         addMethodEntries(fn);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        // Stub constructors don't get an entry.
+        if (ctor->hasStubImplementation())
+          continue;
+
         // Add entries for constructors.
         addMethodEntries(ctor);
       } else if (auto *asd = dyn_cast<AbstractStorageDecl>(member)) {
@@ -276,7 +280,10 @@ public:
   void addClassAddressPoint() { addInt32(); }
   void addClassCacheData() { addPointer(); addPointer(); }
   void addClassDataPointer() { addPointer(); }
-  void addMethod(SILDeclRef fn) { addPointer(); }
+  void addMethod(SILDeclRef fn) {
+    fn.getDecl()->getType()->dump();
+    addPointer();
+  }
   void addFieldOffset(VarDecl *var) { addPointer(); }
   void addGenericArgument(ArchetypeType *argument, ClassDecl *forClass) {
     addPointer();

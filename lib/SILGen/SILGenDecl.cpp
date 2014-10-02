@@ -1213,6 +1213,10 @@ public:
   }
   
   void visitConstructorDecl(ConstructorDecl *cd) {
+    // Stub constructors don't get an entry.
+    if (cd->hasStubImplementation())
+      return;
+    
     // Abstract constructors have their allocating entry point in the vtable.
     if (cd->isRequired()) {
       addEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
