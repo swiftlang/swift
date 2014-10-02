@@ -212,10 +212,23 @@ ClangImporter::create(ASTContext &ctx,
 
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
-  // Construct the invocation arguments for Objective-C ARC with the current
-  // target.
-  std::vector<std::string> invocationArgStrs = {
-    "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
+  // Construct the invocation arguments for the current target.
+  std::vector<std::string> invocationArgStrs;
+
+  // Set C language options.
+  if (triple.isOSDarwin()) {
+    // Darwin uses Objective-C ARC.
+    for (std::string arg : {"-x", "objective-c", "-std=gnu11", "-fobjc-arc",
+                            "-fmodules", "-fblocks"})
+      invocationArgStrs.push_back(arg);
+  } else {
+    // We can not assume an Objective-C environment on other platforms.
+    for (std::string arg : {"-x", "c", "-std=gnu11", "-fmodules"})
+      invocationArgStrs.push_back(arg);
+  }
+
+  // Add target-independent options.
+  std::vector<std::string> extraSwiftArgs = {
     "-fsyntax-only", "-w", "-femit-all-decls",
     "-target", irGenOpts.Triple,
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
@@ -233,6 +246,8 @@ ClangImporter::create(ASTContext &ctx,
     "-Werror=non-modular-include-in-framework-module",
     "<swift-imported-modules>"
   };
+  invocationArgStrs.insert(invocationArgStrs.end(), extraSwiftArgs.begin(),
+                           extraSwiftArgs.end());
 
   if (triple.isOSDarwin()) {
     std::string minVersionBuf;
