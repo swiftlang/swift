@@ -223,7 +223,8 @@ void SILDeclRef::print(raw_ostream &OS) const {
     const char *Suffix;
     switch (FD->getAccessorKind()) {
     case AccessorKind::IsWillSet:
-    case AccessorKind::IsDidSet:  assert(0 && "Shouldn't reach here");
+    case AccessorKind::IsDidSet:
+      llvm_unreachable("Shouldn't reach here");
     case AccessorKind::NotAccessor:
       Suffix = "";
       isDot = false;
