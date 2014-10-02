@@ -281,7 +281,6 @@ public:
   void addClassCacheData() { addPointer(); addPointer(); }
   void addClassDataPointer() { addPointer(); }
   void addMethod(SILDeclRef fn) {
-    fn.getDecl()->getType()->dump();
     addPointer();
   }
   void addFieldOffset(VarDecl *var) { addPointer(); }
