@@ -19,7 +19,6 @@ target_link_libraries(swiftClangImporter
   clangIndex
   clangFormat
   clangTooling
-  clangFormat
   clangFrontendTool
   clangFrontend
   clangDriver
