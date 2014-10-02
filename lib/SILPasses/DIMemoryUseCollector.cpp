@@ -666,12 +666,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // project_existential and open_existential are uses of the protocol value,
+    // open_existential is a use of the protocol value,
     // so it is modeled as a load.
-    if (isa<ProjectExistentialInst>(User)
-        || isa<OpenExistentialInst>(User)) {
+    if (isa<OpenExistentialInst>(User)) {
       Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
-      // TODO: Is it safe to ignore all uses of the project_existential?
+      // TODO: Is it safe to ignore all uses of the open_existential?
       continue;
     }
 

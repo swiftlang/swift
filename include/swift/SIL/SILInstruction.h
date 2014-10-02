@@ -1998,24 +1998,6 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
-/// ProjectExistentialInst - Given the address of an existential, returns a
-/// RawPointer pointing to the value inside the existential.
-class ProjectExistentialInst
-  : public UnaryInstructionBase<ValueKind::ProjectExistentialInst>
-{
-public:
-  ProjectExistentialInst(SILLocation Loc, SILValue Operand, SILType SelfTy);
-};
-
-/// ProjectExistentialRefInst - Given a class existential, returns an
-/// UnknownObject referencing the contained class instance.
-class ProjectExistentialRefInst
-  : public UnaryInstructionBase<ValueKind::ProjectExistentialRefInst>
-{
-public:
-  ProjectExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty);
-};
-
 /// OpenExistentialInst - Given the address of an existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.

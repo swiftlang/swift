@@ -858,9 +858,9 @@ bb0(%0 : $AnyObject):
   %3 = alloc_box $Optional<() -> ()>
   %4 = load %1#1 : $*AnyObject
   strong_retain %4 : $AnyObject
-  // CHECK: project_existential_ref %{{.*}} : $AnyObject to $@sil_self AnyObject
-  %6 = project_existential_ref %4 : $AnyObject to $@sil_self AnyObject
-  %7 = unchecked_ref_cast %6 : $@sil_self AnyObject to $Builtin.UnknownObject
+  // CHECK: open_existential_ref %{{.*}} : $AnyObject to $@opened({{.*}}) AnyObject
+  %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject
+  %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject to $Builtin.UnknownObject
   // CHECK: dynamic_method_br %{{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb{{.*}}, bb{{.*}}
   dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
 bb1(%z : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):

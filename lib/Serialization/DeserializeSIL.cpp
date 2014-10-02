@@ -732,8 +732,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                (SILValueCategory)TyCategory2)),                \
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
     break;
-  ONEOPERAND_ONETYPE_INST(ProjectExistential)
-  ONEOPERAND_ONETYPE_INST(ProjectExistentialRef)
   ONEOPERAND_ONETYPE_INST(OpenExistential)
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   // Conversion instructions.

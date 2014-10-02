@@ -186,7 +186,7 @@ static bool canValueEscape(SILValue V, bool examineApply) {
     // a way that escapes.  Recursively check that the uses of the instruction
     // don't escape and collect all of the uses of the value.
     if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
-        isa<ProjectExistentialInst>(User) || isa<OpenExistentialInst>(User) ||
+        isa<OpenExistentialInst>(User) ||
         isa<MarkUninitializedInst>(User) || isa<AddressToPointerInst>(User) ||
         isa<PointerToAddressInst>(User)) {
       if (canValueEscape(User, examineApply))

@@ -603,20 +603,6 @@ public:
                                     Volatile));
   }
 
-  ProjectExistentialInst *createProjectExistential(SILLocation Loc,
-                                                   SILValue Operand,
-                                                   SILType SelfTy) {
-    return insert(new (F.getModule())
-                    ProjectExistentialInst(Loc, Operand, SelfTy));
-  }
-  
-  ProjectExistentialRefInst *createProjectExistentialRef(SILLocation Loc,
-                                                         SILValue Operand,
-                                                         SILType Ty) {
-    return insert(new (F.getModule())
-                    ProjectExistentialRefInst(Loc, Operand, Ty));
-  }
-
   OpenExistentialInst *createOpenExistential(SILLocation Loc, SILValue Operand,
                                              SILType SelfTy) {
     return insert(new (F.getModule())

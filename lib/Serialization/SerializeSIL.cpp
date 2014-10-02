@@ -809,32 +809,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                               S.addDeclRef(PI->getProtocol()), 0);
     break;
   }
-  case ValueKind::ProjectExistentialInst: {
-    const ProjectExistentialInst *PEI = cast<ProjectExistentialInst>(&SI);
-    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
-        S.addTypeRef(PEI->getType().getSwiftRValueType()),
-        (unsigned)PEI->getType().getCategory(),
-        S.addTypeRef(PEI->getOperand().getType().getSwiftRValueType()),
-        (unsigned)PEI->getOperand().getType().getCategory(),
-        addValueRef(PEI->getOperand()),
-        PEI->getOperand().getResultNumber());
-    break;
-  }
-  case ValueKind::ProjectExistentialRefInst: {
-    const ProjectExistentialRefInst *PEI = cast<ProjectExistentialRefInst>(&SI);
-    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
-        S.addTypeRef(PEI->getType().getSwiftRValueType()),
-        (unsigned)PEI->getType().getCategory(),
-        S.addTypeRef(PEI->getOperand().getType().getSwiftRValueType()),
-        (unsigned)PEI->getOperand().getType().getCategory(),
-        addValueRef(PEI->getOperand()),
-        PEI->getOperand().getResultNumber());
-    break;
-  }
   case ValueKind::OpenExistentialInst: {
     const OpenExistentialInst *OEI = cast<OpenExistentialInst>(&SI);
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,

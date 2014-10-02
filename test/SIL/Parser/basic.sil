@@ -719,7 +719,7 @@ bb0(%t : $T):
   return %1 : $()
 }
 
-sil @test_project_downcast_existential_addr : $@thin <U> (@in P) -> () {
+sil @test_open_downcast_existential_addr : $@thin <U> (@in P) -> () {
 bb0(%t : $*P):
   %0 = unconditional_checked_cast %t : $*P to $*U
   %1 = tuple ()
@@ -910,8 +910,8 @@ bb0(%0 : $AnyObject):
   %3 = alloc_box $Optional<() -> ()>
   %4 = load %1#1 : $*AnyObject
   strong_retain %4 : $AnyObject
-  %6 = project_existential_ref %4 : $AnyObject to $@sil_self AnyObject
-  %7 = unchecked_ref_cast %6 : $@sil_self AnyObject to $Builtin.UnknownObject
+  %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject
+  %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject to $Builtin.UnknownObject
   dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
 bb1(%z : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
   br bb3

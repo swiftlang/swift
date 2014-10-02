@@ -94,7 +94,6 @@ static Optional<bool> isDeinit(Operand* Oper) {
   case ValueKind::ExistentialMetatypeInst:
   case ValueKind::InjectEnumAddrInst:
   case ValueKind::LoadInst:
-  case ValueKind::ProjectExistentialInst:
   case ValueKind::StructElementAddrInst:
     return false;
   case ValueKind::InitEnumDataAddrInst:
@@ -141,7 +140,6 @@ static Optional<bool> isInit(Operand* Oper) {
   case ValueKind::ExistentialMetatypeInst:
   case ValueKind::InjectEnumAddrInst:
   case ValueKind::LoadInst:
-  case ValueKind::ProjectExistentialInst:
   case ValueKind::StructElementAddrInst:
     return false;
   case ValueKind::DestroyAddrInst:
@@ -243,7 +241,6 @@ bool CopyForwarding::collectUsers() {
       break;
     default:
       // TODO: we could peak through struct element users like COWArrayOpts.
-      // ProjectExistentialInst
       // StructElementAddrInst
       DEBUG(llvm::dbgs() << "  Skipping copy: use exposes def " << *UserInst);
       return false;

@@ -639,8 +639,6 @@ public:
   void visitWitnessMethodInst(WitnessMethodInst *i);
   void visitDynamicMethodInst(DynamicMethodInst *i);
 
-  void visitProjectExistentialInst(ProjectExistentialInst *i);
-  void visitProjectExistentialRefInst(ProjectExistentialRefInst *i);
   void visitOpenExistentialInst(OpenExistentialInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
@@ -3178,29 +3176,6 @@ void IRGenSILFunction::visitDeinitExistentialInst(
   Address container = getLoweredAddress(i->getOperand());
   emitOpaqueExistentialContainerDeinit(*this, container,
                                        i->getOperand().getType());
-}
-
-void IRGenSILFunction::visitProjectExistentialInst(
-                                             swift::ProjectExistentialInst *i) {
-  SILType baseTy = i->getOperand().getType();
-  Address base = getLoweredAddress(i->getOperand());
-
-  Address object = emitOpaqueExistentialProjection(*this, base, baseTy,
-                                                   CanArchetypeType());
-  
-  setLoweredAddress(SILValue(i, 0), object);
-}
-
-void IRGenSILFunction::visitProjectExistentialRefInst(
-                                          swift::ProjectExistentialRefInst *i) {
-  SILType baseTy = i->getOperand().getType();
-  Explosion base = getLoweredExplosion(i->getOperand());
-
-  Explosion result;
-  llvm::Value *instance
-    = emitClassExistentialProjection(*this, base, baseTy, CanArchetypeType());
-  result.add(instance);
-  setLoweredExplosion(SILValue(i, 0), result);
 }
 
 void IRGenSILFunction::visitOpenExistentialInst(OpenExistentialInst *i) {

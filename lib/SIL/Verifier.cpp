@@ -1298,37 +1298,6 @@ public:
             "lookup class type");
   }
 
-  void checkProjectExistentialInst(ProjectExistentialInst *PEI) {
-    SILType operandType = PEI->getOperand().getType();
-    require(operandType.isAddress(),
-            "project_existential must be applied to address");
-
-    SmallVector<ProtocolDecl*, 4> protocols;
-    require(operandType.getSwiftRValueType().isExistentialType(protocols),
-            "project_existential must be applied to address of existential");
-    require(PEI->getType().isAddress(),
-            "project_existential result must be an address");
-
-    require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
-            "project_existential result must be Self archetype of one of "
-            "its protocols");
-  }
-
-  void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
-    SILType operandType = PEI->getOperand().getType();
-    require(operandType.isObject(),
-            "project_existential_ref operand must not be address");
-    SmallVector<ProtocolDecl*, 4> protocols;
-    require(operandType.getSwiftRValueType().isExistentialType(protocols),
-            "project_existential must be applied to existential");
-    require(operandType.isClassExistentialType(),
-            "project_existential_ref operand must be class existential");
-
-    require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
-            "project_existential_ref result must be Self archetype of one of "
-            "its protocols");
-  }
-
   void checkOpenExistentialInst(OpenExistentialInst *OEI) {
     SILType operandType = OEI->getOperand().getType();
     require(operandType.isAddress(),

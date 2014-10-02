@@ -1193,8 +1193,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
     .Case("project_block_storage", ValueKind::ProjectBlockStorageInst)
-    .Case("project_existential", ValueKind::ProjectExistentialInst)
-    .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
@@ -1661,8 +1659,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createBuiltinFunctionRef(InstLoc, Id, Ty);
     break;
   }
-  case ValueKind::ProjectExistentialInst:
-  case ValueKind::ProjectExistentialRefInst:
   case ValueKind::OpenExistentialInst:
   case ValueKind::OpenExistentialRefInst: {
     SILType Ty;
@@ -1681,14 +1677,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     switch (Opcode) {
-    case ValueKind::ProjectExistentialInst:
-      ResultVal = B.createProjectExistential(InstLoc, Val, Ty);
-      break;
-
-    case ValueKind::ProjectExistentialRefInst:
-      ResultVal = B.createProjectExistentialRef(InstLoc, Val, Ty);
-      break;
-
     case ValueKind::OpenExistentialInst:
       ResultVal = B.createOpenExistential(InstLoc, Val, Ty);
       break;

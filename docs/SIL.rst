@@ -2885,23 +2885,6 @@ existential containers that have been partially initialized by
 ``init_existential`` but haven't had their contained value initialized.
 A fully initialized existential must be destroyed with ``destroy_addr``.
 
-project_existential
-```````````````````
-::
-
-  sil-instruction ::= 'project_existential' sil-operand 'to' sil-type
-
-  %1 = project_existential %0 : $*P to $*@sil_self P
-  // %0 must be of a $*P type for non-class protocol or protocol composition
-  //   type P
-  // $*@sil_self P must be the address-of-Self type for one of the protocols %0
-  //   conforms to
-  // %1 will be of type $*@sil_self P
-
-Obtains the address of the concrete value inside the
-existential container referenced by ``%0``.
-Deprecated in favor of open_existential.
-
 open_existential
 ````````````````
 ::
@@ -2934,21 +2917,6 @@ init_existential_ref
 
 Creates a class existential container of type ``$P`` containing a reference to
 the class instance ``%0``.
-
-project_existential_ref
-```````````````````````
-::
-
-  sil-instruction ::= 'project_existential_ref' sil-operand
-
-  %1 = project_existential_ref %0 : $P
-  // %0 must be of a class protocol or protocol composition type $P
-  // $@sil_self P must be the Self type for one of the protocols %0
-  //   conforms to
-  // %1 will be of type $@sil_self P
-
-Extracts the class instance reference from a class existential container.
-Deprecated in favor of open_existential_ref.
 
 open_existential_ref
 ````````````````````

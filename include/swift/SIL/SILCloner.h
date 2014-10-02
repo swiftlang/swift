@@ -1000,26 +1000,6 @@ SILCloner<ImplClass>::visitDynamicMethodInst(DynamicMethodInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::
-visitProjectExistentialInst(ProjectExistentialInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createProjectExistential(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getOperand()),
-                                          getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::
-visitProjectExistentialRefInst(ProjectExistentialRefInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createProjectExistentialRef(getOpLocation(Inst->getLoc()),
-                                             getOpValue(Inst->getOperand()),
-                                             getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitOpenExistentialInst(OpenExistentialInst *Inst) {
   // Create a new archetype for this opened existential type.
   auto archetypeTy

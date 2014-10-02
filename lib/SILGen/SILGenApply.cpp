@@ -1080,7 +1080,7 @@ public:
     //
     // In the last case, the AST has this call typed as being applied to an
     // rvalue, but the witness is actually expecting a pointer to the +0 value
-    // in memory.  We access this with the project_existential instruction, or
+    // in memory.  We access this with the open_existential instruction, or
     // just pass in the address since archetypes are address-only.
     //
     // FIXME: This is hideous. We should be letting emitRawApply figure this

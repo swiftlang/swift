@@ -1027,14 +1027,6 @@ public:
     OS << ", ";
     OS << DMI->getType();
   }
-  void visitProjectExistentialInst(ProjectExistentialInst *PI) {
-    OS << "project_existential " << getIDAndType(PI->getOperand())
-       << " to " << PI->getType();
-  }
-  void visitProjectExistentialRefInst(ProjectExistentialRefInst *PI) {
-    OS << "project_existential_ref " << getIDAndType(PI->getOperand())
-       << " to " << PI->getType();
-  }
   void visitOpenExistentialInst(OpenExistentialInst *OI) {
     OS << "open_existential " << getIDAndType(OI->getOperand())
        << " to " << OI->getType();

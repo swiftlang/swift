@@ -1000,18 +1000,6 @@ TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
 MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
   : SILInstruction(ValueKind::MetatypeInst, Loc, Metatype) {}
 
-ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc,
-                                               SILValue Operand,
-                                               SILType SelfTy)
-  : UnaryInstructionBase(Loc, Operand, SelfTy)
-{}
-
-ProjectExistentialRefInst::ProjectExistentialRefInst(SILLocation Loc,
-                                                     SILValue Operand,
-                                                     SILType Ty)
-  : UnaryInstructionBase(Loc, Operand, Ty)
-{}
-
 OpenExistentialInst::OpenExistentialInst(SILLocation Loc,
                                          SILValue Operand,
                                          SILType SelfTy)
