@@ -212,7 +212,7 @@ using OwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum DefaultArgumentKind : uint8_t {
+enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
   File,

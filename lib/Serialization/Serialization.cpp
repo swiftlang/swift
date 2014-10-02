@@ -567,22 +567,18 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 /// are guaranteed to be stable.
 static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) {
   switch (kind) {
-  case swift::DefaultArgumentKind::None:
-    return serialization::DefaultArgumentKind::None;
-  case swift::DefaultArgumentKind::Normal:
-    return serialization::DefaultArgumentKind::Normal;
-  case swift::DefaultArgumentKind::Inherited:
-    return serialization::DefaultArgumentKind::Inherited;
-  case swift::DefaultArgumentKind::Column:
-    return serialization::DefaultArgumentKind::Column;
-  case swift::DefaultArgumentKind::File:
-    return serialization::DefaultArgumentKind::File;
-  case swift::DefaultArgumentKind::Line:
-    return serialization::DefaultArgumentKind::Line;
-  case swift::DefaultArgumentKind::Function:
-    return serialization::DefaultArgumentKind::Function;
-  case swift::DefaultArgumentKind::DSOHandle:
-    return serialization::DefaultArgumentKind::DSOHandle;
+#define CASE(X) \
+  case swift::DefaultArgumentKind::X: \
+    return static_cast<uint8_t>(serialization::DefaultArgumentKind::X);
+  CASE(None)
+  CASE(Normal)
+  CASE(Inherited)
+  CASE(Column)
+  CASE(File)
+  CASE(Line)
+  CASE(Function)
+  CASE(DSOHandle)
+#undef CASE
   }
 }
 
