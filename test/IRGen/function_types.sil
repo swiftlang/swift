@@ -41,19 +41,6 @@ entry(%x : $@thin @cc(witness_method) () -> ()):
   return %x : $@thin @cc(witness_method) () -> ()
 }
 
-// CHECK-LABEL: define { i8*, %swift.type* } @thick_witness_value(i8*, %swift.type*) {
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    %2 = insertvalue { i8*, %swift.type* } undef, i8* %0, 0
-// CHECK-NEXT:    %3 = insertvalue { i8*, %swift.type* } %2, %swift.type* %1, 1
-// CHECK-NEXT:    ret { i8*, %swift.type* } %3
-// CHECK-NEXT:  }
-sil @thick_witness_value : $@thin (@owned @cc(witness_method) () -> ()) -> @owned @cc(witness_method) () -> () {
-entry(%x : $@cc(witness_method) () -> ()):
-  strong_retain %x : $@cc(witness_method) () -> ()
-  strong_release %x : $@cc(witness_method) () -> ()
-  return %x : $@cc(witness_method) () -> ()
-}
-
 struct X {}
 
 sil @out_void_return : $@thin (@out X) -> ()
