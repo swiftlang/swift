@@ -2708,7 +2708,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // high.
     if (baseObjTy->isAnyObject() && argumentLabels) {
       name = DeclName(TC.Context, name.getBaseName(), *argumentLabels);
-      argumentLabels = Nothing;
+      argumentLabels.reset();
     }
   }
 
@@ -2782,7 +2782,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // mismatch and ended up with nothing, try again ignoring the
     // labels. This allows us to perform typo correction on the labels.
     if (choices.empty() && labelMismatch && shouldAttemptFixes()) {
-      argumentLabels = Nothing;
+      argumentLabels.reset();
       goto retry_ctors_after_fail;
     }
 
@@ -3116,7 +3116,7 @@ retry_after_fail:
   // mismatch and ended up with nothing, try again ignoring the
   // labels. This allows us to perform typo correction on the labels.
   if (choices.empty() && labelMismatch && shouldAttemptFixes()) {
-    argumentLabels = Nothing;
+    argumentLabels.reset();
     goto retry_after_fail;
   }
 
