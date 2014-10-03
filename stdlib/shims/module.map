@@ -2,5 +2,6 @@ module SwiftShims {
   header "shims.h"
   header "HeapObject.h"
   header "RefCount.h"
+  header "GlobalObjects.h"
   export *
 }

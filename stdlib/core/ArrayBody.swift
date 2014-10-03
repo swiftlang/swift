@@ -15,13 +15,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 internal struct _ArrayBody {
+  var _storage: _SwiftArrayBodyStorage
+  
   init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
     _sanityCheck(count >= 0)
     _sanityCheck(capacity >= 0)
-    self.count = count
-    self._capacityAndFlags
-      = (UInt(capacity) << 1) | (elementTypeIsBridgedVerbatim ? 1 : 0)
+    
+    _storage = _SwiftArrayBodyStorage(
+      count: count,
+      _capacityAndFlags:
+        (UInt(capacity) << 1) | (elementTypeIsBridgedVerbatim ? 1 : 0))
   }
 
   /// In principle CountAndCapacity shouldn't need to be default
@@ -29,12 +35,18 @@ internal struct _ArrayBody {
   /// capacity after a new buffer is allocated, it's typical to want
   /// to update it immediately after construction.
   init() {
-    self.count = 0
-    self._capacityAndFlags = 0
+    _storage = _SwiftArrayBodyStorage(count: 0, _capacityAndFlags: 0)
   }
   
   /// The number of elements stored in this Array
-  var count: Int
+  var count: Int {
+    get {
+      return _storage.count
+    }
+    set(newCount) {
+      _storage.count = newCount
+    }
+  }
 
   /// The number of elements that can be stored in this Array without
   /// reallocation.
@@ -60,6 +72,13 @@ internal struct _ArrayBody {
 
   /// Storage optimization: compresses capacity and
   /// elementTypeIsBridgedVerbatim together.
-  var _capacityAndFlags: UInt
+  var _capacityAndFlags: UInt {
+    get {
+      return _storage._capacityAndFlags
+    }
+    set {
+      _storage._capacityAndFlags = newValue
+    }
+  }
 }
 
