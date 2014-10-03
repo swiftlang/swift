@@ -12,81 +12,17 @@
 
 import SwiftShims
 
-/// A common base class for all `ManagedBuffer<V,E>`\ 's.
-public class ManagedBufferBase {}
-
-/// A class whose instances contain a property of type `Value` and raw
-/// storage for an array of `Element`, whose size is determined at
+/// A base class of `ManagedBuffer<Value,Element>`, used during
 /// instance creation.
 ///
-/// Note that the `Element` array is suitably-aligned **raw memory**.
-/// You are expected to construct and---if necessary---destroy objects
-/// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
-/// Typical usage stores a count and capacity in `Value` and destroys
-/// any live elements in the `deinit` of a subclass.  Note: subclasses
-/// must not have any stored properties; any storage needed should be
-/// included in `Value`.
-public class ManagedBuffer<Value, Element> : ManagedBufferBase {
-  
-  /// Create a new instance of the most-derived class, calling
-  /// `initialize` on the partially-constructed object to generate an
-  /// initial `Value`.
-  ///
-  /// Note, in particular, accessing `value` inside the `initialize`
-  /// function is undefined.
-  public final class func create(
-    minimumCapacity: Int, initialize: (ManagedBuffer)->Value
-  ) -> ManagedBuffer {
-    _precondition(
-      minimumCapacity >= 0,
-      "ManagedBuffer must have non-negative capacity")
-
-    let totalSize = ManagedBuffer._elementOffset
-      +  minimumCapacity * strideof(Element.self)
-
-    let alignMask = ManagedBuffer._alignmentMask
-
-    let result: ManagedBuffer = unsafeDowncast(
-        _swift_bufferAllocate(self, totalSize, alignMask)
-      )
-    
-    result.withUnsafeMutablePointerToValue {
-      $0.initialize(initialize(result))
-    }
-    return result
-  }
-
-  /// Make ordinary initialization unavailable
-  internal init(_doNotCallMe: ()) {
-    fatalError("Only initialize these by calling create")
-  }
-  
-  /// Destroy the stored Value
-  deinit {
-    // FIXME: doing the work in a helper is a workaround for
-    // <rdar://problem/18158010>
-    _deinit()
-  }
-
-  // FIXME: separating this from the real deinit is a workaround for
-  // <rdar://problem/18158010>
-  /// The guts of deinit(); do not call
-  internal final func _deinit() {
-    withUnsafeMutablePointerToValue { $0.destroy() }
-  }
-
-  /// The required alignment for allocations of this type, minus 1
-  internal final class var _alignmentMask : Int {
-    return max(
-      alignof(_HeapObject.self),
-      max(alignof(Value.self), alignof(Element.self))) &- 1
-  }
-
-  /// The actual number of bytes allocated for this object.
-  internal final var _allocatedByteCount : Int {
-    return Int(bitPattern: malloc_size(unsafeAddressOf(self)))
-  }
-  
+/// During instance creation, in particular during
+/// `ManagedBuffer.create`\ 's call to initialize, `ManagedBuffer`\ 's
+/// `value` property is as-yet uninitialized, and therefore
+///
+/// `ManagedProtoBuffer` does not offer
+/// access to the as-yet uninitialized `value` property of
+/// `ManagedBuffer`,
+public class ManagedProtoBuffer<Value, Element> {
   /// The actual number of elements that can be stored in this object.
   ///
   /// This value may be nontrivial to compute; it is usually a good
@@ -94,26 +30,10 @@ public class ManagedBuffer<Value, Element> : ManagedBufferBase {
   /// an instance is created.
   public final var allocatedElementCount : Int {
     return (
-      _allocatedByteCount &- ManagedBuffer._elementOffset &+ sizeof(Element) &- 1
+      _allocatedByteCount &- ManagedProtoBuffer._elementOffset &+ sizeof(Element) &- 1
     ) &/ sizeof(Element)
   }
 
-  /// The stored `Value` instance.
-  ///
-  /// Note: this value must not be accessed during instance creation.
-  public final var value: Value {
-    get {
-      return withUnsafeMutablePointerToValue {
-        return $0.memory
-      }
-    }
-    set {
-      withUnsafeMutablePointerToValue {
-        $0.memory = newValue
-      }
-    }
-  }
-  
   /// Call `body` with an `UnsafeMutablePointer` to the stored `Value`
   public final func withUnsafeMutablePointerToValue<R>(
     body: (UnsafeMutablePointer<Value>)->R
@@ -134,11 +54,30 @@ public class ManagedBuffer<Value, Element> : ManagedBufferBase {
     body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
   ) -> R {
     let result = body(
-      UnsafeMutablePointer(_address + ManagedBuffer._valueOffset),
-      UnsafeMutablePointer(_address + ManagedBuffer._elementOffset)
+      UnsafeMutablePointer(_address + ManagedProtoBuffer._valueOffset),
+      UnsafeMutablePointer(_address + ManagedProtoBuffer._elementOffset)
     )
     _fixLifetime(self)
     return result
+  }
+  
+  //===--- internal/private API -------------------------------------------===//
+  
+  /// Make ordinary initialization unavailable
+  internal init(_doNotCallMe: ()) {
+    _sanityCheckFailure("Only initialize these by calling create")
+  }
+  
+  /// The required alignment for allocations of this type, minus 1
+  internal final class var _alignmentMask : Int {
+    return max(
+      alignof(_HeapObject.self),
+      max(alignof(Value.self), alignof(Element.self))) &- 1
+  }
+
+  /// The actual number of bytes allocated for this object.
+  internal final var _allocatedByteCount : Int {
+    return Int(bitPattern: malloc_size(unsafeAddressOf(self)))
   }
   
   /// The address of this instance in a convenient pointer-to-bytes form
@@ -161,6 +100,79 @@ public class ManagedBuffer<Value, Element> : ManagedBufferBase {
   /// allocated size.  Probably completely unused per
   /// <rdar://problem/18156440>
   internal final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
-    return (_allocatedByteCount, ManagedBuffer._alignmentMask)
+    return (_allocatedByteCount, ManagedProtoBuffer._alignmentMask)
+  }
+}
+
+/// A class whose instances contain a property of type `Value` and raw
+/// storage for an array of `Element`, whose size is determined at
+/// instance creation.
+///
+/// Note that the `Element` array is suitably-aligned **raw memory**.
+/// You are expected to construct and---if necessary---destroy objects
+/// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
+/// Typical usage stores a count and capacity in `Value` and destroys
+/// any live elements in the `deinit` of a subclass.  Note: subclasses
+/// must not have any stored properties; any storage needed should be
+/// included in `Value`.
+public class ManagedBuffer<Value, Element>
+  : ManagedProtoBuffer<Value, Element> {
+  
+  /// Create a new instance of the most-derived class, calling
+  /// `initialize` on the partially-constructed object to generate an
+  /// initial `Value`.
+  ///
+  /// Note, in particular, accessing `value` inside the `initialize`
+  /// function is undefined.
+  public final class func create(
+    minimumCapacity: Int, initialize: (ManagedProtoBuffer<Value,Element>)->Value
+  ) -> ManagedBuffer {
+    _precondition(
+      minimumCapacity >= 0,
+      "ManagedBuffer must have non-negative capacity")
+
+    let totalSize = ManagedBuffer._elementOffset
+      +  minimumCapacity * strideof(Element.self)
+
+    let alignMask = ManagedBuffer._alignmentMask
+
+    let result: ManagedBuffer = unsafeDowncast(
+        _swift_bufferAllocate(self, totalSize, alignMask)
+      )
+    
+    result.withUnsafeMutablePointerToValue {
+      $0.initialize(initialize(result))
+    }
+    return result
+  }
+
+  /// Destroy the stored Value
+  deinit {
+    // FIXME: doing the work in a helper is a workaround for
+    // <rdar://problem/18158010>
+    _deinit()
+  }
+
+  // FIXME: separating this from the real deinit is a workaround for
+  // <rdar://problem/18158010>
+  /// The guts of deinit(); do not call
+  internal final func _deinit() {
+    withUnsafeMutablePointerToValue { $0.destroy() }
+  }
+
+  /// The stored `Value` instance.
+  ///
+  /// Note: this value must not be accessed during instance creation.
+  public final var value: Value {
+    get {
+      return withUnsafeMutablePointerToValue {
+        return $0.memory
+      }
+    }
+    set {
+      withUnsafeMutablePointerToValue {
+        $0.memory = newValue
+      }
+    }
   }
 }
