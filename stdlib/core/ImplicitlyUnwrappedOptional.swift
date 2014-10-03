@@ -79,7 +79,7 @@ extension ImplicitlyUnwrappedOptional : Printable {
 
 // Intrinsics for use by language features.
 @transparent
-internal func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {
+public func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {
   switch v {
   case .Some:
     return true.value
@@ -89,7 +89,7 @@ internal func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Built
 }
 
 @transparent
-internal func _preconditionImplicitlyUnwrappedOptionalHasValue<T>(inout v: T!) {
+public func _preconditionImplicitlyUnwrappedOptionalHasValue<T>(inout v: T!) {
   switch v {
   case .Some:
     break
@@ -100,7 +100,7 @@ internal func _preconditionImplicitlyUnwrappedOptionalHasValue<T>(inout v: T!) {
 }
 
 @transparent
-internal func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
+public func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
   switch v {
   case .Some(let x):
     return x
@@ -111,12 +111,12 @@ internal func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
 }
 
 @transparent
-internal func _injectValueIntoImplicitlyUnwrappedOptional<T>(v: T) -> T! {
+public func _injectValueIntoImplicitlyUnwrappedOptional<T>(v: T) -> T! {
   return .Some(v)
 }
 
 @transparent
-internal func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
+public func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
   return .None
 }
 

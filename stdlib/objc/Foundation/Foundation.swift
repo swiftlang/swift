@@ -139,7 +139,7 @@ extension NSString : _CocoaStringType {}
 /// bridge Cocoa strings properly.  Currently invoked by a HACK in
 /// Misc.mm; a better mechanism may be needed.
 @asmname("__swift_initializeCocoaStringBridge") 
-func __swift_initializeCocoaStringBridge() -> COpaquePointer {
+public func __swift_initializeCocoaStringBridge() -> COpaquePointer {
   _cocoaStringToContiguous = _cocoaStringToContiguousImpl
   _cocoaStringReadAll = _cocoaStringReadAllImpl
   _cocoaStringLength = _cocoaStringLengthImpl

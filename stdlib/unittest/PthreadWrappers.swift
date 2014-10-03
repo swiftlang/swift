@@ -23,7 +23,7 @@ func _stdlib_getExecuteBlockFunctionPtr_VoidPtr_VoidPtr()
 @asmname("swift_stdlib_getTypeMetadata")
 func _stdlib_getTypeMetadata<T>(_: T.Type) -> UnsafePointer<Void>
 
-struct ExecuteSwiftClosureContext<Argument, Result> {
+public struct ExecuteSwiftClosureContext<Argument, Result> {
   let argumentTypeMetadata: UnsafePointer<Void>
   let resultTypeMetadata: UnsafePointer<Void>
   let closure: ((Argument) -> Result)
@@ -35,7 +35,7 @@ struct ExecuteSwiftClosureContext<Argument, Result> {
 /// :param: closureAndArg closure and its argument.  The function takes
 ///   ownership of this pointer.
 @asmname("swift_stdlib_executeSwiftClosure")
-func _stdlib_executeSwiftClosure<Param, Result>(
+public func _stdlib_executeSwiftClosure<Param, Result>(
   context: UnsafeMutablePointer<ExecuteSwiftClosureContext<Param, Result>>
 ) -> UnsafeMutablePointer<Result> {
   let closure = context.memory.closure

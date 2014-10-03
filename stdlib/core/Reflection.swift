@@ -193,7 +193,7 @@ public protocol MirrorType {
 /// for an arbitrary object. The memory pointed to by "out" is initialized with
 /// the summary string.
 @asmname("swift_getSummary")
-func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
+public func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
   out.initialize(reflect(x).summary)
 }
 
