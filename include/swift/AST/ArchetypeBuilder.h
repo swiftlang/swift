@@ -40,6 +40,7 @@ class GenericParamList;
 class GenericSignature;
 class GenericTypeParamDecl;
 class GenericTypeParamType;
+class LazyResolver;
 class Module;
 class Pattern;
 class ProtocolConformance;
@@ -69,6 +70,7 @@ private:
   Module &Mod;
   ASTContext &Context;
   DiagnosticEngine &Diags;
+  LazyResolver *Resolver = nullptr;
   struct Implementation;
   std::unique_ptr<Implementation> Impl;
 
@@ -126,6 +128,7 @@ public:
   /// results of AbstractTypeParamDecl::getProtocols() for an associated type.
   ArchetypeBuilder(
     Module &mod, DiagnosticEngine &diags,
+    LazyResolver *resolver,
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
       getInheritedProtocols,
     GetConformsToCallback getConformsTo,
@@ -139,6 +142,9 @@ public:
 
   /// Retrieve the module.
   Module &getModule() const { return Mod; }
+
+  /// Retrieve the lazy resolver, if there is one.
+  LazyResolver *getLazyResolver() const { return Resolver; }
 
 private:
   PotentialArchetype *addGenericParameter(ProtocolDecl *RootProtocol,

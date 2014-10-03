@@ -1,4 +1,4 @@
-//===--- ArchetypeBuilder.cpp - Generic Requirement Builder -------------===//
+//===--- ArchetypeBuilder.cpp - Generic Requirement Builder ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -140,7 +140,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       SmallVector<ValueDecl *, 2> decls;
       if (mod.lookupQualified(proto->getDeclaredType(), Name,
                               NL_VisitSupertypes | NL_IgnoreAccessibility,
-                              nullptr, decls)) {
+                              /*FIXME:*/nullptr, decls)) {
         for (auto decl : decls) {
           if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
             assocTypeOrProto = assocType;
@@ -189,7 +189,7 @@ ArchetypeBuilder::PotentialArchetype::getAssociatedType(Module &mod,
     SmallVector<ValueDecl *, 2> decls;
     if (mod.lookupQualified(proto->getDeclaredType(), name,
                             NL_VisitSupertypes | NL_IgnoreAccessibility,
-                            nullptr, decls)) {
+                            /*FIXME:*/nullptr, decls)) {
       for (auto decl : decls) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
           return assocType;
@@ -330,12 +330,13 @@ ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
 
 ArchetypeBuilder::ArchetypeBuilder(
   Module &mod, DiagnosticEngine &diags,
+  LazyResolver *lazyResolver,
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
   GetConformsToCallback getConformsTo,
   std::function<ProtocolConformance * (Module &, Type, ProtocolDecl*)>
     conformsToProtocol)
   : Mod(mod), Context(mod.getASTContext()), Diags(diags),
-    Impl(new Implementation)
+    Resolver(lazyResolver), Impl(new Implementation)
 {
   Impl->getInheritedProtocols = std::move(getInheritedProtocols);
   Impl->getConformsTo = std::move(getConformsTo);
@@ -637,7 +638,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(PotentialArchetype *T,
   for (auto nested : T->getNestedTypes()) {
     AssociatedTypeDecl *assocType = T->getAssociatedType(Mod, nested.first);
     auto witness = conformances[assocType->getProtocol()]
-          ->getTypeWitness(assocType, nullptr);
+          ->getTypeWitness(assocType, getLazyResolver());
     addSameTypeRequirementToConcrete(nested.second, EqualLoc,
                                  witness.getReplacement()->getDesugaredType());
   }
@@ -815,7 +816,8 @@ public:
       case RequirementKind::SameType: {
         auto firstType = req.getFirstType().subst(&Builder.getModule(), 
                                                   substitutions,
-                                                  true, nullptr);
+                                                  true,
+                                                  Builder.getLazyResolver());
         if (!firstType)
           break;
 
@@ -823,7 +825,8 @@ public:
 
         auto secondType = req.getSecondType().subst(&Builder.getModule(), 
                                                     substitutions,
-                                                    true, nullptr);
+                                                    true,
+                                                    Builder.getLazyResolver());
         if (!secondType)
           break;
         auto secondPA = Builder.resolveArchetype(secondType);
@@ -837,7 +840,7 @@ public:
           }
         } else if (firstPA || secondPA) {
           auto PA = firstPA ? firstPA : secondPA;
-          auto concrete = firstPA ? firstType : secondType;
+          auto concrete = firstPA ? secondType : firstType;
           if (Builder.addSameTypeRequirementToConcrete(PA, SourceLoc(), 
                                                        concrete)) {
             HadError = true;
@@ -848,9 +851,10 @@ public:
       }
 
       case RequirementKind::Conformance: {
-        auto subjectType = req.getFirstType().subst(&Builder.getModule(), 
+        auto subjectType = req.getFirstType().subst(&Builder.getModule(),
                                                     substitutions,
-                                                    true, nullptr);
+                                                    true,
+                                                    Builder.getLazyResolver());
         if (!subjectType)
           break;
 
@@ -1047,15 +1051,16 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
     
     auto assocType = depType->getAssocType();
     auto proto = assocType->getProtocol();
-    auto conformance = M.lookupConformance(base, proto, nullptr);
+    auto conformance = M.lookupConformance(base, proto,
+                                           Archetypes.getLazyResolver());
     switch (conformance.getInt()) {
     case ConformanceKind::DoesNotConform:
     case ConformanceKind::UncheckedConforms:
       llvm_unreachable("substituted base does not conform to protocol?!");
         
     case ConformanceKind::Conforms:
-      return conformance.getPointer()->getTypeWitness(assocType, nullptr)
-          .getReplacement();
+      return conformance.getPointer()->getTypeWitness(
+               assocType, Archetypes.getLazyResolver()).getReplacement();
     }
   }
   
@@ -1086,7 +1091,8 @@ Type swift::resolvePotentialArchetypeToType(
     for (auto proto : parentPA->getConformsTo()) {
       SmallVector<ValueDecl *, 2> decls;
       if (mod.lookupQualified(proto->getDeclaredType(), name,
-                              NL_VisitSupertypes, nullptr, decls)) {
+                              NL_VisitSupertypes, builder.getLazyResolver(),
+                              decls)) {
         for (auto decl : decls) {
           associatedType = dyn_cast<AssociatedTypeDecl>(decl);
           if (associatedType)
