@@ -647,10 +647,9 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
 }
 
 /// Create a fresh archetype builder.
-/// FIXME: Duplicated with TypeCheckGeneric.cpp; this one should go away.
 ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
   return ArchetypeBuilder(
-           *mod, Diags,
+           *mod, Diags, this,
            [=](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
              return getDirectConformsTo(protocol);
            },
@@ -2602,11 +2601,19 @@ createDesignatedInitOverride(TypeChecker &tc,
 /// \param outerGenericParams The generic parameters from the outer scope.
 ///
 /// \returns the type of 'self'.
-static Type configureImplicitSelf(AbstractFunctionDecl *func,
+static Type configureImplicitSelf(TypeChecker &tc,
+                                  AbstractFunctionDecl *func,
                                   GenericParamList *&outerGenericParams) {
   outerGenericParams = nullptr;
 
   auto selfDecl = func->getImplicitSelfDecl();
+
+  // Validate the context.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(func->getDeclContext())) {
+    tc.validateDecl(nominal);
+  } else {
+    tc.validateExtension(cast<ExtensionDecl>(func->getDeclContext()));
+  }
 
   // Compute the type of self.
   Type selfTy = func->computeSelfType(&outerGenericParams);
@@ -5108,7 +5115,7 @@ public:
     GenericParamList *outerGenericParams = nullptr;
     if (FD->getDeclContext()->isTypeContext() &&
         !FD->getImplicitSelfDecl()->hasType())
-      configureImplicitSelf(FD, outerGenericParams);
+      configureImplicitSelf(TC, FD, outerGenericParams);
 
     // If we have generic parameters, check the generic signature now.
     if (auto gp = FD->getGenericParams()) {
@@ -6301,7 +6308,7 @@ public:
     }
 
     GenericParamList *outerGenericParams;
-    Type SelfTy = configureImplicitSelf(CD, outerGenericParams);
+    Type SelfTy = configureImplicitSelf(TC, CD, outerGenericParams);
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -6483,7 +6490,7 @@ public:
     }
 
     GenericParamList *outerGenericParams;
-    Type SelfTy = configureImplicitSelf(DD, outerGenericParams);
+    Type SelfTy = configureImplicitSelf(TC, DD, outerGenericParams);
 
     if (outerGenericParams)
       TC.validateGenericFuncSignature(DD);
@@ -6762,7 +6769,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           if (auto funcDeclContext =
                   dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
             GenericParamList *outerGenericParams = nullptr;
-            configureImplicitSelf(funcDeclContext, outerGenericParams);
+            configureImplicitSelf(*this, funcDeclContext, outerGenericParams);
           }
         } else {
           D->setType(ErrorType::get(Context));
@@ -7471,7 +7478,7 @@ createDesignatedInitOverride(TypeChecker &tc,
 
   // Configure 'self'.
   GenericParamList *outerGenericParams = nullptr;
-  Type selfType = configureImplicitSelf(ctor, outerGenericParams);
+  Type selfType = configureImplicitSelf(tc, ctor, outerGenericParams);
   selfBodyPattern->setType(selfType);
   cast<TypedPattern>(selfBodyPattern)->getSubPattern()->setType(selfType);
 

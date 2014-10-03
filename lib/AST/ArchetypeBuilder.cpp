@@ -777,40 +777,20 @@ public:
     if (!boundGeneric)
       return Action::Continue; 
 
-    auto genericParams = boundGeneric->getDecl()->getGenericParams();
-    auto params = genericParams->getParams();
+    auto genericSig = boundGeneric->getDecl()->getGenericSignature();
+    auto params = genericSig->getGenericParams();
     auto args = boundGeneric->getGenericArgs();
-    for (unsigned i = 0, n = params.size(); i != n; ++i) {
-      auto arg = args[i];
-      auto param = params[i];
 
-      // Try to resolve the argument to a potential archetype.
-      auto argPA = Builder.resolveArchetype(arg);
-      if (!argPA)
-        continue;
-      
-      // Add implicit conformances for all of the protocol requirements on
-      // FIXME: This won't capture same-type requirements that map down to
-      // fixed types, although that isn't permitted yet.
-      for (auto proto : param->getArchetype()->getConformsTo()) {
-        if (Builder.addConformanceRequirement(argPA, proto)) {
-          HadError = true;
-          return Action::Stop;
-        }
-      }
-    }
-
-    // Capture the archetype -> generic parameter type mapping.
+    // Produce substitutions from the generic parameters to the actual
+    // arguments.
     TypeSubstitutionMap substitutions;
-    for (auto params = genericParams; params;
-         params = params->getOuterParameters()) {
-      for (auto param : *params) {
-        substitutions[param->getArchetype()] = param->getDeclaredType();
-      }
+    for (unsigned i = 0, n = params.size(); i != n; ++i) {
+      substitutions[params[i]->getCanonicalType()->castTo<SubstitutableType>()]
+        = args[i];
     }
-    
-    // Handle the 'where' clause.
-    for (const auto &req : genericParams->getRequirements()) {
+
+    // Handle the requirements.
+    for (const auto &req : genericSig->getRequirements()) {
       switch (req.getKind()) {
       case RequirementKind::WitnessMarker:
         break;
@@ -851,9 +831,9 @@ public:
       }
 
       case RequirementKind::Conformance: {
-        auto subjectType = req.getSubject().subst(&Builder.getModule(), 
-                                                  substitutions,
-                                                  true, nullptr);
+        auto subjectType = req.getFirstType().subst(&Builder.getModule(), 
+                                                    substitutions,
+                                                    true, nullptr);
         if (!subjectType)
           break;
 
@@ -862,13 +842,13 @@ public:
           break;
         }
         
-        if (auto proto = req.getConstraint()->getAs<ProtocolType>()) {
+        if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
           if (Builder.addConformanceRequirement(subjectPA, proto->getDecl())) {
             HadError = true;
             return Action::Stop;
           }
         } else if (Builder.addSuperclassRequirement(subjectPA, SourceLoc(),
-                                                    req.getConstraint())) {
+                                                    req.getSecondType())) {
           HadError = true;
           return Action::Stop;
         }

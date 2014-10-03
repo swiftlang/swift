@@ -181,13 +181,9 @@ static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
   if (auto parentDC = dc->getParent())
     addContextParamsAndRequirements(builder, parentDC);
 
-  for (auto param : nominal->getGenericParamTypes()) {
-    assert(param->getDecl() && "Missing generic parameter declaration?");
-    builder.addGenericParameter(param->getDecl());
-  }
-
-  for (const auto &req : nominal->getGenericRequirements()) {
-    builder.addRequirement(req);
+  // Add generic signature from this context.
+  if (auto sig = nominal->getGenericSignature()) {
+    builder.addGenericSignature(sig);
   }
 }
 
@@ -225,8 +221,6 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
         invalid = true;
 
       // Infer requirements from the inherited types.
-      // FIXME: This doesn't actually do what we want for outer generic
-      // parameters, because they've been resolved to archetypes too eagerly.
       for (const auto &inherited : param->getInherited()) {
         if (builder->inferRequirements(inherited))
           invalid = true;
