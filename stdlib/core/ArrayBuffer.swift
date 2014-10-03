@@ -101,8 +101,7 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
   public
   init() {
     storage = !_isClassOrObjCExistential(T.self)
-      ? Builtin.castToNativeObject(_emptyArrayStorage) 
-      : Builtin.castToNativeObject(
+      ? nil : Builtin.castToNativeObject(
       _IndirectArrayBuffer(
         nativeBuffer: _ContiguousArrayBuffer<T>(),
         isMutable: false,
@@ -198,16 +197,11 @@ extension _ArrayBuffer {
   /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's baseAddress may
   /// not match ours, if we are a _SliceBuffer.
-  public func requestNativeBuffer() -> NativeBuffer? {
-    if !_isClassOrObjCExistential(T.self) {
-      return _native
-    }
-    else {
-      let i = indirect
-      return _fastPath(!i.isCocoa)
-        ? i.getNativeBufferOf(T.self) 
-        : nil
-    }
+  public
+  func requestNativeBuffer() -> NativeBuffer? {
+    let result = self._native
+    if result.hasStorage { return result }
+    return nil
   }
 
   /// Replace the given subRange with the first newCount elements of

@@ -12,51 +12,12 @@
 
 import SwiftShims
 
-/// Class used whose sole instance is used as storage for empty
-/// arrays.  The instance is defined in the runtime and statically
-/// initialized.  See stdlib/runtime/GlobalObjects.cpp for details.
-internal final class _EmptyArrayStorage
-  : _ContiguousArrayStorageBase {
-
-  init(_DoNotCallMe: ()) {
-    _sanityCheckFailure("creating instance of _EmptyArrayStorage")
-  }
-  
-  var countAndCapacity: _ArrayBody
-
-  override func _tryGetVerbatimBridgedUnsafeBuffer(
-    dummy: Void
-  ) -> UnsafeBufferPointer<AnyObject> {
-    return UnsafeBufferPointer(start: .null(), count: 0)
-  }
-
-  override func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
-    return 0
-  }
-
-  override func _getNonVerbatimBridgedHeapBuffer(
-    dummy: Void
-  ) -> HeapBuffer<Int, AnyObject> {
-    return HeapBuffer<Int, AnyObject>(
-      HeapBufferStorage<Int, AnyObject>.self, 0, 0)
-  }
-
-  override func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
-    return false
-  }
-
-  /// A type that every element in the array is.
-  override var staticElementType: Any.Type {
-    return Void.self
-  }
-}
-
 // The empty array prototype.  We use the same object for all empty
 // [Native]Array<T>s.
-var _emptyArrayStorage : _EmptyArrayStorage {
-  return Builtin.bridgeFromRawPointer(
-    Builtin.addressof(&_swiftEmptyArrayStorage))
-}
+let _emptyContiguousArrayStorageBase = unsafeBitCast(
+  _ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0),
+  _ContiguousArrayStorageBase.self
+)
 
 // The class that implements the storage for a ContiguousArray<T>
 final class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
@@ -139,25 +100,19 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// result's .baseAddress or set the result's .count to zero.
   public init(count: Int, minimumCapacity: Int)
   {
-    let realMinimumCapacity = max(count, minimumCapacity)
-    if realMinimumCapacity == 0 {
-      self = _ContiguousArrayBuffer<T>()
-    }
-    else {
-      _base = HeapBuffer(
-        _ContiguousArrayStorage<T>.self,
-        _ArrayBody(),
-        realMinimumCapacity)
+    _base = HeapBuffer(
+      _ContiguousArrayStorage<T>.self,
+      _ArrayBody(),
+      max(count, minimumCapacity))
 
-      var bridged = false
-      if _canBeClass(T.self) != 0 {
-        bridged = _isBridgedVerbatimToObjectiveC(T.self)
-      }
-
-      _base.value = _ArrayBody(
-        count: count, capacity: _base._capacity(),
-        elementTypeIsBridgedVerbatim: bridged)
+    var bridged = false
+    if _canBeClass(T.self) != 0 {
+      bridged = _isBridgedVerbatimToObjectiveC(T.self)
     }
+
+    _base.value = _ArrayBody(
+      count: count, capacity: _base._capacity(),
+      elementTypeIsBridgedVerbatim: bridged)
   }
 
   init(_ storage: _ContiguousArrayStorage<T>?) {
@@ -201,13 +156,23 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return ret
   }
 
+  public mutating func take() -> _ContiguousArrayBuffer {
+    if !_base.hasStorage {
+      return _ContiguousArrayBuffer()
+    }
+    _sanityCheck(_base.isUniquelyReferenced(), "Can't \"take\" a shared array buffer")
+    let result = self
+    _base = _Base()
+    return result
+  }
+
   //===--- _ArrayBufferType conformance -----------------------------------===//
   /// The type of elements stored in the buffer
   public typealias Element = T
 
   /// create an empty buffer
   public init() {
-    _base = unsafeBitCast(_emptyArrayStorage, HeapBuffer<_ArrayBody, T>.self)
+    _base = HeapBuffer()
   }
 
   /// Adopt the storage of x
@@ -359,7 +324,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
         "Array element type is not bridged to ObjectiveC")
     if count == 0 {
       return _NSSwiftArray(
-        _nativeStorage: _emptyArrayStorage)
+        _nativeStorage: _emptyContiguousArrayStorageBase)
     }
     return _NSSwiftArray(_nativeStorage: _storage!)
   }
@@ -391,11 +356,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     _: U.Type
   ) -> Bool {
     _sanityCheck(_isClassOrObjCExistential(U.self))
-    
-    // Start with the base class so that optimizations based on
-    // 'final' don't bypass dynamic type check.
-    let s: _ContiguousArrayStorageBase? = _storage
-    
+    let s = _storage
     if _fastPath(s != nil){
       if _fastPath(s!.staticElementType is U.Type) {
         // Done in O(1)
@@ -505,7 +466,7 @@ public func ~> <
   for x in GeneratorSequence(source.generate()) {
     result += x
   }
-  return result
+  return result.take()
 }
 
 public func ~> <
