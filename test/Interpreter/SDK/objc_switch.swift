@@ -3,103 +3,102 @@
 import Foundation
 
 func testAnyObjectIsa(obj: AnyObject) {
-
+  print("(")
   if obj is String {
-    println("String")
+    print("String")
   }
-  else if obj is Int {
-    println("Int")
+  if obj is Int {
+    print("Int")
   }
-  else if obj is [NSString] {
-    println("[NSString]")
+  if obj is [NSString] {
+    print("[NSString]")
   }
-  else if obj is [Int] {
-    println("[Int]")
+  if obj is [Int] {
+    print("[Int]")
   }
-  else if obj is Dictionary<String, Int> {
-    println("Dictionary<String, Int>")
+  if obj is Dictionary<String, Int> {
+    print("Dictionary<String, Int>")
   }
-  else {
-    println("Did not match")
-  }
+  println(")")
 }
 
-// CHECK: String
+// CHECK: testing...
+println("testing...")
+
+
+// CHECK-NEXT: (String)
 testAnyObjectIsa("hello")
 
-// CHECK: Int
+// CHECK-NEXT: (Int)
 testAnyObjectIsa(5)
 
-// CHECK: [NSString]
+// CHECK-NEXT: ([NSString])
 testAnyObjectIsa(["hello", "swift", "world"])
 
-// CHECK: [Int]
+// CHECK-NEXT: ([Int])
 testAnyObjectIsa([1, 2, 3, 4, 5])
 
-// CHECK: Dictionary<String, Int>
+// CHECK-NEXT: (Dictionary<String, Int>)
 testAnyObjectIsa(["hello" : 1, "world" : 2])
 
 func testNSArrayIsa(nsArr: NSArray) {
+  print("(")
   if nsArr is [String] {
-    println("[String]")
+    print("[String]")
   }
-  else if nsArr is [Int] {
-    println("[Int]")
+  if nsArr is [Int] {
+    print("[Int]")
   }
-  else {
-    println("Did not match")
-  }
+  println(")")
 }
 
-// CHECK: [String]
+// CHECK-NEXT: ([String])
 testNSArrayIsa(["a", "b", "c"])
 
-// CHECK: [Int]
+// CHECK-NEXT: ([Int])
 testNSArrayIsa([1, 2, 3])
 
-// CHECK: Did not match
+// CHECK-NEXT: ()
 testNSArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsa(arr: Array<AnyObject>) {
+  print("(")
   if arr is [NSString] {
-    println("[NSString]")
+    print("[NSString]")
   }
-  else if arr is [NSNumber] {
-    println("[NSNumber]")
+  if arr is [NSNumber] {
+    print("[NSNumber]")
   }
-  else {
-    println("Did not match")
-  }
+  println(")")
 }
 
-// CHECK: [NSString]
+// CHECK-NEXT: ([NSString])
 testArrayIsa(["a", "b", "c"])
 
-// CHECK: [NSNumber]
+// CHECK-NEXT: ([NSNumber])
 testArrayIsa([1, 2, 3])
 
-// CHECK: Did not match
+// CHECK-NEXT: ()
 testArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsaBridged(arr: Array<AnyObject>) {
+  print("(")
   if arr is [String] {
-    println("[String]")
+    print("[String]")
   }
-  else if arr is [Int] {
-    println("[Int]")
+  if arr is [Int] {
+    print("[Int]")
   }
-  else {
-    println("Did not match");
-  }
+  println(")")
 }
 
-// CHECK: [String]
+// CHECK-NEXT: ([String])
 testArrayIsaBridged(["a", "b", "c"])
 
-// CHECK: [Int]
+// CHECK-NEXT: ([Int])
 testArrayIsaBridged([1, 2, 3])
 
-// CHECK: Did not match
+// CHECK-NEXT: ()
 testArrayIsaBridged([[1, 2], [3, 4], [5, 6]])
 
 func testNSMutableStringMatch(sa: NSMutableString) {
@@ -111,10 +110,10 @@ func testNSMutableStringMatch(sa: NSMutableString) {
   }
 }
 
-// CHECK: MATCH
+// CHECK-NEXT: MATCH
 testNSMutableStringMatch("foobar")
 
-// CHECK: nomatch
+// CHECK-NEXT: nomatch
 testNSMutableStringMatch("nope")
 
 func testAnyObjectDowncast(obj: AnyObject!) {
@@ -139,16 +138,16 @@ func testAnyObjectDowncast(obj: AnyObject!) {
   }
 }
 
-// CHECK: String: hello
+// CHECK-NEXT: String: hello
 testAnyObjectDowncast("hello")
 
-// CHECK: Int: 5
+// CHECK-NEXT: Int: 5
 testAnyObjectDowncast(5)
 
-// CHECK: NSString array: [hello, swift, world]
+// CHECK-NEXT: NSString array: [hello, swift, world]
 testAnyObjectDowncast(["hello", "swift", "world"] as NSArray)
 
-// CHECK: Int array: [1, 2, 3, 4, 5]
+// CHECK-NEXT: Int array: [1, 2, 3, 4, 5]
 testAnyObjectDowncast([1, 2, 3, 4, 5])
 
 // CHECK: Dictionary<String, Int>: [
@@ -157,7 +156,7 @@ testAnyObjectDowncast([1, 2, 3, 4, 5])
 // CHECK: ]
 testAnyObjectDowncast(["hello" : 1, "world" : 2])
 
-// CHECK: Did not match
+// CHECK-NEXT: Did not match
 testAnyObjectDowncast(nil)
 
 func testNSArrayDowncast(nsArr: NSArray?) {
@@ -173,14 +172,14 @@ func testNSArrayDowncast(nsArr: NSArray?) {
   }
 }
 
-// CHECK: [String]: [a, b, c]
+// CHECK-NEXT: [String]: [a, b, c]
 testNSArrayDowncast(["a", "b", "c"])
 
-// CHECK: [Int]: [1, 2, 3]
+// CHECK-NEXT: [Int]: [1, 2, 3]
 testNSArrayDowncast([1, 2, 3])
 
-// CHECK: Did not match
+// CHECK-NEXT: Did not match
 testNSArrayDowncast([[1, 2], [3, 4], [5, 6]])
 
-// CHECK: Did not match
+// CHECK-NEXT: Did not match
 testNSArrayDowncast(nil)
