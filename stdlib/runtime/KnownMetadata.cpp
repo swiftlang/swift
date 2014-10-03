@@ -126,6 +126,7 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVBo =
 const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
   ValueWitnessTableForBox<PointerPointerBox>::table;
 
+#if SWIFT_OBJC_INTEROP
 /*** Objective-C pointers ****************************************************/
 
 // This section can reasonably be suppressed in builds that don't
@@ -134,6 +135,7 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
 /// The basic value-witness table for ObjC object pointers.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBO =
   ValueWitnessTableForBox<ObjCRetainableBox>::table;
+#endif
 
 /*** Functions ***************************************************************/
 
@@ -162,7 +164,9 @@ OPAQUE_METADATA(Bi32_)
 OPAQUE_METADATA(Bi64_)
 OPAQUE_METADATA(Bi128_)
 OPAQUE_METADATA(Bo)
+#if SWIFT_OBJC_INTEROP
 OPAQUE_METADATA(BO)
+#endif
 
 /// The standard metadata for the empty tuple.
 const FullMetadata<TupleTypeMetadata> swift::_TMdT_ = {

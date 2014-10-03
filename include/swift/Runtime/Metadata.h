@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <utility>
+#include "swift/Runtime/Config.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 
@@ -648,8 +649,10 @@ extern "C" const ValueWitnessTable _TWVBi128_;    // Builtin.Int128
 // pointer types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBo; // Builtin.NativeObject
 
+#if SWIFT_OBJC_INTEROP
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBO; // Builtin.UnknownObject
+#endif
 
 // The () -> () table can be used for arbitrary function types.
 extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
@@ -1804,10 +1807,12 @@ extern "C" const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata(const Metadata *argMetadata,
                               const Metadata *resultMetadata);
 
+#if SWIFT_OBJC_INTEROP
 /// \brief Fetch a uniqued metadata for a block type.
 extern "C" const FunctionTypeMetadata *
 swift_getBlockTypeMetadata(const Metadata *argMetadata,
                            const Metadata *resultMetadata);
+#endif
 
 /// \brief Fetch a uniqued type metadata for an ObjC class.
 extern "C" const Metadata *

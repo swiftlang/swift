@@ -279,6 +279,7 @@ struct SwiftRetainableBox :
   }
 };
 
+#if SWIFT_OBJC_INTEROP
 extern "C" void *objc_retain(void *obj);
 extern "C" void objc_release(void *obj);
 
@@ -295,6 +296,7 @@ struct ObjCRetainableBox : RetainableBoxBase<ObjCRetainableBox, void*> {
     objc_release(obj);
   }
 };
+#endif
 
 /// A box implementation class for unknown-retainable object pointers.
 struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {

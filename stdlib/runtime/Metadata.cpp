@@ -646,6 +646,7 @@ static MetadataCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
+#if SWIFT_OBJC_INTEROP
   // If the class pointer is valid as metadata, no translation is required.
   if (theClass->isTypeMetadata()) {
     return theClass;
@@ -669,6 +670,9 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
     });
 
   return entry->getData();
+#else
+  fatalError("swift_getObjCClassMetadata: no Objective-C interop");
+#endif
 }
 
 namespace {
@@ -735,6 +739,7 @@ swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
                                   _TWVFT_T_);
 }
 
+#if SWIFT_OBJC_INTEROP
 const FunctionTypeMetadata *
 swift::swift_getBlockTypeMetadata(const Metadata *argMetadata,
                                   const Metadata *resultMetadata) {
@@ -743,6 +748,7 @@ swift::swift_getBlockTypeMetadata(const Metadata *argMetadata,
                                   BlockTypes,
                                   _TWVBO);
 }
+#endif
 
 /*** Tuples ****************************************************************/
 
@@ -1727,8 +1733,13 @@ static llvm::DenseMap<unsigned, const ExtraInhabitantsValueWitnessTable*>
 /// container with the given number of witness table pointers.
 static const ExtraInhabitantsValueWitnessTable *
 getClassExistentialValueWitnesses(unsigned numWitnessTables) {
-  if (numWitnessTables == 0)
+  if (numWitnessTables == 0) {
+#if SWIFT_OBJC_INTEROP
     return &_TWVBO;
+#else
+    return &_TWVBo;
+#endif
+  }
   if (numWitnessTables == 1)
     return &ClassExistentialValueWitnesses_1;
   if (numWitnessTables == 2)
