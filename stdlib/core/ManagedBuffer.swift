@@ -12,6 +12,9 @@
 
 import SwiftShims
 
+/// A common base class for all `ManagedBuffer<V,E>`\ 's.
+public class ManagedBufferBase {}
+
 /// A class whose instances contain a property of type `Value` and raw
 /// storage for an array of `Element`, whose size is determined at
 /// instance creation.
@@ -23,12 +26,14 @@ import SwiftShims
 /// any live elements in the `deinit` of a subclass.  Note: subclasses
 /// must not have any stored properties; any storage needed should be
 /// included in `Value`.
-public class ManagedBuffer<Value, Element> {
+public class ManagedBuffer<Value, Element> : ManagedBufferBase {
   
   /// Create a new instance of the most-derived class, calling
   /// `initialize` on the partially-constructed object to generate an
-  /// initial `Value`.  Note, in particular, accessing `value` inside
-  /// the `initialize` function is undefined.
+  /// initial `Value`.
+  ///
+  /// Note, in particular, accessing `value` inside the `initialize`
+  /// function is undefined.
   public final class func create(
     minimumCapacity: Int, initialize: (ManagedBuffer)->Value
   ) -> ManagedBuffer {
@@ -41,7 +46,9 @@ public class ManagedBuffer<Value, Element> {
 
     let alignMask = ManagedBuffer._alignmentMask
 
-    let result = self._allocate(totalSize, alignMask: alignMask)
+    let result: ManagedBuffer = unsafeDowncast(
+        _swift_bufferAllocate(self, totalSize, alignMask)
+      )
     
     result.withUnsafeMutablePointerToValue {
       $0.initialize(initialize(result))
@@ -49,17 +56,8 @@ public class ManagedBuffer<Value, Element> {
     return result
   }
 
-  // helper function for create, above
-  internal final class func _allocate(
-    totalSize: Int, alignMask: Int
-  ) -> ManagedBuffer {
-    return unsafeDowncast(
-        _swift_bufferAllocate(self, totalSize, alignMask)
-      )
-  }
-
-  /// Make ordinary initialization unavaible
-  internal init() {
+  /// Make ordinary initialization unavailable
+  internal init(_doNotCallMe: ()) {
     fatalError("Only initialize these by calling create")
   }
   
@@ -89,9 +87,11 @@ public class ManagedBuffer<Value, Element> {
     return Int(bitPattern: malloc_size(unsafeAddressOf(self)))
   }
   
-  /// The actual number of elements allocated for this object.  May be
-  /// nontrivial to compute; it may be a good idea to store this
-  /// information in the value area upon creation.
+  /// The actual number of elements that can be stored in this object.
+  ///
+  /// This value may be nontrivial to compute; it is usually a good
+  /// idea to store this information in the "value" area when
+  /// an instance is created.
   public final var allocatedElementCount : Int {
     return (
       _allocatedByteCount &- ManagedBuffer._elementOffset &+ sizeof(Element) &- 1
@@ -99,6 +99,8 @@ public class ManagedBuffer<Value, Element> {
   }
 
   /// The stored `Value` instance.
+  ///
+  /// Note: this value must not be accessed during instance creation.
   public final var value: Value {
     get {
       return withUnsafeMutablePointerToValue {
