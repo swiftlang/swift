@@ -111,10 +111,10 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 }
 
 ArchetypeType::NestedType
-ArchetypeBuilder::PotentialArchetype::getType(Module &mod) {
+ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   // Retrieve the archetype from the representation of this set.
   if (Representative != this)
-    return getRepresentative()->getType(mod);
+    return getRepresentative()->getType(builder);
   
   // Return a concrete type or archetype we've already resolved.
   if (ArchetypeOrConcreteType) {
@@ -124,10 +124,11 @@ ArchetypeBuilder::PotentialArchetype::getType(Module &mod) {
   ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = RootProtocol;
   // Allocate a new archetype.
   ArchetypeType *ParentArchetype = nullptr;
+  auto &mod = builder.getModule();
   if (Parent) {
     assert(assocTypeOrProto.isNull() &&
            "root protocol type given for non-root archetype");
-    auto parentTy = Parent->getType(mod);
+    auto parentTy = Parent->getType(builder);
     if (!parentTy)
       return {};
     ParentArchetype = parentTy.dyn_cast<ArchetypeType*>();
@@ -174,7 +175,7 @@ ArchetypeBuilder::PotentialArchetype::getType(Module &mod) {
     FlatNestedTypes;
   for (auto Nested : NestedTypes) {
     FlatNestedTypes.push_back({ Nested.first,
-                                Nested.second->getType(mod) });
+                                Nested.second->getType(builder) });
   }
   arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
   
@@ -890,13 +891,13 @@ bool ArchetypeBuilder::inferRequirements(Pattern *pattern) {
 }
 
 ArchetypeType *
-ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) const {
+ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) {
   auto known = Impl->PotentialArchetypes.find(
                  GenericTypeParamKey::forDecl(GenericParam));
   if (known == Impl->PotentialArchetypes.end())
     return nullptr;
 
-  return known->second->getType(getModule()).dyn_cast<ArchetypeType *>();
+  return known->second->getType(*this).dyn_cast<ArchetypeType *>();
 }
 
 ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
@@ -907,7 +908,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
     for (auto GP : Impl->GenericParams) {
       PotentialArchetype *PA = Impl->PotentialArchetypes[GP];
       if (PA->isPrimary()) {
-        auto Archetype = PA->getType(Mod).get<ArchetypeType *>();
+        auto Archetype = PA->getType(*this).get<ArchetypeType *>();
         assert(Archetype->isPrimary() && "isPrimary mismatch");
         if (KnownArchetypes.insert(Archetype))
           Impl->AllArchetypes.push_back(Archetype);
@@ -918,7 +919,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
     for (auto GP : Impl->GenericParams) {
       PotentialArchetype *PA = Impl->PotentialArchetypes[GP];
       if (!PA->isConcreteType()) {
-        auto Archetype = PA->getType(Mod).get<ArchetypeType *>();
+        auto Archetype = PA->getType(*this).get<ArchetypeType *>();
         GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
                                               Impl->AllArchetypes);
       }
@@ -1018,7 +1019,8 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
   // Resolve generic type parameters to their types.
   if (auto genType = ty->getAs<GenericTypeParamType>()) {
     if (auto potentialArchetype = Archetypes.resolveArchetype(genType)) {
-      return ArchetypeType::getNestedTypeValue(potentialArchetype->getType(M));
+      return ArchetypeType::getNestedTypeValue(
+               potentialArchetype->getType(Archetypes));
     }
 
     return genType;
@@ -1028,7 +1030,8 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
   if (auto depType = ty->getAs<DependentMemberType>()) {
     // See if the type directly references an associated archetype.
     if (auto potentialArchetype = Archetypes.resolveArchetype(depType)) {
-      return ArchetypeType::getNestedTypeValue(potentialArchetype->getType(M));
+      return ArchetypeType::getNestedTypeValue(
+               potentialArchetype->getType(Archetypes));
     }
     
     // If not, resolve the base type, then look up the associated type in

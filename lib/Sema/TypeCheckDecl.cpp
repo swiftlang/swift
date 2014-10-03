@@ -649,7 +649,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
 /// Create a fresh archetype builder.
 ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
   return ArchetypeBuilder(
-           *mod, Diags, this,
+           *mod, Diags,
            [=](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
              return getDirectConformsTo(protocol);
            },

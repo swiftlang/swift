@@ -233,7 +233,7 @@ public:
   
   /// \brief Retrieve the archetype that corresponds to the given generic
   /// parameter.
-  ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam) const;
+  ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam);
 
   /// \brief Retrieve the array of all of the archetypes produced during
   /// archetype assignment. The 'primary' archetypes will occur first in this
@@ -373,7 +373,7 @@ public:
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype.
-  ArchetypeType::NestedType getType(Module &mod);
+  ArchetypeType::NestedType getType(ArchetypeBuilder &builder);
   
   /// Retrieve the associated type declaration for a given nested type.
   AssociatedTypeDecl *getAssociatedType(Module &mod, Identifier name);
