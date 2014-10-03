@@ -28,5 +28,45 @@ private func foo(a: A) -> Int {
   return a.f()
 }
 
-
 println("foo(C()) = \(foo(C()))")
+
+private class F1 {
+  init() {
+  }
+
+  func addConstraint() {
+    addToGraph()
+  }
+
+  func addToGraph() {
+  }
+}
+
+private class F2 : F1 {
+  init (v : Int) {
+    super.init()
+    addConstraint()
+  }
+
+  override func addToGraph() {
+  }
+  
+  @inline(never) 
+  func test() {
+// Check that invocation of addConstraint() gets completely devirtualized and inlined
+//
+// CHECK-LABEL: sil private [noinline] @_TFC17devirt_base_classP33_C1ED27807F941A622F32D66AB60A15CD2F24testfS0_FT_T_
+// CHECK-NOT: class_method
+// CHECK-NOT: function_ref
+// CHECK: return
+    addConstraint()
+  }
+  
+}
+
+private class F3 : F2 {
+}
+
+private var f = F2(v:1)
+f.test()
+println("unary constraint is: \(f)")

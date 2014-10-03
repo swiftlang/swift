@@ -733,8 +733,10 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (ClassInstance.getType() != InstanceType) {
     // The implementation of a method to be invoked may actually
     // be defined by one of the superclasses.
-    if(!ClassInstance.getType().isSuperclassOf(InstanceType))
-          return false;
+    assert(ClassInstance.getType().isSuperclassOf(InstanceType) &&
+           "Method should be defined by a superclass");
+    // ClassInstance and InstanceType should match for devirtMethod to work.
+    ClassInstance = ClassInstance.stripCasts();
   }
 
   if (!CHA->hasKnownSubclasses(CD)) {
