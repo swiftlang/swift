@@ -3256,15 +3256,17 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   global->setInitializer(initializer);
   global->setAlignment(getWitnessTableAlignment().getValue());
 
-  // FIXME: Set the referenced-dynamically bit on the witness table's symbol. 
-  // asm(".desc _symbol, 0x10")
-  // Our dynamic protocol lookup hack relies on witness tables always being
-  // available, and this bit prevents the symbol name from being stripped.
-  if (llvm::GlobalValue::isExternalLinkage(global->getLinkage())) {
-    llvm::SmallString<128> referencedDynamicallyAsm(".desc _");
-    referencedDynamicallyAsm += global->getName();
-    referencedDynamicallyAsm += ", 0x10";
-    global->getParent()->appendModuleInlineAsm(referencedDynamicallyAsm);
+  if (TargetInfo.MarkWitnessTablesUsedMachOStyle) {
+    // FIXME: Set the referenced-dynamically bit on the witness table's symbol.
+    // asm(".desc _symbol, 0x10")
+    // Our dynamic protocol lookup hack relies on witness tables always being
+    // available, and this bit prevents the symbol name from being stripped.
+    if (llvm::GlobalValue::isExternalLinkage(global->getLinkage())) {
+      llvm::SmallString<128> referencedDynamicallyAsm(".desc _");
+      referencedDynamicallyAsm += global->getName();
+      referencedDynamicallyAsm += ", 0x10";
+      global->getParent()->appendModuleInlineAsm(referencedDynamicallyAsm);
+    }
   }
 
   // TODO: We should record what access mode the witness table requires:
