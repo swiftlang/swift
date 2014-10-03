@@ -135,6 +135,54 @@ public enum Character :
     }
   }
 
+  internal struct _SmallUTF8 : CollectionType {
+    init(var _ u8: UInt64) {
+      let count = Character._smallSize(u8)
+      _sanityCheck(count <= 8, "Character with more than 8 UTF-8 code units")
+      self.count = UInt16(count)
+      self.data = u8
+    }
+
+    /// The position of the first element in a non-empty collection.
+    ///
+    /// Identical to `endIndex` in an empty collection.
+    var startIndex: Int {
+      return 0
+    }
+
+    /// The collection's "past the end" position.
+    ///
+    /// `endIndex` is not a valid argument to `subscript`, and is always
+    /// reachable from `startIndex` by zero or more applications of
+    /// `successor()`.
+    var endIndex: Int {
+      return Int(count)
+    }
+
+    /// Access the code unit at `position`.
+    ///
+    /// Requires: `position` is a valid position in `self` and
+    /// `position != endIndex`.
+    subscript(position: Int) -> UTF8.CodeUnit {
+      _sanityCheck(position >= 0)
+      _sanityCheck(position < Int(count))
+      // Note: using unchecked arthmetic because overflow can not happen if the
+      // above sanity checks hold.
+      return UTF8.CodeUnit(
+        truncatingBitPattern: data >> (UInt64(position) &* 8))
+    }
+
+    /// Return a *generator* over the elements of this *sequence*.
+    ///
+    /// Complexity: O(1)
+    func generate() -> IndexingGenerator<_SmallUTF8> {
+      return IndexingGenerator(self)
+    }
+
+    var count: UInt16
+    var data: UInt64
+  }
+
   internal struct _SmallUTF16Sink : SinkType {
     mutating func put(x: UTF16.CodeUnit) {
       u16 = u16 << 16
@@ -148,7 +196,7 @@ public enum Character :
       let count = UTF16.measure(
         UTF8.self, input: Character._makeSmallUTF8Generator(u8),
         repairIllFormedSequences: true)!.0
-      _sanityCheck(count <= 4, "Character with more than 4 UTF16 code units")
+      _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
       self.count = UInt16(count)
       var output = _SmallUTF16Sink()
       transcode(
@@ -163,7 +211,7 @@ public enum Character :
     var startIndex : Int {
       return 0
     }
-    
+
     /// The collection's "past the end" position.
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -172,7 +220,7 @@ public enum Character :
     var endIndex : Int {
       return Int(count)
     }
-    
+
     /// Access the code unit at `position`.
     ///
     /// Requires: `position` is a valid position in `self` and
@@ -192,11 +240,11 @@ public enum Character :
     func generate() -> IndexingGenerator<_SmallUTF16> {
       return IndexingGenerator(self)
     }
-    
+
     var count: UInt16
     var data: UInt64
   }
-  
+
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
@@ -221,14 +269,10 @@ extension String {
   public init(_ c: Character) {
     switch c {
     case .SmallRepresentation(var _63bits):
-      var value = Character._smallValue(_63bits)
-      var size = Character._smallSize(value)
+      let value = Character._smallValue(_63bits)
+      let smallUTF8 = Character._SmallUTF8(value)
       self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(
-          start: UnsafeMutablePointer<UTF8.CodeUnit>(
-            Builtin.addressof(&value)), 
-          count: size))
+        UTF8.self, input: smallUTF8)
     case .LargeRepresentation(var value):
       self = value._value
     }
