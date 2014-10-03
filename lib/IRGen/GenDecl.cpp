@@ -537,9 +537,10 @@ void IRGenModule::emitGlobalTopLevel() {
     emitSILGlobalVariable(&v);
   
   // Emit SIL functions.
+  bool isWholeModule = SILMod->isWholeModule();
   for (SILFunction &f : *SILMod) {
     // Only eagerly emit functions that are externally visible.
-    if (!isPossiblyUsedExternally(f.getLinkage()))
+    if (!isPossiblyUsedExternally(f.getLinkage(), isWholeModule))
       continue;
 
     emitSILFunction(&f);
@@ -551,7 +552,7 @@ void IRGenModule::emitGlobalTopLevel() {
   // Emit witness tables.
   for (SILWitnessTable &wt : SILMod->getWitnessTableList()) {
     // Try to be lazy about it.
-    if (!isPossiblyUsedExternally(wt.getLinkage())) {
+    if (!isPossiblyUsedExternally(wt.getLinkage(), isWholeModule)) {
       // Remember that we know how to emit this conformance.
       auto lookup =
         LazyWitnessTablesByConformance.insert({wt.getConformance(), &wt});
@@ -617,8 +618,8 @@ void IRGenModule::emitLazyDefinitions() {
     // and possibly of type metadata.
     while (!LazyWitnessTables.empty()) {
       SILWitnessTable *wt = LazyWitnessTables.pop_back_val();
-      assert(!isPossiblyUsedExternally(wt->getLinkage()) &&
-             "witness table with externally-visible linkage emitted lazily?");
+      assert(!isPossiblyUsedExternally(wt->getLinkage(), SILMod->isWholeModule())
+            && "witness table with externally-visible linkage emitted lazily?");
       emitSILWitnessTable(wt);
     }
 
@@ -632,8 +633,8 @@ void IRGenModule::emitLazyDefinitions() {
     // Emit any lazy function definitions we require.
     while (!LazyFunctionDefinitions.empty()) {
       SILFunction *f = LazyFunctionDefinitions.pop_back_val();
-      assert(!isPossiblyUsedExternally(f->getLinkage()) &&
-             "function with externally-visible linkage emitted lazily?");
+      assert(!isPossiblyUsedExternally(f->getLinkage(), SILMod->isWholeModule())
+             && "function with externally-visible linkage emitted lazily?");
       emitSILFunction(f);
     }
   }
@@ -1120,24 +1121,6 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
   return result;
 }
 
-/// Find the entry point for a SIL function, which we assume exists in
-/// the module.
-llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
-                                                  ForDefinition_t forDefinition) {
-  llvm::SmallString<32> name;
-  fnRef.mangle(name);
-  SILFunction *fn = SILMod->lookUpFunction(name);
-  if (!fn) {
-    assert(!forDefinition &&
-           "defining a SILFunction that's not in the SILModule?");
-    auto linkage = fnRef.getLinkage(forDefinition);
-    auto type = SILMod->Types.getConstantType(fnRef).castTo<SILFunctionType>();
-    fn = SILFunction::create(*SILMod, linkage, name, type, nullptr,
-                             None, IsNotBare, IsNotTransparent, IsNotFragile);
-  }
-  return getAddrOfSILFunction(fn, forDefinition);
-}
-
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                                   ForDefinition_t forDefinition) {
@@ -1169,7 +1152,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
     // Also, if we have a lazy definition for it, be sure to queue that up.
     if (!forDefinition &&
-        !isPossiblyUsedExternally(f->getLinkage()))
+        !isPossiblyUsedExternally(f->getLinkage(), SILMod->isWholeModule()))
       LazyFunctionDefinitions.push_back(f);
   }
     

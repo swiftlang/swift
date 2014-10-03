@@ -48,20 +48,29 @@ struct FinalEliminator {
 //===----------------------------------------------------------------------===//
 
 bool tryToRemoveFunction(SILFunction *F, FinalEliminator *FE = nullptr) {
+  
+  SILModule &M = F->getModule();
+  
   // Remove internal functions that are not referenced by anything.
   // TODO: top_level_code is currently marked as internal so we explicitly check
   // for functions with this name and keep them around.
-  if (isPossiblyUsedExternally(F->getLinkage()) || F->getRefCount() ||
-      F->getName() == SWIFT_ENTRY_POINT_FUNCTION)
+  if (isPossiblyUsedExternally(F->getLinkage(), M.isWholeModule()) ||
+      F->getRefCount() || F->getName() == SWIFT_ENTRY_POINT_FUNCTION)
     return false;
 
+  if (F->getLoweredFunctionType()->getAbstractCC() == AbstractCC::ObjCMethod) {
+    // ObjC functions are called through the runtime and are therefore alive
+    // even if not referenced inside SIL.
+    return false;
+  }
+  
   DEBUG(llvm::dbgs() << "DEAD FUNCTION ELIMINATION: Erasing:" << F->getName()
                      << "\n");
   if (FE) {
     FE->updateBeforeRemoveFunction(F);
   }
 
-  F->getModule().eraseFunction(F);
+  M.eraseFunction(F);
   NumDeadFunc++;
   return true;
 }

@@ -50,6 +50,10 @@ bb0(%0 : $Int, %1 : $SwiftGizmo):
   return %1 : $SwiftGizmo
 }
 
+sil @_TFC19objc_attr_NSManaged10SwiftGizmoD : $@cc(method) @thin (@owned SwiftGizmo) -> ()
+
+sil @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__ : $@cc(method) @thin (Int, @owned SwiftGizmo) -> Int
+
 sil_vtable SwiftGizmo {
   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_     // objc_attr_NSManaged.SwiftGizmo.init (objc_attr_NSManaged.SwiftGizmo.Type)() -> objc_attr_NSManaged.SwiftGizmo
   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_S0_      // objc_attr_NSManaged.SwiftGizmo.init (objc_attr_NSManaged.SwiftGizmo.Type)(withBellsOn : Swift.Int) -> objc_attr_NSManaged.SwiftGizmo

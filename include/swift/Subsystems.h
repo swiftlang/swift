@@ -160,8 +160,11 @@ namespace swift {
   ///
   /// If \p makeModuleFragile is true, all functions and global variables of
   /// the module are marked as fragile. This is used for compiling the stdlib.
+  /// if \p wholeModuleCompilation is true, the optimizer assumes that the SIL
+  /// of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule> performSILGeneration(Module *M,
-                                               bool makeModuleFragile = false);
+                                       bool makeModuleFragile = false,
+                                       bool wholeModuleCompilation = false);
 
   /// Turn a source file into SIL IR.
   ///

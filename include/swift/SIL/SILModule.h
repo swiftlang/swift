@@ -161,13 +161,17 @@ private:
   /// constructed. In certain cases this was before all Modules had been loaded
   /// causeing us to not
   std::unique_ptr<SerializedSILLoader> SILLoader;
+  
+  /// True if this SILModule really contains the whole module, i.e.
+  /// optimizations can assume that they see the whole module.
+  bool wholeModule;
 
   /// The external SIL source to use when linking this module.
   SILExternalSource *ExternalSource = nullptr;
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(Module *M, const DeclContext *associatedDC);
+  SILModule(Module *M, const DeclContext *associatedDC, bool wholeModule);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -209,12 +213,13 @@ public:
   static std::unique_ptr<SILModule>
   constructSIL(Module *M, SourceFile *sf = nullptr,
                Optional<unsigned> startElem = None,
-               bool makeModuleFragile = false);
+               bool makeModuleFragile = false,
+               bool isWholeModule = false);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule> createEmptyModule(Module *M) {
-    return std::unique_ptr<SILModule>(new SILModule(M, M));
+    return std::unique_ptr<SILModule>(new SILModule(M, M, false));
   }
 
   /// Get the Swift module associated with this SIL module.
@@ -234,6 +239,12 @@ public:
   /// can be made.
   const DeclContext *getAssociatedContext() const {
     return AssociatedDeclContext;
+  }
+
+  /// Returns true if this SILModule really contains the whole module, i.e.
+  /// optimizations can assume that they see the whole module.
+  bool isWholeModule() const {
+    return wholeModule;
   }
 
   // FIXME: Remove these when SILGlobalVariable is ready to take over.
@@ -329,6 +340,11 @@ public:
   SILFunction *lookUpFunction(StringRef name) {
     return FunctionTable.lookup(name);
   }
+
+  /// Look for a function by declaration.
+  ///
+  /// \return null if this module has no such function
+  SILFunction *lookUpFunction(SILDeclRef fnRef);
 
   /// Attempt to link the SILFunction. Returns true if linking succeeded, false
   /// otherwise.

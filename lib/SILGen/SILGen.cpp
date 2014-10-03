@@ -854,7 +854,8 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(Module *mod, SourceFile *sf,
-                        Optional<unsigned> startElem, bool makeModuleFragile) {
+                        Optional<unsigned> startElem, bool makeModuleFragile,
+                        bool isWholeModule) {
   const DeclContext *DC;
   if (startElem) {
     assert(sf && "cannot have a start element without a source file");
@@ -867,7 +868,7 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
     DC = mod;
   }
 
-  std::unique_ptr<SILModule> m(new SILModule(mod, DC));
+  std::unique_ptr<SILModule> m(new SILModule(mod, DC, isWholeModule));
   SILGenModule sgm(*m, mod, makeModuleFragile);
 
   if (sf) {
@@ -890,13 +891,15 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
 }
 
 std::unique_ptr<SILModule> swift::performSILGeneration(Module *mod,
-                                                       bool makeModuleFragile) {
-  return SILModule::constructSIL(mod, nullptr, None, makeModuleFragile);
+                                            bool makeModuleFragile,
+                                            bool accessControlEnabled) {
+  return SILModule::constructSIL(mod, nullptr, None, makeModuleFragile,
+                                 accessControlEnabled);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(SourceFile &sf, Optional<unsigned> startElem,
                             bool makeModuleFragile) {
   return SILModule::constructSIL(sf.getParentModule(), &sf, startElem,
-                                 makeModuleFragile);
+                                 makeModuleFragile, false);
 }

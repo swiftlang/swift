@@ -18,6 +18,7 @@
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -91,10 +92,11 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
   }
 };
 
-SILModule::SILModule(Module *SwiftModule, const DeclContext *associatedDC)
+SILModule::SILModule(Module *SwiftModule, const DeclContext *associatedDC,
+                     bool wholeModule)
   : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
     Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
-    Types(*this) {
+    wholeModule(wholeModule), Types(*this) {
   TypeListUniquing = new SILTypeListUniquingType();
 }
 
@@ -662,6 +664,12 @@ private:
 };
 
 } // end anonymous namespace.
+
+SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
+  llvm::SmallString<32> name;
+  fnRef.mangle(name);
+  return lookUpFunction(name);
+}
 
 bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode,

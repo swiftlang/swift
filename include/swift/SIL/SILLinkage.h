@@ -112,7 +112,11 @@ inline bool isAvailableExternally(SILLinkage linkage) {
 
 /// Return whether the given linkage indicates that an object's
 /// definition might be required outside the current SILModule.
-inline bool isPossiblyUsedExternally(SILLinkage linkage) {
+/// If \p is true then we are in whole-module compilation.
+inline bool isPossiblyUsedExternally(SILLinkage linkage, bool wholeModule) {
+  if (wholeModule) {
+    return linkage <= SILLinkage::Public;
+  }
   return linkage <= SILLinkage::Hidden;
 }
 

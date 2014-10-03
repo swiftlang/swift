@@ -475,6 +475,8 @@ class MandatoryInlining : public SILModuleTransform {
     if (!ShouldCleanup)
       return;
 
+    bool isWholeModule = M->isWholeModule();
+    
     // Now that we've inlined some functions, clean up.  If there are any
     // transparent functions that are deserialized from another module that are
     // now unused, just remove them from the module.
@@ -496,8 +498,13 @@ class MandatoryInlining : public SILModuleTransform {
       // We discard functions that don't have external linkage,
       // e.g. deserialized functions, internal functions, and thunks.
       // Being marked transparent controls this.
-      if (isPossiblyUsedExternally(F.getLinkage())) continue;
+      if (isPossiblyUsedExternally(F.getLinkage(), isWholeModule)) continue;
 
+      // ObjC functions are called through the runtime and are therefore alive
+      // even if not referenced inside SIL.
+      if (F.getLoweredFunctionType()->getAbstractCC() == AbstractCC::ObjCMethod)
+        continue;
+      
       // Okay, just erase the function from the module.
       M->eraseFunction(&F);
     }

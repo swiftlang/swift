@@ -2293,7 +2293,14 @@ namespace {
       auto dtorRef = SILDeclRef(Target->getDestructor(),
                                 SILDeclRef::Kind::Deallocator,
                                 expansion);
-      addWord(IGM.getAddrOfSILFunction(dtorRef, NotForDefinition));
+      SILFunction *dtorFunc = IGM.SILMod->lookUpFunction(dtorRef);
+      if (dtorFunc) {
+        addWord(IGM.getAddrOfSILFunction(dtorFunc, NotForDefinition));
+      } else {
+        // In case the optimizer removed the function. See comment in
+        // addMethod().
+        addWord(llvm::ConstantPointerNull::get(IGM.FunctionPtrTy));
+      }
     }
     
     void addNominalTypeDescriptor() {
@@ -2448,7 +2455,16 @@ namespace {
                       fn.uncurryLevel);
 
       // Add the appropriate method to the module.
-      addWord(IGM.getAddrOfSILFunction(fn, NotForDefinition));
+      SILFunction *func = IGM.SILMod->lookUpFunction(fn);
+      if (func) {
+        addWord(IGM.getAddrOfSILFunction(func, NotForDefinition));
+      } else {
+        // Just add a null pointer in case the optimizer has removed the
+        // function because it is dead. This is some kind of a hack which is
+        // only required because the vtable generation in SIL is different than
+        // the algorithm here.
+        addWord(llvm::ConstantPointerNull::get(IGM.FunctionPtrTy));
+      }
     }
 
     void addGenericArgument(ArchetypeType *archetype, ClassDecl *forClass) {
