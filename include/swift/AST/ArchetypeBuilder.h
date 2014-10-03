@@ -242,10 +242,6 @@ public:
   /// parameter.
   ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam) const;
 
-  /// \brief Retrieve the archetype that corresponds to the given generic
-  /// parameter.
-  ArchetypeType *getArchetype(GenericTypeParamType *GenericParam) const;
-  
   /// \brief Retrieve the array of all of the archetypes produced during
   /// archetype assignment. The 'primary' archetypes will occur first in this
   /// list.
@@ -384,9 +380,21 @@ public:
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
   bool isConcreteType() const {
+    if (Representative != this)
+      return Representative->isPrimary();
+
     return ArchetypeOrConcreteType.is<Type>();
   }
-  
+
+  /// Determine whether this potential archetype will map to a primary
+  /// archetype.
+  bool isPrimary() const {
+    if (Representative != this)
+      return Representative->isPrimary();
+
+    return Index.hasValue() && !isConcreteType();
+  }
+
   void setIsRecursive() { this->isRecursive = true; }
   bool getIsRecursive() { return this->isRecursive; }
   
