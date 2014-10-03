@@ -1059,7 +1059,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   switch (attr) {
   default: break;
   case TAK_local_storage:
-  case TAK_sil_self:
   case TAK_out:
   case TAK_in:
   case TAK_owned:

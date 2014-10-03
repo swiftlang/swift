@@ -1248,17 +1248,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if (ty->is<ErrorType>())
     return ty;
 
-  // In SIL, handle @sil_self, which extracts the Self type of a protocol.
-  if (attrs.has(TAK_sil_self)) {
-    if (auto protoTy = ty->getAs<ProtocolType>()) {
-      ty = protoTy->getDecl()->getSelf()->getArchetype();
-    } else {
-      TC.diagnose(attrs.getLoc(TAK_sil_self), diag::sil_self_non_protocol, ty)
-        .highlight(repr->getSourceRange());
-    }
-    attrs.clearAttribute(TAK_sil_self);
-  }
-
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {

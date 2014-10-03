@@ -397,12 +397,6 @@ type as the first result of ``alloc_stack`` and the operand of
 Local-storage address types are not *first-class* in the same sense
 that address types are not first-class.
 
-Protocol ``Self`` Types
-```````````````````````
-
-The *self type for T* ``sil_self T`` refers to the ``Self`` type
-within the protocol ``T``.
-
 Function Types
 ``````````````
 

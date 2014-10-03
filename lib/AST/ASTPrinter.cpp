@@ -2448,13 +2448,6 @@ public:
   }
 
   void visitArchetypeType(ArchetypeType *T) {
-    if (Options.PrintInSILBody) {
-      if (auto proto = T->getSelfProtocol()) {
-        Printer << "@sil_self ";
-        visit(proto->getDeclaredType());
-        return;
-      }
-    }
     if (auto existentialTy = T->getOpenedExistentialType()) {
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
       visit(existentialTy);
