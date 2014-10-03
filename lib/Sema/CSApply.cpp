@@ -379,7 +379,8 @@ namespace {
 
     /// \brief Convert an expression that references a potentially unavailable
     /// declaration to an optional reflecting the potential unavailability.
-    Expr *convertUnavailableToOptional(Expr *expr,
+    Expr *convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
+                                       SourceLoc declRefLoc,
                                        const UnavailabilityReason &reason);
   public:
     /// \brief Build a reference to the given declaration.
@@ -763,6 +764,29 @@ namespace {
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
       }
       return finishApply(apply, openedType, nullptr);
+    }
+    
+    /// \brief Build a reference to a potentially unavailable member.
+    Expr *buildUnavailableMemberRef(Expr *base, Type openedFullType,
+                                    SourceLoc dotLoc, ValueDecl *member,
+                                    SourceLoc memberLoc, Type openedType,
+                                    ConstraintLocatorBuilder locator,
+                                    bool implicit,
+                                    AccessSemantics semantics,
+                                    Optional<UnavailabilityReason> reason) {
+
+      // Let buildMemberRef() do the heavy lifting.
+      Expr *ref = buildMemberRef(base, openedFullType, dotLoc, member, memberLoc,
+                                 openedType, locator, implicit, semantics);
+
+      // Wrap in a conversion expression if the member reference
+      // may not be available.
+      if (reason.hasValue()) {
+        ref = convertUnavailableToOptional(ref, member, memberLoc,
+                                           reason.getValue());
+      }
+
+      return ref;
     }
     
     /// \brief Build a new dynamic member reference with the given base and
@@ -1827,7 +1851,7 @@ namespace {
                                   expr->getAccessSemantics());
       
       if (choice.isPotentiallyUnavailable()) {
-        newRef = convertUnavailableToOptional(newRef,
+        newRef = convertUnavailableToOptional(newRef,decl, expr->getLoc(),
                                               choice.getReasonUnavailable(cs));
       }
       
@@ -1946,7 +1970,7 @@ namespace {
                                   AccessSemantics::Ordinary);
       
       if (choice.isPotentiallyUnavailable()) {
-        newRef = convertUnavailableToOptional(newRef,
+        newRef = convertUnavailableToOptional(newRef, decl, expr->getLoc(),
                                               choice.getReasonUnavailable(cs));
       }
       
@@ -2100,6 +2124,10 @@ namespace {
                           expr,
                           ConstraintLocator::Member));
 
+      Optional<UnavailabilityReason> reason;
+      if (selected.choice.isPotentiallyUnavailable()) {
+        reason = selected.choice.getReasonUnavailable(cs);
+      }
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
         // Look through an implicitly unwrapped optional.
@@ -2131,14 +2159,16 @@ namespace {
 
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaUnwrappedOptional: {
-        auto member = buildMemberRef(base,
-                                     selected.openedFullType,
-                                     dotLoc,
-                                     selected.choice.getDecl(),
-                                     nameLoc,
-                                     selected.openedType,
-                                     cs.getConstraintLocator(expr),
-                                     implicit, AccessSemantics::Ordinary);
+        auto member = buildUnavailableMemberRef(base,
+                                                selected.openedFullType,
+                                                dotLoc,
+                                                selected.choice.getDecl(),
+                                                nameLoc,
+                                                selected.openedType,
+                                                cs.getConstraintLocator(expr),
+                                                implicit,
+                                                AccessSemantics::Ordinary,
+                                                reason);
         
         // If this is an application of a value type method or enum constructor,
         // arrange for us to check that it gets fully applied.
@@ -4427,20 +4457,15 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 }
 
 Expr *
-ExprRewriter::convertUnavailableToOptional(Expr *expr,
+ExprRewriter::convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
+                                           SourceLoc declRefLoc,
                                            const UnavailabilityReason &reason) {
   assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
-
-  // For the moment, we only work with DeclRefExprs. In the future we will
-  // need to support additional reference expressions.
-  DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(expr);
-  assert(declRef);
 
   if (!cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
     // If feature is not enabled, do not perform a conversion and instead
     // diagnose immediately.
-    cs.TC.diagnosePotentialUnavailability(declRef->getDecl(), declRef->getLoc(),
-                                          reason);
+    cs.TC.diagnosePotentialUnavailability(decl, declRefLoc, reason);
     return expr;
   }
 
@@ -4448,7 +4473,7 @@ ExprRewriter::convertUnavailableToOptional(Expr *expr,
   Type unavailTy = cs.getTypeWhenUnavailable(expr->getType());
 
   return new (cs.getASTContext())
-      UnavailableToOptionalExpr(declRef, reason, unavailTy);
+      UnavailableToOptionalExpr(expr, reason, unavailTy);
 }
 
 

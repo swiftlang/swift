@@ -77,5 +77,100 @@ func callOverloadedFunctions() {
   
   let _: Int = overloadedFunction()
   let _: Int = overloadedFunction!(0)
-  let _: Int? = overloadedFunction?(0)
+  if let _: Int = overloadedFunction?(0) {}
+}
+
+// Unavailable methods
+
+class ClassWithUnavailableMethod {
+  @availability(OSX, introduced=10.9)
+  func methAvailableOn10_9() -> Int { return 9 }
+  
+  @availability(OSX, introduced=10.10)
+  func methAvailableOn10_10() -> Int { return 10 }
+  
+  @availability(OSX, introduced=10.10)
+  class func classMethAvailableOn10_10() -> Int { return 10 }
+  
+  func someOtherMethod() {
+    methAvailableOn10_9()
+    methAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+    
+    let _: () -> Int = methAvailableOn10_9
+    let _: () -> Int = methAvailableOn10_10 // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+    if let _: () -> Int = methAvailableOn10_10 {}
+    
+    let _: Int = methAvailableOn10_10!()
+    if let _: Int = methAvailableOn10_10?() {}
+  }
+}
+
+func callUnavailableMethods(o: ClassWithUnavailableMethod) {
+  let m10_9 = o.methAvailableOn10_9
+  m10_9()
+  
+  if let m10_10 : () -> Int = o.methAvailableOn10_10 {
+    m10_10()
+  }
+  
+  o.methAvailableOn10_9()
+  o.methAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int = o.methAvailableOn10_10!()
+  if let _: Int = o.methAvailableOn10_10?() {}
+}
+
+func callUnavailableMethodsViaIUO(o: ClassWithUnavailableMethod!) {
+  let m10_9 = o.methAvailableOn10_9
+  m10_9()
+  
+  if let m10_10 : () -> Int = o.methAvailableOn10_10 {
+    m10_10()
+  }
+  
+  o.methAvailableOn10_9()
+  o.methAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int = o.methAvailableOn10_10!()
+  if let _: Int = o.methAvailableOn10_10?() {}
+}
+
+func callUnavailableClassMethod() {
+  ClassWithUnavailableMethod.classMethAvailableOn10_10() // expected-error {{value of optional type '(() -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  if let _: () -> Int = ClassWithUnavailableMethod.classMethAvailableOn10_10 {}
+
+  let _: Int = ClassWithUnavailableMethod.classMethAvailableOn10_10!()
+  if let _: Int = ClassWithUnavailableMethod.classMethAvailableOn10_10?() {}
+}
+
+class ClassWithUnavailableOverloadedMethod {
+  @availability(OSX, introduced=10.9)
+  func overloadedMethod() -> Int { return 9 }
+
+  @availability(OSX, introduced=10.10)
+  func overloadedMethod(on1010: Int) -> Int { return 10 }
+}
+
+func callUnavailableOverloadedMethod(o: ClassWithUnavailableOverloadedMethod) {
+  o.overloadedMethod()
+  o.overloadedMethod(0) // expected-error {{value of optional type '((Int) -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int = o.overloadedMethod!(0)
+  if let _: Int = o.overloadedMethod?(0) { } 
+}
+
+class ClassWithMethodReturningOptional {
+   @availability(OSX, introduced=10.10)
+  func methAvailableOn10_10() -> Int? { return 10 }
+}
+
+func callMethodReturningOptional(o: ClassWithMethodReturningOptional) {
+  let _: Int? = o.methAvailableOn10_10() // expected-error {{value of optional type '(() -> Int?)?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int? = o.methAvailableOn10_10!()
+  let _: Int?? = o.methAvailableOn10_10?()
+  
+  let _: Int? = o.methAvailableOn10_10?()!
+  let _: Int = o.methAvailableOn10_10!()!
 }

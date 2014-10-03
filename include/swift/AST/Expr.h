@@ -2000,12 +2000,10 @@ class UnavailableToOptionalExpr : public ImplicitConversionExpr {
   UnavailabilityReason Reason;
 
 public:
-  UnavailableToOptionalExpr(DeclRefExpr *ref, UnavailabilityReason Reason,
+  UnavailableToOptionalExpr(Expr *subExpr, UnavailabilityReason Reason,
                             Type ty)
-      : ImplicitConversionExpr(ExprKind::UnavailableToOptional, ref, ty),
+      : ImplicitConversionExpr(ExprKind::UnavailableToOptional, subExpr, ty),
         Reason(Reason) {}
-
-  DeclRefExpr *getRef() const { return cast<DeclRefExpr>(getSubExpr()); }
 
   /// Returns the reason the reference is potentially unavailable.
   const UnavailabilityReason &getReason() const { return Reason; }

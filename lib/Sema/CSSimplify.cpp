@@ -3040,8 +3040,12 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       choices.push_back(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
                                                                     result));
     } else {
+      SourceLoc anchorLoc = constraint.getLocator()->getAnchor()->getLoc();
+      auto unavailReason = TC.checkDeclarationAvailability(result, anchorLoc,
+                                                           DC);
       choices.push_back(OverloadChoice(ovlBaseTy, result,
-                                       /*isSpecialized=*/false, *this));
+                                       /*isSpecialized=*/false, *this,
+                                       unavailReason));
     }
   };
 

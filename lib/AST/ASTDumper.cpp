@@ -1759,7 +1759,7 @@ public:
   }
   void visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E) {
     printCommon(E, "unavailable_to_optional_expr") << '\n';
-    printRec(E->getRef());
+    printRec(E->getSubExpr());
     OS << ')';
   }
 };

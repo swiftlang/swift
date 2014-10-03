@@ -98,3 +98,90 @@ func overloadedFunction(on1010: Int) {}
 
 overloadedFunction()
 overloadedFunction(0) // expected-error {{'overloadedFunction' is only available on OS X version 10.10 or greater}}
+
+// Unavailable methods
+
+class ClassWithUnavailableMethod {
+  @availability(OSX, introduced=10.9)
+  func methAvailableOn10_9() {}
+  
+  @availability(OSX, introduced=10.10)
+  func methAvailableOn10_10() {}
+  
+  @availability(OSX, introduced=10.10)
+  class func classMethAvailableOn10_10() {}
+  
+  func someOtherMethod() {
+    methAvailableOn10_9()
+    methAvailableOn10_10() // expected-error {{'methAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+  }
+}
+
+func callUnavailableMethods(o: ClassWithUnavailableMethod) {
+  let m10_9 = o.methAvailableOn10_9
+  m10_9()
+  
+  let m10_10 = o.methAvailableOn10_10 // expected-error {{'methAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+  m10_10()
+  
+  o.methAvailableOn10_9()
+  o.methAvailableOn10_10() // expected-error {{'methAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+}
+
+func callUnavailableMethodsViaIUO(o: ClassWithUnavailableMethod!) {
+  let m10_9 = o.methAvailableOn10_9
+  m10_9()
+  
+  let m10_10 = o.methAvailableOn10_10 // expected-error {{'methAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+  m10_10()
+  
+  o.methAvailableOn10_9()
+  o.methAvailableOn10_10() // expected-error {{'methAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+}
+
+func callUnavailableClassMethod() {
+  ClassWithUnavailableMethod.classMethAvailableOn10_10() // expected-error {{'classMethAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+  
+  let m10_10 = ClassWithUnavailableMethod.classMethAvailableOn10_10 // expected-error {{'classMethAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+  m10_10()
+}
+
+class SubClassWithUnavailableMethod : ClassWithUnavailableMethod {
+  func someMethod() {
+    methAvailableOn10_9()
+    methAvailableOn10_10() // expected-error {{'methAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+  }
+}
+
+class SubClassOverridingUnavailableMethod : ClassWithUnavailableMethod {
+
+  override func methAvailableOn10_10() {
+    methAvailableOn10_9()
+    super.methAvailableOn10_10() // expected-error {{'methAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+    
+    let m10_9 = super.methAvailableOn10_9
+    m10_9()
+    
+    let m10_10 = super.methAvailableOn10_10 // expected-error {{'methAvailableOn10_10()' is only available on OS X version 10.10 or greater}}
+    m10_10()
+  }
+  
+  func someMethod() {
+    methAvailableOn10_9()
+    // Calling our override should be fine
+    methAvailableOn10_10()
+  }
+}
+
+class ClassWithUnavailableOverloadedMethod {
+  @availability(OSX, introduced=10.9)
+  func overloadedMethod() {}
+
+  @availability(OSX, introduced=10.10)
+  func overloadedMethod(on1010: Int) {}
+}
+
+func callUnavailableOverloadedMethod(o: ClassWithUnavailableOverloadedMethod) {
+  o.overloadedMethod()
+  o.overloadedMethod(0) // expected-error {{'overloadedMethod' is only available on OS X version 10.10 or greater}}
+}
