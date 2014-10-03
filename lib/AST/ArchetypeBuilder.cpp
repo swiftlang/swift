@@ -111,24 +111,23 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 }
 
 ArchetypeType::NestedType
-ArchetypeBuilder::PotentialArchetype::getType(ProtocolDecl *rootProtocol,
-                                              Module &mod) {
+ArchetypeBuilder::PotentialArchetype::getType(Module &mod) {
   // Retrieve the archetype from the representation of this set.
   if (Representative != this)
-    return getRepresentative()->getType(rootProtocol, mod);
+    return getRepresentative()->getType(mod);
   
   // Return a concrete type or archetype we've already resolved.
   if (ArchetypeOrConcreteType) {
     return ArchetypeOrConcreteType;
   }
   
-  ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = rootProtocol;
+  ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = RootProtocol;
   // Allocate a new archetype.
   ArchetypeType *ParentArchetype = nullptr;
   if (Parent) {
     assert(assocTypeOrProto.isNull() &&
            "root protocol type given for non-root archetype");
-    auto parentTy = Parent->getType(nullptr, mod);
+    auto parentTy = Parent->getType(mod);
     if (!parentTy)
       return {};
     ParentArchetype = parentTy.dyn_cast<ArchetypeType*>();
@@ -175,7 +174,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ProtocolDecl *rootProtocol,
     FlatNestedTypes;
   for (auto Nested : NestedTypes) {
     FlatNestedTypes.push_back({ Nested.first,
-                                Nested.second->getType(nullptr, mod) });
+                                Nested.second->getType(mod) });
   }
   arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
   
@@ -283,8 +282,7 @@ struct ArchetypeBuilder::Implementation {
   std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
     conformsToProtocol;
   SmallVector<GenericTypeParamKey, 4> GenericParams;
-  DenseMap<GenericTypeParamKey, std::pair<ProtocolDecl*, PotentialArchetype*>>
-    PotentialArchetypes;
+  DenseMap<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
   SmallVector<ArchetypeType *, 4> AllArchetypes;
 
   SmallVector<SameTypeRequirement, 4>
@@ -332,7 +330,7 @@ ArchetypeBuilder::~ArchetypeBuilder() {
     return;
 
   for (auto PA : Impl->PotentialArchetypes)
-    delete PA.second.second;
+    delete PA.second;
 }
 
 auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
@@ -342,7 +340,7 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
     if (known == Impl->PotentialArchetypes.end())
       return nullptr;
 
-    return known->second.second;
+    return known->second;
   }
 
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
@@ -368,9 +366,9 @@ auto ArchetypeBuilder::addGenericParameter(ProtocolDecl *RootProtocol,
   Impl->GenericParams.push_back(Key);
 
   // Create a potential archetype for this type parameter.
-  assert(!Impl->PotentialArchetypes[Key].second);
-  auto PA = new PotentialArchetype(nullptr, ParamName, Index);
-  Impl->PotentialArchetypes[Key] = {RootProtocol, PA};
+  assert(!Impl->PotentialArchetypes[Key]);
+  auto PA = new PotentialArchetype(RootProtocol, ParamName, Index);
+  Impl->PotentialArchetypes[Key] = PA;
   
   return PA;
 }
@@ -757,8 +755,8 @@ void ArchetypeBuilder::addRequirement(const Requirement &req) {
 bool ArchetypeBuilder::addImplicitConformance(GenericTypeParamDecl *Param,
                                               ProtocolDecl *Proto) {
   auto Key = GenericTypeParamKey::forDecl(Param);
-  assert(Impl->PotentialArchetypes[Key].second != nullptr && "Unknown parameter");
-  return addConformanceRequirement(Impl->PotentialArchetypes[Key].second, Proto);
+  assert(Impl->PotentialArchetypes[Key] != nullptr && "Unknown parameter");
+  return addConformanceRequirement(Impl->PotentialArchetypes[Key], Proto);
 }
 
 /// AST walker that infers requirements from type representations.
@@ -877,7 +875,7 @@ void ArchetypeBuilder::assignArchetypes() {
   // Compute the archetypes for each of the potential archetypes (i.e., the
   // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
-    PA.second.second->getType(PA.second.first, Mod);
+    PA.second->getType(Mod);
   }
 }
 
@@ -888,8 +886,7 @@ ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) const {
   if (known == Impl->PotentialArchetypes.end())
     return nullptr;
 
-  return known->second.second->getType(known->second.first, getModule())
-           .dyn_cast<ArchetypeType *>();
+  return known->second->getType(getModule()).dyn_cast<ArchetypeType *>();
 }
 
 ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
@@ -898,10 +895,9 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
     // Collect the primary archetypes first.
     llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
     for (auto GP : Impl->GenericParams) {
-      auto const &PA = Impl->PotentialArchetypes[GP];
-      if (PA.second->isPrimary()) {
-        auto Archetype = PA.second->getType(PA.first, Mod)
-                           .get<ArchetypeType *>();
+      PotentialArchetype *PA = Impl->PotentialArchetypes[GP];
+      if (PA->isPrimary()) {
+        auto Archetype = PA->getType(Mod).get<ArchetypeType *>();
         assert(Archetype->isPrimary() && "isPrimary mismatch");
         if (KnownArchetypes.insert(Archetype))
           Impl->AllArchetypes.push_back(Archetype);
@@ -910,10 +906,9 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
 
     // Collect all of the remaining archetypes.
     for (auto GP : Impl->GenericParams) {
-      auto const &PA = Impl->PotentialArchetypes[GP];
-      if (!PA.second->isConcreteType()) {
-        auto Archetype = PA.second->getType(PA.first, Mod)
-                           .get<ArchetypeType *>();
+      PotentialArchetype *PA = Impl->PotentialArchetypes[GP];
+      if (!PA->isConcreteType()) {
+        auto Archetype = PA->getType(Mod).get<ArchetypeType *>();
         GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
                                               Impl->AllArchetypes);
       }
@@ -931,7 +926,7 @@ ArchetypeBuilder::getSameTypeRequirements() const {
 void ArchetypeBuilder::dump() {
   llvm::errs() << "Archetypes to build:\n";
   for (const auto &PA : Impl->PotentialArchetypes) {
-    PA.second.second->dump(llvm::errs(), 2);
+    PA.second->dump(llvm::errs(), 2);
   }
 }
 
@@ -1013,8 +1008,7 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
   // Resolve generic type parameters to their types.
   if (auto genType = ty->getAs<GenericTypeParamType>()) {
     if (auto potentialArchetype = Archetypes.resolveArchetype(genType)) {
-      return ArchetypeType::getNestedTypeValue(
-               potentialArchetype->getType(nullptr, M));
+      return ArchetypeType::getNestedTypeValue(potentialArchetype->getType(M));
     }
 
     return genType;
@@ -1024,8 +1018,7 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
   if (auto depType = ty->getAs<DependentMemberType>()) {
     // See if the type directly references an associated archetype.
     if (auto potentialArchetype = Archetypes.resolveArchetype(depType)) {
-      return ArchetypeType::getNestedTypeValue(
-        potentialArchetype->getType(nullptr, M));
+      return ArchetypeType::getNestedTypeValue(potentialArchetype->getType(M));
     }
     
     // If not, resolve the base type, then look up the associated type in

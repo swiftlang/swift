@@ -295,7 +295,10 @@ public:
 class ArchetypeBuilder::PotentialArchetype {
   /// \brief The parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
-  PotentialArchetype *Parent;
+  PotentialArchetype *Parent = nullptr;
+
+  /// The root protocol with which this potential archetype is associated.
+  ProtocolDecl *RootProtocol = nullptr;
 
   /// \brief The name of this potential archetype.
   Identifier Name;
@@ -323,8 +326,13 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief Construct a new potential archetype.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name,
                      Optional<unsigned> Index = None)
-    : Parent(Parent), Name(Name), Index(Index), Representative(this),
-      ArchetypeOrConcreteType() { }
+    : Parent(Parent), Name(Name), Index(Index), Representative(this) { }
+
+  /// \brief Construct a new potential archetype.
+  PotentialArchetype(ProtocolDecl *RootProtocol, Identifier Name,
+                     Optional<unsigned> Index = None)
+    : RootProtocol(RootProtocol), Name(Name), Index(Index),
+      Representative(this) { }
 
   /// \brief Recursively build the full name.
   void buildFullName(SmallVectorImpl<char> &Result) const;
@@ -372,7 +380,7 @@ public:
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype.
-  ArchetypeType::NestedType getType(ProtocolDecl *rootProtocol, Module &mod);
+  ArchetypeType::NestedType getType(Module &mod);
   
   /// Retrieve the associated type declaration for a given nested type.
   AssociatedTypeDecl *getAssociatedType(Module &mod, Identifier name);

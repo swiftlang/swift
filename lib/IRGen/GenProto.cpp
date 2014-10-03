@@ -3540,7 +3540,7 @@ namespace {
       if (!potential)
         return nullptr;
       
-      return potential->getType(nullptr, ParamArchetypes.getModule());
+      return potential->getType(ParamArchetypes.getModule());
     }
 
   public:
