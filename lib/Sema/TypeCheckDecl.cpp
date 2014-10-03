@@ -916,7 +916,6 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
                                      DeclContext *dc,
                                      TypeChecker &TC) {
   // Wire up the archetypes.
-  builder.assignArchetypes();
   for (auto GP : *genericParams) {
     GP->setArchetype(builder.getArchetype(GP));
     TC.checkInheritanceClause(GP);

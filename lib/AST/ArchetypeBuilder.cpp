@@ -277,16 +277,34 @@ struct DenseMapInfo<GenericTypeParamKey> {
 }
 
 struct ArchetypeBuilder::Implementation {
+  /// Callback that produces the array of protocols describing the protocols
+  /// inherited by its argument.
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
+
+  /// Callback that produces the superclass and protocol requirements placed
+  /// on the given generic type parameter.
   GetConformsToCallback getConformsTo;
+
+  /// Compute the protocol conformance when a given type conforms to the given
+  /// protocol.
   std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
     conformsToProtocol;
+
+  /// The list of generic parameters.
   SmallVector<GenericTypeParamKey, 4> GenericParams;
+
+  /// A mapping from generic parameters to the corresponding potential
+  /// archetypes.
   DenseMap<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
+
+  /// A vector containing all of the archetypes, expanded out.
+  /// FIXME: This notion should go away, because it's impossible to expand
+  /// out "all" archetypes
   SmallVector<ArchetypeType *, 4> AllArchetypes;
 
-  SmallVector<SameTypeRequirement, 4>
-    SameTypeRequirements;
+  /// A vector containing the same-type requirements introduced into the
+  /// system.
+  SmallVector<SameTypeRequirement, 4> SameTypeRequirements;
 };
 
 ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
@@ -869,14 +887,6 @@ bool ArchetypeBuilder::inferRequirements(Pattern *pattern) {
   InferRequirementsWalker walker(*this);
   pattern->getType().walk(walker);
   return walker.hadError();
-}
-
-void ArchetypeBuilder::assignArchetypes() {
-  // Compute the archetypes for each of the potential archetypes (i.e., the
-  // generic parameters).
-  for (const auto& PA : Impl->PotentialArchetypes) {
-    PA.second->getType(Mod);
-  }
 }
 
 ArchetypeType *

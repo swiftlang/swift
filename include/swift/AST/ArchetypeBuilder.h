@@ -231,13 +231,6 @@ public:
   /// member types to the appropriate associated types.
   Type substDependentType(Type type);
   
-  /// \brief Assign archetypes to each of the generic parameters and all
-  /// of their associated types, recursively.
-  ///
-  /// This operation should only be performed after all generic parameters and
-  /// requirements have been added to the builder. It is non-reversible.
-  void assignArchetypes();
-
   /// \brief Retrieve the archetype that corresponds to the given generic
   /// parameter.
   ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam) const;

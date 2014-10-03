@@ -2256,8 +2256,6 @@ void TypeConverter::pushGenericContext(GenericSignature *sig) {
   GenericArchetypes.emplace(*M.getSwiftModule(), M.getASTContext().Diags);
   if (GenericArchetypes->addGenericSignature(sig))
     llvm_unreachable("error adding generic signature to archetype builder?!");
-  // FIXME: Shouldn't need to force this
-  GenericArchetypes->assignArchetypes();
 }
 
 void TypeConverter::popGenericContext(GenericSignature *sig) {
