@@ -1261,13 +1261,6 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   if (InputIsTrivial && !OutputIsTrivial)
     return nullptr;
 
-  // The structs could have different size. We have code in the stdlib that
-  // casts pointers to differently sized integer types. This code prevents that
-  // we bitcast the values.
-  if (InputTy.getStructOrBoundGenericStruct() &&
-      OutputTy.getStructOrBoundGenericStruct())
-    return nullptr;
-
   // For each user U of the unchecked_addr_cast...
   for (auto U : UADCI->getUses())
     // Check if it is load. If it is not a load, bail...

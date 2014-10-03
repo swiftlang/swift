@@ -638,23 +638,3 @@ bb2:
   %9999 = tuple()
   return %9999 : $()
 }
-
-struct C {
-  var i : Builtin.Int16
-}
-
-// Don't bitcast differently sized structs.
-// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct
-// CHECK-NOT: unchecked_trivial_bit_cast
-// CHECK: return
-
-sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct : $@thin (A) -> () {
-bb0(%0 : $A):
-  %1 = alloc_stack $A
-  store %0 to %1#1 : $*A
-  %2 = unchecked_addr_cast %1#1 : $*A to $*C
-  %3 = load %2 : $*C
-  dealloc_stack %1#0 : $*@local_storage A
-  %9999 = tuple()
-  return %9999 : $()
-}
