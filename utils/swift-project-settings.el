@@ -237,7 +237,7 @@ takes precedence for files in the Swift project"
     ad-do-it))
 
 (push 'swift-stdlibunittest compilation-error-regexp-alist)
-(push `(swift-stdlibunittest "^\\(?:out\\|err\\)>>>.* failed\\(?: at\\|.*file\\) \\(.+\\), line \\([0-9]+\\)$"
+(push `(swift-stdlibunittest "^\\(?:out\\|err\\)>>>.* \\(?:failed\\(?: at\\|.*file\\)\\|.*: file\\) \\(.+\\), line \\([0-9]+\\)$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
     
