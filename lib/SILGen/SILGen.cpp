@@ -279,9 +279,10 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     IsFrag = IsFragile;
   }
 
-  if (makeModuleFragile && constant.isGlobal() && forDefinition) {
+  if (makeModuleFragile && constant.isGlobal()) {
     // TODO: make global variables fragile. For this we need to mangle the
-    // module name into the global name.
+    // module name into the global name, and to ensure the initialization tokens
+    // are unique (or can be eliminated).
     linkage = SILLinkage::Public;
     IsFrag = IsNotFragile;
   }
