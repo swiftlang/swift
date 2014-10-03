@@ -9,6 +9,7 @@ import Foundation
 // CHECK:         %[[FOO]]* (i64, %[[FOO]]*)*
 // -- The init() stub should get no vtable entry
 // CHECK-NOT:     %[[FOO]]* (%[[FOO]]*)*
+// CHECK:       {{^(@|define)}}
 class Foo: NSObject {
   init(x: Int) { super.init() }
 }
