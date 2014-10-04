@@ -29,11 +29,35 @@ void ClassHierarchyAnalysis::init() {
 
     // Add the superclass to the list of inherited classes.
     ClassDecl *Super = C->getSuperclass()->getClassOrBoundGenericClass();
-    auto &K = SubclassesCache[Super];
+    auto &K = DirectSubclassesCache[Super];
     assert(std::find(K.begin(), K.end(), C) == K.end() &&
            "Class vector must be unique");
     K.push_back(C);
   }
 }
+
+/// \brief Get all subclasses subclasses of a given class.
+/// Does not include any direct subclasses of given base class.
+///
+/// \p Base base class, whose direct subclasses are to be excluded
+/// \p Current class, whose direct and indirect subclasses are
+///    to be collected.
+/// \p IndirectSubs placeholder for collected results
+void ClassHierarchyAnalysis::getIndirectSubClasses(ClassDecl *Base,
+                                                   ClassDecl *Current,
+                                                   ClassList& IndirectSubs) {
+  // Get direct subclasses
+  if (!hasKnownDirectSubclasses(Current))
+    return;
+  ClassList &Subs = getDirectSubClasses(Current);
+  for (auto S : Subs) {
+    // Remember this subclass
+    if (Base != Current)
+      IndirectSubs.push_back(S);
+    // Collect subclasses of a given subclass
+    getIndirectSubClasses(Base, S, IndirectSubs);
+  }
+}
+
 
 ClassHierarchyAnalysis::~ClassHierarchyAnalysis() {}

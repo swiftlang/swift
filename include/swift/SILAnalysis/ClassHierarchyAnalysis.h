@@ -44,19 +44,40 @@ public:
 
   virtual void invalidate(InvalidationKind K) {
     if (K >= InvalidationKind::All) {
-      SubclassesCache.clear();
+      DirectSubclassesCache.clear();
+      IndirectSubclassesCache.clear();
       init(); 
     }
   }
 
 
-  /// \returns a list of the known direct subclasses of a class \p C in
+  /// Returns a list of the known direct subclasses of a class \p C in
   /// the current module.
-  ClassList& getSubClasses(ClassDecl *C) { return SubclassesCache[C]; }
+  ClassList& getDirectSubClasses(ClassDecl *C) {
+    return DirectSubclassesCache[C];
+  }
 
-  /// \returns True if the class is inherited by another class in this module.
-  bool hasKnownSubclasses(ClassDecl *CD) {
-    return SubclassesCache.count(CD);
+  /// Returns a list of the known indirect subclasses of a class \p C in
+  /// the current module.
+  ClassList& getIndirectSubClasses(ClassDecl *C) {
+    if (!IndirectSubclassesCache.count(C)) {
+      // Lazy initialization
+      auto &K = IndirectSubclassesCache[C];
+      getIndirectSubClasses(C, C, K);
+    }
+    return IndirectSubclassesCache[C];
+  }
+
+  /// Returns true if the class is inherited by another class in this module.
+  bool hasKnownDirectSubclasses(ClassDecl *C) {
+    return DirectSubclassesCache.count(C);
+  }
+
+  /// Returns true if the class is indirectly inherited by another class
+  /// in this module.
+  bool hasKnownIndirectSubclasses(ClassDecl *C) {
+    return IndirectSubclassesCache.count(C) &&
+           IndirectSubclassesCache[C].size() > 0;
   }
 
   virtual void invalidate(SILFunction *F, InvalidationKind K) {
@@ -66,12 +87,17 @@ public:
 private:
   /// Compute inheritance properties.
   void init();
-
+  void getIndirectSubClasses(ClassDecl *Base,
+                             ClassDecl *Current,
+                             ClassList& IndirectSubs);
   /// The module
   SILModule *M;
 
-  /// A cache that maps a class to all of its known subclasses.
-  llvm::DenseMap<ClassDecl*, ClassList> SubclassesCache;
+  /// A cache that maps a class to all of its known direct subclasses.
+  llvm::DenseMap<ClassDecl*, ClassList> DirectSubclassesCache;
+
+  /// A cache that maps a class to all of its known indirect subclasses.
+  llvm::DenseMap<ClassDecl*, ClassList> IndirectSubclassesCache;
 };
 
 }
