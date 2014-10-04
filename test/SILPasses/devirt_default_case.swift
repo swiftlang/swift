@@ -58,12 +58,12 @@ public func callOuter(x: Int) -> Int {
 // internl class
 class Base3 {
   @inline(never) func inner() { println("Base")}
-  func middle() { inner() }
+  @inline(never) func middle() { inner() }
 // Check that call to Base3.middle can be devirtualized
 // 
 // CHECK-LABEL: sil hidden @_TFC19devirt_default_case5Base35outerfS0_FT_T_
 // CHECK: function_ref @_TFC19devirt_default_caseP33_77424841540E67CC820F5E5F7940DCB08Derived36middlefS0_FT_T_
-// CHECK: function_ref @_TFC19devirt_default_case5Base35innerfS0_FT_T_
+// CHECK: function_ref @_TFC19devirt_default_case5Base36middlefS0_FT_T_
 // CHECK-NOT: class_method
 // CHECK: }
   func outer() {
@@ -154,3 +154,25 @@ public class Base5 {
 
 class Derived5 : Base5 {
 }
+
+public class C6 { 
+  func bar() -> Int { return 1 } 
+}
+
+class D6 : C6 { 
+  override func bar() -> Int { return 2 } 
+}
+
+@inline(never)
+func check_static_class_devirt(c: C6) -> Int { 
+// Check that C.bar() and D.bar() are devirtualized.
+//
+// CHECK-LABEL: sil hidden [noinline] @_TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
+// CHECK: checked_cast_br [exact] %0 : $C6 to $D6
+// CHECK: checked_cast_br [exact] %0 : $C6 to $C6
+// CHECK: class_method
+// CHECK: return
+  return c.bar() 
+}
+
+println(check_static_class_devirt(D6()))

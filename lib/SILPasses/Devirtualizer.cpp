@@ -916,9 +916,12 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (NotHandledSubsNum || !isDefaultCaseKnown(CHA, AI, CD, Subs)) {
     // Devirtualization of remaining cases is not possible,
     // because more than one implementation of the method
-    // needs to be handled here. Thus, class_method cannot be
-    // replaced by a direct call.
-    return Changed;
+    // needs to be handled here. Thus, an indirect call through
+    // the class_method cannot be eliminated completely.
+    //
+    // But we can still try to devirtualize the static class of instance
+    // if it is possible.
+    return insertMonomorphicInlineCaches(AI, InstanceType);
   }
 
   // At this point it is known that there is only one remaining method
