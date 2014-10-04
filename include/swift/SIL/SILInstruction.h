@@ -392,6 +392,9 @@ public:
                            bool Transparent,
                            SILFunction &F);
 
+  // The operand number of the first argument.
+  static unsigned getArgumentOperandNumber() { return 1; }
+
   SILValue getCallee() const { return Operands[Callee].get(); }
 
   // Get the type of the callee without the applied substitutions.
