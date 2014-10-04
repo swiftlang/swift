@@ -1083,6 +1083,16 @@ public:
 ///   store %1 to %dest
 /// but a copy instruction must be used for address-only types.
 class CopyAddrInst : public SILInstruction {
+public:
+  enum {
+    /// The lvalue being loaded from.
+    Src,
+
+    /// The lvalue being stored to.
+    Dest
+  };
+
+private:
   // FIXME: compress storage
 
   /// IsTakeOfSrc - True if ownership will be taken from the value at the source
@@ -1093,13 +1103,6 @@ class CopyAddrInst : public SILInstruction {
   /// uninitialized destination memory location.
   unsigned IsInitializationOfDest : 1;
 
-  enum {
-    /// The lvalue being loaded from.
-    Src,
-
-    /// The lvalue being stored to.
-    Dest
-  };
   FixedOperandList<2> Operands;
 
 public:
