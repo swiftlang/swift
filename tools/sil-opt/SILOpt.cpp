@@ -81,6 +81,7 @@ enum class PassKind {
   ABCOpts,
   ClosureSpecialization,
   CapturePropagation,
+  CopyForwarding,
 };
 
 enum class OptGroup {
@@ -267,6 +268,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::CapturePropagation,
                                    "capture-prop",
                                    "Captured Constant Propagation."),
+                        clEnumValN(PassKind::CopyForwarding,
+                                   "copy-forwarding",
+                                   "Copy Forwarding."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -475,6 +479,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::CapturePropagation:
       PM.add(createCapturePropagation());
+      break;
+    case PassKind::CopyForwarding:
+      PM.add(createCopyForwarding());
       break;
     }
   }
