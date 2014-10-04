@@ -5,7 +5,7 @@
 // CHECK: define i32 @main
 // CHECK: tail call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %[[C:.*]], i64 %[[C]]), !dbg ![[MULSCOPE:.*]]
 // CHECK-DAG: ![[TOPLEVEL:.*]] = {{.*}}; [ DW_TAG_file_type ] [{{.*}}/inlinescopes.swift]
-// CHECK-DAG: ![[MAIN:.*]] = {{.*}}"main"{{.*}}[ DW_TAG_subprogram ]
+// CHECK-DAG: ![[MAIN:.*]] = {{.*}}\00main\00{{.*}}[ DW_TAG_subprogram ]
 // CHECK-DAG: ![[INLINED_TOPLEVEL:.*]] = metadata !{i32 0, i32 0, metadata ![[MAIN:.*]], null}
 
 func square(x : Int) -> Int {

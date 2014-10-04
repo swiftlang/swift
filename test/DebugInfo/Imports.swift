@@ -3,12 +3,12 @@
 // RUN: %swift -emit-ir -module-name Foo %s -I %S -enable-source-import -g -o - | FileCheck %s
 // RUN: %swift -c -module-name Foo %s -I %S -enable-source-import -g -o - | llvm-dwarfdump - | FileCheck --check-prefix=DWARF %s
 // CHECK-DAG: ![[FOOMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Foo]
-// CHECK-DAG: metadata ![[THISFILE:[0-9]+]], metadata ![[FOOMODULE]], i32 1} ; [ DW_TAG_imported_module ]
+// CHECK-DAG: metadata !{metadata !"0x3a\001\00", metadata ![[THISFILE:[0-9]+]], metadata ![[FOOMODULE]]} ; [ DW_TAG_imported_module ]
 // CHECK-DAG: ![[THISFILE]] = metadata {{.*}}[ DW_TAG_file_type ] [{{.*}}test/DebugInfo/Imports.swift]
 // CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = {{.*}}[ DW_TAG_file_type ]{{.*}}Swift.swiftmodule
 // CHECK-DAG: ![[SWIFTMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Swift]
-// CHECK-DAG: metadata ![[SWIFTFILE]], metadata ![[SWIFTMODULE]], i32 0} ; [ DW_TAG_imported_module ]
-// CHECK-DAG: metadata ![[BASICFILE:[0-9]+]], metadata ![[BASICMODULE:[0-9]+]], i32 [[@LINE+3]]} ; [ DW_TAG_imported_module ]
+// CHECK-DAG: metadata !{metadata !"0x3a\000\00", metadata ![[SWIFTFILE]], metadata ![[SWIFTMODULE]]} ; [ DW_TAG_imported_module ]
+// CHECK-DAG: metadata !{metadata !"0x3a\00[[@LINE+3]]\00", metadata ![[BASICFILE:[0-9]+]], metadata ![[BASICMODULE:[0-9]+]]} ; [ DW_TAG_imported_module ]
 // CHECK-DAG: ![[BASICFILE]] = {{.*}}basic.swift
 // CHECK-DAG: ![[BASICMODULE]] = {{.*}}[ DW_TAG_module ] [basic]
 import basic

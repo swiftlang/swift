@@ -33,7 +33,7 @@ func main() -> Int {
 }
 
 // Self should be artificial.
-// CHECK: , i32 64, i32 0} ; [ DW_TAG_arg_variable ] [self] [line 16]
+// CHECK: \0064"{{.*}}} ; [ DW_TAG_arg_variable ] [self] [line 16]
 
 // CHECK: ![[LOC]] ={{.*}}[ DW_TAG_auto_variable ] [loc2d] [line [[@LINE-9]]]
 

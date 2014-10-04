@@ -8,9 +8,9 @@ func a(arg : Int)
 }
 
 // WTF, you ask? This field is ArgNo << 24 | LineNo!
-// CHECK-DAG: i32 16{{.*}} [ DW_TAG_arg_variable ] [a] [line [[@LINE+3]]]
-// CHECK-DAG: i32 33{{.*}} [ DW_TAG_arg_variable ] [b] [line [[@LINE+2]]]
-// CHECK-DAG: i32 67{{.*}} [ DW_TAG_arg_variable ] [c] [line [[@LINE+1]]]
+// CHECK-DAG: \0016{{.*}} [ DW_TAG_arg_variable ] [a] [line [[@LINE+3]]]
+// CHECK-DAG: \0033{{.*}} [ DW_TAG_arg_variable ] [b] [line [[@LINE+2]]]
+// CHECK-DAG: \0067{{.*}} [ DW_TAG_arg_variable ] [c] [line [[@LINE+1]]]
 func many(a: Int, b: (Int, Int), c: Int) -> Int {
 // CHECK-DAG: [ DW_TAG_auto_variable ] [i1] [line [[@LINE+1]]]
   var i1 = a
@@ -24,10 +24,10 @@ func many(a: Int, b: (Int, Int), c: Int) -> Int {
 
 class A {
   var member : Int
-// CHECK-DAG: i32 16{{.*}} [ DW_TAG_arg_variable ] [a] [line [[@LINE+1]]]
+// CHECK-DAG: \0016{{.*}} [ DW_TAG_arg_variable ] [a] [line [[@LINE+1]]]
   init(a: Int) { member = a }
 
-// CHECK-DAG: i32 16{{.*}}[ DW_TAG_arg_variable ] [offset] [line [[@LINE+2]]]
+// CHECK-DAG: \0016{{.*}}[ DW_TAG_arg_variable ] [offset] [line [[@LINE+2]]]
 // CHECK-DAG: [ DW_TAG_arg_variable ] [self] [line [[@LINE+1]]]
   func getValuePlus(offset: Int) -> Int {
 // CHECK-DAG: [ DW_TAG_auto_variable ] [a] [line [[@LINE+1]]]
@@ -35,8 +35,8 @@ class A {
     return a+offset
   }
 
-// CHECK-DAG: i32 16{{.*}}[ DW_TAG_arg_variable ] [factor] [line [[@LINE+3]]]
-// CHECK-DAG: i32 33{{.*}}[ DW_TAG_arg_variable ] [offset] [line [[@LINE+2]]]
+// CHECK-DAG: \0016{{.*}}[ DW_TAG_arg_variable ] [factor] [line [[@LINE+3]]]
+// CHECK-DAG: \0033{{.*}}[ DW_TAG_arg_variable ] [offset] [line [[@LINE+2]]]
 // CHECK-DAG: [ DW_TAG_arg_variable ] [self] [line [[@LINE+1]]]
   func getValueTimesPlus(factor: Int, offset: Int) -> Int {
 // CHECK-DAG: [ DW_TAG_auto_variable ] [a] [line [[@LINE+1]]]
@@ -46,7 +46,7 @@ class A {
     return a*f+offset
   }
 
-// CHECK: i32 16{{.*}}[ DW_TAG_arg_variable ] [self] [line 50]
+// CHECK: \0016{{.*}}[ DW_TAG_arg_variable ] [self] [line 50]
   deinit {
     println(member)
   }
@@ -54,14 +54,14 @@ class A {
 }
 
 // Curried functions have their arguments backwards.
-// CHECK: i32 16{{.*}} [ DW_TAG_arg_variable ] [b] [line [[@LINE+2]]]
-// CHECK: i32 33{{.*}} [ DW_TAG_arg_variable ] [a] [line [[@LINE+1]]]
+// CHECK: \0016{{.*}} [ DW_TAG_arg_variable ] [b] [line [[@LINE+2]]]
+// CHECK: \0033{{.*}} [ DW_TAG_arg_variable ] [a] [line [[@LINE+1]]]
 func uncurry (a: Int) (b: Int) -> (Int, Int) {
   return (a, b)
 }
 
-// CHECK: i32 16{{.*}} [ DW_TAG_arg_variable ] [x] [line [[@LINE+2]]]
-// CHECK: i32 33{{.*}} [ DW_TAG_arg_variable ] [y] [line [[@LINE+1]]]
+// CHECK: \0016{{.*}} [ DW_TAG_arg_variable ] [x] [line [[@LINE+2]]]
+// CHECK: \0033{{.*}} [ DW_TAG_arg_variable ] [y] [line [[@LINE+1]]]
 func tuple(x: Int, y: (Int, Float, String)) -> Int {
   return x+y.0;
 }

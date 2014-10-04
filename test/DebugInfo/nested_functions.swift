@@ -3,7 +3,7 @@ func outer(a: Int) -> Int {
      // Inner functions have a linkage name of "closure[0-9]+", but
      // their DW_AT_name is preserved.
 
-     // CHECK: i1 false, i1 true, i32 0, i32 0, null, i32 0,{{.*}}[ DW_TAG_subprogram ] [line [[@LINE+1]]] [def] {{.*}}[inner]
+     // CHECK: \00_TFF16nested_functions5outerFSiSiL_5innerfSiSi\00[[@LINE+1]]\000\001\000\000\000\00{{.*}}[ DW_TAG_subprogram ] [line [[@LINE+1]]] [def] {{.*}}[inner]
      func inner(b: Int) -> Int {
        return a+b
      }

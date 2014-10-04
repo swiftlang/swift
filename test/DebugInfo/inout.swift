@@ -11,9 +11,9 @@ typealias MyFloat = Float
 // CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCB]]}, metadata ![[B:.*]], metadata !{{[0-9]+}})
 // CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCA]]}, metadata
 // CHECK: ![[REFINT:.*]] = {{.*}}[ DW_TAG_structure_type ] [_TtRSi]
-// CHECK: ![[B]] = {{.*}}metadata ![[MYFLOAT:.*]], i32 0, i32 0} ; [ DW_TAG_arg_variable ] [b] [line [[@LINE+4]]]
+// CHECK: ![[B]] = {{.*}}metadata ![[MYFLOAT:.*]]} ; [ DW_TAG_arg_variable ] [b] [line [[@LINE+4]]]
 // CHECK: ![[MYFLOAT]] = {{.*}}[ DW_TAG_typedef ] [_Tta5inout7MyFloat] {{.*}} [from _TtSf]
-// CHECK: ![[A:[0-9]+]] = {{.*}}metadata !"_TtRSi",  i32 0, i32 0} ; [ DW_TAG_arg_variable ] [a] [line [[@LINE+1]]]
+// CHECK: ![[A:[0-9]+]] = {{.*}}metadata !"_TtRSi"} ; [ DW_TAG_arg_variable ] [a] [line [[@LINE+1]]]
 func modifyFooHeap(inout a: Int,
                    var b: MyFloat)
 {
@@ -26,8 +26,8 @@ func modifyFooHeap(inout a: Int,
 }
 
 func modifyFoo(inout u: Int,
-// CHECK: metadata ![[MYFLOAT]], i32 0, i32 0} ; [ DW_TAG_arg_variable ] [v] [line [[@LINE+2]]]
-// CHECK: metadata !"_TtRSi", i32 0, i32 0} ; [ DW_TAG_arg_variable ] [u] [line [[@LINE-2]]]
+// CHECK: metadata ![[MYFLOAT]]} ; [ DW_TAG_arg_variable ] [v] [line [[@LINE+2]]]
+// CHECK: metadata !"_TtRSi"} ; [ DW_TAG_arg_variable ] [u] [line [[@LINE-2]]]
                var v: MyFloat)
 {
     if (v > 2.71) {

@@ -6,10 +6,10 @@ class DWARF
 }
 
 func main () {
-  // CHECK-DAG: metadata ![[DIEOFFSET]], i32 0, i32 0} ; [ DW_TAG_auto_variable ] [a] [line [[@LINE+1]]]
+  // CHECK-DAG: metadata ![[DIEOFFSET]]} ; [ DW_TAG_auto_variable ] [a] [line [[@LINE+1]]]
     var a : DWARF.DIEOffset = 123
     println("a is \(a)")
-  // CHECK-DAG: metadata ![[DIEOFFSET]], i32 0, i32 0} ; [ DW_TAG_auto_variable ] [b] [line [[@LINE+1]]]
+  // CHECK-DAG: metadata ![[DIEOFFSET]]} ; [ DW_TAG_auto_variable ] [b] [line [[@LINE+1]]]
     var b = DWARF.DIEOffset(456) as DWARF.DIEOffset
     println("b is \(b)")
 }

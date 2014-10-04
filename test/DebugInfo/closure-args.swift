@@ -26,16 +26,16 @@ func main() -> Void
                || count(rhs.unicodeScalars) == random_int
             {
             // Ensure the two local_vars are in different lexical scopes.
-            // CHECK-DAG: metadata !{{{.*}}, metadata ![[THENSCOPE:.*]], metadata !"local_var", {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]
-            // CHECK-DAG: ![[THENSCOPE]] = metadata !{{{.*}}, i32 [[@LINE-3]], {{.*}}} ; [ DW_TAG_lexical_block ]
+            // CHECK-DAG: metadata !"0x100\00local_var\00[[@LINE+2]]\000", metadata ![[THENSCOPE:[0-9]+]], {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]
+            // CHECK-DAG: ![[THENSCOPE]] = {{.*}}\00[[@LINE-3]]\00{{.*}}} ; [ DW_TAG_lexical_block ]
                 var local_var : Int = 10
                 print ("I have an int here \(local_var).\n")
                 return false
             }
             else
             {
-            // CHECK-DAG: metadata !{{{.*}}, metadata ![[ELSESCOPE:.*]], metadata !"local_var", {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]
-            // CHECK-DAG: ![[ELSESCOPE]] = metadata !{{{.*}}, i32 [[@LINE-2]], {{.*}}} ; [ DW_TAG_lexical_block ]
+            // CHECK-DAG: metadata !"0x100\00local_var\00[[@LINE+2]]\000", metadata ![[ELSESCOPE:[0-9]+]], {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]
+            // CHECK-DAG: ![[ELSESCOPE]] = {{.*}}\00[[@LINE-2]]\00{{.*}}} ; [ DW_TAG_lexical_block ]
                 var local_var : String = "g"
                 print ("I have another string here \(local_var).\n")
                 // Assign to all the captured variables to inhibit capture promotion.

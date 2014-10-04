@@ -32,15 +32,15 @@ class MyObject : NSObject {
   // LOC-CHECK: define {{.*}} @_TToFC4main8MyObjectg5MyArrCSo7NSArray
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
-  // LOC-CHECK: ![[THUNK:.*]] = {{.*}}metadata !"_TToFC4main8MyObjectg5MyArrCSo7NSArray", {{.*}} ; [ DW_TAG_subprogram ] [line [[@LINE+2]]] [local] [def]
+  // LOC-CHECK: ![[THUNK:.*]] = {{.*}}_TToFC4main8MyObjectg5MyArrCSo7NSArray{{.*}} ; [ DW_TAG_subprogram ] [line [[@LINE+2]]] [local] [def]
   // LOC-CHECK: ![[DBG]] = metadata !{i32 0, i32 0, metadata ![[THUNK]], null}
   var MyArr = NSArray()
 // Capture the pointer size from type Int
 // IMPORT-CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>
-// IMPORT-CHECK: metadata ![[FOUNDATION:[0-9]+]], metadata !"NSArray", i32 {{.*}}, null, null, metadata ![[NSARRAY:.*]]} ; [ DW_TAG_structure_type ] [NSArray]
+// IMPORT-CHECK: metadata ![[FOUNDATION:[0-9]+]], {{[^,]+}}, {{[^,]+}}, null, null, metadata ![[NSARRAY:.*]]} ; [ DW_TAG_structure_type ] [NSArray]
 // IMPORT-CHECK: [[FOUNDATION]] = {{.*}} ; [ DW_TAG_module ] [Foundation]
 // IMPORT-CHECK: metadata ![[NSARRAY]]} ; [ DW_TAG_member ] [MyArr] [line 0, size [[PTRSIZE]], align [[PTRSIZE]], offset 0] [from _TtCSo7NSArray]
-// IMPORT-CHECK: metadata ![[FOUNDATION_FILE:[0-9]+]], metadata ![[FOUNDATION_MODULE:[0-9]+]], i32 1} ; [ DW_TAG_imported_module ]
+// IMPORT-CHECK: \001\00", metadata ![[FOUNDATION_FILE:[0-9]+]], metadata ![[FOUNDATION_MODULE:[0-9]+]]} ; [ DW_TAG_imported_module ]
 // CHECK: ![[FOUNDATION_FILE]] = {{.*}}foundation.swift
 // CHECK: ![[FOUNDATION_MODULE]] = {{.*}}[ DW_TAG_module ] [foundation]
 
@@ -61,7 +61,7 @@ extension MyObject {
 }
 
 // SANITY-DAG: metadata !"_TtCSo8NSObject"} ; [ DW_TAG_structure_type ] [NSObject]
-// SANITY-DAG: i32 [[@LINE+1]], metadata !"_TtCSo8NSObject", {{.*}} [ DW_TAG_variable ] [NsObj] [line [[@LINE+1]]] [def]
+// SANITY-DAG: metadata !"_TtCSo8NSObject", {{.*}} [ DW_TAG_variable ] [NsObj] [line [[@LINE+1]]] [def]
 var NsObj: NSObject
 NsObj = MyObject()
 var MyObj: MyObject

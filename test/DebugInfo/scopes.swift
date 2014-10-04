@@ -14,7 +14,7 @@ class AppDelegate {
   var window: UIWindow?
 
   func application() -> Bool {
-    // CHECK-DAG: i32 [[@LINE+1]], i32 13, i32 {{[0-9]+}}} ; [ DW_TAG_lexical_block ]
+    // CHECK-DAG: "0xb\00[[@LINE+1]]\0013{{.*}}; [ DW_TAG_lexical_block ]
     if true {
       // Verify that all debug line table entries for the expression
       // below are in the same scope.
