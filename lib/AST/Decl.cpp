@@ -1928,6 +1928,43 @@ StringRef ClassDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
+FuncDecl *ClassDecl::findOverridingDecl(const FuncDecl *Method) const {
+  auto Members = getMembers();
+  for (auto M : Members) {
+    FuncDecl *CurMethod = dyn_cast<FuncDecl>(M);
+    if (!CurMethod)
+      continue;
+    if (CurMethod->isOverridingDecl(Method)) {
+      return CurMethod;
+    }
+  }
+  return nullptr;
+}
+
+FuncDecl * ClassDecl::findImplementingMethod(const FuncDecl *Method) const {
+  const ClassDecl *C = this;
+  while (C) {
+    auto Members = C->getMembers();
+    for (auto M : Members) {
+      FuncDecl *CurMethod = dyn_cast<FuncDecl>(M);
+      if (!CurMethod)
+        continue;
+      if (Method == CurMethod)
+        return CurMethod;
+      if (CurMethod->isOverridingDecl(Method)) {
+        // This class implements a method
+        return CurMethod;
+      }
+    }
+    // Check the superclass
+    if (!C->hasSuperclass())
+      break;
+    C = C->getSuperclass()->getClassOrBoundGenericClass();
+  }
+  return nullptr;
+}
+
+
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
                                    DeclContext *DC) {
@@ -3076,6 +3113,16 @@ bool FuncDecl::isBinaryOperator() const {
   
   return argTuple->getNumFields() == 2
     || (argTuple->getNumFields() == 1 && argTuple->hasVararg());
+}
+
+bool FuncDecl::isOverridingDecl(const FuncDecl *Method) const {
+  const FuncDecl *CurMethod = this;
+  while (CurMethod) {
+    if (CurMethod == Method)
+      return true;
+    CurMethod = CurMethod->getOverriddenDecl();
+  }
+  return false;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
