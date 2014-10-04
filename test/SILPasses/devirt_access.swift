@@ -86,7 +86,7 @@ private class LocalPrivateSubclass : PrivateClass {
 }
 
 //PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access11testPrivateFT_T_
-//PRIMARY-FILE: class_method
+//PRIMARY-FILE: function_ref @_TF13devirt_accessP[[DISCRIMINATOR:[0-9]+_.+]]15getPrivateClassFT_CS_P[[DISCRIMINATOR]]12PrivateClass
 //WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access11testPrivateFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_accessP[[DISCRIMINATOR:[0-9]+_.+]]15getPrivateClassFT_CS_P[[DISCRIMINATOR]]12PrivateClass
 //WHOLE-MODULE: return
