@@ -222,6 +222,8 @@ public:
   SILValue getOperand() const { return Operands[0].get(); }
   void setOperand(SILValue V) { Operands[0].set(V); }
 
+  Operand &getOperandRef() { return Operands[0]; }
+
   /// getType() is ok if this is known to only have one type.
   template<typename X = void>
   typename std::enable_if<has_result<X>::value, SILType>::type
