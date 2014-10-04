@@ -677,8 +677,11 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     auto &C = getChunks()[i];
     switch (C.getKind()) {
     case CodeCompletionString::Chunk::ChunkKind::Text:
-      return i;
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
+      return i;
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
     case CodeCompletionString::Chunk::ChunkKind::RightBracket:
@@ -693,15 +696,12 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword:
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
-    case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
