@@ -81,6 +81,21 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 
 void SILPassManager::runOneIteration() {
   DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
+  if (Options.PrintAll && NumOptimizationIterations == 0) {
+    if (SILPrintOnlyFun.empty()) {
+      llvm::dbgs() << "*** SIL module before transformation ("
+                   << NumOptimizationIterations << ") ***\n";
+      Mod->dump();
+    } else {
+      for (auto &F : *Mod) {
+        if (F.getName().str() == SILPrintOnlyFun) {
+          llvm::dbgs() << "*** SIL function before transformation ("
+                       << NumOptimizationIterations << ") ***\n";
+          F.dump();
+        }
+      }
+    }
+  }
   NumOptzIterations++;
   NumOptimizationIterations++;
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
@@ -154,10 +169,20 @@ void SILPassManager::runOneIteration() {
 }
 
 void SILPassManager::run() {
-  if (Options.PrintAll && SILPrintOnlyFun.empty()) {
-    llvm::dbgs() << "*** SIL module before transformation ("
-                 << NumOptimizationIterations << ") ***\n";
-    Mod->dump();
+  if (Options.PrintAll) {
+    if (SILPrintOnlyFun.empty()) {
+      llvm::dbgs() << "*** SIL module before transformation ("
+                   << NumOptimizationIterations << ") ***\n";
+      Mod->dump();
+    } else {
+      for (auto &F : *Mod) {
+        if (F.getName().str() == SILPrintOnlyFun) {
+          llvm::dbgs() << "*** SIL function before transformation ("
+                       << NumOptimizationIterations << ") ***\n";
+          F.dump();
+        }
+      }
+    }
   }
   // Keep optimizing the module until no pass requested another iteration
   // of the pass or we reach the maximum.
