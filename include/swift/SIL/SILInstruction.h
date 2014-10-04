@@ -864,12 +864,15 @@ public:
 
 /// StoreInst - Represents a store from a memory location.
 class StoreInst : public SILInstruction {
+public:
   enum {
     /// the value being stored
     Src,
     /// the lvalue being stored to
     Dest
   };
+
+private:
   FixedOperandList<2> Operands;
 public:
 
