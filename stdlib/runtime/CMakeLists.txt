@@ -38,6 +38,7 @@ endif()
 add_swift_library(swiftRuntime
   Casting.cpp
   Demangle.cpp
+  GlobalObjects.cpp
   HeapObject.cpp
   KnownMetadata.cpp
   Metadata.cpp

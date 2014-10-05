@@ -42,7 +42,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   func _invariantCheck() {
     let isNative = _hasNativeBuffer
-    let isNativeStorage: Bool = (owner as? NativeStorage) != nil
+    let isNativeStorage: Bool = (owner as? _ContiguousArrayStorageBase) != nil
     _sanityCheck(
       isNativeStorage == isNative
     )
