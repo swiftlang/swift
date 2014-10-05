@@ -705,7 +705,7 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   auto Scope = MainModule;
   auto Line = L.Line;
 
-  // We know that top_level_code always comes from MainFile.
+  // We know that main always comes from MainFile.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
     if (!L.Filename)
       File = MainFile;
@@ -727,7 +727,7 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
   // ignore it. Explicit closures are exempt from this rule. We also
-  // make an exception for top_level_code, which, albeit it does not
+  // make an exception for main, which, albeit it does not
   // have a Swift name, does appear prominently in the source code.
   if ((Name.empty() && LinkageName != SWIFT_ENTRY_POINT_FUNCTION &&
        !isExplicitClosure(DS)) ||

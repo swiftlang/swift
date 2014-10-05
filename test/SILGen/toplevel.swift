@@ -1,7 +1,7 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
-// CHECK-LABEL: sil private @top_level_code
-// CHECK: bb0:
+// CHECK-LABEL: sil @main
+// CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
 
 // -- initialize x
 // CHECK: [[X:%[0-9]+]] = sil_global_addr @_Tv8toplevel1xSi : $*Int
@@ -19,7 +19,7 @@
 // CHECK: [[Y:%[0-9]+]] = mark_uninitialized [var] [[Y1]]
 // CHECK: assign {{.*}} to [[Y]]
 // CHECK: [[PRINT_Y:%[0-9]+]] = function_ref @_TF8toplevel7print_yFT_T_
-// CHECK: [[RET:%[0-9]+]] = tuple ()
+// CHECK: [[RET:%[0-9]+]] = struct $Int32
 // CHECK: return [[RET]]
 
 var x = 999

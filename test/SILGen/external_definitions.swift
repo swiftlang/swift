@@ -9,7 +9,7 @@ var anse = NSAnse
 
 hasNoPrototype()
 
-// CHECK-LABEL: sil  private @top_level_code
+// CHECK-LABEL: sil @main
 // -- Foreign function is referenced with C calling conv and ownership semantics
 // CHECK:   [[NSANSE:%.*]] = function_ref @NSAnse : $@cc(cdecl) @thin (ImplicitlyUnwrappedOptional<Ansible>) -> @autoreleased ImplicitlyUnwrappedOptional<Ansible>
 // CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPSs9AnyObject___GSQS__

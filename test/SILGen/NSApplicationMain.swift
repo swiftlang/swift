@@ -8,9 +8,9 @@ import AppKit
 @NSApplicationMain
 class MyDelegate: NSApplicationDelegate {}
 
-// CHECK-LABEL: sil private @top_level_code
+// CHECK-LABEL: sil @main
 // CHECK:         function_ref @NSApplicationMain
-// IR-LABEL: define internal void @top_level_code
+// IR-LABEL: define i32 @main
 // IR:            call i32 @NSApplicationMain
 
 // Ensure that we coexist with normal references to the functions we

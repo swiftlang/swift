@@ -49,4 +49,7 @@ FUNC_DECL(ForceBridgeFromObjectiveC,
 FUNC_DECL(ConditionallyBridgeFromObjectiveC,
           "_conditionallyBridgeFromObjectiveC")
 
+FUNC_DECL(DidEnterMain,
+          "_didEnterMain")
+
 #undef FUNC_DECL

@@ -5,13 +5,13 @@ import Swift
 
 // Make sure we inline everything.
 
-// CHECK-LABEL: sil private @top_level_code : $@thin () -> () {
-// CHECK: bb0:
+// CHECK-LABEL: sil @main
+// CHECK: bb0({{.*}}):
 // CHECK-NEXT: global_addr
 // CHECK-NEXT: struct
 // CHECK-NEXT: struct
 // CHECK-NEXT: store
-// CHECK-NEXT: tuple
+// CHECK-NEXT: integer_literal
 // CHECK-NEXT: return
 
 var a = doSomething()

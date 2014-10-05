@@ -8,7 +8,7 @@
 // Test variables-interpreter.swift runs this code with `swift -g -i`.
 // Test variables-repl.swift runs this code with `swift -g < variables.swift`.
 
-// CHECK-DAG: ![[TLC:[0-9]+]] ={{.*}}top_level_code{{.*}}", metadata ![[FILE:[0-9]+]]{{.*}} ; [ DW_TAG_subprogram ] [line 1] [def] [scope 0]
+// CHECK-DAG: ![[TLC:[0-9]+]] ={{.*}}main{{.*}}", metadata ![[FILE:[0-9]+]]{{.*}} ; [ DW_TAG_subprogram ]
 
 // Global variables.
 var glob_i8:   Int8 = 8;

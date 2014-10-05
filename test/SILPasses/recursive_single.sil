@@ -4,7 +4,7 @@
 // Make sure we can handle recursive function within a class that
 // calls itself once.
 
-// CHECK-LABEL: @top_level_code
+// CHECK-LABEL: @main
 // CHECK: function_ref
 
 sil_stage raw
@@ -16,9 +16,8 @@ class REC {
   func recursive(a: Int)
 }
 
-// top_level_code
-sil private @top_level_code : $@thin () -> () {
-bb0:
+sil @main : $@cc(cdecl) @thin (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+bb0(%c : $Builtin.Int32, %v : $Builtin.RawPointer):
   // function_ref single.test (Swift.Int) -> ()
   %0 = function_ref @_TF6single4testFSiT_ : $@thin (Int) -> () // user: %5
   // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
@@ -27,8 +26,8 @@ bb0:
   %3 = integer_literal $Builtin.Int2048, 1000     // user: %4
   %4 = apply [transparent] %1(%3, %2) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %5
   %5 = apply %0(%4) : $@thin (Int) -> ()
-  %6 = tuple ()                                   // user: %7
-  return %6 : $()                                 // id: %7
+  %6 = integer_literal $Builtin.Int32, 0
+  return %6 : $Builtin.Int32
 }
 
 // single.REC.recursive (single.REC)(Swift.Int) -> ()

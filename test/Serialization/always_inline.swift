@@ -8,7 +8,7 @@
 
 import def_always_inline
 
-// SIL-LABEL: sil private @top_level_code : $@thin () -> () {
+// SIL-LABEL: sil @main
 // SIL: [[RAW:%.+]] = sil_global_addr @_Tv13always_inline3rawSb : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_TF17def_always_inline16testAlwaysInlineFT1xSb_Sb : $@thin (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@thin (Bool) -> Bool

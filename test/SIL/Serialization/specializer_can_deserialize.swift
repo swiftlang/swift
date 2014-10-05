@@ -5,8 +5,8 @@ import Swift
 
 // Make sure the specializer can deserialize code.
 
-// CHECK-LABEL: sil private @top_level_code : $@thin () -> () {
-// CHECK: bb0:
+// CHECK-LABEL: sil @main
+// CHECK: bb0({{.*}}):
 // CHECK: function_ref @_TTSBi32____TFVSs9ContainerCU__fMGS_Q__FT_GS_Q__
 // CHECK: function_ref @_TTSBi32____TFVSs9Container11doSomethingU__fGS_Q__FT_T_ : $@cc(method) @thin (Container<Builtin.Int32>) -> ()
 

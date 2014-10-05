@@ -3,8 +3,8 @@
 // Make sure that we completely inline/devirtualize/substitute all the way down
 // to unknown1.
 
-// CHECK-LABEL: sil private @top_level_code
-// CHECK: bb0:
+// CHECK-LABEL: sil @main
+// CHECK: bb0({{.*}}):
 // CHECK: alloc_ref
 // CHECK: function_ref @unknown1
 // CHECK: apply

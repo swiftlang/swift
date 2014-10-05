@@ -1,7 +1,7 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
 // __FUNCTION__ used as top-level parameter produces the module name.
-// CHECK-LABEL: sil private @top_level_code
+// CHECK-LABEL: sil @main
 // CHECK:         string_literal utf16 "default_arguments"
 
 // Default argument for first parameter.

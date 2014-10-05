@@ -142,6 +142,7 @@ public:
   clang::CanQualType visitProtocolCompositionType(
                                                CanProtocolCompositionType type);
   clang::CanQualType visitBuiltinRawPointerType(CanBuiltinRawPointerType type);
+  clang::CanQualType visitBuiltinIntegerType(CanBuiltinIntegerType type);
   clang::CanQualType visitBuiltinUnknownObjectType(
                                                 CanBuiltinUnknownObjectType type);
   clang::CanQualType visitArchetypeType(CanArchetypeType type);
@@ -449,6 +450,32 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
 clang::CanQualType GenClangType::visitBuiltinRawPointerType(
   CanBuiltinRawPointerType type) {
   return getClangASTContext().VoidPtrTy;
+}
+
+clang::CanQualType GenClangType::visitBuiltinIntegerType(
+                                                   CanBuiltinIntegerType type) {
+  auto &ctx = getClangASTContext();
+  // Map certain known integer sizes to signed integer types.
+  if (type->getWidth().isPointerWidth()) {
+    return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::Long);
+  }
+  if (type->getWidth().isFixedWidth()) {
+    switch (type->getWidth().getFixedWidth()) {
+    case 8:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::SChar);
+    case 16:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::Short);
+    case 32:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::Int);
+    case 64:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::LongLong);
+    case 128:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::Int128);
+    default:
+      break;
+    }
+  }
+  llvm_unreachable("");
 }
 
 clang::CanQualType GenClangType::visitBuiltinUnknownObjectType(

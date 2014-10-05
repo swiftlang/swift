@@ -984,8 +984,7 @@ private:
       if (FuncsAlreadyGenerated.count(function.getName()))
         function.deleteBody();
       else {
-        if (function.getName() != "top_level_code" &&
-            function.getName() != "main")
+        if (function.getName() != SWIFT_ENTRY_POINT_FUNCTION)
           FuncsAlreadyGenerated.insert(function.getName());
       }
     }
@@ -1069,7 +1068,6 @@ private:
     std::unique_ptr<llvm::Module> NewModule(CloneModule(Module));
 
     Module->getFunction("main")->eraseFromParent();
-    Module->getFunction("top_level_code")->eraseFromParent();
 
     stripPreviouslyGenerated(*NewModule);
 

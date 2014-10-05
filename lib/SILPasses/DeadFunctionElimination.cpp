@@ -52,7 +52,7 @@ bool tryToRemoveFunction(SILFunction *F, FinalEliminator *FE = nullptr) {
   SILModule &M = F->getModule();
   
   // Remove internal functions that are not referenced by anything.
-  // TODO: top_level_code is currently marked as internal so we explicitly check
+  // TODO: main is currently marked as internal so we explicitly check
   // for functions with this name and keep them around.
   if (isPossiblyUsedExternally(F->getLinkage(), M.isWholeModule()) ||
       F->getRefCount() || F->getName() == SWIFT_ENTRY_POINT_FUNCTION)

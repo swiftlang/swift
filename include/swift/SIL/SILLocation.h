@@ -471,6 +471,10 @@ public:
 
   static MandatoryInlinedLocation getMandatoryInlinedLocation(SILLocation L);
 
+  static MandatoryInlinedLocation getModuleLocation() {
+    return MandatoryInlinedLocation();
+  }
+  
 private:
   friend class SILLocation;
   static bool isKind(const SILLocation& L) {

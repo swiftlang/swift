@@ -9,7 +9,7 @@ class Bar {}
 let x: Any = Foo.self
 
 
-// CHECK: [[CONCRETE:%.*]] = init_existential [[EXISTENTIAL:%.*]] : $*protocol<>, $() -> () // user: %11
+// CHECK: [[CONCRETE:%.*]] = init_existential [[EXISTENTIAL:%.*]] : $*protocol<>, $() -> ()
 // CHECK: [[CLOSURE:%.*]] = function_ref
 // CHECK: [[CLOSURE_THICK:%.*]] = thin_to_thick_function [[CLOSURE]]
 // CHECK: [[REABSTRACTION_THUNK:%.*]] = function_ref @_TTRXFo__dT__XFo_iT__iT__

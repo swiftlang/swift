@@ -147,6 +147,9 @@ MandatoryInlinedLocation::getMandatoryInlinedLocation(SILLocation L) {
                                     L.getSpecialFlags());
   }
 
+  if (L.isInTopLevel())
+    return MandatoryInlinedLocation::getModuleLocation();
+  
   llvm_unreachable("Cannot construct Inlined loc from the given location.");
 }
 

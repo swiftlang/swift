@@ -15,9 +15,9 @@ class TopLevelObjectTyWithoutDestructor {
 }
 var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
-// CHECK-LABEL: sil private @top_level_code
-// tuple ()  {{.*}} top_level
-// return    {{.*}} top_level
+// CHECK-LABEL: sil @main
+// CHECK: integer_literal ${{.*}}, 0  {{.*}} top_level
+// CHECK: return    {{.*}} top_level
 
 // Check default constructor
 // CHECK-LABEL: sil_locations_top_level.TopLevelObjectTy.init

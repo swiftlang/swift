@@ -311,95 +311,41 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     return;
   }
   
-  // Emit main().
-  // FIXME: We should only emit this in non-JIT modes.
-
+  // In JIT mode, we need to inject additional setup into the entry point for
+  // ObjC interop.
+  if (!ObjCInterop || !Opts.UseJIT)
+    return;
+  
   // Look for an entrypoint function in the SIL module.
-  llvm::Function *topLevelCodeFn = nullptr;
-  if (auto topLevelCodeSILFn =
+  llvm::Function *mainFn = nullptr;
+  if (auto mainSILFn =
         SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
-    topLevelCodeFn = getAddrOfSILFunction(topLevelCodeSILFn, NotForDefinition);
+    mainFn = getAddrOfSILFunction(mainSILFn, NotForDefinition);
   }
+  assert(mainFn && "no entry point for source file?!");
 
-  llvm::Type* argcArgvTypes[2] = {
-    llvm::TypeBuilder<llvm::types::i<32>, true>::get(LLVMContext),
-    llvm::TypeBuilder<llvm::types::i<8>**, true>::get(LLVMContext)
-  };
-
-  llvm::Function *mainFn =
-    llvm::Function::Create(
-      llvm::FunctionType::get(Int32Ty, argcArgvTypes, false),
-        llvm::GlobalValue::ExternalLinkage, "main", &Module);
-
-  IRGenFunction mainIGF(*this, mainFn);
-  if (DebugInfo) {
-    // Emit at least the return type.
-    SILParameterInfo paramTy(CanType(BuiltinIntegerType::get(32, Context)),
-                             ParameterConvention::Direct_Unowned);
-    SILResultInfo retTy(TupleType::getEmpty(Context),
-                        ResultConvention::Unowned);
-    auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                        SILFunctionType::Representation::Thin,
-                                        /*noreturn*/ false);
-    auto fnTy = SILFunctionType::get(nullptr, extInfo,
-                                     ParameterConvention::Direct_Unowned,
-                                     paramTy, retTy,
-                                     Context);
-    auto silFnTy = SILType::getPrimitiveLocalStorageType(fnTy);
-    DebugInfo->emitArtificialFunction(mainIGF, mainFn, silFnTy);
-  }
-
-  // Poke argc and argv into variables declared in the Swift stdlib
-  auto args = mainFn->arg_begin();
+  IRBuilder B(getLLVMContext());
+  B.SetInsertPoint(mainFn->begin(), mainFn->begin()->begin());
   
-  auto accessorTy
-    = llvm::FunctionType::get(Int8PtrTy, {}, /*varArg*/ false);
-  
-  for (auto varNames : {
-    // global accessor for Swift.C_ARGC : CInt
-    std::make_pair("argc", "_TFSsa6C_ARGCVSs5Int32"),
-    // global accessor for Swift.C_ARGV : UnsafeMutablePointer<CString>
-    std::make_pair("argv", "_TFSsa6C_ARGVGVSs20UnsafeMutablePointerGS_VSs4Int8__"),
-  }) {
-    StringRef fnParameterName;
-    StringRef accessorName;
-    std::tie(fnParameterName, accessorName) = varNames;
-    
-    llvm::Value* fnParameter = args++;
-    fnParameter->setName(fnParameterName);
-
-    // Access the address of the global.
-    auto accessor = Module.getOrInsertFunction(accessorName, accessorTy);
-    llvm::Value *ptr = mainIGF.Builder.CreateCall(accessor);
-    // Cast to the type of the parameter we're storing.
-    ptr = mainIGF.Builder.CreateBitCast(ptr,
-                                  fnParameter->getType()->getPointerTo());
-    mainIGF.Builder.CreateStore(fnParameter, ptr);
-  }
-
   // Emit Objective-C runtime interop setup for immediate-mode code.
   if (ObjCInterop && Opts.UseJIT) {
     if (!ObjCClasses.empty()) {
       // Emit an initializer for the Objective-C classes.
-      mainIGF.Builder.CreateCall(emitObjCClassInitializer(*this,ObjCClasses));
+      B.CreateCall(emitObjCClassInitializer(*this, ObjCClasses));
     }
     if (!ObjCCategoryDecls.empty()) {
       // Emit an initializer to add declarations from category decls.
-      mainIGF.Builder.CreateCall(emitObjCCategoryInitializer(*this,
-                                                          ObjCCategoryDecls));
+      B.CreateCall(emitObjCCategoryInitializer(*this, ObjCCategoryDecls));
     }
   }
   
-  // Call the top-level code.
-  if (topLevelCodeFn)
-    mainIGF.Builder.CreateCall(topLevelCodeFn);
-  mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
+  mainFn->dump();
 }
 
 void IRGenModule::emitObjCRegistration() {
   SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
   
-  // If we're debugging, we probably don't have a top_level_code. Find a
+  // If we're debugging, we probably don't have a main. Find a
   // function marked with the LLDBDebuggerFunction attribute instead.
   if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
     for (SILFunction &SF : *SILMod) {
@@ -831,8 +777,13 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
+  //
+  // Exclude "main", because it should naturally be used, and because adding it
+  // to llvm.used leaves a dangling use when the REPL attempts to discard
+  // intermediate mains.
   if (linkage.first == llvm::GlobalValue::ExternalLinkage &&
-      linkage.second == llvm::GlobalValue::DefaultVisibility) {
+      linkage.second == llvm::GlobalValue::DefaultVisibility &&
+      global->getName() != SWIFT_ENTRY_POINT_FUNCTION) {
     IGM.addUsedGlobal(global);
   }
 }
@@ -890,9 +841,14 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
+  //
+  // Exclude "main", because it should naturally be used, and because adding it
+  // to llvm.used leaves a dangling use when the REPL attempts to discard
+  // intermediate mains.
   if (ForDefinition &&
       Linkage == llvm::GlobalValue::ExternalLinkage &&
-      Visibility == llvm::GlobalValue::DefaultVisibility) {
+      Visibility == llvm::GlobalValue::DefaultVisibility &&
+      getName() != SWIFT_ENTRY_POINT_FUNCTION) {
     IGM.addUsedGlobal(fn);
   }
 

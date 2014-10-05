@@ -25,6 +25,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/Debug.h"
+#include "ManagedValue.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -228,14 +229,59 @@ STANDARD_GET_BRIDGING_FN(OBJC_MODULE_NAME, ObjCBool, Bool)
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
   auto extInfo = FunctionType::ExtInfo()
-    .withRepresentation(FunctionType::Representation::Thin);
-  Type topLevelType = FunctionType::get(TupleType::getEmpty(C),
-                                        TupleType::getEmpty(C),
-                                        extInfo);
-  auto loweredType = getLoweredType(topLevelType).castTo<SILFunctionType>();
-  return SILFunction::create(M, SILLinkage::Private,
-                             SWIFT_ENTRY_POINT_FUNCTION, loweredType, nullptr,
-                             Loc, IsNotBare, IsNotTransparent, IsNotFragile);
+    .withRepresentation(FunctionType::Representation::Thin)
+    .withCallingConv(AbstractCC::C);
+  
+  auto findStdlibDecl = [&](StringRef name) -> ValueDecl* {
+    if (!getASTContext().getStdlibModule())
+      return nullptr;
+    SmallVector<ValueDecl*, 1> lookupBuffer;
+    getASTContext().getStdlibModule()->lookupValue({},
+                                       getASTContext().getIdentifier(name),
+                                       NLKind::QualifiedLookup,
+                                       lookupBuffer);
+    if (lookupBuffer.size() == 1)
+      return lookupBuffer[0];
+    return nullptr;
+  };
+
+  // Use standard library types if we have them; otherwise, fall back to
+  // builtins.
+  CanType Int32Ty;
+  if (auto Int32Decl = dyn_cast_or_null<TypeDecl>(findStdlibDecl("Int32"))) {
+    Int32Ty = Int32Decl->getDeclaredType()->getCanonicalType();
+  } else {
+    Int32Ty = CanType(BuiltinIntegerType::get(32, C));
+  }
+
+  CanType PtrPtrInt8Ty = C.TheRawPointerType;
+  if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
+    if (auto Int8Decl = cast<TypeDecl>(findStdlibDecl("Int8"))) {
+      Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
+                                                 nullptr,
+                                                 Int8Decl->getDeclaredType());
+      PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
+                                           nullptr,
+                                           PointerInt8Ty)
+        ->getCanonicalType();
+    }
+  }
+  
+  SILParameterInfo params[] = {
+    SILParameterInfo(Int32Ty, ParameterConvention::Direct_Unowned),
+    SILParameterInfo(PtrPtrInt8Ty, ParameterConvention::Direct_Unowned),
+  };
+
+  CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
+                                   ParameterConvention::Direct_Unowned,
+                                   params,
+                                   SILResultInfo(Int32Ty,
+                                                 ResultConvention::Unowned),
+                                   C);
+  
+  return SILFunction::create(M, SILLinkage::Public,
+                             SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
+                             Loc, IsBare, IsNotTransparent, IsNotFragile);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -776,6 +822,31 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     addGlobalVariable(vd);
 }
 
+void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
+  assert(gen.B.getInsertionBB() == gen.F.begin()
+         && "not at entry point?!");
+  
+  SILBasicBlock *entry = gen.B.getInsertionBB();
+  // Create the argc and argv arguments.
+  auto &C = gen.getASTContext();
+  auto FnTy = gen.F.getLoweredFunctionType();
+  auto argc = new (gen.F.getModule()) SILArgument(
+                                  FnTy->getParameters()[0].getSILType(), entry);
+  auto argv = new (gen.F.getModule()) SILArgument(
+                                  FnTy->getParameters()[1].getSILType(), entry);
+  
+  // If the standard library provides a _didEnterMain intrinsic, call it first
+  // thing.
+  if (auto didEnterMain = C.getDidEnterMain(nullptr)) {
+    ManagedValue params[] = {
+      ManagedValue::forUnmanaged(argc),
+      ManagedValue::forUnmanaged(argv),
+    };
+    gen.emitApplyOfLibraryIntrinsic(loc, didEnterMain, {}, params,
+                                    SGFContext());
+  }
+}
+
 namespace {
 
 /// An RAII class to scope source file codegen.
@@ -800,13 +871,32 @@ public:
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->Name;
       sgm.TopLevelSGF->prepareEpilog(Type(),
                                  CleanupLocation::getModuleCleanupLocation());
+      
+      emitTopLevelProlog(*sgm.TopLevelSGF,
+                         RegularLocation::getModuleLocation());
     }
   }
   
   ~SourceFileScope() {
     if (sgm.TopLevelSGF) {
-      sgm.TopLevelSGF->emitEpilog(RegularLocation::getModuleLocation(),
-                                  /* AutoGen */ true);
+      // Write out the epilog.
+      auto moduleLoc = RegularLocation::getModuleLocation();
+      auto returnInfo
+        = sgm.TopLevelSGF->emitEpilogBB(moduleLoc);
+      auto returnLoc = returnInfo.second;
+      
+      // Signal a normal return to the OS by returning 0.
+      auto &B = sgm.TopLevelSGF->B;
+      auto &F = sgm.TopLevelSGF->F;
+      auto &C = sgm.getASTContext();
+      SILValue zero = B.createIntegerLiteral(moduleLoc,
+                                      SILType::getBuiltinIntegerType(32, C), 0);
+      if (zero.getType() != F.getLoweredFunctionType()->getResult().getSILType())
+        zero = B.createStruct(moduleLoc,
+                          F.getLoweredFunctionType()->getResult().getSILType(),
+                          zero);
+      sgm.TopLevelSGF->B.createReturn(returnLoc, zero);
+      
       SILFunction *toplevel = &sgm.TopLevelSGF->getFunction();
       delete sgm.TopLevelSGF;
       
@@ -834,8 +924,9 @@ public:
       // Assign a debug scope pointing into the void to the top level function.
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
       
-      SILGenFunction(sgm, *toplevel)
-        .emitArtificialTopLevel(artificialMain, mainClass);
+      SILGenFunction gen(sgm, *toplevel);
+      emitTopLevelProlog(gen, mainClass);
+      gen.emitArtificialTopLevel(artificialMain, mainClass);
       break;
     }
   }

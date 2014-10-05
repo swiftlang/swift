@@ -72,6 +72,11 @@ public:
     ClearedIP = nullptr;
     IRBuilderBase::SetInsertPoint(BB);
   }
+  
+  void SetInsertPoint(llvm::BasicBlock *BB, llvm::BasicBlock::iterator before) {
+    ClearedIP = nullptr;
+    IRBuilderBase::SetInsertPoint(BB, before);
+  }
 
   /// A stable insertion point in the function.  "Stable" means that
   /// it will point to the same location in the function, even if

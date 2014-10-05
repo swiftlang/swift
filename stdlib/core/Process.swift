@@ -31,3 +31,15 @@ public struct _Process {
 
 /// An instance that exposes API for interaction with processes
 public let Process = _Process()
+
+/// Intrinsic entry point invoked on entry to a standalone program's "main".
+@transparent
+public // COMPILER_INTRINSIC
+func _didEnterMain(argc: Int32,
+                   argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) {
+  // Initialize the C_ARGC and C_ARGV variables with the values that were
+  // passed in to main.
+  C_ARGC = CInt(argc)
+  C_ARGV = UnsafeMutablePointer(argv)
+}
+

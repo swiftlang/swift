@@ -8,7 +8,7 @@
 
 import def_noinline
 
-// SIL-LABEL: sil private @top_level_code : $@thin () -> () {
+// SIL-LABEL: sil @main
 // SIL: [[RAW:%.+]] = sil_global_addr @_Tv8noinline3rawSb : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_TF12def_noinline12testNoinlineFT1xSb_Sb : $@thin (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@thin (Bool) -> Bool

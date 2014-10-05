@@ -23,7 +23,7 @@
 
 /// The symbol name used for the program entry point function.
 /// FIXME: Hardcoding this is lame.
-#define SWIFT_ENTRY_POINT_FUNCTION "top_level_code"
+#define SWIFT_ENTRY_POINT_FUNCTION "main"
 
 namespace swift {
 

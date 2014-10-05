@@ -48,9 +48,6 @@ func foo(var a: Int, var b: Int) -> Int {
      }
 }
 // CHECK-DAG: Swift version{{.*}}x86_64-apple-macosx10.9{{.*}}-emit-ir{{.*}} [ DW_TAG_compile_unit ] [{{.*}}basic.swift]
-// top_level_code is not an artificial function (Flags & 64 == 0).
-//            LinkageName       Line   Type                  local     isDefn   0      0  ScopeLine Flags   optimized
-// CHECK-DAG: metadata !"0x2e\00\00\00top_level_code\001\000\001\000\000\000\000\000"{{.*}} [ DW_TAG_subprogram ]
 // CHECK-DAG: \00main\00{{.*}} [ DW_TAG_subprogram ]
 
 // Function type for foo.

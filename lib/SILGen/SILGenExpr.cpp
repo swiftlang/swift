@@ -3002,38 +3002,9 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
 
 void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
                                             ClassDecl *mainClass) {
-  auto findStdlibDecl = [&](StringRef name) -> ValueDecl* {
-    SmallVector<ValueDecl*, 1> lookupBuffer;
-    getASTContext().getStdlibModule()->lookupValue({},
-                                       getASTContext().getIdentifier(name),
-                                       NLKind::QualifiedLookup,
-                                       lookupBuffer);
-    assert(lookupBuffer.size() == 1 && "stdlib has more than one?!");
-    return lookupBuffer[0];
-  };
-
-  // Load argc and argv from their global addressors.
-  auto argcDecl = findStdlibDecl("C_ARGC");
-  SILDeclRef argcRef(argcDecl, SILDeclRef::Kind::GlobalAccessor);
-  auto argcGetterFn = SGM.getFunction(argcRef, NotForDefinition);
-  auto argcGetter = B.createFunctionRef(mainClass, argcGetterFn);
-  SILValue argc = B.createApply(mainClass, argcGetter, argcGetter->getType(),
-              argcGetter->getFunctionType()->getResult().getSILType(),
-              {}, {});
-  argc = B.createPointerToAddress(mainClass, argc,
-     SILType::getPrimitiveAddressType(argcDecl->getType()->getCanonicalType()));
-  argc = B.createLoad(mainClass, argc);
-  
-  auto argvDecl = findStdlibDecl("C_ARGV");
-  SILDeclRef argvRef(argvDecl, SILDeclRef::Kind::GlobalAccessor);
-  auto argvGetterFn = SGM.getFunction(argvRef, NotForDefinition);
-  auto argvGetter = B.createFunctionRef(mainClass, argvGetterFn);
-  SILValue argv = B.createApply(mainClass, argvGetter, argvGetter->getType(),
-              argvGetter->getFunctionType()->getResult().getSILType(),
-              {}, {});
-  argv = B.createPointerToAddress(mainClass, argv,
-     SILType::getPrimitiveAddressType(argvDecl->getType()->getCanonicalType()));
-  argv = B.createLoad(mainClass, argv);
+  // Load argc and argv from the entry point arguments.
+  SILValue argc = F.begin()->getBBArg(0);
+  SILValue argv = F.begin()->getBBArg(1);
   
   switch (kind) {
   case ArtificialMainKind::UIApplicationMain: {
@@ -3123,7 +3094,12 @@ void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
     B.createApply(mainClass, UIApplicationMain,
                   UIApplicationMain->getType(),
                   argc.getType(), {}, args);
-    auto r = B.createTuple(mainClass, SGM.Types.getEmptyTupleType(), {});
+    SILValue r = B.createIntegerLiteral(mainClass,
+                        SILType::getBuiltinIntegerType(32, getASTContext()), 0);
+    if (r.getType() != F.getLoweredFunctionType()->getResult().getSILType())
+      r = B.createStruct(mainClass,
+                       F.getLoweredFunctionType()->getResult().getSILType(), r);
+    
     B.createReturn(mainClass, r);
     return;
   }
@@ -3162,7 +3138,11 @@ void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
     B.createApply(mainClass, NSApplicationMain,
                   NSApplicationMain->getType(),
                   argc.getType(), {}, args);
-    auto r = B.createTuple(mainClass, SGM.Types.getEmptyTupleType(), {});
+    SILValue r = B.createIntegerLiteral(mainClass,
+                        SILType::getBuiltinIntegerType(32, getASTContext()), 0);
+    if (r.getType() != F.getLoweredFunctionType()->getResult().getSILType())
+      r = B.createStruct(mainClass,
+                       F.getLoweredFunctionType()->getResult().getSILType(), r);
     B.createReturn(mainClass, r);
     return;
   }
