@@ -31,7 +31,7 @@
 #include "ExistentialMetadataImpl.h"
 #include "Lazy.h"
 #include "Debug.h"
-
+#include "Private.h"
 
 // FIXME: Can't use llvm's RWMutex because it isn't a header-only implementation
 
@@ -1514,6 +1514,19 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   assert(self->isTypeMetadata());
   self->setInstanceSize(size);
   self->setInstanceAlignMask(alignMask);
+}
+
+/// \brief Fetch the type metadata associated with the formal dynamic
+/// type of the given (possibly Objective-C) object.  The formal
+/// dynamic type ignores dynamic subclasses such as those introduced
+/// by KVO.
+///
+/// The object pointer may be a tagged pointer, but cannot be null.
+const Metadata *swift::swift_getObjectType(HeapObject *object) {
+  auto classAsMetadata = _swift_getClass(object);
+  if (classAsMetadata->isTypeMetadata()) return classAsMetadata;
+
+  return swift_getObjCClassMetadata(classAsMetadata);
 }
 
 /*** Metatypes *************************************************************/
