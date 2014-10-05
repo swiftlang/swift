@@ -37,7 +37,7 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
                                             bool inAppliedFunction,
                                             llvm::SmallVectorImpl<Operand*> &);
-static bool operandEscapesApply(Operand *O);
+static bool partialApplyArgumentEscapes(Operand *O);
 
 // Propagate liveness backwards from an initial set of blocks in our
 // LiveIn set.
@@ -154,13 +154,10 @@ static bool useCaptured(Operand *UI) {
   auto *User = UI->getUser();
 
   // These instructions do not cause the address to escape.
-  if (isa<CopyAddrInst>(User) ||
-      isa<LoadInst>(User) ||
-      isa<DebugValueInst>(User) ||
+  if (isa<DebugValueInst>(User) ||
       isa<DebugValueAddrInst>(User) ||
       isa<StrongReleaseInst>(User) ||
-      isa<StrongRetainInst>(User) ||
-      isa<DeallocBoxInst>(User))
+      isa<StrongRetainInst>(User))
     return false;
 
   if (auto *Store = dyn_cast<StoreInst>(User)) {
@@ -174,25 +171,13 @@ static bool useCaptured(Operand *UI) {
   return true;
 }
 
-static bool canValueEscape(SILValue V, bool examineApply) {
+static bool partialApplyEscapes(SILValue V, bool examineApply) {
   for (auto UI : V.getUses()) {
     auto *User = UI->getUser();
 
     // These instructions do not cause the address to escape.
     if (!useCaptured(UI))
       continue;
-
-    // These instructions only cause the value to escape if they are used in
-    // a way that escapes.  Recursively check that the uses of the instruction
-    // don't escape and collect all of the uses of the value.
-    if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
-        isa<OpenExistentialInst>(User) ||
-        isa<MarkUninitializedInst>(User) || isa<AddressToPointerInst>(User) ||
-        isa<PointerToAddressInst>(User)) {
-      if (canValueEscape(User, examineApply))
-        return true;
-      continue;
-    }
 
     if (auto apply = dyn_cast<ApplyInst>(User)) {
       // Applying a function does not cause the function to escape.
@@ -207,7 +192,7 @@ static bool canValueEscape(SILValue V, bool examineApply) {
 
       // Optionally drill down into an apply to see if the operand is
       // captured in or returned from the apply.
-      if (examineApply && !operandEscapesApply(UI))
+      if (examineApply && !partialApplyArgumentEscapes(UI))
         continue;
     }
 
@@ -220,7 +205,7 @@ static bool canValueEscape(SILValue V, bool examineApply) {
         ->getParameters();
       params = params.slice(params.size() - args.size(), args.size());
       if (params[UI->getOperandNumber()-1].isIndirect()) {
-        if (canValueEscape(User, /*examineApply = */ true))
+        if (partialApplyEscapes(partialApply, /*examineApply = */ true))
           return true;
         continue;
       }
@@ -302,7 +287,7 @@ static SILFunction *getFunctionBody(SILInstruction *Call) {
 
 /// Could this operand to an apply escape that function by being
 /// stored or returned?
-static bool operandEscapesApply(Operand *O) {
+static bool partialApplyArgumentEscapes(Operand *O) {
   SILFunction *F = getFunctionBody(O->getUser());
   // If we cannot examine the function body, assume the worst.
   if (!F)
@@ -311,7 +296,7 @@ static bool operandEscapesApply(Operand *O) {
   // Check the uses of the operand, but do not recurse down into other
   // apply instructions.
   auto Param = getParameterForOperand(F, O);
-  return canValueEscape(Param, /* examineApply = */ false);
+  return partialApplyEscapes(Param, /* examineApply = */ false);
 }
 
 /// checkPartialApplyBody - Check the body of a partial apply to see
@@ -366,7 +351,7 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
     // itself cannot escape, then everything is fine.
     if (auto *PAI = dyn_cast<PartialApplyInst>(User))
       if (examinePartialApply && checkPartialApplyBody(UI) &&
-          !canValueEscape(PAI, /* examineApply = */ true)) {
+          !partialApplyEscapes(PAI, /* examineApply = */ true)) {
         LocalElidedOperands.push_back(UI);
         continue;
       }
