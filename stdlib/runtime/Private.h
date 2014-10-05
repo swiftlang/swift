@@ -29,9 +29,16 @@ namespace swift {
   extern "C" uintptr_t swift_isaMask;
 #endif
 
+#if SWIFT_OBJC_INTEROP
   extern "C" LLVM_LIBRARY_VISIBILITY
   bool _swift_classConformsToObjCProtocol(const void *theClass,
                                     const ProtocolDescriptor *theProtocol);
+#else
+  static inline bool _swift_classConformsToObjCProtocol(const void *theClass,
+                                    const ProtocolDescriptor *theProtocol) {
+    return false;
+  }
+#endif
 
   extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NORETURN
   void _swift_abortRetainUnowned(const void *object);
