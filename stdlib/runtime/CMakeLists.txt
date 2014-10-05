@@ -31,8 +31,11 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     SwiftObject.mm
     NSSwiftXXXBase.mm.gyb
     Reflection.mm)
+
+  set(FRAMEWORKS Foundation)
 else()
   set(SWIFT_RUNTIME_OBJC_SOURCES)
+  set(FRAMEWORKS)
 endif()
 
 add_swift_library(swiftRuntime
@@ -51,7 +54,7 @@ add_swift_library(swiftRuntime
   ${SWIFT_RUNTIME_OBJC_SOURCES}
   COMPILE_FLAGS ${SWIFT_RUNTIME_COMPILE_FLAGS}
   TARGET_LIBRARY INSTALL
-  FRAMEWORK_DEPENDS Foundation)
+  FRAMEWORK_DEPENDS ${FRAMEWORKS})
 
 
 list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_OSX_SYSROOT}")

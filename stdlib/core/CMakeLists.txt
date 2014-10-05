@@ -111,19 +111,33 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   )
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set(LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")
+  set(RUNTIME_DEPENDENCY swiftRuntime)
+else()
+  set(LINK_FLAGS)
+  # With the GNU linker the equivalent of -all_load is to tell the linker
+  # --whole-archive before the archive and --no-whole-archive after (without
+  # the second, it causes errors when the system libraries are told to
+  # include everything). The best way to get it in there, according to the
+  # documentation, is to put the flags in the target_link_Libraries setting.
+  set(RUNTIME_DEPENDENCY
+    -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
+endif()
+
 set(SWIFT_CHECK_ESSENTIAL_STDLIB NO CACHE BOOL
   "Check core standard library layering by linking its essential subset")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
  add_swift_library(swift_stdlib_essential IS_STDLIB_CORE
    ${SWIFTLIB_ESSENTIAL}
-   DEPENDS swiftRuntime)
+   )
+  target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
 set(SHARED_LIBRARY ON)
 add_swift_library(swiftCore INSTALL IS_STDLIB_CORE TARGET_LIBRARY
   ${SWIFTLIB_SOURCES}
-  DEPENDS swiftRuntime
   # The copy_shim_headers target dependency is required to let the
   # Makefile build know that there's a rule to produce the shims
   # directory, but is not sufficient to cause Swift.o to be rebuilt
@@ -131,6 +145,8 @@ add_swift_library(swiftCore INSTALL IS_STDLIB_CORE TARGET_LIBRARY
   # and the generated directory as dependencies
   FILE_DEPENDS
     copy_shim_headers ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims
-  LINK_FLAGS "-all_load -Xlinker -reexport-lobjc"
+  LINK_FLAGS ${LINK_FLAGS}
   )
 add_dependencies(swiftCore swift)
+
+target_link_libraries(swiftCore ${RUNTIME_DEPENDENCY})
