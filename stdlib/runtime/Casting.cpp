@@ -26,21 +26,15 @@
 #include "Private.h"
 #include "stddef.h"
 
+// FIXME: Clang defines max_align_t in stddef.h since 3.6.
+// Replace this with max_align_t when we can use it.
+typedef long double swift_max_align_t;
+
 #include <dlfcn.h>
 
 #include <cstring>
 #include <mutex>
 #include <sstream>
-#include <type_traits>
-
-// FIXME: Clang defines max_align_t in stddef.h since 3.6.
-// Replace this with max_align_t when we can use it.
-typedef long double swift_max_align_t;
-
-#ifdef __APPLE__
-static_assert(std::is_same<swift_max_align_t, std::max_align_t>::value,
-    "types should match exactly on OS X and iOS");
-#endif
 
 using namespace swift;
 using namespace metadataimpl;
