@@ -26,15 +26,20 @@
 #include "Private.h"
 #include "stddef.h"
 
-// FIXME: Clang defines max_align_t in stddef.h since 3.6.
-// Replace this with max_align_t when we can use it.
-typedef long double swift_max_align_t;
-
 #include <dlfcn.h>
 
 #include <cstring>
 #include <mutex>
 #include <sstream>
+#include <type_traits>
+
+// FIXME: Clang defines max_align_t in stddef.h since 3.6.
+// Remove this hack when we don't care about older Clangs on all platforms.
+#ifdef __APPLE__
+typedef std::max_align_t swift_max_align_t;
+#else
+typedef long double swift_max_align_t;
+#endif
 
 using namespace swift;
 using namespace metadataimpl;
