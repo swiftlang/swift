@@ -185,3 +185,54 @@ func callUnavailableOverloadedMethod(o: ClassWithUnavailableOverloadedMethod) {
   o.overloadedMethod()
   o.overloadedMethod(0) // expected-error {{'overloadedMethod' is only available on OS X version 10.10 or greater}}
 }
+
+// Initializers
+
+class ClassWithUnavailableInitializer {
+  @availability(OSX, introduced=10.9)
+  required init() {  }
+  
+  @availability(OSX, introduced=10.10)
+  required init(_ val: Int) {  }
+  
+  convenience init(s: String) {
+    self.init(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+  }
+  
+  @availability(OSX, introduced=10.10)
+  convenience init(onlyOn1010: String) {
+    self.init(5)
+  }
+}
+
+func callUnavailableInitializer() {
+  ClassWithUnavailableInitializer()
+  ClassWithUnavailableInitializer(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+  
+  let i = ClassWithUnavailableInitializer.self 
+  i()
+  i(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+}
+
+class SuperWithWithUnavailableInitializer {
+  @availability(OSX, introduced=10.9)
+  init() {  }
+  
+  @availability(OSX, introduced=10.10)
+  init(_ val: Int) {  }
+}
+
+class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer {
+  override init(_ val: Int) {
+    super.init(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+  }
+  
+  override init() {
+    super.init()
+  }
+  
+  @availability(OSX, introduced=10.10)
+  init(on1010: Int) {
+    super.init(22)
+  }
+}

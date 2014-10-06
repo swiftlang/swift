@@ -2773,8 +2773,12 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
           isUnavailableInExistential(getTypeChecker(), constructor))
         continue;
 
+      SourceLoc anchorLoc = constraint.getLocator()->getAnchor()->getLoc();
+      auto unavailReason = TC.checkDeclarationAvailability(constructor,
+                                                           anchorLoc, DC);
       choices.push_back(OverloadChoice(baseTy, constructor,
-                                       /*isSpecialized=*/false, *this));
+                                       /*isSpecialized=*/false, *this,
+                                       unavailReason));
     }
 
 

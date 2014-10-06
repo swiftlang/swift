@@ -174,3 +174,21 @@ func callMethodReturningOptional(o: ClassWithMethodReturningOptional) {
   let _: Int? = o.methAvailableOn10_10?()!
   let _: Int = o.methAvailableOn10_10!()!
 }
+
+
+// Initializers
+// For the moment, we do not convert unavailable initializers to optionals
+// and instead just diagnose unavailability.
+class ClassWithUnavailableInitializer {
+  @availability(OSX, introduced=10.10)
+  required init(_ v: Int) {  }
+  
+  convenience init(s: String) {
+    self.init(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+  }
+}
+
+func callUnavailableInitializer() {
+  // 
+  ClassWithUnavailableInitializer(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+}

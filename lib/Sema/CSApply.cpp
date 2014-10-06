@@ -382,6 +382,12 @@ namespace {
     Expr *convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
                                        SourceLoc declRefLoc,
                                        const UnavailabilityReason &reason);
+    
+    /// \brief Emit a diagnostic if the chosen overload is potentially
+    /// unavailable.
+    void diagnoseOverloadChoiceUnavailability(OverloadChoice choice,
+                                              SourceLoc referenceLoc);
+    
   public:
     /// \brief Build a reference to the given declaration.
     Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
@@ -1940,6 +1946,12 @@ namespace {
         }
       }
 
+      // We diagnose unavailability here, but do not convert to an optional,
+      // even when EnableExperimentalUnavailableAsOptional is turned on.
+      // We may want to do eventually treat unavailable OtherConstructorRefs,
+      // as optional, but perhaps only inside failable initializers.
+      diagnoseOverloadChoiceUnavailability(choice, expr->getConstructorLoc());
+      
       // Build a partial application of the initializer.
       Expr *ctorRef = buildOtherConstructorRef(selected.openedFullType,
                                                ctor, expr->getConstructorLoc(),
@@ -4476,6 +4488,15 @@ ExprRewriter::convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
       UnavailableToOptionalExpr(expr, reason, unavailTy);
 }
 
+void
+ExprRewriter::diagnoseOverloadChoiceUnavailability(OverloadChoice choice,
+                                                   SourceLoc referenceLoc) {
+  if (choice.isPotentiallyUnavailable()) {
+    assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
+    cs.TC.diagnosePotentialUnavailability(choice.getDecl(), referenceLoc,
+                                          choice.getReasonUnavailable(cs));
+  }
+}
 
 /// Determine whether the given type refers to a non-final class (or
 /// dynamic self of one).
@@ -4631,6 +4652,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto choice = selected->choice;
   auto decl = choice.getDecl();
 
+  // We diagnose unavailability here, but do not yet convert to an optional,
+  // even when EnableExperimentalTreatOptionalAsUnavailable is turned on.
+  diagnoseOverloadChoiceUnavailability(choice, fn->getEndLoc());
+  
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
   Expr *declRef = buildMemberRef(fn,
