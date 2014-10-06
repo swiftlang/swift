@@ -70,8 +70,8 @@ static bool extractFirstUnicodeScalarImpl(StringRef S, unsigned &Scalar) {
   UTF32 C;
   UTF32 *TargetStart = &C;
 
-  ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, TargetStart + 1,
-                     lenientConversion);
+  ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart,
+                     TargetStart + 1, lenientConversion);
   if (TargetStart == &C) {
     // The source string contains an ill-formed subsequence at the end.
     return false;
