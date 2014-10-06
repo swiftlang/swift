@@ -98,8 +98,7 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
   public typealias Element = T
 
   /// create an empty buffer
-  public
-  init() {
+  public init() {
     storage = !_isClassOrObjCExistential(T.self)
       ? Builtin.castToNativeObject(_emptyArrayStorage) 
       : Builtin.castToNativeObject(
