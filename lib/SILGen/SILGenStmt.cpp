@@ -118,8 +118,7 @@ enterTrueConditionalBinding(SILGenFunction &gen,
   FullExpr scope(gen.Cleanups, CB.PBD);
   auto &optTL = gen.getTypeLowering(CB.PBD->getPattern()->getType());
   // Take the value out of the temporary buffer into the variables.
-  // At this point we've already checked that the
-  ManagedValue mv = gen.emitUncheckedGetOptionalValueFrom(CB.PBD,
+  ManagedValue mv = gen.emitGetOptionalValueFrom(CB.PBD,
                          ManagedValue(CB.OptAddr->getAddress(),
                                       CB.OptAddr->getInitializedCleanup()),
                          optTL, SGFContext(init.get()));
@@ -546,7 +545,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
       Scope InnerForScope(Cleanups, CleanupLocation(S->getBody()));
       InitializationPtr initLoopVars
         = emitPatternBindingInitialization(S->getPattern());
-      ManagedValue val = emitUncheckedGetOptionalValueFrom(S,
+      ManagedValue val = emitGetOptionalValueFrom(S,
                                ManagedValue::forUnmanaged(nextBuf),
                                optTL,
                                SGFContext(initLoopVars.get()));

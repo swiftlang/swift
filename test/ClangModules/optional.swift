@@ -20,8 +20,10 @@ class A {
 // CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<String>([[TMP_OPTSTR]]#1
 // CHECK-NEXT: cond_br [[T1]]
 //   Something branch: project value, translate, inject into result.
-// CHECK:      [[TMP_STR:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTSTR]]
-// CHECK-NEXT: [[STR:%.*]] = load [[TMP_STR]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: [[TMP_STR:%.*]] = alloc_stack $String
+// CHECK-NEXT: apply [transparent] [[T0]]<String>([[TMP_STR]]#1, [[TMP_OPTSTR]]#1)
+// CHECK-NEXT: [[STR:%.*]] = load [[TMP_STR]]#1
 // CHECK:      [[T0:%.*]] = function_ref @swift_StringToNSString
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[STR]])
 // CHECK-NEXT: [[TMP_NSSTR:%.*]] = alloc_stack $NSString
@@ -29,6 +31,7 @@ class A {
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
 // CHECK-NEXT: apply [transparent] [[T0]]<NSString>([[TMP_OPTNSSTR]]#1, [[TMP_NSSTR]]#1)
 // CHECK-NEXT: dealloc_stack [[TMP_NSSTR]]#0
+// CHECK-NEXT: dealloc_stack [[TMP_STR]]#0
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
@@ -49,8 +52,10 @@ class A {
 // CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<NSString>([[TMP_OPTNSSTR]]#1
 // CHECK-NEXT: cond_br [[T1]]
 //   Something branch: project value, translate, inject into result.
-// CHECK:      [[TMP_NSSTR:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTNSSTR]]
-// CHECK-NEXT: [[NSSTR:%.*]] = load [[TMP_NSSTR]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: [[TMP_NSSTR:%.*]] = alloc_stack $NSString
+// CHECK-NEXT: apply [transparent] [[T0]]<NSString>([[TMP_NSSTR]]#1, [[TMP_OPTNSSTR]]#1)
+// CHECK-NEXT: [[NSSTR:%.*]] = load [[TMP_NSSTR]]#1
 // CHECK:      [[T0:%.*]] = function_ref @swift_NSStringToString
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR]])
@@ -59,6 +64,7 @@ class A {
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
 // CHECK-NEXT: apply [transparent] [[T0]]<String>([[TMP_OPTSTR]]#1, [[TMP_STR2]]#1)
 // CHECK-NEXT: dealloc_stack [[TMP_STR2]]#0
+// CHECK-NEXT: dealloc_stack [[TMP_STR]]#0
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__

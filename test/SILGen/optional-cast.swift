@@ -27,19 +27,23 @@ func foo(y : A?) {
 // CHECK-NEXT: br [[NOT_PRESENT:bb[0-9]+]]
 //   If so, pull the value out and check whether it's a B.
 // CHECK:    [[IS_PRESENT]]:
-// CHECK-NEXT: [[TMP_A:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTA]]#1
-// CHECK-NEXT: [[VAL:%.*]] = load [[TMP_A]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: [[TMP_A:%.*]] = alloc_stack $A
+// CHECK-NEXT: apply [transparent] [[T0]]<A>([[TMP_A]]#1, [[TMP_OPTA]]#1)
+// CHECK-NEXT: [[VAL:%.*]] = load [[TMP_A]]#1
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //   If so, materialize that and inject it into x.
 // CHECK:    [[IS_B]]([[T0:%.*]] : $B):
 // CHECK-NEXT: store [[T0]] to [[X_VALUE]] : $*B
 // CHECK-NEXT: inject_enum_addr [[X]]#1 : $*Optional<B>, #Optional.Some
+// CHECK-NEXT: dealloc_stack [[TMP_A]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OPTA]]#0
 // CHECK-NEXT: br [[CONT]]
 //   If not, release the A and inject nothing into x.
 // CHECK:    [[NOT_B]]:
 // CHECK-NEXT: strong_release [[VAL]]
 // CHECK-NEXT: inject_enum_addr [[X]]#1 : $*Optional<B>, #Optional.None
+// CHECK-NEXT: dealloc_stack [[TMP_A]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OPTA]]#0
 // CHECK-NEXT: br [[CONT]]
 //   Finish the not-present path.
@@ -92,9 +96,8 @@ func bar(y : A????) {
 // CHECK-NEXT: br [[NIL_DEPTH2:bb[0-9]+]]
 //   If so, drill down another level and check for Some(Some(...)).
 // CHECK:    [[P]]:
-// CHECK-NEXT: [[PAYLOAD_OOOA:%.*]] = unchecked_take_enum_data_addr [[TMP_OOOOA]]
-// CHECK-NEXT: [[VALUE_OOOA:%.*]] = load [[PAYLOAD_OOOA]]
-// CHECK-NEXT: store [[VALUE_OOOA]] to [[TMP_OOOA]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: apply [transparent] [[T0]]<Optional<Optional<Optional<A>>>>([[TMP_OOOA]]#1, [[TMP_OOOOA]]#1)
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
 // CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<Optional<Optional<A>>>([[TMP_OOOA]]#1)
 // CHECK-NEXT: cond_br [[T1]], [[PP:bb.*]], [[NPP:bb[0-9]+]]
@@ -112,9 +115,8 @@ func bar(y : A????) {
 // CHECK-NEXT: br [[NIL_DEPTH2]]
 //   If so, drill down another level and check for Some(Some(Some(...))).
 // CHECK:    [[PP]]:
-// CHECK-NEXT: [[PAYLOAD_OOA:%.*]] = unchecked_take_enum_data_addr [[TMP_OOOA]]
-// CHECK-NEXT: [[VALUE_OOA:%.*]] = load [[PAYLOAD_OOA]]
-// CHECK-NEXT: store [[VALUE_OOA]] to [[TMP_OOA]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: apply [transparent] [[T0]]<Optional<Optional<A>>>([[TMP_OOA]]#1, [[TMP_OOOA]]#1)
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
 // CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<Optional<A>>([[TMP_OOA]]#1)
 // CHECK-NEXT: cond_br [[T1]], [[PPP:bb.*]], [[NPPP:bb[0-9]+]]
@@ -131,9 +133,8 @@ func bar(y : A????) {
 // CHECK-NEXT: br [[NIL_DEPTH1:bb[0-9]+]]
 //   If so, drill down another level and check for Some(Some(Some(Some(...)))).
 // CHECK:    [[PPP]]:
-// CHECK-NEXT: [[PAYLOAD_OA:%.*]] = unchecked_take_enum_data_addr [[TMP_OOA]]
-// CHECK-NEXT: [[VALUE_OA:%.*]] = load [[PAYLOAD_OA]]
-// CHECK-NEXT: store [[VALUE_OA]] to [[TMP_OA]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: apply [transparent] [[T0]]<Optional<A>>([[TMP_OA]]#1, [[TMP_OOA]]#1)
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
 // CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<A>([[TMP_OA]]#1)
 // CHECK-NEXT: cond_br [[T1]], [[PPPP:bb.*]], [[NPPPP:bb[0-9]+]]
@@ -149,14 +150,17 @@ func bar(y : A????) {
 // CHECK-NEXT: br [[NIL_DEPTH0:bb[0-9]+]]
 //   If so, pull out the A and check whether it's a B.
 // CHECK:    [[PPPP]]:
-// CHECK-NEXT: [[TMP_A:%.*]] = unchecked_take_enum_data_addr [[TMP_OA]]
-// CHECK-NEXT: [[VAL:%.*]] = load [[TMP_A]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: [[TMP_A:%.*]] = alloc_stack $A
+// CHECK-NEXT: apply [transparent] [[T0]]<A>([[TMP_A]]#1, [[TMP_OA]]#1)
+// CHECK-NEXT: [[VAL:%.*]] = load [[TMP_A]]#1
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //   If so, inject it back into an optional.
 //   TODO: We're going to switch back out of this; we really should peephole it.
 // CHECK:    [[IS_B]]([[T0:%.*]] : $B):
 // CHECK-NEXT: store [[T0]] to [[TMP_OB2_VALUE]]
 // CHECK-NEXT: inject_enum_addr [[TMP_OB2]]#1 : $*Optional<B>, #Optional.Some
+// CHECK-NEXT: dealloc_stack [[TMP_A]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OOOOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OOOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
@@ -166,6 +170,7 @@ func bar(y : A????) {
 // CHECK:    [[NOT_B]]:
 // CHECK-NEXT: strong_release [[VAL]]
 // CHECK-NEXT: inject_enum_addr [[TMP_OB2]]#1 : $*Optional<B>, #Optional.None
+// CHECK-NEXT: dealloc_stack [[TMP_A]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OOOOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OOOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
@@ -181,9 +186,8 @@ func bar(y : A????) {
 // CHECK-NEXT: br [[NIL_DEPTH2]]
 //   If it's present, set OB := Some(x).
 // CHECK:    [[IS_B2]]:
-// CHECK-NEXT: [[PAYLOAD_B:%.*]] = unchecked_take_enum_data_addr [[TMP_OB2]]
-// CHECK-NEXT: [[VALUE_B:%.*]] = load [[PAYLOAD_B]]
-// CHECK-NEXT: store [[VALUE_B]] to [[TMP_B]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: apply [transparent] [[T0]]<B>([[TMP_B]]#1, [[TMP_OB2]]#1)
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
 // CHECK-NEXT: apply [transparent] [[T0]]<B>([[TMP_OB]]#1, [[TMP_B]]#1)
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
@@ -232,6 +236,8 @@ func baz(y : AnyObject?) {
 // CHECK-NEXT: store %0 to [[TMP_OPTANY]]#1
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
 // CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<AnyObject>([[TMP_OPTANY]]#1)
-// CHECK:      [[TMP_ANY:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTANY]]
-// CHECK-NEXT: [[VAL:%.*]] = load [[TMP_ANY]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: [[TMP_ANY:%.*]] = alloc_stack $AnyObject
+// CHECK-NEXT: apply [transparent] [[T0]]<AnyObject>([[TMP_ANY]]#1, [[TMP_OPTANY]]#1)
+// CHECK-NEXT: [[VAL:%.*]] = load [[TMP_ANY]]#1
 // CHECK-NEXT: checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]

@@ -14,7 +14,8 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
 // CHECK:  [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
 // CHECK:  apply [transparent] [[T0]]<NSString>([[OPT_BRIDGED_BUF]]#1)
-// CHECK:  [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
+// CHECK:  [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+// CHECK:  apply [transparent] [[T0]]<NSString>([[BRIDGED_BUF:%.*]]#1, [[OPT_BRIDGED_BUF]]#1)
 // CHECK:  [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
@@ -42,7 +43,8 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
 // CHECK:   apply [transparent] [[T0]]<NSString>([[OPT_BRIDGED_BUF]]#1)
-// CHECK:   [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+// CHECK:   apply [transparent] [[T0]]<NSString>([[BRIDGED_BUF:%.*]]#1, [[OPT_BRIDGED_BUF]]#1)
 // CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
@@ -69,8 +71,10 @@ func setFoo(var f: Foo, var s: String) {
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
 // CHECK:   store [[OPT_NATIVE]] to [[OPT_NATIVE_BUF:%.*]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
-// CHECK:   [[NATIVE_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_NATIVE_BUF]]
-// CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
+// CHECK:   apply [transparent] [[T0]]<String>([[OPT_NATIVE_BUF]]#1)
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+// CHECK:   apply [transparent] [[T0]]<String>([[NATIVE_BUF:%.*]]#1, [[OPT_NATIVE_BUF]]#1)
+// CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]#1
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
 // CHECK:   store [[BRIDGED]] to [[BRIDGED_BUF:%.*]]#1
@@ -114,7 +118,8 @@ func callBar() -> String {
 // CHECK:   store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
 // CHECK:   apply [transparent] [[T0]]<NSString>([[OPT_BRIDGED_BUF]]#1)
-// CHECK:   [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+// CHECK:   apply [transparent] [[T0]]<NSString>([[BRIDGED_BUF:%.*]]#1, [[OPT_BRIDGED_BUF]]#1)
 // CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
@@ -142,8 +147,9 @@ func callSetBar(var s: String) {
 // CHECK:   store [[OPT_NATIVE]] to [[OPT_NATIVE_BUF:%.*]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
 // CHECK:   apply [transparent] [[T0]]<String>([[OPT_NATIVE_BUF]]#1)
-// CHECK:   [[NATIVE_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_NATIVE_BUF]]
-// CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+// CHECK:   apply [transparent] [[T0]]<String>([[NATIVE_BUF:%.*]]#1, [[OPT_NATIVE_BUF]]#1)
+// CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]#1
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
 // CHECK:   store [[BRIDGED]] to [[BRIDGED_BUF:%.*]]#1

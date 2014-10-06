@@ -150,8 +150,10 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-NEXT: apply [[T0]]([[V]])
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
 // CHECK-NEXT: apply [transparent] [[T0]]<OptionalResult>
-// CHECK:      [[T1:%.*]] = unchecked_take_enum_data_addr 
-// CHECK:      [[T2:%.*]] = load [[T1]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+// CHECK-NEXT: [[T1:%.*]] = alloc_stack $OptionalResult
+// CHECK-NEXT: apply [transparent] [[T0]]<OptionalResult>([[T1]]#1,
+// CHECK-NEXT: [[T2:%.*]] = load [[T1]]#1
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T2]] : $OptionalResult to $OptionalResultInheritor
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ :
 // CHECK-NEXT: apply [transparent] [[T0]]<OptionalResultInheritor>

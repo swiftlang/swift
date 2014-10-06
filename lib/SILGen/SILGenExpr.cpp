@@ -4751,7 +4751,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     case OTK_None: {
       auto matMV = ManagedValue(mat.address, mat.valueCleanup);
       // If the current constructor is not failable, force out the value.
-      newSelf = SGF.emitCheckedGetOptionalValueFrom(E, matMV,
+      newSelf = SGF.emitGetOptionalValueFrom(E, matMV,
                                          SGF.getTypeLowering(newSelf.getType()),
                                          SGFContext());
       break;
@@ -5324,9 +5324,10 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
     // Pull the value out.  This will load if the value is not address-only.
     auto &inputTL = getTypeLowering(input.getType());
-    auto inputValue = emitUncheckedGetOptionalValueFrom(loc,
-                                          ManagedValue::forUnmanaged(inputTemp),
-                                          inputTL, SGFContext());
+    auto inputValue = emitGetOptionalValueFrom(loc,
+                                        ManagedValue::forUnmanaged(inputTemp),
+                                               inputTL,
+                                               SGFContext());
 
     // Transform it.
     auto resultValue = transformValue(*this, loc, inputValue,
@@ -5608,8 +5609,7 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
   
   // If we continued, get the value out as the result of the expression.
   auto optValue = temp->getManagedAddress();
-  auto resultValue = SGF.emitUncheckedGetOptionalValueFrom(E, optValue,
-                                                           optTL, C);
+  auto resultValue = SGF.emitGetOptionalValueFrom(E, optValue, optTL, C);
   return RValue(SGF, E, resultValue);
 }
 
@@ -5794,8 +5794,7 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
   SGF.emitExprInto(E, optTemp.get());
 
   ManagedValue V =
-    SGF.emitCheckedGetOptionalValueFrom(loc,
-                                        optTemp->getManagedAddress(), optTL, C);
+    SGF.emitGetOptionalValueFrom(loc, optTemp->getManagedAddress(), optTL, C);
   return RValue(SGF, loc, valueType->getCanonicalType(), V);
 }
 

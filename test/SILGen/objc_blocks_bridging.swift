@@ -39,7 +39,9 @@ import Foundation
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         store [[COPY]]
   // CHECK-NOT:     store %0
-  // CHECK:         [[BLOCK_ADDR:%.*]] = unchecked_take_enum_data_addr
+  // CHECK:         [[GET_OPTIONAL:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+  // CHECK:         [[BLOCK_ADDR:%.*]] = alloc_stack $@cc(cdecl) @objc_block (NSString) -> @autoreleased NSString
+  // CHECK:         apply [transparent] [[GET_OPTIONAL]]<@objc_block String -> String>([[BLOCK_ADDR]]#1, {{%.*}}#1)
   // CHECK:         [[BLOCK:%.*]] = load [[BLOCK_ADDR]]
   // TODO: redundant reabstractions here
   // CHECK:         [[BLOCK_THUNK:%.*]] = function_ref @_TTRXFdCb_dCSo8NSString_aS__XFo_oSS_oSS_
