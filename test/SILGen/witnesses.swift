@@ -407,7 +407,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 
   // CHECK-LABEL: sil @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   // CHECK: function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-  // CHECK: function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
+  // CHECK: unchecked_take_enum_data_addr
   // CHECK: function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
   // CHECK: function_ref @_TFSs45_injectNothingIntoImplicitlyUnwrappedOptionalU__FT_GSQQ__
   // CHECK: return [[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
@@ -417,7 +417,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
   // CHECK: function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
-  // CHECK: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK: unchecked_take_enum_data_addr
   // CHECK: function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
   // CHECK: function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
   // CHECK: return [[RESULT:%[0-9]+]] : $Optional<IUOFailableClassModel>

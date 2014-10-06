@@ -956,10 +956,19 @@ public:
   SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addr);
   
   /// \brief Emit a call to the library intrinsic _getOptionalValue
-  /// given the address of the optional.
-  ManagedValue emitGetOptionalValueFrom(SILLocation loc, ManagedValue addr,
-                                        const TypeLowering &optTL,
-                                        SGFContext C);
+  /// given the address of the optional, which checks that an optional contains
+  /// some value and either returns the value or traps if there is none.
+  ManagedValue emitCheckedGetOptionalValueFrom(SILLocation loc,
+                                               ManagedValue addr,
+                                               const TypeLowering &optTL,
+                                               SGFContext C);
+  
+  /// \brief Extract the value from an optional, which must be known to contain
+  /// a value.
+  ManagedValue emitUncheckedGetOptionalValueFrom(SILLocation loc,
+                                                 ManagedValue addr,
+                                                 const TypeLowering &optTL,
+                                                 SGFContext C);
 
   typedef std::function<ManagedValue(SILGenFunction &gen,
                                      SILLocation loc,

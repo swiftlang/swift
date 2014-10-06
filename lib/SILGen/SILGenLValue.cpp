@@ -1559,7 +1559,7 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
     .getUnmanagedValue();
 }
 
-ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
+ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
                                                       ManagedValue src,
                                                       const TypeLowering &optTL,
                                                       SGFContext C) {
@@ -1571,6 +1571,43 @@ ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
   return emitApplyOfLibraryIntrinsic(loc, fn, sub, src, C);
+}
+
+ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
+                                                    ManagedValue addr,
+                                                    const TypeLowering &optTL,
+                                                    SGFContext C) {
+  OptionalTypeKind OTK;
+  SILType origPayloadTy = addr.getType().getAnyOptionalObjectType(SGM.M, OTK);
+
+  auto formalOptionalTy = addr.getType().getSwiftRValueType();
+  auto formalPayloadTy = formalOptionalTy
+    ->getAnyOptionalObjectType()
+    ->getCanonicalType();
+  
+  auto archetype = formalOptionalTy->getNominalOrBoundGenericNominal()
+    ->getGenericParams()->getPrimaryArchetypes()[0];
+  
+  // Take the payload from the optional.
+  // Cheat a bit in the +0 case—UncheckedTakeEnumData will never actually
+  // invalidate an Optional enum value.
+  SILValue payloadVal = B.createUncheckedTakeEnumDataAddr(loc,
+                                       addr.forward(*this),
+                                       getASTContext().getOptionalSomeDecl(OTK),
+                                       origPayloadTy);
+  
+  if (optTL.isLoadable())
+    payloadVal = B.createLoad(loc, payloadVal);
+  ManagedValue origPayload;
+  if (addr.hasCleanup())
+    origPayload = emitManagedRValueWithCleanup(payloadVal);
+  else
+    origPayload = ManagedValue::forUnmanaged(payloadVal);
+  
+  // Reabstract it to the substituted form, if necessary.
+  return emitOrigToSubstValue(loc, origPayload,
+                              AbstractionPattern(archetype),
+                              formalPayloadTy, C);
 }
 
 SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
