@@ -18,9 +18,9 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
-// CHECK:  store [[NATIVE]] to [[NATIVE_BUF:%.*]]#1
-// CHECK:  [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-// CHECK:  apply [transparent] [[T0]]<String>([[OPT_NATIVE_BUF:%.*]]#1, [[NATIVE_BUF]]#1)
+// CHECK:  [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
+// CHECK:  store [[NATIVE]] to [[NATIVE_BUF]]
+// CHECK:  inject_enum_addr [[OPT_NATIVE_BUF]]{{.*}}Some
 // CHECK:  [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
 // CHECK:  [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
 // CHECK:  apply [transparent] [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
@@ -46,9 +46,9 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
-// CHECK:   store [[NATIVE]] to [[NATIVE_BUF:%.*]]#1
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-// CHECK:   apply [transparent] [[T0]]<String>([[OPT_NATIVE_BUF:%.*]]#1, [[NATIVE_BUF]]#1)
+// CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
+// CHECK:   store [[NATIVE]] to [[NATIVE_BUF]]
+// CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
 // CHECK:   apply [transparent] [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
@@ -63,9 +63,9 @@ func setFoo(var f: Foo, var s: String) {
 // CHECK-LABEL: sil hidden @_TF13objc_bridging6setFoo
 // CHECK: bb0({{%.*}} : $Foo, {{%.*}} : $String):
 // CHECK:   [[SET_FOO:%.*]] = class_method [volatile] [[F:%.*]] : {{.*}}, #Foo.setFoo!1.foreign
-// CHECK:   copy_addr {{%.*}} to [initialization] [[NATIVE_BUF:%.*]]#1 : $*String
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-// CHECK:   apply [transparent] [[T0]]<String>([[OPT_NATIVE_BUF:%.*]]#1, [[NATIVE_BUF]]#1)
+// CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
+// CHECK:   copy_addr {{%.*}} to [initialization] [[NATIVE_BUF]] : $*String
+// CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
 // CHECK:   store [[OPT_NATIVE]] to [[OPT_NATIVE_BUF:%.*]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
@@ -73,9 +73,9 @@ func setFoo(var f: Foo, var s: String) {
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
-// CHECK:   store [[BRIDGED]] to [[BRIDGED_BUF:%.*]]#1
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-// CHECK:   apply [transparent] [[T0]]<NSString>([[OPT_BRIDGED_BUF:%.*]]#1, [[BRIDGED_BUF]]#1)
+// CHECK:   [[BRIDGED_BUF:%.*]] = init_enum_data_addr [[OPT_BRIDGED_BUF:%[0-9]+]]
+// CHECK:   store [[BRIDGED]] to [[BRIDGED_BUF]]
+// CHECK:   inject_enum_addr [[OPT_BRIDGED_BUF]]
 // CHECK:   [[OPT_BRIDGED:%.*]] = load [[OPT_BRIDGED_BUF]]#1
 // CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], [[F]])
 // CHECK:   release_value [[OPT_BRIDGED]]
@@ -118,9 +118,9 @@ func callBar() -> String {
 // CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
-// CHECK:   store [[NATIVE]] to [[NATIVE_BUF:%.*]]#1
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-// CHECK:   apply [transparent] [[T0]]<String>([[OPT_NATIVE_BUF:%.*]]#1, [[NATIVE_BUF]]#1)
+// CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
+// CHECK:   store [[NATIVE]] to [[NATIVE_BUF]]
+// CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
 // CHECK:   apply [transparent] [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
@@ -135,9 +135,9 @@ func callSetBar(var s: String) {
 // CHECK-LABEL: sil hidden @_TF13objc_bridging10callSetBar
 // CHECK: bb0({{%.*}} : $String):
 // CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
-// CHECK:   copy_addr {{%.*}} to [initialization] [[NATIVE_BUF:%.*]]#1 : $*String
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-// CHECK:   apply [transparent] [[T0]]<String>([[OPT_NATIVE_BUF:%.*]]#1, [[NATIVE_BUF]]#1)
+// CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
+// CHECK:   copy_addr {{%.*}} to [initialization] [[NATIVE_BUF]] : $*String
+// CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
 // CHECK:   store [[OPT_NATIVE]] to [[OPT_NATIVE_BUF:%.*]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
@@ -146,9 +146,9 @@ func callSetBar(var s: String) {
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
-// CHECK:   store [[BRIDGED]] to [[BRIDGED_BUF:%.*]]#1
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-// CHECK:   apply [transparent] [[T0]]<NSString>([[OPT_BRIDGED_BUF:%.*]]#1, [[BRIDGED_BUF]]#1)
+// CHECK:   [[BRIDGED_BUF:%.*]] = init_enum_data_addr [[OPT_BRIDGED_BUF:%[0-9]+]]
+// CHECK:   store [[BRIDGED]] to [[BRIDGED_BUF]]
+// CHECK:   inject_enum_addr [[OPT_BRIDGED_BUF]]
 // CHECK:   [[OPT_BRIDGED:%.*]] = load [[OPT_BRIDGED_BUF]]#1
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   release_value [[OPT_BRIDGED]]

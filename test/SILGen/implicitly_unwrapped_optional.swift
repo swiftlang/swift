@@ -8,7 +8,7 @@ func foo(var #f: (()->())!) {
 // CHECK-NEXT: [[F:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
 // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<()>
-// CHECK-NEXT: [[TEMP_RESULT:%.*]] = alloc_stack $()
+// CHECK-NEXT: [[TEMP_RESULT:%.*]] = init_enum_data_addr [[RESULT]]
 //   Switch out on the lvalue (() -> ())!:
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_ : $@thin <τ_0_0> (@inout ImplicitlyUnwrappedOptional<τ_0_0>) -> Builtin.Int1
 // CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<() -> ()>([[F]]#1)
@@ -16,7 +16,6 @@ func foo(var #f: (()->())!) {
 //   If it doesn't have a value, kill all the temporaries and jump to
 //   the first nothing block.
 // CHECK:    bb1:
-// CHECK-NEXT: dealloc_stack [[TEMP_RESULT]]#0
 // CHECK-NEXT: br bb3
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
@@ -31,9 +30,7 @@ func foo(var #f: (()->())!) {
 // CHECK:      br bb4
 //   (first nothing block)
 // CHECK:    bb3:
-// CHECK-NEXT: // function_ref Swift._injectNothingIntoOptional
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<()>([[RESULT]]#1)
+// CHECK-NEXT: inject_enum_addr [[RESULT]]#1{{.*}}None
 // CHECK-NEXT: br bb4
 //   The rest of this is tested in optional.swift
 

@@ -358,8 +358,9 @@ struct FailableModel: FailableRequirement, IUOFailableRequirement {
   // CHECK-LABEL: sil @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   // CHECK: bb0([[SELF:%[0-9]+]] : $*ImplicitlyUnwrappedOptional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
   // CHECK: apply [transparent] [[CHECK_OPTIONAL_FN:%[0-9]+]]<FailableModel>([[RESULT_ADDR:%[0-9]+]]#1) : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-  // CHECK-NEXT: cond_br
-  // CHECK: apply [transparent] [[INJECT_IUO_FN:%[0-9]+]]<FailableModel>([[IUO_TEMP:%[0-9]+]]#1, [[RESULT:%[0-9]+]]#1) : $@thin <τ_0_0> (@out ImplicitlyUnwrappedOptional<τ_0_0>, @in τ_0_0) -> ()
+  // CHECK: [[RESULT:%[0-9]+]] = init_enum_data_addr [[IUO_TEMP:%[0-9]+]]#1
+  // CHECK: cond_br
+  // CHECK: inject_enum_addr [[IUO_TEMP]]
   init?(foo: Int) {}
 }
 
@@ -408,8 +409,8 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
   // CHECK-LABEL: sil @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   // CHECK: function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
   // CHECK: unchecked_take_enum_data_addr
-  // CHECK: function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-  // CHECK: function_ref @_TFSs45_injectNothingIntoImplicitlyUnwrappedOptionalU__FT_GSQQ__
+  // CHECK: inject_enum_addr {{.*}}Some
+  // CHECK: inject_enum_addr {{.*}}None
   // CHECK: return [[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
   init?(foo: Int) {}
 }
@@ -418,8 +419,8 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
   // CHECK-LABEL: sil @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
   // CHECK: function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
   // CHECK: unchecked_take_enum_data_addr
-  // CHECK: function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-  // CHECK: function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
+  // CHECK: inject_enum_addr {{.*}}Some
+  // CHECK: inject_enum_addr {{.*}}None
   // CHECK: return [[RESULT:%[0-9]+]] : $Optional<IUOFailableClassModel>
 
   // CHECK-LABEL: sil @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementFS1_CUS1___fMQPS1_FT3fooSi_S2_

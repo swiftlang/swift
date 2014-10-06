@@ -130,12 +130,13 @@ class OptionalResult {
   func foo() -> Self? { return self }
 }
 // CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foofDS0_FT_GSqDS0__ : $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ :
-// CHECK-NEXT: apply [transparent] [[T0]]<OptionalResult>([[T1:%.*]]#1, [[T2:%.*]]#1)
-// CHECK-NEXT: dealloc_stack [[T2]]#0
-// CHECK-NEXT: [[T0:%.*]] = load [[T1]]#1
-// CHECK-NEXT: dealloc_stack [[T1]]#0
-// CHECK-NEXT: strong_release %0
+// CHECK:      [[SOME:%.*]] = init_enum_data_addr [[OPT:%[0-9]+]]
+// CHECK-NEXT: strong_retain [[VALUE:%[0-9]+]]
+// CHECK-NEXT: store [[VALUE]] to [[SOME]]
+// CHECK-NEXT: inject_enum_addr [[OPT]]{{.*}}Some
+// CHECK-NEXT: [[T0:%.*]] = load [[OPT]]#1
+// CHECK-NEXT: dealloc_stack [[OPT]]#0
+// CHECK-NEXT: strong_release [[VALUE]]
 // CHECK-NEXT: return [[T0]] : $Optional<OptionalResult>
 
 class OptionalResultInheritor : OptionalResult {
@@ -153,8 +154,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK:      [[T1:%.*]] = unchecked_take_enum_data_addr 
 // CHECK:      [[T2:%.*]] = load [[T1]]
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T2]] : $OptionalResult to $OptionalResultInheritor
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ :
-// CHECK-NEXT: apply [transparent] [[T0]]<OptionalResultInheritor>
+// CHECK-NEXT: init_enum_data_addr
 
 // CHECK-LABEL: sil_witness_table X: P module dynamic_self {
 // CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PFS1_1fUS1___fRQPS1_FT_S2_

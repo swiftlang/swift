@@ -1490,40 +1490,40 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
                                                  const TypeLowering &optTL) {
   SILType optType = optTL.getLoweredType();
   OptionalTypeKind optionalKind;
-  CanType valueType = getOptionalValueType(optType, optionalKind);
+  auto loweredPayloadTy
+    = optType.getAnyOptionalObjectType(SGM.M, optionalKind);
+  assert(optionalKind != OTK_None);
 
-  FuncDecl *fn =
-    getASTContext().getInjectValueIntoOptionalDecl(nullptr, optionalKind);
-  Substitution sub = getSimpleSubstitution(fn, valueType);
+  // Project out the payload area.
+  auto someDecl = getASTContext().getOptionalSomeDecl(optionalKind);
+  auto destPayload = B.createInitEnumDataAddr(loc, dest,
+                                            someDecl,
+                                            loweredPayloadTy.getAddressType());
+  
+  CanType formalOptType = optType.getSwiftRValueType();
+  auto archetype = formalOptType->getNominalOrBoundGenericNominal()
+    ->getGenericParams()->getPrimaryArchetypes()[0];
+  AbstractionPattern origType(archetype);
 
-  // Materialize the r-value into a temporary.
-  FullExpr scope(Cleanups, CleanupLocation::getCleanupLocation(loc));
-  auto valueAddr = std::move(value).materialize(*this,
-                              AbstractionPattern(CanType(sub.getArchetype())));
-
-  TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
-  auto result = emitApplyOfLibraryIntrinsic(loc, fn, sub, valueAddr,
-                                            SGFContext(&emitInto));
-  assert(result.isInContext() && "didn't emit directly into buffer?");
-  (void)result;
+  // Emit the value into the payload area.
+  TemporaryInitialization emitInto(destPayload, CleanupHandle::invalid());
+  auto &payloadTL = getTypeLowering(origType, value.getSubstType());
+  std::move(value).forwardInto(*this, origType,
+                               &emitInto,
+                               payloadTL);
+  
+  // Inject the tag.
+  B.createInjectEnumAddr(loc, dest, someDecl);
 }
 
 void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
                                                    SILValue dest,
                                                    const TypeLowering &optTL) {
-  SILType optType = optTL.getLoweredType();
-  OptionalTypeKind optionalKind;
-  CanType valueType = getOptionalValueType(optType, optionalKind);
-
-  FuncDecl *fn =
-    getASTContext().getInjectNothingIntoOptionalDecl(nullptr, optionalKind);
-  Substitution sub = getSimpleSubstitution(fn, valueType);
-
-  TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
-  auto result = emitApplyOfLibraryIntrinsic(loc, fn, sub, {},
-                                            SGFContext(&emitInto));
-  assert(result.isInContext() && "didn't emit directly into buffer?");
-  (void)result;
+  OptionalTypeKind OTK;
+  optTL.getLoweredType().getSwiftRValueType()->getAnyOptionalObjectType(OTK);
+  assert(OTK != OTK_None);
+  
+  B.createInjectEnumAddr(loc, dest, getASTContext().getOptionalNoneDecl(OTK));
 }
 
 void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,

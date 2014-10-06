@@ -34,8 +34,9 @@ func test5(var g: Gizmo) {
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
   // CHECK-NEXT: [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      copy_addr %1#1 to [initialization] {{%.*}}#1 : $*Gizmo
-  // CHECK:      injectValueIntoImplicitlyUnwrappedOptional
+  // CHECK:      init_enum_data_addr
+  // CHECK:      copy_addr %1#1 to [initialization] {{%.*}} : $*Gizmo
+  // CHECK:      inject_enum_addr
   // CHECK:      [[G:%.*]] = load {{%.*}}#1 : $*ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK-NEXT: release_value [[G]]
@@ -47,8 +48,8 @@ func test6(var g: Gizmo) {
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
   // CHECK-NEXT: [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      copy_addr %1#1 to [initialization] {{%.*}}#1 : $*Gizmo
-  // CHECK:      injectValueIntoImplicitlyUnwrappedOptional
+  // CHECK:      copy_addr %1#1 to [initialization] {{%.*}} : $*Gizmo
+  // CHECK:      inject_enum_addr {{.*}}Some
   // CHECK:      [[G:%.*]] = load {{%.*}}#1 : $*ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK-NOT:  release_value [[G]]
@@ -116,9 +117,9 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_OBJC_BUF]]
   // CHECK-NEXT: [[OBJC:%.*]] = load [[OBJC_BUF]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      store [[THICK]] to [[THICK_BUF:%.*]]#1
-  // CHECK:      [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-  // CHECK-NEXT: apply [transparent] [[T0]]<AnyObject.Type>([[OPT_THICK_BUF:%.*]]#1, [[THICK_BUF]]#1)
+  // CHECK-NEXT: [[THICK_BUF:%.*]] = init_enum_data_addr [[OPT_THICK_BUF:%[0-9]+]]
+  // CHECK-NEXT: store [[THICK]] to [[THICK_BUF:%.*]]
+  // CHECK-NEXT: inject_enum_addr [[OPT_THICK_BUF]]
   // CHECK:      [[T0:%.*]] = load [[OPT_THICK_BUF]]#1
   // CHECK-NEXT: store [[T0]] to [[OPT_THICK_BUF:%.*]]#1
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
@@ -143,9 +144,9 @@ func test11(let g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_OBJC_BUF]]
   // CHECK-NEXT: [[OBJC:%.*]] = load [[OBJC_BUF]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      store [[THICK]] to [[THICK_BUF:%.*]]#1
-  // CHECK:      [[T0:%.*]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-  // CHECK-NEXT: apply [transparent] [[T0]]<AnyObject.Type>([[OPT_THICK_BUF:%.*]]#1, [[THICK_BUF]]#1)
+  // CHECK-NEXT: [[THICK_BUF:%.*]] = init_enum_data_addr [[OPT_THICK_BUF:%[0-9]+]]
+  // CHECK-NEXT: store [[THICK]] to [[THICK_BUF]]
+  // CHECK-NEXT: inject_enum_addr [[OPT_THICK_BUF]]
   // CHECK:      [[T0:%.*]] = load [[OPT_THICK_BUF]]#1
   // CHECK-NEXT: store [[T0]] to [[OPT_THICK_BUF:%.*]]#1
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_

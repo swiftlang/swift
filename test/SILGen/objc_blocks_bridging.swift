@@ -81,9 +81,9 @@ func callBlocks(x: Foo,
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
   // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@cc(cdecl) @objc_block (NSString) -> @autoreleased NSString
-  // CHECK: store [[G_BLOCK]] to [[SLOT:%.*]]#1
-  // CHECK: [[INJECT:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-  // CHECK: apply [transparent] [[INJECT]]<@objc_block String -> String>({{%.*}}, [[SLOT]]#1)
+  // CHECK: [[SLOT:%.*]] = init_enum_data_addr [[OPTIONAL:%[0-9]+]]
+  // CHECK: store [[G_BLOCK]] to [[SLOT]]
+  // CHECK: inject_enum_addr [[OPTIONAL]]
 
   return (x.foo(f, x: 0), x.bar(g, x: "one"), x.bas(h, x: "two"), x.optFunc(g, x: "three"))
 }

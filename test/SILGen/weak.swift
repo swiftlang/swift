@@ -23,12 +23,9 @@ func test0(var #c: C) {
 // CHECK:      [[X:%.*]] = alloc_box $@sil_weak Optional<C>  // var x
 //   Implicit conversion: call _injectValueIntoOptional
 // CHECK-NEXT: [[OPT:%.*]] = alloc_stack $Optional<C>
-// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $C
-// CHECK-NEXT: copy_addr [[C]]#1 to [initialization] [[TMP]]#1 : $*C
-// CHECK-NEXT: _injectValueIntoOptional
-// CHECK-NEXT: [[INJECT:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NEXT: apply [transparent] [[INJECT]]<{{.*}}>([[OPT]]#1, [[TMP]]#1)
-// CHECK-NEXT: dealloc_stack [[TMP]]#0 : $*@local_storage C
+// CHECK-NEXT: [[TMP:%.*]] = init_enum_data_addr [[OPT]]
+// CHECK-NEXT: copy_addr [[C]]#1 to [initialization] [[TMP]] : $*C
+// CHECK-NEXT: inject_enum_addr [[OPT]]
 // CHECK-NEXT: [[OPTVAL:%.*]] = load [[OPT]]#1 : $*Optional<C>
 // CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[X]]#1 : $*@sil_weak Optional<C>
 // CHECK-NEXT: release_value [[OPTVAL]] : $Optional<C>
@@ -37,12 +34,9 @@ func test0(var #c: C) {
   a.x = c
 //   Implicit conversion: call _injectValueIntoOptional
 // CHECK-NEXT: [[OPT:%.*]] = alloc_stack $Optional<C>
-// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $C
-// CHECK-NEXT: copy_addr [[C]]#1 to [initialization] [[TMP]]#1 : $*C
-// CHECK-NEXT: _injectValueIntoOptional
-// CHECK-NEXT: [[INJECT:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NEXT: apply [transparent] [[INJECT]]<{{.*}}>([[OPT]]#1, [[TMP]]#1)
-// CHECK-NEXT: dealloc_stack [[TMP]]#0 : $*@local_storage C
+// CHECK-NEXT: [[TMP:%.*]] = init_enum_data_addr [[OPT]]
+// CHECK-NEXT: copy_addr [[C]]#1 to [initialization] [[TMP]] : $*C
+// CHECK-NEXT: inject_enum_addr [[OPT]]
 // CHECK-NEXT: [[OPTVAL:%.*]] = load [[OPT]]#1 : $*Optional<C>
 //   Drill to a.x
 // CHECK-NEXT: [[A_X:%.*]] = struct_element_addr [[A]] : $*A, #A.x

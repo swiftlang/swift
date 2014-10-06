@@ -8,7 +8,7 @@ func foo(var f: (()->())?) {
 // CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> ()>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
 // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<()>
-// CHECK-NEXT: [[TEMP_RESULT:%.*]] = alloc_stack $()
+// CHECK-NEXT: [[TEMP_RESULT:%.*]] = init_enum_data_addr [[RESULT]]
 //   Switch out on the lvalue (() -> ())!:
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
 // CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<() -> ()>([[F]]#1)
@@ -16,7 +16,6 @@ func foo(var f: (()->())?) {
 //   If it doesn't have a value, kill all the temporaries and jump to
 //   the first nothing block.
 // CHECK:    bb1:
-// CHECK-NEXT: dealloc_stack [[TEMP_RESULT]]#0
 // CHECK-NEXT: br bb3
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
@@ -31,9 +30,7 @@ func foo(var f: (()->())?) {
 // CHECK:      br bb4
 //   (first nothing block)
 // CHECK:    bb3:
-// CHECK-NEXT: // function_ref Swift._injectNothingIntoOptional
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<()>([[RESULT]]#1)
+// CHECK-NEXT: inject_enum_addr [[RESULT]]
 // CHECK-NEXT: br bb4
 
 func foo2<T>(var f: (()->T)?) {
@@ -44,7 +41,7 @@ func foo2<T>(var f: (()->T)?) {
 // CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> T>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
 // CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>
-// CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
+// CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[X]]
 //   Check whether 'f' holds a value.
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
@@ -52,7 +49,6 @@ func foo2<T>(var f: (()->T)?) {
 // CHECK-NEXT: cond_br [[T1]], bb2, bb1
 //   If not, leave all the cleanups we needed and jump to the nothing block.
 // CHECK:    bb1:
-// CHECK-NEXT: dealloc_stack [[TEMP]]#0
 // CHECK-NEXT: br bb3
 //   If so, pull out the value...
 // CHECK:    bb2:
@@ -63,18 +59,13 @@ func foo2<T>(var f: (()->T)?) {
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[THUNK:%.*]] = function_ref @{{.*}} : $@thin <τ_0_0> (@out τ_0_0, @owned @callee_owned (@out τ_0_0, @in ()) -> ()) -> ()
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[THUNK]]<T>([[T0]])
-// CHECK-NEXT: apply [[T1]]([[TEMP_RESULT]]#1)
+// CHECK-NEXT: apply [[T1]]([[TEMP_RESULT]])
 //   ...and coerce to T?
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ : $@thin <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0) -> ()
-// CHECK-NEXT: apply [transparent] [[T0]]<T>([[X]]#1, [[TEMP]]#1)
-// CHECK-NEXT: dealloc_stack [[TEMP]]#0
+// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}Some
 // CHECK-NEXT: br bb4
 //   Nothing block.
 // CHECK:    bb3:
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@thin <τ_0_0> (@out Optional<τ_0_0>) -> ()
-// CHECK-NEXT: apply [transparent] [[T0]]<T>([[X]]#1)
+// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
 // CHECK-NEXT: br bb4
 //   Continuation block.
 // CHECK:    bb4

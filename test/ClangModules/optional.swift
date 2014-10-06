@@ -24,15 +24,12 @@ class A {
 // CHECK-NEXT: [[STR:%.*]] = load [[TMP_STR]]
 // CHECK:      [[T0:%.*]] = function_ref @swift_StringToNSString
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[STR]])
-// CHECK-NEXT: [[TMP_NSSTR:%.*]] = alloc_stack $NSString
-// CHECK-NEXT: store [[T1]] to [[TMP_NSSTR]]#1
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<NSString>([[TMP_OPTNSSTR]]#1, [[TMP_NSSTR]]#1)
-// CHECK-NEXT: dealloc_stack [[TMP_NSSTR]]#0
+// CHECK-NEXT: [[TMP_NSSTR:%.*]] = init_enum_data_addr [[TMP_OPTNSSTR]]
+// CHECK-NEXT: store [[T1]] to [[TMP_NSSTR]]
+// CHECK-NEXT: inject_enum_addr [[TMP_OPTNSSTR]]{{.*}}Some
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<NSString>([[TMP_OPTNSSTR]]#1)
+// CHECK:      inject_enum_addr [[TMP_OPTNSSTR]]{{.*}}None
 // CHECK-NEXT: br
 //   Continuation.
 // CHECK:      [[T0:%.*]] = load [[TMP_OPTNSSTR]]
@@ -54,15 +51,12 @@ class A {
 // CHECK:      [[T0:%.*]] = function_ref @swift_NSStringToString
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR]])
-// CHECK-NEXT: [[TMP_STR2:%.*]] = alloc_stack $String
-// CHECK-NEXT: store [[T1]] to [[TMP_STR2]]#1
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<String>([[TMP_OPTSTR]]#1, [[TMP_STR2]]#1)
-// CHECK-NEXT: dealloc_stack [[TMP_STR2]]#0
+// CHECK-NEXT: [[TMP_STR2:%.*]] = init_enum_data_addr [[TMP_OPTSTR]]
+// CHECK-NEXT: store [[T1]] to [[TMP_STR2]]
+// CHECK-NEXT: inject_enum_addr [[TMP_OPTSTR]]{{.*}}Some
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<String>([[TMP_OPTSTR]]#1)
+// CHECK:      inject_enum_addr [[TMP_OPTSTR]]{{.*}}None
 // CHECK-NEXT: br
 //   Continuation.
 // CHECK:      [[T0:%.*]] = load [[TMP_OPTSTR]]

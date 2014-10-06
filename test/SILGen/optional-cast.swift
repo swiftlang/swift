@@ -44,8 +44,7 @@ func foo(y : A?) {
 // CHECK-NEXT: br [[CONT]]
 //   Finish the not-present path.
 // CHECK:    [[NOT_PRESENT]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<B>([[X]]#1)
+// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
 // CHECK-NEXT: br [[CONT2]]
 //   Finish.
 // CHECK:    [[CONT2]]:
@@ -57,9 +56,9 @@ func bar(y : A????) {
 }
 // CHECK-DAG: sil hidden @_TF4main3bar
 // CHECK:      [[X:%.*]] = alloc_box $Optional<Optional<Optional<B>>>
-// CHECK-NEXT: [[TMP_OOB:%.*]] = alloc_stack $Optional<Optional<B>>
-// CHECK-NEXT: [[TMP_OB:%.*]] = alloc_stack $Optional<B>
-// CHECK-NEXT: [[TMP_B:%.*]] = alloc_stack $B
+// CHECK-NEXT: [[TMP_OOB:%.*]] = init_enum_data_addr [[X]]
+// CHECK-NEXT: [[TMP_OB:%.*]] = init_enum_data_addr [[TMP_OOB]]
+// CHECK-NEXT: [[TMP_B:%.*]] = init_enum_data_addr [[TMP_OB]]
 // CHECK-NEXT: [[TMP_OB2:%.*]] = alloc_stack $Optional<B>
 // CHECK-NEXT: [[TMP_OB2_VALUE:%.*]] = init_enum_data_addr [[TMP_OB2]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: [[TMP_OA:%.*]] = alloc_stack $Optional<A>
@@ -86,9 +85,6 @@ func bar(y : A????) {
 // CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_B]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OB]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OOB]]#0
 // CHECK-NEXT: br [[NIL_DEPTH2:bb[0-9]+]]
 //   If so, drill down another level and check for Some(Some(...)).
 // CHECK:    [[P]]:
@@ -106,9 +102,6 @@ func bar(y : A????) {
 // CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_B]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OB]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OOB]]#0
 // CHECK-NEXT: br [[NIL_DEPTH2]]
 //   If so, drill down another level and check for Some(Some(Some(...))).
 // CHECK:    [[PP]]:
@@ -126,8 +119,6 @@ func bar(y : A????) {
 // CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_B]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OB]]#0
 // CHECK-NEXT: br [[NIL_DEPTH1:bb[0-9]+]]
 //   If so, drill down another level and check for Some(Some(Some(Some(...)))).
 // CHECK:    [[PPP]]:
@@ -145,7 +136,6 @@ func bar(y : A????) {
 // CHECK-NEXT: destroy_addr [[TMP_OA]]#1
 // CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_B]]#0
 // CHECK-NEXT: br [[NIL_DEPTH0:bb[0-9]+]]
 //   If so, pull out the A and check whether it's a B.
 // CHECK:    [[PPPP]]:
@@ -175,46 +165,34 @@ func bar(y : A????) {
 // CHECK:    [[NOT_B2]]:
 // CHECK-NEXT: destroy_addr [[TMP_OB2]]#1
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_B]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OB]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OOB]]#0
 // CHECK-NEXT: br [[NIL_DEPTH2]]
 //   If it's present, set OB := Some(x).
 // CHECK:    [[IS_B2]]:
 // CHECK-NEXT: [[PAYLOAD_B:%.*]] = unchecked_take_enum_data_addr [[TMP_OB2]]
 // CHECK-NEXT: [[VALUE_B:%.*]] = load [[PAYLOAD_B]]
 // CHECK-NEXT: store [[VALUE_B]] to [[TMP_B]]
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<B>([[TMP_OB]]#1, [[TMP_B]]#1)
+// CHECK-NEXT: inject_enum_addr [[TMP_OB]]{{.*}}Some
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_B]]#0
 // CHECK-NEXT: br [[DONE_DEPTH0:bb[0-9]+]]
 //   On various failure paths, set OB := nil.
 // CHECK:    [[NIL_DEPTH0]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<B>([[TMP_OB]]#1)
+// CHECK-NEXT: inject_enum_addr [[TMP_OB]]{{.*}}None
 // CHECK-NEXT: br [[DONE_DEPTH0]]
 //   Set OOB := Some(OB).
 // CHECK:    [[DONE_DEPTH0]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<Optional<B>>([[TMP_OOB]]#1, [[TMP_OB]]#1)
-// CHECK-NEXT: dealloc_stack [[TMP_OB]]#0
+// CHECK-NEXT: inject_enum_addr [[TMP_OOB]]{{.*}}Some
 // CHECK-NEXT: br [[DONE_DEPTH1:bb[0-9]+]]
 //   On various failure paths, set OOB := nil.
 // CHECK:    [[NIL_DEPTH1]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<Optional<B>>([[TMP_OOB]]#1)
+// CHECK-NEXT: inject_enum_addr [[TMP_OOB]]{{.*}}None
 // CHECK-NEXT: br [[DONE_DEPTH1]]
 //   Set X := Some(OOB).
 // CHECK:    [[DONE_DEPTH1]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<Optional<Optional<B>>>([[X]]#1, [[TMP_OOB]]#1)
-// CHECK-NEXT: dealloc_stack [[TMP_OOB]]#0
+// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}Some
 // CHECK-NEXT: br [[DONE_DEPTH2:bb[0-9]+]]
 //   On various failure paths, set X := nil.
 // CHECK:    [[NIL_DEPTH2]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NEXT: apply [transparent] [[T0]]<Optional<Optional<B>>>([[X]]#1)
+// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
 // CHECK-NEXT: br [[DONE_DEPTH2]]
 //   Done.
 // CHECK:    [[DONE_DEPTH2]]:

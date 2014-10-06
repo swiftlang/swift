@@ -64,19 +64,16 @@ func opt_to_class(var obj: AnyObject) {
   // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> ()):
   // CHECK-NEXT: strong_retain [[OBJ_SELF]]
   // CHECK-NEXT: [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF]]) : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> ()
-  // CHECK-NEXT: [[THUNKTEMP:%.*]] = alloc_stack $@callee_owned (@out (), @in ()) -> ()
+  // CHECK-NEXT: [[THUNK_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL:%[0-9]+]]
   // CHECK:      [[THUNKFN:%.*]] = function_ref @{{.*}} : $@thin (@out (), @in (), @owned @callee_owned () -> ()) -> ()
   // CHECK-NEXT: [[THUNK:%.*]] = partial_apply [[THUNKFN]]([[PARTIAL]])
-  // CHECK-NEXT: store [[THUNK]] to [[THUNKTEMP]]
-  // CHECK: [[SOMEREF:%[0-9]+]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-  // CHECK-NEXT: [[SOMEOPT:%[0-9]+]] = apply [transparent] [[SOMEREF]]
-  // CHECK-NEXT: dealloc_stack [[THUNKTEMP]]#0
+  // CHECK-NEXT: store [[THUNK]] to [[THUNK_PAYLOAD]]
+  // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}Some
   // CHECK-NEXT: br [[CONTBB:[a-zA-Z0-9]+]]
   
   // No method BB:
   // CHECK: [[NOBB]]:
-  // CHECK: [[NONEREF:%[0-9]+]] = function_ref @_TFSs45_injectNothingIntoImplicitlyUnwrappedOptionalU__FT_GSQQ__
-  // CHECK-NEXT: [[NONEVAL:%[0-9]+]] = apply [transparent] [[NONEREF]]<() -> ()>([[OPTTEMP]]#1)
+  // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}None
   // CHECK-NEXT: br [[CONTBB]]
 
   // Continuation block
@@ -131,11 +128,9 @@ func opt_to_property(var obj: AnyObject) {
   // CHECK-NEXT: strong_retain [[RAWOBJ_SELF]]
   // CHECK-NEXT: [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF]]) : $@cc(objc_method) @thin (@opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[BOUND_METHOD]]() : $@callee_owned () -> Int
-  // CHECK-NEXT: [[VALUETEMP:%.*]] = alloc_stack $Int
+  // CHECK-NEXT: [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // CHECK-NEXT: store [[VALUE]] to [[VALUETEMP]]
-  // CHECK: [[INJECT:%[0-9]+]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-  // CHECK-NEXT: apply [transparent] [[INJECT]]<Int>([[OPTTEMP]]#1, [[VALUETEMP]]#1)
-  // CHECK-NEXT: dealloc_stack [[VALUETEMP]]#0
+  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]{{.*}}Some
   // CHECK-NEXT: br bb3
   var i: Int = obj.value!
 }
@@ -160,11 +155,9 @@ func direct_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: strong_retain [[OBJ_REF]]
   // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@cc(objc_method) @thin (Int, @opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
-  // CHECK-NEXT: [[RESULTTEMP:%.*]] = alloc_stack $Int
+  // CHECK-NEXT: [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]
-  // CHECK: [[INJECT_VALUE:%[0-9]+]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-  // CHECK-NEXT: apply [transparent] [[INJECT_VALUE]]<Int>([[OPTTEMP]]#1, [[RESULTTEMP]]#1)
-  // CHECK-NEXT: dealloc_stack [[RESULTTEMP]]#0
+  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]{{.*}}Some
   // CHECK-NEXT: br bb3
   var x: Int = obj[i]!
 }
@@ -187,11 +180,9 @@ func opt_to_subscript(var obj: AnyObject, var i: Int) {
   // CHECK-NEXT: strong_retain [[OBJ_REF]]
   // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@cc(objc_method) @thin (Int, @opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
-  // CHECK-NEXT: [[RESULTTEMP:%.*]] = alloc_stack $Int
+  // CHECK-NEXT: [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]
-  // CHECK: [[INJECT_VALUE:%[0-9]+]] = function_ref @_TFSs43_injectValueIntoImplicitlyUnwrappedOptionalU__FQ_GSQQ__
-  // CHECK-NEXT: [[OPT_RESULT:%[0-9]+]] = apply [transparent] [[INJECT_VALUE]]<Int>([[OPTTEMP]]#1, [[RESULTTEMP]]#1)
-  // CHECK-NEXT: dealloc_stack [[RESULTTEMP]]#0
+  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]
   // CHECK-NEXT: br bb3
   obj[i]
 }
