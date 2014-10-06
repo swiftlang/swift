@@ -148,6 +148,7 @@ func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 
 /// Returns true iff T is a class type or an @objc existential such as
 /// AnyObject
+@inline(__always)
 internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   let tmp = _canBeClass(x)
 
