@@ -372,7 +372,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   SILBasicBlock *NewFEntryBB = &*NewF->begin();
   for (auto *A : NewFEntryBB->getBBArgs()) {
-    ThunkBody->createArgument(A->getType());
+    ThunkBody->createArgument(A->getType(), A->getDecl());
   }
 
   // Then erase the dead arguments from NewF using DeadArgs. We go backwards so
