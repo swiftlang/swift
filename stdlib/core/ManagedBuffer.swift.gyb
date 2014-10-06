@@ -173,15 +173,11 @@ ${public} class ${cluster}Buffer<Value, Element>
   ///
   /// Note: this value must not be accessed during instance creation.
   ${public} final var value: Value {
-    get {
-      return withUnsafeMutablePointerToValue {
-        return $0.memory
-      }
+    address {
+      return withUnsafeMutablePointerToValue { UnsafePointer($0) }
     }
-    set {
-      withUnsafeMutablePointerToValue {
-        $0.memory = newValue
-      }
+    mutableAddress {
+      return withUnsafeMutablePointerToValue { $0 }
     }
   }
 }
