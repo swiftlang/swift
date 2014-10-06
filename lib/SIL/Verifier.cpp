@@ -2214,6 +2214,9 @@ void SILFunction::verify() const {
   if (isExternalDeclaration()) {
     assert(isAvailableExternally() &&
            "external declaration of internal SILFunction not allowed");
+    assert(!hasSharedVisibility(getLinkage()) &&
+           "external declarations of SILFunctions with shared visiblity is not "
+           "allowed");
     return;
   }
   SILVerifier(*this).verify();
