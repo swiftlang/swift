@@ -93,6 +93,7 @@ namespace swift {
     SILFunction *getFuncForReference(StringRef Name);
     SILFunction *lookupSILFunction(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
+    SILGlobalVariable *getGlobalForReference(StringRef Name);
     SILGlobalVariable *readGlobalVar(StringRef Name);
     SILWitnessTable *readWitnessTable(serialization::DeclID,
                                       SILWitnessTable *existingWt,

@@ -333,6 +333,18 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
   return readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
 }
 
+/// Helper function to find a SILGlobalVariable given its name. It first checks
+/// in the module. If we can not find it in the module, we attempt to
+/// deserialize it.
+SILGlobalVariable *SILDeserializer::getGlobalForReference(StringRef name) {
+  // Check to see if we have a global by this name already.
+  if (SILGlobalVariable *g = SILMod.lookUpGlobalVariable(name))
+    return g;
+
+  // Otherwise, look for a global with this name in the module.
+  return readGlobalVar(name);
+}
+
 /// Deserialize a SILFunction if it is not already deserialized. The input
 /// SILFunction can either be an empty declaration or null. If it is an empty
 /// declaration, we fill in the contents. If the input SILFunction is
@@ -756,14 +768,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
-      
+
   case ValueKind::ObjCProtocolInst: {
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Proto = MF->getDecl(ValID);
     ResultVal = Builder.createObjCProtocol(Loc, cast<ProtocolDecl>(Proto), Ty);
     break;
   }
-      
+
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst: {
 
@@ -918,7 +930,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     Identifier Name = MF->getIdentifier(ValID);
 
     // Find the global variable.
-    SILGlobalVariable *g = readGlobalVar(Name.str());
+    SILGlobalVariable *g = getGlobalForReference(Name.str());
     assert(g && "Can't deserialize global variable");
     assert(g->getLoweredType().getAddressType() ==
            getSILType(Ty, (SILValueCategory)TyCategory) &&
@@ -1487,17 +1499,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
            "expected 6 values for InitBlockStorageHeader");
     SILType blockTy
       = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    
+
     SILType storageTy = getSILType(MF->getType(ListOfValues[2]),
                                    SILValueCategory::Address);
     SILValue storage
       = getLocalValue(ListOfValues[0], ListOfValues[1], storageTy);
-    
+
     SILType invokeTy = getSILType(MF->getType(ListOfValues[5]),
                                   SILValueCategory::Object);
     SILValue invoke
       = getLocalValue(ListOfValues[3], ListOfValues[4], invokeTy);
-    
+
     ResultVal = Builder.createInitBlockStorageHeader(Loc, storage, invoke,
                                                      blockTy);
     break;
@@ -1763,7 +1775,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     MF->error();
     return nullptr;
   }
-  
+
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
     DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
