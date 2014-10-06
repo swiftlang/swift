@@ -338,8 +338,6 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
       B.CreateCall(emitObjCCategoryInitializer(*this, ObjCCategoryDecls));
     }
   }
-  
-  mainFn->dump();
 }
 
 void IRGenModule::emitObjCRegistration() {
