@@ -118,12 +118,6 @@ struct ASTContext::Implementation {
   /// func _getOptionalValue<T>(v : Optional<T>) -> T
   FuncDecl *GetOptionalValueDecls[NumOptionalTypeKinds] = {};
 
-  /// func _injectValueIntoOptional<T>(v : T) -> Optional<T>
-  FuncDecl *InjectValueIntoOptionalDecls[NumOptionalTypeKinds] = {};
-
-  /// func _injectNothingIntoOptional<T>() -> Optional<T>
-  FuncDecl *InjectNothingIntoOptionalDecls[NumOptionalTypeKinds] = {};
-
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.
   EnumDecl *ImplicitlyUnwrappedOptionalDecl = nullptr;
 
@@ -908,64 +902,11 @@ FuncDecl *ASTContext::getGetOptionalValueDecl(LazyResolver *resolver,
   return decl;
 }
 
-FuncDecl *ASTContext::getInjectValueIntoOptionalDecl(LazyResolver *resolver,
-                                        OptionalTypeKind optionalKind) const {
-  auto &cache = Impl.InjectValueIntoOptionalDecls[asIndex(optionalKind)];
-  if (cache) return cache;
-
-  auto name = getOptionalIntrinsicName("_injectValueInto", optionalKind, "");
-
-  // Look for the function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, name, resolver);
-  if (!decl || !isGenericIntrinsic(decl, input, output, param))
-    return nullptr;
-
-  // Input must be T.
-  if (input != param)
-    return nullptr;
-
-  // Output must be Optional<T>.
-  if (!isOptionalType(*this, optionalKind, output, param))
-    return nullptr;
-
-  cache = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getInjectNothingIntoOptionalDecl(LazyResolver *resolver,
-                                         OptionalTypeKind optionalKind) const {
-  auto &cache = Impl.InjectNothingIntoOptionalDecls[asIndex(optionalKind)];
-  if (cache) return cache;
-
-  auto name = getOptionalIntrinsicName("_injectNothingInto", optionalKind, "");
-
-  // Look for the function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, name, resolver);
-  if (!decl || !isGenericIntrinsic(decl, input, output, param))
-    return nullptr;
-
-  // Input must be ().
-  auto inputTuple = dyn_cast<TupleType>(input);
-  if (!inputTuple || inputTuple->getNumElements() != 0)
-    return nullptr;
-
-  // Output must be Optional<T>.
-  if (!isOptionalType(*this, optionalKind, output, param))
-    return nullptr;
-
-  cache = decl;
-  return decl;
-}
-
 static bool hasOptionalIntrinsics(const ASTContext &ctx, LazyResolver *resolver,
                                   OptionalTypeKind optionalKind) {
   return ctx.getPreconditionOptionalHasValueDecl(resolver, optionalKind) &&
          ctx.getDoesOptionalHaveValueDecl(resolver, optionalKind) &&
-         ctx.getGetOptionalValueDecl(resolver, optionalKind) &&
-         ctx.getInjectValueIntoOptionalDecl(resolver, optionalKind) &&
-         ctx.getInjectNothingIntoOptionalDecl(resolver, optionalKind);
+         ctx.getGetOptionalValueDecl(resolver, optionalKind);
 }
 
 bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {

@@ -410,16 +410,6 @@ public:
   FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,
                                     OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of
-  /// Swift._injectValueInto{,ImplicitlyUnwrapped}Optional.
-  FuncDecl *getInjectValueIntoOptionalDecl(LazyResolver *resolver,
-                                           OptionalTypeKind kind) const;
-
-  /// Retrieve the declaration of
-  /// Swift._injectNothingInto{,ImplicitlyUnwrapped}Optional.
-  FuncDecl *getInjectNothingIntoOptionalDecl(LazyResolver *resolver,
-                                             OptionalTypeKind kind) const;
-
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
   ///
