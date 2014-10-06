@@ -6137,7 +6137,72 @@ RValue RValueEmitter::visitAvailabilityQueryExpr(AvailabilityQueryExpr *E,
 RValue
 RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
                                               SGFContext C) {
-  llvm_unreachable("Unimplemented");
+  // Emit construction of an optional value for E's declaration reference.
+  // The value will be .None if the underlying declaration reference is
+  // unavailable and .Some(rvalue) if the declaration is available.
+
+  // E must have an optional type.
+  assert(E->getType().getPointer()->getOptionalObjectType().getPointer());
+
+  DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getSubExpr());
+
+  // For the moment, we only support potentially unavailable global variables.
+  // In the future, we will extend this to other kinds of declarations.
+  assert(DRE);
+  assert(dyn_cast<VarDecl>(DRE->getDecl()));
+
+  // The type of the DeclRefExpr must be an lvalue, for global variables.
+  assert(DRE->getType()->getAs<LValueType>());
+
+  SILType silOptType = SGF.getLoweredType(E->getType());
+  SILLocation loc(E);
+  
+  auto lv = SGF.emitLValue(DRE, AccessKind::Read);
+  
+  SILValue allocatedOptional = SGF.emitTemporaryAllocation(loc, silOptType);
+
+  // Emit the check for availability
+  SILValue isAvailable;
+  const UnavailabilityReason &Reason = E->getReason();
+  switch (Reason.getReasonKind()) {
+  case UnavailabilityReason::Kind::RequiresOSVersionRange:
+    isAvailable = emitOSVersionRangeCheck(
+        loc, Reason.getRequiredOSVersionRange(), SGF, C);
+    break;
+
+  case UnavailabilityReason::Kind::ExplicitlyWeakLinked:
+    // We don't handle explicit weak linking yet.
+    // In the future, we will do so by converting the global variable
+    // lvalue to an address and comparing to 0.
+    llvm_unreachable("Unimplemented optional for weakly-linked global");
+  }
+
+  Condition cond = SGF.emitCondition(isAvailable, loc);
+  cond.enterTrue(SGF.B);
+  {
+    // If the declaration is available, load its value and inject it into
+    // the optional.
+    ManagedValue loadedValue = SGF.emitLoadOfLValue(loc, lv, C);
+    SGF.emitInjectOptionalValueInto(
+        loc, RValueSource(
+                 loc, RValue(SGF, loc, lv.getSubstFormalType(), loadedValue)),
+        allocatedOptional, SGF.getTypeLowering(silOptType));
+  }
+  cond.exitTrue(SGF.B);
+
+  cond.enterFalse(SGF.B);
+  {
+    // If the declaration is not available, inject .None.
+    SGF.emitInjectOptionalNothingInto(loc, allocatedOptional,
+                                      SGF.getTypeLowering(silOptType));
+  }
+  cond.exitFalse(SGF.B);
+  cond.complete(SGF.B);
+
+  ManagedValue managedValue = SGF.emitLoad(
+      loc, allocatedOptional, SGF.getTypeLowering(silOptType), C, IsNotTake);
+
+  return RValue(SGF, E, managedValue);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
