@@ -18,12 +18,11 @@ func if_no_else() {
   // CHECK:   cond_br [[HAS_VALUE]], [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YES]]:
-  // CHECK:   [[GET_OPT_VAL:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
-  // CHECK:   apply [transparent] [[GET_OPT_VAL]]<String>([[VAL_BUF:%.*]]#1, [[OPT_BUF]]#1)
-  // CHECK:   [[VAL:%.*]] = load [[VAL_BUF]]#1
+  // CHECK:   [[VAL_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
+  // CHECK:   [[VAL:%.*]] = load [[VAL_BUF]]
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
-  // CHECK:   retain_value %10
-  // CHECK:   apply [[A]](%10)
+  // CHECK:   retain_value [[VAL]]
+  // CHECK:   apply [[A]]([[VAL]])
   // CHECK:   release_value [[VAL]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x)
@@ -44,12 +43,11 @@ func if_else_chain() {
   // CHECK:   cond_br [[HAS_VALUE]], [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YES]]:
-  // CHECK:   [[GET_OPT_VAL:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
-  // CHECK:   apply [transparent] [[GET_OPT_VAL]]<String>([[VAL_BUF:%.*]]#1, [[OPT_BUF]]#1)
-  // CHECK:   [[VAL:%.*]] = load [[VAL_BUF]]#1
+  // CHECK:   [[VAL_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
+  // CHECK:   [[VAL:%.*]] = load [[VAL_BUF]]
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
-  // CHECK:   retain_value %10
-  // CHECK:   apply [[A]](%10)
+  // CHECK:   retain_value [[VAL]]
+  // CHECK:   apply [[A]]([[VAL]])
   // CHECK:   release_value [[VAL]]
   // CHECK:   br [[CONT_A:bb[0-9]+]]
     a(x)

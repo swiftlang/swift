@@ -797,7 +797,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
                  "Cannot force non-implicit optional");
           (void)fromOTK;
 
-          translated = gen.emitGetOptionalValueFrom(loc,
+          translated = gen.emitCheckedGetOptionalValueFrom(loc,
                                                     replaceWithTemp(translated),
                                                     innerResultTL,
                                                     SGFContext());
@@ -858,7 +858,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
                "Cannot force non-implicit optional");
         (void)fromOTK;
 
-        translated = gen.emitGetOptionalValueFrom(loc,
+        translated = gen.emitCheckedGetOptionalValueFrom(loc,
                                                   replaceWithTemp(translated),
                                                   innerResultTL,
                                                   SGFContext());

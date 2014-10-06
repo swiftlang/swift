@@ -113,8 +113,7 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK:      store [[OPT_OBJC]] to [[OPT_OBJC_BUF:%.*]]#1
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
   // CHECK-NEXT: apply [transparent] [[T0]]<@objc_metatype AnyObject.Type>([[OPT_OBJC_BUF]]#1)
-  // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-  // CHECK:      apply [transparent] [[T0]]<@objc_metatype AnyObject.Type>([[OBJC_BUF:%.*]]#1, [[OPT_OBJC_BUF]]#1)
+  // CHECK:      [[OBJC_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_OBJC_BUF]]
   // CHECK-NEXT: [[OBJC:%.*]] = load [[OBJC_BUF]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      store [[THICK]] to [[THICK_BUF:%.*]]#1
@@ -141,8 +140,7 @@ func test11(let g: Gizmo) -> AnyClass {
   // CHECK:      store [[OPT_OBJC]] to [[OPT_OBJC_BUF:%.*]]#1
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
   // CHECK-NEXT: apply [transparent] [[T0]]<@objc_metatype AnyObject.Type>([[OPT_OBJC_BUF]]#1)
-  // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-  // CHECK:      apply [transparent] [[T0]]<@objc_metatype AnyObject.Type>([[OBJC_BUF:%.*]]#1, [[OPT_OBJC_BUF]]#1)
+  // CHECK:      [[OBJC_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_OBJC_BUF]]
   // CHECK-NEXT: [[OBJC:%.*]] = load [[OBJC_BUF]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      store [[THICK]] to [[THICK_BUF:%.*]]#1
