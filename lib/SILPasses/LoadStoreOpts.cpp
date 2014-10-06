@@ -409,6 +409,15 @@ forwardAddressValueToUncheckedAddrToLoad(SILValue Address,
 
   // If the output is trivial, we have a trivial bit cast.
   if (OutputIsTrivial) {
+
+    // The structs could have different size. We have code in the stdlib that
+    // casts pointers to differently sized integer types. This code prevents
+    // that we bitcast the values.
+    SILType InputTy = UADCI->getOperand().getType();
+    if (OutputTy.getStructOrBoundGenericStruct() &&
+        InputTy.getStructOrBoundGenericStruct())
+      return SILValue();
+
     CastValue =  B.createUncheckedTrivialBitCast(UADCI->getLoc(), StoredValue,
                                                  OutputTy.getObjectType());
   } else {
