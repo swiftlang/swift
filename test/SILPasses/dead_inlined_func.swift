@@ -9,8 +9,7 @@
 // ... and also not in the llvm IR
 // CHECK-IR-NOT: define {{.*}}to_be_inlined
 
-// But: we want debug info for it.
-// CHECK-IR: metadata {{.*}}"to_be_inlined"
+// CHECK-IR: metadata !{metadata !"{{.*}}to_be_inlined{{.*}}"
 
 private func to_be_inlined(x: Int) -> Int {
 	return x + 1
