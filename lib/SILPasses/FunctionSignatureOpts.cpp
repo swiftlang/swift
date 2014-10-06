@@ -288,13 +288,17 @@ createEmptyFunctionWithOptimizedSig(SILFunction *OldF,
       OldFTy->getGenericSignature(), OldFTy->getExtInfo(),
       OldFTy->getCalleeConvention(), InterfaceParams, InterfaceResult, Ctx);
 
-  // Create the new function.
+  // Create the new function make it bare so that we don't care about debug
+  // scopes.
+  auto *NewDebugScope = new (M) SILDebugScope(*OldF->getDebugScope());
   SILFunction *NewF = SILFunction::create(
       M, OptimizedLinkage, NewFName, NewFTy, nullptr, OldF->getLocation(),
       OldF->isBare(), OldF->isTransparent(), OldF->isFragile(),
       OldF->getInlineStrategy(), OldF->getEffectsInfo(), 0,
-      OldF->getDebugScope(), OldF->getDeclContext());
+      NewDebugScope, OldF->getDeclContext());
   NewF->setSemanticsAttr(OldF->getSemanticsAttr());
+  NewDebugScope->SILFn = NewF;
+
   return NewF;
 }
 

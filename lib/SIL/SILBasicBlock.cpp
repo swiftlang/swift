@@ -116,6 +116,10 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
   if (Parent == SrcTraits.Parent) return;
 
   // If splicing blocks not in the same function, update the parent pointers.
-  for (; First != Last; ++First)
+  for (; First != Last; ++First) {
     First->Parent = Parent;
+    for (auto &II : *First) {
+      II.setDebugScope(Parent->getDebugScope());
+    }
+  }
 }
