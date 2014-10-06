@@ -214,3 +214,26 @@ bb3(%3 : $FakeOptional<Builtin.NativeObject>):
   %5 = tuple()
   return %5 : $()
 }
+
+struct _SwiftEmptyArrayStorage {
+}
+
+sil_global [fragile] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
+
+// CHECK-LABEL: sil @dont_strip_rawpointer_to_adress
+// CHECK: raw_pointer_to_ref
+// CHECK: strong_retain
+// CHECK: return
+sil @dont_strip_rawpointer_to_adress : $@thin(FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  %2 = sil_global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
+  %3 = address_to_pointer %2 : $*_SwiftEmptyArrayStorage to $Builtin.RawPointer
+  %4 = raw_pointer_to_ref %3 : $Builtin.RawPointer to $Builtin.NativeObject
+  strong_retain %4 : $Builtin.NativeObject
+  %5 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %5(%4) : $@thin (Builtin.NativeObject) -> ()
+  apply %5(%4) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %4 : $Builtin.NativeObject
+  %6 = tuple()
+  return %6 : $()
+}

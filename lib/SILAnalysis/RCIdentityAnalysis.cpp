@@ -37,12 +37,8 @@ static bool isNoPayloadEnum(SILValue V) {
 static bool isRCIdentityPreservingCast(ValueKind Kind) {
   switch (Kind) {
   case ValueKind::UpcastInst:
-  case ValueKind::AddressToPointerInst:
-  case ValueKind::PointerToAddressInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:
-  case ValueKind::RefToRawPointerInst:
-  case ValueKind::RawPointerToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
   case ValueKind::UncheckedRefBitCastInst:
     return true;
