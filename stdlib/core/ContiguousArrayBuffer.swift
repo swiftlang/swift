@@ -19,11 +19,7 @@ internal final class _EmptyArrayStorage
   : _ContiguousArrayStorageBase {
 
   init(_doNotCallMe: ()) {
-    // FIXME: Appaarent LLVM bug forces us to dynamically create one of these:
-    // <rdar://problem/18540783>
-
-    countAndCapacity = _ArrayBody()
-    // _sanityCheckFailure("creating instance of _EmptyArrayStorage")
+    _sanityCheckFailure("creating instance of _EmptyArrayStorage")
   }
   
   var countAndCapacity: _ArrayBody
@@ -55,18 +51,12 @@ internal final class _EmptyArrayStorage
   }
 }
 
-// FIXME: Appaarent LLVM bug forces us to dynamically allocate one of these:
-// <rdar://problem/18540783>
-
 /// The empty array prototype.  We use the same object for all empty
 /// [Native]Array<T>s.
-internal let _emptyArrayStorage = _EmptyArrayStorage(_doNotCallMe: ())
-/*
 internal var _emptyArrayStorage : _EmptyArrayStorage {
   return Builtin.bridgeFromRawPointer(
     Builtin.addressof(&_swiftEmptyArrayStorage))
 }
-*/
 
 // The class that implements the storage for a ContiguousArray<T>
 final class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
