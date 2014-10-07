@@ -72,39 +72,41 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     _destroyBridgedStorage(_heapBufferBridged)
   }
 
-  internal func _getBridgedUnsafeBuffer() -> UnsafeBufferPointer<AnyObject> {
-    // If we've already got a buffer of bridged objects, just return it.
-    if let bridgedStorage = _heapBufferBridged {
-      let heapBuffer = HeapBuffer(bridgedStorage)
-      return UnsafeBufferPointer(
-        start: heapBuffer.baseAddress, count: heapBuffer.value)
-    }
+  internal func _withBridgedUnsafeBuffer<R>(
+    body: (UnsafeBufferPointer<AnyObject>)->R
+  ) -> R {
+    do {
+      var buffer: UnsafeBufferPointer<AnyObject>
+      
+      // If we've already got a buffer of bridged objects, just use it
+      if let bridgedStorage = _heapBufferBridged {
+        let heapBuffer = HeapBuffer(bridgedStorage)
+        buffer = UnsafeBufferPointer(
+            start: heapBuffer.baseAddress, count: heapBuffer.value)
+      }
 
-    // If elements are bridged verbatim, the native buffer is all we
-    // need, so return that.
-    let maybeNewDataUnsafeBuffer =
-      _nativeStorage._tryGetVerbatimBridgedUnsafeBuffer()
-    if maybeNewDataUnsafeBuffer.baseAddress != nil {
-      return maybeNewDataUnsafeBuffer
+      // If elements are bridged verbatim, the native buffer is all we
+      // need, so return that.
+      else if let buf = _nativeStorage._withVerbatimBridgedUnsafeBuffer({ $0 }) {
+        buffer = buf
+      }
+      else {
+        // Create buffer of bridged objects.
+        let bridgedHeapBuffer = _nativeStorage._getNonVerbatimBridgedHeapBuffer()
+        
+        // Atomically store a reference to that buffer in self.
+        if !_stdlib_atomicInitializeARCRef(
+          object: _heapBufferBridgedPtr, desired: bridgedHeapBuffer.storage!) {
+          // Another thread won the race.  Throw out our buffer
+          _destroyBridgedStorage(bridgedHeapBuffer.storage!)
+        }
+        continue // try again
+      }
+      let result = body(buffer)
+      _fixLifetime(self)
+      return result
     }
-
-    // Create buffer of bridged objects.
-    let bridgedHeapBuffer = _nativeStorage._getNonVerbatimBridgedHeapBuffer()
-    
-    // Atomically store a reference to that buffer in self.
-    if !_stdlib_atomicInitializeARCRef(
-      object: _heapBufferBridgedPtr, desired: bridgedHeapBuffer.storage!) {
-      // Another thread won the race.  Throw out our buffer and try again.
-      _destroyBridgedStorage(bridgedHeapBuffer.storage!)
-      return _getBridgedUnsafeBuffer()
-    }
-
-    // Now that we're bridged, we don't need the native storage any
-    // longer... but we can't let it go without causing a race against
-    // another thread that may already be building its own buffer of
-    // bridged objects.
-    return UnsafeBufferPointer(
-      start: bridgedHeapBuffer.baseAddress, count: bridgedHeapBuffer.value)
+    while true
   }
 
   //
@@ -121,39 +123,40 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     }
 
     // Check if elements are bridged verbatim.
-    let maybeNewDataUnsafeBuffer =
-      _nativeStorage._tryGetVerbatimBridgedUnsafeBuffer()
-    if maybeNewDataUnsafeBuffer.baseAddress != nil {
-      return maybeNewDataUnsafeBuffer.count
-    }
-    return _nativeStorage._getNonVerbatimBridgedCount()
+    return _nativeStorage._withVerbatimBridgedUnsafeBuffer { $0.count }
+      ?? _nativeStorage._getNonVerbatimBridgedCount()
   }
 
   @objc internal func objectAtIndex(index: Int) -> AnyObject {
-    let bridgedUnsafeBuffer = _getBridgedUnsafeBuffer()
-    _precondition(
-      _isValidArraySubscript(index, bridgedUnsafeBuffer.count),
-      "Array index out of range")
-    return bridgedUnsafeBuffer[index]
+    return _withBridgedUnsafeBuffer {
+      objects in
+      _precondition(
+        _isValidArraySubscript(index, objects.count),
+        "Array index out of range")
+      return objects[index]
+    }
   }
 
   @objc internal func getObjects(
-    aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange) {
-    let bridgedUnsafeBuffer = _getBridgedUnsafeBuffer()
-    _precondition(
-      _isValidArrayIndex(range.location, bridgedUnsafeBuffer.count),
-      "Array index out of range")
-    _precondition(
-      _isValidArrayIndex(
-        range.location + range.length, bridgedUnsafeBuffer.count),
-      "Array index out of range")
+    aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
+  ) {
+    return _withBridgedUnsafeBuffer {
+      objects in
+      _precondition(
+        _isValidArrayIndex(range.location, objects.count),
+        "Array index out of range")
 
-    // These objects are "returned" at +0, so treat them as values to
-    // avoid retains.
-    var dst = UnsafeMutablePointer<Word>(aBuffer)
-    dst.initializeFrom(
-      UnsafeMutablePointer(bridgedUnsafeBuffer.baseAddress + range.location),
-      count: range.length)
+      _precondition(
+        _isValidArrayIndex(
+          range.location + range.length, objects.count),
+        "Array index out of range")
+
+      // These objects are "returned" at +0, so treat them as values to
+      // avoid retains.
+      UnsafeMutablePointer<Word>(aBuffer).initializeFrom(
+        UnsafeMutablePointer(objects.baseAddress + range.location),
+        count: range.length)
+    }
   }
 
   @objc internal func countByEnumeratingWithState(
@@ -166,14 +169,16 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
       return 0
     }
 
-    let bridgedUnsafeBuffer = _getBridgedUnsafeBuffer()
-    enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-    enumerationState.itemsPtr = unsafeBitCast(
-      bridgedUnsafeBuffer.baseAddress,
-      AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
-    enumerationState.state = 1
-    state.memory = enumerationState
-    return bridgedUnsafeBuffer.count
+    return _withBridgedUnsafeBuffer {
+      objects in
+      enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+      enumerationState.itemsPtr = unsafeBitCast(
+        objects.baseAddress,
+        AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
+      enumerationState.state = 1
+      state.memory = enumerationState
+      return objects.count
+    }
   }
 
   @objc internal func copyWithZone(_: _SwiftNSZone) -> AnyObject {
@@ -185,11 +190,14 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
 /// this is not a class protocol instead, is that instances of class
 /// protocols are fatter than plain object references.
 class _ContiguousArrayStorageBase {
-  internal func _tryGetVerbatimBridgedUnsafeBuffer(
-    dummy: Void
-  ) -> UnsafeBufferPointer<AnyObject> {
+  /// If the stored type is bridged verbatim, invoke `body` on an
+  /// `UnsafeBufferPointer` to the elements and return the result.
+  /// Otherwise, return `nil`.
+  internal func _withVerbatimBridgedUnsafeBuffer<R>(
+    body: (UnsafeBufferPointer<AnyObject>)->R
+  ) -> R? {
     _sanityCheckFailure(
-      "Concrete subclasses must implement _tryGetVerbatimBridgedUnsafeBuffer")
+      "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }
 
   internal func _getNonVerbatimBridgedCount(dummy: Void) -> Int {

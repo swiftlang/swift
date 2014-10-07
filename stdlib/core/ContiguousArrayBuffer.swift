@@ -24,10 +24,10 @@ internal final class _EmptyArrayStorage
   
   var countAndCapacity: _ArrayBody
 
-  override func _tryGetVerbatimBridgedUnsafeBuffer(
-    dummy: Void
-  ) -> UnsafeBufferPointer<AnyObject> {
-    return UnsafeBufferPointer(start: .null(), count: 0)
+  override func _withVerbatimBridgedUnsafeBuffer<R>(
+    body: (UnsafeBufferPointer<AnyObject>)->R
+  ) -> R? {
+    return body(UnsafeBufferPointer(start: .null(), count: 0))
   }
 
   override func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
@@ -58,8 +58,37 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
     Builtin.addressof(&_swiftEmptyArrayStorage))
 }
 
+// FIXME: This whole class is a workaround for
+// <rdar://problem/18560464> Can't override generic method in generic
+// subclass.  If it weren't for that bug, we'd override
+// _withVerbatimBridgedUnsafeBuffer directly in
+// _ContiguousArrayStorage<T>.
+class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
+  /// If the `T` is bridged verbatim, invoke `body` on an
+  /// `UnsafeBufferPointer` to the elements and return the result.
+  /// Otherwise, return `nil`.
+  final override func _withVerbatimBridgedUnsafeBuffer<R>(
+    body: (UnsafeBufferPointer<AnyObject>)->R
+  ) -> R? {
+    var result: R? = nil
+    self._withVerbatimBridgedUnsafeBufferImpl {
+      result = body($0)
+    }
+    return result
+  }
+
+  /// If `T` is bridged verbatim, invoke `body` on an
+  /// `UnsafeBufferPointer` to the elements.
+  internal func _withVerbatimBridgedUnsafeBufferImpl(
+    body: (UnsafeBufferPointer<AnyObject>)->Void
+  ) {
+    _sanityCheckFailure(
+      "Must override _withVerbatimBridgedUnsafeBufferImpl in derived classes")
+  }
+}
+
 // The class that implements the storage for a ContiguousArray<T>
-final class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
+final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
   typealias Buffer = _ContiguousArrayBuffer<T>
 
   deinit {
@@ -72,18 +101,19 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorageBase {
     return Buffer(self)._base._allocatedSizeAndAlignMask()
   }
 
-  /// If `T` is bridged verbatim, returns a pointer to the array data buffer.
-  /// Otherwise, returns a null pointer.
-  override internal func _tryGetVerbatimBridgedUnsafeBuffer(
-    dummy: Void
-  ) -> UnsafeBufferPointer<AnyObject> {
+  /// If `T` is bridged verbatim, invoke `body` on an
+  /// `UnsafeBufferPointer` to the elements.
+  internal final override func _withVerbatimBridgedUnsafeBufferImpl(
+    body: (UnsafeBufferPointer<AnyObject>)->Void
+  ) {
     if _isBridgedVerbatimToObjectiveC(T.self) {
       let nativeBuffer = Buffer(self)
-      return UnsafeBufferPointer(
-        start: UnsafePointer(nativeBuffer.baseAddress),
-        count: nativeBuffer.count)
+      body(
+        UnsafeBufferPointer(
+          start: UnsafePointer(nativeBuffer.baseAddress),
+          count: nativeBuffer.count))
+      _fixLifetime(self)
     }
-    return UnsafeBufferPointer(start: .null(), count: 0)
   }
 
   /// Returns the number of elements in the array.
