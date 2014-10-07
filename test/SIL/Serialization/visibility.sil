@@ -33,8 +33,8 @@ import Builtin
 // CHECK: sil [fragile] @public_function_test : $@thin () -> () {
 // CHECK: sil [fragile] @public_function : $@thin () -> () {
 // CHECK: sil hidden [fragile] @hidden_function : $@thin () -> () {
-// CHECK-NOT: sil shared_external [fragile] @shared_external_function_test : $@thin () -> () {
-// CHECK: sil shared_external [fragile] @shared_external_function_test : $@thin () -> ()
+// CHECK-NOT: sil shared_external [fragile] @shared_external_function_test : $@thin () -> ()
+// CHECK: sil shared [fragile] @shared_external_function_test : $@thin () -> ()
 
 sil_global private [fragile] @private_global : $Builtin.Word
 sil_global [fragile] @public_global : $Builtin.Word

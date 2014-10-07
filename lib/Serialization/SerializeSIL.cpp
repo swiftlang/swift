@@ -224,8 +224,24 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   IdentifierID SemanticsID =
     F.getSemanticsAttr().empty() ? (IdentifierID)0 :
     S.addIdentifierRef(Ctx.getIdentifier(F.getSemanticsAttr()));
+
+  SILLinkage Linkage = F.getLinkage();
+
+  // We serialize shared_external linkage as shared since:
+  //
+  // 1. shared_external linkage is just a hack to tell the optimizer that a
+  // shared function was deserialized.
+  //
+  // 2. We can not just serialize a declaration to a shared_external function
+  // since shared_external functions still have linkonce_odr linkage at the LLVM
+  // level. This means they must be defined not just declared.
+  //
+  // TODO: When serialization is reworked, this should be removed.
+  if (hasSharedVisibility(Linkage))
+    Linkage = SILLinkage::Shared;
+
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                toStableSILLinkage(F.getLinkage()),
+                                toStableSILLinkage(Linkage),
                                 (unsigned)F.isTransparent(),
                                 (unsigned)F.isFragile(),
                                 (unsigned)F.isGlobalInit(),
@@ -233,7 +249,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                                 (unsigned)F.getEffectsInfo(),
                                 FnID, SemanticsID);
 
-  if (DeclOnly || F.isAvailableExternally() || F.isExternalDeclaration())
+  if (DeclOnly || isAvailableExternally(Linkage) || F.isExternalDeclaration())
     return;
 
   // Write the body's context archetypes, unless we don't actually have a body.
