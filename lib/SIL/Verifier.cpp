@@ -544,10 +544,10 @@ public:
     case SILLinkage::PrivateExternal:
     case SILLinkage::Hidden:
     case SILLinkage::HiddenExternal:
-    case SILLinkage::SharedExternal:
       return false;
 
     case SILLinkage::Shared:
+    case SILLinkage::SharedExternal:
         // This handles some kind of generated functions, like constructors
         // of clang imported types.
         // TODO: check why those functions are not fragile anyway and make
