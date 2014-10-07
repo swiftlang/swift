@@ -129,6 +129,10 @@ analyzeArguments(SILFunction *F, SmallVectorImpl<ArgDescriptor> &ArgDescList,
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
+static bool isSpecializedFunction(SILFunction &F) {
+  return F.getName().startswith("_TTOS");
+}
+
 static void createNewName(SILFunction &OldF, ArrayRef<ArgDescriptor> Args,
                           llvm::SmallString<64> &Name) {
   llvm::raw_svector_ostream buffer(Name);
@@ -403,18 +407,6 @@ optimizeFunctionSignature(SILFunction *F,
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
 
-  // If F has no body, bail...
-  if (F->empty()) {
-    DEBUG(llvm::dbgs() << "    Has no body... Bailing!\n");
-    return false;
-  }
-
-  // For now ignore generic functions to keep things simple...
-  if (F->getLoweredFunctionType()->isPolymorphic()) {
-    DEBUG(llvm::dbgs() << "    Polymorphic function... Bailing!\n");
-    return false;
-  }
-
   // An array containing our ArgDescriptor objects that contain information
   // from our analysis.
   llvm::SmallVector<ArgDescriptor, 8> Arguments;
@@ -474,6 +466,57 @@ optimizeFunctionSignature(SILFunction *F,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
+static bool isSpecializableCC(AbstractCC CC) {
+  switch (CC) {
+  case AbstractCC::Method:
+  case AbstractCC::Freestanding:
+  case AbstractCC::C:
+    return true;
+  case AbstractCC::WitnessMethod:
+  case AbstractCC::ObjCMethod:
+    return false;
+  }
+}
+
+static bool canSpecializeFunction(SILFunction &F) {
+  // Do not specialize the signature of SILFunctions that are external
+  // declarations since there is no body to optimize.
+  if (F.isExternalDeclaration())
+    return false;
+
+  // Do not specialize functions that are available externally. If an external
+  // function was able to be specialized, it would have been specialized in its
+  // own module. We will inline the original function as a thunk. The thunk will
+  // call the specialized function.
+  if (F.isAvailableExternally())
+    return false;
+
+  // Do not specialize functions that we already specialized.
+  if (isSpecializedFunction(F))
+    return false;
+
+  // Do not specialize the signature of transparent functions or always inline
+  // functions, we will just inline them and specialize each one of the
+  // individual functions that these sorts of functions are inlined into.
+  if (F.isTransparent() || F.getInlineStrategy() == Inline_t::AlwaysInline)
+    return false;
+
+  // For now ignore generic functions to keep things simple...
+  if (F.getLoweredFunctionType()->isPolymorphic())
+    return false;
+
+  // Only specialize fragile functions for now since I keep running into
+  // bugs other places in the compiler with non-fragile functions.
+  if (!F.isFragile())
+    return false;
+
+  // Make sure F has a linkage that we can optimize.
+  if (!isSpecializableCC(F.getAbstractCC()))
+    return false;
+
+  return true;
+}
+
 namespace {
 
 class FunctionSignatureOpts : public SILModuleTransform {
@@ -498,16 +541,32 @@ public:
     // line more calls may be exposed and the inliner might be able to handle
     // those calls.
     bool Changed = false;
+
     for (auto &F : *M) {
-      // First try and grab F's call graph node.
+      // Check the signature of F to make sure that it is a function that we can
+      // specialize. These are conditions independent of the call graph.
+      if (!canSpecializeFunction(F))
+        continue;
+
+      // Then try and grab F's call graph node.
       CallGraphNode *FNode = CG.getCallGraphNode(&F);
 
       // If we don't have any call graph information for F, skip F.
       if (!FNode)
         continue;
 
-      // Now that we have our call graph, optimize F and all of its apply insts.
+      // Now that we have our call graph, grab the CallSites of F.
       auto CallSites = FNode->getKnownCallerCallSites();
+
+      // If this function is not called anywhere, for now don't do anything.
+      //
+      // TODO: If it is public, it may still make sense to specialize since if
+      // we link in the public function in another module, we may be able to
+      // inline it and access the specialized version.
+      if (CallSites.empty())
+        continue;
+
+      // Otherwise, try to optimize the function signature of F.
       Changed |= optimizeFunctionSignature(&F, CallSites, RCIA);
     }
 
