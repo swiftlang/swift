@@ -1,4 +1,4 @@
-set(sources DarwinShims.h FoundationShims.h GlobalObjects.h HeapObject.h RefCount.h UnicodeShims.h module.map)
+set(sources DarwinShims.h FoundationShims.h GlobalObjects.h HeapObject.h RefCount.h RuntimeShims.h UnicodeShims.h module.map)
 set(output_dir "${SWIFTLIB_DIR}/shims")
 
 set(commands)

@@ -25,12 +25,6 @@ import Swift
 //===--- Code destined for stdlib -----------------------------------------===//
 import SwiftShims
 
-@asmname("_swift_usesNativeSwiftReferenceCounting_nonNull")
-func _swift_usesNativeSwiftReferenceCounting_nonNull(_: UnsafePointer<Void>) -> Bool
-
-@asmname("_swift_isUniquelyReferencedNative_nonNull")
-func _swift_isUniquelyReferencedNative_nonNull(_: UnsafePointer<Void>) -> Bool
-
 @asmname("_swift_isUniquelyReferenced")
 func _swift_isUniquelyReferenced(_: UnsafeMutablePointer<HeapObject>) -> Bool
 

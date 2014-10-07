@@ -4,6 +4,7 @@ module SwiftShims {
   header "GlobalObjects.h"
   header "HeapObject.h"
   header "RefCount.h"
+  header "RuntimeShims.h"
   header "UnicodeShims.h"
   export *
 }
