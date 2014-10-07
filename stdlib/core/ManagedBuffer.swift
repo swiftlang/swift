@@ -12,45 +12,37 @@
 
 import SwiftShims
 
-/// A common non-generic base class for all `ManagedBuffer`\ 's.
-public class ManagedBufferBase {}
-
-typealias _Contiguous_ArrayBufferBase = _ContiguousArrayStorageBase
-
-% for cluster in 'Managed', '_Contiguous_Array':
-%   public = 'public' if not cluster.startswith('_') else 'internal'
-
-/// A base class of `${cluster}Buffer<Value,Element>`, used during
+/// A base class of `ManagedBuffer<Value,Element>`, used during
 /// instance creation.
 ///
 /// During instance creation, in particular during
-/// `${cluster}Buffer.create`\ 's call to initialize, `${cluster}Buffer`\ 's
+/// `ManagedBuffer.create`\ 's call to initialize, `ManagedBuffer`\ 's
 /// `value` property is as-yet uninitialized, and therefore
 ///
-/// `${cluster}ProtoBuffer` does not offer
+/// `ManagedProtoBuffer` does not offer
 /// access to the as-yet uninitialized `value` property of
-/// `${cluster}Buffer`,
-${public} class ${cluster}ProtoBuffer<Value, Element> : ${cluster}BufferBase {
+/// `ManagedBuffer`,
+public class ManagedProtoBuffer<Value, Element> {
   /// The actual number of elements that can be stored in this object.
   ///
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  ${public} final var allocatedElementCount : Int {
+  public final var allocatedElementCount : Int {
     return (
-      _allocatedByteCount &- ${cluster}ProtoBuffer._elementOffset &+ sizeof(Element) &- 1
+      _allocatedByteCount &- ManagedProtoBuffer._elementOffset &+ sizeof(Element) &- 1
     ) &/ sizeof(Element)
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored `Value`
-  ${public} final func withUnsafeMutablePointerToValue<R>(
+  public final func withUnsafeMutablePointerToValue<R>(
     body: (UnsafeMutablePointer<Value>)->R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
   
   /// Call body with an `UnsafeMutablePointer` to the `Element` storage
-  ${public} final func withUnsafeMutablePointerToElements<R>(
+  public final func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>)->R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
@@ -58,12 +50,12 @@ ${public} class ${cluster}ProtoBuffer<Value, Element> : ${cluster}BufferBase {
 
   /// Call body with `UnsafeMutablePointer`\ s to the stored `Value`
   /// and raw `Element` storage
-  ${public} final func withUnsafeMutablePointers<R>(
+  public final func withUnsafeMutablePointers<R>(
     body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
   ) -> R {
     let result = body(
-      UnsafeMutablePointer(_address + ${cluster}ProtoBuffer._valueOffset),
-      UnsafeMutablePointer(_address + ${cluster}ProtoBuffer._elementOffset)
+      UnsafeMutablePointer(_address + ManagedProtoBuffer._valueOffset),
+      UnsafeMutablePointer(_address + ManagedProtoBuffer._elementOffset)
     )
     _fixLifetime(self)
     return result
@@ -108,7 +100,7 @@ ${public} class ${cluster}ProtoBuffer<Value, Element> : ${cluster}BufferBase {
   /// allocated size.  Probably completely unused per
   /// <rdar://problem/18156440>
   internal final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
-    return (_allocatedByteCount, ${cluster}ProtoBuffer._alignmentMask)
+    return (_allocatedByteCount, ManagedProtoBuffer._alignmentMask)
   }
 }
 
@@ -123,34 +115,33 @@ ${public} class ${cluster}ProtoBuffer<Value, Element> : ${cluster}BufferBase {
 /// any live elements in the `deinit` of a subclass.  Note: subclasses
 /// must not have any stored properties; any storage needed should be
 /// included in `Value`.
-${public} class ${cluster}Buffer<Value, Element>
-  : ${cluster}ProtoBuffer<Value, Element> {
+public class ManagedBuffer<Value, Element>
+  : ManagedProtoBuffer<Value, Element> {
   
   /// Create a new instance of the most-derived class, calling
-  /// `initialValue` on the partially-constructed object to generate an
+  /// `initialize` on the partially-constructed object to generate an
   /// initial `Value`.
   ///
   /// Note, in particular, accessing `value` inside the `initialize`
   /// function is undefined.
-  ${public} final class func create(
-    minimumCapacity: Int,
-    initialValue: (${cluster}ProtoBuffer<Value,Element>)->Value
-  ) -> ${cluster}Buffer {
+  public final class func create(
+    minimumCapacity: Int, initialize: (ManagedProtoBuffer<Value,Element>)->Value
+  ) -> ManagedBuffer {
     _precondition(
       minimumCapacity >= 0,
-      "${cluster}Buffer must have non-negative capacity")
+      "ManagedBuffer must have non-negative capacity")
 
-    let totalSize = ${cluster}Buffer._elementOffset
+    let totalSize = ManagedBuffer._elementOffset
       +  minimumCapacity * strideof(Element.self)
 
-    let alignMask = ${cluster}Buffer._alignmentMask
+    let alignMask = ManagedBuffer._alignmentMask
 
-    let result: ${cluster}Buffer = unsafeDowncast(
+    let result: ManagedBuffer = unsafeDowncast(
         _swift_bufferAllocate(self, totalSize, alignMask)
       )
     
     result.withUnsafeMutablePointerToValue {
-      $0.initialize(initialValue(result))
+      $0.initialize(initialize(result))
     }
     return result
   }
@@ -172,7 +163,7 @@ ${public} class ${cluster}Buffer<Value, Element>
   /// The stored `Value` instance.
   ///
   /// Note: this value must not be accessed during instance creation.
-  ${public} final var value: Value {
+  public final var value: Value {
     address {
       return withUnsafeMutablePointerToValue { UnsafePointer($0) }
     }
@@ -181,5 +172,3 @@ ${public} class ${cluster}Buffer<Value, Element>
     }
   }
 }
-
-% end
