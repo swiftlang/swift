@@ -121,8 +121,13 @@ else()
   # the second, it causes errors when the system libraries are told to
   # include everything). The best way to get it in there, according to the
   # documentation, is to put the flags in the target_link_Libraries setting.
-  set(RUNTIME_DEPENDENCY
-    -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
+
+  # TODO: However, for the moment this actually makes things explode with an
+  # incomplete runtime. This should be turned back on when more of the porting
+  # effort has been completed.
+  #set(RUNTIME_DEPENDENCY
+  #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
+  set(RUNTIME_DEPENDENCY swiftRuntime)
 endif()
 
 set(SWIFT_CHECK_ESSENTIAL_STDLIB NO CACHE BOOL
