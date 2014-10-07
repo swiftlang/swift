@@ -95,6 +95,8 @@ public func reinterpretCast<T, U>(var x: T) -> U {
 public func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
     "can't unsafeBitCast between types of different sizes")
+  // FIXME: <rdar://problem/18574301> Builtin.reinterpretCast is broken
+  // return Builtin.reinterpretCast(x)
   return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
 }
 
