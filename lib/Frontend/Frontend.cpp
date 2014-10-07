@@ -168,7 +168,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
       llvm::sys::path::replace_extension(ModuleDocFilePath,
                                          SERIALIZED_MODULE_DOC_EXTENSION);
       FileOrError ModuleDocOrErr =
-        llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath);
+        llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
       if (!ModuleDocOrErr &&
           ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
         Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
