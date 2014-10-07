@@ -127,16 +127,16 @@ struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject> : BridgeStorage
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    return _swift_isUniquelyReferencedNative_nonNull(address)
+    return _swift_isUniquelyReferencedNative_nonNull(object)
   }
   
   var native: Native? {
-    return _swift_usesNativeSwiftReferenceCounting_nonNull(address)
+    return _swift_usesNativeSwiftReferenceCounting_nonNull(object)
     ? .Some(Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(object))) : nil
   }
     
   var cocoa: Cocoa? {
-    return _swift_usesNativeSwiftReferenceCounting_nonNull(address)
+    return _swift_usesNativeSwiftReferenceCounting_nonNull(object)
     ? nil : .Some(Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(object)))
   }
     
