@@ -933,6 +933,8 @@ static AccessorKind getAccessorKind(StringRef ident) {
   return llvm::StringSwitch<AccessorKind>(ident)
            .Case("getter", AccessorKind::IsGetter)
            .Case("setter", AccessorKind::IsSetter)
+           .Case("addressor", AccessorKind::IsAddressor)
+           .Case("mutableAddressor", AccessorKind::IsMutableAddressor)
            .Case("materializeForSet", AccessorKind::IsMaterializeForSet)
            .Default(AccessorKind::NotAccessor);
 }
