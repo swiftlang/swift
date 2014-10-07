@@ -25,24 +25,28 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(swift::Type Ty,
+                             llvm::Type *StorageTy,
                              uint64_t SizeInBytes,
                              uint32_t AlignInBytes,
                              DeclContext *DC)
   : DeclOrContext(DC),
     Type(Ty.getPointer()),
-    StorageType(nullptr),
+    StorageType(StorageTy),
     size(SizeInBytes),
     align(AlignInBytes) {
+  assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(swift::Type Ty, Size size, Alignment align,
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
+                             Size size, Alignment align,
                              DeclContext *DC)
   : DeclOrContext(DC),
     Type(Ty.getPointer()),
-    StorageType(nullptr),
+    StorageType(StorageTy),
     size(size),
     align(align) {
+  assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
 }
 
@@ -60,6 +64,7 @@ initFromTypeInfo(Size &size, Alignment &align, llvm::Type *&StorageType,
   }
   align = Info.getBestKnownAlignment();
   assert(align.getValue() != 0);
+  assert(StorageType && "StorageType is a nullptr");
 }
 
 DebugTypeInfo::DebugTypeInfo(swift::Type Ty, const TypeInfo &Info,
@@ -80,9 +85,10 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align)
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy,
+                             Size size, Alignment align)
   : DeclOrContext(Decl),
-    StorageType(nullptr),
+    StorageType(StorageTy),
     size(size),
     align(align) {
   // Use the sugared version of the type, if there is one.
@@ -91,6 +97,7 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align)
   else
     Type = Decl->getType().getPointer();
 
+  assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
 }
 

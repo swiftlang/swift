@@ -43,21 +43,23 @@ namespace swift {
       /// The type we need to emit may be different from the type
       /// mentioned in the Decl, for example, stripped of qualifiers.
       TypeBase *Type;
-      /// Needed to determine the size of basic types.
-      // FIXME: Remove this if possible.
+      /// Needed to determine the size of basic types and to determine
+      /// the storage type for undefined variables.
       llvm::Type *StorageType;
       Size size;
       Alignment align;
 
       DebugTypeInfo()
         : Type(nullptr), StorageType(nullptr), size(0), align(1) {}
-      DebugTypeInfo(swift::Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes,
+      DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
+                    uint64_t SizeInBytes, uint32_t AlignInBytes,
                     DeclContext *DC);
-      DebugTypeInfo(swift::Type Ty, Size size, Alignment align,
-                    DeclContext *DC);
+      DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
+                    Size size, Alignment align, DeclContext *DC);
       DebugTypeInfo(swift::Type Ty, const TypeInfo &Info, DeclContext *DC);
       DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
-      DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align);
+      DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageType,
+                    Size size, Alignment align);
       DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info);
       TypeBase* getType() const { return Type; }
 
@@ -87,7 +89,7 @@ namespace llvm {
     }
     static swift::irgen::DebugTypeInfo getTombstoneKey() {
       return swift::irgen::DebugTypeInfo(llvm::DenseMapInfo<swift::TypeBase*>
-                                         ::getTombstoneKey(), 0, 0, 0);
+                                         ::getTombstoneKey(), nullptr, 0, 0, 0);
     }
     static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
       return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

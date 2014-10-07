@@ -888,7 +888,7 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                                       StringRef Name) {
   auto TName = BumpAllocatedString(("$swift.type." + Name).str());
-  DebugTypeInfo DbgTy(getMetadataType(),
+  DebugTypeInfo DbgTy(getMetadataType(), Metadata->getType(),
                       (Size)CI.getTargetInfo().getPointerWidth(0),
                       (Alignment)CI.getTargetInfo().getPointerAlign(0));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
@@ -1120,7 +1120,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.size() == 0) {
-    auto undef = llvm::UndefValue::get(llvm::Type::getVoidTy(M.getContext()));
+    auto undef = llvm::UndefValue::get(DbgTy.StorageType);
     emitDbgIntrinsic(BB, undef, Var, Expr, Line, Loc.Col, Scope, DS);
   }
 }
@@ -1283,14 +1283,16 @@ llvm::DIArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
       DebugTypeInfo ElemDbgTy;
       if (ElemDecl->hasArgumentType())
         ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(),
+                                  DbgTy.StorageType,
                                   DbgTy.size, DbgTy.align, D);
       else
         if (D->hasRawType())
-          ElemDbgTy = DebugTypeInfo(D->getRawType(),
+          ElemDbgTy = DebugTypeInfo(D->getRawType(), DbgTy.StorageType,
                                     DbgTy.size, DbgTy.align, D);
         else
           // Fallback to Int as the element type.
           ElemDbgTy = DebugTypeInfo(IGM.Context.getIntDecl()->getDeclaredType(),
+                                    DbgTy.StorageType,
                                     DbgTy.size, DbgTy.align, D);
       unsigned Offset = 0;
       auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
@@ -1334,7 +1336,8 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
 /// Return a DIType for Ty reusing any DeclContext found in DbgTy.
 llvm::DIType IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                       DebugTypeInfo DbgTy) {
-  DebugTypeInfo BlandDbgTy(Ty, DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
+  DebugTypeInfo BlandDbgTy(Ty, DbgTy.StorageType, DbgTy.size, DbgTy.align,
+                           DbgTy.getDeclContext());
   return getOrCreateType(BlandDbgTy);
 }
 
@@ -1692,8 +1695,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BuiltinVector: {
     (void)MangledName; // FIXME emit the name somewhere.
     auto BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
-    DebugTypeInfo ElemDbgTy(BuiltinVectorTy->getElementType(), DbgTy.size,
-                            DbgTy.align, DbgTy.getDeclContext());
+    DebugTypeInfo ElemDbgTy(BuiltinVectorTy->getElementType(),
+                            DbgTy.StorageType,
+                            DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
     auto Subscripts = llvm::DIArray();
     return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
                                      AlignInBits, getOrCreateType(ElemDbgTy),
@@ -1723,8 +1727,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto File = getOrCreateFile(L.Filename);
     // For NameAlias types, the DeclContext for the aliasED type is
     // in the decl of the alias type.
-    DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.size, DbgTy.align,
-                               DbgTy.getDeclContext());
+    DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.StorageType,
+                               DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
     return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                   File, L.Line, File);
   }

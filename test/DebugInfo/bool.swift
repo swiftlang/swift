@@ -1,6 +1,6 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// Int1 still uses 8 bits of storage.
-// CHECK: [ DW_TAG_base_type ] [_TtBi1_] [line 0, size 8, align 8, offset 0, enc DW_ATE_unsigned]
+// Int1 uses 1 bit, but is aligned at 8 bits.
+// CHECK: [ DW_TAG_base_type ] [_TtBi1_] [line 0, size 1, align 8, offset 0, enc DW_ATE_unsigned]
 func main()
 {
 	var t = true
