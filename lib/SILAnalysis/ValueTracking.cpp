@@ -132,6 +132,8 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RefToUnmanagedInst:
   case ValueKind::RefToUnownedInst:
+  case ValueKind::SelectEnumInst:
+  case ValueKind::SelectEnumAddrInst:
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
   case ValueKind::StructInst:

@@ -1134,6 +1134,23 @@ bb0:
   return %0 : $()
 }
 
+// CHECK-LABEL: sil @select_enum : $@thin (@in Beth) -> () {
+sil @select_enum : $@thin (@in Beth) -> () {
+bb0(%0 : $*Beth):
+  %1 = load %0 : $*Beth
+  %2 = integer_literal $Builtin.Int32, 2
+  %3 = integer_literal $Builtin.Int32, 3
+  // CHECK: %4 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt.1: %3 : $Builtin.Int32
+  %4 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt.1: %3 : $Builtin.Int32
+  // CHECK: %5 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt.1: %3 : $Builtin.Int32
+  %5 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt.1: %3 : $Builtin.Int32
+  // CHECK: %6 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32
+  %6 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32
+  // CHECK: %7 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32
+  %7 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32
+  return undef : $()
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis

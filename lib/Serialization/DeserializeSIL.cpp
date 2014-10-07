@@ -1271,6 +1271,41 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                       DefaultBB, CaseBBs);
     break;
   }
+  case ValueKind::SelectEnumInst:
+  case ValueKind::SelectEnumAddrInst: {
+    // Format: condition, a list of cases (EnumElementDecl + Value ID),
+    // default value ID. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list has value for condition, result type,
+    //   hasDefault, default
+    // basic block ID, a list of (DeclID, BasicBlock ID).
+    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
+                                  getSILType(MF->getType(TyID),
+                                             (SILValueCategory)TyCategory));
+
+    Type ResultLoweredTy = MF->getType(ListOfValues[2]);
+    SILValueCategory ResultCategory = (SILValueCategory)ListOfValues[3];
+    SILType ResultTy = getSILType(ResultLoweredTy, ResultCategory);
+    
+    SILValue DefaultVal = nullptr;
+    if (ListOfValues[4])
+      DefaultVal = getLocalValue(ListOfValues[5], ListOfValues[6],
+                                   ResultTy);
+
+    SmallVector<std::pair<EnumElementDecl*, SILValue>, 4> CaseVals;
+    for (unsigned I = 7, E = ListOfValues.size(); I < E; I += 3) {
+      auto Value = getLocalValue(ListOfValues[I+1], ListOfValues[I+2],
+                                 ResultTy);
+      CaseVals.push_back({cast<EnumElementDecl>(MF->getDecl(ListOfValues[I])),
+                         Value});
+    }
+    if ((ValueKind)OpCode == ValueKind::SelectEnumInst)
+      ResultVal = Builder.createSelectEnum(Loc, Cond, ResultTy,
+                                           DefaultVal, CaseVals);
+    else
+      ResultVal = Builder.createSelectEnumAddr(Loc, Cond, ResultTy,
+                                               DefaultVal, CaseVals);
+    break;
+  }
   case ValueKind::SwitchIntInst: {
     // Format: condition, a list of cases (APInt + Basic Block ID),
     // default basic block ID. Use SILOneTypeValuesLayout: the type is

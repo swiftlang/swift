@@ -362,6 +362,8 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::UnownedRetainInst:
     case ValueKind::UnownedToRefInst:
     case ValueKind::InitBlockStorageHeaderInst:
+    case ValueKind::SelectEnumAddrInst:
+    case ValueKind::SelectEnumInst:
       return InlineCost::Expensive;
 
     case ValueKind::SILArgument:

@@ -501,6 +501,22 @@ public:
                     InjectEnumAddrInst(Loc, Operand, Element));
   }
   
+  SelectEnumInst *createSelectEnum(SILLocation Loc, SILValue Operand,
+         SILType Ty,
+         SILValue DefaultValue,
+         ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues) {
+    return insert(SelectEnumInst::create(Loc, Operand, Ty, DefaultValue,
+                                         CaseValues, F));
+  }
+
+  SelectEnumAddrInst *createSelectEnumAddr(SILLocation Loc, SILValue Operand,
+         SILType Ty,
+         SILValue DefaultValue,
+         ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues) {
+    return insert(SelectEnumAddrInst::create(Loc, Operand, Ty, DefaultValue,
+                                             CaseValues, F));
+  }
+  
   TupleExtractInst *createTupleExtract(SILLocation Loc, SILValue Operand,
                                        unsigned FieldNo, SILType ResultTy) {
     return insert(new (F.getModule())

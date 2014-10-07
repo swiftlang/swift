@@ -2811,6 +2811,67 @@ Extracts the tag from an enum value and compares with the tag for ``case``.
 Returns ``1`` if the enum tag matches that of ``case``.  Returns ``0``
 otherwise.
 
+select_enum
+```````````
+::
+
+  sil-instruction ::= 'select_enum' sil-operand sil-select-case*
+                      (',' 'default' sil-value)?
+                      ':' sil-type
+
+  %n = select_enum %0 : $U,      \
+    case #U.Case1: %1,           \
+    case #U.Case2: %2, /* ... */ \
+    default %3 : $T
+
+  // $U must be an enum type
+  // #U.Case1, Case2, etc. must be cases of enum $U
+  // %1, %2, %3, etc. must have type $T
+  // %n has type $T
+
+Selects one of the "case" or "default" operands based on the case of an
+enum value. This is equivalent to a trivial `switch_enum`_ branch sequence::
+
+  entry:
+    switch_enum %0 : $U,            \
+      case #U.Case1: bb1,           \
+      case #U.Case2: bb2, /* ... */ \
+      default bb_default
+  bb1:
+    br cont(%1 : $T) // value for #U.Case1
+  bb2:
+    br cont(%2 : $T) // value for #U.Case2
+  bb_default:
+    br cont(%3 : $T) // value for default
+  cont(%n : $T):
+    // use argument %n
+
+but turns the control flow dependency into a data flow dependency.
+For address-only enums, `select_enum_addr`_ offers the same functionality for
+an indirectly referenced enum value in memory.
+
+select_enum_addr
+````````````````
+::
+
+  sil-instruction ::= 'select_enum' sil-operand sil-select-case*
+                      (',' 'default' sil-value)?
+                      ':' sil-type
+
+  %n = select_enum %0 : $U,      \
+    case #U.Case1: %1,           \
+    case #U.Case2: %2, /* ... */ \
+    default %3 : $T
+
+  // $U must be an enum type
+  // #U.Case1, Case2, etc. must be cases of enum $U
+  // %1, %2, %3, etc. must have type $T
+  // %n has type $T
+
+Selects one of the "case" or "default" operands based on the case of the
+referenced enum value. This is the address-only counterpart to
+`select_enum`_.
+
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

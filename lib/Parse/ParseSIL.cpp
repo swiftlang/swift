@@ -1161,8 +1161,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("deinit_existential", ValueKind::DeinitExistentialInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("release_value", ValueKind::ReleaseValueInst)
-    .Case("switch_enum_addr",
-          ValueKind::SwitchEnumAddrInst)
     .Case("dynamic_method", ValueKind::DynamicMethodInst)
     .Case("dynamic_method_br", ValueKind::DynamicMethodBranchInst)
     .Case("enum", ValueKind::EnumInst)
@@ -1208,6 +1206,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("strong_retain_autoreleased", ValueKind::StrongRetainAutoreleasedInst)
     .Case("strong_retain_unowned", ValueKind::StrongRetainUnownedInst)
     .Case("return", ValueKind::ReturnInst)
+    .Case("select_enum", ValueKind::SelectEnumInst)
+    .Case("select_enum_addr", ValueKind::SelectEnumAddrInst)
     .Case("store", ValueKind::StoreInst)
     .Case("store_weak", ValueKind::StoreWeakInst)
     .Case("string_literal", ValueKind::StringLiteralInst)
@@ -1215,8 +1215,10 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("struct_element_addr", ValueKind::StructElementAddrInst)
     .Case("struct_extract", ValueKind::StructExtractInst)
     .Case("super_method", ValueKind::SuperMethodInst)
-    .Case("switch_int", ValueKind::SwitchIntInst)
     .Case("switch_enum", ValueKind::SwitchEnumInst)
+    .Case("switch_enum_addr",
+          ValueKind::SwitchEnumAddrInst)
+    .Case("switch_int", ValueKind::SwitchIntInst)
     .Case("unchecked_enum_data", ValueKind::UncheckedEnumDataInst)
     .Case("unchecked_addr_cast", ValueKind::UncheckedAddrCastInst)
     .Case("unchecked_trivial_bit_cast", ValueKind::UncheckedTrivialBitCastInst)
@@ -2635,6 +2637,68 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createSILGlobalAddr(InstLoc, global);
     break;
   }
+  case ValueKind::SelectEnumInst:
+  case ValueKind::SelectEnumAddrInst: {
+    if (parseTypedValueRef(Val))
+      return true;
+
+    SmallVector<std::pair<EnumElementDecl*, UnresolvedValueName>, 4>
+      CaseValueNames;
+    Optional<UnresolvedValueName> DefaultValueName;
+    while (P.consumeIf(tok::comma)) {
+      Identifier BBName;
+      SourceLoc BBLoc;
+      // Parse 'default' sil-value.
+     UnresolvedValueName tmp;
+      if (P.consumeIf(tok::kw_default)) {
+        if (parseValueName(tmp))
+          return true;
+        DefaultValueName = tmp;
+        break;
+      }
+
+      // Parse 'case' sil-decl-ref ':' sil-value.
+      if (P.consumeIf(tok::kw_case)) {
+        SILDeclRef ElemRef;
+        if (parseSILDeclRef(ElemRef))
+          return true;
+        assert(ElemRef.hasDecl() && isa<EnumElementDecl>(ElemRef.getDecl()));
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");
+        parseValueName(tmp);
+        CaseValueNames.push_back(std::make_pair(
+                                     cast<EnumElementDecl>(ElemRef.getDecl()),
+                                     tmp));
+        continue;
+      }
+
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
+      return true;
+    }
+    
+    // Parse the type of the result operands.
+    SILType ResultType;
+    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || parseSILType(ResultType))
+      return true;
+    
+    // Resolve the results.
+    SmallVector<std::pair<EnumElementDecl*, SILValue>, 4> CaseValues;
+    SILValue DefaultValue;
+    if (DefaultValueName)
+      DefaultValue = getLocalValue(*DefaultValueName, ResultType, InstLoc);
+    for (auto &caseName : CaseValueNames)
+      CaseValues.push_back(std::make_pair(caseName.first,
+                          getLocalValue(caseName.second, ResultType, InstLoc)));
+    
+    if (Opcode == ValueKind::SelectEnumInst)
+      ResultVal = B.createSelectEnum(InstLoc, Val, ResultType,
+                                     DefaultValue, CaseValues);
+    else
+      ResultVal = B.createSelectEnumAddr(InstLoc, Val, ResultType,
+                                         DefaultValue, CaseValues);
+    break;
+  }
+      
   case ValueKind::SwitchEnumInst:
   case ValueKind::SwitchEnumAddrInst: {
     if (parseTypedValueRef(Val))

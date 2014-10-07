@@ -1142,7 +1142,7 @@ public:
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
       OS << ", case " << SILDeclRef(elt, SILDeclRef::Kind::EnumElement)
-      << ": " << getID(dest);
+         << ": " << getID(dest);
     }
     if (SOI->hasDefault())
       OS << ", default " << getID(SOI->getDefaultBB());
@@ -1156,6 +1156,32 @@ public:
     OS << "switch_enum_addr ";
     printSwitchEnumInst(SOI);
   }
+  
+  void printSelectEnumInst(SelectEnumInstBase *SEI) {
+    OS << getIDAndType(SEI->getEnumOperand());
+
+    for (unsigned i = 0, e = SEI->getNumCases(); i < e; ++i) {
+      EnumElementDecl *elt;
+      SILValue result;
+      std::tie(elt, result) = SEI->getCase(i);
+      OS << ", case " << SILDeclRef(elt, SILDeclRef::Kind::EnumElement)
+         << ": " << getID(result);
+    }
+    if (SEI->hasDefault())
+      OS << ", default " << getID(SEI->getDefaultResult());
+    
+    OS << " : " << SEI->getType();
+  }
+  
+  void visitSelectEnumInst(SelectEnumInst *SEI) {
+    OS << "select_enum ";
+    printSelectEnumInst(SEI);
+  }
+  void visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
+    OS << "select_enum_addr ";
+    printSelectEnumInst(SEI);
+  }
+  
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
     OS << "dynamic_method_br " << getIDAndType(DMBI->getOperand()) << ", ";
     DMBI->getMember().print(OS);

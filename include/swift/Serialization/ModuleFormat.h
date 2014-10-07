@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 150; // Last change: remove SIL protocol_method
+const uint16_t VERSION_MINOR = 151; // Last change: add SIL select_enum insns
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;

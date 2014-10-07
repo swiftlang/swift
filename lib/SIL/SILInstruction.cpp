@@ -1221,6 +1221,73 @@ SwitchIntInst *SwitchIntInst::create(SILLocation Loc, SILValue Operand,
   return ::new (buf) SwitchIntInst(Loc, Operand, DefaultBB, CaseBBs);
 }
 
+static SmallVector<SILValue, 4>
+getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
+                SILValue DefaultValue) {
+  SmallVector<SILValue, 4> result;
+  
+  for (auto &pair : CaseValues)
+    result.push_back(pair.second);
+  if (DefaultValue)
+    result.push_back(DefaultValue);
+  
+  return result;
+}
+
+SelectEnumInstBase::SelectEnumInstBase(
+                ValueKind Kind,
+                SILLocation Loc, SILValue Operand, SILType Ty,
+                SILValue DefaultValue,
+                ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues)
+  : SILInstruction(Kind, Loc, Ty),
+    NumCases(CaseValues.size()),
+    HasDefault(bool(DefaultValue)),
+    Operands(this, getCaseOperands(CaseValues, DefaultValue), Operand)
+{
+  // Initialize the case and successor arrays.
+  auto *cases = getCaseBuf();
+  for (unsigned i = 0, size = CaseValues.size(); i < size; ++i) {
+    cases[i] = CaseValues[i].first;
+  }
+}
+
+template<typename SELECT_ENUM_INST>
+SELECT_ENUM_INST *
+SelectEnumInstBase::createSelectEnum(SILLocation Loc, SILValue Operand,
+                 SILType Ty,
+                 SILValue DefaultValue,
+                 ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
+                 SILFunction &F) {
+  // Allocate enough room for the instruction with tail-allocated
+  // EnumElementDecl and operand arrays. There are `CaseBBs.size()` decls
+  // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` values.
+  unsigned numCases = CaseValues.size();
+
+  void *buf = F.getModule().allocate(
+    sizeof(SELECT_ENUM_INST) + sizeof(EnumElementDecl*) * numCases
+     + TailAllocatedOperandList<1>::getExtraSize(numCases + (bool)DefaultValue),
+    alignof(SELECT_ENUM_INST));
+  return ::new (buf) SELECT_ENUM_INST(Loc,Operand,Ty,DefaultValue,CaseValues);
+}
+
+SelectEnumInst *
+SelectEnumInst::create(SILLocation Loc, SILValue Operand, SILType Type,
+                    SILValue DefaultValue,
+                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+                    SILFunction &F) {
+  return createSelectEnum<SelectEnumInst>(Loc, Operand, Type, DefaultValue,
+                                          CaseValues, F);
+}
+
+SelectEnumAddrInst *
+SelectEnumAddrInst::create(SILLocation Loc, SILValue Operand, SILType Type,
+                    SILValue DefaultValue,
+                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
+                    SILFunction &F) {
+  return createSelectEnum<SelectEnumAddrInst>(Loc, Operand, Type, DefaultValue,
+                                              CaseValues, F);
+}
+
 SwitchEnumInstBase::SwitchEnumInstBase(
                 ValueKind Kind,
                 SILLocation Loc, SILValue Operand,

@@ -1710,6 +1710,124 @@ public:
   EnumElementDecl *getElement() const { return Element; }
 };
 
+/// Common base class for the select_enum and select_enum_addr instructions,
+/// which select one of a set of possible values based on the case of an enum.
+class SelectEnumInstBase : public SILInstruction {
+  unsigned NumCases : 31;
+  unsigned HasDefault : 1;
+
+  // The first operand is the enumeration; the rest are the values to select.
+  TailAllocatedOperandList<1> Operands;
+
+  // Tail-allocated after the operands is an array of `NumCases`
+  // EnumElementDecl* pointers, referencing the case discriminators for each
+  // operand.
+  
+  EnumElementDecl **getCaseBuf() {
+    return reinterpret_cast<EnumElementDecl**>(Operands.asArray().end());
+  }
+  EnumElementDecl * const* getCaseBuf() const {
+    return reinterpret_cast<EnumElementDecl* const*>(Operands.asArray().end());
+  }
+
+protected:
+  SelectEnumInstBase(ValueKind Kind, SILLocation Loc, SILValue Enum,
+                     SILType Type,
+                     SILValue DefaultValue,
+                     ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues);
+  
+  template<typename SELECT_ENUM_INST>
+  static SELECT_ENUM_INST *
+  createSelectEnum(SILLocation Loc, SILValue Enum,
+                   SILType Type,
+                   SILValue DefaultValue,
+                   ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
+                   SILFunction &F);
+
+public:
+  SILValue getEnumOperand() const { return Operands[0].get(); }
+  
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  unsigned getNumCases() const { return NumCases; }
+  
+  std::pair<EnumElementDecl*, SILValue>
+  getCase(unsigned i) const {
+    assert(i < NumCases && "case out of bounds");
+    return std::make_pair(getCaseBuf()[i], Operands[i+1].get());
+  }
+  
+  /// Return the value that will be used as the result for the specified enum
+  /// case.
+  SILValue getCaseResult(EnumElementDecl *D) {
+    for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
+      auto Entry = getCase(i);
+      if (Entry.first == D) return Entry.second;
+    }
+    // select_enum is required to be fully covered, so return the default if we
+    // didn't find anything.
+    return getDefaultResult();
+  }
+  
+  bool hasDefault() const { return HasDefault; }
+  SILValue getDefaultResult() const {
+    assert(HasDefault && "doesn't have a default");
+    return Operands[NumCases + 1].get();
+  }
+  
+  // getType() is OK because there's only one result.
+  SILType getType() const { return SILInstruction::getType(0); }
+};
+  
+/// Select one of a set of values based on the case of an enum.
+class SelectEnumInst : public SelectEnumInstBase {
+private:
+  friend class SelectEnumInstBase;
+
+  SelectEnumInst(SILLocation Loc, SILValue Operand,
+                 SILType Type,
+                 SILValue DefaultValue,
+                 ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues)
+  : SelectEnumInstBase(ValueKind::SelectEnumInst, Loc, Operand, Type,
+                       DefaultValue, CaseValues)
+  {}
+
+public:
+  static SelectEnumInst *create(SILLocation Loc, SILValue Operand, SILType Type,
+                 SILValue DefaultValue,
+                 ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
+                 SILFunction &F);
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::SelectEnumInst;
+  }
+};
+
+/// Select one of a set of values based on the case of an enum.
+class SelectEnumAddrInst : public SelectEnumInstBase {
+private:
+  friend class SelectEnumInstBase;
+
+  SelectEnumAddrInst(SILLocation Loc, SILValue Operand, SILType Type,
+                 SILValue DefaultValue,
+                 ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues)
+    : SelectEnumInstBase(ValueKind::SelectEnumAddrInst, Loc, Operand, Type,
+                         DefaultValue, CaseValues)
+  {}
+
+public:
+  static SelectEnumAddrInst *create(SILLocation Loc, SILValue Operand,
+                 SILType Type,
+                 SILValue DefaultValue,
+                 ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
+                 SILFunction &F);
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::SelectEnumAddrInst;
+  }
+};
+
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
 class MetatypeInst : public SILInstruction {
@@ -2776,13 +2894,14 @@ public:
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
   }
 
-  /// \brief Return the block that will be branched to on the specified enum.
+  /// \brief Return the block that will be branched to on the specified enum
+  /// case.
   SILBasicBlock *getCaseDestination(EnumElementDecl *D) {
     for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
       auto Entry = getCase(i);
       if (Entry.first == D) return Entry.second;
     }
-    // switch_enum is required to be fully covered, return the default if we
+    // switch_enum is required to be fully covered, so return the default if we
     // didn't find anything.
     return getDefaultBB();
   }

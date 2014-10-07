@@ -642,6 +642,43 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+  case ValueKind::SelectEnumInst:
+  case ValueKind::SelectEnumAddrInst: {
+    // Format: condition, a list of cases (EnumElementDecl + Value ID),
+    // default value ID. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list has value for condition, result type,
+    //   hasDefault, default
+    // basic block ID, a list of (DeclID, BasicBlock ID).
+    const SelectEnumInstBase *SOI = cast<SelectEnumInstBase>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    ListOfValues.push_back(addValueRef(SOI->getEnumOperand()));
+    ListOfValues.push_back(SOI->getEnumOperand().getResultNumber());
+    ListOfValues.push_back(S.addTypeRef(SOI->getType().getSwiftRValueType()));
+    ListOfValues.push_back((unsigned)SOI->getType().getCategory());
+    ListOfValues.push_back((unsigned)SOI->hasDefault());
+    if (SOI->hasDefault()) {
+      ListOfValues.push_back(addValueRef(SOI->getDefaultResult()));
+      ListOfValues.push_back(SOI->getDefaultResult().getResultNumber());
+    } else {
+      ListOfValues.push_back(0);
+      ListOfValues.push_back(0);
+    }
+    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
+      EnumElementDecl *elt;
+      SILValue result;
+      std::tie(elt, result) = SOI->getCase(i);
+      ListOfValues.push_back(S.addDeclRef(elt));
+      ListOfValues.push_back(addValueRef(result));
+      ListOfValues.push_back(result.getResultNumber());
+    }
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(SOI->getEnumOperand().getType().getSwiftRValueType()),
+        (unsigned)SOI->getEnumOperand().getType().getCategory(),
+        ListOfValues);
+    break;
+  }
   case ValueKind::SwitchIntInst: {
     // Format: condition, a list of cases (APInt + Basic Block ID),
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
