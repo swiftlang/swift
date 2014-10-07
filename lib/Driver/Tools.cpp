@@ -615,14 +615,68 @@ Job *linux::Linker::constructJob(const JobAction &JA,
                                  const ActionList &InputActions,
                                  const ArgList &Args,
                                  const OutputInfo &OI) const {
+  const ToolChain &TC = getToolChain();
+  const Driver &D = TC.getDriver();
+
   assert(Output->getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
 
   ArgStringList Arguments;
+
+  switch (cast<LinkJobAction>(JA).getKind()) {
+  case LinkKind::None:
+    llvm_unreachable("invalid link kind");
+  case LinkKind::Executable:
+    Arguments.push_back("-lpthread");
+    Arguments.push_back("-ldl");
+    break;
+  case LinkKind::DynamicLibrary:
+    Arguments.push_back("-shared");
+    break;
+  }
+
   addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
-  std::string Exec = getToolChain().getProgramPath("ld");
+  Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
+  Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  Args.AddAllArgs(Arguments, options::OPT_F);
+
+  // Add the runtime library link path, which is platform-specific and found
+  // relative to the compiler.
+  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
+  // library link path and the standard library module import path don't
+  // need to be the same.
+  llvm::SmallString<128> RuntimeLibPath;
+
+  if (const Arg *A = Args.getLastArg(options::OPT_resource_dir)) {
+    RuntimeLibPath = A->getValue();
+  } else {
+    RuntimeLibPath = D.getSwiftProgramPath();
+    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /swift
+    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
+    llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
+  }
+  Arguments.push_back("-L");
+  Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
+
+  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+  // of time the standard library won't be copied.
+  Arguments.push_back("-Xlinker");
+  Arguments.push_back("-rpath");
+  Arguments.push_back("-Xlinker");
+  Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
+
+  Arguments.push_back("-lswiftCore");
+
+  // This should be the last option, for convenience in checking output.
+  Arguments.push_back("-o");
+  Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
+
+  // This avoids a bunch of issues trying to correctly guess parameters
+  // for ld for linux platforms. We know we have clang, we know it should
+  // be able to link, so use clang for now.
+  std::string Exec = TC.getProgramPath("clang++");
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output),
                      Args.MakeArgString(Exec), Arguments);
