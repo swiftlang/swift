@@ -233,6 +233,11 @@ public:
     return swift::isAvailableExternally(getLinkage());
   }
 
+  /// Helper method which returns true if the linkage of the SILFunction
+  /// indicates that the objects definition might be required outside the
+  /// current SILModule.
+  bool isPossiblyUsedExternally() const;
+
   /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const { return DeclCtx; }
   void setDeclContext(Decl *D);

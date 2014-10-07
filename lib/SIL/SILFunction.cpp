@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
@@ -411,4 +412,13 @@ void SILFunction::viewCFG() const {
 
   ViewGraph(const_cast<SILFunction *>(this), "cfg" + getName().str());
 #endif
+}
+
+  /// Helper method which returns true if the linkage of the SILFunction
+  /// indicates that the objects definition might be required outside the
+  /// current SILModule.
+bool
+SILFunction::isPossiblyUsedExternally() const {
+  return swift::isPossiblyUsedExternally(getLinkage(),
+                                         getModule().isWholeModule());
 }
