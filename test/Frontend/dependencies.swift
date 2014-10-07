@@ -6,7 +6,7 @@
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty.swift
 // CHECK-BASIC: Swift.swiftmodule
-// CHECK-BASIC-DAG: shims/shims.h
+// CHECK-BASIC-DAG: shims/{{.*}}.h
 // CHECK-BASIC-DAG: shims/module.map
 // CHECK-BASIC-NOT: :
 // CHECK-BASIC-NOT: /
@@ -30,7 +30,7 @@
 // CHECK-IMPORT: dependencies.swift
 // CHECK-IMPORT-DAG: Inputs/dependencies/extra-header.h
 // CHECK-IMPORT-DAG: Swift.swiftmodule
-// CHECK-IMPORT-DAG: shims/shims.h
+// CHECK-IMPORT-DAG: shims/{{.*}}.h
 // CHECK-IMPORT-DAG: shims/module.map
 // CHECK-IMPORT-DAG: Foundation.swift
 // CHECK-IMPORT-DAG: ObjectiveC.swift
