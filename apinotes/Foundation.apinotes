@@ -11379,19 +11379,19 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'initWithName:stringValue:'
     MethodKind: Instance
     Nullability:
     - N
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'initWithName:URI:'
     MethodKind: Instance
     Nullability:
     - N
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'initWithXMLString:error:'
     MethodKind: Instance
     Nullability:
@@ -11535,13 +11535,13 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'initWithKind:options:'
     MethodKind: Instance
     Nullability:
     - S
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'localNameForName:'
     MethodKind: Class
     Nullability:
@@ -11646,13 +11646,13 @@ Classes:
     MethodKind: Instance
     Nullability:
     - U
-    NullabilityOfRet: O
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'initWithStream:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: allowedExternalEntityURLs
     Nullability: O
@@ -12740,146 +12740,6 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - N
-    NullabilityOfRet: S
-- Name: NSXMLParserDelegate
-  Methods:
-  - Selector: 'parser:didEndElement:namespaceURI:qualifiedName:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:didEndMappingPrefix:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:didStartElement:namespaceURI:qualifiedName:attributes:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - O
-    - O
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:didStartMappingPrefix:toURI:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - O
-    NullabilityOfRet: S
-  - Selector: 'parser:foundAttributeDeclarationWithName:forElement:type:defaultValue:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - N
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundCDATA:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundCharacters:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundComment:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundElementDeclarationWithName:model:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundExternalEntityDeclarationWithName:publicID:systemID:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundIgnorableWhitespace:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundInternalEntityDeclarationWithName:value:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundNotationDeclarationWithName:publicID:systemID:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundProcessingInstructionWithTarget:data:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:foundUnparsedEntityDeclarationWithName:publicID:systemID:notationName:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - N
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:parseErrorOccurred:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parser:resolveExternalEntityName:systemID:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    - O
-    NullabilityOfRet: O
-  - Selector: 'parser:validationErrorOccurred:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parserDidEndDocument:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
-  - Selector: 'parserDidStartDocument:'
-    MethodKind: Instance
-    Nullability:
     - N
     NullabilityOfRet: S
 - Name: NSXPCListenerDelegate

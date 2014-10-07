@@ -964,7 +964,7 @@ Classes:
     Nullability:
     - S
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'pause:'
     MethodKind: Instance
     Nullability:

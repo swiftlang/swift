@@ -1109,7 +1109,7 @@ Classes:
     Nullability:
     - S
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'insertItemsAtIndexPaths:'
     MethodKind: Instance
@@ -1237,10 +1237,10 @@ Classes:
     MethodKind: Instance
     Nullability:
     - U
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: collectionView
-    Nullability: O
+    Nullability: N
 - Name: UICollectionViewLayout
   Methods:
   - Selector: 'finalLayoutAttributesForDisappearingDecorationElementOfKind:atIndexPath:'
@@ -1417,7 +1417,7 @@ Classes:
     Nullability:
     - N
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'updateValue:forAnimatedKey:'
     MethodKind: Instance
     Nullability:
@@ -1733,7 +1733,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'loadFromContents:ofType:error:'
     MethodKind: Instance
@@ -1904,13 +1904,13 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'initWithURL:inMode:'
     MethodKind: Instance
     Nullability:
     - N
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: delegate
     Nullability: O
@@ -1920,12 +1920,12 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'initWithReferenceView:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'itemsInRect:'
     MethodKind: Instance
     Nullability:
@@ -2005,7 +2005,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'linearVelocityForItem:'
     MethodKind: Instance
     Nullability:
@@ -2217,7 +2217,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'removeItem:'
     MethodKind: Instance
     Nullability:
@@ -2430,7 +2430,7 @@ Classes:
     Nullability:
     - S
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
     DesignatedInit: true
 - Name: UIInputViewController
   Methods:
@@ -2588,7 +2588,7 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
 - Name: UINavigationBar
   Methods:
   - Selector: 'backgroundImageForBarMetrics:'
@@ -2644,12 +2644,12 @@ Classes:
     Nullability:
     - U
     - U
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'initWithRootViewController:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'popToRootViewControllerAnimated:'
     MethodKind: Instance
     Nullability:
@@ -2749,13 +2749,13 @@ Classes:
     Nullability:
     - N
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'nibWithNibName:bundle:'
     MethodKind: Class
     Nullability:
     - N
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
 - Name: UIPageControl
   Properties:
   - Name: currentPageIndicatorTintColor
@@ -2936,7 +2936,7 @@ Classes:
     Nullability:
     - U
     - U
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: delegate
     Nullability: O
@@ -2952,7 +2952,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - U
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: displayLocation
     Nullability: O
@@ -3055,7 +3055,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: progressImage
     Nullability: O
@@ -3364,7 +3364,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - U
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'insertSegmentWithImage:atIndex:animated:'
     MethodKind: Instance
     Nullability:
@@ -3416,12 +3416,12 @@ Classes:
     MethodKind: Instance
     Nullability:
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'initWithText:'
     MethodKind: Instance
     Nullability:
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: color
     Nullability: O
@@ -3590,7 +3590,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: offImage
     Nullability: O
@@ -3756,7 +3756,7 @@ Classes:
     Nullability:
     - S
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'insertRowsAtIndexPaths:withRowAnimation:'
     MethodKind: Instance
     Nullability:
@@ -3859,7 +3859,7 @@ Classes:
     Nullability:
     - S
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
     DesignatedInit: true
   Properties:
   - Name: accessoryView
@@ -3896,7 +3896,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - O
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: backgroundView
     Nullability: O
