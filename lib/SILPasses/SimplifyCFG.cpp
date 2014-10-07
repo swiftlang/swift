@@ -374,24 +374,6 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceInfo *DT) {
   return Changed;
 }
 
-// Handle the mechanical aspects of removing an unreachable block.
-static void removeDeadBlock(SILBasicBlock *BB) {
-  // Instructions in the dead block may be used by other dead blocks.  Replace
-  // any uses of them with undef values.
-  while (!BB->empty()) {
-    auto *Inst = &BB->getInstList().back();
-
-    // Replace any non-dead results with SILUndef values.
-    for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i)
-      if (!SILValue(Inst, i).use_empty())
-        SILValue(Inst, i).replaceAllUsesWith(SILUndef::get(Inst->getType(i),
-                                                           BB->getModule()));
-    BB->getInstList().pop_back();
-  }
-
-  BB->eraseFromParent();
-}
-
 // If BB is trivially unreachable, remove it from the worklist, add its
 // successors to the worklist, and then remove the block.
 bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {

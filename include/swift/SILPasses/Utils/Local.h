@@ -89,6 +89,13 @@ namespace swift {
   TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
                                 TermInst *Branch);
 
+  /// Handle the mechanical aspects of removing an unreachable block.
+  void removeDeadBlock(SILBasicBlock *BB);
+
+  /// Remove all instructions in the body of \p BB in safe manner by using
+  /// undef.
+  void clearBlockBody(SILBasicBlock *BB);
+
   /// \brief Get the linkage to be used for specializations of a function with
   /// the given linkage.
   SILLinkage getSpecializedLinkage(SILLinkage L);

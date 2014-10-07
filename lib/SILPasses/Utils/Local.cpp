@@ -508,3 +508,30 @@ void swift::ArraySemanticsCall::replaceByRetainValue() {
       .createReleaseValue(SemanticsCall->getLoc(), getSelf());
   SemanticsCall->eraseFromParent();
 }
+
+/// Remove all instructions in the body of \p BB in safe manner by using
+/// undef.
+void swift::clearBlockBody(SILBasicBlock *BB) {
+  // Instructions in the dead block may be used by other dead blocks.  Replace
+  // any uses of them with undef values.
+  while (!BB->empty()) {
+    // Grab the last instruction in the BB.
+    auto *Inst = &BB->getInstList().back();
+
+    // Replace any non-dead results with SILUndef values.
+    Inst->replaceAllUsesWithUndef();
+
+    // Pop the instruction off of the back of the basic block.
+    BB->getInstList().pop_back();
+  }
+
+}
+
+// Handle the mechanical aspects of removing an unreachable block.
+void swift::removeDeadBlock(SILBasicBlock *BB) {
+  // Clear the body of BB.
+  clearBlockBody(BB);
+
+  // Now that the BB is empty, eliminate it.
+  BB->eraseFromParent();
+}
