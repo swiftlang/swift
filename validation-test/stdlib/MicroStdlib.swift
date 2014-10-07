@@ -1,5 +1,9 @@
-// RUN: %swift -c -parse-as-library -parse-stdlib -module-name Swift %s -emit-module -o %t
-// RUN: %swift -c -parse-as-library -parse-stdlib -module-name Swift %s -o %t
+// RUN: rm -rf %t
+// RUN: mkdir %t
+// RUN: %target-build-swift -c -force-single-frontend-invocation -parse-as-library -parse-stdlib -module-name Swift -emit-module -emit-module-path %t/Swift.swiftmodule -o %t/Swift.o %s
+// RUN: ls %t/Swift.swiftmodule
+// RUN: ls %t/Swift.swiftdoc
+// RUN: ls %t/Swift.o
 
 //
 // A bare-bones Swift standard library
