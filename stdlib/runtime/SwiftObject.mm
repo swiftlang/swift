@@ -26,6 +26,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ObjCBridge.h"
+#include "../shims/RuntimeShims.h"
 #include "Private.h"
 #include "Debug.h"
 #include <dlfcn.h>

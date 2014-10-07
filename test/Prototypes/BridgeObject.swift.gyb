@@ -25,9 +25,6 @@ import Swift
 //===--- Code destined for stdlib -----------------------------------------===//
 import SwiftShims
 
-@asmname("_swift_isUniquelyReferenced")
-func _swift_isUniquelyReferenced(_: UnsafeMutablePointer<HeapObject>) -> Bool
-
 protocol BridgeStorage {
   typealias Native : AnyObject
   typealias Cocoa : AnyObject
@@ -102,8 +99,9 @@ case Cocoa0(CocoaType)
   }
   
   mutating func isUniquelyReferenced() -> Bool {
+    let w = Builtin.ptrtoint_Word(Builtin.bridgeToRawPointer(native!))
     if let n = native.map({ Builtin.bridgeToRawPointer($0) }) {
-      return _swift_isUniquelyReferenced(UnsafeMutablePointer(n))
+      return _swift_isUniquelyReferenced(UWord(Builtin.ptrtoint_Word(n))) != 0
     }
     return false
   }

@@ -48,9 +48,6 @@ public class HeapBufferStorage<Value,Element> {
   }
 }
 
-@asmname("_swift_isUniquelyReferenced")
-func _swift_isUniquelyReferenced(_: UnsafeMutablePointer<HeapObject>) -> Bool
-
 // Return true if x is the only (strong) reference to the given RawBuffer
 // 
 // This is an inout function for two reasons:
@@ -73,8 +70,7 @@ func _swift_isUniquelyReferenced(_: UnsafeMutablePointer<HeapObject>) -> Bool
 // we accept everything; unsafeBitCast will at least catch
 // inappropriately-sized things at runtime.
 public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
-  return _swift_isUniquelyReferenced(
-    unsafeBitCast(x, UnsafeMutablePointer<HeapObject>.self))
+  return _swift_isUniquelyReferenced(unsafeBitCast(x, UWord.self)) != 0
 }
 
 /// Management API for `HeapBufferStorage<Value, Element>`

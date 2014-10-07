@@ -26,7 +26,7 @@ namespace swift { extern "C" {
 
 bool _swift_isUniquelyReferencedNative_nonNull(const void* object);
 bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *object);
-bool _swift_isUniquelyReferenced(uintptr_t bits);
+unsigned char _swift_isUniquelyReferenced(uintptr_t bits);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift
