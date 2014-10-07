@@ -125,7 +125,7 @@ else()
   # TODO: However, for the moment this actually makes things explode with an
   # incomplete runtime. This should be turned back on when more of the porting
   # effort has been completed.
-  #set(RUNTIME_DEPENDENCY
+  #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   set(RUNTIME_DEPENDENCY swiftRuntime)
 endif()
@@ -151,7 +151,6 @@ add_swift_library(swiftCore INSTALL IS_STDLIB_CORE TARGET_LIBRARY
   FILE_DEPENDS
     copy_shim_headers ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims
   LINK_FLAGS ${LINK_FLAGS}
+  DEPENDS ${RUNTIME_DEPENDENCY}
   )
 add_dependencies(swiftCore swift)
-
-target_link_libraries(swiftCore ${RUNTIME_DEPENDENCY})
