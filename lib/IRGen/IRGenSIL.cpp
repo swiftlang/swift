@@ -2522,15 +2522,15 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     // Discard any inout or lvalue qualifiers. Since the object itself
     // is stored in the alloca, emitting it as a reference type would
     // be wrong.
-    auto DTI = DebugTypeInfo(Decl,
-                             Decl->getType()->getLValueOrInOutObjectType(),
-                             type);
+    auto DbgTy = DebugTypeInfo(Decl,
+                               Decl->getType()->getLValueOrInOutObjectType(),
+                               type);
     auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
     auto DS = i->getDebugScope();
     if (!DS) DS = CurSILFn->getDebugScope();
     assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
     emitDebugVariableDeclaration(Builder, addr.getAddress().getAddress(),
-                                 DTI, DS, Name);
+                                 DbgTy, DS, Name);
   }
 
   setLoweredAddress(i->getContainerResult(), addr.getContainer());
