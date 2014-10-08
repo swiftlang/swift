@@ -2491,6 +2491,14 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       } else if (Tok.isContextualKeyword("set")) {
         Kind = AccessorKind::IsSetter;
         TheDeclPtr = &accessors.Set;
+      } else if (!Flags.contains(PD_InProtocol) &&
+                 Tok.isContextualKeyword("address")) {
+        Kind = AccessorKind::IsAddressor;
+        TheDeclPtr = &accessors.Addressor;
+      } else if (!Flags.contains(PD_InProtocol) &&
+                 Tok.isContextualKeyword("mutableAddress")) {
+        Kind = AccessorKind::IsMutableAddressor;
+        TheDeclPtr = &accessors.MutableAddressor;
       } else {
         diagnose(Tok, diag::expected_getset_in_protocol);
         return true;
