@@ -90,6 +90,12 @@ static void updateTargetConfigurationOptions(LangOptions &LangOpts,
     llvm_unreachable("Unsupported target architecture");
   }
 
+  // Set the "runtime" target configuration.
+  if (triple.isOSDarwin())
+    LangOpts.addTargetConfigOption("_runtime", "_ObjC");
+  else
+    LangOpts.addTargetConfigOption("_runtime", "_Native");
+
   // Set the minimum platform version for deployment.
   unsigned major, minor, revision;
   if (triple.isMacOSX()) {

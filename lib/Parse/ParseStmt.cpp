@@ -859,7 +859,8 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
 
     auto targetValue = fnNameExpr->getName().str();
     
-    if (!targetValue.equals("arch") && !targetValue.equals("os")) {
+    if (!targetValue.equals("arch") && !targetValue.equals("os") &&
+        !targetValue.equals("_runtime")) {
       diagnose(CE->getLoc(), diag::unsupported_target_config_expression);
       return false;
     }

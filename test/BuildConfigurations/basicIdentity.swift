@@ -35,17 +35,17 @@ var m = 0
 #endif
 var n = m
 
-#if FOO && !BAR && BAZ && os(OSX) && arch(x86_64)
+#if FOO && !BAR && BAZ && os(OSX) && arch(x86_64) && _runtime(_ObjC)
 var o = 0
 #endif
 var p = o
 
-#if FOO && (!BAR && BAZ && os(OSX) && arch(x86_64))
+#if FOO && (!BAR && BAZ && os(OSX) && arch(x86_64)) && _runtime(_ObjC)
 var q = 0
 #endif
 var r = q
 
-#if FOO && !(!BAZ && BAZ && os(OSX) && arch(x86_64))
+#if FOO && !(!BAZ && BAZ && os(OSX) && arch(x86_64)) && _runtime(_ObjC)
 var s = 0
 #endif
 var t = s

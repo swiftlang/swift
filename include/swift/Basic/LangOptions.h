@@ -105,10 +105,11 @@ namespace swift {
     /// The minimum platform version to which code will be deployed.
     clang::VersionTuple MinPlatformVersion;
 
-    /// Implicit target configuration options.  There are currently two
+    /// Implicit target configuration options.  There are currently three
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)
     ///     arch - The active arch target (X64, I386, ARM, ARM64)
+    ///     _runtime - Runtime support (_ObjC or _Native)
     void addTargetConfigOption(StringRef Name, StringRef Value) {
       assert(!Name.empty() && !Value.empty());
       TargetConfigOptions.push_back(std::make_pair(Name, Value));
