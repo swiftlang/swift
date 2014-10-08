@@ -1092,17 +1092,24 @@ namespace {
     
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                               Address dest, SILType T) const override {
-      // Fill in the extra inhabitants.  Is this actually necessary?
-      for (unsigned i = 0; i < getNumStoredProtocols(); ++i) {
-        Address witnessDest = projectWitnessTable(IGF, dest, i);
-        IGF.Builder.CreateStore(
-                      llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy),
-                      witnessDest);
-      }
-      
       Address valueDest = projectValue(IGF, dest);
       asDerived().getPayloadTypeInfoForExtraInhabitants(IGF.IGM)
                  .storeExtraInhabitant(IGF, index, valueDest, SILType());
+    }
+
+    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
+                                          llvm::Value *bits) const override {
+      // Truncate down to the payload type.
+      llvm::Type *originalType = bits->getType();
+      bits = IGF.Builder.CreateTrunc(bits, IGF.IGM.IntPtrTy);
+
+      // Ask the payload type to apply a mask, in case that matters.
+      bits = asDerived().getPayloadTypeInfoForExtraInhabitants(IGF.IGM)
+                        .maskFixedExtraInhabitant(IGF, bits);
+
+      // Zext out to the size of the existential.
+      bits = IGF.Builder.CreateZExt(bits, originalType);
+      return bits;
     }
   };
 
