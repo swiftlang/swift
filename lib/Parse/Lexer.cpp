@@ -654,6 +654,9 @@ void Lexer::lexOperatorIdentifier() {
     if (CurPtr-TokStart == 3 && TokStart[0] == '>' && TokStart[1] == '?' &&
         TokStart[2] == '>')
       CurPtr--;
+    if (CurPtr-TokStart == 4 && TokStart[0] == '>' && TokStart[1] == '?' &&
+        TokStart[2] == '>' && TokStart[3] == '?')
+      CurPtr -= 2;
 
     // If there is a "//" in the middle of an identifier token, it starts
     // a single-line comment.
