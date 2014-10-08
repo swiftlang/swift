@@ -1525,13 +1525,6 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
      << "\nimport SwiftShims" << "\n\n";
 
-  // Compute the list of emitted functions, whose AST Decls we do not need to
-  // print.
-  llvm::DenseSet<const Decl*> emittedFunctions;
-  for (const SILFunction &f : *this)
-    if (f.hasLocation())
-      emittedFunctions.insert(f.getLocation().getAsASTNode<Decl>());
-
   // Print the declarations and types from the origin module, unless we're not
   // in whole-module mode.
   if (M && AssociatedDeclContext == M && PrintASTDecls) {
@@ -1543,14 +1536,17 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     Options.SkipImplicit = false;
     Options.PrintGetSetOnRWProperties = true;
     Options.PrintInSILBody = false;
+    Options.PrintDefaultParameterPlaceholder = false;
 
     SmallVector<Decl *, 32> topLevelDecls;
     M->getTopLevelDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
            isa<ExtensionDecl>(D)) &&
-          !emittedFunctions.count(D) &&
           !D->isImplicit()) {
+        if (auto *FD = dyn_cast<FuncDecl>(D))
+          if (FD->isAccessor())
+            continue;
         D->print(OS, Options);
         OS << "\n\n";
       }

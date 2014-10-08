@@ -41,4 +41,4 @@ class Foo {
 func bar(x: Foo) -> Int {
   return x.x
 }
-// CHECK-NOT: func bar(x: Foo) -> Int
+// CHECK: func bar(x: Foo) -> Int
