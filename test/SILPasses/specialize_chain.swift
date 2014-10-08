@@ -34,16 +34,16 @@ func exp1() {
   var II = YYY<Int>(t: 5)
   print(II.AAA9(t: 4))
 }
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA9U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA8U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA7U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA6U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA5U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA4U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA3U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA2U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA1U__fRGS0_Q__FT1tQ__Si
 //CHECK: exp1
 //CHECK: function_ref @_TTSSi___TFV16specialize_chain3YYYCU__fMGS0_Q__FT1tQ__GS0_Q__
 //CHECK: function_ref @_TTSSi___TFV16specialize_chain3YYY4AAA9U__fRGS0_Q__FT1tQ__Si
 //CHECK: return
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA9U__fRGS0_Q__FT1tQ__Si
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA8U__fRGS0_Q__FT1tQ__Si
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA7U__fRGS0_Q__FT1tQ__Si
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA6U__fRGS0_Q__FT1tQ__Si
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA5U__fRGS0_Q__FT1tQ__Si
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA4U__fRGS0_Q__FT1tQ__Si
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA3U__fRGS0_Q__FT1tQ__Si
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA2U__fRGS0_Q__FT1tQ__Si
-//CHECK-DAG: sil shared @_TTSSi___TFV16specialize_chain3YYY4AAA1U__fRGS0_Q__FT1tQ__Si

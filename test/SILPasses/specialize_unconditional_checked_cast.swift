@@ -154,17 +154,6 @@ ArchetypeToConcreteConvertC(t: d)
 // CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
 ArchetypeToConcreteConvertC(t: e)
 
-// x -> y where x,y are classes, but y is unrelated to x. The idea is
-// to make sure that the fact that y is concrete does not affect the
-// result.
-// CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
-// CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
-ArchetypeToConcreteConvertE(t: c)
-
 // x -> y where x,y are classes and x is a sub class of y.
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertDU__FT1tQ__CS_1D : $@thin (@in C) -> @owned D {
 // CHECK: bb0
@@ -181,6 +170,17 @@ ArchetypeToConcreteConvertE(t: c)
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: return
 ArchetypeToConcreteConvertD(t: c)
+
+// x -> y where x,y are classes, but y is unrelated to x. The idea is
+// to make sure that the fact that y is concrete does not affect the
+// result.
+// CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+ArchetypeToConcreteConvertE(t: c)
 
 ///////////////////////////
 // Concrete to Archetype //

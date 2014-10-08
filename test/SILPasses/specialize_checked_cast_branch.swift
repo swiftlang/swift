@@ -166,13 +166,6 @@ ArchetypeToConcreteCastC(t: d)
 // CHECK: unreachable
 ArchetypeToConcreteCastC(t: e)
 
-// CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
-// CHECK: bb0
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail [[TRUE]]
-// CHECK: unreachable
-ArchetypeToConcreteCastE(t: c)
-
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastDU__FT1tQ__CS_1D : $@thin (@in C) -> @owned D {
 // CHECK: bb0
 // CHECK:  [[T0:%.*]] = load %0 : $*C
@@ -181,6 +174,13 @@ ArchetypeToConcreteCastE(t: c)
 // CHECK: strong_retain [[T0]] : $C
 // CHECK: bb0
 ArchetypeToConcreteCastD(t: c)
+
+// CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
+// CHECK: bb0
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[TRUE]]
+// CHECK: unreachable
+ArchetypeToConcreteCastE(t: c)
 
 ///////////////////////////
 // Concrete To Archetype //
