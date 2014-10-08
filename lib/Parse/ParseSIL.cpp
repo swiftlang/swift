@@ -1446,7 +1446,7 @@ static GenericSignature *canonicalPolymorphicFunctionType(
 
 static bool checkPolymorphicFunctionType(PolymorphicFunctionType *Ty,
                                          PolymorphicFunctionType *Ty2,
-                                         ASTContext &Context) {
+                                         ASTContext &Context, unsigned depth) {
   bool InputIsPoly = isa<PolymorphicFunctionType>(Ty->getInput().getPointer());
   bool OutputIsPoly =
     isa<PolymorphicFunctionType>(Ty->getResult().getPointer());
@@ -1460,8 +1460,10 @@ static bool checkPolymorphicFunctionType(PolymorphicFunctionType *Ty,
     return false;
 
   // FIXME: We currently have issues canonicalizing PolymorphicFunctionType
-  // whose input type or result type is also a PolymorphicFunctionType.
-  if (InputIsPoly || OutputIsPoly)
+  // whose input type or result type is also a PolymorphicFunctionType. We also
+  // have issues when PolymorphicFunctionType is part of a FunctionType.
+  // rdar://18021608
+  if (InputIsPoly || OutputIsPoly || depth)
     return true;
 
   // Try to canonicalize PolymorphicFunctionType and compare.
@@ -1469,6 +1471,37 @@ static bool checkPolymorphicFunctionType(PolymorphicFunctionType *Ty,
   auto sig = canonicalPolymorphicFunctionType(Ty, Context, inTy, outTy);
   auto sig2 = canonicalPolymorphicFunctionType(Ty2, Context, inTy2, outTy2);
   return sig == sig2 && inTy == inTy2 && outTy == outTy2;
+}
+
+static bool checkFunctionType(FunctionType *Ty, FunctionType *Ty2,
+                              ASTContext &Context);
+
+static bool checkASTType(CanType Ty, CanType Ty2, ASTContext &Context,
+                         unsigned depth) {
+  if (Ty == Ty2)
+    return true;
+  if (auto *InputTy = dyn_cast<FunctionType>(Ty.getPointer())) {
+    auto *Input2Ty = dyn_cast<FunctionType>(Ty2.getPointer());
+    if (!Input2Ty)
+      return false;
+    return checkFunctionType(InputTy, Input2Ty, Context);
+  }
+  if (auto *InputPoly = dyn_cast<PolymorphicFunctionType>(Ty.getPointer())) {
+    auto *Input2Poly = dyn_cast<PolymorphicFunctionType>(Ty2.getPointer());
+    if (!Input2Poly)
+      return false;
+    return checkPolymorphicFunctionType(InputPoly, Input2Poly, Context, depth);
+  }
+  return false;
+}
+
+static bool checkFunctionType(FunctionType *Ty, FunctionType *Ty2,
+                              ASTContext &Context) {
+  return Ty == Ty2 ||
+         (checkASTType(Ty->getInput()->getCanonicalType(),
+                       Ty2->getInput()->getCanonicalType(), Context, 1) &&
+          checkASTType(Ty->getResult()->getCanonicalType(),
+                       Ty2->getResult()->getCanonicalType(), Context, 1));
 }
 
 ///   sil-instruction:
@@ -2369,20 +2402,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // Pick the ValueDecl that has the right type.
     ValueDecl *TheDecl = nullptr;
     auto declTy = Ty.getType()->getCanonicalType();
-    auto declPoly = dyn_cast<PolymorphicFunctionType>(declTy.getPointer());
     auto unlabeledDecl =
       declTy->getUnlabeledType(P.Context)->getCanonicalType();
     for (unsigned I = 0, E = values.size(); I < E; I++) {
       auto lookupTy = values[I]->getType()->getCanonicalType();
       auto unlabeledLookup =
         lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
-      auto lookupPoly = dyn_cast<PolymorphicFunctionType>(
-                            lookupTy.getPointer());
-      // We handle comparision of PolymorphicFunctionType by calling
-      // checkPolymorphicFunctionType.
-      if ((declPoly && lookupPoly &&
-           checkPolymorphicFunctionType(lookupPoly, declPoly, P.Context)) ||
-          unlabeledLookup == unlabeledDecl) {
+      if (checkASTType(unlabeledLookup, unlabeledDecl, P.Context, 0)) {
         TheDecl = values[I];
         // Update SILDeclRef to point to the right Decl.
         Member.loc = TheDecl;
