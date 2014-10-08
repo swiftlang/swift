@@ -1082,12 +1082,19 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   }
 }
 
+static bool isStructOrClassContext(DeclContext *dc) {
+  if (auto ctx = dc->getDeclaredTypeInContext())
+    return ctx->getClassOrBoundGenericClass() ||
+           ctx->getStructOrBoundGenericStruct();
+  return false;
+}
+
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
   // Print @sil_stored when the attribute is not already
   // on, decl has storage and it is on a class.
   if (Options.PrintForSIL && decl->hasStorage() &&
-      decl->getDeclContext()->isClassOrClassExtensionContext() &&
+      isStructOrClassContext(decl->getDeclContext()) &&
       !decl->getAttrs().hasAttribute<SILStoredAttr>())
     Printer << "@sil_stored ";
   printAttributes(decl);

@@ -182,8 +182,12 @@ void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
 
 void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
   auto *VD = cast<VarDecl>(D);
-  if (!VD->getDeclContext()->isClassOrClassExtensionContext())
-    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
+  if (VD->getDeclContext()->isClassOrClassExtensionContext())
+    return;
+  auto ctx = VD->getDeclContext()->getDeclaredTypeInContext();
+  if (ctx && ctx->getStructOrBoundGenericStruct())
+    return;
+  return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
 }
 
 static Optional<Diag<bool,Type>>
