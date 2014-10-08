@@ -788,7 +788,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   unsigned predecessors = std::distance(silBB->pred_begin(), silBB->pred_end());
   
   IGF.Builder.SetInsertPoint(llBB);
-  if (IGF.IGM.DebugInfo && !IGF.isAvailableExternally()) {
+  if (IGF.IGM.DebugInfo) {
     // Use the location of the first instruction in the basic block
     // for the φ-nodes.
     if (!silBB->empty()) {
@@ -821,7 +821,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   }
 
   // Since we return to the entry of the function, reset the location.
-  if (IGF.IGM.DebugInfo && !IGF.isAvailableExternally())
+  if (IGF.IGM.DebugInfo)
     IGF.IGM.DebugInfo->clearLoc(IGF.Builder);
 
   return phis;
