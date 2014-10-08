@@ -70,7 +70,8 @@ public class HeapBufferStorage<Value,Element> {
 // we accept everything; unsafeBitCast will at least catch
 // inappropriately-sized things at runtime.
 public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
-  return _swift_isUniquelyReferenced(unsafeBitCast(x, UWord.self)) != 0
+  return _swift_isUniquelyReferenced_native_spareBits(
+    unsafeBitCast(x, UWord.self)) != 0
 }
 
 /// Management API for `HeapBufferStorage<Value, Element>`

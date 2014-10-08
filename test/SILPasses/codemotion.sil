@@ -641,7 +641,7 @@ bb3:
 }
 
 sil @arc_user : $@thin () -> ()
-sil @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
+sil @_swift_isUniquelyReferenced_native_spareBits : $@thin (Int) -> Bool
 
 // The retains here aren't able to be moved to a successor BB.  But we still want to move them as far
 // as possible down the current BB.  The first retain should be moved to above the release_value.
@@ -649,7 +649,7 @@ sil @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
 // The third retain should move below the sadd builtin_function_ref
 // The fourth retain should move below the arc_user builtin_function_ref, but above the apply
 // The fifth retain should *NOT* move below the apply to
-// _swift_isUniquelyReferenced, unless we can prove that the pointers do not
+// _swift_isUniquelyReferenced_native_spareBits, unless we can prove that the pointers do not
 // alias.
 // And the last retain should remain where it is at the end of the BB.
 //
@@ -665,8 +665,8 @@ sil @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
 // CHECK-NEXT: retain_value %3
 // CHECK-NEXT: retain_value %2
 // CHECK-NEXT: apply
-// CHECK-NEXT: function_ref _swift_isUniquelyReferenced
-// CHECK-NEXT: function_ref @_swift_isUniquelyReferenced
+// CHECK-NEXT: function_ref _swift_isUniquelyReferenced_native_spareBits
+// CHECK-NEXT: function_ref @_swift_isUniquelyReferenced_native_spareBits
 // CHECK-NEXT: integer_literal $Builtin.Word, 1
 // CHECK-NEXT: struct $Int
 // CHECK-NEXT: retain_value %3
@@ -687,8 +687,8 @@ bb0(%0 : $FakeOptional<Builtin.Int32>, %1 : $FakeOptional<Builtin.Int32>, %2 : $
   %1000 = function_ref @arc_user : $@thin () -> ()
   apply %1000 () : $@thin () -> ()
   retain_value %3 : $FakeOptional<Builtin.Int32>
-  // function_ref _swift_isUniquelyReferenced
-  %500 = function_ref @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
+  // function_ref _swift_isUniquelyReferenced_native_spareBits
+  %500 = function_ref @_swift_isUniquelyReferenced_native_spareBits : $@thin (Int) -> Bool
   %501 = integer_literal $Builtin.Word, 1
   %502 = struct $Int (%501 : $Builtin.Word)
   %503 = apply %500(%502) : $@thin (Int) -> Bool

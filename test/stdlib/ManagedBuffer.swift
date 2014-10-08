@@ -12,6 +12,7 @@
 // RUN: %target-run-simple-swift
 
 import StdlibUnittest
+import Foundation
 
 struct CountAndCapacity {
   var count: LifetimeTracked
@@ -97,6 +98,24 @@ tests.test("basic") {
     }
   }
   expectEqual(0, LifetimeTracked.instances)
+}
+
+tests.test("isUniquelyReferenced") {
+  var s = TestManagedBuffer<LifetimeTracked>.create(0)
+  expectTrue(isUniquelyReferenced(&s))
+  var s2 = s
+  expectFalse(isUniquelyReferenced(&s))
+  expectFalse(isUniquelyReferenced(&s2))
+}
+
+tests.test("isUniquelyReferencedNonObjC") {
+  var s = TestManagedBuffer<LifetimeTracked>.create(0)
+  expectTrue(isUniquelyReferencedNonObjC(&s))
+  var s2 = s
+  expectFalse(isUniquelyReferencedNonObjC(&s))
+  expectFalse(isUniquelyReferencedNonObjC(&s2))
+  var s3 = NSArray()
+  expectFalse(isUniquelyReferencedNonObjC(&s3))
 }
 
 runAllTests()

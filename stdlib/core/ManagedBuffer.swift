@@ -12,6 +12,12 @@
 
 import SwiftShims
 
+/// A common base class for classes that need to be non-\ `@objc`, 
+/// recognizably in the type system.
+///
+/// See `isUniquelyReferenced`
+public class NonObjectiveCBase {}
+
 /// A base class of `ManagedBuffer<Value,Element>`, used during
 /// instance creation.
 ///
@@ -22,7 +28,7 @@ import SwiftShims
 /// `ManagedProtoBuffer` does not offer
 /// access to the as-yet uninitialized `value` property of
 /// `ManagedBuffer`,
-public class ManagedProtoBuffer<Value, Element> {
+public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// The actual number of elements that can be stored in this object.
   ///
   /// This value may be nontrivial to compute; it is usually a good
@@ -172,3 +178,73 @@ public class ManagedBuffer<Value, Element>
     }
   }
 }
+
+// FIXME: when our calling convention changes to pass self at +0,
+// inout should be dropped from the arguments to these functions.
+
+/// Returns `true` iff `object` is a non-\ `@objc` class with a single
+/// strong reference.
+///
+/// * Does *not* modify `object`; the use of `inout` is an
+///   implementation artifact.
+/// * If `object` is an Objective-C class instance, returns `false`.
+/// * Weak references do not affect the result of this function.
+///  
+/// Useful for implementing the copy-on-write optimization for the
+/// deep storage of value types::
+///
+///   mutating func modifyMe(arg: X) {
+///     if isUniquelyReferencedNonObjC(&myStorage) {
+///       myStorage.modifyInPlace(arg)
+///     }
+///     else {
+///       myStorage = self.createModified(myStorage, arg)
+///     }
+///   }
+///
+/// This function is safe to use for `mutating` functions in
+/// multithreaded code because a false positive would imply that there
+/// is already a user-level data race on the value being mutated.
+public func isUniquelyReferencedNonObjC<T: AnyObject>(inout object: T) -> Bool {
+  
+  // Note: the pointer must be extracted in a separate step or an
+  // extra reference will be held during the check below
+  let o = UnsafePointer<Void>(Builtin.bridgeToRawPointer(object))
+  let result = _swift_isUniquelyReferencedNonObjC_nonNull(o)
+  Builtin.fixLifetime(object)
+  return result != 0
+}
+
+/// Returns `true` iff `object` is a non-\ `@objc` class with a single
+/// strong reference.
+///
+/// * Does *not* modify `object`; the use of `inout` is an
+///   implementation artifact.
+/// * Weak references do not affect the result of this function.
+///  
+/// Useful for implementing the copy-on-write optimization for the
+/// deep storage of value types::
+///
+///   mutating func modifyMe(arg: X) {
+///     if isUniquelyReferenced(&myStorage) {
+///       myStorage.modifyInPlace(arg)
+///     }
+///     else {
+///       myStorage = myStorage.createModified(arg)
+///     }
+///   }
+///
+/// This function is safe to use for `mutating` functions in
+/// multithreaded code because a false positive would imply that there
+/// is already a user-level data race on the value being mutated.
+public func isUniquelyReferenced<T: NonObjectiveCBase>(
+  inout object: T
+) -> Bool {
+  // Note: the pointer must be extracted in a separate step or an
+  // extra reference will be held during the check below
+  let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(object))
+  let result = _swift_isUniquelyReferenced_nonNull_native(o)
+  Builtin.fixLifetime(object)
+  return result != 0
+}
+

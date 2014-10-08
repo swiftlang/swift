@@ -18,19 +18,17 @@
 #define SWIFT_STDLIB_SHIMS_RUNTIMESHIMS_H_
 
 #include <stddef.h>
-#include <stdbool.h>
-
-typedef struct objc_object *id;
 
 #ifdef __cplusplus
 namespace swift { extern "C" {
 #endif
 
-bool _swift_isUniquelyReferencedNative_nonNull(id);
-bool _swift_usesNativeSwiftReferenceCounting_nonNull(id);
-unsigned char _swift_isUniquelyReferenced(uintptr_t bits);
+unsigned char _swift_isUniquelyReferencedNonObjC_nonNull(const void*);
+unsigned char _swift_usesNativeSwiftReferenceCounting_nonNull(const void*);
+unsigned char _swift_isUniquelyReferenced_native_spareBits(uintptr_t bits);
+unsigned char _swift_isUniquelyReferenced_nonNull_native(
+  const struct HeapObject*);
 
-  
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif

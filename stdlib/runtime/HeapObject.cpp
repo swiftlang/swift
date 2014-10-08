@@ -446,7 +446,6 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
 extern "C" void swift_fixLifetime(OpaqueValue* value) {
 }
 
-
 void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
   ref->Value = value;
   swift_weakRetain(value);
@@ -522,24 +521,4 @@ void swift::swift_weakTakeAssign(WeakReference *dest, WeakReference *src) {
 void swift::_swift_abortRetainUnowned(const void *object) {
   (void)object;
   swift::crash("attempted to retain deallocated object");
-}
-
-//===----------------------------------------------------------------------===//
-// FIXME: this should return bool but it chokes the compiler
-// <rdar://problem/18573806>
-//===----------------------------------------------------------------------===//
-/// Given the bits of a Native swift object reference, or of a
-/// word-sized Swift enum containing a Native swift object reference as
-/// a payload, return true iff the object's strong reference count is
-/// 1.
-unsigned char swift::_swift_isUniquelyReferenced(std::uintptr_t bits) {
-  const auto object = reinterpret_cast<HeapObject*>(
-    bits & ~heap_object_abi::SwiftSpareBitsMask);
-
-  // Sometimes we have a NULL "owner" object, e.g. because the data
-  // being referenced (usually via UnsafeMutablePointer<T>) has infinite
-  // lifetime, or lifetime managed outside the Swift object system.
-  // In these cases we have to assume the data is shared among
-  // multiple references, and needs to be copied before modification.
-  return object != nullptr && object->refCount < 2 * RC_INTERVAL;
 }

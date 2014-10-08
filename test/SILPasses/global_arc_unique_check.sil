@@ -34,8 +34,8 @@ bb2:
   // CHECK-NOT: strong_retain
   // CHECK-NOT: strong_release
   strong_retain %0 : $MD5
-  // function_ref _swift_isUniquelyReferenced
-  %172 = function_ref @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
+  // function_ref _swift_isUniquelyReferenced_native_spareBits
+  %172 = function_ref @_swift_isUniquelyReferenced_native_spareBits : $@thin (Int) -> Bool
   %314 = ref_element_addr %0 : $MD5, #MD5.w
   %318 = load %314 : $*Array<UInt32>
   %319 = alloc_stack $Array<UInt32>
@@ -65,4 +65,4 @@ bb5:
   br bb1(%13 : $Builtin.Word)
 
 }
-sil @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
+sil @_swift_isUniquelyReferenced_native_spareBits : $@thin (Int) -> Bool

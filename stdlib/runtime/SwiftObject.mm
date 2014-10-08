@@ -683,7 +683,9 @@ extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,
 
 // Given a non-nil object reference, return true iff the object uses
 // native swift reference counting.
-bool swift::_swift_usesNativeSwiftReferenceCounting_nonNull(id object) {
+unsigned char swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
+  const void* object
+) {
     assert(object != nullptr);
 #if SWIFT_OBJC_INTEROP
     return !isObjCTaggedPointer(object) &&
@@ -693,13 +695,48 @@ bool swift::_swift_usesNativeSwiftReferenceCounting_nonNull(id object) {
 #endif 
 }
 
+// Given a non-nil non-@objc object reference, return true iff the
+// object has a strong reference count of 1.
+unsigned char swift::_swift_isUniquelyReferenced_nonNull_native(
+  const HeapObject* object
+) {
+  assert(object != nullptr);
+  return object->refCount < 2 * RC_INTERVAL;
+}
+
 // Given a non-nil object reference, return true iff the object is a
 // native swift object with strong reference count of 1.
-bool swift::_swift_isUniquelyReferencedNative_nonNull(id object) {
+unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull(
+  const void* object
+) {
   assert(object != nullptr);
   return
 #if SWIFT_OBJC_INTEROP
     swift::_swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif 
-    ((const HeapObject*)object)->refCount < 2 * RC_INTERVAL;
+    _swift_isUniquelyReferenced_nonNull_native((HeapObject*)object);
 }
+
+//===----------------------------------------------------------------------===//
+// FIXME: this should return bool but it chokes the compiler
+// <rdar://problem/18573806>
+//===----------------------------------------------------------------------===//
+/// Given the bits of a possibly-nil Native swift object reference, or of a
+/// word-sized Swift enum containing a Native swift object reference as
+/// a payload, return true iff the object's strong reference count is
+/// 1.
+unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
+  std::uintptr_t bits
+) {
+  const auto object = reinterpret_cast<HeapObject*>(
+    bits & ~heap_object_abi::SwiftSpareBitsMask);
+
+  // Sometimes we have a NULL "owner" object, e.g. because the data
+  // being referenced (usually via UnsafeMutablePointer<T>) has infinite
+  // lifetime, or lifetime managed outside the Swift object system.
+  // In these cases we have to assume the data is shared among
+  // multiple references, and needs to be copied before modification.
+  return object != nullptr && object->refCount < 2 * RC_INTERVAL;
+}
+
+

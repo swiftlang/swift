@@ -31,7 +31,7 @@ using namespace swift::arc;
 static bool isKnownToNotDecrementRefCount(FunctionRefInst *FRI) {
    return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
      .Case("swift_keepAlive", true)
-     .Case("_swift_isUniquelyReferenced", true)
+     .StartsWith("_swift_isUniquelyReferenced", true)
      .Default(false);
 }
 
@@ -146,8 +146,8 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
 bool swift::arc::canCheckRefCount(SILInstruction *User) {
   if (auto *AI = dyn_cast<ApplyInst>(User))
     if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-        return FRI->getReferencedFunction()->getName() ==
-            "_swift_isUniquelyReferenced";
+        return FRI->getReferencedFunction()->getName().startswith(
+          "_swift_isUniquelyReferenced");
   return false;
 }
 

@@ -99,9 +99,8 @@ case Cocoa0(CocoaType)
   }
   
   mutating func isUniquelyReferenced() -> Bool {
-    let w = Builtin.ptrtoint_Word(Builtin.bridgeToRawPointer(native!))
-    if let n = native.map({ Builtin.bridgeToRawPointer($0) }) {
-      return _swift_isUniquelyReferenced(UWord(Builtin.ptrtoint_Word(n))) != 0
+    if let raw = native.map({ Builtin.bridgeToRawPointer($0) }) {
+      return _swift_isUniquelyReferenced_nonNull_native(UnsafePointer(raw)) != 0
     }
     return false
   }
@@ -127,25 +126,29 @@ struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject> : BridgeStorage
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    return _swift_isUniquelyReferencedNative_nonNull(object)
+    return _swift_isUniquelyReferencedNonObjC_nonNull(
+      UnsafePointer(rawObject)) != 0
   }
   
   var native: Native? {
-    return _swift_usesNativeSwiftReferenceCounting_nonNull(object)
-    ? .Some(Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(object))) : nil
+    return _swift_usesNativeSwiftReferenceCounting_nonNull(
+      UnsafePointer(rawObject)) != 0
+    ? .Some(Builtin.bridgeFromRawPointer(rawObject)) 
+    : nil
   }
     
   var cocoa: Cocoa? {
-    return _swift_usesNativeSwiftReferenceCounting_nonNull(object)
-    ? nil : .Some(Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(object)))
+    return _swift_usesNativeSwiftReferenceCounting_nonNull(
+      UnsafePointer(rawObject)) != 0
+    ? nil : .Some(Builtin.bridgeFromRawPointer(rawObject))
   }
     
   var spareBits: Int {
     return Int(bits)
   }
   
-  var address: UnsafePointer<Void> {
-    return unsafeAddressOf(object)
+  var rawObject: Builtin.RawPointer {
+    return Builtin.bridgeToRawPointer(object)
   }
   
   let object: AnyObject
