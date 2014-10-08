@@ -207,6 +207,10 @@ public:
   // current SILValue.
   SILValue stripCasts();
 
+  // Return the underlying SILValue after stripping off all upcasts from the
+  // current SILValue.
+  SILValue stripUpCasts();
+
   // Return the underlying SILValue after stripping off all casts and
   // address projection instructions.
   //
