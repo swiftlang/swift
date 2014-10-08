@@ -607,8 +607,9 @@ public:
             return true;
 
       if (AFD->getBody(/*canSynthesize=*/false)) {
+        AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
         if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
-          AFD->setBody(S);
+          AFD->setBody(S, PreservedKind);
         else
           return true;
       }

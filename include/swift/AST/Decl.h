@@ -4043,12 +4043,12 @@ public:
     }
     return nullptr;
   }
-  void setBody(BraceStmt *S) {
+  void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed) {
     assert(getBodyKind() != BodyKind::Skipped &&
            "can not set a body if it was skipped");
 
     Body = S;
-    setBodyKind(BodyKind::Parsed);
+    setBodyKind(NewBodyKind);
   }
 
   /// \brief Note that the body was skipped for this function.  Function body
