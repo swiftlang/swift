@@ -292,8 +292,7 @@ createEmptyFunctionWithOptimizedSig(SILFunction *OldF,
       OldFTy->getGenericSignature(), OldFTy->getExtInfo(),
       OldFTy->getCalleeConvention(), InterfaceParams, InterfaceResult, Ctx);
 
-  // Create the new function make it bare so that we don't care about debug
-  // scopes.
+  // Create the new function.
   auto *NewDebugScope = new (M) SILDebugScope(*OldF->getDebugScope());
   SILFunction *NewF = SILFunction::create(
       M, OptimizedLinkage, NewFName, NewFTy, nullptr, OldF->getLocation(),
@@ -394,6 +393,46 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   return NewF;
 }
 
+/// This function takes in a function F, removes all basic blocks except for F's
+/// first BB, and then converts F into a thunk calling NewF according to the
+/// list of ArgDescriptor \p Arguments.
+static void
+convertFunctionToThunk(SILFunction *F, SILFunction *NewF,
+                       ArrayRef<ArgDescriptor> Arguments) {
+  // First remove the terminator from the first basic block. This is just to be
+  // careful around any potential references to other BB and make sure we do not
+  // reference deallocating objects.
+  SILBasicBlock *FirstBB = &*F->begin();
+  TermInst *FirstBBTerm = FirstBB->getTerminator();
+  FirstBBTerm->eraseFromParent();
+
+  // Then delete all basic blocks, except for the first one.
+  SILFunction::iterator BI = std::prev(F->end()), BE = FirstBB;
+  while (BI != BE) {
+    SILBasicBlock *TargetBB = BI;
+    --BI;
+    removeDeadBlock(TargetBB);
+  }
+
+  // Then go back through the first BB and delete all instructions.
+  clearBlockBody(FirstBB);
+
+  // Create the dead args array.
+  //
+  // TODO: Refactor this with the code in computeOptimizedInterfaceParams.
+  llvm::SmallVector<unsigned, 8> DeadArgs;
+  CanSILFunctionType OldFTy = F->getLoweredFunctionType();
+  for (unsigned i = 0, e = OldFTy->getParameters().size(); i != e; ++i) {
+    // If we have a dead argument, add it to the dead arg list with the index.
+    if (Arguments[i].IsDead) {
+      DeadArgs.push_back(i);
+    }
+  }
+
+  // Then create the thunk body.
+  createThunkBody(FirstBB, NewF, Arguments, DeadArgs);
+}
+
 /// This function takes in a SILFunction F and its callsites in the current
 /// module and produces a new SILFunction that has the body of F but with
 /// optimized function arguments. F is changed to be a thunk that calls NewF to
@@ -430,23 +469,29 @@ optimizeFunctionSignature(SILFunction *F,
   llvm::SmallString<64> NewFName;
   createNewName(*F, Arguments, NewFName);
 
-  SILFunction *NewF;
-  // Ok, we have optimizations that we can perform here. First attempt to look
-  // up the optimized function from the module if we already created it in a
-  // previous pass manager iteration.
+  // If we already have a specialized version of this function, do not
+  // respecialize. Just rewrite the body of this function as the appropriate
+  // thunk.
   //
-  // This can occur if we specialize a function F to a function NewF and then F
-  // is deleted. If F is deleted, we will re-link in F if F is able to be shown
-  // to be used somewhere else due to a different optimization exposing a
-  // function_ref.
-  if (!(NewF = F->getModule().lookUpFunction(NewFName))) {
+  // TODO: Can we find out when we don't need to remake the thunk? Doing this
+  // ensures that we do not need to identify if this function was converted into
+  // a thunk or not. This is simpler yet wasteful. The thing is I don't expect
+  // this to happen very often. If it becomes an issue, it should be
+  // refactored. The thing I am worried about are false negatives due to the
+  // compiler "shifting" or bugs where we remove the release from a thunk when
+  // we process it a second time.
+  SILFunction *NewF;
+  if ((NewF = F->getModule().lookUpFunction(NewFName))) {
     // Otherwise, create the new function and transfer the current function over
     // to that function.
+    convertFunctionToThunk(F, NewF, Arguments);
+  } else {
+    // Otherwise, move F over to NewF.
     NewF = moveFunctionBodyToNewFunctionWithName(F, NewFName, Arguments);
   }
 
-  // Rewrite all apply inst to be to the new function performing any
-  // modifications needed to the caller.
+  // Rewrite all apply insts calling F to call NewF. Update each call site as
+  // appropriate given the form of function signature optimization performed.
   rewriteApplyInstToCallNewFunction(F, NewF, Arguments, CallSites);
 
   // Remove all Callee releases that we found and made redundent via owned to

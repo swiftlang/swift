@@ -96,6 +96,47 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %5 : $()
 }
 
+// Make sure that we handle specializing functions which have been specialized in a different module.
+
+// CHECK-LABEL: sil [fragile] @dead_arg_already_specialized_callsite : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: [[FUNC:%.*]] = function_ref @_TTOS_dn_dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC]]
+
+sil [fragile] @dead_arg_already_specialized_callsite : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %4 = apply %2(%0, %1) : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: [[FUNC:%.*]] = function_ref @_TTOS_dn_dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC]]
+sil [fragile] @dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  %3 = apply %2(%1) : $@thin (Builtin.NativeObject) -> ()
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @_TTOS_dn_dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject) -> () {
+sil [fragile] @_TTOS_dn_dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = tuple()
+  return %1 : $()
+}
+
 //======================
 // @owned => @guaranteed
 
