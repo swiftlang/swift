@@ -7490,8 +7490,12 @@ createDesignatedInitOverride(TypeChecker &tc,
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
-      if (objcAttr->hasName())
-        ctor->getAttrs().add(objcAttr->clone(ctx));
+      if (objcAttr->hasName()) {
+        auto *clonedAttr = objcAttr->clone(ctx);
+        // Set it to implicit to disable printing it for SIL.
+        clonedAttr->setImplicit(true);
+        ctor->getAttrs().add(clonedAttr);
+      }
     }
 
   }

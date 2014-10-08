@@ -184,6 +184,8 @@ void DeclAttribute::print(ASTPrinter &Printer,
   }
 
   case DAK_ObjC: {
+    if (Options.PrintForSIL && isImplicit())
+      break;
     Printer << "@objc";
     llvm::SmallString<32> scratch;
     if (auto Name = cast<ObjCAttr>(this)->getName()) {
