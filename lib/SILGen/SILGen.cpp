@@ -288,24 +288,25 @@ SILType SILGenModule::getConstantType(SILDeclRef constant) {
   return Types.getConstantType(constant);
 }
 
-static void updateLinkageForDefinition(SILGenModule &SGM,
-                                       SILFunction *fn, SILDeclRef constant) {
-  // In all the cases where getConstantLinkage returns something
-  // different for ForDefinition, it returns an available-externally
-  // linkage.
-  if (!isAvailableExternally(fn->getLinkage())) return;
-  fn->setLinkage(constant.getLinkage(ForDefinition));
-}
-
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   auto found = emittedFunctions.find(constant);
   if (found != emittedFunctions.end()) {
     SILFunction *F = found->second;
     if (forDefinition) {
-      updateLinkageForDefinition(*this, F, constant);
-      if (makeModuleFragile && !constant.isGlobal()) {
-        F->setFragile(IsFragile);
+      // In all the cases where getConstantLinkage returns something
+      // different for ForDefinition, it returns an available-externally
+      // linkage.
+      if (isAvailableExternally(F->getLinkage())) {
+        F->setLinkage(constant.getLinkage(ForDefinition));
+      }
+      if (makeModuleFragile) {
+        if (constant.isGlobal()) {
+          // This is because globals are currently not fragile. See TODO below.
+          F->setLinkage(SILLinkage::Public);
+        } else {
+          F->setFragile(IsFragile);
+        }
       }
     }
     return F;
@@ -327,9 +328,9 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   if (makeModuleFragile && constant.isGlobal()) {
     // TODO: make global variables fragile. For this we need to mangle the
-    // module name into the global name, and to ensure the initialization tokens
+    // module name into the global name to ensure that the initialization tokens
     // are unique (or can be eliminated).
-    linkage = SILLinkage::Public;
+    linkage = forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal;
     IsFrag = IsNotFragile;
   }
   
