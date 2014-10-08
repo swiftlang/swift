@@ -497,10 +497,6 @@ public struct RawByte {
   let _inaccessible: UInt8
 }
 
-@availability(*,unavailable,message="it has been renamed 'UnsafePointer'; the old 'UnsafePointer' was renamed 'UnsafeMutablePointer''")
-public struct ConstUnsafePointer<T> {
-}
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
