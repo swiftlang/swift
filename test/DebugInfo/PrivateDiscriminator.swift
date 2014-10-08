@@ -9,7 +9,7 @@
 class A {
   init(val : Int) { member = val }
   private let member : Int
-  // CHECK: [[DISCRIMINATOR]]{{.*}} [ DW_TAG_subprogram ] [line [[@LINE+1]]] [def] [getMember]
+  // CHECK: [[DISCRIMINATOR]]{{.*}} [ DW_TAG_subprogram ] [line [[@LINE+1]]] [local] [def] [getMember]
   private func getMember() -> Int { return member }
   func getVal() -> Int { return getMember() }  
 }

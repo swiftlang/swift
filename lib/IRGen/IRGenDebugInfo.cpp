@@ -719,7 +719,7 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   llvm::DISubprogram Decl;
 
   // Various flags
-  bool IsLocalToUnit = false;
+  bool IsLocalToUnit = Fn ? Fn->hasInternalLinkage() : true;
   bool IsDefinition = true;
   bool IsOptimized = Opts.Optimize;
   unsigned Flags = 0;
@@ -740,20 +740,6 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
 
   if (FnTy && FnTy->getRepresentation() == FunctionType::Representation::Block)
     Flags |= llvm::DIDescriptor::FlagAppleBlock;
-
-  switch (CC) {
-  // FIXME: We need to invent new DWARF attributes for the CC, but we
-  // can't do that without patching the LLVM backend.
-  // Hijacking a completely different field for now.
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    IsLocalToUnit = true;
-    break;
-  case AbstractCC::Method:
-  case AbstractCC::Freestanding:
-  case AbstractCC::WitnessMethod:
-    IsLocalToUnit = false;
-  }
 
   llvm::DISubprogram SP = DBuilder.createFunction(
       Scope, Name, LinkageName, File, Line, DIFnTy, IsLocalToUnit, IsDefinition,

@@ -32,7 +32,7 @@ class MyObject : NSObject {
   // LOC-CHECK: define {{.*}} @_TToFC4main8MyObjectg5MyArrCSo7NSArray
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
-  // LOC-CHECK: ![[THUNK:.*]] = {{.*}}_TToFC4main8MyObjectg5MyArrCSo7NSArray{{.*}} ; [ DW_TAG_subprogram ] [line [[@LINE+2]]] [local] [def]
+  // LOC-CHECK: ![[THUNK:.*]] = {{.*}}_TToFC4main8MyObjectg5MyArrCSo7NSArray{{.*}} ; [ DW_TAG_subprogram ] [line [[@LINE+2]]] [def]
   // LOC-CHECK: ![[DBG]] = metadata !{i32 0, i32 0, metadata ![[THUNK]], null}
   var MyArr = NSArray()
 // Capture the pointer size from type Int
@@ -53,7 +53,7 @@ class MyObject : NSObject {
 }
 
 // FIXME (LLVM-branch): The [local] attribute means ObjectiveC-CC.
-// SANITY-DAG: [ DW_TAG_subprogram ] [line [[@LINE+2]]] [local] [def] {{.*}}[blah]
+// SANITY-DAG: [ DW_TAG_subprogram ] [line [[@LINE+2]]] [def] {{.*}}[blah]
 extension MyObject {
   func blah() {
     println("blah blah blah")
