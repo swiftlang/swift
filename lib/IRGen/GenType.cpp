@@ -827,7 +827,7 @@ const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
   return Types.getWitnessTablePtrTypeInfo();
 }
 
-const TypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
+const LoadableTypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
   if (WitnessTablePtrTI) return *WitnessTablePtrTI;
   WitnessTablePtrTI =
     createPrimitiveForAlignedPointer(IGM.WitnessTablePtrTy,
@@ -843,13 +843,33 @@ const TypeInfo &IRGenModule::getTypeMetadataPtrTypeInfo() {
   return Types.getTypeMetadataPtrTypeInfo();
 }
 
-const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
+const LoadableTypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   if (TypeMetadataPtrTI) return *TypeMetadataPtrTI;
   TypeMetadataPtrTI =
     createUnmanagedStorageType(IGM.TypeMetadataPtrTy);
   TypeMetadataPtrTI->NextConverted = FirstType;
   FirstType = TypeMetadataPtrTI;
   return *TypeMetadataPtrTI;
+}
+
+const LoadableTypeInfo &IRGenModule::getUnknownObjectTypeInfo() {
+  return Types.getUnknownObjectTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getUnknownObjectTypeInfo() {
+  if (UnknownObjectTI) return *UnknownObjectTI;
+  UnknownObjectTI = convertBuiltinUnknownObject();
+  UnknownObjectTI->NextConverted = FirstType;
+  FirstType = UnknownObjectTI;
+  return *UnknownObjectTI;
+}
+
+const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
+  if (EmptyTI) return *EmptyTI;
+  EmptyTI = new EmptyTypeInfo(IGM.Int8Ty);
+  EmptyTI->NextConverted = FirstType;
+  FirstType = EmptyTI;
+  return *EmptyTI;
 }
 
 /// Get the fragile type information for the given type, which may not
@@ -1271,7 +1291,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::BuiltinNativeObject:
     return convertBuiltinNativeObject();
   case TypeKind::BuiltinUnknownObject:
-    return convertBuiltinUnknownObject();
+    return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
@@ -1569,41 +1589,26 @@ const TypeInfo *TypeConverter::convertModuleType(ModuleType *T) {
 const TypeInfo *TypeConverter::convertMetatypeType(MetatypeType *T) {
   assert(T->hasRepresentation() &&
          "metatype should have been assigned a representation by SIL");
-  
-  switch (T->getRepresentation()) {
-  case MetatypeRepresentation::Thin:
-    // Thin metatypes are empty.
-    return new EmptyTypeInfo(IGM.Int8Ty);
 
-  case MetatypeRepresentation::Thick:
-    // Thick metatypes are represented with a metadata pointer.
-    return &getTypeMetadataPtrTypeInfo();
-
-  case MetatypeRepresentation::ObjC:
-    // ObjC metatypes are represented with an objc_class pointer.
-    return &getObjCClassPtrTypeInfo();
-  }
+  return &getMetatypeTypeInfo(T->getRepresentation());
 }
 
-const TypeInfo *
-TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
-  assert(T->hasRepresentation() &&
-         "metatype should have been assigned a representation by SIL");
- 
-  // FIXME: include space for value witness tables!
- 
-  switch (T->getRepresentation()) {
+const LoadableTypeInfo &
+TypeConverter::getMetatypeTypeInfo(MetatypeRepresentation representation) {
+  switch (representation) {
   case MetatypeRepresentation::Thin:
-    llvm_unreachable("existential metatypes are never thin!");
+    // Thin metatypes are empty.
+    return getEmptyTypeInfo();
 
   case MetatypeRepresentation::Thick:
     // Thick metatypes are represented with a metadata pointer.
-    return &getTypeMetadataPtrTypeInfo();
+    return getTypeMetadataPtrTypeInfo();
 
   case MetatypeRepresentation::ObjC:
     // ObjC metatypes are represented with an objc_class pointer.
-    return &getObjCClassPtrTypeInfo();
+    return getObjCClassPtrTypeInfo();
   }
+  llvm_unreachable("bad representation");
 }
 
 /// createNominalType - Create a new nominal type.

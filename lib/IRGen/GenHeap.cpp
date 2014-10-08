@@ -230,7 +230,7 @@ namespace {
   };
 }
 
-const TypeInfo *
+const LoadableTypeInfo *
 TypeConverter::createUnmanagedStorageType(llvm::Type *valueType) {
   return new UnmanagedReferenceTypeInfo(valueType,
                                         IGM.getHeapObjectSpareBits(),

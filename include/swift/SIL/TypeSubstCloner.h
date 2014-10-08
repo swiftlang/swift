@@ -67,20 +67,23 @@ protected:
     return ty.subst(SwiftMod, SubsMap, false, nullptr)->getCanonicalType();
   }
 
-  ProtocolConformance *remapConformance(CanType Ty, ProtocolConformance *C) {
-    // If Ty does not have unbound generic types, we did not specialize it so
-    // just return C. This relies on the fact that we do not partially
-    // specialize.
-    if (!Ty->hasArchetype())
-      return C;
+  Substitution remapSubstitution(Substitution sub) {
+    auto newSub = sub.subst(SwiftMod,
+                            Original.getContextGenericParams(),
+                            ApplySubs);
+    // Remap opened archetypes into the cloned context.
+    newSub = Substitution(newSub.getArchetype(),
+                          getASTTypeInClonedContext(newSub.getReplacement()
+                                                      ->getCanonicalType()),
+                          newSub.getConformances());
+    return newSub;
+  }
 
-    // Otherwise we need to create a specialized conformance for C. Remap the
-    // type...
-    CanType Type = remapASTType(Ty).getSwiftRValueType()->getCanonicalType();
-
-    // And create the new specialized conformance.
-    ASTContext &AST = SwiftMod->getASTContext();
-    return AST.getSpecializedConformance(Type, C, ApplySubs);
+  ProtocolConformance *remapConformance(ArchetypeType *archetype,
+                                        CanType type,
+                                        ProtocolConformance *conf) {
+    Substitution sub(archetype, type, conf);
+    return remapSubstitution(sub).getConformances()[0];
   }
 
   void visitClassMethodInst(ClassMethodInst *Inst) {
@@ -118,15 +121,7 @@ protected:
 
     SmallVector<Substitution, 16> TempSubstList;
     for (auto &Sub : Inst->getSubstitutions()) {
-      auto newSub = Sub.subst(Inst->getModule().getSwiftModule(),
-                              Original.getContextGenericParams(),
-                              ApplySubs);
-      // Remap opened archetypes into the cloned context.
-      newSub = Substitution(newSub.getArchetype(),
-                            getASTTypeInClonedContext(newSub.getReplacement()
-                                                        ->getCanonicalType()),
-                            newSub.getConformances());
-      TempSubstList.push_back(newSub);
+      TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
     }
 
     ApplyInst *N = Builder.createApply(
@@ -159,15 +154,7 @@ protected:
 
     SmallVector<Substitution, 16> TempSubstList;
     for (auto &Sub : Inst->getSubstitutions()) {
-      auto newSub = Sub.subst(Inst->getModule().getSwiftModule(),
-                              Original.getContextGenericParams(),
-                              ApplySubs);
-      // Remap opened archetypes into the cloned context.
-      newSub = Substitution(newSub.getArchetype(),
-                            getASTTypeInClonedContext(newSub.getReplacement()
-                                                        ->getCanonicalType()),
-                            newSub.getConformances());
-      TempSubstList.push_back(newSub);
+      TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
     }
     
     PartialApplyInst *N = Builder.createPartialApply(

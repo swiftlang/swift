@@ -164,6 +164,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(OpenExistentialInst, SILInstruction, None)
   INST(InitExistentialRefInst, SILInstruction, None)
   INST(OpenExistentialRefInst, SILInstruction, None)
+  INST(InitExistentialMetatypeInst, SILInstruction, None)
+  INST(OpenExistentialMetatypeInst, SILInstruction, None)
 
   // Blocks
   INST(ProjectBlockStorageInst, SILInstruction, None)

@@ -331,12 +331,14 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:
     case ValueKind::InitExistentialInst:
+    case ValueKind::InitExistentialMetatypeInst:
     case ValueKind::InitExistentialRefInst:
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::IsNonnullInst:
     case ValueKind::LoadInst:
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialInst:
+    case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
     case ValueKind::PartialApplyInst:
     case ValueKind::ExistentialMetatypeInst:

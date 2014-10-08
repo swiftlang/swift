@@ -4213,3 +4213,15 @@ llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
                           IGF.IGM.ProtocolDescriptorStructTy->getPointerTo());
   return val;
 }
+
+//===----------------------------------------------------------------------===//
+// Other metadata.
+//===----------------------------------------------------------------------===//
+
+llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
+                                             llvm::Value *metatypeMetadata) {
+  // The instance type field of MetatypeMetadata is immediately after
+  // the isa field.
+  return emitLoadFromMetadataAtIndex(IGF, metatypeMetadata, 1,
+                                     IGF.IGM.TypeMetadataPtrTy);
+}

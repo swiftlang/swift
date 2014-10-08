@@ -137,6 +137,10 @@ namespace irgen {
                                     VarDecl *field,
                                     llvm::Value *metadata);
 
+  /// Given a metatype value, read its instance type.
+  llvm::Value *emitMetatypeInstanceType(IRGenFunction &IGF,
+                                        llvm::Value *metatypeMetadata);
+
   /// Load the fragile instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>

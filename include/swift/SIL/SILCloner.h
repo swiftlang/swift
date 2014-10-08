@@ -73,7 +73,8 @@ protected:
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   SILType remapType(SILType Ty) { return Ty; }
   CanType remapASTType(CanType Ty) { return Ty; }
-  ProtocolConformance *remapConformance(CanType Ty, ProtocolConformance *C) {
+  ProtocolConformance *remapConformance(ArchetypeType *archetype,
+                                        CanType Ty, ProtocolConformance *C) {
     return C;
   }
   SILValue remapValue(SILValue Value);
@@ -84,34 +85,19 @@ protected:
   SILLocation getOpLocation(SILLocation Loc) {
     return asImpl().remapLocation(Loc);
   }
-  Substitution getOpSubstitution(Substitution Sub) {
-    CanType newReplacement = asImpl()
-      .getOpASTType(Sub.getReplacement()->getCanonicalType());
-    auto &C = newReplacement->getASTContext();
+  Substitution getOpSubstitution(Substitution sub) {
+    return asImpl().remapSubstitution(sub);
+  }
+  Substitution remapSubstitution(Substitution sub) {
+    CanType newReplacement =
+      asImpl().getOpASTType(sub.getReplacement()->getCanonicalType());
     
-    ArrayRef<ProtocolConformance*> conformances = Sub.getConformances();
-    MutableArrayRef<ProtocolConformance*> newConformancesBuf;
-    
-    auto copyConformances = [&]{
-      if (!newConformancesBuf.empty())
-        return;
-      newConformancesBuf = C.Allocate<ProtocolConformance*>(conformances.size());
-      memcpy(newConformancesBuf.data(), conformances.data(),
-             sizeof(ProtocolConformance*) * conformances.size());
-      conformances = newConformancesBuf;
-    };
-    
-    for (unsigned i = 0, e = conformances.size(); i < e; ++i) {
-      ProtocolConformance *newConformance = asImpl().getOpConformance(
-                                      Sub.getReplacement()->getCanonicalType(),
-                                      conformances[i]);
-      if (newConformance != conformances[i]) {
-        copyConformances();
-        newConformancesBuf[i] = newConformance;
-      }
-    }
-    
-    return Substitution(Sub.getArchetype(),
+    ArrayRef<ProtocolConformance*> conformances =
+      asImpl().getOpConformances(sub.getArchetype(),
+                                 sub.getReplacement()->getCanonicalType(),
+                                 sub.getConformances());
+
+    return Substitution(sub.getArchetype(),
                         newReplacement,
                         conformances);
   }
@@ -169,11 +155,59 @@ protected:
     ty = getASTTypeInClonedContext(ty);
     return asImpl().remapASTType(ty);
   }
-  
-  ProtocolConformance *getOpConformance(CanType Ty,
-                                        ProtocolConformance *Conformance) {
-    return asImpl().remapConformance(Ty, Conformance);
+
+  /// Remap an entire set of conformances.
+  ///
+  /// Returns the passed-in conformances array if none of the elements
+  /// changed.
+  ArrayRef<ProtocolConformance*> getOpConformances(ArchetypeType *archetype,
+                                                   CanType type,
+                             ArrayRef<ProtocolConformance*> oldConformances) {
+    SmallVector<ProtocolConformance*, 4> newConformances;
+    newConformances.reserve(oldConformances.size());
+    bool hasDifferences = false;
+
+    for (auto oldConf : oldConformances) {
+      auto newConf = asImpl().getOpConformance(archetype, type, oldConf);
+      hasDifferences |= (oldConf != newConf);
+      newConformances.push_back(newConf);
+    }
+
+    // Use the existing conformances array if possible.
+    if (!hasDifferences) return oldConformances;
+    return type->getASTContext().AllocateCopy(newConformances);
   }
+
+  // Find an archetype with the right shape for an existential.
+  static ArchetypeType *getArchetypeForExistential(CanType existential) {
+    assert(existential.isAnyExistentialType());
+
+    // Look through existential metatypes.
+    while (auto metatype = dyn_cast<ExistentialMetatypeType>(existential))
+      existential = metatype.getInstanceType();
+
+    // For simple protocol types, use Self.
+    if (auto protocol = dyn_cast<ProtocolType>(existential))
+      return protocol->getDecl()->getSelf()->getArchetype();
+
+    // Otherwise, open a new archetype with the right conformances.
+    assert(isa<ProtocolCompositionType>(existential));
+    return ArchetypeType::getOpened(existential);
+  }
+
+  ArrayRef<ProtocolConformance*>
+  getOpConformancesForExistential(CanType existential, CanType concreteType,
+                             ArrayRef<ProtocolConformance*> oldConformances) {
+    if (oldConformances.empty()) return oldConformances;
+    return asImpl().getOpConformances(getArchetypeForExistential(existential),
+                                      concreteType, oldConformances);
+  }
+  
+  ProtocolConformance *getOpConformance(ArchetypeType *archetype, CanType ty,
+                                        ProtocolConformance *conformance) {
+    return asImpl().remapConformance(archetype, ty, conformance);
+  }
+
   SILValue getOpValue(SILValue Value) {
     return asImpl().remapValue(Value);
   }
@@ -977,11 +1011,13 @@ SILCloner<ImplClass>::visitSuperMethodInst(SuperMethodInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
+  auto conformance =
+    getOpConformance(Inst->getLookupProtocol()->getSelf()->getArchetype(),
+                     Inst->getLookupType(), Inst->getConformance());
   doPostProcess(Inst,
     getBuilder().createWitnessMethod(getOpLocation(Inst->getLoc()),
                                      getOpASTType(Inst->getLookupType()),
-                                     getOpConformance(Inst->getLookupType(),
-                                                      Inst->getConformance()),
+                                     conformance,
                                      Inst->getMember(),
                                      getOpType(Inst->getType()),
                                      Inst->isVolatile()));
@@ -1018,6 +1054,27 @@ SILCloner<ImplClass>::visitOpenExistentialInst(OpenExistentialInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::
+visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *inst) {
+  // Create a new archetype for this opened existential type.
+  CanType openedType = inst->getType().getSwiftRValueType();
+  CanType exType = inst->getOperand().getType().getSwiftRValueType();
+  while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
+    exType = exMetatype.getInstanceType();
+    openedType = cast<MetatypeType>(openedType).getInstanceType();
+  }
+  auto archetypeTy = cast<ArchetypeType>(openedType);
+  OpenedExistentialSubs[archetypeTy] 
+    = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
+
+  doPostProcess(inst,
+    getBuilder().createOpenExistentialRef(getOpLocation(inst->getLoc()),
+                                          getOpValue(inst->getOperand()),
+                                          getOpType(inst->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
 visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
   // Create a new archetype for this opened existential type.
   auto archetypeTy
@@ -1034,24 +1091,48 @@ visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitInitExistentialInst(InitExistentialInst *Inst) {
+  CanType origFormalType = Inst->getFormalConcreteType();
+  auto conformances =
+    getOpConformancesForExistential(
+                         Inst->getOperand().getType().getSwiftRValueType(),
+                                    origFormalType, Inst->getConformances());
   doPostProcess(Inst,
     getBuilder().createInitExistential(getOpLocation(Inst->getLoc()),
                                    getOpValue(Inst->getOperand()),
-                                   getOpASTType(Inst->getFormalConcreteType()),
+                                   getOpASTType(origFormalType),
                                    getOpType(Inst->getLoweredConcreteType()),
-                                   Inst->getConformances()));
+                                       conformances));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *Inst) {
+  auto conformances =
+    getOpConformancesForExistential(Inst->getType().getSwiftRValueType(),
+                                    Inst->getFormalErasedObjectType(),
+                                    Inst->getConformances());
+  doPostProcess(Inst,
+    getBuilder().createInitExistentialMetatype(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand()),
+                                               getOpType(Inst->getType()),
+                                               conformances));
 }
 
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::
 visitInitExistentialRefInst(InitExistentialRefInst *Inst) {
+  CanType origFormalType = Inst->getFormalConcreteType();
+  auto conformances =
+    getOpConformancesForExistential(Inst->getType().getSwiftRValueType(),
+                                    origFormalType, Inst->getConformances());
   doPostProcess(Inst,
     getBuilder().createInitExistentialRef(getOpLocation(Inst->getLoc()),
                                     getOpType(Inst->getType()),
-                                    getOpASTType(Inst->getFormalConcreteType()),
+                                    getOpASTType(origFormalType),
                                     getOpValue(Inst->getOperand()),
-                                    Inst->getConformances()));
+                                    conformances));
 }
 
 template<typename ImplClass>

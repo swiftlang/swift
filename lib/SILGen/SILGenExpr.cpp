@@ -1681,28 +1681,62 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   return emitAddressOnlyErasure(SGF, E, C);
 }
 
+/// Given an existential type or metatype, produce the type that
+/// results from opening the underlying existential type.
+static CanType getOpenedTypeForExistential(CanType type) {
+  assert(type.isAnyExistentialType());
+  if (auto metatype = dyn_cast<ExistentialMetatypeType>(type)) {
+    auto instance = getOpenedTypeForExistential(metatype.getInstanceType());
+    return CanMetatypeType::get(instance);
+  }
+  return CanType(ArchetypeType::getOpened(type));
+}
+
+static SILType
+getOpenedTypeForLoweredExistentialMetatype(SILType type) {
+  auto metatype = type.castTo<ExistentialMetatypeType>();
+  auto instanceType = getOpenedTypeForExistential(metatype.getInstanceType());
+  auto resultType =
+    CanMetatypeType::get(instanceType, metatype->getRepresentation());
+  return SILType::getPrimitiveObjectType(resultType);
+}
+
+static SILValue emitOpenExistentialMetatype(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            SILValue metatype) {
+  SILType resultType =
+    getOpenedTypeForLoweredExistentialMetatype(metatype.getType());
+  return SGF.B.createOpenExistentialMetatype(loc, metatype, resultType);
+}
+
 RValue RValueEmitter::visitMetatypeErasureExpr(MetatypeErasureExpr *E,
                                                SGFContext C) {
   SILValue metatype =
     SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
 
   // Thicken the metatype if necessary.
-  if (auto metatypeTy = metatype.getType().getAs<MetatypeType>()) {
+  auto metatypeTy = metatype.getType().castTo<AnyMetatypeType>();
+  if (isa<MetatypeType>(metatypeTy)) {
     if (metatypeTy->getRepresentation() == MetatypeRepresentation::Thin) {
       auto thickMetatypeTy = CanMetatypeType::get(metatypeTy.getInstanceType(),
                                                   MetatypeRepresentation::Thick);
       metatype = SGF.B.createMetatype(E,
                              SILType::getPrimitiveObjectType(thickMetatypeTy));
     }
+
+  // If we're starting from an existential metatype, open it first.
+  } else {
+    assert(isa<ExistentialMetatypeType>(metatypeTy));
+    metatype = emitOpenExistentialMetatype(SGF, E, metatype);
   }
 
   assert(metatype.getType().castTo<AnyMetatypeType>()->getRepresentation()
            == MetatypeRepresentation::Thick);
 
-  // FIXME: use some sort of init_existential_metatype instruction
-
   auto loweredResultTy = SGF.getLoweredLoadableType(E->getType());
-  auto upcast = SGF.B.createUpcast(E, metatype, loweredResultTy);
+  auto upcast =
+    SGF.B.createInitExistentialMetatype(E, metatype, loweredResultTy,
+                                        E->getConformances());
   return RValue(SGF, E, ManagedValue::forUnmanaged(upcast));
 }
 
@@ -3019,8 +3053,12 @@ void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
     CanType mainClassTy = mainClass->getDeclaredTypeInContext()->getCanonicalType();
     CanType mainClassMetaty = CanMetatypeType::get(mainClassTy,
                                                    MetatypeRepresentation::ObjC);
-    CanType anyObjectTy = getASTContext()
-      .getProtocol(KnownProtocolKind::AnyObject)
+    ProtocolDecl *anyObjectProtocol =
+      getASTContext().getProtocol(KnownProtocolKind::AnyObject);
+    auto mainClassAnyObjectConformance =
+      getASTContext().getConformsTo(mainClassTy, anyObjectProtocol)
+        ->getPointer();
+    CanType anyObjectTy = anyObjectProtocol
       ->getDeclaredTypeInContext()
       ->getCanonicalType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
@@ -3047,8 +3085,10 @@ void SILGenFunction::emitArtificialTopLevel(ArtificialMainKind kind,
     auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
-    metaTy = B.createUpcast(mainClass, metaTy,
-                          SILType::getPrimitiveObjectType(anyObjectMetaTy));
+    metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
+                          SILType::getPrimitiveObjectType(anyObjectMetaTy),
+                          getASTContext().AllocateCopy(
+                            llvm::makeArrayRef(mainClassAnyObjectConformance)));
     SILValue iuoptMetaTy =
       B.createEnum(mainClass, metaTy,
                    getASTContext().getImplicitlyUnwrappedOptionalSomeDecl(),

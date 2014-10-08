@@ -81,9 +81,11 @@ private:
   const TypeInfo *FirstType;
   
   const ProtocolInfo *FirstProtocol;
-  const TypeInfo *WitnessTablePtrTI = nullptr;
-  const TypeInfo *TypeMetadataPtrTI = nullptr;
-  const TypeInfo *ObjCClassPtrTI = nullptr;
+  const LoadableTypeInfo *UnknownObjectTI = nullptr;
+  const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
+  const LoadableTypeInfo *TypeMetadataPtrTI = nullptr;
+  const LoadableTypeInfo *ObjCClassPtrTI = nullptr;
+  const LoadableTypeInfo *EmptyTI = nullptr;
   SmallVector<const LoadableTypeInfo *, 4> OpaqueStorageTypes;
   
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
@@ -110,7 +112,7 @@ private:
   const TypeInfo *convertProtocolType(ProtocolType *T);
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertBuiltinNativeObject();
-  const TypeInfo *convertBuiltinUnknownObject();
+  const LoadableTypeInfo *convertBuiltinUnknownObject();
   const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
   const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
   const TypeInfo *convertWeakStorageType(WeakStorageType *T);
@@ -123,17 +125,20 @@ public:
   const TypeInfo &getCompleteTypeInfo(CanType type);
   const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const TypeInfo &getTypeInfo(ClassDecl *D);
-  const TypeInfo &getTypeMetadataPtrTypeInfo();
-  const TypeInfo &getObjCClassPtrTypeInfo();
-  const TypeInfo &getWitnessTablePtrTypeInfo();
+  const LoadableTypeInfo &getUnknownObjectTypeInfo();
+  const LoadableTypeInfo &getTypeMetadataPtrTypeInfo();
+  const LoadableTypeInfo &getObjCClassPtrTypeInfo();
+  const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
+  const LoadableTypeInfo &getEmptyTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize);
+  const LoadableTypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
 
   const WeakTypeInfo *createSwiftWeakStorageType(llvm::Type *valueType);
   const UnownedTypeInfo *createSwiftUnownedStorageType(llvm::Type *valueType);
   const WeakTypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
   const UnownedTypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
-  const TypeInfo *createUnmanagedStorageType(llvm::Type *valueType);
+  const LoadableTypeInfo *createUnmanagedStorageType(llvm::Type *valueType);
 
   /// Enter a generic context for lowering the parameters of a generic function
   /// type.

@@ -46,6 +46,15 @@ namespace irgen {
                                    CanType formalSrcType,
                                    SILType loweredSrcType,
                                    ArrayRef<ProtocolConformance*> conformances);
+
+  /// Emit an existential metatype container from a metatype value
+  /// as an explosion.
+  void emitExistentialMetatypeContainer(IRGenFunction &IGF,
+                                        Explosion &out,
+                                        SILType outType,
+                                        llvm::Value *metatype,
+                                        SILType metatypeType,
+                                 ArrayRef<ProtocolConformance*> conformances);
   
   /// Emit a class existential container from a class instance value
   /// as an explosion.
@@ -81,6 +90,15 @@ namespace irgen {
                                               Explosion &base,
                                               SILType baseTy,
                                               CanArchetypeType openedArchetype);
+
+  /// Extract the metatype pointer from an existential metatype value.
+  ///
+  /// \param openedTy If non-null, a metatype of the archetype that
+  ///   will capture the metadata and witness tables
+  llvm::Value *emitExistentialMetatypeProjection(IRGenFunction &IGF,
+                                                 Explosion &base,
+                                                 SILType baseTy,
+                                                 CanType openedTy);
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
@@ -145,15 +163,14 @@ namespace irgen {
                                                 Address archetypeAddr,
                                                 SILType archetypeType);
   
-  /// Emit a dynamic metatype lookup for the given existential.
-  llvm::Value *emitDynamicTypeOfOpaqueExistential(IRGenFunction &IGF,
-                                                  Address addr,
-                                                  SILType type);
+  /// Emit the existential metatype of an opaque existential value.
+  void emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
+                                       SILType type, Explosion &out);
   
-  /// Emit a dynamic metatype lookup for the given class existential.
-  llvm::Value *emitDynamicTypeOfClassExistential(IRGenFunction &IGF,
-                                                 Explosion &value,
-                                                 SILType type);
+  /// Emit the existential metatype of a class existential value.
+  void emitMetatypeOfClassExistential(IRGenFunction &IGF,
+                                      Explosion &value,
+                                      SILType type, Explosion &out);
   
   std::pair<Address, llvm::Value*>
   emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,

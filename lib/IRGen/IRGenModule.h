@@ -242,6 +242,7 @@ public:
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size);
+  const LoadableTypeInfo &getUnknownObjectTypeInfo();
   llvm::Type *getStorageTypeForUnlowered(Type T);
   llvm::Type *getStorageTypeForLowered(CanType T);
   llvm::Type *getStorageType(SILType T);

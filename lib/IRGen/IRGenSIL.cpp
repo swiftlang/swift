@@ -642,8 +642,10 @@ public:
   void visitDynamicMethodInst(DynamicMethodInst *i);
 
   void visitOpenExistentialInst(OpenExistentialInst *i);
+  void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
+  void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialInst(DeinitExistentialInst *i);
   
@@ -1549,18 +1551,16 @@ void IRGenSILFunction::visitValueMetatypeInst(
 
 void IRGenSILFunction::visitExistentialMetatypeInst(
                                                swift::ExistentialMetatypeInst *i) {
-  llvm::Value *metatype;
+  Explosion result;
   if (i->getOperand().getType().isClassExistentialType()) {
     Explosion existential = getLoweredExplosion(i->getOperand());
-    metatype = emitDynamicTypeOfClassExistential(*this, existential,
-                                                 i->getOperand().getType());
+    emitMetatypeOfClassExistential(*this, existential,
+                                   i->getOperand().getType(), result);
   } else {
     Address existential = getLoweredAddress(i->getOperand());
-    metatype = emitDynamicTypeOfOpaqueExistential(*this, existential,
-                                                  i->getOperand().getType());
+    emitMetatypeOfOpaqueExistential(*this, existential,
+                                    i->getOperand().getType(), result);
   }
-  Explosion result;
-  result.add(metatype);
   setLoweredExplosion(SILValue(i, 0), result);
 }
 
@@ -3315,6 +3315,18 @@ void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
   setLoweredAddress(SILValue(i, 0), buffer);
 }
 
+void IRGenSILFunction::visitInitExistentialMetatypeInst(
+                                              InitExistentialMetatypeInst *i) {
+  Explosion metatype = getLoweredExplosion(i->getOperand());
+  Explosion result;
+  emitExistentialMetatypeContainer(*this,
+                                   result, i->getType(),
+                                   metatype.claimNext(),
+                                   i->getOperand().getType(),
+                                   i->getConformances());
+  setLoweredExplosion(SILValue(i, 0), result);
+}
+
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
   Explosion instance = getLoweredExplosion(i->getOperand());
   Explosion result;
@@ -3358,6 +3370,19 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
     = emitClassExistentialProjection(*this, base, baseTy,
                                      openedArchetype);
   result.add(instance);
+  setLoweredExplosion(SILValue(i, 0), result);
+}
+
+void IRGenSILFunction::visitOpenExistentialMetatypeInst(
+                                              OpenExistentialMetatypeInst *i) {
+  SILType baseTy = i->getOperand().getType();
+  Explosion base = getLoweredExplosion(i->getOperand());
+  auto openedTy = i->getType().getSwiftRValueType();
+
+  llvm::Value *metatype =
+    emitExistentialMetatypeProjection(*this, base, baseTy, openedTy);
+  Explosion result;
+  result.add(metatype);
   setLoweredExplosion(SILValue(i, 0), result);
 }
 

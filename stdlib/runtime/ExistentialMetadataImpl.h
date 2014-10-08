@@ -361,6 +361,127 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedClassExistentialBox
   using type = Container;
 };
 
+/// A common base class for fixed and non-fixed existential metatype box
+/// implementations.
+struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
+    : ExistentialBoxBase<ExistentialMetatypeBoxBase> {
+  static constexpr unsigned numExtraInhabitants =
+    swift_getHeapObjectExtraInhabitantCount();
+
+  template <class Container, class... A>
+  static void destroy(Container *value, A... args) {
+  }
+  
+  template <class Container, class... A>
+  static Container *initializeWithCopy(Container *dest, Container *src,
+                                       A... args) {
+    src->copyTypeInto(dest, args...);
+    *dest->getValueSlot() = *src->getValueSlot();
+    return dest;  
+  }
+
+  template <class Container, class... A>
+  static Container *initializeWithTake(Container *dest, Container *src,
+                                       A... args) {
+    src->copyTypeInto(dest, args...);
+    *dest->getValueSlot() = *src->getValueSlot();
+    return dest;
+  }
+
+  template <class Container, class... A>
+  static Container *assignWithCopy(Container *dest, Container *src,
+                                   A... args) {
+    src->copyTypeInto(dest, args...);
+    *dest->getValueSlot() = *src->getValueSlot();
+    return dest;
+  }
+
+  template <class Container, class... A>
+  static Container *assignWithTake(Container *dest, Container *src,
+                                   A... args) {
+    src->copyTypeInto(dest, args...);
+    *dest->getValueSlot() = *src->getValueSlot();
+    return dest;
+  }
+
+  template <class Container, class... A>
+  static void storeExtraInhabitant(Container *dest, int index, A... args) {
+    swift_storeHeapObjectExtraInhabitant((HeapObject**) dest->getValueSlot(),
+                                         index);
+  }
+
+  template <class Container, class... A>
+  static int getExtraInhabitantIndex(const Container *src, A... args) {
+    return swift_getHeapObjectExtraInhabitantIndex(
+                                  (HeapObject* const *) src->getValueSlot());
+  }
+  
+};
+
+/// A box implementation class for an existential metatype container
+/// with a fixed number of protocol witness tables.
+template <unsigned NumWitnessTables>
+struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBox
+    : ExistentialMetatypeBoxBase {
+  struct Container {
+    ExistentialMetatypeContainer Header;
+    const void *TypeInfo[NumWitnessTables];
+
+    void copyTypeInto(Container *dest) const {
+      for (unsigned i = 0; i != NumWitnessTables; ++i)
+        dest->TypeInfo[i] = TypeInfo[i];
+    }
+    const Metadata **getValueSlot() { return &Header.Value; }
+    const Metadata * const *getValueSlot() const { return &Header.Value; }
+    
+    static size_t getContainerStride() { return sizeof(Container); }
+  };
+
+  using type = Container;
+
+  static constexpr size_t size = sizeof(Container);
+  static constexpr size_t alignment = alignof(Container);
+  static constexpr size_t stride = sizeof(Container);
+  static constexpr size_t isPOD = true;
+  static constexpr size_t isBitwiseTakable = true;
+};
+
+/// A non-fixed box implementation class for an existential metatype
+/// type with a dynamic number of witness tables.
+struct LLVM_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
+    : ExistentialMetatypeBoxBase {
+  struct Container {
+    ExistentialMetatypeContainer Header;
+
+    static unsigned getNumWitnessTables(const Metadata *self) {
+      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self); 
+      return castSelf->Flags.getNumWitnessTables();
+    }
+
+    void copyTypeInto(Container *dest, const Metadata *self) {
+      Header.copyTypeInto(&dest->Header, getNumWitnessTables(self));
+    }
+
+    const Metadata **getValueSlot() { return &Header.Value; }
+    const Metadata * const *getValueSlot() const { return &Header.Value; }
+
+    static size_t getAlignment(unsigned numWitnessTables) {
+      return alignof(void*);
+    }
+    static size_t getSize(unsigned numWitnessTables) {
+      return sizeof(ExistentialMetatypeContainer)
+             + numWitnessTables * sizeof(void*);
+    }
+    static size_t getStride(unsigned numWitnessTables) {
+      return getSize(numWitnessTables);
+    }
+    static size_t getContainerStride(const Metadata *self) {
+      return getStride(getNumWitnessTables(self));
+    }
+  };
+  using type = Container;
+};
+
 } // end namespace metadataimpl
 } // end namespace swift
 

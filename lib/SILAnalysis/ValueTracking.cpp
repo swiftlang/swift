@@ -113,6 +113,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::InitBlockStorageHeaderInst:
   case ValueKind::InitEnumDataAddrInst:
   case ValueKind::InitExistentialInst:
+  case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::ObjCExistentialMetatypeToObjectInst:
   case ValueKind::ObjCMetatypeToObjectInst:
@@ -122,6 +123,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::UncheckedTrivialBitCastInst:
   case ValueKind::UncheckedRefBitCastInst:
   case ValueKind::OpenExistentialInst:
+  case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::PartialApplyInst:
   case ValueKind::PointerToAddressInst:

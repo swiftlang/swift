@@ -21,9 +21,9 @@ end:
 
 protocol P {}
 
-// CHECK-LABEL: define void @existential_archetype_metatype_cast(%swift.type*, %swift.type* %T)
-// CHECK:         %1 = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %0, %swift.type* %T)
-// CHECK:         %2 = icmp ne %swift.type* %1, null
+// CHECK-LABEL: define void @existential_archetype_metatype_cast(%swift.type*, i8**, %swift.type* %T)
+// CHECK:         [[T0:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %0, %swift.type* %T)
+// CHECK:         [[T1:%.*]] = icmp ne %swift.type* [[T0]], null
 sil @existential_archetype_metatype_cast : $@thin <T> (@thick P.Type) -> () {
 entry(%0 : $@thick P.Type):
   checked_cast_br %0 : $@thick P.Type to $@thick T.Type, yes, no
@@ -51,9 +51,9 @@ entry(%m : $@objc_metatype SomeClass.Type):
 
 protocol SomeClassProtocol : class {}
 
-// CHECK-LABEL: define %objc_object* @existential_metatype_object_conversion(%objc_class*) {
-// CHECK:         %1 = bitcast %objc_class* %0 to %objc_object*
-// CHECK:         ret %objc_object* %1
+// CHECK-LABEL: define %objc_object* @existential_metatype_object_conversion(%objc_class*, i8**) {
+// CHECK:         [[T0:%.*]] = bitcast %objc_class* %0 to %objc_object*
+// CHECK:         ret %objc_object* [[T0]]
 // CHECK:       }
 sil @existential_metatype_object_conversion : $@thin (@objc_metatype SomeClassProtocol.Type) -> @owned AnyObject {
 entry(%m : $@objc_metatype SomeClassProtocol.Type):

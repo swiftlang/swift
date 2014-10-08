@@ -2154,6 +2154,17 @@ public:
   OpenExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty);
 };
 
+/// OpenExistentialMetatypeInst - Given an existential metatype,
+/// "opens" the existential by returning a pointer to a fresh
+/// archetype metatype T.Type, which also captures the (dynamic)
+/// conformances.
+class OpenExistentialMetatypeInst
+  : public UnaryInstructionBase<ValueKind::OpenExistentialMetatypeInst>
+{
+public:
+  OpenExistentialMetatypeInst(SILLocation loc, SILValue operand, SILType ty);
+};
+
 /// InitExistentialInst - Given an address to an uninitialized buffer of
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized
@@ -2221,6 +2232,46 @@ public:
     return ConcreteType;
   }
 
+  ArrayRef<ProtocolConformance*> getConformances() const {
+    return Conformances;
+  }
+};
+
+/// InitExistentialMetatypeInst - Given a metatype reference and a set
+/// of conformances, creates an existential metatype value referencing
+/// the metatype.
+class InitExistentialMetatypeInst
+  : public UnaryInstructionBase<ValueKind::InitExistentialMetatypeInst>
+{
+  ArrayRef<ProtocolConformance*> Conformances;
+
+  InitExistentialMetatypeInst(SILLocation loc,
+                              SILType existentialMetatypeType,
+                              SILValue metatype,
+                         ArrayRef<ProtocolConformance*> conformances)
+    : UnaryInstructionBase(loc, metatype, existentialMetatypeType),
+      Conformances(conformances)
+  {}
+public:
+  static InitExistentialMetatypeInst *
+  create(SILLocation loc, SILType existentialMetatypeType,
+         SILValue metatype, ArrayRef<ProtocolConformance *> conformances,
+         SILFunction *parent);
+
+  /// Return the object type which was erased.  That is, if this
+  /// instruction erases Decoder<T>.Type.Type to Printable.Type.Type,
+  /// this method returns Decoder<T>.
+  CanType getFormalErasedObjectType() const {
+    CanType exType = getType().getSwiftRValueType();
+    CanType concreteType = getOperand().getType().getSwiftRValueType();
+    while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
+      exType = exMetatype.getInstanceType();
+      concreteType = cast<MetatypeType>(concreteType).getInstanceType();
+    }
+    assert(exType.isExistentialType());
+    return concreteType;
+  }
+  
   ArrayRef<ProtocolConformance*> getConformances() const {
     return Conformances;
   }

@@ -1027,6 +1027,10 @@ public:
     OS << "open_existential_ref " << getIDAndType(OI->getOperand())
        << " to " << OI->getType();
   }
+  void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *OI) {
+    OS << "open_existential_metatype " << getIDAndType(OI->getOperand())
+       << " to " << OI->getType();
+  }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
     OS << "init_existential " << getIDAndType(AEI->getOperand()) << ", $";
     AEI->getFormalConcreteType().print(OS);
@@ -1035,6 +1039,10 @@ public:
     OS << "init_existential_ref " << getIDAndType(AEI->getOperand())
        << " : $" << AEI->getFormalConcreteType()
        << ", " << AEI->getType();
+  }
+  void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *AEI) {
+    OS << "init_existential_metatype " << getIDAndType(AEI->getOperand())
+       << " : " << AEI->getType();
   }
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getIDAndType(DEI->getOperand());

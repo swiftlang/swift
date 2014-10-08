@@ -674,7 +674,8 @@ static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
 
 /// Return value witnesses for a pointer-aligned pointer type.
 static inline
-const ValueWitnessTable &getUnmanagedPointerPointerValueWitnesses() {
+const ExtraInhabitantsValueWitnessTable &
+getUnmanagedPointerPointerValueWitnesses() {
   return _TWVMBo;
 }
 
@@ -1685,6 +1686,24 @@ struct ExistentialTypeMetadata : public Metadata {
 
   static bool classof(const Metadata *metadata) {
     return metadata->getKind() == MetadataKind::Existential;
+  }
+};
+
+/// The basic layout of an existential metatype type.
+struct ExistentialMetatypeContainer {
+  const Metadata *Value;
+
+  const void **getWitnessTables() {
+    return reinterpret_cast<const void**>(this + 1);
+  }
+  const void * const *getWitnessTables() const {
+    return reinterpret_cast<const void* const *>(this + 1);
+  }
+
+  void copyTypeInto(ExistentialMetatypeContainer *dest,
+                    unsigned numTables) const {
+    for (unsigned i = 0; i != numTables; ++i)
+      dest->getWitnessTables()[i] = getWitnessTables()[i];
   }
 };
 

@@ -1020,6 +1020,12 @@ OpenExistentialRefInst::OpenExistentialRefInst(SILLocation Loc,
   : UnaryInstructionBase(Loc, Operand, Ty)
 {}
 
+OpenExistentialMetatypeInst::OpenExistentialMetatypeInst(SILLocation loc,
+                                                         SILValue operand,
+                                                         SILType ty)
+  : UnaryInstructionBase(loc, operand, ty)
+{}
+
 //===----------------------------------------------------------------------===//
 // Instructions representing terminators
 //===----------------------------------------------------------------------===//
@@ -1489,4 +1495,21 @@ InitExistentialRefInst::create(SILLocation Loc, SILType ExistentialType,
                                                ConcreteType,
                                                Instance,
                                                Conformances);
+}
+
+InitExistentialMetatypeInst *
+InitExistentialMetatypeInst::create(SILLocation loc,
+                                    SILType existentialMetatypeType,
+                                    SILValue metatype,
+                               ArrayRef<ProtocolConformance *> conformances,
+                                    SILFunction *F) {
+  SILModule &M = F->getModule();
+  void *buffer = M.allocate(sizeof(InitExistentialMetatypeInst),
+                            alignof(InitExistentialMetatypeInst));
+  for (ProtocolConformance *conformance : conformances)
+    if (!M.lookUpWitnessTable(conformance, false).first)
+      declareWitnessTable(M, conformance);
+
+  return ::new (buffer) InitExistentialMetatypeInst(loc, existentialMetatypeType,
+                                                    metatype, conformances);
 }

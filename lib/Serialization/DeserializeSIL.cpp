@@ -746,6 +746,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   ONEOPERAND_ONETYPE_INST(OpenExistential)
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
+  ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
   // Conversion instructions.
   ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
@@ -777,11 +778,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
 
   case ValueKind::InitExistentialInst:
+  case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst: {
 
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ty2 = MF->getType(TyID2);
-    auto ConcreteTy = MF->getType(ConcreteTyID)->getCanonicalType();
+    CanType ConcreteTy;
+    if ((ValueKind) OpCode != ValueKind::InitExistentialMetatypeInst)
+      ConcreteTy = MF->getType(ConcreteTyID)->getCanonicalType();
     SILValue operand = getLocalValue(ValID, ValResNum,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
 
@@ -804,6 +808,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                 ConcreteTy,
                                                 Ty,
                                                 ctxConformances);
+      break;
+    case ValueKind::InitExistentialMetatypeInst:
+      ResultVal = Builder.createInitExistentialMetatype(Loc, operand, Ty,
+                                                        ctxConformances);
       break;
     case ValueKind::InitExistentialRefInst:
       ResultVal = Builder.createInitExistentialRef(Loc, Ty,

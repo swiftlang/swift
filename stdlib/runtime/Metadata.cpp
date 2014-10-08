@@ -1614,11 +1614,59 @@ namespace {
 /// The uniquing structure for existential metatype type metadata.
 static MetadataCache<ExistentialMetatypeCacheEntry> ExistentialMetatypeTypes;
 
-/// \brief Find the appropriate value witness table for the given type.
-static const ValueWitnessTable *
+static const ExtraInhabitantsValueWitnessTable
+ExistentialMetatypeValueWitnesses_1 =
+  ValueWitnessTableForBox<ExistentialMetatypeBox<1>>::table;
+static const ExtraInhabitantsValueWitnessTable
+ExistentialMetatypeValueWitnesses_2 =
+  ValueWitnessTableForBox<ExistentialMetatypeBox<2>>::table;
+
+static llvm::DenseMap<unsigned, const ExtraInhabitantsValueWitnessTable*>
+  ExistentialMetatypeValueWitnessTables;
+
+/// Instantiate a value witness table for an existential metatype
+/// container with the given number of witness table pointers.
+static const ExtraInhabitantsValueWitnessTable *
 getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
-  // FIXME
-  return &getUnmanagedPointerPointerValueWitnesses();
+  if (numWitnessTables == 0)
+    return &getUnmanagedPointerPointerValueWitnesses();
+  if (numWitnessTables == 1)
+    return &ExistentialMetatypeValueWitnesses_1;
+  if (numWitnessTables == 2)
+    return &ExistentialMetatypeValueWitnesses_2;
+
+  static_assert(3 * sizeof(void*) >= sizeof(ValueBuffer),
+                "not handling all possible inline-storage class existentials!");
+
+  auto found = ExistentialMetatypeValueWitnessTables.find(numWitnessTables);
+  if (found != ExistentialMetatypeValueWitnessTables.end())
+    return found->second;
+  
+  using Box = NonFixedExistentialMetatypeBox;
+  using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
+  
+  auto *vwt = new ExtraInhabitantsValueWitnessTable;
+#define STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(WITNESS) \
+  vwt->WITNESS = Witnesses::WITNESS;
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(STORE_VAR_EXISTENTIAL_METATYPE_WITNESS)
+  STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(storeExtraInhabitant)
+  STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(getExtraInhabitantIndex)
+#undef STORE_VAR_EXISTENTIAL_METATYPE_WITNESS
+  
+  vwt->size = Box::Container::getSize(numWitnessTables);
+  vwt->flags = ValueWitnessFlags()
+    .withAlignment(Box::Container::getAlignment(numWitnessTables))
+    .withPOD(true)
+    .withBitwiseTakable(true)
+    .withInlineStorage(false)
+    .withExtraInhabitants(true);
+  vwt->stride = Box::Container::getStride(numWitnessTables);
+  vwt->extraInhabitantFlags = ExtraInhabitantFlags()
+    .withNumExtraInhabitants(Witnesses::numExtraInhabitants);
+  
+  ExistentialMetatypeValueWitnessTables.insert({numWitnessTables, vwt});
+  
+  return vwt;
 }
 
 /// \brief Fetch a uniqued metadata for a metatype type.
@@ -1632,9 +1680,6 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
       // Create a new entry for the cache.
       auto entry = 
         ExistentialMetatypeCacheEntry::allocate(args, numGenericArgs, 0);
-
-      // FIXME: the value witnesses should probably account for room for
-      // protocol witness tables
 
       ExistentialTypeFlags flags;
       if (instanceMetadata->getKind() == MetadataKind::Existential) {

@@ -1358,6 +1358,48 @@ public:
             "archetype or metatype thereof");
   }
 
+  void checkOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *I) {
+    SILType operandType = I->getOperand().getType();
+    require(operandType.isObject(),
+            "open_existential_metatype operand must not be address");
+    require(operandType.is<ExistentialMetatypeType>(),
+            "open_existential_metatype operand must be existential metatype");
+    require(operandType.castTo<ExistentialMetatypeType>()->hasRepresentation(),
+            "open_existential_metatype operand must have a representation");
+
+    SILType resultType = I->getType();
+    require(resultType.isObject(),
+            "open_existential_metatype result must not be address");
+    require(resultType.is<MetatypeType>(),
+            "open_existential_metatype result must be metatype");
+    require(resultType.castTo<MetatypeType>()->hasRepresentation(),
+            "open_existential_metatype result must have a representation");
+    require(operandType.castTo<ExistentialMetatypeType>()->getRepresentation()
+              == resultType.castTo<MetatypeType>()->getRepresentation(),
+            "open_existential_metatype result must match representation of "
+            "operand");
+
+    CanType operandInstTy =
+      operandType.castTo<ExistentialMetatypeType>().getInstanceType();
+    CanType resultInstTy = 
+      resultType.castTo<MetatypeType>().getInstanceType();
+
+    while (auto operandMetatype =
+             dyn_cast<ExistentialMetatypeType>(operandInstTy)) {
+      require(isa<MetatypeType>(resultInstTy),
+              "metatype depth mismatch in open_existential_metatype result");
+      operandInstTy = operandMetatype.getInstanceType();
+      resultInstTy = cast<MetatypeType>(resultInstTy).getInstanceType();
+    }
+
+    require(operandInstTy.isExistentialType(),
+            "ill-formed existential metatype in open_existential_metatype "
+            "operand");
+    require(isOpenedArchetype(resultInstTy),
+            "open_existential_metatype result must be an opened existential "
+            "metatype");
+  }
+
   void checkInitExistentialInst(InitExistentialInst *AEI) {
     SILType exType = AEI->getOperand().getType();
     require(exType.isAddress(),
@@ -1431,6 +1473,33 @@ public:
             "deinit_existential must be applied to address of existential");
     require(!exType.isClassExistentialType(),
             "deinit_existential must be applied to non-class existential");
+  }
+
+  void checkInitExistentialMetatypeInst(InitExistentialMetatypeInst *I) {
+    SILType operandType = I->getOperand().getType();
+    require(operandType.isObject(),
+            "init_existential_metatype operand must not be an address");
+    require(operandType.is<MetatypeType>(),
+            "init_existential_metatype operand must be a metatype");
+    require(operandType.castTo<MetatypeType>()->hasRepresentation(),
+            "init_existential_metatype operand must have a representation");
+
+    SILType resultType = I->getType();
+    require(resultType.is<ExistentialMetatypeType>(),
+            "init_existential_metatype result must be an existential metatype");
+    require(resultType.isObject(),
+            "init_existential_metatype result must not be an address");
+    require(resultType.castTo<ExistentialMetatypeType>()->hasRepresentation(),
+            "init_existential_metatype result must have a representation");
+    require(resultType.castTo<ExistentialMetatypeType>()->getRepresentation()
+              == operandType.castTo<MetatypeType>()->getRepresentation(),
+            "init_existential_metatype result must match representation of "
+            "operand");
+    
+    for (ProtocolConformance *C : I->getConformances())
+      // We allow for null conformances.
+      require(!C || I->getModule().lookUpWitnessTable(C, false).first,
+              "Could not find witness table for conformance.");
   }
 
   void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy) {
@@ -1594,28 +1663,8 @@ public:
   void checkUpcastInst(UpcastInst *UI) {
     require(UI->getType() != UI->getOperand().getType(),
             "can't upcast to same type");
-    // FIXME: Existential metatype upcasts should have their own instruction.
-    // For now accept them blindly.
-    if (UI->getType().is<ExistentialMetatypeType>()) {
-      require(UI->getOperand().getType().is<AnyMetatypeType>(),
-              "must upcast existential metatype from metatype");
-      auto operandRep = UI->getOperand().getType().castTo<AnyMetatypeType>()
-        ->getRepresentation();
-      auto resultRep = UI->getType().castTo<AnyMetatypeType>()
-        ->getRepresentation();
-      require(operandRep != MetatypeRepresentation::Thin,
-              "must upcast existential metatype from thick metatype");
-      require(operandRep == resultRep,
-              "upcast cannot change metatype representation");
-      return;
-    }
-    
     if (UI->getType().is<MetatypeType>()) {
       CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());
-      
-      if (instTy->isExistentialType())
-        return;
-      
       require(UI->getOperand().getType().is<MetatypeType>(),
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand().getType().castTo<MetatypeType>()

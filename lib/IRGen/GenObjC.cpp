@@ -211,7 +211,7 @@ namespace {
   };
 }
 
-const TypeInfo *TypeConverter::convertBuiltinUnknownObject() {
+const LoadableTypeInfo *TypeConverter::convertBuiltinUnknownObject() {
   return new ObjCTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
                           IGM.getHeapObjectSpareBits(),
                           IGM.getPointerAlignment());
@@ -221,7 +221,7 @@ const TypeInfo &IRGenModule::getObjCClassPtrTypeInfo() {
   return Types.getObjCClassPtrTypeInfo();
 }
 
-const TypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
+const LoadableTypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
   if (ObjCClassPtrTI) return *ObjCClassPtrTI;
   // ObjC class objects are guaranteed to be pointer-aligned.
   ObjCClassPtrTI = createPrimitiveForAlignedPointer(IGM.ObjCClassPtrTy,

@@ -625,6 +625,13 @@ public:
                     OpenExistentialInst(Loc, Operand, SelfTy));
   }
   
+  OpenExistentialMetatypeInst *
+  createOpenExistentialMetatype(SILLocation loc, SILValue operand,
+                                SILType selfTy) {
+    return insert(new (F.getModule())
+                    OpenExistentialMetatypeInst(loc, operand, selfTy));
+  }
+
   OpenExistentialRefInst *createOpenExistentialRef(SILLocation Loc,
                                                    SILValue Operand,
                                                    SILType Ty) {
@@ -644,6 +651,15 @@ public:
                                               Conformances, &F));
   }
   
+  InitExistentialMetatypeInst *
+  createInitExistentialMetatype(SILLocation loc, SILValue metatype,
+                                SILType existentialType,
+                                ArrayRef<ProtocolConformance*> conformances) {
+    return insert(InitExistentialMetatypeInst::create(loc, existentialType,
+                                                      metatype,
+                                                      conformances, &F));
+  }
+  
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType,
@@ -654,7 +670,7 @@ public:
                                                  Concrete,
                                                  Conformances, &F));
   }
-  
+
   DeinitExistentialInst *createDeinitExistential(SILLocation Loc,
                                                  SILValue Existential) {
     return insert(new (F.getModule()) DeinitExistentialInst(Loc, Existential));

@@ -1173,6 +1173,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("init_block_storage_header", ValueKind::InitBlockStorageHeaderInst)
     .Case("init_enum_data_addr", ValueKind::InitEnumDataAddrInst)
     .Case("init_existential", ValueKind::InitExistentialInst)
+    .Case("init_existential_metatype", ValueKind::InitExistentialMetatypeInst)
     .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
     .Case("inject_enum_addr", ValueKind::InjectEnumAddrInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
@@ -1189,6 +1190,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("objc_protocol", ValueKind::ObjCProtocolInst)
     .Case("objc_to_thick_metatype", ValueKind::ObjCToThickMetatypeInst)
     .Case("open_existential", ValueKind::OpenExistentialInst)
+    .Case("open_existential_metatype", ValueKind::OpenExistentialMetatypeInst)
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
@@ -1697,6 +1699,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::OpenExistentialInst:
+  case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::OpenExistentialRefInst: {
     SILType Ty;
     Identifier ToToken;
@@ -1716,6 +1719,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     switch (Opcode) {
     case ValueKind::OpenExistentialInst:
       ResultVal = B.createOpenExistential(InstLoc, Val, Ty);
+      break;
+
+    case ValueKind::OpenExistentialMetatypeInst:
+      ResultVal = B.createOpenExistentialMetatype(InstLoc, Val, Ty);
       break;
 
     case ValueKind::OpenExistentialRefInst:
@@ -2858,6 +2865,18 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // in SIL.rst.
     ResultVal = B.createInitExistentialRef(InstLoc, ExistentialTy,
                                            FormalConcreteTy, Val,
+                                           ArrayRef<ProtocolConformance*>());
+    break;
+  }
+  case ValueKind::InitExistentialMetatypeInst: {
+    SILType ExistentialTy;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(ExistentialTy))
+      return true;
+    
+    // FIXME: We should be parsing conformances here.
+    ResultVal = B.createInitExistentialMetatype(InstLoc, Val, ExistentialTy,
                                            ArrayRef<ProtocolConformance*>());
     break;
   }

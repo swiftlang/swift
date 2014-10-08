@@ -184,6 +184,8 @@ namespace {
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
 
+    void writeConversionLikeInstruction(const SILInstruction *I);
+
     /// Helper function to determine if given the current state of the
     /// deserialization if the function body for F should be deserialized.
     bool shouldEmitFunctionBody(const SILFunction &F);
@@ -330,6 +332,25 @@ void SILSerializer::handleMethodInst(const MethodInst *MI,
   ListOfValues.push_back(operand.getResultNumber());
 }
 
+/// Write an instruction that looks exactly like a conversion: all
+/// important information is encoded in the operand and the result type.
+void SILSerializer::writeConversionLikeInstruction(const SILInstruction *I) {
+  assert(I->getNumOperands() == 1);
+  assert(I->getNumTypes() == 1);
+  SILType resultType = I->getType(0);
+  SILValue operand = I->getOperand(0);
+  SILType operandType = operand.getType();
+  auto resultTy = S.addTypeRef(resultType.getSwiftRValueType());
+  auto operandTy = S.addTypeRef(operandType.getSwiftRValueType());
+  auto operandValue = addValueRef(operand);
+  SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+        (unsigned)I->getKind(), 0,
+        resultTy, (unsigned)resultType.getCategory(),
+        operandTy, (unsigned)operandType.getCategory(),
+        operandValue, operand.getResultNumber());
+}
+
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   switch (SI.getKind()) {
   case ValueKind::SILArgument:
@@ -343,13 +364,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::InitExistentialInst:
+  case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst: {
     SILValue operand;
     SILType Ty;
     CanType FormalConcreteType;
     ArrayRef<ProtocolConformance*> conformances;
 
-    CanType existentialType;
     switch (SI.getKind()) {
     default: assert(0 && "out of sync with parent");
     case ValueKind::InitExistentialInst: {
@@ -358,7 +379,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Ty = IEI.getLoweredConcreteType();
       FormalConcreteType = IEI.getFormalConcreteType();
       conformances = IEI.getConformances();
-      existentialType = IEI.getOperand().getType().getSwiftRValueType();
       break;
     }
     case ValueKind::InitExistentialRefInst: {
@@ -367,12 +387,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Ty = IERI.getType();
       FormalConcreteType = IERI.getFormalConcreteType();
       conformances = IERI.getConformances();
-      existentialType = IERI.getType().getSwiftRValueType();
+      break;
+    }
+    case ValueKind::InitExistentialMetatypeInst: {
+      auto &IEMI = cast<InitExistentialMetatypeInst>(SI);
+      operand = IEMI.getOperand();
+      Ty = IEMI.getType();
+      conformances = IEMI.getConformances();
       break;
     }
     }
-
-    assert(existentialType->isExistentialType() && "Not an existential type?");
 
     SmallVector<DeclID, 8> conformancesData;
     SmallVector<const ProtocolConformance *, 4> conformancesToWrite;
@@ -862,33 +886,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                               S.addDeclRef(PI->getProtocol()), 0);
     break;
   }
-  case ValueKind::OpenExistentialInst: {
-    const OpenExistentialInst *OEI = cast<OpenExistentialInst>(&SI);
-    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
-        S.addTypeRef(OEI->getType().getSwiftRValueType()),
-        (unsigned)OEI->getType().getCategory(),
-        S.addTypeRef(OEI->getOperand().getType().getSwiftRValueType()),
-        (unsigned)OEI->getOperand().getType().getCategory(),
-        addValueRef(OEI->getOperand()),
-        OEI->getOperand().getResultNumber());
-    break;
-  }
-  case ValueKind::OpenExistentialRefInst: {
-    const OpenExistentialRefInst *OEI = cast<OpenExistentialRefInst>(&SI);
-    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
-        S.addTypeRef(OEI->getType().getSwiftRValueType()),
-        (unsigned)OEI->getType().getCategory(),
-        S.addTypeRef(OEI->getOperand().getType().getSwiftRValueType()),
-        (unsigned)OEI->getOperand().getType().getCategory(),
-        addValueRef(OEI->getOperand()),
-        OEI->getOperand().getResultNumber());
-    break;
-  }
-  // Conversion instructions.
+  // Conversion instructions (and others of similar form).
+  case ValueKind::OpenExistentialInst:
+  case ValueKind::OpenExistentialRefInst:
+  case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedTrivialBitCastInst:
@@ -909,16 +910,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ObjCMetatypeToObjectInst:
   case ValueKind::ObjCExistentialMetatypeToObjectInst:
   case ValueKind::ProjectBlockStorageInst: {
-    SILValue operand = SI.getOperand(0);
-    SILType Ty = SI.getType(0);
-    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
-        S.addTypeRef(Ty.getSwiftRValueType()),
-        (unsigned)Ty.getCategory(),
-        S.addTypeRef(operand.getType().getSwiftRValueType()),
-        (unsigned)operand.getType().getCategory(),
-        addValueRef(operand), operand.getResultNumber());
+    writeConversionLikeInstruction(&SI);
     break;
   }
   // Checked Conversion instructions.
