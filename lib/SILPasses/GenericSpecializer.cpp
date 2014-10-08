@@ -255,7 +255,8 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   for (auto &AI : List) {
     bool Placed = false;
 
-    DEBUG(llvm::dbgs() << "Function: " << AI->getFunction()->getName() << "; ApplyInst: " << *AI);
+    DEBUG(llvm::dbgs() << "Function: " << AI->getFunction()->getName() <<
+          "; ApplyInst: " << *AI);
 
     // Scan the existing buckets and search for a bucket of the right type.
     for (int i = 0, e = Buckets.size(); i < e; ++i) {
@@ -336,8 +337,8 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       auto Subs = Bucket[0]->getSubstitutions();
       auto FTy =
         F->getLoweredFunctionType()->substGenericArgs(*M,
-                                                               M->getSwiftModule(),
-                                                               Subs);
+                                                      M->getSwiftModule(),
+                                                      Subs);
       assert(FTy == NewF->getLoweredFunctionType() &&
              "Previously specialized function does not match expected type.");
 #endif
