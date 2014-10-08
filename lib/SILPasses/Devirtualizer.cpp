@@ -495,7 +495,7 @@ static ClassDecl *getClassFromAccessControl(ClassMethodInst *CMI) {
 
   SILDeclRef Member = CMI->getMember();
   FuncDecl *FD = Member.getFuncDecl();
-  SILType ClassType = CMI->getOperand().stripCasts().getType();
+  SILType ClassType = CMI->getOperand().stripUpCasts().getType();
   ClassDecl *CD = ClassType.getClassOrBoundGenericClass();
 
   // Only handle valid non-dynamic non-overridden members.
@@ -560,7 +560,7 @@ static bool optimizeApplyInst(ApplyInst *AI) {
     // Try to search for the point of construction.
     if (ClassDecl *C = getClassFromConstructor(CMI->getOperand()))
       return devirtMethod(AI, CMI->getMember(),
-                          CMI->getOperand().stripCasts(), C);
+                          CMI->getOperand().stripUpCasts(), C);
   }
 
   return false;
@@ -817,7 +817,12 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   assert(CMI && "Invalid class method instruction");
 
   SILValue ClassInstance = CMI->getOperand();
-  SILType InstanceType = ClassInstance.stripCasts().getType();
+  // The static type used by the class_method instruction
+  // is the class which a given method belongs to.
+  // Is either the class of the instance itself or one of its superclasses.
+  // Therefore, strip all upcasts to get the real static type
+  // of the instance.
+  SILType InstanceType = ClassInstance.stripUpCasts().getType();
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
 
   // Check if it is legal to insert inline caches.
@@ -827,10 +832,10 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (ClassInstance.getType() != InstanceType) {
     // The implementation of a method to be invoked may actually
     // be defined by one of the superclasses.
-    assert(ClassInstance.getType().isSuperclassOf(InstanceType) &&
-           "Method should be defined by a superclass");
+    if (!ClassInstance.getType().isSuperclassOf(InstanceType))
+      return false;
     // ClassInstance and InstanceType should match for devirtMethod to work.
-    ClassInstance = ClassInstance.stripCasts();
+    ClassInstance = ClassInstance.stripUpCasts();
   }
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {

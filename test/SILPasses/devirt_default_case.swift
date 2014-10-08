@@ -176,3 +176,29 @@ func check_static_class_devirt(c: C6) -> Int {
 }
 
 println(check_static_class_devirt(D6()))
+
+
+class A7 { @inline(never) func foo() -> Bool { return false } }
+class B7 : A7 { @inline(never) override func foo() -> Bool { return true } }
+
+// Check that it compiles without crashes and devirtualizes
+// calls to A7.foo and B7.foo
+//
+// CHECK-LABEL: sil hidden [noinline] @_TF19devirt_default_case33check_call_on_downcasted_instanceFCS_2A7Sb
+// CHECK: checked_cast_br
+// CHECK-NOT: class_method
+// CHECK: unconditional_checked_cast
+// CHECK: function_ref @_TFC19devirt_default_case2B73foofS0_FT_Sb
+// CHECK-NOT: class_method
+// CHECK: function_ref @_TFC19devirt_default_case2A73foofS0_FT_Sb
+// CHECK-NOT: class_method
+// CHECK: return
+@inline(never)
+func check_call_on_downcasted_instance(a: A7) -> Bool {
+  if a is B7 {
+    return (a as B7).foo()
+  }
+  return a.foo()
+}
+
+println(check_call_on_downcasted_instance(B7()))
