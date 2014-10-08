@@ -300,7 +300,7 @@ public:
 
     bool Changed = false;
     // Inline functions bottom up from the leafs.
-    for (auto *F : CGA->bottomUpCallGraphOrder()) {
+    for (auto *F : CGA->getCallGraph().getBottomUpFunctionOrder()) {
       // If F is empty, attempt to link it. Skip it if we fail to do so.
       if (F->empty() &&
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
