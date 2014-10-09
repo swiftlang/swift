@@ -700,7 +700,17 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
     L = FL.Loc;
     ScopeLine = FL.LocForLinetable.Line;
   }
-  auto LinkageName = Fn ? Fn->getName() : Name;
+
+  StringRef LinkageName;
+  if (Fn)
+    LinkageName = Fn->getName();
+  else if (DS)
+    LinkageName = Name;
+  else {
+    assert(false && "function has no mangled name");
+    LinkageName = Name;
+  }
+
   auto File = getOrCreateFile(L.Filename);
   auto Scope = MainModule;
   auto Line = L.Line;
