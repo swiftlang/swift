@@ -68,7 +68,7 @@ struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
 // CHECK-LABEL: .inferSameType1@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   U : P4 [inferred @ {{.*}}:[[@LINE+5]]:26]
-// CHECK-NEXT:   U.P4Assoc == τ_0_0.P3Assoc [inferred @ {{.*}}:[[@LINE+4]]:26]
+// CHECK-NEXT:   U.P4Assoc == T.P3Assoc [inferred @ {{.*}}:[[@LINE+4]]:26]
 // CHECK-NEXT:   T : P3 [inferred @ {{.*}}:[[@LINE+3]]:26]
 // CHECK-NEXT:   T.P3Assoc : P2 [protocol @ {{.*}}:[[@LINE+2]]:26]
 // CHECK-NEXT:   T.P3Assoc : P1 [protocol @ {{.*}}:[[@LINE+1]]:26]

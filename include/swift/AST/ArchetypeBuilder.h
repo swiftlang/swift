@@ -195,10 +195,10 @@ public:
   LazyResolver *getLazyResolver() const { return Resolver; }
 
 private:
-  PotentialArchetype *addGenericParameter(ProtocolDecl *RootProtocol,
-                           Identifier ParamName,
-                           unsigned ParamDepth, unsigned ParamIndex,
-                           Optional<unsigned> Index = None);
+  PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
+                                          ProtocolDecl *RootProtocol,
+                                          Identifier ParamName,
+                                          Optional<unsigned> Index = None);
 
 public:
   /// \brief Add a new generic parameter for which there may be requirements.
@@ -338,9 +338,10 @@ public:
 };
 
 class ArchetypeBuilder::PotentialArchetype {
-  /// \brief The parent of this potential archetype, which will be non-null
-  /// when this potential archetype is an associated type.
-  PotentialArchetype *Parent = nullptr;
+  /// Either the parent of this potential archetype (for an associated
+  /// type) or the generic type parameter type to which this potential
+  /// archetype corresponds.
+  llvm::PointerUnion<PotentialArchetype*, GenericTypeParamType*> ParentOrParam;
 
   /// The root protocol with which this potential archetype is associated.
   ProtocolDecl *RootProtocol = nullptr;
@@ -374,16 +375,20 @@ class ArchetypeBuilder::PotentialArchetype {
   /// type that the parameter was same-type constrained to.
   ArchetypeType::NestedType ArchetypeOrConcreteType;
 
-  /// \brief Construct a new potential archetype.
+  /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name,
                      Optional<unsigned> Index = None)
-    : Parent(Parent), Name(Name), Index(Index), Representative(this) { }
+    : ParentOrParam(Parent), Name(Name), Index(Index), Representative(this) { 
+    assert(Parent != nullptr && "Not an associated type?");
+  }
 
-  /// \brief Construct a new potential archetype.
-  PotentialArchetype(ProtocolDecl *RootProtocol, Identifier Name,
+  /// \brief Construct a new potential archetype for a generic parameter.
+  PotentialArchetype(GenericTypeParamType *GenericParam, 
+                     ProtocolDecl *RootProtocol,
+                     Identifier Name,
                      Optional<unsigned> Index = None)
-    : RootProtocol(RootProtocol), Name(Name), Index(Index),
-      Representative(this) { }
+    : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
+      Name(Name), Index(Index), Representative(this) { }
 
   /// \brief Recursively build the full name.
   void buildFullName(SmallVectorImpl<char> &Result) const;
@@ -405,7 +410,15 @@ public:
 
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
-  PotentialArchetype *getParent() const { return Parent; }
+  PotentialArchetype *getParent() const { 
+    return ParentOrParam.dyn_cast<PotentialArchetype *>(); 
+  }
+
+  /// Retrieve the generic type parameter for this potential
+  /// archetype, if it corresponds to a generic parameter.
+  GenericTypeParamType *getGenericParam() const {
+    return ParentOrParam.dyn_cast<GenericTypeParamType *>(); 
+  }
 
   /// Retrieve the set of protocols to which this type conforms.
   const llvm::MapVector<ProtocolDecl *, RequirementSource> &

@@ -138,8 +138,8 @@ ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
 
 void ArchetypeBuilder::PotentialArchetype::buildFullName(
        SmallVectorImpl<char> &Result) const {
-  if (Parent) {
-    Parent->buildFullName(Result);
+  if (auto parent = getParent()) {
+    parent->buildFullName(Result);
     Result.push_back('.');
   }
   Result.append(getName().begin(), getName().end());
@@ -153,7 +153,7 @@ std::string ArchetypeBuilder::PotentialArchetype::getFullName() const {
 
 unsigned ArchetypeBuilder::PotentialArchetype::getNestingDepth() const {
   unsigned Depth = 0;
-  for (auto P = Parent; P; P = P->Parent)
+  for (auto P = getParent(); P; P = P->getParent())
     ++Depth;
   return Depth;
 }
@@ -191,10 +191,10 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
     // allow us to deal with recursive dependencies without comparing identifier
     // names.
     if (parentName &&
-        this->Parent &&
-        (*parentName == this->Parent->Name ||
-         this->Parent->Name.str().equals("Self") ||
-         this->Parent->Name == this->Name) &&
+        this->getParent() &&
+        (*parentName == this->getParent()->Name ||
+         this->getParent()->Name.str().equals("Self") ||
+         this->getParent()->Name == this->Name) &&
         nestedName == this->Name) {
       Result = this;
     } else {
@@ -220,10 +220,10 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   // Allocate a new archetype.
   ArchetypeType *ParentArchetype = nullptr;
   auto &mod = builder.getModule();
-  if (Parent) {
+  if (auto parent = getParent()) {
     assert(assocTypeOrProto.isNull() &&
            "root protocol type given for non-root archetype");
-    auto parentTy = Parent->getType(builder);
+    auto parentTy = parent->getType(builder);
     if (!parentTy)
       return {};
     ParentArchetype = parentTy.dyn_cast<ArchetypeType*>();
@@ -282,22 +282,14 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
 Type ArchetypeBuilder::PotentialArchetype::getDependentType(
        ArchetypeBuilder &builder) {
-  if (Parent) {
+  if (auto parent = getParent()) {
     // FIXME: It would be far better to have an associated type here.
-    Type parentType = Parent->getDependentType(builder);
+    Type parentType = parent->getDependentType(builder);
     return DependentMemberType::get(parentType, Name, builder.Context);
   }
 
-  // FIXME: Find the corresponding generic parameter. This is lamely
-  // slow. We could/should stash this somewhere.
-  for (auto param : builder.Impl->GenericParams) {
-    if (builder.Impl->PotentialArchetypes[param] == this) {
-      return GenericTypeParamType::get(param.Depth, param.Index, 
-                                       builder.Context);
-    }
-  }
-
-  llvm_unreachable("this potential archetype doesn't exist?");
+  assert(getGenericParam() && "Not a generic parameter?");
+  return getGenericParam();
 }
 
 AssociatedTypeDecl *
@@ -526,20 +518,20 @@ UpdateRequirementSource::UpdateRequirementSource(
   return;
 }
 
-auto ArchetypeBuilder::addGenericParameter(ProtocolDecl *RootProtocol,
+auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
+                                           ProtocolDecl *RootProtocol,
                                            Identifier ParamName,
-                                           unsigned ParamDepth,
-                                           unsigned ParamIndex,
                                            Optional<unsigned> Index)
   -> PotentialArchetype *
 {
-  GenericTypeParamKey Key{ParamDepth, ParamIndex};
+  GenericTypeParamKey Key{GenericParam->getDepth(), GenericParam->getIndex()};
   
   Impl->GenericParams.push_back(Key);
 
   // Create a potential archetype for this type parameter.
   assert(!Impl->PotentialArchetypes[Key]);
-  auto PA = new PotentialArchetype(RootProtocol, ParamName, Index);
+  auto PA = new PotentialArchetype(GenericParam, RootProtocol, ParamName, 
+                                   Index);
   Impl->PotentialArchetypes[Key] = PA;
   
   return PA;
@@ -548,10 +540,11 @@ auto ArchetypeBuilder::addGenericParameter(ProtocolDecl *RootProtocol,
 bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam,
                                            Optional<unsigned> Index) {
   PotentialArchetype *PA
-    = addGenericParameter(dyn_cast<ProtocolDecl>(GenericParam->getDeclContext()),
-                          GenericParam->getName(),
-                          GenericParam->getDepth(),
-                          GenericParam->getIndex(), Index);
+    = addGenericParameter(
+        GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
+        dyn_cast<ProtocolDecl>(GenericParam->getDeclContext()),
+        GenericParam->getName(),
+        Index);
   
   if (!PA)
     return true;
@@ -584,10 +577,9 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
   if (name.str().startswith("$"))
     name = Context.getIdentifier(name.str().slice(1, name.str().size()));
   
-  PotentialArchetype *PA = addGenericParameter(nullptr,
-                                               name,
-                                               GenericParam->getDepth(),
-                                               GenericParam->getIndex());
+  PotentialArchetype *PA = addGenericParameter(GenericParam,
+                                               nullptr,
+                                               name);
   return !PA;
 }
 
@@ -1338,6 +1330,9 @@ Type swift::resolvePotentialArchetypeToType(
               ArchetypeBuilder &builder,
               ArrayRef<GenericTypeParamType *> params,
               ArchetypeBuilder::PotentialArchetype *pa) {
+  // FIXME: Replace this with PotentialArchetype::getDependentType() once that
+  // resolves associated types properly.
+
   // If the potential archetype has a parent, it resolves to a dependent member
   // type.
   if (auto parentPA = pa->getParent()) {
@@ -1375,11 +1370,5 @@ Type swift::resolvePotentialArchetypeToType(
 
   // For potential archetypes that do not have parents, find the corresponding
   // generic parameter.
-  // FIXME: O(n).
-  for (auto param : params) {
-    if (builder.resolveArchetype(param) == pa)
-      return param;
-  }
-
-  llvm_unreachable("Couldn't find generic parameter");
+  return pa->getGenericParam();
 }
