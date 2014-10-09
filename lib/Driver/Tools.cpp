@@ -627,8 +627,7 @@ Job *linux::Linker::constructJob(const JobAction &JA,
   case LinkKind::None:
     llvm_unreachable("invalid link kind");
   case LinkKind::Executable:
-    Arguments.push_back("-lpthread");
-    Arguments.push_back("-ldl");
+    // Default case, nothing extra needed
     break;
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
@@ -638,7 +637,7 @@ Job *linux::Linker::constructJob(const JobAction &JA,
   addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
-  Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
+  Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   Args.AddAllArgs(Arguments, options::OPT_F);
 

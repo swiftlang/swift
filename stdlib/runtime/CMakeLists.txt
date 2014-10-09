@@ -56,6 +56,9 @@ add_swift_library(swiftRuntime
   TARGET_LIBRARY INSTALL
   FRAMEWORK_DEPENDS ${FRAMEWORKS})
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  target_link_libraries(swiftRuntime "-lpthread" "-ldl")
+endif()
 
 list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_OSX_SYSROOT}")
 find_library(CRASHREPORTERCLIENT CrashReporterClient ONLY_CMAKE_FIND_ROOT_PATH)
