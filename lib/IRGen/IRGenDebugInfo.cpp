@@ -706,10 +706,8 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
     LinkageName = Fn->getName();
   else if (DS)
     LinkageName = Name;
-  else {
-    assert(false && "function has no mangled name");
-    LinkageName = Name;
-  }
+  else
+    llvm_unreachable("function has no mangled name");
 
   auto File = getOrCreateFile(L.Filename);
   auto Scope = MainModule;
@@ -1009,6 +1007,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
     SILDebugScope *DS, StringRef Name, unsigned Tag, unsigned ArgNo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
   // FIXME: Make this an assertion.
+  //assert(DS && "variable has no scope");
   if (!DS)
     return;
 
@@ -1031,9 +1030,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   // If there is no debug info for this type then do not emit debug info
   // for this variable.
-  assert(DITy);
-  if (!DITy)
-    return;
+  assert(DITy && "could not determine debug type of variable");
 
   unsigned Line = Loc.Line;
   unsigned Flags = 0;
@@ -1066,10 +1063,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   ElementSizes EltSizes(DITy, DIRefMap);
   for (llvm::Value *Piece : Storage) {
-    // FIXME: enable this assertion.
-    // assert(Piece && "already-claimed explosion value?");
-    if (!Piece)
-      return;
+    assert(Piece && "already-claimed explosion value?");
 
     // There are variables without storage, such as "struct { func foo() {} }".
     // Emit them as constant 0.
