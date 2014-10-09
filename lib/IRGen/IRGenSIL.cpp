@@ -582,9 +582,17 @@ public:
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
   void visitDebugValueInst(DebugValueInst *i) {
-    if (!IGM.DebugInfo) return;
+    if (!IGM.DebugInfo)
+      return;
+
     VarDecl *Decl = i->getDecl();
-    if (!Decl) return;
+    if (!Decl)
+      return;
+
+    auto N = ArgNo.find(Decl);
+    if (N != ArgNo.end() && DidEmitDebugInfoForArg[N->second])
+      return;
+
     StringRef Name = Decl->getNameStr();
     auto SILVal = i->getOperand();
     Explosion e = getLoweredExplosion(SILVal);
