@@ -7,7 +7,7 @@ import Builtin
 // the output for the file. (Maybe this is an interesting enough feature to add to FileCheck?).
 
 // CHECK-NEGATIVE-NOT: sil [fragile] @_TTOS_dn_dead_arg_no_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK-NEGATIVE-NOT: sil [fragile] @_TTOS_o2g_owned_to_gauranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK-NEGATIVE-NOT: sil [fragile] @_TTOS_o2g_owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
 
 sil [fragile] @user : $@thin (Builtin.NativeObject) -> ()
 
@@ -96,57 +96,16 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %5 : $()
 }
 
-// Make sure that we handle specializing functions which have been specialized in a different module.
-
-// CHECK-LABEL: sil [fragile] @dead_arg_already_specialized_callsite : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK: [[FUNC:%.*]] = function_ref @_TTOS_dn_dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject) -> ()
-// CHECK: apply [[FUNC]]
-
-sil [fragile] @dead_arg_already_specialized_callsite : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
-  %2 = function_ref @dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> ()
-  %4 = apply %2(%0, %1) : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> ()
-  %5 = tuple()
-  return %5 : $()
-}
-
-// CHECK-LABEL: sil [fragile] @dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK: [[FUNC:%.*]] = function_ref @_TTOS_dn_dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject) -> ()
-// CHECK: apply [[FUNC]]
-sil [fragile] @dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
-  cond_br undef, bb1, bb2
-
-bb1:
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
-  %3 = apply %2(%1) : $@thin (Builtin.NativeObject) -> ()
-  %4 = tuple()
-  return %4 : $()
-}
-
-// CHECK-LABEL: sil [fragile] @_TTOS_dn_dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject) -> () {
-sil [fragile] @_TTOS_dn_dead_arg_already_specialized_with_callsites : $@thin (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = tuple()
-  return %1 : $()
-}
-
 //======================
 // @owned => @guaranteed
 
 // We should optimize this call.
-// CHECK-LABEL: sil [fragile] @owned_to_gauranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
-// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTOS_o2g_owned_to_gauranteed_simple_singlebb_callee : $@thin (@guaranteed Builtin.NativeObject) -> ()
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTOS_o2g_owned_to_guaranteed_simple_singlebb_callee : $@thin (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
 // CHECK: fix_lifetime
 // CHECK: release_value
-sil [fragile] @owned_to_gauranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
+sil [fragile] @owned_to_guaranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   release_value %0 : $Builtin.NativeObject
   %1 = tuple()
@@ -154,32 +113,32 @@ bb0(%0 : $Builtin.NativeObject):
 }
 
 // Callee to make sure we handle multiple callees properly.
-// CHECK-LABEL: sil [fragile] @owned_to_gauranteed_simple_singlebb_caller1 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@thin (Builtin.NativeObject) -> () {
 // CHECK: fix_lifetime
 // CHECK: release_value
-sil [fragile] @owned_to_gauranteed_simple_singlebb_caller1 : $@thin (Builtin.NativeObject) -> () {
+sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@thin (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @owned_to_gauranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> ()
+  %1 = function_ref @owned_to_guaranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> ()
   apply %1(%0) : $@thin (@owned Builtin.NativeObject) -> ()
   %2 = tuple()
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @owned_to_gauranteed_simple_singlebb_caller2 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@thin (Builtin.NativeObject) -> () {
 // CHECK: fix_lifetime
 // CHECK: release_value
-sil [fragile] @owned_to_gauranteed_simple_singlebb_caller2 : $@thin (Builtin.NativeObject) -> () {
+sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@thin (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @owned_to_gauranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> ()
+  %1 = function_ref @owned_to_guaranteed_simple_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> ()
   apply %1(%0) : $@thin (@owned Builtin.NativeObject) -> ()
   %2 = tuple()
   return %2 : $()
 }
 
 // We should not optimize this call due to the user.
-// CHECK-LABEL: sil [fragile] @owned_to_gauranteed_sideeffectblock_singlebb_callee
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_sideeffectblock_singlebb_callee
 // CHECK-NOT: fix_lifetime
-sil [fragile] @owned_to_gauranteed_sideeffectblock_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
+sil [fragile] @owned_to_guaranteed_sideeffectblock_singlebb_callee : $@thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   release_value %0 : $Builtin.NativeObject
   %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
@@ -189,8 +148,8 @@ bb0(%0 : $Builtin.NativeObject):
 }
 
 // We should be able to optimize this callee since the release is in the exit BB.
-// CHECK-LABEL: sil [fragile] @owned_to_gauranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
-sil [fragile] @owned_to_gauranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   cond_br undef, bb1, bb2
 
@@ -204,9 +163,9 @@ bb2:
 }
 
 // In this case the release is not in the exit, so we can not specialize.
-// CHECK-LABEL: sil [fragile] @owned_to_gauranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
 // CHECK-NOT: fix_lifetime
-sil [fragile] @owned_to_gauranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   strong_release %0 : $Builtin.NativeObject
   cond_br undef, bb1, bb2
@@ -219,8 +178,8 @@ bb2:
   return %1 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @owned_to_gauranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
-sil [fragile] @owned_to_gauranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
+sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject, %2 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 
@@ -236,16 +195,16 @@ bb3:
   return %3 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @owned_to_gauranteed_simple_singlebb_multiple_arg_caller : $@thin (Builtin.NativeObject) -> () {
-sil [fragile] @owned_to_gauranteed_simple_singlebb_multiple_arg_caller : $@thin (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@thin (Builtin.NativeObject) -> () {
+sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@thin (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @owned_to_gauranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
+  %1 = function_ref @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
   %2 = integer_literal $Builtin.Int1, 0
   %3 = integer_literal $Builtin.Int1, 0
   apply %1(%2, %0, %3) : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
-  %4 = function_ref @owned_to_gauranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> ()
+  %4 = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> ()
   apply %4(%0) : $@thin (@owned Builtin.NativeObject) -> ()
-  %5 = function_ref @owned_to_gauranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> ()
+  %5 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> ()
   apply %5(%0) : $@thin (@owned Builtin.NativeObject) -> ()
 
   %6 = tuple()
@@ -270,12 +229,12 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil shared [fragile] @_TTOS_o2g_owned_to_gauranteed_simple_singlebb_callee : $@thin (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [fragile] @_TTOS_o2g_owned_to_guaranteed_simple_singlebb_callee : $@thin (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil shared [fragile] @_TTOS_o2g_owned_to_gauranteed_multibb_callee_with_release_in_exit : $@thin (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [fragile] @_TTOS_o2g_owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(
 // CHECK-NEXT:  cond_br undef, bb1, bb2
 // CHECK: bb1:

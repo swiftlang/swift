@@ -470,32 +470,21 @@ optimizeFunctionSignature(SILFunction *F,
   createNewName(*F, Arguments, NewFName);
 
   // If we already have a specialized version of this function, do not
-  // respecialize. Just rewrite the body of this function as the appropriate
-  // thunk.
+  // respecialize. For now just bail.
   //
-  // TODO: Can we find out when we don't need to remake the thunk? Doing this
-  // ensures that we do not need to identify if this function was converted into
-  // a thunk or not. This is simpler yet wasteful. The thing is I don't expect
-  // this to happen very often. If it becomes an issue, it should be
-  // refactored. The thing I am worried about are false negatives due to the
-  // compiler "shifting" or bugs where we remove the release from a thunk when
-  // we process it a second time.
-  SILFunction *NewF;
-  if ((NewF = F->getModule().lookUpFunction(NewFName))) {
-    // Otherwise, create the new function and transfer the current function over
-    // to that function.
-    convertFunctionToThunk(F, NewF, Arguments);
-  } else {
-    // Otherwise, move F over to NewF.
-    NewF = moveFunctionBodyToNewFunctionWithName(F, NewFName, Arguments);
-  }
+  // TODO: Improve this. I do not expect this to occur often so I am fine for
+  // now avoiding this issue. The main things I am worried about are assumptions
+  // that we make about the callee and caller being violated. That said, this is
+  // just a fear.
+  if (F->getModule().lookUpFunction(NewFName))
+    return false;
 
-  // Rewrite all apply insts calling F to call NewF. Update each call site as
-  // appropriate given the form of function signature optimization performed.
-  rewriteApplyInstToCallNewFunction(F, NewF, Arguments, CallSites);
+  // Otherwise, move F over to NewF.
+  SILFunction *NewF = moveFunctionBodyToNewFunctionWithName(F, NewFName,
+                                                            Arguments);
 
-  // Remove all Callee releases that we found and made redundent via owned to
-  // guaranteed conversion.
+  // And remove all Callee releases that we found and made redundent via owned
+  // to guaranteed conversion.
   //
   // TODO: If more stuff needs to be placed here, refactor into its own method.
   for (auto &A : Arguments) {
@@ -503,6 +492,10 @@ optimizeFunctionSignature(SILFunction *F,
       A.CalleeRelease->eraseFromParent();
     }
   }
+
+  // Rewrite all apply insts calling F to call NewF. Update each call site as
+  // appropriate given the form of function signature optimization performed.
+  rewriteApplyInstToCallNewFunction(F, NewF, Arguments, CallSites);
 
   return true;
 }
