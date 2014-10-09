@@ -202,7 +202,7 @@ getOtherElementOfTwoElementEnum(EnumDecl *E, EnumElementDecl *Element) {
   EnumElementDecl *OtherElt = nullptr;
 
   for (EnumElementDecl *Elt : E->getAllElements()) {
-    // Skip the case where we find the enum_is_tag element
+    // Skip the case where we find the select_enum element
     if (Elt == Element)
       continue;
     // If we find another element, then we must have more than 2, so bail.
@@ -922,7 +922,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // If we have a (cond (select_enum)) on a two element enum, always have the
   // first case as our checked tag. If we have the second, create a new
-  // enum_is_tag with the first case and swap our operands. This simplifies
+  // select_enum with the first case and swap our operands. This simplifies
   // later dominance based processing.
   if (auto *SEI = dyn_cast<SelectEnumInst>(BI->getCondition())) {
     EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
@@ -1340,7 +1340,7 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB,
 
   // Keep track of which predecessors map to true and which to false
   // If we have only a single predecessor as either true or false then we
-  // can create an [!]enum_is_tag
+  // can create a select_enum
   SmallVector<SILBasicBlock*, 4> TrueBBs;
   SmallVector<SILBasicBlock*, 4> FalseBBs;
 
@@ -1438,7 +1438,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
 
   // If we are reading an i1, then check to see if it comes from
   // a switch_enum.  If so, we may be able to lower this sequence to
-  // en enum_is_tag
+  // a select_enum.
   if (A->getType().is<BuiltinIntegerType>())
     return simplifySwitchEnumToSelectEnum(BB, i, A);
 

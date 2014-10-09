@@ -526,7 +526,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   // Look for a single other element on this enum.
   EnumElementDecl *OtherElt = nullptr;
   for (EnumElementDecl *Elt : E->getAllElements()) {
-    // Skip the case where we find the enum_is_tag element
+    // Skip the case where we find the select_enum element
     if (Elt == TrueElement)
       continue;
     // If we find another element, then we must have more than 2, so bail.
@@ -571,8 +571,8 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
     if (auto *S = dyn_cast<SwitchEnumInst>(T))
       return tryToSinkRefCountAcrossSwitch(S, I, AA);
 
-    // In contrast, even if we do not sink ref counts across a cond_br from an
-    // enum_is_tag, we may be able to sink anyways. So we do not return on a
+    // In contrast, even if we do not sink ref counts across a cond_br from a
+    // select_enum, we may be able to sink anyways. So we do not return on a
     // failure case.
     if (auto *CondBr = dyn_cast<CondBranchInst>(T))
       if (tryToSinkRefCountAcrossSelectEnum(CondBr, I, AA))
@@ -858,7 +858,7 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
     // Look for a single other element on this enum.
     EnumElementDecl *OtherElt = nullptr;
     for (EnumElementDecl *Elt : E->getAllElements()) {
-      // Skip the case where we find the enum_is_tag element
+      // Skip the case where we find the select_enum element
       if (Elt == TrueElement)
         continue;
       // If we find another element, then we must have more than 2, so bail.

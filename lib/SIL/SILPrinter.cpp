@@ -920,13 +920,6 @@ public:
     }
   }
 
-  void visitEnumIsTagInst(EnumIsTagInst *EITI) {
-    OS << "enum_is_tag "
-       << EITI->getType() << ", "
-       << getIDAndType(EITI->getOperand()) << ", "
-       << SILDeclRef(EITI->getElement(), SILDeclRef::Kind::EnumElement);
-  }
-  
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *UDAI) {
     OS << "init_enum_data_addr "
        << getIDAndType(UDAI->getOperand()) << ", "

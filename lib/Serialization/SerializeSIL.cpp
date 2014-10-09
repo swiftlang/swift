@@ -1112,22 +1112,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         UI->hasOperand() ? UI->getOperand().getResultNumber() : 0);
     break;
   }
-  case ValueKind::EnumIsTagInst: {
-    // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
-    // (DeclID + hasOperand), and an operand.
-    const EnumIsTagInst *UI = cast<EnumIsTagInst>(&SI);
-    TypeID OperandTy = S.addTypeRef(UI->getOperand().getType().getSwiftRValueType());
-    unsigned OperandTyCategory = (unsigned)UI->getOperand().getType().getCategory();
-    SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILTwoOperandsLayout::Code], (unsigned)SI.getKind(), 0,
-        S.addTypeRef(UI->getType().getSwiftRValueType()),
-        (unsigned)UI->getType().getCategory(),
-        S.addDeclRef(UI->getElement()), true /* has operand */,
-        OperandTy, OperandTyCategory,
-        addValueRef(UI->getOperand()),
-        UI->getOperand().getResultNumber());
-    break;
-  }
   case ValueKind::WitnessMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and a type.

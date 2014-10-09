@@ -89,7 +89,6 @@ struct SimpleValue {
     case ValueKind::AddressToPointerInst:
     case ValueKind::CondFailInst:
     case ValueKind::EnumInst:
-    case ValueKind::EnumIsTagInst:
     case ValueKind::UncheckedEnumDataInst:
     case ValueKind::IsNonnullInst:
     case ValueKind::UncheckedRefBitCastInst:
@@ -321,11 +320,6 @@ public:
 
   hash_code visitUncheckedRefCastInst(UncheckedRefCastInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
-  }
-
-  hash_code visitEnumIsTagInst(EnumIsTagInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand(),
-                              X->getType(), X->getElement());
   }
 
   hash_code visitSelectEnumInstBase(SelectEnumInstBase *X) {

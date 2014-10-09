@@ -751,20 +751,6 @@ public:
     }
   }
 
-  void checkEnumIsTagInst(EnumIsTagInst *EGTI) {
-    auto intTy = EGTI->getType().getAs<BuiltinIntegerType>();
-    require(intTy && intTy->isFixedWidth(1),
-            "EnumIsTagInst instruction must return a Builtin.Int1");
-
-    SILType uTy = EGTI->getOperand().getType();
-    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
-    require(uDecl, "EnumIsTagInst must take an enum operand");
-    require(EGTI->getElement()->getParentEnum() == uDecl,
-            "EnumIsTagInst case must be a case of the enum operand type");
-    require(EGTI->getOperand().getType().isObject(),
-            "EnumIsTagInst must take an address operand");
-  }
-
   void checkInitEnumDataAddrInst(InitEnumDataAddrInst *UI) {
     EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
     require(ud, "InitEnumDataAddrInst must take an enum operand");

@@ -1484,16 +1484,6 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitEnumIsTagInst(EnumIsTagInst *EIT) {
-  auto *EI = dyn_cast<EnumInst>(EIT->getOperand());
-  if (!EI)
-    return nullptr;
-
-  bool SameTag = EI->getElement() == EIT->getElement();
-  return IntegerLiteralInst::create(EIT->getLoc(), EIT->getType(),
-                                    APInt(1, SameTag), *EIT->getFunction());
-}
-
 SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *EIT) {
   // TODO: We should be able to flat-out replace the select_enum instruction
   // with the selected value in another pass. For parity with the enum_is_tag

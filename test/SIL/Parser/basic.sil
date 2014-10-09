@@ -825,15 +825,6 @@ bb3:
   return %18 : $()                                        // CHECK: return
 }
 
-// CHECK-LABEL: sil @test_enum_is_tag : $@thin (MaybePair) -> Bool
-sil @test_enum_is_tag : $@thin (MaybePair) -> Bool {
-bb0(%0 : $MaybePair):
-// CHECK: %1 = enum_is_tag $Builtin.Int1, %0 : $MaybePair, #MaybePair.Neither!enumelt
-  %1 = enum_is_tag $Builtin.Int1, %0 : $MaybePair, #MaybePair.Neither!enumelt
-  %6 = struct $Bool (%1 : $Builtin.Int1)
-  return %6 : $Bool
-}
-
 class ConcreteClass : ClassP {
 }
 struct Spoon : Bendable {

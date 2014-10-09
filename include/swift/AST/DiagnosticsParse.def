@@ -460,8 +460,6 @@ ERROR(sil_witness_method_type_does_not_conform,decl_parsing,none,
       "witness_method type does not conform to protocol", ())
 ERROR(sil_witness_archetype_not_found,decl_parsing,none,
       "archetype name not found in specialized protocol conformance", ())
-ERROR(sil_enum_is_tag_not_integer_type,decl_parsing,none,
-      "enum_is_tag instruction requires a 'Builtin.Int1' type", ())
 ERROR(sil_member_decl_not_found,decl_parsing,none,
       "member not found in method instructions", ())
 ERROR(sil_member_decl_type_mismatch, decl_parsing,none,

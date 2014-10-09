@@ -264,7 +264,7 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
     // Look for a single other element on this enum.
     EnumElementDecl *OtherElt = nullptr;
     for (EnumElementDecl *Elt : E->getAllElements()) {
-      // Skip the case where we find the enum_is_tag element
+      // Skip the case where we find the select_enum element
       if (Elt == TrueElement)
         continue;
       // If we find another element, then we must have more than 2, so bail.

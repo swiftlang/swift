@@ -402,13 +402,6 @@ namespace {
       return X->getElement() == RHS->getElement();
     }
 
-    bool visitEnumIsTagInst(const EnumIsTagInst *RHS) {
-      // We have already compared the operands/types, so we should have equality
-      // at this point.
-      auto *X = cast<EnumIsTagInst>(LHS);
-      return X->getElement() == RHS->getElement();
-    }
-      
     bool visitSelectEnumInstBase(const SelectEnumInstBase *RHS) {
       // Check that the instructions match cases in the same order.
       auto *X = cast<SelectEnumInstBase>(LHS);

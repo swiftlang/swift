@@ -326,7 +326,6 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::DynamicMethodBranchInst:
     case ValueKind::DynamicMethodInst:
     case ValueKind::EnumInst:
-    case ValueKind::EnumIsTagInst:
     case ValueKind::IndexAddrInst:
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:

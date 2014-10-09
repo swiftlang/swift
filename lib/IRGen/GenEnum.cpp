@@ -115,14 +115,6 @@ namespace {
       return Address(llvm::UndefValue::get(IGF.IGM.OpaquePtrTy), Alignment(1));
     }
 
-    void emitIsTag(IRGenFunction &IGF,
-                   Explosion &data,
-                   EnumElementDecl *elt,
-                   Explosion &out,
-                   SILType ty) const override {
-      out.add(llvm::UndefValue::get(IGF.IGM.Int1Ty));
-    }
-
     void storeTag(IRGenFunction &IGF,
                   EnumElementDecl *elt,
                   Address enumAddr,
@@ -381,19 +373,6 @@ namespace {
                                           EnumElementDecl *elt,
                                           Address enumAddr) const override {
       return getSingletonAddress(IGF, enumAddr);
-    }
-
-    void emitIsTag(IRGenFunction &IGF,
-                   Explosion &data,
-                   EnumElementDecl *elt,
-                   Explosion &out,
-                   SILType ty) const override {
-      // No tag, so this is always true
-      CanType IntTy = ty.getSwiftRValueType();
-      (void)IntTy;
-      assert(cast<BuiltinIntegerType>(IntTy)->isFixedWidth(1) &&
-             "enum_is_tag assumed to be i1 result");
-      out.add(IGF.Builder.getTrue());
     }
 
     void storeTag(IRGenFunction &IGF,
@@ -746,22 +725,6 @@ namespace {
                                           EnumElementDecl *elt,
                                           Address enumAddr) const override {
       llvm_unreachable("cannot project data for no-payload cases");
-    }
-
-    void emitIsTag(IRGenFunction &IGF,
-                   Explosion &data,
-                   EnumElementDecl *elt,
-                   Explosion &out,
-                   SILType ty) const override {
-      // No payload.  The tag is just the index of the element
-      CanType IntTy = ty.getSwiftRValueType();
-      (void)IntTy;
-      assert(cast<BuiltinIntegerType>(IntTy)->isFixedWidth(1) &&
-             "enum_is_tag assumed to be i64 result");
-
-      llvm::Value *enum_tag = data.claimNext();
-      llvm::Value *discriminator = getDiscriminatorIndex(elt);
-      out.add(IGF.Builder.CreateICmpEQ(enum_tag, discriminator));
     }
 
     void storeTag(IRGenFunction &IGF, EnumElementDecl *elt, Address enumAddr,
@@ -1201,42 +1164,6 @@ namespace {
       if (ExtraTagBitCount > 0)
         extraTag = IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr));
       return {payload, extraTag};
-    }
-  public:
-
-    void emitIsTag(IRGenFunction &IGF,
-                   Explosion &data,
-                   EnumElementDecl *elt,
-                   Explosion &out,
-                   SILType ty) const override {
-      // A payload could have the enum tag bits in a number of different
-      // places.  Instead of recreating all of the logic in emitValueSwitch,
-      // just emit a switch where the element we want returns a true, and all
-      // others false.
-      auto &C = IGF.IGM.getLLVMContext();
-      auto *trueBB = llvm::BasicBlock::Create(C);
-      auto *falseBB = llvm::BasicBlock::Create(C);
-      auto *PhiBB = llvm::BasicBlock::Create(C);
-
-      SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 1> TagMap;
-      TagMap.push_back({ elt, trueBB });
-
-      emitValueSwitch(IGF, data, TagMap, falseBB);
-
-      // Both true and false BBs should branch to the phiBB
-      IGF.Builder.emitBlock(trueBB);
-      IGF.Builder.CreateBr(PhiBB);
-      IGF.Builder.emitBlock(falseBB);
-      IGF.Builder.CreateBr(PhiBB);
-
-      IGF.Builder.emitBlock(PhiBB);
-      // The PHI is true if it comes from the element BB, and false if from
-      // the default BB.
-      llvm::PHINode *TagPhi = IGF.Builder.CreatePHI(IGF.Builder.getInt1Ty(), 2);
-      TagPhi->addIncoming(IGF.Builder.getTrue(), trueBB);
-      TagPhi->addIncoming(IGF.Builder.getFalse(), falseBB);
-
-      out.add(TagPhi);
     }
   };
 

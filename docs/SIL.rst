@@ -2796,21 +2796,6 @@ also been invalidated.
 For the first payloaded case of an enum, ``unchecked_take_enum_data_addr``
 is guaranteed to have no side effects; the enum value will not be invalidated.
 
-enum_is_tag
-```````````
-::
-
-  sil-instruction ::= 'enum_is_tag' sil-type, sil-operand ',' sil-decl-ref
-
-  %1 = enum_is_tag $Builtin.Int1, %0 : $*U, #U.Case
-  // $U must be an enum type
-  // #U.Case must be a case of enum $U
-  // %1 must be of type $Builtin.Int1
-
-Extracts the tag from an enum value and compares with the tag for ``case``.
-Returns ``1`` if the enum tag matches that of ``case``.  Returns ``0``
-otherwise.
-
 select_enum
 ```````````
 ::

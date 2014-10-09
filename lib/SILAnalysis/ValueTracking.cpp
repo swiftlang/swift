@@ -107,7 +107,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::ConvertFunctionInst:
   case ValueKind::DynamicMethodInst:
   case ValueKind::EnumInst:
-  case ValueKind::EnumIsTagInst:
   case ValueKind::IndexAddrInst:
   case ValueKind::IndexRawPointerInst:
   case ValueKind::InitBlockStorageHeaderInst:

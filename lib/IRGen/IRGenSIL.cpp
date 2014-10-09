@@ -619,7 +619,6 @@ public:
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
-  void visitEnumIsTagInst(EnumIsTagInst *i);
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *i);
   void visitSelectEnumInst(SelectEnumInst *i);
   void visitSelectEnumAddrInst(SelectEnumAddrInst *i);
@@ -2426,15 +2425,6 @@ void IRGenSILFunction::visitEnumInst(swift::EnumInst *i) {
     : Explosion();
   Explosion out;
   emitInjectLoadableEnum(*this, i->getType(), i->getElement(), data, out);
-  setLoweredExplosion(SILValue(i, 0), out);
-}
-
-void IRGenSILFunction::visitEnumIsTagInst(swift::EnumIsTagInst *i) {
-  Explosion out;
-  Explosion enumValue = getLoweredExplosion(i->getOperand());
-
-  getEnumImplStrategy(IGM, i->getOperand().getType())
-  .emitIsTag(*this, enumValue, i->getElement(), out, i->getType());
   setLoweredExplosion(SILValue(i, 0), out);
 }
 

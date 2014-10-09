@@ -1164,7 +1164,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dynamic_method", ValueKind::DynamicMethodInst)
     .Case("dynamic_method_br", ValueKind::DynamicMethodBranchInst)
     .Case("enum", ValueKind::EnumInst)
-    .Case("enum_is_tag", ValueKind::EnumIsTagInst)
     .Case("fix_lifetime", ValueKind::FixLifetimeInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
     .Case("global_addr", ValueKind::GlobalAddrInst)
@@ -2252,26 +2251,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     default:
       llvm_unreachable("switch out of sync");
     }
-    break;
-  }
-  case ValueKind::EnumIsTagInst: {
-    SILValue Operand;
-    SILDeclRef EltRef;
-    SILType ResultTy;
-    if (parseSILType(ResultTy) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseTypedValueRef(Operand) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILDeclRef(EltRef))
-      return true;
-
-    auto intTy = ResultTy.getAs<BuiltinIntegerType>();
-    if (!intTy || !intTy->isFixedWidth(1)) {
-      P.diagnose(P.Tok, diag::sil_enum_is_tag_not_integer_type);
-      return true;
-    }
-    EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
-    ResultVal = B.createEnumIsTag(InstLoc, Operand, Elt, ResultTy);
     break;
   }
   case ValueKind::InjectEnumAddrInst: {

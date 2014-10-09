@@ -1352,18 +1352,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                (SILValueCategory)TyCategory));
     break;
   }
-  case ValueKind::EnumIsTagInst: {
-    // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
-    // (DeclID + hasOperand), and an operand.
-    SILValue Operand = getLocalValue(ValID2, ValResNum2,
-                                     getSILType(MF->getType(TyID2),
-                                                (SILValueCategory)TyCategory2));
-    ResultVal = Builder.createEnumIsTag(Loc, Operand,
-                                    cast<EnumElementDecl>(MF->getDecl(ValID)),
-                                    getSILType(MF->getType(TyID),
-                                               (SILValueCategory)TyCategory));
-    break;
-  }
   case ValueKind::InitEnumDataAddrInst: {
     // Use SILOneValueOneOperandLayout.
     EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
