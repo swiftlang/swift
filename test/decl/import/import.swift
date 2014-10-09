@@ -32,8 +32,8 @@ import func Swift.print
 // Import specific decls
 import typealias Swift.Int
 import struct Swift.Int
-import typealias Swift.HeapBufferStorage
-import class Swift.HeapBufferStorage
+import typealias Swift.ManagedBuffer
+import class Swift.ManagedBuffer
 import typealias Swift.Bool
 import struct Swift.Bool
 import protocol Swift.GeneratorType

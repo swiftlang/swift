@@ -651,7 +651,8 @@ StringTests.test("stringCoreReserve") {
     expectEqual(!base._core.hasCocoaBuffer, startedNative)
     
     var originalBuffer = base.bufferID
-    let startedUnique = startedNative && _isUniquelyReferenced(&originalBuffer)
+    let startedUnique = startedNative && base._core._owner != nil
+      && isUniquelyReferencedNonObjC(&base._core._owner!)
     
     base._core.reserveCapacity(0)
     // Now it's unique

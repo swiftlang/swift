@@ -13,7 +13,7 @@ struct Bundle {
   var locations: [String]
 }
 
-var a = HeapBuffer<Bundle,Int>(HeapBufferStorage<Bundle,Int>.self, Bundle(), 10)
+var a = _HeapBuffer<Bundle,Int>(_HeapBufferStorage<Bundle,Int>.self, Bundle(), 10)
 var b = a.value
 a.value.name = "DaveA"
 a.value.locations.append("Princeton")
@@ -38,8 +38,8 @@ testUnique()
 println("a == a: \(a == a)")
 // CHECK-NEXT: a == a: true
 
-let other = HeapBuffer<Bundle,Int>(
-  HeapBufferStorage<Bundle,Int>.self, Bundle(), 0)
+let other = _HeapBuffer<Bundle,Int>(
+  _HeapBufferStorage<Bundle,Int>.self, Bundle(), 0)
 println("a == other: \(a == other)")
 // CHECK-NEXT: a == other: false
 

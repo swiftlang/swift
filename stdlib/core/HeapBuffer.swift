@@ -17,6 +17,12 @@ typealias _HeapObject = SwiftShims.HeapObject
 func _swift_bufferAllocate(
   bufferType: AnyClass, size: Int, alignMask: Int) -> AnyObject
 
+@availability(*, unavailable, message="Please use ManagedBuffer<Value,Element> instead.")
+public class HeapBufferStorage<Value,Element> {}
+
+@availability(*, unavailable, message="Please use class ManagedBuffer<Value,Element> instead.")
+public struct HeapBuffer<Value,Element> {}
+
 /// A class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is
 /// determined at create time.
@@ -24,26 +30,26 @@ func _swift_bufferAllocate(
 /// The analogous C++-ish class template would be::
 ///
 ///   template <class Value, class Element>
-///   struct HeapBuffer {
+///   struct _HeapBuffer {
 ///     Value value;
 ///     Element baseAddress[];        // length determined at creation time
 ///
-///     HeapBuffer() = delete
-///     static shared_ptr<HeapBuffer> create(Value init, int capacity);
+///     _HeapBuffer() = delete
+///     static shared_ptr<_HeapBuffer> create(Value init, int capacity);
 ///   }
 ///
 /// Note that the Element array is RAW MEMORY.  You are expected to
 /// construct and---if necessary---destroy Elements there yourself,
 /// either in a derived class, or it can be in some manager object
-/// that owns the HeapBuffer.
-public class HeapBufferStorage<Value,Element> {
+/// that owns the _HeapBuffer.
+internal class _HeapBufferStorage<Value,Element> {
   /// The type used to actually manage instances of
-  /// `HeapBufferStorage<Value,Element>`
-  public typealias Buffer = HeapBuffer<Value, Element>
+  /// `_HeapBufferStorage<Value,Element>`
+  typealias Buffer = _HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()
   }
-  public final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+  final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     return Buffer(self)._allocatedSizeAndAlignMask()
   }
 }
@@ -69,14 +75,14 @@ public class HeapBufferStorage<Value,Element> {
 // to be in that case, without affecting its reference count.  Instead
 // we accept everything; unsafeBitCast will at least catch
 // inappropriately-sized things at runtime.
-public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
+internal func _isUniquelyReferenced<T>(inout x: T) -> Bool {
   return _swift_isUniquelyReferenced_native_spareBits(
     unsafeBitCast(x, UWord.self)) != 0
 }
 
-/// Management API for `HeapBufferStorage<Value, Element>`
-public struct HeapBuffer<Value, Element> : Equatable {
-  public typealias Storage = HeapBufferStorage<Value, Element>
+/// Management API for `_HeapBufferStorage<Value, Element>`
+internal struct _HeapBuffer<Value, Element> : Equatable {
+  typealias Storage = _HeapBufferStorage<Value, Element>
   let storage: Storage?
   
   static func _valueOffset() -> Int {
@@ -105,11 +111,11 @@ public struct HeapBuffer<Value, Element> : Equatable {
 
   var _value: UnsafeMutablePointer<Value> {
     return UnsafeMutablePointer(
-      HeapBuffer._valueOffset() + _address)
+      _HeapBuffer._valueOffset() + _address)
   }
 
   var baseAddress: UnsafeMutablePointer<Element> {
-    return UnsafeMutablePointer(HeapBuffer._elementOffset() + _address)
+    return UnsafeMutablePointer(_HeapBuffer._elementOffset() + _address)
   }
 
   func _allocatedSize() -> Int {
@@ -117,7 +123,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   func _allocatedAlignMask() -> Int {
-    return HeapBuffer._requiredAlignMask()
+    return _HeapBuffer._requiredAlignMask()
   }
 
   func _allocatedSizeAndAlignMask() -> (Int, Int) {
@@ -126,7 +132,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
 
   /// Return the actual number of `Elements` we can possibly store.
   func _capacity() -> Int {
-    return (_allocatedSize() - HeapBuffer._elementOffset())
+    return (_allocatedSize() - _HeapBuffer._elementOffset())
       / strideof(Element.self)
   }
 
@@ -138,17 +144,17 @@ public struct HeapBuffer<Value, Element> : Equatable {
     self.storage = storage
   }
   
-  /// Create a `HeapBuffer` with `self.value = initializer` and
+  /// Create a `_HeapBuffer` with `self.value = initializer` and
   /// `self._capacity() >= capacity`.
-  public init(
+  init(
     _ storageClass: AnyClass,
     _ initializer: Value, _ capacity: Int
   ) {
-    _sanityCheck(capacity >= 0, "creating a HeapBuffer with negative capacity")
+    _sanityCheck(capacity >= 0, "creating a _HeapBuffer with negative capacity")
 
-    let totalSize = HeapBuffer._elementOffset() +
+    let totalSize = _HeapBuffer._elementOffset() +
         capacity * strideof(Element.self)
-    let alignMask = HeapBuffer._requiredAlignMask()
+    let alignMask = _HeapBuffer._requiredAlignMask()
 
     self.storage = unsafeBitCast(
       _swift_bufferAllocate(storageClass, totalSize, alignMask), Storage.self)
@@ -165,7 +171,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   /// True if storage is non-\ `nil`
-  public var hasStorage: Bool {
+  var hasStorage: Bool {
     return storage != nil
   }
 
@@ -182,11 +188,11 @@ public struct HeapBuffer<Value, Element> : Equatable {
     return unsafeBitCast(storage, Builtin.NativeObject.self)
   }
 
-  static func fromNativeObject(x: Builtin.NativeObject) -> HeapBuffer {
-    return HeapBuffer(Builtin.castFromNativeObject(x) as Storage)
+  static func fromNativeObject(x: Builtin.NativeObject) -> _HeapBuffer {
+    return _HeapBuffer(Builtin.castFromNativeObject(x) as Storage)
   }
 
-  public mutating func isUniquelyReferenced() -> Bool {
+  mutating func isUniquelyReferenced() -> Bool {
     if storage == nil {
       return false
     }
@@ -196,25 +202,12 @@ public struct HeapBuffer<Value, Element> : Equatable {
 }
 
 // HeapBuffers are equal when they reference the same buffer
-public func == <Value, Element> (
-  lhs: HeapBuffer<Value, Element>,
-  rhs: HeapBuffer<Value, Element>) -> Bool {
+func == <Value, Element> (
+  lhs: _HeapBuffer<Value, Element>,
+  rhs: _HeapBuffer<Value, Element>) -> Bool {
   return lhs._nativeObject == rhs._nativeObject
 }
 
-// OnHeap<T>
-// 
-// A way to store a value on the heap.  These values are likely to be
-// implicitly shared, so it's safest if they're immutable.
-//
-public struct OnHeap<T> {
-  typealias Buffer = HeapBuffer<T, Void>
-  
-  init(_ value: T) {
-    _storage = HeapBuffer(Buffer.Storage.self, value, 0)
-  }
-  
-  var _value: T { return _storage._value.memory }
 
-  var _storage: Buffer
-}
+@availability(*, unavailable, message="Please use ManagedBuffer<T,Void> instead")
+public struct OnHeap<T> {}

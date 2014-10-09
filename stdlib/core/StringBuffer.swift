@@ -29,7 +29,7 @@ struct _StringBufferIVars {
   }
 
   // This stored property should be stored at offset zero.  We perform atomic
-  // operations on it using HeapBuffer's pointer.
+  // operations on it using _HeapBuffer's pointer.
   var usedEnd: UnsafeMutablePointer<RawByte>
 
   var capacityAndElementShift: Int
@@ -42,14 +42,14 @@ struct _StringBufferIVars {
 }
 
 // FIXME: Wanted this to be a subclass of
-// HeapBuffer<_StringBufferIVars,UTF16.CodeUnit>, but
+// _HeapBuffer<_StringBufferIVars,UTF16.CodeUnit>, but
 // <rdar://problem/15520519> (Can't call static method of derived
 // class of generic class with dependent argument type) prevents it.
 public struct _StringBuffer {
 
   // Make this a buffer of UTF-16 code units so that it's properly
   // aligned for them if that's what we store.
-  typealias _Storage = HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
+  typealias _Storage = _HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
 
   init(_ storage: _Storage) {
     _storage = storage

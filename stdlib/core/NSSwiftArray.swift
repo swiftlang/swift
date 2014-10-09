@@ -48,10 +48,10 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
   }
 
-  internal var _heapBufferBridged: HeapBufferStorage<Int, AnyObject>? {
+  internal var _heapBufferBridged: _HeapBufferStorage<Int, AnyObject>? {
     if let ref: AnyObject =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, HeapBufferStorage<Int, AnyObject>.self)
+      return unsafeBitCast(ref, _HeapBufferStorage<Int, AnyObject>.self)
     }
     return nil
   }
@@ -60,9 +60,9 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     self._nativeStorage = _nativeStorage
   }
 
-  internal func _destroyBridgedStorage(hb: HeapBufferStorage<Int, AnyObject>?) {
+  internal func _destroyBridgedStorage(hb: _HeapBufferStorage<Int, AnyObject>?) {
     if let bridgedStorage = hb {
-      let heapBuffer = HeapBuffer(bridgedStorage)
+      let heapBuffer = _HeapBuffer(bridgedStorage)
       let count = heapBuffer.value
       heapBuffer.baseAddress.destroy(count)
     }
@@ -80,7 +80,7 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
       
       // If we've already got a buffer of bridged objects, just use it
       if let bridgedStorage = _heapBufferBridged {
-        let heapBuffer = HeapBuffer(bridgedStorage)
+        let heapBuffer = _HeapBuffer(bridgedStorage)
         buffer = UnsafeBufferPointer(
             start: heapBuffer.baseAddress, count: heapBuffer.value)
       }
@@ -119,7 +119,7 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     // Note: calling this function should not trigger bridging of array
     // elements, there is no need in that.
     if let bridgedStorage = _heapBufferBridged {
-      return HeapBuffer(bridgedStorage).value
+      return _HeapBuffer(bridgedStorage).value
     }
 
     // Check if elements are bridged verbatim.
@@ -206,7 +206,7 @@ class _ContiguousArrayStorageBase {
   }
 
   internal func _getNonVerbatimBridgedHeapBuffer(dummy: Void) ->
-    HeapBuffer<Int, AnyObject> {
+    _HeapBuffer<Int, AnyObject> {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedHeapBuffer")
   }

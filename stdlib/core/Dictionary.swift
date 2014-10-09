@@ -237,11 +237,11 @@ struct _DictionaryElement<Key, Value> {
 }
 
 /// An instance of this class has all dictionary data tail-allocated.  It is
-/// used as a `HeapBuffer` storage.
+/// used as a `_HeapBuffer` storage.
 final class _NativeDictionaryStorageImpl<Key, Value> {
 
   typealias Element = _DictionaryElement<Key, Value>
-  typealias DictionaryHeapBuffer = HeapBuffer<_DictionaryBody, Element?>
+  typealias DictionaryHeapBuffer = _HeapBuffer<_DictionaryBody, Element?>
 
   deinit {
     // FIXME: this cast is invalid.
@@ -858,7 +858,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
 
   /// Returns the bridged Dictionary values.
   var bridgedNativeStorage: BridgedNativeStorage {
-    return BridgedNativeStorage(buffer: HeapBuffer(_heapBufferBridged!))
+    return BridgedNativeStorage(buffer: _HeapBuffer(_heapBufferBridged!))
   }
 
   func _createBridgedNativeStorage(capacity: Int) -> BridgedNativeStorage {
@@ -1566,7 +1566,7 @@ struct _CocoaDictionaryIndex : BidirectionalIndexType, Comparable {
   let cocoaDictionary: _SwiftNSDictionaryType
 
   /// An unowned array of keys.
-  var allKeys: HeapBuffer<Int, AnyObject>
+  var allKeys: _HeapBuffer<Int, AnyObject>
 
   /// Index into `allKeys`.
   var currentKeyIndex: Int
@@ -1584,7 +1584,7 @@ struct _CocoaDictionaryIndex : BidirectionalIndexType, Comparable {
   }
 
   init(_ cocoaDictionary: _SwiftNSDictionaryType,
-       _ allKeys: HeapBuffer<Int, AnyObject>,
+       _ allKeys: _HeapBuffer<Int, AnyObject>,
        _ currentKeyIndex: Int) {
     self.cocoaDictionary = cocoaDictionary
     self.allKeys = allKeys
@@ -2501,10 +2501,10 @@ func _stdlib_NSObject_isEqual(lhs: AnyObject, rhs: AnyObject) -> Bool
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
 func _stdlib_NSDictionary_allKeys(nsd: _SwiftNSDictionaryType)
-    -> HeapBuffer<Int, AnyObject> {
+    -> _HeapBuffer<Int, AnyObject> {
   let count = nsd.count
-  var buffer = HeapBuffer<Int, AnyObject>(
-      HeapBufferStorage<Int, AnyObject>.self, count, count)
+  var buffer = _HeapBuffer<Int, AnyObject>(
+      _HeapBufferStorage<Int, AnyObject>.self, count, count)
   nsd.getObjects(nil, andKeys: buffer.baseAddress)
   return buffer
 }

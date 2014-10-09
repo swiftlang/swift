@@ -36,9 +36,9 @@ internal final class _EmptyArrayStorage
 
   override func _getNonVerbatimBridgedHeapBuffer(
     dummy: Void
-  ) -> HeapBuffer<Int, AnyObject> {
-    return HeapBuffer<Int, AnyObject>(
-      HeapBufferStorage<Int, AnyObject>.self, 0, 0)
+  ) -> _HeapBuffer<Int, AnyObject> {
+    return _HeapBuffer<Int, AnyObject>(
+      _HeapBufferStorage<Int, AnyObject>.self, 0, 0)
   }
 
   override func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
@@ -130,14 +130,14 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
   ///
   /// Precondition: `T` is bridged non-verbatim.
   override internal func _getNonVerbatimBridgedHeapBuffer(dummy: Void) ->
-    HeapBuffer<Int, AnyObject> {
+    _HeapBuffer<Int, AnyObject> {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
       "Verbatim bridging should be handled separately")
     let nativeBuffer = Buffer(self)
     let count = nativeBuffer.count
-    let result = HeapBuffer<Int, AnyObject>(
-      HeapBufferStorage<Int, AnyObject>.self, count, count)
+    let result = _HeapBuffer<Int, AnyObject>(
+      _HeapBufferStorage<Int, AnyObject>.self, count, count)
     let resultPtr = result.baseAddress
     for i in 0..<count {
       (resultPtr + i).initialize(
@@ -174,7 +174,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       self = _ContiguousArrayBuffer<T>()
     }
     else {
-      _base = HeapBuffer(
+      _base = _HeapBuffer(
         _ContiguousArrayStorage<T>.self,
         _ArrayBody(),
         realMinimumCapacity)
@@ -191,7 +191,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 
   init(_ storage: _ContiguousArrayStorage<T>?) {
-    _base = unsafeBitCast(storage , HeapBuffer<_ArrayBody, T>.self)
+    _base = unsafeBitCast(storage , _HeapBuffer<_ArrayBody, T>.self)
   }
 
   public var hasStorage: Bool {
@@ -237,7 +237,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// create an empty buffer
   public init() {
-    _base = unsafeBitCast(_emptyArrayStorage, HeapBuffer<_ArrayBody, T>.self)
+    _base = unsafeBitCast(_emptyArrayStorage, _HeapBuffer<_ArrayBody, T>.self)
   }
 
   /// Adopt the storage of x
@@ -448,7 +448,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return unsafeBitCast(_base.storage, _OptionalStorage.self)
   }
 
-  typealias _Base = HeapBuffer<_ArrayBody, T>
+  typealias _Base = _HeapBuffer<_ArrayBody, T>
   var _base: _Base
 }
 

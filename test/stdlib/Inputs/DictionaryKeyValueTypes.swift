@@ -617,8 +617,8 @@ func slurpFastEnumerationFromSwift<
   var state = NSFastEnumerationState()
 
   let stackBufLength = 3
-  var stackBuf = HeapBuffer<(), AnyObject?>(
-    HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
+  var stackBuf = _HeapBuffer<(), AnyObject?>(
+    _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
 
   var itemsReturned = 0
   while true {
@@ -660,8 +660,8 @@ func slurpFastEnumerationFromSwift<
   var state = NSFastEnumerationState()
 
   let stackBufLength = 3
-  var stackBuf = HeapBuffer<(), AnyObject?>(
-    HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
+  var stackBuf = _HeapBuffer<(), AnyObject?>(
+    _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
 
   var itemsReturned = 0
   while true {

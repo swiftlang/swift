@@ -1,6 +1,13 @@
 Latest
 ------
 
+* 'HeapBuffer<Value,Element>', 'HeapBufferStorage<Value,Element>', and
+  'OnHeap<Value>' were never really useful, because their APIs were
+  insufficiently public.  They have been replaced with a single class,
+  'ManagedBuffer<Value,Element>'.  See also the new function
+  'isUniquelyReferenced(x)' which is often useful in conjunction with
+  'ManagedBuffer'.
+
 * The 'Character' enum has been turned into a struct, to avoid
   exposing its internal implementation details.
 

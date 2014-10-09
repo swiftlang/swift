@@ -1,19 +1,20 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-stdlib-swift | FileCheck %s
+import Swift
 
 // Regression test for <rdar://problem/16119895>.
 
 struct Generic<T> {
-  typealias Storage = HeapBufferStorage<Int,T>
+  typealias Storage = _HeapBufferStorage<Int,T>
 
   init() {
-    buffer = HeapBuffer(Storage.self, 0, 0)
+    buffer = _HeapBuffer(Storage.self, 0, 0)
   }
 
   mutating func isUniquelyReferenced() -> Bool {
     return buffer.isUniquelyReferenced()
   }
   
-  var buffer: HeapBuffer<Int, T>
+  var buffer: _HeapBuffer<Int, T>
 }
 func g0() {
   var x = Generic<Int>()
@@ -27,17 +28,17 @@ g0()
 
 struct NonGeneric {
   typealias T = Int
-  typealias Storage = HeapBufferStorage<Int,T>
+  typealias Storage = _HeapBufferStorage<Int,T>
 
   init() {
-    buffer = HeapBuffer(Storage.self, 0, 0)
+    buffer = _HeapBuffer(Storage.self, 0, 0)
   }
 
   mutating func isUniquelyReferenced() -> Bool {
     return buffer.isUniquelyReferenced()
   }
   
-  var buffer: HeapBuffer<Int, T>
+  var buffer: _HeapBuffer<Int, T>
 }
 func g1() {
   var x = NonGeneric()

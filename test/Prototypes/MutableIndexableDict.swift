@@ -102,7 +102,7 @@
 // this scheme never compromises memory safety.
 import Swift
 
-class FixedSizedRefArrayOfOptionalStorage<T> : HeapBufferStorage<Int, T?> {
+class FixedSizedRefArrayOfOptionalStorage<T> : _HeapBufferStorage<Int, T?> {
   deinit {
     let buffer = Buffer(self)
     for i in 0..<buffer.value {

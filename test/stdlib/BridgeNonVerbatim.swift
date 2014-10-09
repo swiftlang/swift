@@ -16,9 +16,10 @@
 //  outlive the array.  
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift %s | FileCheck %s
+// RUN: %target-run-stdlib-swift %s | FileCheck %s
 // XFAIL: interpret
 
+import Swift
 import SwiftShims
 import ObjectiveC
 
@@ -129,7 +130,8 @@ func testScope() {
 
   // CHECK-NEXT: getObjects yields them at +0: true
   var x = objects[0]
-  println("getObjects yields them at +0: \(_isUniquelyReferenced(&x))")
+  println("getObjects yields them at +0: "
+    + "\(_swift_isUniquelyReferenced_native_spareBits(UInt(x)) != 0)")
 }
 
 autoreleasepool() {
