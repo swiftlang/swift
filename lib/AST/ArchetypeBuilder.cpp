@@ -111,8 +111,8 @@ struct ArchetypeBuilder::Implementation {
   std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
     conformsToProtocol;
 
-  /// The list of generic parameters.
-  SmallVector<GenericTypeParamKey, 4> GenericParams;
+  /// The list of potential archetypes that correspond to generic parameters.
+  SmallVector<PotentialArchetype *, 4> RootPotentialArchetypes;
 
   /// A mapping from generic parameters to the corresponding potential
   /// archetypes.
@@ -526,14 +526,13 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
 {
   GenericTypeParamKey Key{GenericParam->getDepth(), GenericParam->getIndex()};
   
-  Impl->GenericParams.push_back(Key);
-
   // Create a potential archetype for this type parameter.
   assert(!Impl->PotentialArchetypes[Key]);
   auto PA = new PotentialArchetype(GenericParam, RootProtocol, ParamName, 
                                    Index);
+
   Impl->PotentialArchetypes[Key] = PA;
-  
+  Impl->RootPotentialArchetypes.push_back(PA);  
   return PA;
 }
 
@@ -1074,8 +1073,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
   if (Impl->AllArchetypes.empty()) {
     // Collect the primary archetypes first.
     llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
-    for (auto GP : Impl->GenericParams) {
-      PotentialArchetype *PA = Impl->PotentialArchetypes[GP];
+    for (auto PA : Impl->RootPotentialArchetypes) {
       if (PA->isPrimary()) {
         auto Archetype = PA->getType(*this).get<ArchetypeType *>();
         assert(Archetype->isPrimary() && "isPrimary mismatch");
@@ -1085,8 +1083,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
     }
 
     // Collect all of the remaining archetypes.
-    for (auto GP : Impl->GenericParams) {
-      PotentialArchetype *PA = Impl->PotentialArchetypes[GP];
+    for (auto PA : Impl->RootPotentialArchetypes) {
       if (!PA->isConcreteType()) {
         auto Archetype = PA->getType(*this).get<ArchetypeType *>();
         GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
