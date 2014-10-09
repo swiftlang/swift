@@ -156,11 +156,11 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   var value : Value {
-    get {
-      return _value.memory
+    address {
+      return UnsafePointer(_value)
     }
-    nonmutating set(newValue) {
-      _value.memory = newValue
+    nonmutating mutableAddress {
+      return _value
     }
   }
 
@@ -170,11 +170,11 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   subscript(i: Int) -> Element {
-    get {
-      return baseAddress[i]
+    address {
+      return UnsafePointer(baseAddress + i)
     }
-    nonmutating set(newValue) {
-      baseAddress[i] = newValue
+    nonmutating mutableAddress {
+      return baseAddress + i
     }
   }
 
