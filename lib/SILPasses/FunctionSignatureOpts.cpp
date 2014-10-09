@@ -393,46 +393,6 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   return NewF;
 }
 
-/// This function takes in a function F, removes all basic blocks except for F's
-/// first BB, and then converts F into a thunk calling NewF according to the
-/// list of ArgDescriptor \p Arguments.
-static void
-convertFunctionToThunk(SILFunction *F, SILFunction *NewF,
-                       ArrayRef<ArgDescriptor> Arguments) {
-  // First remove the terminator from the first basic block. This is just to be
-  // careful around any potential references to other BB and make sure we do not
-  // reference deallocating objects.
-  SILBasicBlock *FirstBB = &*F->begin();
-  TermInst *FirstBBTerm = FirstBB->getTerminator();
-  FirstBBTerm->eraseFromParent();
-
-  // Then delete all basic blocks, except for the first one.
-  SILFunction::iterator BI = std::prev(F->end()), BE = FirstBB;
-  while (BI != BE) {
-    SILBasicBlock *TargetBB = BI;
-    --BI;
-    removeDeadBlock(TargetBB);
-  }
-
-  // Then go back through the first BB and delete all instructions.
-  clearBlockBody(FirstBB);
-
-  // Create the dead args array.
-  //
-  // TODO: Refactor this with the code in computeOptimizedInterfaceParams.
-  llvm::SmallVector<unsigned, 8> DeadArgs;
-  CanSILFunctionType OldFTy = F->getLoweredFunctionType();
-  for (unsigned i = 0, e = OldFTy->getParameters().size(); i != e; ++i) {
-    // If we have a dead argument, add it to the dead arg list with the index.
-    if (Arguments[i].IsDead) {
-      DeadArgs.push_back(i);
-    }
-  }
-
-  // Then create the thunk body.
-  createThunkBody(FirstBB, NewF, Arguments, DeadArgs);
-}
-
 /// This function takes in a SILFunction F and its callsites in the current
 /// module and produces a new SILFunction that has the body of F but with
 /// optimized function arguments. F is changed to be a thunk that calls NewF to
