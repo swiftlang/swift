@@ -872,9 +872,10 @@ public:
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->Name;
       sgm.TopLevelSGF->prepareEpilog(Type(),
                                  CleanupLocation::getModuleCleanupLocation());
-      
-      emitTopLevelProlog(*sgm.TopLevelSGF,
-                         RegularLocation::getModuleLocation());
+
+      auto PrologueLoc = RegularLocation::getModuleLocation();
+      PrologueLoc.markAsPrologue();
+      emitTopLevelProlog(*sgm.TopLevelSGF, PrologueLoc);
     }
   }
   

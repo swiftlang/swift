@@ -162,6 +162,7 @@ private:
 
   void setKind(LocationKind K) { KindData |= (K & BaseMask); }
   unsigned getSpecialFlags() const { return unsigned(KindData) & ~BaseMask; }
+  void setSpecialFlags(unsigned Flags) { KindData |= (Flags & ~BaseMask); }
 public:
 
   /// When an ASTNode gets implicitely converted into a SILLocation we
@@ -471,8 +472,10 @@ public:
 
   static MandatoryInlinedLocation getMandatoryInlinedLocation(SILLocation L);
 
-  static MandatoryInlinedLocation getModuleLocation() {
-    return MandatoryInlinedLocation();
+  static MandatoryInlinedLocation getModuleLocation(unsigned Flags) {
+    auto L = MandatoryInlinedLocation();
+    L.setSpecialFlags(Flags);
+    return L;
   }
   
 private:

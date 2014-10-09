@@ -509,6 +509,8 @@ public:
             OS << " auto_gen";
           else
             OS << " no_loc";
+          if (L.isInPrologue())
+            OS << ":in_prologue";
         }
 
         // Print inlined-at location, if any.
