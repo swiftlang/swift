@@ -92,7 +92,15 @@ namespace {
       auto memberLocator =
         CS.getConstraintLocator(expr, ConstraintLocator::Member);
       auto tv = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
-      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false, CS);
+      
+      // When the member is a property, this availability is for the
+      // property itself and not for the getter or setter individually.
+      // Unfortunately, this means that we do not support the scenario where
+      // a getter and a setter have different availabilities.
+      Optional<UnavailabilityReason> reason =
+          CS.TC.checkDeclarationAvailability(decl, expr->getLoc(), CS.DC);
+      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false, CS,
+                            reason);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator);
       return tv;
@@ -391,9 +399,12 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
+        auto unavailReason =
+            CS.TC.checkDeclarationAvailability(decls[i], expr->getLoc(), CS.DC);
+        
         choices.push_back(OverloadChoice(baseTy, decls[i],
                                          /*isSpecialized=*/false,
-                                         CS));
+                                         CS, unavailReason));
       }
 
       // If there are no valid overloads, give up.

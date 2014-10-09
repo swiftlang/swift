@@ -696,13 +696,20 @@ namespace {
 
 /// A class to walk the AST to build the type refinement context hierarchy.
 class TypeRefinementContextBuilder : private ASTWalker {
-  TypeRefinementContext *CurTRC;
+  std::vector<TypeRefinementContext *> ContextStack;
   ASTContext &AC;
+  
 
+  TypeRefinementContext *getCurrentTRC() {
+    assert(ContextStack.size() > 0);
+    return ContextStack[ContextStack.size() - 1];
+  }
+  
 public:
   TypeRefinementContextBuilder(TypeRefinementContext *TRC, ASTContext &AC)
-      : CurTRC(TRC), AC(AC) {
+      : AC(AC) {
     assert(TRC);
+    ContextStack.push_back(TRC);
   }
 
   void build(Decl *D) { D->walk(*this); }
@@ -711,47 +718,89 @@ public:
 
 private:
   virtual bool walkToDeclPre(Decl *D) override {
-    auto FD = dyn_cast<AbstractFunctionDecl>(D);
-    if (!FD) return true;
-
-    buildFunctionRefinementContext(FD);
-
-    return false;
+    TypeRefinementContext *NewTRC = nullptr;
+    if (declarationIntroducesNewContext(D)) {
+      NewTRC = buildDeclarationRefinementContext(D);
+    } else {
+      NewTRC = getCurrentTRC();
+    }
+    
+    ContextStack.push_back(NewTRC);
+    return true;
+  }
+  
+  virtual bool walkToDeclPost(Decl *D) override {
+    assert(ContextStack.size() > 0);
+    ContextStack.pop_back();
+    
+    return true;
   }
 
   /// Builds the type refinement hierarchy for the body of the function.
-  void buildFunctionRefinementContext(AbstractFunctionDecl *D) {
-    if (D->getBodyKind() == AbstractFunctionDecl::BodyKind::None) {
-      return;
-    }
-
-    // We only introduce a nested refinement context for the body if the
-    // function has an availability attribute.
-    if (!hasActiveAvailabilityAttribute(D)) {
-      return;
-    }
-
+  TypeRefinementContext *buildDeclarationRefinementContext(Decl *D) {
     // We require a valid range in order to be able to query for the TRC
     // corresponding to a given SourceLoc.
     assert(D->getSourceRange().isValid());
     
-    // The potential versions in the body are constrained by both
-    // the declared availability of the function and potential versions
+    // The potential versions in the declaration are constrained by both
+    // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    VersionRange BodyVersionRange = TypeChecker::availableRange(D, AC);
-    BodyVersionRange.meetWith(CurTRC->getPotentialVersions());
+    VersionRange DeclVersionRange = TypeChecker::availableRange(D, AC);
+    DeclVersionRange.meetWith(getCurrentTRC()->getPotentialVersions());
     
     TypeRefinementContext *newTRC =
-        TypeRefinementContext::createForDecl(AC, D, CurTRC, BodyVersionRange);
+        TypeRefinementContext::createForDecl(AC, D, getCurrentTRC(),
+                                             DeclVersionRange,
+                                             refinementSourceRangeForDecl(D));
     
-    Stmt *Body = D->getBody();
-    // If there is no body it may be because we will synthesize it and
-    // type check it later.
-    if (Body) {
-      Body->walk(TypeRefinementContextBuilder(newTRC, AC));
+    return newTRC;
+  }
+  
+  /// Returns true if the declaration should introduce a new refinement context.
+  bool declarationIntroducesNewContext(Decl *D) {
+    if (!dyn_cast<ValueDecl>(D)) {
+      return false;
     }
+    
+    // No need to introduce a context if the declaration does not have an
+    // availability attribute.
+    if (!hasActiveAvailabilityAttribute(D)) {
+      return false;
+    }
+    
+    // Only introduce for an AbstractStorageDecl if it is not local.
+    // We introduce for the non-local case because these may
+    // have getters and setters (and these may be synthesized, so they might
+    // not even exist yet).
+    if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
+      if (storageDecl->getDeclContext()->isLocalContext()) {
+        // No need to
+        return false;
+      }
+    }
+    
+    if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
+      return funcDecl->getBodyKind() != AbstractFunctionDecl::BodyKind::None;
+    }
+    
+    return true;
   }
 
+  /// Returns the source range which should be refined by declaration. This
+  /// provides a convenient place to specify the refined range when it is
+  /// different than the declaration's source range.
+  SourceRange refinementSourceRangeForDecl(Decl *D) {
+    if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
+      // Use the declaration's availability for the context when checking
+      // the bodies of its accessors.
+      if (storageDecl->hasAccessorFunctions()) {
+        return SourceRange(storageDecl->getStartLoc(),
+                           storageDecl->getBracesRange().End);
+      }
+    }
+    
+    return D->getSourceRange();
+  }
   bool hasActiveAvailabilityAttribute(Decl *D) {
     for (auto Attr : D->getAttrs())
       if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
@@ -843,14 +892,15 @@ private:
       AC.Diags.diagnose(E->getLoc(),
                         diag::availability_query_required_for_platform,
                         platformString(targetPlatform(AC.LangOpts)));
-      return CurTRC;
+      return getCurrentTRC();
     }
 
     
     VersionRange range = rangeForSpec(Spec);
     E->setAvailableRange(range);
     
-    return TypeRefinementContext::createForIfStmtThen(AC, IS, CurTRC, range);
+    return TypeRefinementContext::createForIfStmtThen(AC, IS, getCurrentTRC(),
+                                                      range);
   }
 
   /// Return the best active spec for the target platform or nullptr if no
@@ -894,24 +944,81 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
   }
 }
 
+/// Climbs the decl context hierarchy, starting from DC, to attempt to find a
+/// declaration context with a valid source location. Returns the location
+/// of the innermost context with a valid location if one is found, and an
+/// invalid location otherwise.
+static SourceLoc bestLocationInDeclContextHierarchy(DeclContext *DC) {
+  DeclContext *Ancestor = DC;
+  while (Ancestor) {
+    SourceLoc Loc;
+    switch (Ancestor->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+      Loc = cast<AbstractClosureExpr>(Ancestor)->getLoc();
+      break;
+
+    case DeclContextKind::TopLevelCodeDecl:
+      Loc = cast<TopLevelCodeDecl>(Ancestor)->getLoc();
+      break;
+
+    case DeclContextKind::AbstractFunctionDecl:
+      Loc = cast<AbstractFunctionDecl>(Ancestor)->getLoc();
+      break;
+
+    case DeclContextKind::NominalTypeDecl:
+      Loc = cast<NominalTypeDecl>(Ancestor)->getLoc();
+      break;
+
+    case DeclContextKind::ExtensionDecl:
+      Loc = cast<ExtensionDecl>(Ancestor)->getLoc();
+      break;
+
+    case DeclContextKind::Initializer:
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+      break;
+    }
+
+    if (Loc.isValid()) {
+      return Loc;
+    }
+    Ancestor = Ancestor->getParent();
+  }
+
+  return SourceLoc();
+}
+
 bool TypeChecker::isDeclAvailable(Decl *D, SourceLoc referenceLoc,
                                   DeclContext *referenceDC,
                                   VersionRange &OutAvailableRange) {
   SourceFile *SF = referenceDC->getParentSourceFile();
   assert(SF);
   
-  TypeRefinementContext *rootTRC = SF->getTypeRefinementContext();
+  SourceLoc lookupLoc;
   
-  TypeRefinementContext *TRC;
   if (referenceLoc.isValid()) {
-    TRC = rootTRC->findMostRefinedSubContext(referenceLoc,
+    lookupLoc = referenceLoc;
+  } else {
+    // For expressions without a valid location (this may be synthesized
+    // code) we conservatively climb up the decl context hierarchy to
+    // find a valid location, if possible. Because we are climbing DeclContexts
+    // we may miss statement or expression level refinement contexts (i.e.,
+    // #os(..)). That is, a reference with an invalid location that is contained
+    // inside a #os() and with no intermediate DeclContext will not be
+    // refined. For now, this is fine -- but if we ever synthesize #os(), this
+    // will be  real problem.
+    lookupLoc = bestLocationInDeclContextHierarchy(referenceDC);
+  }
+  
+  TypeRefinementContext *rootTRC = SF->getTypeRefinementContext();
+  TypeRefinementContext *TRC;
+  
+  if (lookupLoc.isValid()) {
+    TRC = rootTRC->findMostRefinedSubContext(lookupLoc,
                                              Context.SourceMgr);
   } else {
-    // For expressions without a valid location (these may be synthesized
-    // code) we conservatively use the root refinement context. In
-    // the future, we can be more precise here by climbing DeclContexts
-    // until we find a DeclContext with a valid location and looking up
-    // the TRC for that.
+    // If we could not find a valid location, conservatively use the root
+    // refinement context.
     TRC = rootTRC;
   }
   

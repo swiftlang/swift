@@ -236,3 +236,51 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
     super.init(22)
   }
 }
+
+// Properties
+
+class ClassWithUnavailableProperties {
+  @availability(OSX, introduced=10.9)
+  var availableOn10_9Stored: Int = 9
+  
+  @availability(OSX, introduced=10.10)
+  var availableOn10_10Stored : Int = 10
+
+  @availability(OSX, introduced=10.9)
+  var availableOn10_9Computed: Int {
+    get {
+      let _: Int = availableOn10_10Stored // expected-error {{'availableOn10_10Stored' is only available on OS X version 10.10 or greater}}
+      
+      return availableOn10_9Stored
+    }
+    set(newVal) {
+      availableOn10_9Stored = newVal
+    }
+  }
+  
+  @availability(OSX, introduced=10.10)
+  var availableOn10_10Computed: Int {
+    get {
+      return availableOn10_10Stored
+    }
+    set(newVal) {
+      availableOn10_10Stored = newVal
+    }
+  }
+}
+
+func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
+  // Stored properties
+  let _: Int = o.availableOn10_9Stored
+  let _: Int = o.availableOn10_10Stored // expected-error {{'availableOn10_10Stored' is only available on OS X version 10.10 or greater}}
+  
+  o.availableOn10_9Stored = 9
+  o.availableOn10_10Stored = 10 // expected-error {{'availableOn10_10Stored' is only available on OS X version 10.10 or greater}}
+  
+  // Computed Properties
+  let _: Int = o.availableOn10_9Computed
+  let _: Int = o.availableOn10_10Computed // expected-error {{'availableOn10_10Computed' is only available on OS X version 10.10 or greater}}
+  
+  o.availableOn10_9Computed = 9
+  o.availableOn10_10Computed = 10 // expected-error {{'availableOn10_10Computed' is only available on OS X version 10.10 or greater}}
+}

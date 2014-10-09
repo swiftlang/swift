@@ -189,6 +189,63 @@ class ClassWithUnavailableInitializer {
 }
 
 func callUnavailableInitializer() {
-  // 
   ClassWithUnavailableInitializer(5) // expected-error {{'init' is only available on OS X version 10.10 or greater}}
+}
+
+
+// Properties
+
+class ClassWithUnavailableProperties {
+  @availability(OSX, introduced=10.9)
+  var availableOn10_9Stored: Int = 9
+  
+  @availability(OSX, introduced=10.10)
+  var availableOn10_10Stored : Int = 10
+
+  @availability(OSX, introduced=10.9)
+  var availableOn10_9Computed: Int {
+    get {
+      let _: Int = availableOn10_10Stored // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
+      let _: Int = availableOn10_10Stored!
+      
+      return availableOn10_9Stored
+    }
+    set(newVal) {
+      availableOn10_9Stored = newVal
+    }
+  }
+  
+  @availability(OSX, introduced=10.10)
+  var availableOn10_10Computed: Int {
+    get {
+      return availableOn10_10Stored
+    }
+    set(newVal) {
+      availableOn10_10Stored = newVal
+    }
+  }
+}
+
+func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
+  // Stored properties
+  let _: Int = o.availableOn10_9Stored
+  let _: Int = o.availableOn10_10Stored // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int = o.availableOn10_10Stored!
+  
+  o.availableOn10_9Stored = 9
+  
+  // We don't support unavailable optionals as lvals yet.
+  o.availableOn10_10Stored = 10 // expected-error {{cannot assign to 'availableOn10_10Stored' in 'o'}}
+  
+  // Computed Properties
+  let _: Int = o.availableOn10_9Computed
+  let _: Int = o.availableOn10_10Computed // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
+  
+  let _: Int = o.availableOn10_10Computed!
+  
+  o.availableOn10_9Computed = 9
+  
+  // We don't support unavailable optionals as lvals yet.
+  o.availableOn10_10Computed = 10 // expected-error {{cannot assign to 'availableOn10_10Computed' in 'o'}}
 }

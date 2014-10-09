@@ -47,11 +47,12 @@ TypeRefinementContext::createRoot(ASTContext &Ctx, SourceFile *SF,
 TypeRefinementContext *
 TypeRefinementContext::createForDecl(ASTContext &Ctx, Decl *D,
                                      TypeRefinementContext *Parent,
-                                     const VersionRange &Versions) {
+                                     const VersionRange &Versions,
+                                     SourceRange SrcRange) {
   assert(D);
   assert(Parent);
   return new (Ctx)
-      TypeRefinementContext(Ctx, D, Parent, D->getSourceRange(), Versions);
+      TypeRefinementContext(Ctx, D, Parent, SrcRange, Versions);
 }
 
 TypeRefinementContext *

@@ -79,7 +79,8 @@ public:
   /// Create a refinement context for the given declaration.
   static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
                                               TypeRefinementContext *Parent,
-                                              const VersionRange &Versions);
+                                              const VersionRange &Versions,
+                                              SourceRange SrcRange);
   
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *
@@ -105,7 +106,7 @@ public:
   /// refinement context covering an IfStmt Then branch will have the
   /// IfStmt as the introduction node (and its reason as IfStmtThenBranch)
   /// but its source range will cover the Then branch.
-  IntroNode getIntroductionNode() { return Node; }
+  IntroNode getIntroductionNode() const { return Node; }
   
   /// Returns the source range on which this context refines types.
   SourceRange getSourceRange() const { return SrcRange; }

@@ -2027,14 +2027,19 @@ namespace {
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(expr,
                                                 ConstraintLocator::Member));
-      return buildMemberRef(expr->getBase(),
+      Optional<UnavailabilityReason> reason;
+      if (selected.choice.isPotentiallyUnavailable()) {
+        reason = selected.choice.getReasonUnavailable(cs);
+      }
+      return buildUnavailableMemberRef(expr->getBase(),
                             selected.openedFullType,
                             expr->getDotLoc(),
                             selected.choice.getDecl(), expr->getNameLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(),
-                            expr->getAccessSemantics());
+                            expr->getAccessSemantics(),
+                            reason);
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
