@@ -144,6 +144,14 @@ private:
   /// archetypes should map to the equivalent archetype.
   bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
 
+  /// Enumerate the requirements that describe the signature of this
+  /// archetype builder.
+  ///
+  /// \param f A function object that will be passed each requirement
+  /// and requirement source.
+  template<typename F>
+  void enumerateRequirements(F f);
+
 public:
   ArchetypeBuilder(Module &mod, DiagnosticEngine &diags);
 
@@ -347,6 +355,9 @@ class ArchetypeBuilder::PotentialArchetype {
   /// to which this potential archetype belongs.
   PotentialArchetype *Representative;
 
+  /// \brief The source of a same-type requirement.
+  Optional<RequirementSource> SameTypeSource;
+
   /// \brief The superclass of this archetype, if specified.
   Type Superclass;
 
@@ -389,6 +400,9 @@ public:
   /// \brief Retrieve the full display name of this potential archetype.
   std::string getFullName() const;
 
+  /// \brief Retrieve the debug name of this potential archetype.
+  std::string getDebugName() const { return getFullName(); }
+
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
   PotentialArchetype *getParent() const { return Parent; }
@@ -401,6 +415,11 @@ public:
 
   /// Retrieve the superclass of this archetype.
   Type getSuperclass() const { return Superclass; }
+
+  /// Retrieve the requirement source for the superclass requirement.
+  const RequirementSource &getSuperclassSource() const {
+    return *SuperclassSource;
+  } 
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, PotentialArchetype *> &
@@ -416,6 +435,12 @@ public:
   /// path compression on the way.
   PotentialArchetype *getRepresentative();
 
+  /// Retrieve the source of the same-type constraint that applies to this
+  /// potential archetype.
+  const RequirementSource &getSameTypeSource() const {
+    return *SameTypeSource;
+  }
+
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
                                     Identifier *parentName = nullptr);
@@ -423,7 +448,11 @@ public:
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype.
   ArchetypeType::NestedType getType(ArchetypeBuilder &builder);
-  
+
+  /// Retrieve the dependent type that describes this potential
+  /// archetype.
+  Type getDependentType(ArchetypeBuilder &builder);
+
   /// Retrieve the associated type declaration for a given nested type.
   AssociatedTypeDecl *getAssociatedType(Module &mod, Identifier name);
   

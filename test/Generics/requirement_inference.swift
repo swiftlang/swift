@@ -8,6 +8,7 @@ protocol P1 {
 
 protocol P2 : P1 { }
 
+
 struct X1<T : P1> { 
   func getT() -> T { }
 }
@@ -47,22 +48,29 @@ struct InferFromConstructor {
   }
 }
 
+
 // FIXME: Infer superclass requirements.
 
-// FIXME: Infer same-type requirements, which requires us to process
-// the where clause in its entirety.
-
 // ----------------------------------------------------------------------------
-// Redundant requirements
+// Same-type requirements
 // ----------------------------------------------------------------------------
 
-// CHECK-LABEL: .redundant1()@
-// CHECK-NEXT: Archetypes to build:
-// CHECK-NEXT: T : protocol<P2 [explicit @ {{.*}}requirement_inference.swift:[[@LINE+1]]:29], P1 [protocol @ {{.*}}requirement_inference.swift:[[@LINE+1]]:29]>
-func redundant1<T where T : P2, T : P1>() { }
-func redundant2<T where T : P1, T : P2>() { }
-func redundant3<T where T : P2>(x: X5<T>) { }
-func redundant4<T where T : P1>(x: X5<T>) { }
+protocol P3 {
+  typealias P3Assoc : P2
+}
 
-func redundant5<T : X3 where T : X3>() { }
-func redundant6<T : X3>(x: X4<T>) { }
+protocol P4 {
+  typealias P4Assoc : P1
+}
+
+struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
+
+// CHECK-LABEL: .inferSameType1@
+// CHECK-NEXT: Requirements:
+// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:[[@LINE+5]]:26]
+// CHECK-NEXT:   U.P4Assoc == τ_0_0.P3Assoc [inferred @ {{.*}}:[[@LINE+4]]:26]
+// CHECK-NEXT:   T : P3 [inferred @ {{.*}}:[[@LINE+3]]:26]
+// CHECK-NEXT:   T.P3Assoc : P2 [protocol @ {{.*}}:[[@LINE+2]]:26]
+// CHECK-NEXT:   T.P3Assoc : P1 [protocol @ {{.*}}:[[@LINE+1]]:26]
+func inferSameType1<T, U>(x: Model_P3_P4_Eq<T, U>) { }
+

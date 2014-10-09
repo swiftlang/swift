@@ -638,13 +638,6 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     return true;
   }
 
-  // Debugging of the archetype builder.
-  if (Context.LangOpts.DebugGenericSignatures) {
-    func->dumpRef(llvm::errs());
-    llvm::errs() << "\n";
-    builder.dump(llvm::errs());
-  }
-
   // The generic function signature is complete and well-formed. Determine
   // the type of the generic function.
 
@@ -704,6 +697,20 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   }
 
   auto sig = GenericSignature::get(allGenericParams, requirements);
+
+  // Debugging of the archetype builder and generic signature generation.
+  if (Context.LangOpts.DebugGenericSignatures) {
+    func->dumpRef(llvm::errs());
+    llvm::errs() << "\n";
+    builder.dump(llvm::errs());
+    llvm::errs() << "Generic signature: ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Canonical generic signature: ";
+    sig->getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";    
+  }
+
   bool hasSelf = func->getDeclContext()->isTypeContext();
   for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
     Type argTy;

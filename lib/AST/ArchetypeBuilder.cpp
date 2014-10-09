@@ -64,6 +64,70 @@ void RequirementSource::dump(llvm::raw_ostream &out,
   }
 }
 
+/// The identifying information for a generic parameter.
+
+namespace {
+struct GenericTypeParamKey {
+  unsigned Depth : 16;
+  unsigned Index : 16;
+  
+  static GenericTypeParamKey forDecl(GenericTypeParamDecl *d) {
+    return {d->getDepth(), d->getIndex()};
+  }
+  
+  static GenericTypeParamKey forType(GenericTypeParamType *t) {
+    return {t->getDepth(), t->getIndex()};
+  }
+};
+}
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<GenericTypeParamKey> {
+  static inline GenericTypeParamKey getEmptyKey() { return {0xFFFF, 0xFFFF}; }
+  static inline GenericTypeParamKey getTombstoneKey() { return {0xFFFE, 0xFFFE}; }
+  static inline unsigned getHashValue(GenericTypeParamKey k) {
+    return DenseMapInfo<unsigned>::getHashValue(k.Depth << 16 | k.Index);
+  }
+  static bool isEqual(GenericTypeParamKey a, GenericTypeParamKey b) {
+    return a.Depth == b.Depth && a.Index == b.Index;
+  }
+};
+  
+}
+
+struct ArchetypeBuilder::Implementation {
+  /// Callback that produces the array of protocols describing the protocols
+  /// inherited by its argument.
+  std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
+
+  /// Callback that produces the superclass and protocol requirements placed
+  /// on the given generic type parameter.
+  GetConformsToCallback getConformsTo;
+
+  /// Compute the protocol conformance when a given type conforms to the given
+  /// protocol.
+  std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
+    conformsToProtocol;
+
+  /// The list of generic parameters.
+  SmallVector<GenericTypeParamKey, 4> GenericParams;
+
+  /// A mapping from generic parameters to the corresponding potential
+  /// archetypes.
+  DenseMap<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
+
+  /// A vector containing all of the archetypes, expanded out.
+  /// FIXME: This notion should go away, because it's impossible to expand
+  /// out "all" archetypes
+  SmallVector<ArchetypeType *, 4> AllArchetypes;
+
+  /// A vector containing the same-type requirements introduced into the
+  /// system.
+  SmallVector<SameTypeRequirement, 4> SameTypeRequirements;
+};
+
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
   for (auto Nested : NestedTypes) {
     if (Nested.second != this) {
@@ -216,6 +280,26 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   return arch;
 }
 
+Type ArchetypeBuilder::PotentialArchetype::getDependentType(
+       ArchetypeBuilder &builder) {
+  if (Parent) {
+    // FIXME: It would be far better to have an associated type here.
+    Type parentType = Parent->getDependentType(builder);
+    return DependentMemberType::get(parentType, Name, builder.Context);
+  }
+
+  // FIXME: Find the corresponding generic parameter. This is lamely
+  // slow. We could/should stash this somewhere.
+  for (auto param : builder.Impl->GenericParams) {
+    if (builder.Impl->PotentialArchetypes[param] == this) {
+      return GenericTypeParamType::get(param.Depth, param.Index, 
+                                       builder.Context);
+    }
+  }
+
+  llvm_unreachable("this potential archetype doesn't exist?");
+}
+
 AssociatedTypeDecl *
 ArchetypeBuilder::PotentialArchetype::getAssociatedType(Module &mod,
                                                         Identifier name) {
@@ -287,70 +371,6 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
     Nested.second->dump(Out, SrcMgr, Indent + 2);
   }
 }
-
-/// The identifying information for a generic parameter.
-
-namespace {
-struct GenericTypeParamKey {
-  unsigned Depth : 16;
-  unsigned Index : 16;
-  
-  static GenericTypeParamKey forDecl(GenericTypeParamDecl *d) {
-    return {d->getDepth(), d->getIndex()};
-  }
-  
-  static GenericTypeParamKey forType(GenericTypeParamType *t) {
-    return {t->getDepth(), t->getIndex()};
-  }
-};
-}
-
-namespace llvm {
-
-template<>
-struct DenseMapInfo<GenericTypeParamKey> {
-  static inline GenericTypeParamKey getEmptyKey() { return {0xFFFF, 0xFFFF}; }
-  static inline GenericTypeParamKey getTombstoneKey() { return {0xFFFE, 0xFFFE}; }
-  static inline unsigned getHashValue(GenericTypeParamKey k) {
-    return DenseMapInfo<unsigned>::getHashValue(k.Depth << 16 | k.Index);
-  }
-  static bool isEqual(GenericTypeParamKey a, GenericTypeParamKey b) {
-    return a.Depth == b.Depth && a.Index == b.Index;
-  }
-};
-  
-}
-
-struct ArchetypeBuilder::Implementation {
-  /// Callback that produces the array of protocols describing the protocols
-  /// inherited by its argument.
-  std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
-
-  /// Callback that produces the superclass and protocol requirements placed
-  /// on the given generic type parameter.
-  GetConformsToCallback getConformsTo;
-
-  /// Compute the protocol conformance when a given type conforms to the given
-  /// protocol.
-  std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
-    conformsToProtocol;
-
-  /// The list of generic parameters.
-  SmallVector<GenericTypeParamKey, 4> GenericParams;
-
-  /// A mapping from generic parameters to the corresponding potential
-  /// archetypes.
-  DenseMap<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
-
-  /// A vector containing all of the archetypes, expanded out.
-  /// FIXME: This notion should go away, because it's impossible to expand
-  /// out "all" archetypes
-  SmallVector<ArchetypeType *, 4> AllArchetypes;
-
-  /// A vector containing the same-type requirements introduced into the
-  /// system.
-  SmallVector<SameTypeRequirement, 4> SameTypeRequirements;
-};
 
 ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
   : Mod(mod), Context(mod.getASTContext()), Diags(diags),
@@ -725,21 +745,24 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
     assert(!T2->ArchetypeOrConcreteType.dyn_cast<ArchetypeType*>()
            && "already formed archetype for concrete-constrained parameter");
     T2->ArchetypeOrConcreteType = concrete1;
+    T2->SameTypeSource = T1->SameTypeSource;
   } else if (concrete2) {
     assert(!T1->ArchetypeOrConcreteType.dyn_cast<ArchetypeType*>()
            && "already formed archetype for concrete-constrained parameter");
     T1->ArchetypeOrConcreteType = concrete2;
+    T1->SameTypeSource = T2->SameTypeSource;
   }
   
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
+  T2->SameTypeSource = Source;
 
   // Record this same-type requirement.
   Impl->SameTypeRequirements.push_back({ OrigT1, OrigT2 });
 
   // Add all of the protocol conformance requirements of T2 to T1.
-  for (auto Proto : T2->ConformsTo)
-    T1->ConformsTo.insert(Proto);
+  for (auto conforms : T2->ConformsTo)
+    T1->ConformsTo.insert(conforms);
 
   // Recursively merge the associated types of T2 into T1.
   for (auto T2Nested : T2->NestedTypes) {
@@ -800,6 +823,8 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   
   // Record the requirement.
   T->ArchetypeOrConcreteType = Concrete;
+  T->SameTypeSource = Source;
+
   Impl->SameTypeRequirements.push_back({OrigT, Concrete});
   
   // Recursively resolve the associated types to their concrete types.
@@ -1086,16 +1111,96 @@ ArchetypeBuilder::getSameTypeRequirements() const {
   return Impl->SameTypeRequirements;
 }
 
+template<typename F>
+void ArchetypeBuilder::enumerateRequirements(F f) {
+  // Stack containing all of the potential archetypes to visit.
+  SmallVector<PotentialArchetype *, 4> stack;
+  llvm::SmallPtrSet<PotentialArchetype *, 4> visited;
+
+  // Local function that visits a specific archetype.
+  auto visit = [&](PotentialArchetype *archetype) {
+    // If this is not the representative, produce a same-type
+    // constraint to the representative.
+    if (archetype->getRepresentative() != archetype) {
+      f(RequirementKind::SameType, archetype, 
+        archetype->getRepresentative()->getDependentType(*this),
+        archetype->getSameTypeSource());
+      return;
+    }
+
+    // If we have a concrete type, produce a same-type requirement.
+    if (archetype->isConcreteType()) {
+      Type concreteType = archetype->getType(*this).get<Type>();
+      f(RequirementKind::SameType, archetype, concreteType,
+        archetype->getSameTypeSource());
+      return;
+    }
+
+    // If we have a superclass, produce a superclass requirement
+    // (FIXME: Currently described as a conformance requirement)
+    if (Type superclass = archetype->getSuperclass()) {
+      f(RequirementKind::Conformance, archetype, superclass,
+        archetype->getSuperclassSource());
+    }
+
+    // Enumerate conformance requirements.
+    for (const auto &conforms : archetype->getConformsTo()) {
+      f(RequirementKind::Conformance, archetype, 
+        conforms.first->getDeclaredInterfaceType(),
+        conforms.second);
+    }
+
+    // Add nested types.
+    for (const auto &nested : archetype->getNestedTypes()) {
+      if (visited.insert(nested.second))
+        stack.push_back(nested.second);
+    }
+  };
+
+  // Add top-level potential archetypes to the stack.
+  for (const auto &pa : Impl->PotentialArchetypes) {
+    if (visited.insert(pa.second))
+      stack.push_back(pa.second);
+  }
+
+  // Visit all of the potential archetypes.
+  while (!stack.empty()) {
+    PotentialArchetype *pa = stack.back();
+    stack.pop_back();
+    visit(pa);
+  }
+}
+
 void ArchetypeBuilder::dump() {
   dump(llvm::errs());
 }
 
 void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
-  llvm::errs() << "Archetypes to build:\n";
-  for (const auto &PA : Impl->PotentialArchetypes) {
-    if (PA.second->isPrimary())
-      PA.second->dump(out, &Context.SourceMgr, 2);
-  }
+  out << "Requirements:";
+  enumerateRequirements([&](RequirementKind kind, 
+                            PotentialArchetype *archetype,
+                            Type type,
+                            RequirementSource source) {
+    out << "\n  ";
+    switch (kind) {
+    case RequirementKind::Conformance:
+      out << archetype->getDebugName() << " : " 
+          << type.getString() << " [";
+      source.dump(out, &Context.SourceMgr);
+      out << "]";
+      break;
+
+    case RequirementKind::SameType:
+      out << archetype->getDebugName() << " == " << type.getString() << " [";
+      source.dump(out, &Context.SourceMgr);
+      out << "]";
+      break;
+
+    case RequirementKind::WitnessMarker:
+      break;
+    }
+  });
+  out << "\n";
 }
 
 Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type) {
