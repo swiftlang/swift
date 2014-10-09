@@ -302,10 +302,6 @@ public:
   /// Generate IR for the SIL Function.
   void emitSILFunction();
 
-  bool isAvailableExternally() const {
-    return swift::isAvailableExternally(CurSILFn->getLinkage());
-  }
-
   void setLoweredValue(SILValue v, LoweredValue &&lv) {
     auto inserted = LoweredValues.insert({v, std::move(lv)});
     assert(inserted.second && "already had lowered value for sil value?!");
@@ -510,7 +506,7 @@ public:
                                     DebugTypeInfo Ty,
                                     SILDebugScope *DS,
                                     StringRef Name) {
-    if (!IGM.DebugInfo || isAvailableExternally()) return;
+    if (!IGM.DebugInfo) return;
     auto N = ArgNo.find(cast<VarDecl>(Ty.getDecl()));
     if (N != ArgNo.end()) {
       if (DidEmitDebugInfoForArg[N->second])
@@ -586,7 +582,7 @@ public:
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
   void visitDebugValueInst(DebugValueInst *i) {
-    if (!IGM.DebugInfo || isAvailableExternally()) return;
+    if (!IGM.DebugInfo) return;
     VarDecl *Decl = i->getDecl();
     if (!Decl) return;
     StringRef Name = Decl->getNameStr();
@@ -600,7 +596,7 @@ public:
                                  i->getDebugScope(), Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
-    if (!IGM.DebugInfo || isAvailableExternally()) return;
+    if (!IGM.DebugInfo) return;
     VarDecl *Decl = i->getDecl();
     if (!Decl) return;
     StringRef Name = Decl->getName().str();
@@ -1263,7 +1259,7 @@ getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   assert(BB->pred_empty());
-  if (!IGM.DebugInfo || isAvailableExternally())
+  if (!IGM.DebugInfo)
     return;
 
   // This is the prologue of a function. Emit debug info for all
@@ -2667,7 +2663,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   auto addr = type.allocateStack(*this,
                                  i->getElementType(),
                                  dbgname);
-  if (IGM.DebugInfo && Decl && !isAvailableExternally()) {
+  if (IGM.DebugInfo && Decl) {
     // Discard any inout or lvalue qualifiers. Since the object itself
     // is stored in the alloca, emitting it as a reference type would
     // be wrong.
@@ -2747,7 +2743,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   setLoweredExplosion(SILValue(i, 0), box);
   setLoweredAddress(SILValue(i, 1), addr.getAddress());
 
-  if (IGM.DebugInfo && Decl && !isAvailableExternally()) {
+  if (IGM.DebugInfo && Decl) {
     auto Indirection = IndirectValue;
     // LValues are implicitly indirect because of their type.
     if (Decl->getType()->getKind() == TypeKind::LValue)
