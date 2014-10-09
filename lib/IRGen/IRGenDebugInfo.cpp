@@ -437,7 +437,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
   LastScope = DS;
 
   llvm::MDNode *InlinedAt = nullptr;
-  if (DS && DS->InlinedCallSite) {
+  if (DS->InlinedCallSite) {
     assert(Scope && "Inlined location without a lexical scope");
     InlinedAt = createInlinedAt(DS);
   }
