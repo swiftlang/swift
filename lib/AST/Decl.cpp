@@ -565,15 +565,13 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
   // Add all of the same-type requirements.
   if (Builder) {
     for (auto req : Builder->getSameTypeRequirements()) {
-      auto firstType = resolvePotentialArchetypeToType(*Builder, genericParams,
-                                                       req.first);
+      auto firstType = req.first->getDependentType(*Builder);
       Type secondType;
       if (auto concrete = req.second.dyn_cast<Type>())
         secondType = concrete;
       else if (auto secondPA =
                req.second.dyn_cast<ArchetypeBuilder::PotentialArchetype*>())
-        secondType = resolvePotentialArchetypeToType(*Builder, genericParams,
-                                                     secondPA);
+        secondType = secondPA->getDependentType(*Builder);
       requirements.push_back(Requirement(RequirementKind::SameType,
                                          firstType, secondType));
     }

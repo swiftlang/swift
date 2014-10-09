@@ -509,14 +509,12 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
   // Add all of the same-type requirements.
   for (auto req : builder.getSameTypeRequirements()) {
-    auto firstType = resolvePotentialArchetypeToType(builder, params,
-                                                     req.first);
+    auto firstType = req.first->getDependentType(builder);
     Type secondType;
     if (auto concrete = req.second.dyn_cast<Type>())
       secondType = concrete;
     else if (auto secondPA = req.second.dyn_cast<PotentialArchetype*>())
-      secondType = resolvePotentialArchetypeToType(builder, params,
-                                                   secondPA);
+      secondType = secondPA->getDependentType(builder);
     requirements.push_back(Requirement(RequirementKind::SameType,
                                        firstType, secondType));
   }
