@@ -3,14 +3,21 @@
 // Array types.
 class Base1 {
   func f0(x: [Int]) { }
+  func f0a(x: [Int]?) { }
   func f1(x: [[Int]]) { }
+  func f1a(x: [[Int]]?) { }
   func f2(x: [[Int] -> [Int]]) { }
+  // FIXME: shouldn't require parens
+  func f2a(x: [([Int]?) -> [Int]?]?) { }
 }
 
 class Derived1 : Base1 {
   override func f0(x: Array<Int>) { }
+  override func f0a(x: Optional<Array<Int>>) { }
   override func f1(x: Array<Array<Int>>) { }
+  override func f1a(x: Optional<Array<Array<Int>>>) { }
   override func f2(x: Array<Array<Int> -> Array<Int>>) { }
+  override func f2a(x: Optional<Array<Optional<Array<Int>> -> Optional<Array<Int>>>>) { }
 }
 
 

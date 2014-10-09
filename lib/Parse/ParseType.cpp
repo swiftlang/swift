@@ -134,73 +134,6 @@ ParserResult<TypeRepr> Parser::parseType() {
   return parseType(diag::expected_type);
 }
 
-/// Determine whether this type representation has a multi-dimensional
-/// array with an possibly-implicitly-unwrapped optional somewhere
-/// between or after the dimensions, with no parentheses. If so,
-/// diagnose it, because this is confusing.
-static bool checkMultidimensionalArrayThroughOptionals(Parser &parser,
-                                                       TypeRepr *tyR) {
-  if (!tyR)
-    return false;
-
-  TypeRepr *firstArrayRepr = nullptr;
-  TypeRepr *secondArrayRepr = nullptr;
-  SourceLoc optionalLoc;
-  
-  // Local function that records that we've seen an optional. It
-  // returns true if we've detected a problem.
-  auto recordOptional = [&](SourceLoc loc) {
-    if (optionalLoc.isInvalid()) {
-      optionalLoc = loc;
-
-      // If both arrays came before the optional, forget the earlier
-      // one.
-      if (secondArrayRepr) {
-        firstArrayRepr = secondArrayRepr;
-        secondArrayRepr = nullptr;
-      }
-    }
-  };
-
-  while (true) {
-    // Track first and second array representations.
-    if (auto array = dyn_cast<ArrayTypeRepr>(tyR)) {
-      if (!firstArrayRepr) {
-        firstArrayRepr = array;
-      } else {
-        if (!secondArrayRepr)
-          secondArrayRepr = array;
-
-        if (optionalLoc.isValid())
-          break;
-      }
-
-      tyR = array->getBase();
-      continue;
-    }
-
-    if (auto optional = dyn_cast<OptionalTypeRepr>(tyR)) {
-      recordOptional(optional->getQuestionLoc());
-      tyR = optional->getBase();
-      continue;
-    }
-
-    if (auto implicitOpt = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(tyR)) {
-      recordOptional(implicitOpt->getExclamationLoc());
-      tyR = implicitOpt->getBase();
-      continue;
-    }
-
-    // Anything else breaks the chain.
-    return false;
-  };
-
-  parser.diagnose(optionalLoc, diag::multidimensional_array_optional)
-    .highlight(firstArrayRepr->getSourceRange())
-    .highlight(secondArrayRepr->getSourceRange());
-  return true;
-}
-
 /// parseType
 ///   type:
 ///     attribute-list type-function
@@ -254,8 +187,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     } else {
       break;
     }
-
-    checkMultidimensionalArrayThroughOptionals(*this, ty.getPtrOrNull());
   }
 
   if (ty.isNonNull() && !ty.hasCodeCompletion()) {

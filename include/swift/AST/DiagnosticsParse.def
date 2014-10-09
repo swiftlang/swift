@@ -583,11 +583,6 @@ ERROR(expected_langle_protocol,type_parsing,PointsToFirstBadToken,
 ERROR(expected_rangle_protocol,type_parsing,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
 
-// Optional Types
-ERROR(multidimensional_array_optional,type_parsing,none,
-      "multi-dimensional arrays involving optional types require parentheses",
-      ())
-
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
 //------------------------------------------------------------------------------
