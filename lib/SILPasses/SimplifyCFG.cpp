@@ -963,9 +963,6 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                                                         SILValue(),
                                                         SwappedCases);
         
-        SEI->dump();
-        NewSEI->dump();
-   
         // We only change the condition to be NewEITI instead of all uses since
         // EITI may have other uses besides this one that need to be updated.
         BI->setCondition(NewSEI);
