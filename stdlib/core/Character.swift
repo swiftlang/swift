@@ -34,9 +34,9 @@ public struct Character :
   //
   // If the grapheme cluster can be represented as Small, it
   // should be represented as such.
-  enum Representation {
-  case Large(_StringBuffer._Storage)
-  case Small(Builtin.Int63)
+  internal enum Representation {
+    case Large(_StringBuffer._Storage)
+    case Small(Builtin.Int63)
   }
 
   /// Construct a `Character` containing just the given `scalar`.
