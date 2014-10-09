@@ -241,7 +241,9 @@ bb3:
 // CHECK: retain_value [[INPUT]]
 sil @test9_enums : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
-  %1 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional, #FakeOptional.Some!enumelt
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %1 = select_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt: %t, default %f : $Builtin.Int1
   cond_br %1, bb1, bb2
 
 bb1:

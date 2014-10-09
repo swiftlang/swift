@@ -474,23 +474,30 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
   return true;
 }
 
-/// Sink retain_value, release_value before enum_is_tag to be retain_value,
+/// Sink retain_value, release_value before select_enum to be retain_value,
 /// release_value on the payload of the switch_enum in the destination BBs. We
 /// only do this if the destination BBs have only the switch enum as its
 /// predecessor.
-static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
-                                             SILBasicBlock::iterator I,
-                                             AliasAnalysis *AA) {
+static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
+                                              SILBasicBlock::iterator I,
+                                              AliasAnalysis *AA) {
   // If this instruction is not a retain_value, there is nothing left for us to
   // do... bail...
   if (!isa<RetainValueInst>(I))
     return false;
 
-  // Make sure the condition comes from an enum_is_tag
-  auto *EITI = dyn_cast<EnumIsTagInst>(CondBr->getCondition());
-  if (!EITI)
+  // Make sure the condition comes from a select_enum
+  auto *SEI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
+  if (!SEI)
     return false;
 
+  // Try to find a single literal "true" case.
+  // TODO: More general conditions in which we can relate the BB to a single
+  // case, such as when there's a single literal "false" case.
+  EnumElementDecl *TrueElement = SEI->getSingleTrueElement();
+  if (!TrueElement)
+    return false;
+  
   // Next go over all instructions after I in the basic block. If none of them
   // can decrement our ptr value, we can move the retain over the ref count
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
@@ -505,14 +512,14 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
 
   // If the retain value's argument is not the cond_br's argument, we can't do
   // anything with our simplistic analysis... bail...
-  if (Ptr != EITI->getOperand())
+  if (Ptr != SEI->getEnumOperand())
     return false;
-
+  
   // Work out which enum element is the true branch, and which is false.
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
-  EnumElementDecl *Elts[2] = {EITI->getElement(), nullptr};
-  EnumDecl *E = EITI->getOperand().getType().getEnumOrBoundGenericEnum();
+  EnumElementDecl *Elts[2] = {TrueElement, nullptr};
+  EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
   if (!E)
     return false;
 
@@ -520,7 +527,7 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
   EnumElementDecl *OtherElt = nullptr;
   for (EnumElementDecl *Elt : E->getAllElements()) {
     // Skip the case where we find the enum_is_tag element
-    if (Elt == EITI->getElement())
+    if (Elt == TrueElement)
       continue;
     // If we find another element, then we must have more than 2, so bail.
     if (OtherElt)
@@ -534,7 +541,7 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
 
   Elts[1] = OtherElt;
 
-  SILBuilder Builder(EITI);
+  SILBuilder Builder(SEI);
 
   // Ok, we have a ref count instruction, sink it!
   for (unsigned i = 0; i != 2; ++i) {
@@ -568,7 +575,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
     // enum_is_tag, we may be able to sink anyways. So we do not return on a
     // failure case.
     if (auto *CondBr = dyn_cast<CondBranchInst>(T))
-      if (tryToSinkRefCountAcrossEnumIsTag(CondBr, I, AA))
+      if (tryToSinkRefCountAcrossSelectEnum(CondBr, I, AA))
         return true;
   }
 
@@ -736,7 +743,7 @@ public:
   bool sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
                                         RCIdentityAnalysis *RCIA);
   void handlePredSwitchEnum(SwitchEnumInst *S);
-  void handlePredCondEnumIsTag(CondBranchInst *CondBr);
+  void handlePredCondSelectEnum(CondBranchInst *CondBr);
 
   /// Helper method which initializes this state map with the data from the
   /// first predecessor BB.
@@ -824,10 +831,14 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(SwitchEnumInst *S) {
                    "the switch_enum.");
 }
 
-void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
+void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
 
-  EnumIsTagInst *EITI = dyn_cast<EnumIsTagInst>(CondBr->getCondition());
+  SelectEnumInst *EITI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
   if (!EITI)
+    return;
+  
+  auto TrueElement = EITI->getSingleTrueElement();
+  if (!TrueElement)
     return;
 
   // Find the tag associated with our BB and set the state of the
@@ -835,9 +846,9 @@ void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
   // covering switches for enums that have cases without payload.
 
   // Check if we are the true case, ie, we know that we are the given tag.
-  const auto &Operand = EITI->getOperand();
+  const auto &Operand = EITI->getEnumOperand();
   if (CondBr->getTrueBB() == getBB()) {
-    ValueToCaseMap[Operand] = EITI->getElement();
+    ValueToCaseMap[Operand] = TrueElement;
     return;
   }
 
@@ -848,7 +859,7 @@ void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
     EnumElementDecl *OtherElt = nullptr;
     for (EnumElementDecl *Elt : E->getAllElements()) {
       // Skip the case where we find the enum_is_tag element
-      if (Elt == EITI->getElement())
+      if (Elt == TrueElement)
         continue;
       // If we find another element, then we must have more than 2, so bail.
       if (OtherElt)
@@ -911,7 +922,7 @@ mergeSinglePredTermInfoIntoState(BBToDataflowStateMap &BBToStateMap,
   if (!CondBr)
     return;
 
-  handlePredCondEnumIsTag(CondBr);
+  handlePredCondSelectEnum(CondBr);
 }
 
 void

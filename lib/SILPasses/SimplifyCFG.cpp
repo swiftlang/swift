@@ -214,30 +214,35 @@ getOtherElementOfTwoElementEnum(EnumDecl *E, EnumElementDecl *Element) {
   return OtherElt;
 }
 
-/// If PredTerm is a (cond_br (enum_is_tag)) or a (switch_enum), return the decl
+/// If PredTerm is a (cond_br (select_enum)) or a (switch_enum), return the decl
 /// that will yield DomBB.
 static EnumElementDecl *
 getEnumEltTaken(TermInst *PredTerm, SILBasicBlock *DomBB) {
-  // First check if we have a (cond_br (enum_is_tag)).
+  // First check if we have a (cond_br (select_enum)).
   if (auto *CBI = dyn_cast<CondBranchInst>(PredTerm)) {
-    auto *EITI = dyn_cast<EnumIsTagInst>(CBI->getCondition());
-    if (!EITI)
+    auto *SEI = dyn_cast<SelectEnumInst>(CBI->getCondition());
+    if (!SEI)
       return nullptr;
 
-    EnumElementDecl *Element = EITI->getElement();
+    // Try to find a single literal "true" case.
+    // TODO: More general conditions in which we can relate the BB to a single
+    // case, such as when there's a single literal "false" case.
+    EnumElementDecl *TrueElement = SEI->getSingleTrueElement();
+    if (!TrueElement)
+      return nullptr;
 
     // If DomBB is the taken branch, we know that the EnumElementDecl is the one
     // checked for by enum is tag. Return it.
     if (getBranchTaken(CBI, DomBB)) {
-      return Element;
+      return TrueElement;
     }
 
     // Ok, DomBB is not the taken branch. If we have an enum with only two
     // cases, we can still infer the other case for the current branch.
-    EnumDecl *E = EITI->getOperand().getType().getEnumOrBoundGenericEnum();
+    EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
 
     // This will return nullptr if we have more than two cases in our decl.
-    return getOtherElementOfTwoElementEnum(E, Element);
+    return getOtherElementOfTwoElementEnum(E, TrueElement);
   }
 
   auto *SWEI = dyn_cast<SwitchEnumInst>(PredTerm);
@@ -263,12 +268,12 @@ static bool areEquivalentConditions(SILValue C1, SILValue C2) {
   if (C1 == C2)
     return true;
 
-  if (auto *EITI1 = dyn_cast<EnumIsTagInst>(C1)) {
-    if (auto *EITI2 = dyn_cast<EnumIsTagInst>(C2)) {
+  if (auto *EITI1 = dyn_cast<SelectEnumInst>(C1)) {
+    if (auto *EITI2 = dyn_cast<SelectEnumInst>(C2)) {
       // Strip off casts for our comparison since casts do not change the
       // underlying enum value.
-      SILValue Op1 = EITI1->getOperand().stripCasts();
-      SILValue Op2 = EITI2->getOperand().stripCasts();
+      SILValue Op1 = EITI1->getEnumOperand().stripCasts();
+      SILValue Op2 = EITI2->getEnumOperand().stripCasts();
       return Op1 == Op2;
     }
   }
@@ -319,10 +324,12 @@ static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
       auto *CBI = cast<CondBranchInst>(Term);
 
       // If this CBI has an 
-      if (auto *EITI = dyn_cast<EnumIsTagInst>(CBI->getCondition())) {
-        if (EnumElementDecl *Element = getEnumEltTaken(PredTerm, DomBB)) {
-          simplifyCondBranchInst(CBI, Element == EITI->getElement());
-          return true;
+      if (auto *SEI = dyn_cast<SelectEnumInst>(CBI->getCondition())) {
+        if (auto TrueElement = SEI->getSingleTrueElement()) {
+          if (EnumElementDecl *Element = getEnumEltTaken(PredTerm, DomBB)) {
+            simplifyCondBranchInst(CBI, Element == TrueElement);
+            return true;
+          }
         }
       }
 
@@ -434,7 +441,7 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
 
   for (auto UI : BBArg->getUses()) {
     auto *User = UI->getUser();
-    if (isa<SwitchEnumInst>(User) || isa<EnumIsTagInst>(User))
+    if (isa<SwitchEnumInst>(User) || isa<SelectEnumInst>(User))
       return true;
   }
   return false;
@@ -913,29 +920,55 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     }
   }
 
-  // If we have an (cond (enum_is_tag)) on a two element enum, always have the
+  // If we have a (cond (select_enum)) on a two element enum, always have the
   // first case as our checked tag. If we have the second, create a new
   // enum_is_tag with the first case and swap our operands. This simplifies
   // later dominance based processing.
-  if (auto *EITI = dyn_cast<EnumIsTagInst>(BI->getCondition())) {
-    EnumDecl *E = EITI->getOperand().getType().getEnumOrBoundGenericEnum();
+  if (auto *SEI = dyn_cast<SelectEnumInst>(BI->getCondition())) {
+    EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
 
     auto AllElts = E->getAllElements();
     auto Iter = AllElts.begin();
     EnumElementDecl *FirstElt = *Iter;
 
-    if (EITI->getElement() != FirstElt) {
+    if (SEI->getNumCases() >= 1
+        && SEI->getCase(0).first != FirstElt) {
       ++Iter;
+
       if (Iter != AllElts.end() &&
           std::next(Iter) == AllElts.end() &&
-          *Iter == EITI->getElement()) {
-        auto *NewEITI = SILBuilder(EITI).createEnumIsTag(EITI->getLoc(),
-                                                         EITI->getOperand(),
-                                                         FirstElt,
-                                                         EITI->getType());
+          *Iter == SEI->getCase(0).first) {
+        EnumElementDecl *SecondElt = *Iter;
+        
+        SILValue FirstValue;
+        // SelectEnum must be exhaustive, so the second case must be handled
+        // either by a case or the default.
+        if (SEI->getNumCases() >= 2) {
+          assert(FirstElt == SEI->getCase(1).first
+                 && "select_enum missing a case?!");
+          FirstValue = SEI->getCase(1).second;
+        } else {
+          FirstValue = SEI->getDefaultResult();
+        }
+        
+        
+        std::pair<EnumElementDecl*, SILValue> SwappedCases[2] = {
+          {FirstElt, SEI->getCase(0).second},
+          {SecondElt, FirstValue},
+        };
+        
+        auto *NewSEI = SILBuilder(SEI).createSelectEnum(SEI->getLoc(),
+                                                        SEI->getEnumOperand(),
+                                                        SEI->getType(),
+                                                        SILValue(),
+                                                        SwappedCases);
+        
+        SEI->dump();
+        NewSEI->dump();
+   
         // We only change the condition to be NewEITI instead of all uses since
         // EITI may have other uses besides this one that need to be updated.
-        BI->setCondition(NewEITI);
+        BI->setCondition(NewSEI);
         BI->swapSuccessors();
         addToWorklist(BI->getParent());
         addToWorklist(TrueSide);
@@ -1294,11 +1327,13 @@ static SILValue getInsertedValue(SILInstruction *Aggregate,
 }
 
 /// Given a boolean argument, see if its it ultimately matching whether
-/// a given enum is of a given tag.  If so, create a new enum_is_tag instruction
+/// a given enum is of a given tag.  If so, create a new select_enum instruction
 /// to do the match.
-bool simplifySwitchEnumToEnumIsTag(SILBasicBlock *BB,
-                                   unsigned ArgNum,
-                                   SILArgument* BoolArg) {
+/// TODO: Generalize this to simplify arbitrary simple switch_enum diamonds into
+/// select_enums.
+bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB,
+                                    unsigned ArgNum,
+                                    SILArgument* BoolArg) {
   auto IntTy = BoolArg->getType().getAs<BuiltinIntegerType>();
   if (!IntTy->isFixedWidth(1))
     return false;
@@ -1353,31 +1388,45 @@ bool simplifySwitchEnumToEnumIsTag(SILBasicBlock *BB,
   if (SWI->getNumCases() != (TrueBBs.size() + FalseBBs.size()))
     return false;
 
+  SILBasicBlock *TrueBB;
   if (TrueBBs.size() == 1) {
-    // Only a single BB has a true value.  We can create enum_is_addr for this
-    // single case.
-    SILBasicBlock *TrueBB = TrueBBs[0];
-    EnumElementDecl* Elt = nullptr;
-    for (unsigned i = 0, e = SWI->getNumCases(); i != e; ++i) {
-      std::pair<EnumElementDecl*, SILBasicBlock*> Pair = SWI->getCase(i);
-      if (Pair.second == TrueBB) {
-        if (Elt) {
-          // A case already jumped to this BB.  We need to bail out as multiple
-          // cases are true.
-          return false;
-        }
-        Elt = Pair.first;
-      }
-    }
-    EnumIsTagInst *EITI = SILBuilder(SWI).createEnumIsTag(SWI->getLoc(),
-                                                          SWI->getOperand(),
-                                                          Elt,
-                                                          BoolArg->getType());
-    BoolArg->replaceAllUsesWith(EITI);
-    return true;
+    TrueBB = TrueBBs[0];
+  } else {
+    return false;
   }
-  // TODO: Handle single false BB case.  Here we need to xor the enum_is_tag.
-  return false;
+
+  // Only a single BB has a true value.  We can create select_enum for this
+  // single case.
+  
+  SILBuilder B(SWI);
+  
+  auto TrueDef = B.createIntegerLiteral(SWI->getLoc(),
+                                        BoolArg->getType(),
+                                        1);
+  auto FalseDef = B.createIntegerLiteral(SWI->getLoc(),
+                                         BoolArg->getType(),
+                                         0);
+  
+  EnumElementDecl* Elt = nullptr;
+  for (unsigned i = 0, e = SWI->getNumCases(); i != e; ++i) {
+    std::pair<EnumElementDecl*, SILBasicBlock*> Pair = SWI->getCase(i);
+    if (Pair.second == TrueBB) {
+      if (Elt) {
+        // A case already jumped to this BB.  We need to bail out as multiple
+        // cases are true.
+        return false;
+      }
+      Elt = Pair.first;
+    }
+  }
+  auto SelectCase = std::make_pair(Elt, SILValue(TrueDef));
+  auto SelectInst = B.createSelectEnum(SWI->getLoc(),
+                                       SWI->getOperand(),
+                                       BoolArg->getType(),
+                                       FalseDef,
+                                       SelectCase);
+  BoolArg->replaceAllUsesWith(SelectInst);
+  return true;
 }
 
 // Attempt to simplify the ith argument of BB.  We simplify cases
@@ -1391,7 +1440,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // a switch_enum.  If so, we may be able to lower this sequence to
   // en enum_is_tag
   if (A->getType().is<BuiltinIntegerType>())
-    return simplifySwitchEnumToEnumIsTag(BB, i, A);
+    return simplifySwitchEnumToSelectEnum(BB, i, A);
 
   // For now, just focus on cases where there is a single use.
   if (!A->hasOneUse())

@@ -201,6 +201,7 @@ public:
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
   SILInstruction *visitEnumIsTagInst(EnumIsTagInst *EIT);
+  SILInstruction *visitSelectEnumInst(SelectEnumInst *EIT);
   SILInstruction *visitStructExtractInst(StructExtractInst *SEI);
   SILInstruction *visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);

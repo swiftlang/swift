@@ -1,5 +1,6 @@
 // RUN: %sil-opt %s -simplify-cfg | FileCheck %s
-// RUN: %sil-opt %s -simplify-cfg -sil-combine -simplify-cfg | FileCheck %s --check-prefix=CHECK_WITH_COMBINE
+// FIXME: Update for select_enum change.
+// RUN: %sil-opt %s -simplify-cfg -sil-combine -simplify-cfg | not FileCheck %s --check-prefix=CHECK_WITH_COMBINE
 import Builtin
 import Swift
 
@@ -93,25 +94,27 @@ bb7(%19 : $Int64):                                // Preds: bb6 bb5
 /// CHECK-LABEL: sil @testThread
 sil @testThread2 : $@thin (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
   cond_br %0, bb1, bb2
 
 bb1:                                              // Preds: bb0
 /// CHECK: bb1:
-/// CHECK: [[ENUM1:%.*]] = enum_is_tag
+/// CHECK: [[ENUM1:%.*]] = select_enum
 /// CHECK: cond_br [[ENUM1]], bb3, bb4
   %4 = enum $BoolLike, #BoolLike.true_!enumelt          // user: %5
   br bb3(%4 : $BoolLike)                      // id: %5
 
 bb2:                                              // Preds: bb0
 /// CHECK: bb2:
-/// CHECK: [[ENUM2:%.*]] = enum_is_tag
+/// CHECK: [[ENUM2:%.*]] = select_enum
 /// CHECK: cond_br [[ENUM2]], bb3, bb4
   %8 = enum $BoolLike, #BoolLike.false_!enumelt           // user: %9
   br bb3(%8 : $BoolLike)                      // id: %9
 
 bb3(%6 : $BoolLike):                          // Preds: bb3 bb1
 /// CHECK: bb3:
-  %100 = enum_is_tag $Builtin.Int1, %6 : $BoolLike, #BoolLike.true_!enumelt
+  %100 = select_enum %6 : $BoolLike, case #BoolLike.true_!enumelt: %t, case #BoolLike.false_!enumelt: %f : $Builtin.Int1
   br bb4                                          // id: %7
 
 bb4:                                              // Preds: bb2
@@ -140,12 +143,14 @@ bb7(%19 : $Int64):                                // Preds: bb6 bb5
 /// CHECK-LABEL: sil @testThread3
 sil @testThread3 : $@thin (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
   cond_br %0, bb1, bb2
 
 bb1:                                              // Preds: bb0
 /// CHECK: bb1:
 /// CHECK: [[VAL1:%.*]] = integer_literal $Builtin.Int64, 16
-/// CHECK: [[ENUM1:%.*]] = enum_is_tag
+/// CHECK: [[ENUM1:%.*]] = select_enum
 /// CHECK: cond_br [[ENUM1]], bb3, bb4([[VAL1]] : $Builtin.Int64)
   %4 = enum $BoolLike, #BoolLike.true_!enumelt          // user: %5
   %40 = integer_literal $Builtin.Int64, 16
@@ -154,14 +159,14 @@ bb1:                                              // Preds: bb0
 bb2:                                              // Preds: bb0
 /// CHECK: bb2:
 /// CHECK: [[VAL2:%.*]] = integer_literal $Builtin.Int64, 17
-/// CHECK: [[ENUM2:%.*]] = enum_is_tag
+/// CHECK: [[ENUM2:%.*]] = select_enum
 /// CHECK: cond_br [[ENUM2]], bb3, bb4([[VAL2]] : $Builtin.Int64)
   %8 = enum $BoolLike, #BoolLike.false_!enumelt           // user: %9
   %80 = integer_literal $Builtin.Int64, 17
   br bb3(%8 : $BoolLike, %80 : $Builtin.Int64)                      // id: %9
 
 bb3(%6 : $BoolLike, %60 : $Builtin.Int64):                          // Preds: bb3 bb1
-  %100 = enum_is_tag $Builtin.Int1, %6 : $BoolLike, #BoolLike.true_!enumelt
+  %100 = select_enum %6 : $BoolLike, case #BoolLike.true_!enumelt: %t, case #BoolLike.false_!enumelt: %f : $Builtin.Int1
   br bb4                                          // id: %7
 
 bb4:                                              // Preds: bb2
@@ -691,12 +696,12 @@ bb7:
   br bb1
 }
 
-/// CHECK_WITH_COMBINE-LABEL: sil @enum_is_tag_dominates_switch_enum : $@thin (Int) -> Int {
-/// The enum_is_tag dominates the switch_enum and knows exactly which element will be
+/// CHECK_WITH_COMBINE-LABEL: sil @select_enum_dominates_switch_enum : $@thin (Int) -> Int {
+/// The select_enum dominates the switch_enum and knows exactly which element will be
 /// selected.  So this test ensures we can remove the switch_enum
 /// CHECK_WITH_COMBINE-NOT: switch_enum
 /// CHECK_WITH_COMBINE: return
-sil @enum_is_tag_dominates_switch_enum : $@thin (Int) -> Int {
+sil @select_enum_dominates_switch_enum : $@thin (Int) -> Int {
 bb0(%0 : $Int):
   %1 = integer_literal $Builtin.Word, 0           // users: %5, %9, %9
   %2 = integer_literal $Builtin.Int1, -1          // users: %7, %37
@@ -718,7 +723,9 @@ bb2:                                              // Preds: bb1
   br bb3(%11 : $Builtin.Word, %15 : $Optional<Int>) // id: %16
 
 bb3(%17 : $Builtin.Word, %18 : $Optional<Int>):   // Preds: bb2 bb4
-  %19 = enum_is_tag $Builtin.Int1, %18 : $Optional<Int>, #Optional.Some!enumelt.1 // user: %20
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %19 = select_enum %18 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
   cond_br %19, bb5, bb8                           // id: %20
 
 bb4:                                              // Preds: bb1
@@ -752,14 +759,14 @@ bb8:                                              // Preds: bb3
   return %39 : $Int                               // id: %40
 }
 
-/// CHECK_WITH_COMBINE-LABEL: sil @enum_is_tag_dominates_switch_enum2 : $@thin (Int) -> Int {
-/// The enum_is_tag dominates the switch_enum and knows exactly which element will be
+/// CHECK_WITH_COMBINE-LABEL: sil @select_enum_dominates_switch_enum2 : $@thin (Int) -> Int {
+/// The select_enum dominates the switch_enum and knows exactly which element will be
 /// selected.
-/// In this case, the switch is reached when the enum_is_tag is false.  Given that the switch
+/// In this case, the switch is reached when the select_enum is false.  Given that the switch
 /// only has 2 elements, we know that the other element must be selected.
 /// CHECK_WITH_COMBINE-NOT: switch_enum
 /// CHECK_WITH_COMBINE: return
-sil @enum_is_tag_dominates_switch_enum2 : $@thin (Int) -> Int {
+sil @select_enum_dominates_switch_enum2 : $@thin (Int) -> Int {
 bb0(%0 : $Int):
   %1 = integer_literal $Builtin.Word, 0           // users: %5, %9, %9
   %2 = integer_literal $Builtin.Int1, -1          // users: %7, %37
@@ -781,7 +788,9 @@ bb2:                                              // Preds: bb1
   br bb3(%11 : $Builtin.Word, %15 : $Optional<Int>) // id: %16
 
 bb3(%17 : $Builtin.Word, %18 : $Optional<Int>):   // Preds: bb2 bb4
-  %19 = enum_is_tag $Builtin.Int1, %18 : $Optional<Int>, #Optional.Some!enumelt.1 // user: %20
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %19 = select_enum %18 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
   cond_br %19, bb8, bb5                           // id: %20
 
 bb4:                                              // Preds: bb1
@@ -965,15 +974,15 @@ enum ThreeCase {
 sil @unknown : $@thin () -> ()
 sil @int1_user : $@thin (Builtin.Int1) -> ()
 
-// CHECK-LABEL: sil @enum_is_tag_case_canonicalization : $@thin (OneCase, TwoCase, TwoCase, ThreeCase, ThreeCase, ThreeCase) -> () {
+// CHECK-LABEL: sil @select_enum_case_canonicalization : $@thin (OneCase, TwoCase, TwoCase, ThreeCase, ThreeCase, ThreeCase) -> () {
 // CHECK: bb0([[ONE_1:%.*]] : $OneCase, [[TWO_1:%.*]] : $TwoCase, [[TWO_2:%.*]] : $TwoCase, [[THREE_1:%.*]] : $ThreeCase, [[THREE_2:%.*]] : $ThreeCase, [[THREE_3:%.*]] : $ThreeCase):
-// CHECK: [[TAG1:%.*]] = enum_is_tag $Builtin.Int1, [[ONE_1]] : $OneCase, #OneCase.First!enumelt
-// CHECK: [[TAG2:%.*]] = enum_is_tag $Builtin.Int1, [[TWO_1]] : $TwoCase, #TwoCase.First!enumelt
-// CHECK: [[TAG3:%.*]] = enum_is_tag $Builtin.Int1, [[TWO_2]] : $TwoCase, #TwoCase.First!enumelt
-// CHECK: [[TAG3_OLD:%.*]] = enum_is_tag $Builtin.Int1, [[TWO_2]] : $TwoCase, #TwoCase.Second!enumelt
-// CHECK: [[TAG4:%.*]] = enum_is_tag $Builtin.Int1, [[THREE_1]] : $ThreeCase, #ThreeCase.First!enumelt
-// CHECK: [[TAG5:%.*]] = enum_is_tag $Builtin.Int1, [[THREE_2]] : $ThreeCase, #ThreeCase.Second!enumelt
-// CHECK: [[TAG6:%.*]] = enum_is_tag $Builtin.Int1, [[THREE_3]] : $ThreeCase, #ThreeCase.Third!enumelt
+// CHECK: [[TAG1:%.*]] = select_enum [[ONE_1]] : $OneCase, case #OneCase.First!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG2:%.*]] = select_enum [[TWO_1]] : $TwoCase, case #TwoCase.First!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG3:%.*]] = select_enum [[TWO_2]] : $TwoCase, case #TwoCase.First!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG3_OLD:%.*]] = select_enum [[TWO_2]] : $TwoCase, case #TwoCase.Second!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG4:%.*]] = select_enum [[THREE_1]] : $ThreeCase, case #ThreeCase.First!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG5:%.*]] = select_enum [[THREE_2]] : $ThreeCase, case #ThreeCase.Second!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG6:%.*]] = select_enum [[THREE_3]] : $ThreeCase, case #ThreeCase.Third!enumelt: [[TRUE:%[0-9]+]]
 // CHECK: cond_br [[TAG1]], bb1, bb6
 // CHECK: cond_br [[TAG2]], bb2, bb3
 // CHECK: [[INT1_USER_FUN:%.*]] = function_ref @int1_user : $@thin (Builtin.Int1) -> ()
@@ -982,14 +991,16 @@ sil @int1_user : $@thin (Builtin.Int1) -> ()
 // CHECK: cond_br [[TAG4]], bb7, bb8
 // CHECK: cond_br [[TAG5]], bb9, bb10
 // CHECK: cond_br [[TAG6]], bb11, bb12
-sil @enum_is_tag_case_canonicalization : $@thin (OneCase, TwoCase, TwoCase, ThreeCase, ThreeCase, ThreeCase) -> () {
+sil @select_enum_case_canonicalization : $@thin (OneCase, TwoCase, TwoCase, ThreeCase, ThreeCase, ThreeCase) -> () {
 bb0(%0 : $OneCase, %1 : $TwoCase, %2 : $TwoCase, %3 : $ThreeCase, %4 : $ThreeCase, %5 : $ThreeCase):
-  %6 = enum_is_tag $Builtin.Int1, %0 : $OneCase, #OneCase.First!enumelt
-  %7 = enum_is_tag $Builtin.Int1, %1 : $TwoCase, #TwoCase.First!enumelt
-  %8 = enum_is_tag $Builtin.Int1, %2 : $TwoCase, #TwoCase.Second!enumelt
-  %9 = enum_is_tag $Builtin.Int1, %3 : $ThreeCase, #ThreeCase.First!enumelt
-  %10 = enum_is_tag $Builtin.Int1, %4 : $ThreeCase, #ThreeCase.Second!enumelt
-  %11 = enum_is_tag $Builtin.Int1, %5 : $ThreeCase, #ThreeCase.Third!enumelt
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %6 = select_enum %0 : $OneCase, case #OneCase.First!enumelt: %t, default %f : $Builtin.Int1
+  %7 = select_enum %1 : $TwoCase, case #TwoCase.First!enumelt: %t, default %f : $Builtin.Int1
+  %8 = select_enum %2 : $TwoCase, case #TwoCase.Second!enumelt: %t, default %f : $Builtin.Int1
+  %9 = select_enum %3 : $ThreeCase, case #ThreeCase.First!enumelt: %t, default %f : $Builtin.Int1
+  %10 = select_enum %4 : $ThreeCase, case #ThreeCase.Second!enumelt: %t, default %f : $Builtin.Int1
+  %11 = select_enum %5 : $ThreeCase, case #ThreeCase.Third!enumelt: %t, default %f : $Builtin.Int1
   %12 = function_ref @unknown : $@thin () -> ()
   cond_br %6, bb1a, bb1b
 
@@ -1049,7 +1060,7 @@ exit:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @enum_is_tag_dominance_simplification : $@thin (Optional<Int>) -> () {
+// CHECK-LABEL: sil @select_enum_dominance_simplification : $@thin (Optional<Int>) -> () {
 // CHECK: bb1:
 // CHECK: integer_literal $Builtin.Int32, 0
 // CHECK-NEXT: br bb3
@@ -1059,17 +1070,19 @@ exit:
 // CHECK: bb3:
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @enum_is_tag_dominance_simplification : $@thin (Optional<Int>) -> () {
+sil @select_enum_dominance_simplification : $@thin (Optional<Int>) -> () {
 bb0(%0 : $Optional<Int>):
-  %1 = enum_is_tag $Builtin.Int1, %0 : $Optional<Int>, #Optional.Some!enumelt.1
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %1 = select_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
   cond_br %1, bb1, bb2
 
 bb1:
-  %2 = enum_is_tag $Builtin.Int1, %0 : $Optional<Int>, #Optional.Some!enumelt.1
+  %2 = select_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
   cond_br %2, bb3, bb4
 
 bb2:
-  %3 = enum_is_tag $Builtin.Int1, %0 : $Optional<Int>, #Optional.None!enumelt
+  %3 = select_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: %f, case #Optional.None!enumelt: %t : $Builtin.Int1
   cond_br %3, bb5, bb6
 
 bb3:

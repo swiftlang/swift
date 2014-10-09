@@ -107,6 +107,7 @@ struct SimpleValue {
     case ValueKind::UncheckedAddrCastInst:
     case ValueKind::ObjCMetatypeToObjectInst:
     case ValueKind::ObjCExistentialMetatypeToObjectInst:
+    case ValueKind::SelectEnumInst:
         return true;
     default:
         return false;
@@ -327,6 +328,30 @@ public:
                               X->getType(), X->getElement());
   }
 
+  hash_code visitSelectEnumInstBase(SelectEnumInstBase *X) {
+    auto hash = llvm::hash_combine(X->getKind(),
+                                   X->getEnumOperand(),
+                                   X->getType(),
+                                   X->hasDefault());
+    
+    for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
+      hash = llvm::hash_combine(hash, X->getCase(i).first,
+                                X->getCase(i).second);
+    }
+    
+    if (X->hasDefault())
+      hash = llvm::hash_combine(hash, X->getDefaultResult());
+    
+    return hash;
+  }
+  
+  hash_code visitSelectEnumInst(SelectEnumInst *X) {
+    return visitSelectEnumInstBase(X);
+  }
+
+  hash_code visitSelectEnumAddrInst(SelectEnumAddrInst *X) {
+    return visitSelectEnumInstBase(X);
+  }
 
   hash_code visitIsNonnullInst(IsNonnullInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());

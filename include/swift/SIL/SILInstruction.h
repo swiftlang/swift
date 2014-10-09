@@ -1778,6 +1778,14 @@ public:
   
   // getType() is OK because there's only one result.
   SILType getType() const { return SILInstruction::getType(0); }
+  
+  // If there is a single case that returns a literal "true" value (an
+  // "integer_literal $Builtin.Int1, 0" value), return it.
+  //
+  // FIXME: This is used to interoperate with passes that reasoned about the
+  // old enum_is_tag insn. Ideally those passes would become general enough
+  // not to need this.
+  EnumElementDecl *getSingleTrueElement() const;
 };
   
 /// Select one of a set of values based on the case of an enum.

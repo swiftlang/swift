@@ -1583,13 +1583,14 @@ bb0(%0 : $Builtin.Word):
 sil @nonnil : $@thin () -> Builtin.Int1 {
 bb0:
 // CHECK: bb0
-// CHECK-NOT: enum_is_tag
+// CHECK-NOT: select_enum
   %1 = integer_literal $Builtin.Word, 8
   %2 = struct $Int (%1 : $Builtin.Word)
   %3 = enum $Optional<Int>, #Optional.Some!enumelt.1, %2 : $Int
-  %4 = integer_literal $Builtin.Int1, -1
+  %t = integer_literal $Builtin.Int1, -1
+  %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ONE:%[^ ]+]] = integer_literal $Builtin.Int1, -1
-  %5 = enum_is_tag $Builtin.Int1, %3 : $Optional<Int>, #Optional.Some!enumelt.1
+  %5 = select_enum %3 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ONE]]
   return %5 : $Builtin.Int1
 }
@@ -1598,13 +1599,14 @@ bb0:
 sil @isnil : $@thin () -> Builtin.Int1 {
 bb0:
 // CHECK: bb0
-// CHECK-NOT: enum_is_tag
+// CHECK-NOT: select_enum
   %1 = enum $Optional<Int>, #Optional.None!enumelt
-  %2 = integer_literal $Builtin.Int1, -1
+  %t = integer_literal $Builtin.Int1, -1
+  %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ZERO:%[^ ]+]] = integer_literal $Builtin.Int1, 0
-  %3 = enum_is_tag $Builtin.Int1, %1 : $Optional<Int>, #Optional.Some!enumelt.1
+  %5 = select_enum %1 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ZERO]]
-  return %3 : $Builtin.Int1
+  return %5 : $Builtin.Int1
 }
 
 

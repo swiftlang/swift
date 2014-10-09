@@ -2253,6 +2253,8 @@ emitBBMapForSelectEnum(IRGenSILFunction &IGF,
     IGF.Builder.CreateBr(contBB);
   }
   
+  IGF.Builder.emitBlock(contBB);
+  
   IGF.Builder.SetInsertPoint(origBB);
   return contBB;
 }
@@ -2281,8 +2283,9 @@ void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
   emitSwitchLoadableEnumDispatch(*this, inst->getEnumOperand().getType(),
                                   value, dests, defaultDest);
   
-  // emitBBMapForSelectEnum set up a phi node to receive the result.
-  Builder.emitBlock(contBB);
+  // emitBBMapForSelectEnum set up a continuation block and phi nodes to
+  // receive the result.
+  Builder.SetInsertPoint(contBB);
 
   setLoweredValue(SILValue(inst, 0),
                   getLoweredValueForSelectEnum(*this, result, inst));
@@ -2306,7 +2309,7 @@ void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
                                     value, dests, defaultDest);
   
   // emitBBMapForSelectEnum set up a phi node to receive the result.
-  Builder.emitBlock(contBB);
+  Builder.SetInsertPoint(contBB);
 
   setLoweredValue(SILValue(inst, 0),
                   getLoweredValueForSelectEnum(*this, result, inst));

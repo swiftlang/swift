@@ -1494,6 +1494,33 @@ SILInstruction *SILCombiner::visitEnumIsTagInst(EnumIsTagInst *EIT) {
                                     APInt(1, SameTag), *EIT->getFunction());
 }
 
+SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *EIT) {
+  // TODO: We should be able to flat-out replace the select_enum instruction
+  // with the selected value in another pass. For parity with the enum_is_tag
+  // combiner pass, handle integer literals for now.
+  auto *EI = dyn_cast<EnumInst>(EIT->getEnumOperand());
+  if (!EI)
+    return nullptr;
+  
+  SILValue selected;
+  for (unsigned i = 0, e = EIT->getNumCases(); i < e; ++i) {
+    auto casePair = EIT->getCase(i);
+    if (casePair.first == EI->getElement()) {
+      selected = casePair.second;
+      break;
+    }
+  }
+  if (!selected)
+    selected = EIT->getDefaultResult();
+
+  if (auto inst = dyn_cast<IntegerLiteralInst>(selected)) {
+    return IntegerLiteralInst::create(inst->getLoc(), inst->getType(),
+                                      inst->getValue(), *EIT->getFunction());
+  }
+  
+  return nullptr;
+}
+
 /// Helper function for simplifying convertions between
 /// thick and objc metatypes.
 static SILInstruction *

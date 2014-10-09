@@ -297,7 +297,7 @@ bb3:
 }
 
 /// This version does not work since we have a release before the terminator
-/// even though we have the enum_is_tag before it.
+/// even though we have the select_enum before it.
 // CHECK-LABEL: sil @sink_ref_count_ops_enum_over_switch_enum_5 : $@thin (FakeOptional<Builtin.Int32>) -> () {
 // CHECK: bb0({{.*}}):
 // CHECK: bb1:
@@ -337,15 +337,17 @@ bb3:
   return %4 : $()
 }
 
-// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_1 : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_1 : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
 // CHECK: bb0({{.*}}):
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: integer_literal
 // CHECK-NEXT: function_ref blocker
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: apply
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: select_enum
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
 // CHECK-NEXT: unchecked_enum_data
@@ -358,15 +360,17 @@ bb3:
 // CHECK: bb3:
 // CHECK-NOT: retain_value
 // CHECK-NOT: strong_retain
-sil @sink_ref_count_ops_enum_over_enum_is_tag_1 : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+sil @sink_ref_count_ops_enum_over_select_enum_1 : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
   %1 = function_ref @blocker : $@thin () -> ()
   retain_value %0 : $FakeOptional<Builtin.NativeObject>
   apply %1() : $@thin () -> ()
   %3 = alloc_stack $Builtin.Int32
   retain_value %0 : $FakeOptional<Builtin.NativeObject>
   dealloc_stack %3#0 : $*@local_storage Builtin.Int32
-  %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt
+  %100 = select_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: %t, case #FakeOptional.None!enumelt: %f : $Builtin.Int1
   cond_br %100, bb1, bb2
 
 bb1:
@@ -381,13 +385,15 @@ bb3:
   return %4 : $()
 }
 
-// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_2 : $@thin (FakeOptional<Builtin.Int32>) -> () {
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_2 : $@thin (FakeOptional<Builtin.Int32>) -> () {
 // CHECK: bb0({{.*}}):
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: integer_literal
 // CHECK-NEXT: function_ref blocker
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: select_enum
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: cond_br
 // CHECK: bb2:
@@ -399,14 +405,16 @@ bb3:
 // CHECK: bb4:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
-sil @sink_ref_count_ops_enum_over_enum_is_tag_2 : $@thin (FakeOptional<Builtin.Int32>) -> () {
+sil @sink_ref_count_ops_enum_over_select_enum_2 : $@thin (FakeOptional<Builtin.Int32>) -> () {
 bb0(%0 : $FakeOptional<Builtin.Int32>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
   %1 = function_ref @blocker : $@thin () -> ()
   cond_br undef, bb1, bb2
 
 bb1:
   retain_value %0 : $FakeOptional<Builtin.Int32>
-  %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional<Builtin.Int32>, #FakeOptional.Some!enumelt
+  %100 = select_enum %0 : $FakeOptional<Builtin.Int32>, case #FakeOptional.Some!enumelt.1: %t, case #FakeOptional.None!enumelt: %f : $Builtin.Int1
   cond_br %100, bb2, bb3
 
 bb2:
@@ -420,13 +428,15 @@ bb4:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_3 : $@thin (FakeOptional<Builtin.Int32>) -> () {
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_3 : $@thin (FakeOptional<Builtin.Int32>) -> () {
 // CHECK: bb0({{.*}}):
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: integer_literal
 // CHECK-NEXT: function_ref blocker
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: select_enum
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: cond_br
 // CHECK: bb2:
@@ -438,14 +448,16 @@ bb4:
 // CHECK: bb4:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
-sil @sink_ref_count_ops_enum_over_enum_is_tag_3 : $@thin (FakeOptional<Builtin.Int32>) -> () {
+sil @sink_ref_count_ops_enum_over_select_enum_3 : $@thin (FakeOptional<Builtin.Int32>) -> () {
 bb0(%0 : $FakeOptional<Builtin.Int32>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
   %1 = function_ref @blocker : $@thin () -> ()
   cond_br undef, bb1, bb3
 
 bb1:
   retain_value %0 : $FakeOptional<Builtin.Int32>
-  %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional<Builtin.Int32>, #FakeOptional.Some!enumelt
+  %100 = select_enum %0 : $FakeOptional<Builtin.Int32>, case #FakeOptional.Some!enumelt.1: %t, case #FakeOptional.None!enumelt: %f : $Builtin.Int1
   cond_br %100, bb2, bb3
 
 bb2:
@@ -459,10 +471,10 @@ bb4:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_4 : $@thin (FakeOptional<Builtin.Int32>, FakeOptional<Builtin.NativeObject>) -> FakeOptional<Builtin.NativeObject> {
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_4 : $@thin (FakeOptional<Builtin.Int32>, FakeOptional<Builtin.NativeObject>) -> FakeOptional<Builtin.NativeObject> {
 // CHECK: bb0({{%[0-9]+}} : $FakeOptional<Builtin.Int32>, [[ARG1:%[0-9]+]] : $FakeOptional<Builtin.NativeObject>):
 // CHECK-NOT: retain_value [[ARG1]]
-// CHECK: enum_is_tag
+// CHECK: select_enum
 // CHECK: cond_br
 // CHECK: bb1:
 // CHECK: unchecked_enum_data [[ARG1]]
@@ -473,12 +485,14 @@ bb4:
 // CHECK: bb3:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value [[ARG1]]
-sil @sink_ref_count_ops_enum_over_enum_is_tag_4 : $@thin (FakeOptional<Builtin.Int32>, FakeOptional<Builtin.NativeObject>) -> FakeOptional<Builtin.NativeObject> {
+sil @sink_ref_count_ops_enum_over_select_enum_4 : $@thin (FakeOptional<Builtin.Int32>, FakeOptional<Builtin.NativeObject>) -> FakeOptional<Builtin.NativeObject> {
 bb0(%0 : $FakeOptional<Builtin.Int32>, %1 : $FakeOptional<Builtin.NativeObject>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
   %2 = function_ref @blocker : $@thin () -> ()
   retain_value %1 : $FakeOptional<Builtin.NativeObject>
   retain_value %0 : $FakeOptional<Builtin.Int32>
-  %100 = enum_is_tag $Builtin.Int1, %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt
+  %100 = select_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: %t, case #FakeOptional.None!enumelt: %f : $Builtin.Int1
   cond_br %100, bb1, bb2
 
 bb1:
@@ -493,15 +507,15 @@ bb3:
 }
 
 /// This version does not work since we have a release before the terminator
-/// even though we have the enum_is_tag before it.
-// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_5 : $@thin (FakeOptional<Builtin.Int32>) -> () {
+/// even though we have the select_enum before it.
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_5 : $@thin (FakeOptional<Builtin.Int32>) -> () {
 // CHECK: bb0({{.*}}):
 // CHECK: bb1:
 // CHECK-NEXT: function_ref blocker
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: select_enum
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: release_value
 // CHECK-NEXT: cond_br
@@ -511,8 +525,10 @@ bb3:
 // CHECK-NOT: retain_value
 // CHECK: bb4:
 // CHECK-NOT: retain_value
-sil @sink_ref_count_ops_enum_over_enum_is_tag_5 : $@thin (FakeOptional<Builtin.Int32>) -> () {
+sil @sink_ref_count_ops_enum_over_select_enum_5 : $@thin (FakeOptional<Builtin.Int32>) -> () {
 bb0(%0 : $FakeOptional<Builtin.Int32>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
   br bb10
 
 bb10:
@@ -520,7 +536,7 @@ bb10:
   retain_value %0 : $FakeOptional<Builtin.Int32>
   %3 = alloc_stack $Builtin.Int32
   dealloc_stack %3#0 : $*@local_storage Builtin.Int32
-  %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional<Builtin.Int32>, #FakeOptional.Some!enumelt
+  %100 = select_enum %0 : $FakeOptional<Builtin.Int32>, case #FakeOptional.Some!enumelt.1: %t, case #FakeOptional.None!enumelt: %f : $Builtin.Int1
   release_value %0 : $FakeOptional<Builtin.Int32>
   cond_br %100, bb1, bb2
 
@@ -984,8 +1000,10 @@ bb3:
 // CHECK: retain_value [[INPUT]]
 sil @enum_simplification_test9_enums : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
   %2 = function_ref @blocker : $@thin () -> ()
-  %1 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt
+  %1 = select_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: %t, case #FakeOptional.None!enumelt: %f : $Builtin.Int1
   cond_br %1, bb1, bb2
 
 bb1:

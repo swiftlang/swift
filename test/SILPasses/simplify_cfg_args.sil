@@ -336,11 +336,13 @@ bb6:
   unreachable
 }
 
-// CHECK-LABEL: simplify_switch_to_enum_is_tag
-sil @simplify_switch_to_enum_is_tag : $@thin (X) -> Bool {
+// CHECK-LABEL: simplify_switch_to_select_enum
+sil @simplify_switch_to_select_enum : $@thin (X) -> Bool {
 bb0(%0 : $X):
 // CHECK: bb0
-// CHECK: [[VAL:%[a-zA-Z0-9]+]] = enum_is_tag $Builtin.Int1, %0 : $X, #X.A!enumelt
+// CHECK: [[TRUE:%.*]] = integer_literal {{.*}} -1
+// CHECK: [[FALSE:%.*]] = integer_literal {{.*}} 0
+// CHECK: [[VAL:%[a-zA-Z0-9]+]] = select_enum %0 : $X, case #X.A!enumelt: [[TRUE]], default [[FALSE]]
   %2 = integer_literal $Builtin.Int1, 0
   switch_enum %0 : $X, case #X.A!enumelt: bb1, case #X.B!enumelt.1: bb2, case #X.C!enumelt.1: bb3
 
@@ -392,7 +394,9 @@ bb4(%3 : $Builtin.Int1):
 
 sil @same_destination_unused_arg : $@thin (Optional<Int>) -> Optional<Int> {
 bb0(%0 : $Optional<Int>):
-  %1 = enum_is_tag $Builtin.Int1, %0 : $Optional<Int>, #Optional.Some!enumelt.1
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %1 = select_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, default %f : $Builtin.Int1
   cond_br %1, bb1(%0 : $Optional<Int>), bb1(%0 : $Optional<Int>)
 
 bb1(%2 : $Optional<Int>):

@@ -153,7 +153,7 @@ public:
   mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
   bool moveReleasesUpCFGIfCasesCovered(AliasAnalysis *AA);
   void handlePredSwitchEnum(SwitchEnumInst *S);
-  void handlePredCondEnumIsTag(CondBranchInst *CondBr);
+  void handlePredCondSelectEnum(CondBranchInst *CondBr);
 };
 
 /// Map all blocks to BBEnumTagDataflowState in RPO order.
@@ -226,10 +226,17 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(SwitchEnumInst *S) {
                    "the switch_enum.");
 }
 
-void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
+void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
 
-  EnumIsTagInst *EITI = dyn_cast<EnumIsTagInst>(CondBr->getCondition());
-  if (!EITI)
+  auto SEI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
+  if (!SEI)
+    return;
+  
+  // TODO: Non-boolean selects.
+  auto SEIType = SEI->getType().getAs<BuiltinIntegerType>();
+  if (!SEIType)
+    return;
+  if (SEIType->getWidth() != BuiltinIntegerWidth::fixed(1))
     return;
 
   // Find the tag associated with our BB and set the state of the
@@ -237,9 +244,17 @@ void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
   // covering switches for enums that have cases without payload.
 
   // Check if we are the true case, ie, we know that we are the given tag.
-  const auto &Operand = EITI->getOperand();
+  auto Operand = SEI->getEnumOperand();
+  
+  // Try to find a single literal "true" case.
+  // TODO: More general conditions in which we can relate the BB to a single
+  // case, such as when there's a single literal "false" case.
+  EnumElementDecl *TrueElement = SEI->getSingleTrueElement();
+  if (!TrueElement)
+    return;
+  
   if (CondBr->getTrueBB() == getBB()) {
-    ValueToCaseMap[Operand] = EITI->getElement();
+    ValueToCaseMap[Operand] = TrueElement;
     return;
   }
 
@@ -250,7 +265,7 @@ void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
     EnumElementDecl *OtherElt = nullptr;
     for (EnumElementDecl *Elt : E->getAllElements()) {
       // Skip the case where we find the enum_is_tag element
-      if (Elt == EITI->getElement())
+      if (Elt == TrueElement)
         continue;
       // If we find another element, then we must have more than 2, so bail.
       if (OtherElt)
@@ -310,13 +325,13 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
     if (auto *S = dyn_cast<SwitchEnumInst>(PredTerm))
       handlePredSwitchEnum(S);
     else if (auto *CondBr = dyn_cast<CondBranchInst>(PredTerm))
-      handlePredCondEnumIsTag(CondBr);
+      handlePredCondSelectEnum(CondBr);
 
     // There are no other predecessors to merge in. return.
     return;
   }
 
-  DEBUG(llvm::dbgs() << "            Merging in rest of perdecessors...\n");
+  DEBUG(llvm::dbgs() << "            Merging in rest of predecessors...\n");
 
   llvm::SmallVector<SILValue, 4> ValuesToBlot;
 

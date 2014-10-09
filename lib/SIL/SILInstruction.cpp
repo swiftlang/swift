@@ -408,6 +408,30 @@ namespace {
       auto *X = cast<EnumIsTagInst>(LHS);
       return X->getElement() == RHS->getElement();
     }
+      
+    bool visitSelectEnumInstBase(const SelectEnumInstBase *RHS) {
+      // Check that the instructions match cases in the same order.
+      auto *X = cast<SelectEnumInstBase>(LHS);
+      
+      if (X->getNumCases() != RHS->getNumCases())
+        return false;
+      if (X->hasDefault() != RHS->hasDefault())
+        return false;
+      
+      for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
+        if (X->getCase(i).first != RHS->getCase(i).first)
+          return false;
+      }
+      
+      return true;
+    }
+      
+    bool visitSelectEnumInst(const SelectEnumInst *RHS) {
+      return visitSelectEnumInstBase(RHS);
+    }
+    bool visitSelectEnumAddrInst(const SelectEnumAddrInst *RHS) {
+      return visitSelectEnumInstBase(RHS);
+    }
 
     // Conversion instructions.
     // All of these just return true as they have already had their
@@ -1314,6 +1338,34 @@ SwitchEnumInstBase::SwitchEnumInstBase(
 
   if (HasDefault)
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
+}
+
+EnumElementDecl *
+SelectEnumInstBase::getSingleTrueElement() const {
+  auto SEIType = getType().getAs<BuiltinIntegerType>();
+  if (!SEIType)
+    return nullptr;
+  if (SEIType->getWidth() != BuiltinIntegerWidth::fixed(1))
+    return nullptr;
+
+  // Try to find a single literal "true" case.
+  Optional<EnumElementDecl*> TrueElement;
+  for (unsigned i = 0, e = getNumCases(); i < e; ++i) {
+    auto casePair = getCase(i);
+    if (auto intLit = dyn_cast<IntegerLiteralInst>(casePair.second)) {
+      if (intLit->getValue() == APInt(1, 1)) {
+        if (!TrueElement)
+          TrueElement = casePair.first;
+        else
+          // Use Optional(nullptr) to represent more than one.
+          TrueElement = Optional<EnumElementDecl*>(nullptr);
+      }
+    }
+  }
+  
+  if (!TrueElement || !*TrueElement)
+    return nullptr;
+  return *TrueElement;
 }
 
 SwitchEnumInstBase::~SwitchEnumInstBase() {
