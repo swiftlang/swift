@@ -1,6 +1,5 @@
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-simple-swift
 
-import Swift
 import StdlibUnittest
 import Foundation
 
