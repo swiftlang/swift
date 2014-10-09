@@ -122,7 +122,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
   override internal func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for should be handled separately")
+      "Verbatim bridging should be handled separately")
     return Buffer(self).count
   }
 
@@ -133,7 +133,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
     HeapBuffer<Int, AnyObject> {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
-      "Verbatim bridging for should be handled separately")
+      "Verbatim bridging should be handled separately")
     let nativeBuffer = Buffer(self)
     let count = nativeBuffer.count
     let result = HeapBuffer<Int, AnyObject>(
