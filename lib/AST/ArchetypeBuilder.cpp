@@ -64,6 +64,94 @@ void RequirementSource::dump(llvm::raw_ostream &out,
   }
 }
 
+namespace {
+  /// A class whose instances capture the potential update of an
+  /// existing requirement source when another equivalent requirement
+  /// is found.
+  class UpdateRequirementSource {
+    RequirementSource &Source;
+    const RequirementSource &NewSource;
+    bool IsRedundant = false;
+    bool ShouldUpdate = false;
+    bool OriginalIsRedundant = false;
+
+  public:
+    UpdateRequirementSource(RequirementSource &source,
+                            const RequirementSource &newSource);
+
+    ~UpdateRequirementSource() {
+      if (ShouldUpdate)
+        Source = NewSource;
+    }
+
+    /// Determine whether one of the requirements is considered
+    /// redundant, which can be diagnosed.
+    explicit operator bool() const { return IsRedundant; }
+
+    /// Determine whether it is the original source (vs. the new
+    /// source) that is redundant.
+    bool originalIsRedundant() const { return OriginalIsRedundant; }
+  };
+}
+
+UpdateRequirementSource::UpdateRequirementSource(
+                           RequirementSource &source,
+                           const RequirementSource &newSource)
+  : Source(source), NewSource(newSource) 
+{
+  // If one of the requirements is explicit, it is redundant.
+  if (source.getKind() == RequirementSource::Explicit ||
+      newSource.getKind() == RequirementSource::Explicit) {
+    IsRedundant = true;
+    
+    // If the new source isn't explicit, override the old source
+    // with the new. We don't maintain redundant explicit
+    // requirements.
+    if (newSource.getKind() != RequirementSource::Explicit) {
+      ShouldUpdate = true;
+      OriginalIsRedundant = true;
+    }
+
+    return;
+  }
+
+  // If the source kinds are the same, there is nothing to do.
+  if (source.getKind() == newSource.getKind())
+    return;
+
+  switch (newSource.getKind()) {
+  case RequirementSource::Explicit:
+    llvm_unreachable("Handled above");
+
+  case RequirementSource::Inferred:
+    // A new inferred source will never override an existing source.
+    return;
+
+  case RequirementSource::Protocol: {
+    // A new protocol source will override an inferred source.
+    switch (source.getKind()) {
+    case RequirementSource::Explicit:
+    case RequirementSource::Protocol:
+      llvm_unreachable("Handled above");
+
+    case RequirementSource::OuterScope:
+      return;
+
+    case RequirementSource::Inferred:
+      ShouldUpdate = true;
+      return;
+    }
+  }
+
+  case RequirementSource::OuterScope:
+    // An outer-scope source always overrides an existing source.
+    ShouldUpdate = true;
+    return;
+  }
+
+  return;
+}
+
 /// The identifying information for a generic parameter.
 
 namespace {
@@ -156,6 +244,25 @@ unsigned ArchetypeBuilder::PotentialArchetype::getNestingDepth() const {
   for (auto P = getParent(); P; P = P->getParent())
     ++Depth;
   return Depth;
+}
+
+bool ArchetypeBuilder::PotentialArchetype::addConformance(
+       ProtocolDecl *proto, 
+       const RequirementSource &source) {
+  auto rep = getRepresentative();
+  if (rep != this)
+    return rep->addConformance(proto, source);
+
+  auto known = ConformsTo.find(proto);
+  if (known != ConformsTo.end()) {
+    // We already have this requirement. Update the requirement source
+    // appropriately.
+    UpdateRequirementSource(known->second, source);
+    return false;
+  }
+
+  ConformsTo.insert(std::make_pair(proto, source));
+  return true;
 }
 
 auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
@@ -430,94 +537,6 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
   return nullptr;
 }
 
-namespace {
-  /// A class whose instances capture the potential update of an
-  /// existing requirement source when another equivalent requirement
-  /// is found.
-  class UpdateRequirementSource {
-    RequirementSource &Source;
-    const RequirementSource &NewSource;
-    bool IsRedundant = false;
-    bool ShouldUpdate = false;
-    bool OriginalIsRedundant = false;
-
-  public:
-    UpdateRequirementSource(RequirementSource &source,
-                            const RequirementSource &newSource);
-
-    ~UpdateRequirementSource() {
-      if (ShouldUpdate)
-        Source = NewSource;
-    }
-
-    /// Determine whether one of the requirements is considered
-    /// redundant, which can be diagnosed.
-    explicit operator bool() const { return IsRedundant; }
-
-    /// Determine whether it is the original source (vs. the new
-    /// source) that is redundant.
-    bool originalIsRedundant() const { return OriginalIsRedundant; }
-  };
-}
-
-UpdateRequirementSource::UpdateRequirementSource(
-                           RequirementSource &source,
-                           const RequirementSource &newSource)
-  : Source(source), NewSource(newSource) 
-{
-  // If one of the requirements is explicit, it is redundant.
-  if (source.getKind() == RequirementSource::Explicit ||
-      newSource.getKind() == RequirementSource::Explicit) {
-    IsRedundant = true;
-    
-    // If the new source isn't explicit, override the old source
-    // with the new. We don't maintain redundant explicit
-    // requirements.
-    if (newSource.getKind() != RequirementSource::Explicit) {
-      ShouldUpdate = true;
-      OriginalIsRedundant = true;
-    }
-
-    return;
-  }
-
-  // If the source kinds are the same, there is nothing to do.
-  if (source.getKind() == newSource.getKind())
-    return;
-
-  switch (newSource.getKind()) {
-  case RequirementSource::Explicit:
-    llvm_unreachable("Handled above");
-
-  case RequirementSource::Inferred:
-    // A new inferred source will never override an existing source.
-    return;
-
-  case RequirementSource::Protocol: {
-    // A new protocol source will override an inferred source.
-    switch (newSource.getKind()) {
-    case RequirementSource::Explicit:
-    case RequirementSource::Protocol:
-      llvm_unreachable("Handled above");
-
-    case RequirementSource::OuterScope:
-      return;
-
-    case RequirementSource::Inferred:
-      ShouldUpdate = true;
-      return;
-    }
-  }
-
-  case RequirementSource::OuterScope:
-    // An outer-scope source always overrides an existing source.
-    ShouldUpdate = true;
-    return;
-  }
-
-  return;
-}
-
 auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
                                            ProtocolDecl *RootProtocol,
                                            Identifier ParamName,
@@ -588,18 +607,9 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   // Add the requirement to the representative.
   auto T = PAT->getRepresentative();
 
-  // Determine whether we've already added this requirement.
-  auto Known = T->ConformsTo.find(Proto);
-  if (Known != T->ConformsTo.end()) {
-    // We already have this requirement. Update the requirement source
-    // appropriately.
-    UpdateRequirementSource update(Known->second, Source);
-
+  // Add the requirement, if we haven't done so already.
+  if (!T->addConformance(Proto, Source))
     return false;
-  }
-
-  // Add the requirement now.
-  T->ConformsTo.insert(std::make_pair(Proto, Source));
 
   RequirementSource InnerSource(RequirementSource::Protocol, Source.getLoc());
 
@@ -629,17 +639,8 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
           // If it's a recursive requirement, add it directly to the associated
           // archetype.
           if (Proto == InheritedProto) {
-            auto KnownRec 
-              = AssocPA->getRepresentative()->ConformsTo.find(Proto);
-            if (KnownRec != AssocPA->getRepresentative()->ConformsTo.end()) {
-              // We already have this requirement. Update the requirement source
-              // appropriately.
-              UpdateRequirementSource update(Known->second, Source);
-            } else {
-              AssocPA->getRepresentative()->ConformsTo.insert(
-                std::make_pair(Proto, Source));
-            }
             AssocPA->setIsRecursive();
+            AssocPA->addConformance(Proto, Source);
             continue;
           }
           
@@ -751,9 +752,12 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // Record this same-type requirement.
   Impl->SameTypeRequirements.push_back({ OrigT1, OrigT2 });
 
+  // FIXME: superclass requirements!
+
   // Add all of the protocol conformance requirements of T2 to T1.
-  for (auto conforms : T2->ConformsTo)
-    T1->ConformsTo.insert(conforms);
+  for (auto conforms : T2->ConformsTo) {
+    T1->addConformance(conforms.first, conforms.second);
+  }
 
   // Recursively merge the associated types of T2 into T1.
   for (auto T2Nested : T2->NestedTypes) {

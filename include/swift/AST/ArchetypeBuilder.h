@@ -426,6 +426,11 @@ public:
     return ConformsTo;
   }
 
+  /// Add a conformance to this potential archetype.
+  ///
+  /// \returns true if the conformance was new, false if it already existed.
+  bool addConformance(ProtocolDecl *proto, const RequirementSource &source);
+
   /// Retrieve the superclass of this archetype.
   Type getSuperclass() const { return Superclass; }
 
