@@ -767,7 +767,7 @@ Classes:
   - Selector: 'mergedModelFromBundles:forStoreMetadata:'
     MethodKind: Class
     Nullability:
-    - N
+    - O
     - N
     NullabilityOfRet: O
   - Selector: 'modelByMergingModels:'
@@ -1238,6 +1238,6 @@ Protocols:
   - Name: indexTitle
     Nullability: N
   - Name: name
-    Nullability: N
+    Nullability: O
   - Name: objects
     Nullability: N

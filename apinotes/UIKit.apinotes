@@ -1100,7 +1100,7 @@ Classes:
     NullabilityOfRet: O
   - Selector: indexPathsForSelectedItems
     MethodKind: Instance
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: indexPathsForVisibleItems
     MethodKind: Instance
     NullabilityOfRet: N
@@ -3873,20 +3873,20 @@ Classes:
   - Name: editingAccessoryView
     Nullability: O
   - Name: imageView
-    Nullability: O
+    Nullability: N
   - Name: multipleSelectionBackgroundView
     Nullability: O
   - Name: reuseIdentifier
     Nullability: O
   - Name: textLabel
-    Nullability: O
+    Nullability: N
 - Name: UITableViewController
   Methods:
   - Selector: 'initWithStyle:'
     MethodKind: Instance
     Nullability:
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   Properties:
   - Name: refreshControl
     Nullability: O
@@ -4554,7 +4554,7 @@ Classes:
     Nullability:
     - N
     - N
-    - N
+    - O
     NullabilityOfRet: N
   - Selector: 'separateSecondaryViewControllerForSplitViewController:'
     MethodKind: Instance
@@ -4607,7 +4607,7 @@ Classes:
     - N
     - S
     - S
-    - N
+    - O
     - O
     NullabilityOfRet: S
   - Selector: 'viewControllerForUnwindSegueAction:fromViewController:withSender:'
