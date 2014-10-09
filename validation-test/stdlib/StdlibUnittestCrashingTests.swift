@@ -1,5 +1,4 @@
-// RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
-// RUN: %target-run %t.out 2>&1 | FileCheck %s
+// RUN: %target-run-simple-swift 2>&1 | FileCheck %s
 
 import StdlibUnittest
 

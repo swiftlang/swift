@@ -1,5 +1,4 @@
-// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %s -o %t.out
-// RUN: %target-run %t.out | FileCheck %s
+// RUN: %target-run-stdlib-swift | FileCheck %s
 //
 // Parts of this test depend on memory allocator specifics.  The test
 // should be rewritten soon so it doesn't expose legacy components

@@ -1,5 +1,4 @@
-// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %s -o %t.out
-// RUN: %target-run %t.out | FileCheck %s
+// RUN: %target-run-stdlib-swift | FileCheck %s
 
 import Foundation
 import Swift

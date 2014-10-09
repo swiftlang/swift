@@ -1,6 +1,6 @@
-// RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
-// RUN: %target-run %t.out | FileCheck %s
+// RUN: %target-run-stdlib-swift | FileCheck %s
 
+import Swift
 import StdlibUnittest
 
 _setOverrideOSVersion(.iOS(major: 10, minor: 9, bugFix: 3))

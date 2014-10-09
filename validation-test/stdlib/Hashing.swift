@@ -1,6 +1,6 @@
-// RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
-// RUN: %target-run %t.out
+// RUN: %target-run-stdlib-swift
 
+import Swift
 import StdlibUnittest
 
 var HashingTestSuite = TestSuite("Hashing")

@@ -9,9 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-build-swift -Xfrontend -disable-access-control %s -o %t.out
-// RUN: %target-run %t.out
-
+// RUN: %target-run-stdlib-swift
+import Swift
 import StdlibUnittest
 
 var UnicodeInternals = TestSuite("UnicodeInternals")

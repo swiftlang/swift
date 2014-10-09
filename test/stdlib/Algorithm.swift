@@ -1,7 +1,7 @@
-// RUN: %target-build-swift -Xfrontend -disable-access-control %s -o %t.out
-// RUN: %target-run %t.out
+// RUN: %target-run-stdlib-swift
 
 import StdlibUnittest
+import Swift
 
 var Algorithm = TestSuite("Algorithm")
 
