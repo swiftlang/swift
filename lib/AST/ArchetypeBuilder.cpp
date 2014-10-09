@@ -225,18 +225,45 @@ ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
 }
 
 void ArchetypeBuilder::PotentialArchetype::buildFullName(
-       SmallVectorImpl<char> &Result) const {
+       bool forDebug,
+       SmallVectorImpl<char> &result) const {
   if (auto parent = getParent()) {
-    parent->buildFullName(Result);
-    Result.push_back('.');
+    parent->buildFullName(forDebug, result);
+
+    // When building the name for debugging purposes, include the
+    // protocol into which the associated type was resolved.
+    if (forDebug) {
+      if (auto assocType = getResolvedAssociatedType()) {
+        result.push_back('[');
+        result.push_back('.');
+        result.append(assocType->getProtocol()->getName().str().begin(), 
+                      assocType->getProtocol()->getName().str().end());
+        result.push_back(']');
+      }
+    }
+
+    result.push_back('.');
   }
-  Result.append(getName().begin(), getName().end());
+  result.append(getName().str().begin(), getName().str().end());
+}
+
+Identifier ArchetypeBuilder::PotentialArchetype::getName() const { 
+  if (auto assocType = NameOrAssociatedType.dyn_cast<AssociatedTypeDecl *>())
+    return assocType->getName();
+  
+  return NameOrAssociatedType.get<Identifier>();
 }
 
 std::string ArchetypeBuilder::PotentialArchetype::getFullName() const {
-  llvm::SmallString<64> Result;
-  buildFullName(Result);
-  return Result.str().str();
+  llvm::SmallString<64> result;
+  buildFullName(false, result);
+  return result.str().str();
+}
+
+std::string ArchetypeBuilder::PotentialArchetype::getDebugName() const {
+  llvm::SmallString<64> result;
+  buildFullName(true, result);
+  return result.str().str();
 }
 
 unsigned ArchetypeBuilder::PotentialArchetype::getNestingDepth() const {
@@ -253,6 +280,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
   if (rep != this)
     return rep->addConformance(proto, source);
 
+  // Check whether we already know about this conformance.
   auto known = ConformsTo.find(proto);
   if (known != ConformsTo.end()) {
     // We already have this requirement. Update the requirement source
@@ -261,7 +289,30 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
     return false;
   }
 
+  // Add this conformance.
   ConformsTo.insert(std::make_pair(proto, source));
+
+  // Check whether any associated types in this protocol resolve
+  // nested types of this potential archetype.
+  // FIXME: Eventually, will need to add more same-type requirements
+  // here as well.
+  for (auto member : proto->getMembers()) {
+    auto assocType = dyn_cast<AssociatedTypeDecl>(member);
+    if (!assocType)
+      continue;
+
+    auto known = NestedTypes.find(assocType->getName());
+    if (known == NestedTypes.end())
+      continue;
+
+    // If the nested type was not already resolved, do so now.
+    if (!known->second->getResolvedAssociatedType()) {
+      known->second->NameOrAssociatedType = assocType;
+    }
+
+    // FIXME: Otherwise, add same-type requirements here.
+  }
+
   return true;
 }
 
@@ -291,24 +342,47 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
     
   PotentialArchetype *&Result = NestedTypes[nestedName];
     
-  if (!Result) {
-    // FIXME: The fact that we've been checking for "new" nested archetypes on
-    // a purely lexical basis is both fragile and not-quite-correct. We need
-    // to move to a lazier model for adding conformance requirements that will
-    // allow us to deal with recursive dependencies without comparing identifier
-    // names.
-    if (parentName &&
-        this->getParent() &&
-        (*parentName == this->getParent()->Name ||
-         this->getParent()->Name.str().equals("Self") ||
-         this->getParent()->Name == this->Name) &&
-        nestedName == this->Name) {
-      Result = this;
-    } else {
-      Result = new PotentialArchetype(this, nestedName);
-    }
-  }
+  if (Result)
+    return Result;
 
+  // FIXME: The fact that we've been checking for "new" nested archetypes on
+  // a purely lexical basis is both fragile and not-quite-correct. We need
+  // to move to a lazier model for adding conformance requirements that will
+  // allow us to deal with recursive dependencies without comparing identifier
+  // names.
+  if (parentName &&
+      this->getParent() &&
+      (*parentName == this->getParent()->getName() ||
+       this->getParent()->getName().str().equals("Self") ||
+       this->getParent()->getName() == this->getName()) &&
+      nestedName == this->getName()) {
+    Result = this;
+  } else {
+    // Attempt to resolve this nested type to an associated type
+    // of one of the protocols to which the parent potential
+    // archetype conforms.
+    for (const auto &conforms : ConformsTo) {
+      for (auto member : conforms.first->lookupDirect(nestedName)) {
+        auto assocType = dyn_cast<AssociatedTypeDecl>(member);
+        if (!assocType)
+          continue;
+
+        // Create a resolved potential archetype.
+        Result = new PotentialArchetype(this, assocType);
+        
+        // FIXME: Keep going, adding same-type requirements when we
+        // have multiple associated types with the same name.
+        break;
+      }
+    }
+
+    // We couldn't resolve the nested type yet, so create an
+    // unresolved associated type.  
+    // FIXME: Record this somewhere.
+    if (!Result)
+      Result = new PotentialArchetype(this, nestedName);
+  }
+  
   return Result;
 }
 
@@ -340,7 +414,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     // Find the protocol that has an associated type with this name.
     for (auto proto : ParentArchetype->getConformsTo()) {
       SmallVector<ValueDecl *, 2> decls;
-      if (mod.lookupQualified(proto->getDeclaredType(), Name,
+      if (mod.lookupQualified(proto->getDeclaredType(), getName(),
                               NL_VisitSupertypes | NL_IgnoreAccessibility,
                               /*FIXME:*/nullptr, decls)) {
         for (auto decl : decls) {
@@ -369,7 +443,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
   auto arch
     = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
-                            assocTypeOrProto, Name, Protos,
+                            assocTypeOrProto, getName(), Protos,
                             Superclass, this->isRecursive, Index);
 
   ArchetypeOrConcreteType = arch;
@@ -390,9 +464,13 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 Type ArchetypeBuilder::PotentialArchetype::getDependentType(
        ArchetypeBuilder &builder) {
   if (auto parent = getParent()) {
-    // FIXME: It would be far better to have an associated type here.
     Type parentType = parent->getDependentType(builder);
-    return DependentMemberType::get(parentType, Name, builder.Context);
+
+    // If we've resolved to an associated type, use it.
+    if (auto assocType = getResolvedAssociatedType())
+      return DependentMemberType::get(parentType, assocType, builder.Context);
+
+    return DependentMemberType::get(parentType, getName(), builder.Context);
   }
 
   assert(getGenericParam() && "Not a generic parameter?");
@@ -666,7 +744,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   if (T->Superclass) {
     if (!T->Superclass->isEqual(Superclass)) {
       Diags.diagnose(Source.getLoc(),
-                     diag::requires_superclass_conflict, T->Name,
+                     diag::requires_superclass_conflict, T->getName(),
                      T->Superclass, Superclass)
         .highlight(T->SuperclassSource->getLoc());
       return true;
@@ -718,7 +796,7 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // FIXME: Should we simply allow this?
   if (T1Depth == 0 && T2Depth == 0) {
     Diags.diagnose(Source.getLoc(), diag::requires_generic_params_made_equal,
-                   T1->Name, T2->Name);
+                   T1->getName(), T2->getName());
     return true;
   }
   
@@ -798,7 +876,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   if (T->getNestingDepth() == 0) {
     Diags.diagnose(Source.getLoc(), 
                    diag::requires_generic_param_made_equal_to_concrete,
-                   T->Name);
+                   T->getName());
     return true;
   }
   
@@ -1342,7 +1420,7 @@ Type swift::resolvePotentialArchetypeToType(
     // Find the protocol that has an associated type with this name.
     AssociatedTypeDecl *associatedType = nullptr;
     auto &ctx = builder.getASTContext();
-    auto name = ctx.getIdentifier(pa->getName());
+    auto name =pa->getName();
     auto &mod = builder.getModule();
     for (const auto &conforms : parentPA->getConformsTo()) {
       auto proto = conforms.first;

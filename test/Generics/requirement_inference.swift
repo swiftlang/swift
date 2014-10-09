@@ -68,17 +68,17 @@ struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
 // CHECK-LABEL: .inferSameType1@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   U : P4 [inferred @ {{.*}}:[[@LINE+5]]:26]
-// CHECK-NEXT:   U.P4Assoc == T.P3Assoc [inferred @ {{.*}}:[[@LINE+4]]:26]
+// CHECK-NEXT:   U[.P4].P4Assoc == T.P3Assoc [inferred @ {{.*}}:[[@LINE+4]]:26]
 // CHECK-NEXT:   T : P3 [inferred @ {{.*}}:[[@LINE+3]]:26]
-// CHECK-NEXT:   T.P3Assoc : P2 [protocol @ {{.*}}:[[@LINE+2]]:26]
-// CHECK-NEXT:   T.P3Assoc : P1 [protocol @ {{.*}}:[[@LINE+1]]:26]
+// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:[[@LINE+2]]:26]
+// CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}:[[@LINE+1]]:26]
 func inferSameType1<T, U>(x: Model_P3_P4_Eq<T, U>) { }
 
 // CHECK-LABEL: .inferSameType2()@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   U : P4 [explicit @ {{.*}}requirement_inference.swift:[[@LINE+5]]:29]
-// CHECK-NEXT:   U.P4Assoc == T.P3Assoc [explicit @ {{.*}}requirement_inference.swift:[[@LINE+4]]:68]
+// CHECK-NEXT:   U[.P4].P4Assoc == T.P3Assoc [explicit @ {{.*}}requirement_inference.swift:[[@LINE+4]]:68]
 // CHECK-NEXT:   T : P3 [explicit @ {{.*}}requirement_inference.swift:[[@LINE+3]]:21]
-// CHECK-NEXT:   T.P3Assoc : P2 [protocol @ {{.*}}requirement_inference.swift:[[@LINE+2]]:21]
-// CHECK-NEXT:   T.P3Assoc : P1 [protocol @ {{.*}}requirement_inference.swift:[[@LINE+1]]:21]
+// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}requirement_inference.swift:[[@LINE+2]]:21]
+// CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}requirement_inference.swift:[[@LINE+1]]:21]
 func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>() { }

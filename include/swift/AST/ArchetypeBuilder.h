@@ -346,8 +346,10 @@ class ArchetypeBuilder::PotentialArchetype {
   /// The root protocol with which this potential archetype is associated.
   ProtocolDecl *RootProtocol = nullptr;
 
-  /// \brief The name of this potential archetype.
-  Identifier Name;
+  /// \brief The name of this potential archetype or, for an
+  /// associated type, the declaration of the associated type to which
+  /// this potential archetype has been resolved.
+  llvm::PointerUnion<Identifier, AssociatedTypeDecl *> NameOrAssociatedType;
 
   /// \brief The index of the computed archetype.
   Optional<unsigned> Index;
@@ -375,10 +377,19 @@ class ArchetypeBuilder::PotentialArchetype {
   /// type that the parameter was same-type constrained to.
   ArchetypeType::NestedType ArchetypeOrConcreteType;
 
+  /// \brief Construct a new potential archetype for an unresolved
+  /// associated type.
+  PotentialArchetype(PotentialArchetype *Parent, Identifier Name)
+    : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this) 
+  { 
+    assert(Parent != nullptr && "Not an associated type?");
+  }
+
   /// \brief Construct a new potential archetype for an associated type.
-  PotentialArchetype(PotentialArchetype *Parent, Identifier Name,
-                     Optional<unsigned> Index = None)
-    : ParentOrParam(Parent), Name(Name), Index(Index), Representative(this) { 
+  PotentialArchetype(PotentialArchetype *Parent, AssociatedTypeDecl *AssocType)
+    : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
+      Representative(this) 
+  { 
     assert(Parent != nullptr && "Not an associated type?");
   }
 
@@ -388,10 +399,10 @@ class ArchetypeBuilder::PotentialArchetype {
                      Identifier Name,
                      Optional<unsigned> Index = None)
     : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
-      Name(Name), Index(Index), Representative(this) { }
+      NameOrAssociatedType(Name), Index(Index), Representative(this) { }
 
   /// \brief Recursively build the full name.
-  void buildFullName(SmallVectorImpl<char> &Result) const;
+  void buildFullName(bool forDebug, SmallVectorImpl<char> &result) const;
   
   /// \brief Recursively conforms to itself.
   bool isRecursive = false;
@@ -400,18 +411,25 @@ public:
   ~PotentialArchetype();
 
   /// \brief Retrieve the name of this potential archetype.
-  StringRef getName() const { return Name.str(); }
+  Identifier getName() const;
 
   /// \brief Retrieve the full display name of this potential archetype.
   std::string getFullName() const;
 
   /// \brief Retrieve the debug name of this potential archetype.
-  std::string getDebugName() const { return getFullName(); }
+  std::string getDebugName() const;
 
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
   PotentialArchetype *getParent() const { 
     return ParentOrParam.dyn_cast<PotentialArchetype *>(); 
+  }
+
+  /// Retrieve the associated type to which this potential archetype
+  /// has been resolved.
+  AssociatedTypeDecl *getResolvedAssociatedType() const {
+    assert(getParent() && "Not an associated type");
+    return NameOrAssociatedType.dyn_cast<AssociatedTypeDecl *>();
   }
 
   /// Retrieve the generic type parameter for this potential

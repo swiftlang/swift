@@ -740,7 +740,7 @@ ERROR(recursive_requirement_reference,sema_tcd,none,
       "type may not reference itself as a requirement",())
 ERROR(requires_same_type_conflict,sema_tcd,none,
       "generic parameter %0 cannot be equal to both %1 and %2",
-      (StringRef, Type, Type))
+      (Identifier, Type, Type))
 ERROR(requires_generic_param_same_type_does_not_conform,sema_tcd,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))

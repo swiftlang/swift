@@ -65,7 +65,7 @@ func test3<
 func fail1<
   T: Fooable, U: Fooable
   where
-  T.Foo == X, U.Foo == Y, T.Foo == U.Foo // expected-error{{generic parameter Foo cannot be equal to both 'X' and 'Y'}}
+  T.Foo == X, U.Foo == Y, T.Foo == U.Foo // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}
 >(t: T, u: U) -> (X, Y) {
   return (t.foo, u.foo)
 }
@@ -73,7 +73,7 @@ func fail1<
 func fail2<
   T: Fooable, U: Fooable
   where
-  T.Foo == U.Foo, T.Foo == X, U.Foo == Y // expected-error{{generic parameter Foo cannot be equal to both 'X' and 'Y'}}
+  T.Foo == U.Foo, T.Foo == X, U.Foo == Y // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}
 >(t: T, u: U) -> (X, Y) {
   return (t.foo, u.foo) // expected-error{{cannot convert the expression's type '($T1, $T5)' to type 'Y'}}
 }
@@ -106,7 +106,7 @@ func fail4<
   T: Barrable
   where
   T.Bar == Y,
-  T.Bar.Foo == Z // expected-error{{generic parameter Foo cannot be equal to both 'X' and 'Z'}}
+  T.Bar.Foo == Z // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Z'}}
 >(t: T) -> (Y, Z) {
   return (t.bar, t.bar.foo) // expected-error{{cannot convert the expression's type '($T1, $T8)' to type 'Z'}}
 }
@@ -116,12 +116,12 @@ func fail5<
   T: Barrable
   where
   T.Bar.Foo == Z,
-  T.Bar == Y // expected-error{{generic parameter Foo cannot be equal to both 'Z' and 'X'}} expected-error{{generic parameter Foo cannot be equal to both 'Z' and 'X'}}
+  T.Bar == Y // expected-error{{generic parameter 'Foo' cannot be equal to both 'Z' and 'X'}} expected-error{{generic parameter 'Foo' cannot be equal to both 'Z' and 'X'}}
 >(t: T) -> (Y, Z) {
   return (t.bar, t.bar.foo) // expected-error{{cannot convert the expression's type '($T1, $T8)' to type 'Z'}}
 }
 
-func test8<T: Fooable where T.Foo == X, T.Foo == Y>(t: T) {} // expected-error{{generic parameter Foo cannot be equal to both 'X' and 'Y'}}
+func test8<T: Fooable where T.Foo == X, T.Foo == Y>(t: T) {} // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}
 
 func testAssocTypeEquivalence<
   T: Fooable where T.Foo == X
