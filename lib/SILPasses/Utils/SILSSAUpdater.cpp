@@ -75,22 +75,51 @@ SILValue SILSSAUpdater::GetValueAtEndOfBlock(SILBasicBlock *BB) {
   return GetValueAtEndOfBlockInternal(BB);
 }
 
+/// Are all available values identicalTo each other.
+bool areIdentical(AvailableValsTy &Avails) {
+  auto *First = dyn_cast<SILInstruction>(Avails.begin()->second);
+  if (!First)
+    return false;
+  for (auto Avail : Avails) {
+    auto *Inst = dyn_cast<SILInstruction>(Avail.second);
+    if (!Inst)
+      return false;
+    if (!Inst->isIdenticalTo(First))
+      return false;
+  }
+  return true;
+}
+
 void SILSSAUpdater::RewriteUse(Operand &Op) {
   // Replicate function_refs to their uses. SILGen can't build phi nodes for
   // them and it would not make much sense anyways.
   if (auto *FR = dyn_cast<FunctionRefInst>(
           getAvailVals(AV).begin()->second.getDef())) {
+    assert(areIdentical(getAvailVals(AV)) &&
+           "The function_refs need to have the same value");
     SILInstruction *User = Op.getUser();
     auto *NewFR = FR->clone(User);
     Op.set(SILValue(NewFR, Op.get().getResultNumber()));
     return;
   } else if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(
                  getAvailVals(AV).begin()->second.getDef())) {
+    assert(areIdentical(getAvailVals(AV)) &&
+           "The function_refs need to have the same value");
     SILInstruction *User = Op.getUser();
     auto *NewFR = FR->clone(User);
     Op.set(SILValue(NewFR, Op.get().getResultNumber()));
     return;
-  }
+  } else if (auto *IL = dyn_cast<IntegerLiteralInst>(
+                  getAvailVals(AV).begin()->second.getDef()))
+    if (areIdentical(getAvailVals(AV))) {
+      // Some llvm intrinsics don't like phi nodes as their constant inputs (e.g
+      // ctlz).
+      SILInstruction *User = Op.getUser();
+      auto *NewIL = IL->clone(User);
+      Op.set(SILValue(NewIL, Op.get().getResultNumber()));
+      return;
+    }
+
   // Again we need to be careful here, because ssa construction (with the
   // existing representation) can change the operand from under us.
   UseWrapper UW(&Op);
