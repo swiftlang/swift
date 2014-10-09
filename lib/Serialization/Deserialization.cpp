@@ -3100,27 +3100,22 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::ARCHETYPE_TYPE: {
     IdentifierID nameID;
-    bool isPrimary;
-    TypeID parentOrIndex;
+    TypeID parentID;
     DeclID assocTypeOrProtoID;
     TypeID superclassID;
     ArrayRef<uint64_t> rawConformanceIDs;
 
-    decls_block::ArchetypeTypeLayout::readRecord(scratch, nameID, isPrimary,
-                                                 parentOrIndex,
+    decls_block::ArchetypeTypeLayout::readRecord(scratch, nameID, parentID,
                                                  assocTypeOrProtoID,
                                                  superclassID,
                                                  rawConformanceIDs);
 
     ArchetypeType *parent = nullptr;
     Type superclass;
-    Optional<unsigned> index;
     SmallVector<ProtocolDecl *, 4> conformances;
 
-    if (isPrimary)
-      index = parentOrIndex;
-    else
-      parent = getType(parentOrIndex)->castTo<ArchetypeType>();
+    if (auto parentType = getType(parentID))
+      parent = parentType->castTo<ArchetypeType>();
 
     ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto;
     auto assocTypeOrProtoDecl = getDecl(assocTypeOrProtoID);
@@ -3141,7 +3136,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     auto archetype = ArchetypeType::getNew(ctx, parent, assocTypeOrProto,
                                            getIdentifier(nameID), conformances,
-                                           superclass, false, index);
+                                           superclass, false);
     typeOrOffset = archetype;
     
     // Read the associated type names.

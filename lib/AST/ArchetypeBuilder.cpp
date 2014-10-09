@@ -444,7 +444,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   auto arch
     = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
                             assocTypeOrProto, getName(), Protos,
-                            Superclass, this->isRecursive, Index);
+                            Superclass, this->isRecursive);
 
   ArchetypeOrConcreteType = arch;
   
@@ -617,30 +617,26 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
 
 auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
                                            ProtocolDecl *RootProtocol,
-                                           Identifier ParamName,
-                                           Optional<unsigned> Index)
-  -> PotentialArchetype *
+                                           Identifier ParamName)
+       -> PotentialArchetype *
 {
   GenericTypeParamKey Key{GenericParam->getDepth(), GenericParam->getIndex()};
   
   // Create a potential archetype for this type parameter.
   assert(!Impl->PotentialArchetypes[Key]);
-  auto PA = new PotentialArchetype(GenericParam, RootProtocol, ParamName, 
-                                   Index);
+  auto PA = new PotentialArchetype(GenericParam, RootProtocol, ParamName);
 
   Impl->PotentialArchetypes[Key] = PA;
   Impl->RootPotentialArchetypes.push_back(PA);  
   return PA;
 }
 
-bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam,
-                                           Optional<unsigned> Index) {
+bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   PotentialArchetype *PA
     = addGenericParameter(
         GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
         dyn_cast<ProtocolDecl>(GenericParam->getDeclContext()),
-        GenericParam->getName(),
-        Index);
+        GenericParam->getName());
   
   if (!PA)
     return true;
@@ -665,8 +661,7 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam,
   return false;
 }
 
-bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
-                                           Optional<unsigned> Index) {
+bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   auto name = GenericParam->getName();
   // Trim '$' so that archetypes are more readily discernible from abstract
   // parameters.

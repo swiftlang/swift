@@ -2860,7 +2860,6 @@ public:
 
   // FIXME: Temporary hack.
   bool isPrimary() const;
-  unsigned getPrimaryIndex() const;
 
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
@@ -2912,7 +2911,6 @@ private:
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
   AssocTypeOrProtocolType AssocTypeOrProto;
   Identifier Name;
-  unsigned IndexIfPrimary: 31;
   unsigned isRecursive: 1;
   ArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
 
@@ -2931,8 +2929,7 @@ public:
                                AssocTypeOrProtocolType AssocTypeOrProto,
                                Identifier Name, ArrayRef<Type> ConformsTo,
                                Type Superclass,
-                               bool isRecursive = false,
-                               Optional<unsigned> Index = Optional<unsigned>());
+                               bool isRecursive = false);
 
   /// getNew - Create a new archetype with the given name.
   ///
@@ -2943,8 +2940,7 @@ public:
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass,
-                               bool isRecursive = false,
-                               Optional<unsigned> Index = Optional<unsigned>());
+                               bool isRecursive = false);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -3032,14 +3028,7 @@ public:
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., 
   bool isPrimary() const { 
-    return IndexIfPrimary > 0 && 
-           getOpenedExistentialType().isNull();
-  }
-
-  // getPrimaryIndex - For a primary archetype, return the zero-based index.
-  unsigned getPrimaryIndex() const {
-    assert(isPrimary() && "Non-primary archetype does not have index");
-    return IndexIfPrimary - 1;
+    return ParentOrOpened.isNull();
   }
 
   /// Retrieve the ID number of this opened existential.
@@ -3066,13 +3055,12 @@ private:
   ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
                 AssocTypeOrProtocolType AssocTypeOrProto,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass, Optional<unsigned> Index,
+                Type Superclass,
                 bool isRecursive = false)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype,
                         ConformsTo, Superclass),
       ParentOrOpened(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
-      IndexIfPrimary(Index? *Index + 1 : 0),
       isRecursive(isRecursive) { }
 
   ArchetypeType(const ASTContext &Ctx, 
@@ -3083,7 +3071,6 @@ private:
                         RecursiveTypeProperties::HasArchetype,
                         ConformsTo, Superclass),
       ParentOrOpened(Existential.getPointer()), 
-      IndexIfPrimary(0),
       isRecursive(isRecursive) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
@@ -3677,12 +3664,6 @@ inline bool SubstitutableType::isPrimary() const {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype->isPrimary();
 
-  llvm_unreachable("Not a substitutable type");
-}
-
-inline unsigned SubstitutableType::getPrimaryIndex() const {
-  if (auto Archetype = dyn_cast<ArchetypeType>(this))
-    return Archetype->getPrimaryIndex();
   llvm_unreachable("Not a substitutable type");
 }
 

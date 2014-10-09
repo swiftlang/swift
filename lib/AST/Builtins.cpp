@@ -441,7 +441,7 @@ getGenericParam(ASTContext &Context) {
     = ArchetypeType::getNew(Context, nullptr,
                             static_cast<AssociatedTypeDecl *>(nullptr),
                             GenericName,
-                            ArrayRef<Type>(), Type(), false, 0);
+                            ArrayRef<Type>(), Type(), false);
   auto GenericTyDecl =
     new (Context) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                        GenericName, SourceLoc(), 0, 0);
@@ -648,7 +648,7 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &Context,
       = ArchetypeType::getNew(Context, nullptr,
                               static_cast<AssociatedTypeDecl *>(nullptr),
                               GenericName,
-                              ArrayRef<Type>(), Type(), false, index);
+                              ArrayRef<Type>(), Type(), false);
     auto GenericTyDecl =
       new (Context) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                          GenericName, SourceLoc(), 0, index);

@@ -805,7 +805,6 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
   unsigned Depth = genericParams->getDepth();
 
   // Assign archetypes to each of the generic parameters.
-  unsigned Index = 0;
   for (auto GP : *genericParams) {
     // Set the depth of this type parameter.
     GP->setDepth(Depth);
@@ -814,7 +813,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
     TC.checkInheritanceClause(GP, DC);
 
     // Add the generic parameter to the builder.
-    builder.addGenericParameter(GP, Index++);
+    builder.addGenericParameter(GP);
 
     // Infer requirements from the "inherited" types.
     for (auto &inherited : GP->getInherited()) {

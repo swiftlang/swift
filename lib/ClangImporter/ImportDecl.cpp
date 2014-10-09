@@ -4084,7 +4084,7 @@ namespace {
       auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
                                                  result, selfId,
                                                  Type(result->getDeclaredType()),
-                                                 Type(), false, /*Index=*/0);
+                                                 Type(), false);
       selfDecl->setArchetype(selfArchetype);
 
       // Set AllArchetypes of the protocol. ObjC protocols don't have associated

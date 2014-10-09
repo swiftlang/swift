@@ -210,7 +210,6 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
 
   // Visit each of the generic parameters.
   unsigned depth = genericParams->getDepth();
-  unsigned index = 0;
   for (auto param : *genericParams) {
     // Check the generic type parameter.
     // Set the depth of this type parameter.
@@ -221,7 +220,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
 
     if (builder) {
       // Add the generic parameter to the builder.
-      if (builder->addGenericParameter(param, index++))
+      if (builder->addGenericParameter(param))
         invalid = true;
 
       // Infer requirements from the inherited types.

@@ -1676,8 +1676,7 @@ ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
                                      AssocTypeOrProtocolType AssocTypeOrProto,
                                      Identifier Name, ArrayRef<Type> ConformsTo,
                                      Type Superclass,
-                                     bool isRecursive,
-                                     Optional<unsigned> Index) {
+                                     bool isRecursive) {
   // Gather the set of protocol declarations to which this archetype conforms.
   SmallVector<ProtocolDecl *, 4> ConformsToProtos;
   for (auto P : ConformsTo) {
@@ -1688,7 +1687,7 @@ ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
   auto arena = AllocationArena::Permanent;
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
                                         Ctx.AllocateCopy(ConformsToProtos),
-                                        Superclass, Index, isRecursive);
+                                        Superclass, isRecursive);
 }
 
 ArchetypeType *
@@ -1696,14 +1695,14 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                       AssocTypeOrProtocolType AssocTypeOrProto,
                       Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                      Type Superclass, bool isRecursive, Optional<unsigned> Index) {
+                      Type Superclass, bool isRecursive) {
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
                                         Ctx.AllocateCopy(ConformsTo),
-                                        Superclass, Index, isRecursive);
+                                        Superclass, isRecursive);
 }
 
 namespace {

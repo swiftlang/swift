@@ -197,21 +197,18 @@ public:
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
                                           ProtocolDecl *RootProtocol,
-                                          Identifier ParamName,
-                                          Optional<unsigned> Index = None);
+                                          Identifier ParamName);
 
 public:
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameter(GenericTypeParamDecl *GenericParam,
-                           Optional<unsigned> Index = None);
+  bool addGenericParameter(GenericTypeParamDecl *GenericParam);
 
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameter(GenericTypeParamType *GenericParam,
-                           Optional<unsigned> Index = None);
+  bool addGenericParameter(GenericTypeParamType *GenericParam);
   
   /// \brief Add a new requirement.
   ///
@@ -351,9 +348,6 @@ class ArchetypeBuilder::PotentialArchetype {
   /// this potential archetype has been resolved.
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> NameOrAssociatedType;
 
-  /// \brief The index of the computed archetype.
-  Optional<unsigned> Index;
-
   /// \brief The representative of the equivalent class of potential archetypes
   /// to which this potential archetype belongs.
   PotentialArchetype *Representative;
@@ -396,10 +390,9 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief Construct a new potential archetype for a generic parameter.
   PotentialArchetype(GenericTypeParamType *GenericParam, 
                      ProtocolDecl *RootProtocol,
-                     Identifier Name,
-                     Optional<unsigned> Index = None)
+                     Identifier Name)
     : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
-      NameOrAssociatedType(Name), Index(Index), Representative(this) { }
+      NameOrAssociatedType(Name), Representative(this) { }
 
   /// \brief Recursively build the full name.
   void buildFullName(bool forDebug, SmallVectorImpl<char> &result) const;
@@ -507,7 +500,7 @@ public:
     if (Representative != this)
       return Representative->isPrimary();
 
-    return Index.hasValue() && !isConcreteType();
+    return getGenericParam() && !isConcreteType();
   }
 
   void setIsRecursive() { this->isRecursive = true; }

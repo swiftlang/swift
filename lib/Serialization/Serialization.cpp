@@ -2241,11 +2241,7 @@ void Serializer::writeType(Type ty) {
       break;
     }
 
-    TypeID indexOrParentID;
-    if (archetypeTy->isPrimary())
-      indexOrParentID = archetypeTy->getPrimaryIndex();
-    else
-      indexOrParentID = addTypeRef(archetypeTy->getParent());
+    TypeID parentID = addTypeRef(archetypeTy->getParent());
 
     SmallVector<DeclID, 4> conformances;
     for (auto proto : archetypeTy->getConformsTo())
@@ -2260,8 +2256,7 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     addIdentifierRef(archetypeTy->getName()),
-                                    archetypeTy->isPrimary(),
-                                    indexOrParentID,
+                                    parentID,
                                     assocTypeOrProtoID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
