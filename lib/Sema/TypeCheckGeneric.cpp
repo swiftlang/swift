@@ -122,7 +122,9 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   basePA = basePA->getRepresentative();
 
   // Find the associated type declaration for this name.
-  for (auto proto : basePA->getConformsTo()) {
+  for (const auto &conforms : basePA->getConformsTo()) {
+    auto proto = conforms.first;
+
     SmallVector<ValueDecl *, 2> decls;
     if (DC->lookupQualified(proto->getDeclaredType(), name,
                             NL_VisitSupertypes, &TC, decls)) {
@@ -130,6 +132,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
         // Note: once we find any associated type, we have our answer, because
         // the archetype builder is supposed to ensure that all associated
         // types with the same name are equivalent.
+        // FIXME: It would be preferable for this information to be in the
+        // potential archetype itself.
         auto assocType = dyn_cast<AssociatedTypeDecl>(decl);
         if (assocType) {
           return DependentMemberType::get(baseTy, assocType, TC.Context);
@@ -398,8 +402,11 @@ addRequirements(
   }
 
   // Add conformance requirements.
-  SmallVector<ProtocolDecl *, 4> protocols(pa->getConformsTo().begin(),
-                                           pa->getConformsTo().end());
+  SmallVector<ProtocolDecl *, 4> protocols;
+  for (const auto &conforms : pa->getConformsTo()) {
+    protocols.push_back(conforms.first);
+  }
+
   ProtocolType::canonicalizeProtocols(protocols);
   for (auto proto : protocols) {
     requirements.push_back(Requirement(RequirementKind::Conformance,
@@ -629,6 +636,13 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver)) {
     func->setType(ErrorType::get(Context));
     return true;
+  }
+
+  // Debugging of the archetype builder.
+  if (Context.LangOpts.DebugGenericSignatures) {
+    func->dumpRef(llvm::errs());
+    llvm::errs() << "\n";
+    builder.dump(llvm::errs());
   }
 
   // The generic function signature is complete and well-formed. Determine

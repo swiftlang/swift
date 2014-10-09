@@ -77,6 +77,9 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 
+def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
+  HelpText<"Debug generic signatures">;
+
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;

@@ -616,6 +616,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.ImportUnions |= Args.hasArg(OPT_enable_union_import);
   
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
+  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   Opts.Playground |= Args.hasArg(OPT_playground);

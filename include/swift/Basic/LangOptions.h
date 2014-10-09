@@ -44,6 +44,9 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
     
+    /// Debug the generic signatures computed by the archetype builder.
+    bool DebugGenericSignatures = false;
+
     /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
     /// identifier reference with the provided prefix name.
     /// This is for testing purposes.

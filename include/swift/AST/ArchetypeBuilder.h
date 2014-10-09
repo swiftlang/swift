@@ -25,7 +25,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/MapVector.h"
 #include <functional>
 #include <memory>
 
@@ -54,6 +54,45 @@ class TypeRepr;
 class ASTContext;
 class DiagnosticEngine;
 
+/// Describes how a requirement was determined.
+class RequirementSource {
+public:
+  enum Kind : unsigned char {
+    /// The requirement was explicitly stated in the generic parameter
+    /// clause.
+    Explicit,
+    /// The requirement was part of a protocol requirement, e.g., an
+    /// inherited protocol or a requirement on an associated type.
+    Protocol,
+    /// 
+    /// The requirement was inferred from part of the signature.
+    Inferred,
+    /// The requirement came from an outer scope.
+    /// FIXME: eliminate this in favor of keeping requirement sources in 
+    /// GenericSignatures, at least non-canonical ones?
+    OuterScope,
+  };
+
+  RequirementSource(Kind kind, SourceLoc loc) : StoredKind(kind), Loc(loc) { }
+
+  /// Retrieve the kind of requirement source.
+  Kind getKind() const { return StoredKind; }
+
+  /// Retrieve the source location at which the requirement originated.
+  SourceLoc getLoc() const { return Loc; }
+
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(SourceManager *srcMgr) const,
+      "only for use within the debugger");
+
+  /// Dump the requirement source.
+  void dump(llvm::raw_ostream &out, SourceManager *srcMgr) const;
+
+private:
+  Kind StoredKind;
+  SourceLoc Loc;
+};
+
 /// \brief Collects a set of requirements of generic parameters, both explicitly
 /// stated and inferred, and determines the set of archetypes for each of
 /// the generic parameters.
@@ -80,28 +119,30 @@ private:
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
   bool addConformanceRequirement(PotentialArchetype *T,
-                                 ProtocolDecl *Proto);
+                                 ProtocolDecl *Proto,
+                                 RequirementSource Source);
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
   bool addSameTypeRequirementBetweenArchetypes(PotentialArchetype *T1,
-                                               SourceLoc EqualLoc,
-                                               PotentialArchetype *T2);
+                                               PotentialArchetype *T2,
+                                               RequirementSource Source);
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
   bool addSameTypeRequirementToConcrete(PotentialArchetype *T,
-                                        SourceLoc EqualLoc,
-                                        Type Concrete);
+                                        Type Concrete,
+                                        RequirementSource Source);
   
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
-  bool addSuperclassRequirement(PotentialArchetype *T, SourceLoc ColonLoc,
-                                Type Superclass);
+  bool addSuperclassRequirement(PotentialArchetype *T, 
+                                Type Superclass,
+                                RequirementSource Source);
 
   /// \brief Add a new same-type requirement specifying that the given potential
   /// archetypes should map to the equivalent archetype.
-  bool addSameTypeRequirement(Type T1, SourceLoc EqualLoc, Type T2);
+  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
 
 public:
   ArchetypeBuilder(Module &mod, DiagnosticEngine &diags);
@@ -127,8 +168,7 @@ public:
   /// to which the given type parameter conforms. The produces the final
   /// results of AbstractTypeParamDecl::getProtocols() for an associated type.
   ArchetypeBuilder(
-    Module &mod, DiagnosticEngine &diags,
-    LazyResolver *resolver,
+    Module &mod, DiagnosticEngine &diags, LazyResolver *resolver,
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
       getInheritedProtocols,
     GetConformsToCallback getConformsTo,
@@ -175,17 +215,12 @@ public:
   ///
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
-  void addRequirement(const Requirement &req);
+  void addRequirement(const Requirement &req, RequirementSource source);
   
   /// \brief Add all of a generic signature's parameters and requirements.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool addGenericSignature(GenericSignature *sig);
-
-  /// \brief Add a new, implicit conformance requirement for one of the
-  /// parameters.
-  bool addImplicitConformance(GenericTypeParamDecl *Param,
-                              ProtocolDecl *Proto);
 
   /// Infer requirements from the given type, recursively.
   ///
@@ -272,7 +307,10 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
       "only for use within the debugger");
-  
+
+  /// Dump all of the requirements to the given output stream.
+  void dump(llvm::raw_ostream &out);
+
   /// FIXME: Share the guts of our mapTypeIntoContext implementation with
   static Type mapTypeIntoContext(Module *M,
                                  GenericParamList *genericParams,
@@ -312,11 +350,14 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief The superclass of this archetype, if specified.
   Type Superclass;
 
-  /// \brief The list of protocols to which this archetype will conform.
-  llvm::SetVector<ProtocolDecl *, SmallVector<ProtocolDecl *, 4>> ConformsTo;
+  /// The source of the superclass requirement.
+  Optional<RequirementSource> SuperclassSource;
 
-  /// \brief The set of nested typed stores within this archetype.
-  llvm::DenseMap<Identifier, PotentialArchetype *> NestedTypes;
+  /// \brief The list of protocols to which this archetype will conform.
+  llvm::MapVector<ProtocolDecl *, RequirementSource> ConformsTo;
+
+  /// \brief The set of nested types of this archetype.
+  llvm::MapVector<Identifier, PotentialArchetype *> NestedTypes;
 
   /// \brief The actual archetype, once it has been assigned, or the concrete
   /// type that the parameter was same-type constrained to.
@@ -353,15 +394,17 @@ public:
   PotentialArchetype *getParent() const { return Parent; }
 
   /// Retrieve the set of protocols to which this type conforms.
-  ArrayRef<ProtocolDecl *> getConformsTo() const {
-    return llvm::makeArrayRef(ConformsTo.begin(), ConformsTo.end());
+  const llvm::MapVector<ProtocolDecl *, RequirementSource> &
+  getConformsTo() const {
+    return ConformsTo;
   }
 
   /// Retrieve the superclass of this archetype.
   Type getSuperclass() const { return Superclass; }
 
   /// Retrieve the set of nested types.
-  const llvm::DenseMap<Identifier, PotentialArchetype*> &getNestedTypes() const{
+  const llvm::MapVector<Identifier, PotentialArchetype *> &
+  getNestedTypes() const{
     return NestedTypes;
   }
 
@@ -405,7 +448,8 @@ public:
   void setIsRecursive() { this->isRecursive = true; }
   bool getIsRecursive() { return this->isRecursive; }
   
-  void dump(llvm::raw_ostream &Out, unsigned Indent);
+  void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
+            unsigned Indent);
 
   friend class ArchetypeBuilder;
 };
