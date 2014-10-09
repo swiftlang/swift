@@ -1,7 +1,8 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-stdlib-swift
 // XFAIL: interpret
 
 import StdlibUnittest
+import Swift
 
 //===---
 // Utilities.
@@ -177,8 +178,8 @@ func checkRoundTripThroughCharacter(s: String) {
 }
 
 func isSmallRepresentation(s: String) -> Bool {
-  switch(Character(s)) {
-    case .SmallRepresentation:
+  switch(Character(s)._representation) {
+    case .Small:
       return true
     default:
       return false

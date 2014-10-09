@@ -1,6 +1,9 @@
 Latest
 ------
 
+* The 'Character' enum has been turned into a struct, to avoid
+  exposing its internal implementation details.
+
 * The 'countElements' function has been renamed 'count', for better
   consistency with our naming conventions.
 

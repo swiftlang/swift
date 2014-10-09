@@ -22,7 +22,7 @@ internal struct _SmallUTF8Sink : SinkType {
 /// `Character` represents some Unicode grapheme cluster as
 /// defined by a canonical, localized, or otherwise tailored
 /// segmentation algorithm.
-public enum Character :
+public struct Character :
   _BuiltinExtendedGraphemeClusterLiteralConvertible,
   ExtendedGraphemeClusterLiteralConvertible, Equatable, Hashable, Comparable {
 
@@ -32,17 +32,19 @@ public enum Character :
   // representations.  In the small representation, the unused bytes
   // are filled with 0xFF.
   //
-  // If the grapheme cluster can be represented in SmallRepresentation, it
+  // If the grapheme cluster can be represented as Small, it
   // should be represented as such.
-  case LargeRepresentation(OnHeap<String>)
-  case SmallRepresentation(Builtin.Int63)
+  enum Representation {
+  case Large(_StringBuffer._Storage)
+  case Small(Builtin.Int63)
+  }
 
   /// Construct a `Character` containing just the given `scalar`.
   public init(_ scalar: UnicodeScalar) {
     var output = _SmallUTF8Sink()
     UTF8.encode(scalar, output: &output)
     output.asInt |= (~0) << output.shift
-    self = SmallRepresentation(Builtin.trunc_Int64_Int63(output.asInt.value))
+    _representation = .Small(Builtin.trunc_Int64_Int63(output.asInt.value))
   }
 
   @effects(readonly)
@@ -99,10 +101,18 @@ public enum Character :
     let bits = sizeofValue(initialUTF8) &* 8 &- 1
     if _fastPath(
       count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
-      self = SmallRepresentation(Builtin.trunc_Int64_Int63(initialUTF8.value))
+      _representation = .Small(Builtin.trunc_Int64_Int63(initialUTF8.value))
     }
     else {
-      self = LargeRepresentation(OnHeap(s))
+      if let native = s._core.nativeBuffer {
+        if native.start == UnsafeMutablePointer(s._core._baseAddress) {
+          _representation = .Large(native._storage)
+          return
+        }
+      }
+      var nativeString = ""
+      nativeString.extend(s)
+      _representation = .Large(nativeString._core.nativeBuffer!._storage)
     }
   }
 
@@ -262,19 +272,21 @@ public enum Character :
   var utf16: UTF16View {
     return String(self).utf16
   }
+
+  internal var _representation: Representation;
 }
 
 extension String {
   /// Construct an instance containing just the given `Character`.
   public init(_ c: Character) {
-    switch c {
-    case .SmallRepresentation(var _63bits):
+    switch c._representation {
+    case .Small(var _63bits):
       let value = Character._smallValue(_63bits)
       let smallUTF8 = Character._SmallUTF8(value)
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: smallUTF8)
-    case .LargeRepresentation(var value):
-      self = value._value
+    case .Large(var value):
+      self = String(_StringCore(_StringBuffer(value)))
     }
   }
 }
