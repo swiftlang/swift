@@ -1,10 +1,10 @@
-// See <rdar://problem/16533351>
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %target-build-swift -module-cache-path %t/clang-module-cache -emit-ir -g %s -o %t.ll
 // RUN: cat %t.ll | FileCheck %s --check-prefix SANITY
 // RUN: cat %t.ll | FileCheck %s --check-prefix IMPORT-CHECK
 // RUN: cat %t.ll | FileCheck %s --check-prefix LOC-CHECK
-// RUN: llc %t.ll -filetype=obj -o - |llvm-dwarfdump - | FileCheck %s --check-prefix DWARF-CHECK
+// RUN: llc %t.ll -filetype=obj -o %t.o
+// RUN: llvm-dwarfdump %t.o | FileCheck %s --check-prefix DWARF-CHECK
 
 // Make sure that there is no ret instruction without a !dbg annotation.
 // This ensures that we associate every function with a debug scope.
