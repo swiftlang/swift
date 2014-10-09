@@ -374,6 +374,22 @@ llvm::MDNode* IRGenDebugInfo::createInlinedAt(SILDebugScope *InlinedScope) {
   return DL.getAsMDNode(IGM.getLLVMContext());
 }
 
+#ifndef NDEBUG
+/// Perform a couple of sanity checks on scopes.
+static bool parentScopesAreSane(SILDebugScope *DS) {
+  SILDebugScope *Parent = DS->Parent;
+  while (Parent) {
+    if (!DS->InlinedCallSite) {
+      assert(!Parent->InlinedCallSite &&
+             "non-inlined scope has an inlined parent");
+      assert(DS->SILFn == Parent->SILFn
+             && "non-inlined parent scope from different function?");
+    }
+    Parent = Parent->Parent;
+  }
+  return true;
+}
+#endif
 
 void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
                                    Optional<SILLocation> Loc) {
@@ -427,6 +443,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
   }
 
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
+  assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
   auto DL = llvm::DebugLoc::get(L.LocForLinetable.Line, L.LocForLinetable.Col,
                                 Scope, InlinedAt);
   // TODO: Write a strongly-worded letter to the person that came up
