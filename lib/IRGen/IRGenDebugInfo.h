@@ -146,8 +146,7 @@ public:
                                   DeclContext *DeclCtx = nullptr);
 
   /// Emit debug info for a given SIL function.
-  llvm::DIDescriptor emitFunction(SILFunction &SILFn, llvm::Function *Fn,
-                                  bool Force = false);
+  llvm::DIDescriptor emitFunction(SILFunction &SILFn, llvm::Function *Fn);
 
   /// Convenience function useful for functions without any source
   /// location. Internally calls emitFunction, emits a debug

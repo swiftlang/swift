@@ -483,7 +483,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     llvm::Function *Fn = nullptr;
     if (!DS->SILFn->getName().empty() && !DS->SILFn->isZombie())
       Fn = IGM.getAddrOfSILFunction(DS->SILFn, NotForDefinition);
-    llvm::DIDescriptor SP = emitFunction(*DS->SILFn, Fn, true);
+    llvm::DIDescriptor SP = emitFunction(*DS->SILFn, Fn);
 
     // Cache it.
     ScopeCache[DS] = llvm::WeakVH(SP);
@@ -864,11 +864,7 @@ llvm::DIModule IRGenDebugInfo::getOrCreateModule(llvm::DIScope Parent,
 }
 
 llvm::DIDescriptor IRGenDebugInfo::emitFunction(SILFunction &SILFn,
-                                                llvm::Function *Fn,
-                                                bool Force) {
-  if (!Force && isAvailableExternally(SILFn.getLinkage()))
-    return llvm::DIDescriptor();
-
+                                                llvm::Function *Fn) {
   auto DS = SILFn.getDebugScope();
   if (DS && !DS->SILFn)
     DS->SILFn = &SILFn;
