@@ -5,6 +5,7 @@
 // RUN: cat %t.ll | FileCheck %s --check-prefix LOC-CHECK
 // RUN: llc %t.ll -filetype=obj -o %t.o
 // RUN: llvm-dwarfdump %t.o | FileCheck %s --check-prefix DWARF-CHECK
+// RUN: dwarfdump --verify %t.o
 
 // Make sure that there is no ret instruction without a !dbg annotation.
 // This ensures that we associate every function with a debug scope.
