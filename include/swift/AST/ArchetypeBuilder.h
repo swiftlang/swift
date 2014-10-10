@@ -493,9 +493,6 @@ public:
   /// archetype.
   Type getDependentType(ArchetypeBuilder &builder);
 
-  /// Retrieve the associated type declaration for a given nested type.
-  AssociatedTypeDecl *getAssociatedType(Module &mod, Identifier name);
-  
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
   bool isConcreteType() const {

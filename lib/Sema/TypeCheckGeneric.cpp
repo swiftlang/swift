@@ -437,7 +437,7 @@ addNestedRequirements(
     auto rep = nested.second->getRepresentative();
     if (knownPAs.insert(rep)) {
       // Form the dependent type that refers to this archetype.
-      auto assocType = pa->getAssociatedType(mod, nested.first);
+      auto assocType = nested.second->getResolvedAssociatedType();
       if (!assocType)
         continue; // FIXME: If we do this late enough, there will be no failure.
 

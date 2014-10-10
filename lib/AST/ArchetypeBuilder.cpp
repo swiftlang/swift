@@ -426,24 +426,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     if (!ParentArchetype)
       return {};
 
-    // Find the protocol that has an associated type with this name.
-    for (auto proto : ParentArchetype->getConformsTo()) {
-      SmallVector<ValueDecl *, 2> decls;
-      if (mod.lookupQualified(proto->getDeclaredType(), getName(),
-                              NL_VisitSupertypes | NL_IgnoreAccessibility,
-                              /*FIXME:*/nullptr, decls)) {
-        for (auto decl : decls) {
-          if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-            assocTypeOrProto = assocType;
-            break;
-          }
-        }
-      }
-    }
-
-    // FIXME: If assocTypeOrProto is null, we will diagnose it later.
-    // It would be far nicer to know now, and be able to recover, e.g.,
-    // via typo correction.
+    assocTypeOrProto = getResolvedAssociatedType();
   }
 
   // If we ended up building our parent archetype, then we'll have
@@ -490,28 +473,6 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
 
   assert(getGenericParam() && "Not a generic parameter?");
   return getGenericParam();
-}
-
-AssociatedTypeDecl *
-ArchetypeBuilder::PotentialArchetype::getAssociatedType(Module &mod,
-                                                        Identifier name) {
-  for (const auto &conforms : getRepresentative()->getConformsTo()) {
-    auto proto = conforms.first;
-    SmallVector<ValueDecl *, 2> decls;
-    // FIXME: lookupDirect should suffice here.
-    if (mod.lookupQualified(proto->getDeclaredType(), name,
-                            NL_VisitSupertypes | NL_IgnoreAccessibility,
-                            /*FIXME:*/nullptr, decls)) {
-      for (auto decl : decls) {
-        // FIXME: Collect multiple results equate them with same-type
-        // constraints.
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-          return assocType;
-      }
-    }
-  }
-
-  return nullptr;
 }
 
 void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
@@ -915,7 +876,8 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   
   // Recursively resolve the associated types to their concrete types.
   for (auto nested : T->getNestedTypes()) {
-    AssociatedTypeDecl *assocType = T->getAssociatedType(Mod, nested.first);
+    AssociatedTypeDecl *assocType
+      = nested.second.front()->getResolvedAssociatedType();
     auto witness = conformances[assocType->getProtocol()]
           ->getTypeWitness(assocType, getLazyResolver());
     addSameTypeRequirementToConcrete(
