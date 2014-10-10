@@ -2799,9 +2799,15 @@ void IRGenSILFunction::visitPointerToAddressInst(swift::PointerToAddressInst *i)
 static void emitPointerCastInst(IRGenSILFunction &IGF,
                                 SILValue src,
                                 SILValue dest,
-                                llvm::Type *castToType) {
+                                const TypeInfo &ti) {
   Explosion from = IGF.getLoweredExplosion(src);
   llvm::Value *ptrValue = from.claimNext();
+  
+  auto schema = ti.getSchema();
+  assert(schema.size() == 1
+         && schema[0].isScalar()
+         && "pointer schema is not a single scalar?!");
+  auto castToType = schema[0].getScalarType();
   
   ptrValue = IGF.Builder.CreateBitCast(ptrValue, castToType);
   
@@ -2813,8 +2819,7 @@ static void emitPointerCastInst(IRGenSILFunction &IGF,
 void IRGenSILFunction::visitUncheckedRefCastInst(
                                              swift::UncheckedRefCastInst *i) {
   auto &ti = getTypeInfo(i->getType());
-  llvm::Type *destType = ti.getStorageType();
-  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), destType);
+  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), ti);
 }
 
 void IRGenSILFunction::visitUncheckedAddrCastInst(
@@ -2910,12 +2915,7 @@ void IRGenSILFunction::visitRefToRawPointerInst(
 
 void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {
   auto &ti = getTypeInfo(i->getType());
-  auto schema = ti.getSchema();
-  assert(schema.size() == 1 && schema[0].isScalar()
-         && "dest type is not a single scalar");
-  llvm::Type *destType = schema[0].getScalarType();
-  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
-                      destType);
+  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), ti);
 }
 
 // SIL scalar conversions which never change the IR type.

@@ -36,3 +36,9 @@ entry(%p : $Builtin.RawPointer):
   %r = raw_pointer_to_ref %p : $Builtin.RawPointer to $AnyObject
   return %r : $AnyObject
 }
+
+sil @unchecked_ref_cast_to_existential : $@thin (@owned Builtin.NativeObject) -> @owned AnyObject {
+entry(%n : $Builtin.NativeObject):
+  %r = unchecked_ref_cast %n : $Builtin.NativeObject to $AnyObject
+  return %r : $AnyObject
+}

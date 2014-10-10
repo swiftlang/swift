@@ -185,6 +185,10 @@ func class_archetype_from_native_object<T : C>(p: Builtin.NativeObject) -> T {
   return Builtin.castFromNativeObject(p)
 }
 
+func objc_class_existential_from_native_object(p: Builtin.NativeObject) -> AnyObject {
+  return Builtin.castFromNativeObject(p)
+}
+
 // CHECK-LABEL: sil hidden @_TF8builtins20class_to_raw_pointer
 func class_to_raw_pointer(c: C) -> Builtin.RawPointer {
   // CHECK: [[RAW:%.*]] = ref_to_raw_pointer [[C:%.*]] to $Builtin.RawPointer

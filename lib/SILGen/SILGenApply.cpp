@@ -2451,22 +2451,24 @@ namespace {
     assert(substitutions.size() == 1 &&
            "cast should have a single substitution");
 
+    // The substitution determines the destination type.
+    // FIXME: Archetype destination type?
+    SILType destType = gen.getLoweredLoadableType(
+                                             substitutions[0].getReplacement());
+    
     // Bail if the source type is not a class reference of some kind.
-    if (!substitutions[0].getReplacement()->mayHaveSuperclass()) {
+    if (!substitutions[0].getReplacement()->isBridgeableObjectType()) {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                       "castFromNativeObject dest must be a class");
-      // FIXME: Recovery?
-      llvm::report_fatal_error("unable to set up the ObjC bridge!");
+                       "castFromNativeObject dest must be an object type");
+      // Recover by propagating an undef result.
+      SILValue result = SILUndef::get(destType, gen.SGM.M);
+      return ManagedValue::forUnmanaged(result);
     }
     
     // Save the cleanup on the argument so we can forward it onto the cast
     // result.
     auto cleanup = args[0].getCleanup();
 
-    // The substitution determines the destination type.
-    // FIXME: Archetype destination type?
-    SILType destType = gen.getLoweredLoadableType(substitutions[0].getReplacement());
-    
     // Take the reference type argument and cast it.
     SILValue result = gen.B.createUncheckedRefCast(loc, args[0].getValue(),
                                                      destType);
