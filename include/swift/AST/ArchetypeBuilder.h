@@ -264,6 +264,12 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool inferRequirements(Pattern *pattern);
 
+  /// Finalize the set of requirements, performing any remaining checking
+  /// required before generating archetypes.
+  ///
+  /// \returns true if an error occurs, false otherwse.
+  bool finalize(SourceLoc loc);
+
   /// \brief Resolve the given type to the potential archetype it names.
   ///
   /// This routine will synthesize nested types as required to refer to a
@@ -384,6 +390,10 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief Recursively conforms to itself.
   unsigned IsRecursive : 1;
 
+  /// Whether this potential archetype is invalid, e.g., because it could not
+  /// be resolved.
+  unsigned Invalid : 1;
+
   /// The references to this nested type that occur in the source code
   /// that were unresolved (at least at some point).
   llvm::TinyPtrVector<ComponentIdentTypeRepr *> UnresolvedReferences;
@@ -392,7 +402,7 @@ class ArchetypeBuilder::PotentialArchetype {
   /// associated type.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name)
     : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this),
-      IsRecursive(false)
+      IsRecursive(false), Invalid(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
   }
@@ -400,7 +410,7 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *Parent, AssociatedTypeDecl *AssocType)
     : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
-      Representative(this), IsRecursive(false)
+      Representative(this), IsRecursive(false), Invalid(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
   }
@@ -410,7 +420,8 @@ class ArchetypeBuilder::PotentialArchetype {
                      ProtocolDecl *RootProtocol,
                      Identifier Name)
     : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
-      NameOrAssociatedType(Name), Representative(this), IsRecursive(false) { }
+      NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
+      Invalid(false) { }
 
   /// \brief Recursively build the full name.
   void buildFullName(bool forDebug, SmallVectorImpl<char> &result) const;
@@ -522,9 +533,13 @@ public:
     return getGenericParam() && !isConcreteType();
   }
 
-  void setIsRecursive() { this->IsRecursive = true; }
-  bool isRecursive() { return this->IsRecursive; }
-  
+  void setIsRecursive() { IsRecursive = true; }
+  bool isRecursive() { return IsRecursive; }
+
+  bool isInvalid() { return Invalid; }
+
+  void setInvalid() { Invalid = true; }
+
   /// Return the list of unresolved references to this associated type.
   ArrayRef<ComponentIdentTypeRepr *> getUnresolvedReferences() const {
     return UnresolvedReferences;

@@ -127,6 +127,9 @@ ERROR(ambiguous_type_base,sema_nb,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
 ERROR(invalid_member_type,sema_nb,none,
       "%0 is not a member type of %1", (Identifier, Type))
+ERROR(invalid_member_type_suggest,sema_nb,none,
+      "%0 does not have a member type named %1; did you mean %2?",
+      (Type, Identifier, Identifier))
 ERROR(ambiguous_member_type,sema_nb,none,
       "ambiguous type name %0 in %1", (Identifier, Type))
 ERROR(no_module_type,sema_nb,none,

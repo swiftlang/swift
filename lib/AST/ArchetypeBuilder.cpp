@@ -313,8 +313,6 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
 
   // Check whether any associated types in this protocol resolve
   // nested types of this potential archetype.
-  // FIXME: Eventually, will need to add more same-type requirements
-  // here as well.
   for (auto member : proto->getMembers()) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (!assocType)
@@ -791,7 +789,7 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // associated type.
   unsigned T1Depth = T1->getNestingDepth();
   unsigned T2Depth = T2->getNestingDepth();
-  if (T2Depth < T1Depth)
+  if (T2Depth < T1Depth || (T1->isInvalid() && !T2->isInvalid()))
     std::swap(T1, T2);
   
   // Don't allow two generic parameters to be equivalent, because then we
@@ -1151,6 +1149,108 @@ bool ArchetypeBuilder::inferRequirements(Pattern *pattern) {
   return walker.hadError();
 }
 
+/// Perform typo correction on the given nested type, producing the
+/// corrected name (if successful).
+static Identifier typoCorrectNestedType(
+                    ArchetypeBuilder::PotentialArchetype *pa) {
+  StringRef name = pa->getName().str();
+
+  // Look through all of the associated types of all of the protocols
+  // to which the parent conforms.
+  llvm::SmallVector<Identifier, 2> bestMatches;
+  unsigned bestEditDistance = 0;
+  unsigned maxScore = (name.size() + 1) / 3;
+  for (const auto &conforms : pa->getParent()->getConformsTo()) {
+    auto proto = conforms.first;
+    for (auto member : proto->getMembers()) {
+      auto assocType = dyn_cast<AssociatedTypeDecl>(member);
+      if (!assocType)
+        continue;
+
+      unsigned dist = name.edit_distance(assocType->getName().str(),
+                                         /*allowReplacements=*/true,
+                                         maxScore);
+      assert(dist > 0 && "nested type should have matched associated type");
+      if (bestEditDistance == 0 || dist == bestEditDistance) {
+        bestEditDistance = dist;
+        maxScore = bestEditDistance;
+        bestMatches.push_back(assocType->getName());
+      } else if (dist < bestEditDistance) {
+        bestEditDistance = dist;
+        maxScore = bestEditDistance;
+        bestMatches.clear();
+        bestMatches.push_back(assocType->getName());
+      }
+    }
+  }
+
+  // If we didn't find any matches at all, fail.
+  if (bestMatches.empty())
+    return Identifier();
+
+  // Make sure that we didn't find more than one match at the best
+  // edit distance.
+  for (auto other : llvm::makeArrayRef(bestMatches).slice(1)) {
+    if (other != bestMatches.front())
+      return Identifier();
+  }
+
+  return bestMatches.front();
+}
+
+bool ArchetypeBuilder::finalize(SourceLoc loc) {
+  bool invalid = false;
+
+  // If any nested types remain unresolved, produce diagnostics.
+  if (Impl->NumUnresolvedNestedTypes > 0) {
+    visitPotentialArchetypes([&](PotentialArchetype *pa) {
+      // We only care about nested types that haven't been resolved.
+      if (pa->getParent() == nullptr || pa->getResolvedAssociatedType() ||
+          pa->getRepresentative() != pa ||
+          /* FIXME: Should be able to handle this earlier */pa->getSuperclass())
+        return;
+
+      assert(!pa->getUnresolvedReferences().empty() &&
+             "Missing unresolved references?");
+
+      // Try to typo correct to a nested type name.
+      Identifier correction = typoCorrectNestedType(pa);
+      SourceLoc diagLoc = pa->getUnresolvedReferences().front()->getIdLoc();
+
+      // Typo correction failed; a diagnostic will be emitted later.
+      if (correction.empty()) {
+        invalid = true;
+        return;
+      }
+
+      // Typo correction succeeded; emit Fix-Its and update the
+      // component ids.
+      auto diag = Diags.diagnose(diagLoc, diag::invalid_member_type_suggest,
+                                 pa->getParent()->getDependentType(*this),
+                                 pa->getName(),
+                                 correction);
+
+      for (auto comp : pa->getUnresolvedReferences()) {
+        diag.fixItReplace(comp->getIdLoc(), correction.str());
+        comp->overwriteIdentifier(correction);
+      }
+
+      // Resolve the associated type and merge the potential archetypes.
+      pa->setInvalid();
+      auto replacement = pa->getParent()->getNestedType(correction, *this,
+                                                        nullptr);
+      pa->resolveAssociatedType(replacement->getResolvedAssociatedType(),
+                                *this);
+      addSameTypeRequirementBetweenArchetypes(
+        pa, replacement,
+        RequirementSource(RequirementSource::Protocol, diagLoc));
+
+    });
+  }
+
+  return invalid;
+}
+
 ArchetypeType *
 ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) {
   auto known = Impl->PotentialArchetypes.find(
@@ -1226,6 +1326,11 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
 template<typename F>
 void ArchetypeBuilder::enumerateRequirements(F f) {
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+    // Invalid archetypes are never representatives in well-formed or corrected
+    // signature, so we don't need to visit them.
+    if (archetype->isInvalid())
+      return;
+
     // If this is not the representative, produce a same-type
     // constraint to the representative.
     if (archetype->getRepresentative() != archetype) {

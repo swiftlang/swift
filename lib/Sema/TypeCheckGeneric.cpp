@@ -651,6 +651,9 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   if (func->hasType())
     return !func->isInvalid();
 
+  // Finalize the generic requirements.
+  (void)builder.finalize(func->getLoc());
+
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the generic
   // function signature and type-check it again, completely.
@@ -820,6 +823,9 @@ GenericSignature *TypeChecker::validateGenericSignature(
   if (inferRequirements && inferRequirements(builder)) {
     invalid = true;
   }
+
+  // Finalize the generic requirements.
+  (void)builder.finalize(genericParams->getSourceRange().Start);
 
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the signature

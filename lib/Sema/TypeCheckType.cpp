@@ -576,7 +576,6 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
         // Otherwise, check for an ambiguity.
         if (current.is<Module *>() || !current.get<Type>()->isEqual(type)) {
-          auto currentType = current.get<Type>();
           isAmbiguous = true;
           break;
         }
