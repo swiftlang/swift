@@ -381,10 +381,14 @@ class ArchetypeBuilder::PotentialArchetype {
   /// type that the parameter was same-type constrained to.
   ArchetypeType::NestedType ArchetypeOrConcreteType;
 
+  /// \brief Recursively conforms to itself.
+  unsigned IsRecursive : 1;
+
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name)
-    : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this) 
+    : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this),
+      IsRecursive(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
   }
@@ -392,7 +396,7 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *Parent, AssociatedTypeDecl *AssocType)
     : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
-      Representative(this) 
+      Representative(this), IsRecursive(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
   }
@@ -402,13 +406,10 @@ class ArchetypeBuilder::PotentialArchetype {
                      ProtocolDecl *RootProtocol,
                      Identifier Name)
     : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
-      NameOrAssociatedType(Name), Representative(this) { }
+      NameOrAssociatedType(Name), Representative(this), IsRecursive(false) { }
 
   /// \brief Recursively build the full name.
   void buildFullName(bool forDebug, SmallVectorImpl<char> &result) const;
-  
-  /// \brief Recursively conforms to itself.
-  bool isRecursive = false;
 
 public:
   ~PotentialArchetype();
@@ -513,8 +514,8 @@ public:
     return getGenericParam() && !isConcreteType();
   }
 
-  void setIsRecursive() { this->isRecursive = true; }
-  bool getIsRecursive() { return this->isRecursive; }
+  void setIsRecursive() { this->IsRecursive = true; }
+  bool isRecursive() { return this->IsRecursive; }
   
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);

@@ -459,7 +459,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   auto arch
     = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
                             assocTypeOrProto, getName(), Protos,
-                            Superclass, this->isRecursive);
+                            Superclass, isRecursive());
 
   ArchetypeOrConcreteType = arch;
   
