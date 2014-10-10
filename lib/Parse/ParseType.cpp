@@ -47,7 +47,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///     type-simple '.Type'
 ///     type-simple '.Protocol'
 ///     type-simple '?'
-//      type-collection
+///     type-simple '!'
+///     type-collection
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
   // If this is an "inout" marker for an identifier type, consume the inout.
@@ -88,14 +89,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     // FIXME: we could try to continue to parse.
     return ty;
   case tok::l_square:
-    return parseTypeCollection();
+    ty = parseTypeCollection();
+    break;
   default:
     checkForInputIncomplete();
     diagnose(Tok, MessageID);
     return nullptr;
   }
 
-  // '.Type', '.Protocol', and '?' still leave us with type-simple.
+  // '.Type', '.Protocol', '?', and '!' still leave us with type-simple.
   while (ty.isNonNull()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
       if (peekToken().isContextualKeyword("Type")) {
@@ -176,14 +178,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     diagnose(brackets.Start, diag::generic_non_function);
   }
 
-  // Parse array and optional types, and complain if they are mixed.
+  // Parse legacy array types for migration.
   while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
       ty = parseTypeArray(ty.get());
-    } else if (Tok.is(tok::question_postfix)) {
-      ty = parseTypeOptional(ty.get());
-    } else if (isImplicitlyUnwrappedOptionalToken()) {
-      ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
     } else {
       break;
     }

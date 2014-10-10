@@ -7,8 +7,7 @@ class Base1 {
   func f1(x: [[Int]]) { }
   func f1a(x: [[Int]]?) { }
   func f2(x: [[Int] -> [Int]]) { }
-  // FIXME: shouldn't require parens
-  func f2a(x: [([Int]?) -> [Int]?]?) { }
+  func f2a(x: [[Int]? -> [Int]?]?) { }
 }
 
 class Derived1 : Base1 {
