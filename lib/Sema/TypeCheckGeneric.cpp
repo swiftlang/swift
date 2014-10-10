@@ -826,7 +826,22 @@ GenericSignature *TypeChecker::validateGenericSignature(
   collectRequirements(builder, allGenericParams, requirements);
 
   // Record the generic type parameter types and the requirements.
-  return GenericSignature::get(allGenericParams, requirements);
+  auto sig = GenericSignature::get(allGenericParams, requirements);
+
+  // Debugging of the archetype builder and generic signature generation.
+  if (Context.LangOpts.DebugGenericSignatures) {
+    dc->printContext(llvm::errs());
+    llvm::errs() << "\n";
+    builder.dump(llvm::errs());
+    llvm::errs() << "Generic signature: ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Canonical generic signature: ";
+    sig->getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  return sig;
 }
 
 bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
