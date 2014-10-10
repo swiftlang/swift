@@ -320,6 +320,12 @@ func classAvailability() {
   let _ = o10_10.someProp 
 }
 
+func castingUnavailableClass(o : AnyObject) {
+  let _ = o as ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  let _ = o as? ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  let _ = o is ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+}
+
 protocol Createable {
   init()
 }
@@ -334,6 +340,60 @@ func create<T : Createable>() -> T {
 }
 
 func classViaTypeParameter() {
-  let _ : ClassAvailableOn10_10_Createable = 
+  let _ : ClassAvailableOn10_10_Createable = // expected-error {{'ClassAvailableOn10_10_Createable' is only available on OS X version 10.10 or greater}}
       create() // expected-error {{'ClassAvailableOn10_10_Createable' is only available on OS X version 10.10 or greater}}
+      
+      
+  let _ = [ClassAvailableOn10_10]() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+}
+
+// Unavailable class used in declarations
+
+class ClassWithDeclarationsOfUnavailableClasses {
+
+  @availability(OSX, introduced=10.10)
+  init() {
+    unavailablePropertyOfUnavailableType = ClassAvailableOn10_10()
+    unavailablePropertyOfUnavailableType = ClassAvailableOn10_10()
+  }
+
+  var propertyOfUnavailableType: ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  
+  @availability(OSX, introduced=10.10)
+  var unavailablePropertyOfUnavailableType: ClassAvailableOn10_10
+  
+  @availability(OSX, introduced=10.10)
+  var unavailablePropertyOfUnavailableTypeWithInitializer: ClassAvailableOn10_10 = ClassAvailableOn10_10() 
+  
+  func methodWithUnavailableParameterType(o : ClassAvailableOn10_10) { // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  }
+  
+  @availability(OSX, introduced=10.10)
+  func unavailableMethodWithUnavailableParameterType(o : ClassAvailableOn10_10) {
+  }
+  
+  func methodWithUnavailableReturnType() -> ClassAvailableOn10_10  { // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+    return ClassAvailableOn10_10() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  }
+  
+  @availability(OSX, introduced=10.10)
+  func unavailableMethodWithUnavailableReturnType() -> ClassAvailableOn10_10  {
+    return ClassAvailableOn10_10()
+  }
+
+  func methodWithUnavailableLocalDeclaration() {
+    let o : ClassAvailableOn10_10 = methodWithUnavailableReturnType() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  }
+  
+  @availability(OSX, introduced=10.10)
+  func unavailableMethodWithUnavailableLocalDeclaration() {
+    let o : ClassAvailableOn10_10 = methodWithUnavailableReturnType()
+  }
+}
+
+class ClassExtendingUnavailableClass : ClassAvailableOn10_10 { // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+}
+
+@availability(OSX, introduced=10.10)
+class UnavailableClassExtendingUnavailableClass : ClassAvailableOn10_10 {
 }

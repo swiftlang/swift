@@ -791,33 +791,41 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   return type;
 }
 
-static bool checkTypeDeclAvailability(Decl *TypeDecl,
-                                      IdentTypeRepr *IdType,
-                                      SourceLoc Loc,
+static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
+                                      SourceLoc Loc, DeclContext *DC,
                                       TypeChecker &TC) {
-  if (auto Attr = AvailabilityAttr::isUnavailable(TypeDecl)) {
-    if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
+
+  if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
+    if (auto Attr = AvailabilityAttr::isUnavailable(TypeDecl)) {
       if (!Attr->Rename.empty()) {
         TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
-                    CI->getIdentifier(), Attr->Rename)
-        .fixItReplace(Loc, Attr->Rename);
+                    CI->getIdentifier(),
+                    Attr->Rename).fixItReplace(Loc, Attr->Rename);
       } else if (Attr->Message.empty()) {
         TC.diagnose(Loc, diag::availability_decl_unavailable,
-                    CI->getIdentifier())
-        .highlight(SourceRange(Loc, Loc));
-      }
-      else {
+                    CI->getIdentifier()).highlight(SourceRange(Loc, Loc));
+      } else {
         TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                    CI->getIdentifier(), Attr->Message)
-        .highlight(SourceRange(Loc, Loc));
+                    CI->getIdentifier(),
+                    Attr->Message).highlight(SourceRange(Loc, Loc));
       }
 
       auto DLoc = TypeDecl->getLoc();
       if (DLoc.isValid())
         TC.diagnose(DLoc, diag::availability_marked_unavailable,
-                    CI->getIdentifier())
-          .highlight(Attr->getRange());
+                    CI->getIdentifier()).highlight(Attr->getRange());
       return true;
+    }
+    
+    // Check for potential unavailability because of the minimum
+    // deployment version.
+    // We should probably unify this checking for deployment-version API
+    // unavailability with checking for explicitly annotated unavailability.
+    Optional<UnavailabilityReason> Unavail =
+        TC.checkDeclarationAvailability(TypeDecl, Loc, DC);
+    if (Unavail.hasValue()) {
+      TC.diagnosePotentialUnavailability(TypeDecl, CI->getIdentifier(), Loc,
+                                         Unavail.getValue());
     }
   }
 
@@ -826,9 +834,9 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl,
 
 
 static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
-                                 TypeChecker &TC) {
+                                 DeclContext *DC, TypeChecker &TC) {
   if (auto *NAT = dyn_cast<NameAliasType>(ty.getPointer())) {
-    if (checkTypeDeclAvailability(NAT->getDecl(), IdType, Loc, TC))
+    if (checkTypeDeclAvailability(NAT->getDecl(), IdType, Loc, DC, TC))
       return true;
   }
 
@@ -836,7 +844,7 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
   if (canTy.isNull())
     return false;
   if (auto NTD = canTy.getAnyNominal())
-    return checkTypeDeclAvailability(NTD, IdType, Loc, TC);
+    return checkTypeDeclAvailability(NTD, IdType, Loc, DC, TC);
 
   return false;
 }
@@ -868,7 +876,7 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
   // Check the availability of the type. Skip checking for SIL.
   if (!(options & TR_SILType) &&
       diagnoseAvailability(result.get<Type>(), IdType,
-                           Components.back()->getIdLoc(), *this)) {
+                           Components.back()->getIdLoc(), DC, *this)) {
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
     return ty;

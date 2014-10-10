@@ -388,9 +388,6 @@ namespace {
     void diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
                                              SourceLoc referenceLoc);
     
-    /// \brief Emit a diagnostic if the type representation is
-    /// potentially unavailable.
-    void diagnoseIfTypeReprUnavailable(TypeRepr *repr);
     
     /// \brief Emit a diagnostic if any type parameter actuals for an
     /// apply expression are potentially unavailable. These must be available
@@ -1887,10 +1884,6 @@ namespace {
       auto toType = simplifyType(expr->getTypeLoc().getType());
       expr->getTypeLoc().setType(toType, /*validated=*/true);
       expr->setType(MetatypeType::get(toType));
-      
-      if (expr->getTypeRepr()) {
-        diagnoseIfTypeReprUnavailable(expr->getTypeRepr());
-      }
       
       return expr;
     }
@@ -4524,17 +4517,6 @@ ExprRewriter::diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
   }
 }
 
-void ExprRewriter::diagnoseIfTypeReprUnavailable(TypeRepr *repr) {
-  auto *identTypeRepr = dyn_cast<ComponentIdentTypeRepr>(repr);
-  if (!identTypeRepr || !identTypeRepr->isBoundType())
-    return;
-
-  NominalTypeDecl *D = identTypeRepr->getBoundType()->getAnyNominal();
-  if (!D)
-    return;
-  
-  diagnoseIfDeclUnavailable(D, repr->getStartLoc());
-}
 
 void
 ExprRewriter::diagnoseIfTypeParameterActualsUnavailable(ApplyExpr *applyExpr) {

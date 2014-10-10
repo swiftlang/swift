@@ -1144,12 +1144,19 @@ public:
   /// declaration is unavailable. Returns None is the declaration is
   /// definitely available.
   Optional<UnavailabilityReason>
-  checkDeclarationAvailability(ValueDecl *D, SourceLoc referenceLoc,
+  checkDeclarationAvailability(Decl *D, SourceLoc referenceLoc,
                                DeclContext *referenceDC);
 
-  // Emits a diagnostic, if necessary, for a reference to declaration
+  // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location.
   void diagnosePotentialUnavailability(ValueDecl *D, SourceLoc referenceLoc,
+                                       const UnavailabilityReason &Reason);
+
+  // Emits a diagnostic, if necessary, for a reference to a declaration
+  // that is potentially unavailable at the given source location, using
+  // Name as the diagnostic name.
+  void diagnosePotentialUnavailability(Decl *D, DeclName Name,
+                                       SourceLoc referenceLoc,
                                        const UnavailabilityReason &Reason);
   /// @}
 

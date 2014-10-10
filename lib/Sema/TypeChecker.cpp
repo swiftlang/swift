@@ -762,6 +762,16 @@ private:
         return SourceRange(storageDecl->getStartLoc(),
                            storageDecl->getBracesRange().End);
       }
+      
+      // For a variable declaration (without accessors) we use the range of the
+      // containing pattern binding declaration to make sure that we include
+      // any type annotation in the type refinement context range.
+      if (auto varDecl = dyn_cast<VarDecl>(storageDecl)) {
+        PatternBindingDecl *patternBindingDecl = varDecl->getParentPattern();
+        if (patternBindingDecl) {
+          return patternBindingDecl->getSourceRange();
+        }
+      }
     }
     
     return D->getSourceRange();
@@ -1004,7 +1014,7 @@ bool TypeChecker::isDeclAvailable(Decl *D, SourceLoc referenceLoc,
 }
 
 Optional<UnavailabilityReason>
-TypeChecker::checkDeclarationAvailability(ValueDecl *D, SourceLoc referenceLoc,
+TypeChecker::checkDeclarationAvailability(Decl *D, SourceLoc referenceLoc,
                                           DeclContext *referenceDC) {
   if (!Context.LangOpts.EnableExperimentalAvailabilityChecking) {
     return None;
@@ -1027,6 +1037,12 @@ TypeChecker::checkDeclarationAvailability(ValueDecl *D, SourceLoc referenceLoc,
 
 void TypeChecker::diagnosePotentialUnavailability(
     ValueDecl *D, SourceLoc referenceLoc, const UnavailabilityReason &Reason) {
+  diagnosePotentialUnavailability(D, D->getFullName(), referenceLoc, Reason);
+}
+
+void TypeChecker::diagnosePotentialUnavailability(
+    Decl *D, DeclName Name, SourceLoc referenceLoc,
+    const UnavailabilityReason &Reason) {
 
   // We only emit diagnostics for API unavailability, not for explicitly
   // weak-linked symbols.
@@ -1036,8 +1052,7 @@ void TypeChecker::diagnosePotentialUnavailability(
   }
 
   diagnose(referenceLoc, diag::availability_decl_only_version_greater,
-           D->getFullName(),
-           prettyPlatformString(targetPlatform(Context.LangOpts)),
+           Name, prettyPlatformString(targetPlatform(Context.LangOpts)),
            Reason.getRequiredOSVersionRange().getLowerEndpoint());
 }
 
