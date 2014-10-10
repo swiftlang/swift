@@ -706,8 +706,7 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   Location L = {};
   unsigned ScopeLine = 0; // The source line used for the function prologue.
   if (DS) {
-    if (DS->Loc.getKind() == SILLocation::SILFileKind &&
-        !DS->SILFn->isZombie()) {
+    if (DS->Loc.getKind() == SILLocation::SILFileKind) {
       Name = DS->SILFn->getName();
     } else {
       Name = getName(DS->Loc);
@@ -722,7 +721,7 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   if (Fn)
     LinkageName = Fn->getName();
   else if (DS)
-    LinkageName = Name;
+    LinkageName = DS->SILFn->getName();
   else
     llvm_unreachable("function has no mangled name");
 

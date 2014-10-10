@@ -691,14 +691,16 @@ void SILModule::invalidateSILLoader() {
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
 
-  FunctionTable.erase(F->getName());
-
-  // The owner of the function's Name was the FunctionTable key. Avoid a
-  // dangling pointer.
-  F->Name = StringRef();
-
   assert(! F->isZombie() && "zombie function is in list of alive functions");
   if (F->isInlined()) {
+    
+    // The owner of the function's Name is the FunctionTable key. As we remove
+    // the function from the table we have to store the name string elsewhere:
+    // in zombieFunctionNames.
+    StringRef copiedName = F->getName().copy(zombieFunctionNames);
+    FunctionTable.erase(F->getName());
+    F->Name = copiedName;
+    
     // The function is dead, but as it is inlined we need it later (at IRGen)
     // for debug info generation. So we move it into the zombie list.
     getFunctionList().remove(F);
@@ -709,6 +711,7 @@ void SILModule::eraseFunction(SILFunction *F) {
     // (References are not needed for debug info generation.)
     F->dropAllReferences();
   } else {
+    FunctionTable.erase(F->getName());
     getFunctionList().erase(F);
   }
 }
