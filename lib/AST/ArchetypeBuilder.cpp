@@ -199,12 +199,9 @@ struct ArchetypeBuilder::Implementation {
   std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
     conformsToProtocol;
 
-  /// The list of potential archetypes that correspond to generic parameters.
-  SmallVector<PotentialArchetype *, 4> RootPotentialArchetypes;
-
   /// A mapping from generic parameters to the corresponding potential
   /// archetypes.
-  DenseMap<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
+  llvm::MapVector<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
 
   /// A vector containing all of the archetypes, expanded out.
   /// FIXME: This notion should go away, because it's impossible to expand
@@ -637,7 +634,6 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
   auto PA = new PotentialArchetype(GenericParam, RootProtocol, ParamName);
 
   Impl->PotentialArchetypes[Key] = PA;
-  Impl->RootPotentialArchetypes.push_back(PA);  
   return PA;
 }
 
@@ -1270,7 +1266,8 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
   if (Impl->AllArchetypes.empty()) {
     // Collect the primary archetypes first.
     llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
-    for (auto PA : Impl->RootPotentialArchetypes) {
+    for (const auto &Entry : Impl->PotentialArchetypes) {
+      PotentialArchetype *PA = Entry.second;
       if (PA->isPrimary()) {
         auto Archetype = PA->getType(*this).get<ArchetypeType *>();
         assert(Archetype->isPrimary() && "isPrimary mismatch");
@@ -1280,7 +1277,8 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
     }
 
     // Collect all of the remaining archetypes.
-    for (auto PA : Impl->RootPotentialArchetypes) {
+    for (const auto &Entry : Impl->PotentialArchetypes) {
+      PotentialArchetype *PA = Entry.second;
       if (!PA->isConcreteType()) {
         auto Archetype = PA->getType(*this).get<ArchetypeType *>();
         GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
