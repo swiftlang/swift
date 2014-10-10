@@ -210,7 +210,7 @@ final public class VaListBuilder {
   
   func va_list() -> CVaListPointer {
     return CVaListPointer(
-      fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
+      _fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
         storage._baseAddressIfContiguous))
   }
 
