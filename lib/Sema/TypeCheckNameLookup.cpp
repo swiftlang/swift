@@ -114,6 +114,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
 
   // Look through the declarations, keeping only the unique type declarations.
   llvm::SmallPtrSet<CanType, 4> types;
+  SmallVector<AssociatedTypeDecl *, 4> inferredAssociatedTypes;
   for (auto decl : decls) {
     // Ignore non-types found by name lookup.
     auto typeDecl = dyn_cast<TypeDecl>(decl);
@@ -128,21 +129,10 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
     // If we found a member of a protocol type when looking into a non-protocol,
     // non-archetype type, only include this member in the result set if
     // this member was used as the default definition or otherwise inferred.
-    if (auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext())) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
       if (!type->is<ArchetypeType>() && !type->isExistentialType()) {
-        // If the type does not actually conform to the protocol, skip this
-        // member entirely.
-        // FIXME: This is an error path. Should we try to recover?
-        ProtocolConformance *conformance = nullptr;
-        if (!conformsToProtocol(type, protocol, dc, &conformance) ||
-            !conformance || !conformance->isComplete())
-          continue;
-
-        // Use the type witness.
-        auto assocType = cast<AssociatedTypeDecl>(typeDecl);
-        memberType = conformance->getTypeWitness(assocType, this)
-          .getReplacement();
-        assert(memberType && "Missing type witness?");
+        inferredAssociatedTypes.push_back(assocType);
+        continue;
       }
     }
 
@@ -160,6 +150,34 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()))
       result.Results.push_back({typeDecl, memberType});
+  }
+
+  if (result.Results.empty()) {
+    // We couldn't find any normal declarations. Let's try inferring
+    // associated types.
+    for (AssociatedTypeDecl *assocType : inferredAssociatedTypes) {
+      // If the type does not actually conform to the protocol, skip this
+      // member entirely.
+      // FIXME: The "isComplete()" check here is bogus. It's entirely possible
+      // that we're in the middle of checking this protocol and just need a
+      // particular witness.
+      auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
+      ProtocolConformance *conformance = nullptr;
+      if (!conformsToProtocol(type, protocol, dc, &conformance) ||
+          !conformance || !conformance->isComplete()) {
+        // FIXME: This is an error path. Should we try to recover?
+        continue;
+      }
+
+      // Use the type witness.
+      Type memberType =
+        conformance->getTypeWitness(assocType, this).getReplacement();
+      assert(memberType && "Missing type witness?");
+
+      // If we haven't seen this type result yet, add it to the result set.
+      if (types.insert(memberType->getCanonicalType()))
+        result.Results.push_back({assocType, memberType});
+    }
   }
 
   return result;
