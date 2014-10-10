@@ -324,6 +324,22 @@ bool DCE::removeDead(SILFunction &F) {
   bool Changed = false;
 
   for (auto &BB : F) {
+    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ) {
+      auto Inst = *I++;
+      if (LiveValues.count(Inst))
+        continue;
+
+      DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
+      DEBUG(Inst->dump());
+
+      for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
+        auto *Undef = SILUndef::get(Inst->getType(i), Inst->getModule());
+        SILValue(Inst, i).replaceAllUsesWith(Undef);
+      }
+
+      Changed = true;
+    }
+
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       auto Inst = I++;
       if (LiveValues.count(Inst) || isa<BranchInst>(Inst))
