@@ -1196,13 +1196,38 @@ ArchetypeBuilder::getSameTypeRequirements() const {
 }
 
 template<typename F>
-void ArchetypeBuilder::enumerateRequirements(F f) {
+void ArchetypeBuilder::visitPotentialArchetypes(F f) {
   // Stack containing all of the potential archetypes to visit.
   SmallVector<PotentialArchetype *, 4> stack;
   llvm::SmallPtrSet<PotentialArchetype *, 4> visited;
 
-  // Local function that visits a specific archetype.
-  auto visit = [&](PotentialArchetype *archetype) {
+  // Add top-level potential archetypes to the stack.
+  for (const auto &pa : Impl->PotentialArchetypes) {
+    if (visited.insert(pa.second))
+      stack.push_back(pa.second);
+  }
+
+  // Visit all of the potential archetypes.
+  while (!stack.empty()) {
+    PotentialArchetype *pa = stack.back();
+    stack.pop_back();
+    f(pa);
+
+    // Visit nested potential archetypes.
+    for (const auto &nested : pa->getNestedTypes()) {
+      for (auto nestedPA : nested.second) {
+        if (visited.insert(nestedPA)) {
+          stack.push_back(nestedPA);
+        }
+      }
+    }
+  }
+
+}
+
+template<typename F>
+void ArchetypeBuilder::enumerateRequirements(F f) {
+  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     // If this is not the representative, produce a same-type
     // constraint to the representative.
     if (archetype->getRepresentative() != archetype) {
@@ -1233,28 +1258,7 @@ void ArchetypeBuilder::enumerateRequirements(F f) {
         conforms.first->getDeclaredInterfaceType(),
         conforms.second);
     }
-
-    // Add nested types.
-    for (const auto &nested : archetype->getNestedTypes()) {
-      for (auto nestedPA : nested.second) {
-        if (visited.insert(nestedPA))
-          stack.push_back(nestedPA);
-      }
-    }
-  };
-
-  // Add top-level potential archetypes to the stack.
-  for (const auto &pa : Impl->PotentialArchetypes) {
-    if (visited.insert(pa.second))
-      stack.push_back(pa.second);
-  }
-
-  // Visit all of the potential archetypes.
-  while (!stack.empty()) {
-    PotentialArchetype *pa = stack.back();
-    stack.pop_back();
-    visit(pa);
-  }
+  });
 }
 
 void ArchetypeBuilder::dump() {

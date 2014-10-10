@@ -145,6 +145,10 @@ private:
   /// archetypes should map to the equivalent archetype.
   bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
 
+  /// Visit all of the potential archetypes.
+  template<typename F>
+  void visitPotentialArchetypes(F f);
+
   /// Enumerate the requirements that describe the signature of this
   /// archetype builder.
   ///
