@@ -217,9 +217,10 @@ struct ArchetypeBuilder::Implementation {
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
-  for (auto Nested : NestedTypes) {
-    if (Nested.second != this) {
-      delete Nested.second;
+  for (const auto &nested : NestedTypes) {
+    for (auto pa : nested.second) {
+      if (pa != this)
+        delete pa;
     }
   }
 }
@@ -306,11 +307,18 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
       continue;
 
     // If the nested type was not already resolved, do so now.
-    if (!known->second->getResolvedAssociatedType()) {
-      known->second->NameOrAssociatedType = assocType;
+    if (!known->second.front()->getResolvedAssociatedType()) {
+      known->second.front()->NameOrAssociatedType = assocType;
+      continue;
     }
 
-    // FIXME: Otherwise, add same-type requirements here.
+    // Otherwise, create a new potential archetype for this associated type
+    // and make it equivalent to the first potential archetype we encountered.
+    auto otherPA = new PotentialArchetype(this, assocType);
+    otherPA->Representative = known->second.front();
+    otherPA->SameTypeSource = RequirementSource(RequirementSource::Inferred,
+                                                source.getLoc());
+    known->second.push_back(otherPA);
   }
 
   return true;
@@ -339,11 +347,11 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   // Retrieve the nested type from the representation of this set.
   if (Representative != this)
     return getRepresentative()->getNestedType(nestedName);
+
+  llvm::TinyPtrVector<PotentialArchetype *> &nested = NestedTypes[nestedName];
     
-  PotentialArchetype *&Result = NestedTypes[nestedName];
-    
-  if (Result)
-    return Result;
+  if (!nested.empty())
+    return nested.front();
 
   // FIXME: The fact that we've been checking for "new" nested archetypes on
   // a purely lexical basis is both fragile and not-quite-correct. We need
@@ -356,7 +364,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
        this->getParent()->getName().str().equals("Self") ||
        this->getParent()->getName() == this->getName()) &&
       nestedName == this->getName()) {
-    Result = this;
+    nested.push_back(this);
   } else {
     // Attempt to resolve this nested type to an associated type
     // of one of the protocols to which the parent potential
@@ -367,23 +375,30 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         if (!assocType)
           continue;
 
-        // Create a resolved potential archetype.
-        Result = new PotentialArchetype(this, assocType);
-        
-        // FIXME: Keep going, adding same-type requirements when we
-        // have multiple associated types with the same name.
-        break;
+        // Resolve this nested type to this associated type.
+        auto pa = new PotentialArchetype(this, assocType);
+
+        // If we have resolved this nested type to more than one associated
+        // type, create same-type constraints between them.
+        if (!nested.empty()) {
+          pa->Representative = nested.front();
+          pa->SameTypeSource = RequirementSource(RequirementSource::Inferred,
+                                                 SourceLoc());
+        }
+
+        // Add this resolved nested type.
+        nested.push_back(pa);
       }
     }
 
     // We couldn't resolve the nested type yet, so create an
     // unresolved associated type.  
     // FIXME: Record this somewhere.
-    if (!Result)
-      Result = new PotentialArchetype(this, nestedName);
+    if (nested.empty())
+      nested.push_back(new PotentialArchetype(this, nestedName));
   }
   
-  return Result;
+  return nested.front();
 }
 
 ArchetypeType::NestedType
@@ -454,7 +469,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     FlatNestedTypes;
   for (auto Nested : NestedTypes) {
     FlatNestedTypes.push_back({ Nested.first,
-                                Nested.second->getType(builder) });
+                                Nested.second.front()->getType(builder) });
   }
   arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
   
@@ -544,8 +559,10 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   Out << "\n";
 
   // Print nested types.
-  for (const auto &Nested : NestedTypes) {
-    Nested.second->dump(Out, SrcMgr, Indent + 2);
+  for (const auto &nestedVec : NestedTypes) {
+    for (auto nested : nestedVec.second) {
+      nested->dump(Out, SrcMgr, Indent + 2);
+    }
   }
 }
 
@@ -835,7 +852,8 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // Recursively merge the associated types of T2 into T1.
   for (auto T2Nested : T2->NestedTypes) {
     auto T1Nested = T1->getNestedType(T2Nested.first);
-    if (addSameTypeRequirementBetweenArchetypes(T1Nested, T2Nested.second,
+    if (addSameTypeRequirementBetweenArchetypes(T1Nested,
+                                                T2Nested.second.front(),
                                                 Source))
       return true;
   }
@@ -901,7 +919,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
     auto witness = conformances[assocType->getProtocol()]
           ->getTypeWitness(assocType, getLazyResolver());
     addSameTypeRequirementToConcrete(
-      nested.second, 
+      nested.second.front(),
       witness.getReplacement()->getDesugaredType(),
       Source);
   }
@@ -1218,8 +1236,10 @@ void ArchetypeBuilder::enumerateRequirements(F f) {
 
     // Add nested types.
     for (const auto &nested : archetype->getNestedTypes()) {
-      if (visited.insert(nested.second))
-        stack.push_back(nested.second);
+      for (auto nestedPA : nested.second) {
+        if (visited.insert(nestedPA))
+          stack.push_back(nestedPA);
+      }
     }
   };
 

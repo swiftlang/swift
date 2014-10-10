@@ -26,6 +26,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <functional>
 #include <memory>
 
@@ -365,7 +366,12 @@ class ArchetypeBuilder::PotentialArchetype {
   llvm::MapVector<ProtocolDecl *, RequirementSource> ConformsTo;
 
   /// \brief The set of nested types of this archetype.
-  llvm::MapVector<Identifier, PotentialArchetype *> NestedTypes;
+  ///
+  /// For a given nested type name, there may be multiple potential archetypes
+  /// corresponding to different associated types (from different protocols)
+  /// that share a name.
+  llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>>
+    NestedTypes;
 
   /// \brief The actual archetype, once it has been assigned, or the concrete
   /// type that the parameter was same-type constrained to.
@@ -451,7 +457,7 @@ public:
   } 
 
   /// Retrieve the set of nested types.
-  const llvm::MapVector<Identifier, PotentialArchetype *> &
+  const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &
   getNestedTypes() const{
     return NestedTypes;
   }

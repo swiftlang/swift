@@ -423,8 +423,12 @@ addNestedRequirements(
 
   // Collect the nested types, sorted by name.
   // FIXME: Could collect these from the conformance requirements, above.
-  SmallVector<std::pair<Identifier, PotentialArchetype*>, 16>
-    nestedTypes(pa->getNestedTypes().begin(), pa->getNestedTypes().end());
+  SmallVector<std::pair<Identifier, PotentialArchetype*>, 16> nestedTypes;
+  for (const auto &nested : pa->getNestedTypes()) {
+    // FIXME: Dropping requirements among different associated types of the
+    // same name.
+    nestedTypes.push_back(std::make_pair(nested.first, nested.second.front()));
+  }
   std::sort(nestedTypes.begin(), nestedTypes.end(),
             OrderPotentialArchetypeByName());
 
