@@ -22,3 +22,5 @@ let c = Int(C_ARGC)
 let y = square(c)
 println(y)
 
+// Check if the inlined and removed square function still has the correct linkage name in the debug info.
+// CHECK-DAG: metadata !{{.*}}\00_TF4main6squareFSiSi\00
