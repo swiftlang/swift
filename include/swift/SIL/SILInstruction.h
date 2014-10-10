@@ -1766,7 +1766,7 @@ public:
   SILType getType() const { return SILInstruction::getType(0); }
   
   // If there is a single case that returns a literal "true" value (an
-  // "integer_literal $Builtin.Int1, 0" value), return it.
+  // "integer_literal $Builtin.Int1, 1" value), return it.
   //
   // FIXME: This is used to interoperate with passes that reasoned about the
   // old enum_is_tag insn. Ideally those passes would become general enough
