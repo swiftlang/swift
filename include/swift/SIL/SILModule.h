@@ -115,9 +115,6 @@ private:
   /// but kept alive for debug info generation.
   FunctionListType zombieFunctions;
   
-  /// Stores the names of zombie functions.
-  llvm::BumpPtrAllocator zombieFunctionNames;
-  
   /// Lookup table for SIL vtables from class decls.
   llvm::DenseMap<const ClassDecl *, SILVTable *> VTableLookupTable;
 
