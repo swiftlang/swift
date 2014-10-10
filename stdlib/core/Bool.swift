@@ -60,7 +60,9 @@ extension Bool : Printable {
 }
 
 // This is a magic entrypoint known to the compiler.
-@transparent func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }
+@transparent
+public // INTRINSIC
+func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }
 
 //===----------------------------------------------------------------------===//
 // Standard Operators
