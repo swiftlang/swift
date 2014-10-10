@@ -144,31 +144,19 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   assert(basePA && "Missing potential archetype for base");
   basePA = basePA->getRepresentative();
 
-  Identifier name = ref->getIdentifier();
-  SourceLoc nameLoc = ref->getIdLoc();
-
-  // Find the associated type declaration for this name.
-  for (const auto &conforms : basePA->getConformsTo()) {
-    auto proto = conforms.first;
-
-    SmallVector<ValueDecl *, 2> decls;
-    if (DC->lookupQualified(proto->getDeclaredType(), name,
-                            NL_VisitSupertypes, &TC, decls)) {
-      for (auto decl : decls) {
-        // Note: once we find any associated type, we have our answer, because
-        // the archetype builder is supposed to ensure that all associated
-        // types with the same name are equivalent.
-        // FIXME: It would be preferable for this information to be in the
-        // potential archetype itself.
-        auto assocType = dyn_cast<AssociatedTypeDecl>(decl);
-        if (assocType) {
-          return DependentMemberType::get(baseTy, assocType, TC.Context);
-        }
-      }
+  // If the nested type has been resolved to an associated type, use it.
+  if (auto dependentPA = basePA->getNestedType(ref->getIdentifier(),
+                                               Builder, nullptr)) {
+    if (auto assocType = dependentPA->getResolvedAssociatedType()) {
+      return DependentMemberType::get(baseTy, assocType, TC.Context);
     }
   }
 
+  Identifier name = ref->getIdentifier();
+  SourceLoc nameLoc = ref->getIdLoc();
+
   // Check whether the name can be found in the superclass.
+  // FIXME: The archetype builder could do this, too.
   if (auto superclassTy = basePA->getSuperclass()) {
     if (auto lookup = TC.lookupMemberType(superclassTy, name, DC)) {
       if (lookup.isAmbiguous()) {
