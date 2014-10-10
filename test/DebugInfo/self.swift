@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -primary-file %s -emit-ir -g -o - | FileCheck %s
 struct stuffStruct {
     var a: Int = 6
     var b: String = "Nothing"

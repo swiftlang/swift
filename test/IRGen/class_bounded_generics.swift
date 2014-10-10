@@ -1,4 +1,4 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
+// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -primary-file %s | FileCheck %s
 
 protocol ClassBound : class {
   func classBoundMethod()

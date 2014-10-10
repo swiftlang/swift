@@ -1,8 +1,8 @@
-// RUN: %swift -emit-silgen -parse-stdlib %s | FileCheck %s -check-prefix=RAW
-// RUN: %swift -emit-sil -assert-config Debug -parse-stdlib %s | FileCheck -check-prefix=DEBUG %s
-// RUN: %swift -emit-sil -O -assert-config Debug -parse-stdlib %s | FileCheck -check-prefix=DEBUG %s
-// RUN: %swift -emit-sil -assert-config Release -parse-stdlib %s | FileCheck -check-prefix=RELEASE %s
-// RUN: %swift -emit-sil -O -assert-config Release -parse-stdlib %s | FileCheck -check-prefix=RELEASE %s
+// RUN: %swift -emit-silgen -parse-stdlib -primary-file %s | FileCheck %s -check-prefix=RAW
+// RUN: %swift -emit-sil -assert-config Debug -parse-stdlib -primary-file %s | FileCheck -check-prefix=DEBUG %s
+// RUN: %swift -emit-sil -O -assert-config Debug -parse-stdlib -primary-file %s | FileCheck -check-prefix=DEBUG %s
+// RUN: %swift -emit-sil -assert-config Release -parse-stdlib -primary-file %s | FileCheck -check-prefix=RELEASE %s
+// RUN: %swift -emit-sil -O -assert-config Release -parse-stdlib -primary-file %s | FileCheck -check-prefix=RELEASE %s
 
 import Swift
 

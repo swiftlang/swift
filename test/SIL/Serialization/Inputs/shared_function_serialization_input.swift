@@ -1,5 +1,7 @@
 
-public struct X {}
+public struct X {
+  public init() { }
+}
 
 public func the_thing<T>(#t : T) { }
 

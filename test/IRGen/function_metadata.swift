@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir %s | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -primary-file %s | FileCheck %s
 
 func arch<F>(f: F) {}
 

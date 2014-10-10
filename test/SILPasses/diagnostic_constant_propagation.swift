@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil %s -o /dev/null -verify
+// RUN: %swift -emit-sil -primary-file %s -o /dev/null -verify
 // These are tests for diagnostics produced by constant propagation pass.
 
 func testArithmeticOverflow() {

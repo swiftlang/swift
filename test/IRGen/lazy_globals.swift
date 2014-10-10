@@ -1,4 +1,4 @@
-// RUN: %swift -parse-as-library -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
+// RUN: %swift -parse-as-library -emit-ir -target x86_64-apple-macosx10.9 -primary-file %s | FileCheck %s
 
 // CHECK: @globalinit_token0 = internal global i64 0, align 8
 // CHECK: @_Tv12lazy_globals1xSi = global %Si zeroinitializer, align 8

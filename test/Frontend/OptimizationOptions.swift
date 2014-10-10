@@ -1,6 +1,6 @@
-// RUN: %swift -Onone -emit-sil %s 2>&1 | FileCheck %s --check-prefix=DEBUG
-// RUN: %swift -O -emit-sil %s 2>&1 | FileCheck %s --check-prefix=RELEASE
-// RUN: %swift -Ounchecked -emit-sil %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
+// RUN: %swift -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
+// RUN: %swift -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
+// RUN: %swift -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
 
 // REQUIRES: optimized_stdlib
 

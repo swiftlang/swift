@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -primary-file %s -emit-ir -g -o - | FileCheck %s
 // Test debug info for storageless variables.
 struct Symbol {}
 func peek() -> Symbol? { return Symbol() }

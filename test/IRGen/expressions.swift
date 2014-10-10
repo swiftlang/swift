@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -parse-stdlib -disable-access-control -enable-character-literals | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -parse-stdlib -disable-access-control -enable-character-literals | FileCheck %s
 
 import Swift
 

@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -I %S -enable-source-import %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -I %S -enable-source-import -primary-file %s -emit-ir | FileCheck %s
 
 import sil_witness_tables_external_conformance
 

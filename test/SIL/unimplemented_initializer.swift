@@ -1,6 +1,6 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import %s -emit-sil -emit-verbose-sil | FileCheck %s -check-prefix=CHECK-DEBUG
-// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import %s -emit-sil -emit-verbose-sil -O | FileCheck %s -check-prefix=CHECK-RELEASE
+// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil | FileCheck %s -check-prefix=CHECK-DEBUG
+// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil -O | FileCheck %s -check-prefix=CHECK-RELEASE
 
 import gizmo
 

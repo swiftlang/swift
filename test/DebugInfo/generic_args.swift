@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -verify -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -verify -g -o - | FileCheck %s
 protocol AProtocol {
   func f() -> String;
 }

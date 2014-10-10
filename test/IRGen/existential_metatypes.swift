@@ -1,4 +1,4 @@
-// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -o - %s | FileCheck %s
+// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -o - -primary-file %s | FileCheck %s
 
 // Currently, this can't be a SIL file because we don't parse
 // conformances correctly.

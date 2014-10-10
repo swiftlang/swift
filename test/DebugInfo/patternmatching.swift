@@ -1,5 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// RUN: %swift -emit-sil -emit-verbose-sil %s -o - | FileCheck %s --check-prefix=SIL-CHECK
+// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -emit-sil -emit-verbose-sil -primary-file %s -o - | FileCheck %s --check-prefix=SIL-CHECK
 func classifyPoint2(p: (Double, Double)) {
     func return_same (var input : Double) -> Double
     {
