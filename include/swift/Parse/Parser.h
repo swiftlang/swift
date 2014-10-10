@@ -485,6 +485,10 @@ public:
   /// be a complete '>' token or some kind of operator token starting with '>',
   /// e.g., '>>'.
   SourceLoc consumeStartingGreater();
+  
+  /// \brief Consume the starting character of the current token, and split the
+  /// remainder of the token into a new token (or tokens).
+  SourceLoc consumeStartingCharacterOfCurrentToken();
 
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
@@ -818,10 +822,11 @@ public:
   ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
     parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
-  bool isImplicitlyUnwrappedOptionalToken() const {
-    return Tok.is(tok::exclaim_postfix) ||
-           Tok.is(tok::sil_exclamation);
-  }
+  bool isOptionalToken(const Token &T) const;
+  SourceLoc consumeOptionalToken();
+  
+  bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
+  SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
 

@@ -308,28 +308,28 @@ SourceLoc Parser::getEndOfPreviousLoc() {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
+SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
+  // If the text of the token is just '?', grab the next token.
+  if (Tok.getLength() != 1) {
+    auto Loc = Tok.getLoc();
+    // Skip the '?' in the existing token. We have to reset the lexer instead of
+    // using getTokenAt, because if we split a token like '>?>', we'll end up
+    // with a shorter token '?' and lose the following '>'.
+    auto newState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(1));
+    L->restoreState(newState);
+  }
+  
+  return consumeToken();
+}
+
 SourceLoc Parser::consumeStartingLess() {
   assert(startsWithLess(Tok) && "Token does not start with '<'");
-  
-  if (Tok.getLength() == 1)
-    return consumeToken();
-  
-  // Skip the starting '<' in the existing token.
-  SourceLoc Loc = Tok.getLoc();
-  Tok = L->getTokenAt(Loc.getAdvancedLoc(1));
-  return Loc;
+  return consumeStartingCharacterOfCurrentToken();
 }
 
 SourceLoc Parser::consumeStartingGreater() {
   assert(startsWithGreater(Tok) && "Token does not start with '>'");
-  
-  if (Tok.getLength() == 1)
-    return consumeToken();
-  
-  // Skip the starting '>' in the existing token.
-  SourceLoc Loc = Tok.getLoc();
-  Tok = L->getTokenAt(Loc.getAdvancedLoc(1));
-  return Loc;
+  return consumeStartingCharacterOfCurrentToken();
 }
 
 void Parser::skipSingle() {

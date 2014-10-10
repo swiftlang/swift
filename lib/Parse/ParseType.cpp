@@ -117,11 +117,11 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     }
 
     if (!Tok.isAtStartOfLine()) {
-      if (Tok.is(tok::question_postfix)) {
+      if (isOptionalToken(Tok)) {
         ty = parseTypeOptional(ty.get());
         continue;
       }
-      if (isImplicitlyUnwrappedOptionalToken()) {
+      if (isImplicitlyUnwrappedOptionalToken(Tok)) {
         ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
         continue;
       }
@@ -656,11 +656,53 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
                                                       /*OldSyntax=*/false));
 }
 
+bool Parser::isOptionalToken(const Token &T) const {
+  // A postfix '?' by itself is obviously optional.
+  if (T.is(tok::question_postfix))
+    return true;
+  // A postfix or bound infix operator token that begins with '?' can be
+  // optional too. We'll munch off the '?'.
+  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary))
+      && T.getText().startswith("?"))
+    return true;
+  return false;
+}
+bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
+  // A postfix '!' by itself, or a '!' in SIL mode, is obviously optional.
+  if (T.is(tok::exclaim_postfix) || T.is(tok::sil_exclamation))
+    return true;
+  // A postfix or bound infix operator token that begins with '?' can be
+  // optional too. We'll munch off the '?'.
+  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary))
+      && T.getText().startswith("!"))
+    return true;
+  return false;
+}
+
+SourceLoc Parser::consumeOptionalToken() {
+  assert(isOptionalToken(Tok) && "not a '?' token?!");
+  return consumeStartingCharacterOfCurrentToken();
+}
+
+SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
+  assert(isImplicitlyUnwrappedOptionalToken(Tok) && "not a '!' token?!");
+  // If the text of the token is just '!', grab the next token.
+  if (Tok.getLength() == 1)
+    return consumeToken();
+  
+  // Skip the '?' in the existing token. We have to reset the lexer instead of
+  // using getTokenAt, because if we split a token like '>?>', we'll end up with
+  // a shorter token '?' and lose the following '>'.
+  SourceLoc Loc = Tok.getLoc();
+  auto newState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(1));
+  L->restoreState(newState);
+  return Loc;
+}
+
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
 ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
-  assert(Tok.is(tok::question_postfix));
-  SourceLoc questionLoc = consumeToken();
+  SourceLoc questionLoc = consumeOptionalToken();
   return makeParserResult(new (Context) OptionalTypeRepr(base, questionLoc));
 }
 
@@ -668,8 +710,7 @@ ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
 /// are looking at the exclamation mark.
 ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
 Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
-  assert(Tok.is(tok::exclaim_postfix) || Tok.is(tok::sil_exclamation));
-  SourceLoc exclamationLoc = consumeToken();
+  SourceLoc exclamationLoc = consumeImplicitlyUnwrappedOptionalToken();
   return makeParserResult(
            new (Context) ImplicitlyUnwrappedOptionalTypeRepr(
                            base, exclamationLoc));
@@ -679,7 +720,8 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
 // Speculative type list parsing
 //===--------------------------------------------------------------------===//
 
-static bool isGenericTypeDisambiguatingToken(Token &tok) {
+static bool isGenericTypeDisambiguatingToken(Parser &P,
+                                             Token &tok) {
   switch (tok.getKind()) {
   default:
     return false;
@@ -692,8 +734,15 @@ static bool isGenericTypeDisambiguatingToken(Token &tok) {
   case tok::semi:
   case tok::eof:
   case tok::code_complete:
+  case tok::exclaim_postfix:
+  case tok::question_postfix:
     return true;
   
+  case tok::oper_binary:
+  case tok::oper_postfix:
+    // These might be '?' or '!' type modifiers.
+    return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);
+      
   case tok::period_prefix:
     // These will be turned into following tokens if they appear unspaced after
     // a generic angle bracket.
@@ -713,7 +762,7 @@ bool Parser::canParseAsGenericArgumentList() {
   BacktrackingScope backtrack(*this);
 
   if (canParseGenericArguments())
-    return isGenericTypeDisambiguatingToken(Tok);
+    return isGenericTypeDisambiguatingToken(*this, Tok);
 
   return false;
 }
@@ -778,7 +827,7 @@ bool Parser::canParseType() {
     return false;
   }
   
-  // '.Type', '.Protocol', and '?' still leave us with type-simple.
+  // '.Type', '.Protocol', '?', and '!' still leave us with type-simple.
   while (true) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         (peekToken().isContextualKeyword("Type")
@@ -787,8 +836,12 @@ bool Parser::canParseType() {
       consumeToken(tok::identifier);
       continue;
     }
-    if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken()) {
-      consumeToken();
+    if (isOptionalToken(Tok)) {
+      consumeOptionalToken();
+      continue;
+    }
+    if (isImplicitlyUnwrappedOptionalToken(Tok)) {
+      consumeImplicitlyUnwrappedOptionalToken();
       continue;
     }
     break;
@@ -801,16 +854,11 @@ bool Parser::canParseType() {
     return true;
   }
 
-  // Handle optional types and arrays.
-  // For recovery purposes, accept "T[]?" here, even though we'll reject it
-  // later.
+  // Handle legacy arrays.
   while (!Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
       if (!canParseTypeArray())
         return false;
-    } else if (Tok.is(tok::question_postfix) || 
-               isImplicitlyUnwrappedOptionalToken()) {
-      consumeToken();
     } else {
       break;
     }

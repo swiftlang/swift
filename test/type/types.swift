@@ -73,4 +73,69 @@ func test_optional_construct<T>() {
   var c = (Int?)() // Parenthesized name.
 }
 
+// Test disambiguation of generic parameter lists in expression context.
 
+struct Gen<T> {}
+
+var y0 : Gen<Int?>
+var y1 : Gen<Int??>
+var y2 : Gen<[Int?]>
+var y3 : Gen<[Int]?>
+var y3a : Gen<[[Int?]]>
+var y3b : Gen<[Int?]?>
+var y4 : Gen<([Int])?>
+var y5 : Gen<([([[Int??]])?])?>
+var y7 : Gen<(Int,Int)?>
+var y8 : Gen<(Int -> Int)?>
+var y8a : Gen<[[Int]? -> Int]>
+var y9 : Gen<Int? -> Int?>
+var y10 : Gen<Int?.Type?.Type>
+var y11 : Gen<Gen<Int>?>
+var y12 : Gen<Gen<Int>?>?
+var y13 : Gen<Gen<Int?>?>?
+var y14 : Gen<Gen<Int?>>?
+var y15 : Gen<Gen<Gen<Int?>>?>
+var y16 : Gen<Gen<Gen<Int?>?>>
+var y17 : Gen<Gen<Gen<Int?>?>>?
+
+var z0 = Gen<Int?>()
+var z1 = Gen<Int??>()
+var z2 = Gen<[Int?]>()
+var z3 = Gen<[Int]?>()
+var z3a = Gen<[[Int?]]>()
+var z3b = Gen<[Int?]?>()
+var z4 = Gen<([Int])?>()
+var z5 = Gen<([([[Int??]])?])?>()
+var z7 = Gen<(Int,Int)?>()
+var z8 = Gen<(Int -> Int)?>()
+var z8a = Gen<[[Int]? -> Int]>()
+var z9 = Gen<Int? -> Int?>()
+var z10 = Gen<Int?.Type?.Type>()
+var z11 = Gen<Gen<Int>?>()
+var z12 = Gen<Gen<Int>?>?()
+var z13 = Gen<Gen<Int?>?>?()
+var z14 = Gen<Gen<Int?>>?()
+var z15 = Gen<Gen<Gen<Int?>>?>()
+var z16 = Gen<Gen<Gen<Int?>?>>()
+var z17 = Gen<Gen<Gen<Int?>?>>?()
+
+y0  = z0 
+y1  = z1 
+y2  = z2 
+y3  = z3 
+y3a = z3a
+y3b = z3b
+y4  = z4 
+y5  = z5 
+y7  = z7 
+y8  = z8 
+y8a = z8a
+y9  = z9 
+y10 = z10
+y11 = z11
+y12 = z12
+y13 = z13
+y14 = z14
+y15 = z15
+y16 = z16
+y17 = z17
