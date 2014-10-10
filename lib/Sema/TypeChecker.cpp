@@ -313,34 +313,6 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     nominal->addExtension(ED);
 }
 
-/// Returns true if the given decl or extension conforms to a protocol whose
-/// name matches a compiler-known protocol. This is a syntactic check; no type
-/// resolution is performed.
-template <typename DeclTy>
-static bool mayConformToKnownProtocol(const DeclTy *D) {
-  for (TypeLoc inherited : D->getInherited()) {
-    auto identRepr = dyn_cast_or_null<IdentTypeRepr>(inherited.getTypeRepr());
-    if (!identRepr)
-      continue;
-
-    auto lastSimpleID =
-        dyn_cast<SimpleIdentTypeRepr>(identRepr->getComponentRange().back());
-    if (!lastSimpleID)
-      continue;
-
-    bool matchesKnownProtocol =
-      llvm::StringSwitch<bool>(lastSimpleID->getIdentifier().str())
-#define PROTOCOL(Name) \
-        .Case(#Name, true)
-#include "swift/AST/KnownProtocols.def"
-        .Default(false);
-    if (matchesKnownProtocol)
-      return true;
-  }
-
-  return false;
-}
-
 static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
@@ -482,15 +454,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
         continue;
 
       for (auto D : SF->Decls) {
-        if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        if (auto ED = dyn_cast<ExtensionDecl>(D))
           bindExtensionDecl(ED, TC);
-          if (mayConformToKnownProtocol(ED) &&
-              ED->getExtendedType()->getAnyNominal())
-            TC.validateDecl(ED->getExtendedType()->getAnyNominal());
-        } else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-          if (mayConformToKnownProtocol(nominal))
-            TC.validateDecl(nominal);
-        }
       }
     }
   });
