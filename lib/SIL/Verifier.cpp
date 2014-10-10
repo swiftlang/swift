@@ -450,6 +450,47 @@ public:
     }
     require(AI->getType() == substTy->getResult().getSILType(),
             "type of apply instruction doesn't match function result type");
+
+    // Check for special constraints on llvm intrinsics.
+    if (auto FR = AI->getCallee())
+      if (auto BFR = dyn_cast<BuiltinFunctionRefInst>(FR))
+        if (BFR->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic)
+          verifyLLVMInstrinsic(AI, BFR->getIntrinsicInfo().ID);
+  }
+
+  void verifyLLVMInstrinsic(ApplyInst *AI, llvm::Intrinsic::ID ID) {
+    // Certain llvm instrinsic require constant values as their operands.
+    // Consequently, these must not be phi nodes (aka. basic block arguments).
+    switch (ID) {
+    default:
+      break;
+    case llvm::Intrinsic::ctlz: // llvm.ctlz
+    case llvm::Intrinsic::cttz: // llvm.cttz
+      require(!isa<SILArgument>(AI->getArgument(1)),
+              "is_zero_undef argument of bit counting intrinsics must be an "
+              "integer literal");
+      break;
+    case llvm::Intrinsic::memcpy:
+    case llvm::Intrinsic::memmove:
+    case llvm::Intrinsic::memset:
+      require(!isa<SILArgument>(AI->getArgument(3)),
+              "alignment argument of memory intrinsics must be an integer "
+              "literal");
+      require(!isa<SILArgument>(AI->getArgument(4)),
+              "isvolatile argument of memory intrinsics must be an integer "
+              "literal");
+      break;
+    case llvm::Intrinsic::lifetime_start:
+    case llvm::Intrinsic::lifetime_end:
+    case llvm::Intrinsic::invariant_start:
+      require(!isa<SILArgument>(AI->getArgument(0)),
+              "size argument of memory use markers must be an integer literal");
+      break;
+    case llvm::Intrinsic::invariant_end:
+      require(!isa<SILArgument>(AI->getArgument(1)),
+              "llvm.invariant.end parameter #2 must be an integer literal");
+      break;
+    }
   }
 
   void checkPartialApplyInst(PartialApplyInst *PAI) {
