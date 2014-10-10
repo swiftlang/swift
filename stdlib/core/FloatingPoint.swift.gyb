@@ -133,7 +133,8 @@ public struct ${Self} {
   }
 
   @transparent 
-  init(_ v: Builtin.FPIEEE${bits}) {
+  public // @testable
+  init(_bits v: Builtin.FPIEEE${bits}) {
     value = v
   }
 
@@ -156,7 +157,7 @@ extension ${Self} : FloatingPointType {
   public typealias _BitsType = UInt${bits}
 
   public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
-    return ${Self}(Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits.value))
+    return ${Self}(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits.value))
   }
 
   public func _toBitPattern() -> _BitsType {
@@ -308,12 +309,12 @@ extension ${Self} /* : FloatingPointType */ {
 extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
   public
   init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
-    self = ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(_bits: Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
   }
 
   /// Create an instance initialized to `value`.
   public init(integerLiteral value: Int64) {
-    self = ${Self}(Builtin.uitofp_Int64_FPIEEE${bits}(value.value))
+    self = ${Self}(_bits: Builtin.uitofp_Int64_FPIEEE${bits}(value.value))
   }
 }
 
@@ -325,9 +326,9 @@ extension ${Self} : _BuiltinFloatLiteralConvertible {
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
-    self = ${Self}(value)
+    self = ${Self}(_bits: value)
 %   elif bits < builtinFloatLiteralBits:
-    self = ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+    self = ${Self}(_bits: Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
     // FIXME: This is actually losing precision <rdar://problem/14073102>.
     self = ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
@@ -402,7 +403,7 @@ extension ${Self} : AbsoluteValuable {
   /// Returns the absolute value of `x`
   @transparent
   public static func abs(x: ${Self}) -> ${Self} {
-    return ${Self}(Builtin.int_fabs_FPIEEE${bits}(x.value))
+    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x.value))
   }
 }
 
@@ -413,7 +414,7 @@ public prefix func +(x: ${Self}) -> ${Self} {
 
 @transparent
 public prefix func -(x: ${Self}) -> ${Self} {
-  return ${Self}(Builtin.fneg_FPIEEE${bits}(x.value))
+  return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x.value))
 }
 
 //===----------------------------------------------------------------------===//
@@ -500,7 +501,7 @@ extension ${Self} : Strideable {
 % for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
 @transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}(Builtin.${name}_FPIEEE${bits}(lhs.value, rhs.value))
+  return ${Self}(_bits: Builtin.${name}_FPIEEE${bits}(lhs.value, rhs.value))
 }
 % end
 

@@ -814,16 +814,19 @@ internal func _transcodeSomeUTF16AsUTF8<
 
 /// Instances of conforming types are used in internal `String`
 /// representation.
-internal protocol _StringElementType {
+public // @testable
+protocol _StringElementType {
   class func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
   class func _fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
 extension UTF16.CodeUnit : _StringElementType {
-  internal static func _toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
+  public // @testable
+  static func _toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return x
   }
-  internal static func _fromUTF16CodeUnit(
+  public // @testable
+  static func _fromUTF16CodeUnit(
     utf16: UTF16.CodeUnit
   ) -> UTF16.CodeUnit {
     return utf16
@@ -831,11 +834,13 @@ extension UTF16.CodeUnit : _StringElementType {
 }
 
 extension UTF8.CodeUnit : _StringElementType {
-  internal static func _toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
+  public // @testable
+  static func _toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
     _sanityCheck(x <= 0x7f, "should only be doing this with ASCII")
     return UTF16.CodeUnit(x)
   }
-  internal static func _fromUTF16CodeUnit(
+  public // @testable
+  static func _fromUTF16CodeUnit(
     utf16: UTF16.CodeUnit
   ) -> UTF8.CodeUnit {
     _sanityCheck(utf16 <= 0x7f, "should only be doing this with ASCII")
@@ -872,7 +877,8 @@ extension UTF16 {
     ) + 0xDC00
   }
 
-  internal static func copy<T : _StringElementType, U : _StringElementType>(
+  public // @testable
+  static func _copy<T : _StringElementType, U : _StringElementType>(
     source: UnsafeMutablePointer<T>,
     destination: UnsafeMutablePointer<U>, count: Int
   ) {

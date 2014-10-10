@@ -154,7 +154,10 @@ func test() {
 
   let n2 = a0~>_copyToNativeArrayBuffer()
   // CHECK-NEXT: true
-  println(n1 === n2)
+
+  // TODO: The following check is currently disabled because the === function
+  // is not public. But this test() function is not called anyway.
+  // println(n1 === n2)
 }
 
 // CHECK-NEXT: trackedCount = 0

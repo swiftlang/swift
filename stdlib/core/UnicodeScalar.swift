@@ -192,6 +192,7 @@ public struct UnicodeScalar :
   }
 
   // FIXME: Unicode makes this interesting.
+  public // @testable
   func _isSpace() -> Bool {
     // FIXME: The constraint-based type checker goes painfully exponential
     // when we turn this into one large expression. Break it up for now,

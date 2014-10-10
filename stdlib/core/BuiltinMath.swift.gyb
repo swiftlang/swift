@@ -64,7 +64,7 @@ def TypedUnaryIntrinsicFunctions():
 % for T, CT, bits, ufunc in TypedUnaryIntrinsicFunctions():
 @transparent
 public func _${ufunc}(x: ${T}) -> ${T} {
-  return ${T}(Builtin.int_${ufunc}_FPIEEE${bits}(x.value))
+  return ${T}(_bits: Builtin.int_${ufunc}_FPIEEE${bits}(x.value))
 }
 
 % end

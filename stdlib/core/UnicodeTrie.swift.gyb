@@ -44,7 +44,8 @@ SuppDataBytesOffset = 12817
 
 import SwiftShims
 
-internal enum _GraphemeClusterBreakPropertyValue : Int, Printable {
+public // @testable
+enum _GraphemeClusterBreakPropertyValue : Int, Printable {
   case Other = 0
   case CR = 1
   case LF = 2
@@ -60,6 +61,7 @@ internal enum _GraphemeClusterBreakPropertyValue : Int, Printable {
   case LVT = 12
 
   /// A textual representation of `self`.
+  public // @testable
   var description: String {
     switch self {
     case Other:
@@ -109,7 +111,8 @@ struct _GraphemeClusterBreakPropertyRawValue {
   }
 }
 
-internal struct _UnicodeGraphemeClusterBreakPropertyTrie {
+public // @testable
+struct _UnicodeGraphemeClusterBreakPropertyTrie {
   static func _checkParameters() {
     let metadata = _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata
 
@@ -166,6 +169,7 @@ internal struct _UnicodeGraphemeClusterBreakPropertyTrie {
   }
 % end
 
+  public // @testable
   init() {
     _UnicodeGraphemeClusterBreakPropertyTrie._checkParameters()
     _trieData = _swift_stdlib_GraphemeClusterBreakPropertyTrie
@@ -225,6 +229,7 @@ internal struct _UnicodeGraphemeClusterBreakPropertyTrie {
     }
   }
 
+  public // @testable
   func getPropertyValue(
       codePoint: UInt32
   ) -> _GraphemeClusterBreakPropertyValue {

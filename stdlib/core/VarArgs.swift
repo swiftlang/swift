@@ -263,7 +263,7 @@ final public class VaListBuilder {
     header.overflow_arg_area
       = storage._baseAddressIfContiguous + _x86_64RegisterSaveWords
     return CVaListPointer(
-             fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
+             _fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
                Builtin.addressof(&self.header)))
   }
 

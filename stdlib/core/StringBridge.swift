@@ -134,13 +134,13 @@ public final class _NSContiguousString : _NSSwiftString {
     _precondition(aRange.location + aRange.length <= Int(_core.count))
 
     if _core.elementWidth == 2 {
-      UTF16.copy(
+      UTF16._copy(
         _core.startUTF16 + aRange.location,
         destination: UnsafeMutablePointer<UInt16>(buffer),
         count: aRange.length)
     }
     else {
-      UTF16.copy(
+      UTF16._copy(
         _core.startASCII + aRange.location,
         destination: UnsafeMutablePointer<UInt16>(buffer),
         count: aRange.length)

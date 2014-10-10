@@ -234,7 +234,8 @@ extension COpaquePointer {
 public struct CVaListPointer {
   var value: UnsafeMutablePointer<Void>
 
-  init(fromUnsafeMutablePointer from: UnsafeMutablePointer<Void>) {
+  public // @testable
+  init(_fromUnsafeMutablePointer from: UnsafeMutablePointer<Void>) {
     value = from
   }
 }

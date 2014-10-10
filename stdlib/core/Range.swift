@@ -231,7 +231,7 @@ public func ... <Pos : ForwardIndexType where Pos: Comparable> (
 }
 
 // FIXME: This doesn't work yet: <rdar://problem/17668465> 
-func ~= <I : ForwardIndexType where I: Comparable> (
+public func ~= <I : ForwardIndexType where I: Comparable> (
   pattern: Range<I>, value: I
 ) -> Bool {
   // convert to an interval and check that.

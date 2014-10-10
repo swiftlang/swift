@@ -54,11 +54,9 @@ struct _HashingDetail {
 // their inputs and just exhibit avalance effect.
 //
 
-// TODO: This function is only public because it is used in the
-// stdlib/HashingAvalanche.swift validation test. Check if there is another
-// way to let the test access the function.
 @transparent
-public func _mixUInt32(value: UInt32) -> UInt32 {
+public // @testable
+func _mixUInt32(value: UInt32) -> UInt32 {
   // Zero-extend to 64 bits, hash, select 32 bits from the hash.
   //
   // NOTE: this differs from LLVM's implementation, which selects the lower
@@ -70,15 +68,14 @@ public func _mixUInt32(value: UInt32) -> UInt32 {
 }
 
 @transparent
+public // @testable
 func _mixInt32(value: Int32) -> Int32 {
   return Int32(bitPattern: _mixUInt32(UInt32(bitPattern: value)))
 }
 
-// TODO: This function is only public because it is used in the
-// stdlib/HashingAvalanche.swift validation test. Check if there is another
-// way to let the test access the function.
 @transparent
-public func _mixUInt64(value: UInt64) -> UInt64 {
+public // @testable
+func _mixUInt64(value: UInt64) -> UInt64 {
   // Similar to hash_4to8_bytes but using a seed instead of length.
   let seed: UInt64 = _HashingDetail.getExecutionSeed()
   let low: UInt64 = value & 0xffff_ffff
@@ -87,11 +84,13 @@ public func _mixUInt64(value: UInt64) -> UInt64 {
 }
 
 @transparent
+public // @testable
 func _mixInt64(value: Int64) -> Int64 {
   return Int64(bitPattern: _mixUInt64(UInt64(bitPattern: value)))
 }
 
 @transparent
+public // @testable
 func _mixUInt(value: UInt) -> UInt {
 #if arch(i386) || arch(arm)
   return UInt(_mixUInt32(UInt32(value)))
@@ -101,6 +100,7 @@ func _mixUInt(value: UInt) -> UInt {
 }
 
 @transparent
+public // @testable
 func _mixInt(value: Int) -> Int {
 #if arch(i386) || arch(arm)
   return Int(_mixInt32(Int32(value)))
@@ -126,6 +126,7 @@ func _mixInt(value: Int) -> Int {
 /// hash value does not change anything fundamentally: collisions are still
 /// possible, and it does not prevent malicious users from constructing data
 /// sets that will exhibit pathological collisions.
+public // @testable
 func _squeezeHashValue(hashValue: Int, resultRange: Range<Int>) -> Int {
   // Length of a Range<Int> does not fit into an Int, but fits into an UInt.
   // An efficient way to compute the length is to rely on two's complement
@@ -147,6 +148,7 @@ func _squeezeHashValue(hashValue: Int, resultRange: Range<Int>) -> Int {
       UInt(bitPattern: resultRange.startIndex) &+ unsignedResult)
 }
 
+public // @testable
 func _squeezeHashValue(hashValue: Int, resultRange: Range<UInt>) -> UInt {
   let mixedHashValue = UInt(bitPattern: _mixInt(hashValue))
   let resultCardinality: UInt = resultRange.endIndex - resultRange.startIndex

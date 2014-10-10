@@ -474,7 +474,7 @@ func test_PointerPrinting() {
 
   printedIs(COpaquePointer(), expectedNull)
   printedIs(CFunctionPointer<() -> ()>(), expectedNull)
-  printedIs(CVaListPointer(fromUnsafeMutablePointer: nullUP), expectedNull)
+  printedIs(CVaListPointer(_fromUnsafeMutablePointer: nullUP), expectedNull)
   printedIs(AutoreleasingUnsafeMutablePointer<Int>(), expectedNull)
 
   println("test_PointerPrinting done")

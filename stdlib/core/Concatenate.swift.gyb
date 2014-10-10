@@ -10,10 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Unfortunately it is required to make some types in this file public
+// (@testable) just because _lazyConcatenate is called from the
+// stdlib unit tests.
+
 /// The `GeneratorType` used by `_ConcatenateSequenceView`,
 /// `_ForwardConcatenateView`, and `_BidirectionalConcatenateView`.
 /// Generates a sequence of the elements of the elements of its
 /// argument.
+public // @testable
 struct _ConcatenateSequenceGenerator<
   Outer: GeneratorType where Outer.Element : SequenceType
 >: GeneratorType, SequenceType {
@@ -29,6 +34,7 @@ struct _ConcatenateSequenceGenerator<
   /// Requires: `next()` has not been applied to a copy of `self`
   /// since the copy was made, and no preceding call to `self.next()`
   /// has returned `nil`.
+  public // @testable
   mutating func next() -> Outer.Element.Generator.Element? {
     do {
       if _fastPath(_inner != nil) {
@@ -48,6 +54,7 @@ struct _ConcatenateSequenceGenerator<
 
   /// `_ConcatenateSequenceGenerator` is also a `SequenceType`, so it
   /// `generate`\ 's a copy of itself
+  public // @testable
   func generate() -> _ConcatenateSequenceGenerator {
     return self
   }
@@ -110,6 +117,7 @@ func _concatenate<
 
 /// A wrapper for a `${IndexProtocol}` for a collection of
 /// collections, that can be used to index the inner elements.
+public // @testable
 struct ${Index}<
   C: CollectionType
     where C.Index : ${IndexProtocol},
@@ -148,6 +156,7 @@ struct ${Index}<
   /// Returns the next consecutive value after `self`.
   ///
   /// Requires: the next value is representable.
+  public // @testable
   func successor() -> ${Index} {
     return ${Index}.adjustForward(_data, _outer, _inner!.successor())
   }
@@ -156,6 +165,7 @@ struct ${Index}<
   /// Returns the previous consecutive value before `self`.
   ///
   /// Requires: the previous value is representable.
+  public // @testable
   func predecessor() -> ${Index} {
 
     var outer = _outer
@@ -169,12 +179,14 @@ struct ${Index}<
 % end
 }
 
+public // @testable
 func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
   return lhs._outer == rhs._outer && lhs._inner == rhs._inner
 }
 
 /// The lazy `CollectionType` returned by `lazyConcatenate(c)` where `c` is a
 /// `CollectionType` having an `Index` conforming to `${IndexProtocol}`
+public // @testable
 struct ${View}<
   C: CollectionType
     where C.Index: ${IndexProtocol},
@@ -194,6 +206,7 @@ struct ${View}<
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
+  public // @testable
   func generate() -> _ConcatenateSequenceGenerator<C.Generator> {
     return _ConcatenateSequenceGenerator(_base.generate())
   }
@@ -201,6 +214,7 @@ struct ${View}<
   /// The position of the first element in a non-empty collection.
   ///
   /// Identical to `endIndex` in an empty collection.
+  public // @testable
   var startIndex: Index {
     return ${Index}.adjustForward(_base, _base.startIndex, nil)
   }
@@ -210,6 +224,7 @@ struct ${View}<
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
+  public // @testable
   var endIndex: Index {
     return ${Index}(_base, _base.endIndex, nil)
   }
@@ -218,6 +233,7 @@ struct ${View}<
   ///
   /// Requires: `position` is a valid position in `self` and
   /// `position != endIndex`.
+  public // @testable
   subscript(position: Index) -> C.Generator.Element.Generator.Element {
     return _base[position._outer][position._inner!]
   }
@@ -227,6 +243,7 @@ struct ${View}<
 
 /// Return a collection that is a concatenation of the elements of
 /// `source`\ 's elements
+public // @testable
 func _lazyConcatenate<
   C: CollectionType
     where C.Index: ${IndexProtocol},

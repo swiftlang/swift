@@ -56,6 +56,7 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 /// compare-and-exchange instruction will operate on the writeback buffer, and
 /// you will get a *race* while doing writeback into shared memory.
 @transparent
+public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
   #object: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
   #expected: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
@@ -67,6 +68,7 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 }
 
 @transparent
+public // @testable
 func _stdlib_atomicInitializeARCRef(
   #object: UnsafeMutablePointer<AnyObject?>,
   #desired: AnyObject) -> Bool {
@@ -195,6 +197,7 @@ func _swift_stdlib_atomicLoadPtrImpl(
 ) -> COpaquePointer
 
 @transparent
+public // @testable
 func _stdlib_atomicLoadARCRef(
   #object: UnsafeMutablePointer<AnyObject?>
 ) -> AnyObject? {
@@ -353,6 +356,7 @@ func _uint64ToStringImpl(
   bufferLength: UWord, value: UInt64, radix: Int64, uppercase: Bool
 ) -> UWord
 
+public // @testable
 func _uint64ToString(
     value: UInt64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {

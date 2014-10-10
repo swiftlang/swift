@@ -15,12 +15,14 @@
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
 @transparent
+public // @testable
 func _countLeadingZeros(value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
 }
 
 /// Returns if `x` is a power of 2.
 @transparent
+public // @testable
 func _isPowerOf2(x: UInt) -> Bool {
   if x == 0 {
     return false
@@ -32,6 +34,7 @@ func _isPowerOf2(x: UInt) -> Bool {
 
 /// Returns if `x` is a power of 2.
 @transparent
+public // @testable
 func _isPowerOf2(x: Int) -> Bool {
   if x <= 0 {
     return false
@@ -142,6 +145,7 @@ public func _stdlib_demangleName(mangledName: String) -> String {
 ///
 /// TODO: Implement version working on Int instead of Int64.
 @transparent
+public // @testable
 func _floorLog2(x: Int64) -> Int {
   _sanityCheck(x > 0, "_floorLog2 operates only on non-negative integers")
   // Note: use unchecked subtraction because we this expression can not
