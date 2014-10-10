@@ -986,9 +986,9 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
 
 std::unique_ptr<SILModule> swift::performSILGeneration(Module *mod,
                                             bool makeModuleFragile,
-                                            bool accessControlEnabled) {
+                                            bool wholeModuleCompilation) {
   return SILModule::constructSIL(mod, nullptr, None, makeModuleFragile,
-                                 accessControlEnabled);
+                                 wholeModuleCompilation);
 }
 
 std::unique_ptr<SILModule>

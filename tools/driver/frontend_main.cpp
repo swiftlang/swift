@@ -181,13 +181,7 @@ static bool performCompile(CompilerInstance &Instance,
       SM = performSILGeneration(*PrimarySourceFile, None, opts.SILSerializeAll);
     else
       SM = performSILGeneration(Instance.getMainModule(), opts.SILSerializeAll,
-              // Only do whole-module compilation if these options are not set.
-              // This is to keep the test suite happy (many tests use internal
-              // functions).
-              // TODO: add a separate option to explicitly disable whole-
-              // module compilation (to be used in the testsuite).
-              Invocation.getLangOptions().EnableAccessControl &&
-              Invocation.getLangOptions().EnableObjCAttrRequiresFoundation);
+                                true);
   }
 
   // We've been told to emit SIL after SILGen, so write it now.
