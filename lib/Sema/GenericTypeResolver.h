@@ -47,16 +47,26 @@ public:
   ///
   /// \param baseTy The base of the member access.
   /// \param baseRange The source range covering the base type.
-  /// \param name The name of the member type.
-  /// \param nameLoc The location of the member name.
+  /// \param ref The reference to the dependent member type.
   ///
   /// \returns A type that refers to the dependent member type, or an error
   /// type if such a reference is ill-formed.
   virtual Type resolveDependentMemberType(Type baseTy,
                                           DeclContext *DC,
                                           SourceRange baseRange,
-                                          Identifier name,
-                                          SourceLoc nameLoc) = 0;
+                                          ComponentIdentTypeRepr *ref) = 0;
+
+  /// Resolve a reference to an associated type within the 'Self' type
+  /// of a protocol.
+  ///
+  /// \param selfTy The base of the member access.
+  /// \param assocType The associated type.
+  ///
+  /// \returns A type that refers to the dependent member type, or an error
+  /// type if such a reference is ill-formed.
+  virtual Type resolveSelfAssociatedType(Type selfTy,
+                                         DeclContext *DC,
+                                         AssociatedTypeDecl *assocType) = 0;
 
   /// Retrieve the type when referring to the given context.
   ///
@@ -72,13 +82,22 @@ public:
 /// This generic type resolver leaves generic type parameter types alone
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
+  ArchetypeBuilder &Builder;
+
+public:
+  explicit DependentGenericTypeResolver(ArchetypeBuilder &builder)
+    : Builder(builder) { }
+
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,
                                           DeclContext *DC,
                                           SourceRange baseRange,
-                                          Identifier name,
-                                          SourceLoc nameLoc);
+                                          ComponentIdentTypeRepr *ref);
+
+  virtual Type resolveSelfAssociatedType(Type selfTy,
+                                         DeclContext *DC,
+                                         AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 };
@@ -94,8 +113,11 @@ class GenericTypeToArchetypeResolver : public GenericTypeResolver {
   virtual Type resolveDependentMemberType(Type baseTy,
                                           DeclContext *DC,
                                           SourceRange baseRange,
-                                          Identifier name,
-                                          SourceLoc nameLoc);
+                                          ComponentIdentTypeRepr *ref);
+
+  virtual Type resolveSelfAssociatedType(Type selfTy,
+                                         DeclContext *DC,
+                                         AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
@@ -121,8 +143,11 @@ public:
   virtual Type resolveDependentMemberType(Type baseTy,
                                           DeclContext *DC,
                                           SourceRange baseRange,
-                                          Identifier name,
-                                          SourceLoc nameLoc);
+                                          ComponentIdentTypeRepr *ref);
+
+  virtual Type resolveSelfAssociatedType(Type selfTy,
+                                         DeclContext *DC,
+                                         AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 };
@@ -147,8 +172,11 @@ public:
   virtual Type resolveDependentMemberType(Type baseTy,
                                           DeclContext *DC,
                                           SourceRange baseRange,
-                                          Identifier name,
-                                          SourceLoc nameLoc);
+                                          ComponentIdentTypeRepr *ref);
+
+  virtual Type resolveSelfAssociatedType(Type selfTy,
+                                         DeclContext *DC,
+                                         AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 };

@@ -384,6 +384,10 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief Recursively conforms to itself.
   unsigned IsRecursive : 1;
 
+  /// The references to this nested type that occur in the source code
+  /// that were unresolved (at least at some point).
+  llvm::TinyPtrVector<ComponentIdentTypeRepr *> UnresolvedReferences;
+
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name)
@@ -436,6 +440,10 @@ public:
     return NameOrAssociatedType.dyn_cast<AssociatedTypeDecl *>();
   }
 
+  /// Resolve the potential archetype to the given associated type.
+  void resolveAssociatedType(AssociatedTypeDecl *assocType,
+                             ArchetypeBuilder &builder);
+
   /// Retrieve the generic type parameter for this potential
   /// archetype, if it corresponds to a generic parameter.
   GenericTypeParamType *getGenericParam() const {
@@ -451,7 +459,8 @@ public:
   /// Add a conformance to this potential archetype.
   ///
   /// \returns true if the conformance was new, false if it already existed.
-  bool addConformance(ProtocolDecl *proto, const RequirementSource &source);
+  bool addConformance(ProtocolDecl *proto, const RequirementSource &source,
+                      ArchetypeBuilder &builder);
 
   /// Retrieve the superclass of this archetype.
   Type getSuperclass() const { return Superclass; }
@@ -483,6 +492,8 @@ public:
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
+                                    ArchetypeBuilder &builder,
+                                    ComponentIdentTypeRepr *reference,
                                     Identifier *parentName = nullptr);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
@@ -514,6 +525,11 @@ public:
   void setIsRecursive() { this->IsRecursive = true; }
   bool isRecursive() { return this->IsRecursive; }
   
+  /// Return the list of unresolved references to this associated type.
+  ArrayRef<ComponentIdentTypeRepr *> getUnresolvedReferences() const {
+    return UnresolvedReferences;
+  }
+
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);
 

@@ -213,7 +213,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 
   // If we found an associated type in an inherited protocol, the base
   // for our reference to this associated type is our own 'Self'.
-  if (isa<AssociatedTypeDecl>(typeDecl)) {
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
     // If we found an associated type from within its protocol, resolve it
     // as a dependent member relative to Self if Self is still dependent.
     if (auto proto = dyn_cast<ProtocolDecl>(fromDC)) {
@@ -222,10 +222,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
       auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
 
       if (baseTy->isDependentType()) {
-        return resolver->resolveDependentMemberType(baseTy, fromDC,
-                                                    SourceRange(),
-                                                    typeDecl->getName(),
-                                                    SourceLoc());
+        return resolver->resolveSelfAssociatedType(baseTy, fromDC, assocType);
       }
     }
 
@@ -579,6 +576,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
         // Otherwise, check for an ambiguity.
         if (current.is<Module *>() || !current.get<Type>()->isEqual(type)) {
+          auto currentType = current.get<Type>();
           isAmbiguous = true;
           break;
         }
@@ -638,13 +636,9 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           
           // Try to resolve the dependent member type to a specific associated
           // type.
-          Type memberType = resolver->resolveDependentMemberType(
-                                        parentTy, DC,
-                                        parentRange,
-                                        comp->getIdentifier(),
-                                        comp->getIdLoc());
-          
-          
+          Type memberType = resolver->resolveDependentMemberType(parentTy, DC,
+                                                                 parentRange,
+                                                                 comp);
           assert(memberType && "Received null dependent member type");
 
           if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {

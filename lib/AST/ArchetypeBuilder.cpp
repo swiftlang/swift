@@ -214,6 +214,11 @@ struct ArchetypeBuilder::Implementation {
   /// A vector containing the same-type requirements introduced into the
   /// system.
   SmallVector<SameTypeRequirement, 4> SameTypeRequirements;
+
+  /// The number of nested types that haven't yet been resolved to archetypes.
+  /// Once all requirements have been added, this will be zero in well-formed
+  /// code.
+  unsigned NumUnresolvedNestedTypes = 0;
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -274,12 +279,25 @@ unsigned ArchetypeBuilder::PotentialArchetype::getNestingDepth() const {
   return Depth;
 }
 
+void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
+       AssociatedTypeDecl *assocType,
+       ArchetypeBuilder &builder) {
+  assert(!NameOrAssociatedType.is<AssociatedTypeDecl *>() &&
+         "associated type is already resolved");
+  NameOrAssociatedType = assocType;
+  assert(builder.Impl->NumUnresolvedNestedTypes > 0 &&
+         "Mismatch in number of unresolved nested types");
+  --builder.Impl->NumUnresolvedNestedTypes;
+  UnresolvedReferences.clear();
+}
+
 bool ArchetypeBuilder::PotentialArchetype::addConformance(
        ProtocolDecl *proto, 
-       const RequirementSource &source) {
+       const RequirementSource &source,
+       ArchetypeBuilder &builder) {
   auto rep = getRepresentative();
   if (rep != this)
-    return rep->addConformance(proto, source);
+    return rep->addConformance(proto, source, builder);
 
   // Check whether we already know about this conformance.
   auto known = ConformsTo.find(proto);
@@ -308,7 +326,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
 
     // If the nested type was not already resolved, do so now.
     if (!known->second.front()->getResolvedAssociatedType()) {
-      known->second.front()->NameOrAssociatedType = assocType;
+      known->second.front()->resolveAssociatedType(assocType, builder);
       continue;
     }
 
@@ -343,15 +361,24 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
 }
 
 auto ArchetypeBuilder::PotentialArchetype::getNestedType(
-    Identifier nestedName, Identifier *parentName) -> PotentialArchetype *{
+       Identifier nestedName,
+       ArchetypeBuilder &builder,
+       ComponentIdentTypeRepr *reference,
+       Identifier *parentName) -> PotentialArchetype * {
   // Retrieve the nested type from the representation of this set.
   if (Representative != this)
-    return getRepresentative()->getNestedType(nestedName);
+    return getRepresentative()->getNestedType(nestedName, builder, reference);
 
   llvm::TinyPtrVector<PotentialArchetype *> &nested = NestedTypes[nestedName];
     
-  if (!nested.empty())
+  if (!nested.empty()) {
+    // If we haven't resolved this associated type yet, add the reference.
+    if (reference && !nested.front()->getResolvedAssociatedType()) {
+      nested.front()->UnresolvedReferences.push_back(reference);
+    }
+
     return nested.front();
+  }
 
   // FIXME: The fact that we've been checking for "new" nested archetypes on
   // a purely lexical basis is both fragile and not-quite-correct. We need
@@ -393,9 +420,12 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 
     // We couldn't resolve the nested type yet, so create an
     // unresolved associated type.  
-    // FIXME: Record this somewhere.
-    if (nested.empty())
+    if (nested.empty()) {
       nested.push_back(new PotentialArchetype(this, nestedName));
+      ++builder.Impl->NumUnresolvedNestedTypes;
+      if (reference)
+        nested.back()->UnresolvedReferences.push_back(reference);
+    }
   }
   
   return nested.front();
@@ -587,7 +617,7 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
     if (!base)
       return nullptr;
 
-    return base->getNestedType(dependentMember->getName());
+    return base->getNestedType(dependentMember->getName(), *this, nullptr);
   }
 
   return nullptr;
@@ -659,7 +689,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   auto T = PAT->getRepresentative();
 
   // Add the requirement, if we haven't done so already.
-  if (!T->addConformance(Proto, Source))
+  if (!T->addConformance(Proto, Source, *this))
     return false;
 
   RequirementSource InnerSource(RequirementSource::Protocol, Source.getLoc());
@@ -676,7 +706,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
       auto parentName = Proto->getName();
-      auto AssocPA = T->getNestedType(AssocType->getName(),
+      auto AssocPA = T->getNestedType(AssocType->getName(), *this, nullptr,
                                       &parentName);
       
       if (AssocPA != T) {
@@ -691,7 +721,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
           // archetype.
           if (Proto == InheritedProto) {
             AssocPA->setIsRecursive();
-            AssocPA->addConformance(Proto, Source);
+            AssocPA->addConformance(Proto, Source, *this);
             continue;
           }
           
@@ -800,6 +830,12 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   T2->Representative = T1;
   T2->SameTypeSource = Source;
 
+  // Add unresolved references.
+  T1->UnresolvedReferences.insert(T1->UnresolvedReferences.end(),
+                                  T2->UnresolvedReferences.begin(),
+                                  T2->UnresolvedReferences.end());
+  T2->UnresolvedReferences.clear();
+
   // Record this same-type requirement.
   Impl->SameTypeRequirements.push_back({ OrigT1, OrigT2 });
 
@@ -807,12 +843,12 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Add all of the protocol conformance requirements of T2 to T1.
   for (auto conforms : T2->ConformsTo) {
-    T1->addConformance(conforms.first, conforms.second);
+    T1->addConformance(conforms.first, conforms.second, *this);
   }
 
   // Recursively merge the associated types of T2 into T1.
   for (auto T2Nested : T2->NestedTypes) {
-    auto T1Nested = T1->getNestedType(T2Nested.first);
+    auto T1Nested = T1->getNestedType(T2Nested.first, *this, nullptr);
     if (addSameTypeRequirementBetweenArchetypes(T1Nested,
                                                 T2Nested.second.front(),
                                                 Source))

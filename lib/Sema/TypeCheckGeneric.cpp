@@ -29,9 +29,19 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      Type baseTy,
                                      DeclContext *DC,
                                      SourceRange baseRange,
-                                     Identifier name,
-                                     SourceLoc nameLoc) {
-  return DependentMemberType::get(baseTy, name, baseTy->getASTContext());
+                                     ComponentIdentTypeRepr *ref) {
+  return Builder.resolveArchetype(baseTy)->getRepresentative()
+           ->getNestedType(ref->getIdentifier(), Builder, ref)
+           ->getDependentType(Builder);
+}
+
+Type DependentGenericTypeResolver::resolveSelfAssociatedType(
+       Type selfTy,
+       DeclContext *DC,
+       AssociatedTypeDecl *assocType) {
+  return Builder.resolveArchetype(selfTy)->getRepresentative()
+           ->getNestedType(assocType->getName(), Builder, nullptr)
+           ->getDependentType(Builder);
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -58,11 +68,16 @@ Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
                                   Type baseTy,
                                   DeclContext *DC,
                                   SourceRange baseRange,
-                                  Identifier name,
-                                  SourceLoc nameLoc) {
+                                  ComponentIdentTypeRepr *ref) {
   llvm_unreachable("Dependent type after archetype substitution");
 }
 
+Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
+       Type selfTy,
+       DeclContext *DC,
+       AssociatedTypeDecl *assocType) {
+  llvm_unreachable("Dependent type after archetype substitution");  
+}
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return dc->getDeclaredTypeInContext();
@@ -86,10 +101,19 @@ Type PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
                                               Type baseTy,
                                               DeclContext *DC,
                                               SourceRange baseRange,
-                                              Identifier name,
-                                              SourceLoc nameLoc) {
+                                              ComponentIdentTypeRepr *ref) {
   // We don't have enough information to find the associated type.
-  return DependentMemberType::get(baseTy, name, TC.Context);
+  // FIXME: Nonsense, but we shouldn't need this code anyway.
+  return DependentMemberType::get(baseTy, ref->getIdentifier(), TC.Context);
+}
+
+Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
+       Type selfTy,
+       DeclContext *DC,
+       AssociatedTypeDecl *assocType) {
+  // We don't have enough information to find the associated type.
+  // FIXME: Nonsense, but we shouldn't need this code anyway.
+  return DependentMemberType::get(selfTy, assocType->getName(), TC.Context);
 }
 
 Type
@@ -114,12 +138,14 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     Type baseTy,
                                     DeclContext *DC,
                                     SourceRange baseRange,
-                                    Identifier name,
-                                    SourceLoc nameLoc) {
+                                    ComponentIdentTypeRepr *ref) {
   // Resolve the base to a potential archetype.
   auto basePA = Builder.resolveArchetype(baseTy);
   assert(basePA && "Missing potential archetype for base");
   basePA = basePA->getRepresentative();
+
+  Identifier name = ref->getIdentifier();
+  SourceLoc nameLoc = ref->getIdLoc();
 
   // Find the associated type declaration for this name.
   for (const auto &conforms : basePA->getConformsTo()) {
@@ -160,6 +186,14 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
     .highlight(baseRange);
   return ErrorType::get(TC.Context);
+}
+
+Type CompleteGenericTypeResolver::resolveSelfAssociatedType(Type selfTy,
+       DeclContext *DC,
+       AssociatedTypeDecl *assocType) {
+  return Builder.resolveArchetype(selfTy)->getRepresentative()
+           ->getNestedType(assocType->getName(), Builder, nullptr)
+           ->getDependentType(Builder);
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -618,7 +652,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   // Type check the function declaration, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver;
+  DependentGenericTypeResolver dependentResolver(builder);
   if (checkGenericFuncSignature(*this, &builder, func, dependentResolver)) {
     func->setType(ErrorType::get(Context));
     return true;
@@ -788,7 +822,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver;  
+  DependentGenericTypeResolver dependentResolver(builder);  
   if (checkGenericParameters(*this, &builder, genericParams, dc,
                              dependentResolver)) {
     invalid = true;
