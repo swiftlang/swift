@@ -261,24 +261,16 @@ static void simplifyCondBranchInst(CondBranchInst *BI, bool BranchTaken) {
   BI->eraseFromParent();
 }
 
-/// Returns true if C1, C2 represent equivalent conditions.
-///
-/// TODO: Could we use SILInstruction::isIdenticalTo here?
+/// Returns true if C1, C2 represent equivalent conditions in the
+/// sense that each is eventually based on the same value.
 static bool areEquivalentConditions(SILValue C1, SILValue C2) {
-  if (C1 == C2)
-    return true;
+  if (auto *SEI = dyn_cast<SelectEnumInst>(C1))
+    C1 = SEI->getEnumOperand().stripCasts();
 
-  if (auto *EITI1 = dyn_cast<SelectEnumInst>(C1)) {
-    if (auto *EITI2 = dyn_cast<SelectEnumInst>(C2)) {
-      // Strip off casts for our comparison since casts do not change the
-      // underlying enum value.
-      SILValue Op1 = EITI1->getEnumOperand().stripCasts();
-      SILValue Op2 = EITI2->getEnumOperand().stripCasts();
-      return Op1 == Op2;
-    }
-  }
+  if (auto *SEI = dyn_cast<SelectEnumInst>(C2))
+    C2 = SEI->getEnumOperand().stripCasts();
 
-  return false;
+  return C1 == C2;
 }
 
 static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {

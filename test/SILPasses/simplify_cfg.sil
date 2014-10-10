@@ -1,6 +1,6 @@
 // RUN: %sil-opt %s -simplify-cfg | FileCheck %s
 // FIXME: Update for select_enum change.
-// RUN: %sil-opt %s -simplify-cfg -sil-combine -simplify-cfg | not FileCheck %s --check-prefix=CHECK_WITH_COMBINE
+// RUN: %sil-opt %s -simplify-cfg -sil-combine -simplify-cfg | FileCheck %s --check-prefix=CHECK_WITH_COMBINE
 import Builtin
 import Swift
 
