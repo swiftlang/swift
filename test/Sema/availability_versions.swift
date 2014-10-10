@@ -284,3 +284,56 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
   o.availableOn10_9Computed = 9
   o.availableOn10_10Computed = 10 // expected-error {{'availableOn10_10Computed' is only available on OS X version 10.10 or greater}}
 }
+
+// Classes
+
+@availability(OSX, introduced=10.9)
+class ClassAvailableOn10_9 {
+  func someMethod() {}
+  class func someClassMethod() {}
+  var someProp : Int = 22
+}
+
+@availability(OSX, introduced=10.10)
+class ClassAvailableOn10_10 {  
+  func someMethod() {}
+  class func someClassMethod() {
+    let _ = ClassAvailableOn10_10()
+  }
+  var someProp : Int = 22
+}
+
+func classAvailability() {
+  ClassAvailableOn10_9.someClassMethod()
+  ClassAvailableOn10_10.someClassMethod() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+
+  ClassAvailableOn10_9.self
+  ClassAvailableOn10_10.self // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  
+  let o10_9 = ClassAvailableOn10_9()
+  let o10_10 = ClassAvailableOn10_10() // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+  
+  o10_9.someMethod()
+  o10_10.someMethod()
+  
+  let _ = o10_9.someProp
+  let _ = o10_10.someProp 
+}
+
+protocol Createable {
+  init()
+}
+
+@availability(OSX, introduced=10.10)
+class ClassAvailableOn10_10_Createable : Createable { 
+  required init() {}
+}
+
+func create<T : Createable>() -> T {
+  return T()
+}
+
+func classViaTypeParameter() {
+  let _ : ClassAvailableOn10_10_Createable = 
+      create() // expected-error {{'ClassAvailableOn10_10_Createable' is only available on OS X version 10.10 or greater}}
+}

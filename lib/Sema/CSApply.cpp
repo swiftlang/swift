@@ -385,8 +385,22 @@ namespace {
     
     /// \brief Emit a diagnostic if the chosen overload is potentially
     /// unavailable.
-    void diagnoseOverloadChoiceUnavailability(OverloadChoice choice,
-                                              SourceLoc referenceLoc);
+    void diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
+                                             SourceLoc referenceLoc);
+    
+    /// \brief Emit a diagnostic if the type representation is
+    /// potentially unavailable.
+    void diagnoseIfTypeReprUnavailable(TypeRepr *repr);
+    
+    /// \brief Emit a diagnostic if any type parameter actuals for an
+    /// apply expression are potentially unavailable. These must be available
+    /// at the call site because the callee may use the type parameter formals
+    /// to get at the metadata for the type.
+    void diagnoseIfTypeParameterActualsUnavailable(ApplyExpr *applyExpr);
+    
+    /// \brief Emit a diagnostic if the declaration is not available at
+    /// the reference location.
+    void diagnoseIfDeclUnavailable(ValueDecl *D, SourceLoc refLoc);
     
   public:
     /// \brief Build a reference to the given declaration.
@@ -1873,6 +1887,11 @@ namespace {
       auto toType = simplifyType(expr->getTypeLoc().getType());
       expr->getTypeLoc().setType(toType, /*validated=*/true);
       expr->setType(MetatypeType::get(toType));
+      
+      if (expr->getTypeRepr()) {
+        diagnoseIfTypeReprUnavailable(expr->getTypeRepr());
+      }
+      
       return expr;
     }
 
@@ -1950,7 +1969,7 @@ namespace {
       // even when EnableExperimentalUnavailableAsOptional is turned on.
       // We may want to do eventually treat unavailable OtherConstructorRefs,
       // as optional, but perhaps only inside failable initializers.
-      diagnoseOverloadChoiceUnavailability(choice, expr->getConstructorLoc());
+      diagnoseIfOverloadChoiceUnavailable(choice, expr->getConstructorLoc());
       
       // Build a partial application of the initializer.
       Expr *ctorRef = buildOtherConstructorRef(selected.openedFullType,
@@ -2505,6 +2524,8 @@ namespace {
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
+      
+      diagnoseIfTypeParameterActualsUnavailable(expr);
       
       auto result = finishApply(expr, expr->getType(),
                          ConstraintLocatorBuilder(
@@ -4494,12 +4515,49 @@ ExprRewriter::convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
 }
 
 void
-ExprRewriter::diagnoseOverloadChoiceUnavailability(OverloadChoice choice,
-                                                   SourceLoc referenceLoc) {
+ExprRewriter::diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
+                                                  SourceLoc referenceLoc) {
   if (choice.isPotentiallyUnavailable()) {
     assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
     cs.TC.diagnosePotentialUnavailability(choice.getDecl(), referenceLoc,
                                           choice.getReasonUnavailable(cs));
+  }
+}
+
+void ExprRewriter::diagnoseIfTypeReprUnavailable(TypeRepr *repr) {
+  auto *identTypeRepr = dyn_cast<ComponentIdentTypeRepr>(repr);
+  if (!identTypeRepr || !identTypeRepr->isBoundType())
+    return;
+
+  NominalTypeDecl *D = identTypeRepr->getBoundType()->getAnyNominal();
+  if (!D)
+    return;
+  
+  diagnoseIfDeclUnavailable(D, repr->getStartLoc());
+}
+
+void
+ExprRewriter::diagnoseIfTypeParameterActualsUnavailable(ApplyExpr *applyExpr) {
+  auto *DRE =
+      dyn_cast<DeclRefExpr>(applyExpr->getFn()->getValueProvidingExpr());
+  
+  if (!DRE)
+    return;
+  
+  for (Substitution sub : DRE->getDeclRef().getSubstitutions()) {
+    NominalTypeDecl *D = sub.getReplacement()->getAnyNominal();
+    if (!D)
+      continue;
+    
+    diagnoseIfDeclUnavailable(D, DRE->getLoc());
+  }
+}
+
+void ExprRewriter::diagnoseIfDeclUnavailable(ValueDecl *D, SourceLoc refLoc) {
+  auto unavailReason = cs.TC.checkDeclarationAvailability(D, refLoc, dc);
+  
+  if (unavailReason.hasValue()) {
+    cs.TC.diagnosePotentialUnavailability(D, refLoc, unavailReason.getValue());
   }
 }
 
@@ -4659,7 +4717,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // We diagnose unavailability here, but do not yet convert to an optional,
   // even when EnableExperimentalTreatOptionalAsUnavailable is turned on.
-  diagnoseOverloadChoiceUnavailability(choice, fn->getEndLoc());
+  diagnoseIfOverloadChoiceUnavailable(choice, fn->getEndLoc());
   
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
