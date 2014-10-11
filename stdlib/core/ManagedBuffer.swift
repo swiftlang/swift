@@ -148,33 +148,33 @@ public class ManagedBuffer<Value, Element>
 ///          pointerToValue.destroy()
 ///        }
 ///      }
-///  
+///
 ///      // All properties are *computed* based on members of the Value
-///      var count : Int { 
+///      var count: Int {
 ///        return Manager(unsafeBufferObject: self).value.0
 ///      }
-///      var name : String { 
+///      var name: String {
 ///        return Manager(unsafeBufferObject: self).value.1
 ///      }
 ///    }
-///  
+///
 public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Create with new storage containing an initial `Value` and space
   /// for at least `minimumCapacity` `element`\ s.
   ///
-  /// :param: `bufferClass` - the class of the object used for storage.
-  /// :param: `minimumCapacity` - the minimum number of `Elements` that
+  /// :param: `bufferClass` the class of the object used for storage.
+  /// :param: `minimumCapacity` the minimum number of `Elements` that
   ///   must be able to be stored in the new buffer.
-  /// :param: `initialValue` - a function that produces the initial
+  /// :param: `initialValue` a function that produces the initial
   ///   `Value` instance stored in the buffer, given the `buffer`
   ///   object and a function that can be called on it to get the actual
   ///   number of allocated elements.
   ///
   /// Requires: minimumCapacity >= 0, and the type indicated by
-  ///   `bufferClass` is a non-`@objc` class with no declared stored
-  ///   properties.  The `deinit` of `bufferClass` must destroy its
-  ///   stored `Value` and any constructed `Elements`.  
+  /// `bufferClass` is a non-`@objc` class with no declared stored
+  /// properties.  The `deinit` of `bufferClass` must destroy its
+  /// stored `Value` and any constructed `Elements`.
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
@@ -207,8 +207,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// Manage the given `buffer`.
   ///
   /// Requires: `buffer` is an instance of a non-`@objc` class with no
-  ///   declared stored properties, whose `deinit` destroys its
-  ///   stored `Value` and any constructed `Elements`.
+  /// declared stored properties, whose `deinit` destroys its
+  /// stored `Value` and any constructed `Elements`.
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
     self._nativeBuffer = Builtin.castToNativeObject(buffer)

@@ -227,7 +227,7 @@ func _slowPath<C: BooleanType>(x: C) -> Bool {
 
 //===--- Runtime shim wrappers --------------------------------------------===//
 
-/// Returns `true`iff the class indicated by `theClass` is non-\ `@objc`.
+/// Returns `true` iff the class indicated by `theClass` is non-\ `@objc`.
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
   return _swift_usesNativeSwiftReferenceCounting_class(
     unsafeAddressOf(theClass)
