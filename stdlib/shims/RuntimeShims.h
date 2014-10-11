@@ -25,10 +25,12 @@ namespace swift { extern "C" {
 
 unsigned char _swift_isUniquelyReferencedNonObjC_nonNull(const void*);
 unsigned char _swift_usesNativeSwiftReferenceCounting_nonNull(const void*);
+unsigned char _swift_usesNativeSwiftReferenceCounting_class(const void*);
 unsigned char _swift_isUniquelyReferenced_native_spareBits(uintptr_t bits);
 unsigned char _swift_isUniquelyReferenced_nonNull_native(
   const struct HeapObject*);
-
+size_t _swift_class_getInstanceSize_class(const void*);
+    
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif

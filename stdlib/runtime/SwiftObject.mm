@@ -374,6 +374,13 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
   return (theClass->getFlags() & ClassFlags::UsesSwift1Refcounting);
 }
 
+// version for SwiftShims
+unsigned char swift::_swift_usesNativeSwiftReferenceCounting_class(
+  const void *theClass
+) {
+  return usesNativeSwiftReferenceCounting((const ClassMetadata *)theClass);
+}
+
 static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   assert(!isObjCTaggedPointerOrNull(object));
   return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
@@ -739,4 +746,9 @@ unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
   return object != nullptr && object->refCount < 2 * RC_INTERVAL;
 }
 
-
+/// Returns class_getInstanceSize(c)
+///
+/// That function is otherwise unavailable to the core stdlib.
+size_t swift::_swift_class_getInstanceSize_class(const void* c) {
+  return class_getInstanceSize((Class)c);
+}

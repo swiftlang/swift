@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 // Definitions that make elements of Builtin usable in real code
 // without gobs of boilerplate.
 
@@ -223,3 +225,17 @@ func _slowPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.boolValue, false)
 }
 
+//===--- Runtime shim wrappers --------------------------------------------===//
+
+/// Returns `true`iff the class indicated by `theClass` is non-\ `@objc`.
+internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
+  return _swift_usesNativeSwiftReferenceCounting_class(
+    unsafeAddressOf(theClass)
+  ) != 0
+}
+
+/// Returns: `class_getInstanceSize(theClass)`
+internal func _class_getInstanceSize(theClass: AnyClass) -> Int {
+  return Int(_swift_class_getInstanceSize_class(
+      unsafeAddressOf(theClass)))
+}

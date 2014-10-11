@@ -35,9 +35,8 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// idea to store this information in the "value" area when
   /// an instance is created.
   public final var allocatedElementCount : Int {
-    return (
-      _allocatedByteCount &- ManagedProtoBuffer._elementOffset &+ sizeof(Element) &- 1
-    ) &/ sizeof(Element)
+    let p = ManagedBufferPointer<Value,Element>(self)
+    return p.allocatedElementCount
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored `Value`
@@ -59,12 +58,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   public final func withUnsafeMutablePointers<R>(
     body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
   ) -> R {
-    let result = body(
-      UnsafeMutablePointer(_address + ManagedProtoBuffer._valueOffset),
-      UnsafeMutablePointer(_address + ManagedProtoBuffer._elementOffset)
-    )
-    _fixLifetime(self)
-    return result
+    return ManagedBufferPointer(self).withUnsafeMutablePointers(body)
   }
   
   //===--- internal/private API -------------------------------------------===//
@@ -72,41 +66,6 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// Make ordinary initialization unavailable
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only initialize these by calling create")
-  }
-  
-  /// The required alignment for allocations of this type, minus 1
-  internal final class var _alignmentMask : Int {
-    return max(
-      alignof(_HeapObject.self),
-      max(alignof(Value.self), alignof(Element.self))) &- 1
-  }
-
-  /// The actual number of bytes allocated for this object.
-  internal final var _allocatedByteCount : Int {
-    return Int(bitPattern: malloc_size(unsafeAddressOf(self)))
-  }
-  
-  /// The address of this instance in a convenient pointer-to-bytes form
-  internal final var _address : UnsafePointer<UInt8> {
-    return UnsafePointer(unsafeAddressOf(self))
-  }
-
-  /// Offset from the allocated storage for `self` to the stored `Value`
-  internal final class var _valueOffset : Int {
-    return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
-  }
-
-  /// Offset from the allocated storage for `self` to the `Element` storage
-  internal final class var _elementOffset : Int {
-    return _roundUpToAlignment(
-      _valueOffset + sizeof(Value.self), alignof(Element.self))
-  }
-  
-  /// A hack that gives the deallocator information about our
-  /// allocated size.  Probably completely unused per
-  /// <rdar://problem/18156440>
-  internal final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
-    return (_allocatedByteCount, ManagedProtoBuffer._alignmentMask)
   }
 }
 
@@ -125,58 +84,255 @@ public class ManagedBuffer<Value, Element>
   : ManagedProtoBuffer<Value, Element> {
   
   /// Create a new instance of the most-derived class, calling
-  /// `initialize` on the partially-constructed object to generate an
-  /// initial `Value`.
-  ///
-  /// Note, in particular, accessing `value` inside the `initialize`
-  /// function is undefined.
+  /// `initializeValue` on the partially-constructed object to
+  /// generate an initial `Value`.
   public final class func create(
-    minimumCapacity: Int, initialize: (ManagedProtoBuffer<Value,Element>)->Value
-  ) -> ManagedBuffer {
-    _precondition(
-      minimumCapacity >= 0,
-      "ManagedBuffer must have non-negative capacity")
-
-    let totalSize = ManagedBuffer._elementOffset
-      +  minimumCapacity * strideof(Element.self)
-
-    let alignMask = ManagedBuffer._alignmentMask
-
-    let result: ManagedBuffer = unsafeDowncast(
-        _swift_bufferAllocate(self, totalSize, alignMask)
-      )
+    minimumCapacity: Int,
+    initialValue: (ManagedProtoBuffer<Value,Element>)->Value
+  ) -> ManagedBuffer<Value,Element> {
     
-    result.withUnsafeMutablePointerToValue {
-      $0.initialize(initialize(result))
-    }
-    return result
+    let p = ManagedBufferPointer<Value,Element>(
+      bufferClass: self,
+      minimumCapacity: minimumCapacity,
+      { buffer, _ in initialValue(
+          // FIXME: should be an unsafeDowncast <rdar://problem/18618169> 
+          Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(buffer)))
+      })
+
+    // FIXME: should be an unsafeDowncast <rdar://problem/18618169> 
+    return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(p.buffer))
   }
 
   /// Destroy the stored Value
   deinit {
-    // FIXME: doing the work in a helper is a workaround for
-    // <rdar://problem/18158010>
-    _deinit()
-  }
-
-  // FIXME: separating this from the real deinit is a workaround for
-  // <rdar://problem/18158010>
-  /// The guts of deinit(); do not call
-  internal final func _deinit() {
-    withUnsafeMutablePointerToValue { $0.destroy() }
+    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.destroy() }
   }
 
   /// The stored `Value` instance.
-  ///
-  /// Note: this value must not be accessed during instance creation.
   public final var value: Value {
+    address {
+      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue {
+        UnsafePointer($0)
+      }
+    }
+    mutableAddress {
+      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0 }
+    }
+  }
+}
+
+/// Contains a buffer object, and provides access to an instance of
+/// `Value` and contiguous storage for an arbitrary number of
+/// `Element` instances stored in that buffer.
+///
+/// For most purposes, the `ManagedBuffer` class works fine for this
+/// purpose, and can simply be used on its own.  However, in cases
+/// where objects of various different classes must serve as storage,
+/// `ManagedBufferPointer` is needed.
+///
+/// A valid buffer class is non-`@objc`, with no declared stored
+///   properties.  Its `deinit` must destroy its
+///   stored `Value` and any constructed `Elements`.
+///
+/// Example Buffer Class
+/// --------------------
+///
+/// ::
+///
+///    class MyBuffer<Element> { // non-@objc
+///      typealias Manager = ManagedBufferPointer<(Int,String), Element>
+///      deinit {
+///        Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
+///          (pointerToValue, pointerToElements)->Void in
+///          pointerToElements.destroy(self.count)
+///          pointerToValue.destroy()
+///        }
+///      }
+///  
+///      // All properties are *computed* based on members of the Value
+///      var count : Int { 
+///        return Manager(unsafeBufferObject: self).value.0
+///      }
+///      var name : String { 
+///        return Manager(unsafeBufferObject: self).value.1
+///      }
+///    }
+///  
+public struct ManagedBufferPointer<Value, Element> : Equatable {
+
+  /// Create with new storage containing an initial `Value` and space
+  /// for at least `minimumCapacity` `element`\ s.
+  ///
+  /// :param: `bufferClass` - the class of the object used for storage.
+  /// :param: `minimumCapacity` - the minimum number of `Elements` that
+  ///   must be able to be stored in the new buffer.
+  /// :param: `initialValue` - a function that produces the initial
+  ///   `Value` instance stored in the buffer, given the `buffer`
+  ///   object and a function that can be called on it to get the actual
+  ///   number of allocated elements.
+  ///
+  /// Requires: minimumCapacity >= 0, and the type indicated by
+  ///   `bufferClass` is a non-`@objc` class with no declared stored
+  ///   properties.  The `deinit` of `bufferClass` must destroy its
+  ///   stored `Value` and any constructed `Elements`.  
+  public init(
+    bufferClass: AnyClass,
+    minimumCapacity: Int,
+    initialValue: (buffer: AnyObject, allocatedCount: (AnyObject)->Int)->Value
+  ) {
+    ManagedBufferPointer._checkValidBufferClass(bufferClass)
+    _precondition(
+      minimumCapacity >= 0,
+      "ManagedBufferPointer must have non-negative capacity")
+
+    let totalSize = _My._elementOffset
+      +  minimumCapacity * strideof(Element.self)
+
+    let newBuffer: AnyObject = _swift_bufferAllocate(
+      bufferClass, totalSize, _My._alignmentMask)
+
+    self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
+
+    // initialize the value field
+    withUnsafeMutablePointerToValue {
+      $0.initialize(
+        initialValue(
+          buffer: newBuffer,
+          allocatedCount: {
+            ManagedBufferPointer(unsafeBufferObject: $0).allocatedElementCount
+          }))
+    }
+  }
+
+  /// Manage the given `buffer`.
+  ///
+  /// Requires: `buffer` is an instance of a non-`@objc` class with no
+  ///   declared stored properties, whose `deinit` destroys its
+  ///   stored `Value` and any constructed `Elements`.
+  public init(unsafeBufferObject buffer: AnyObject) {
+    ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
+    self._nativeBuffer = Builtin.castToNativeObject(buffer)
+  }
+
+  /// The stored `Value` instance.
+  public var value: Value {    
+    /*
     address {
       return withUnsafeMutablePointerToValue { UnsafePointer($0) }
     }
     mutableAddress {
       return withUnsafeMutablePointerToValue { $0 }
     }
+    */
+    // FIXME: <rdar://problem/18619176> replace get/set with
+    // addressors => link error
+    get { return withUnsafeMutablePointerToValue { $0.memory } }
+    set { withUnsafeMutablePointerToValue { $0.memory = newValue } }
   }
+
+  /// Return the object instance being used for storage.
+  public var buffer: AnyObject {
+    return Builtin.castFromNativeObject(_nativeBuffer)
+  }
+
+  /// The actual number of elements that can be stored in this object.
+  ///
+  /// This value may be nontrivial to compute; it is usually a good
+  /// idea to store this information in the "value" area when
+  /// an instance is created.
+  public var allocatedElementCount : Int {
+    return (
+      _allocatedByteCount &- _My._elementOffset &+ sizeof(Element) &- 1
+    ) &/ sizeof(Element)
+  }
+
+  /// Call `body` with an `UnsafeMutablePointer` to the stored `Value`
+  public func withUnsafeMutablePointerToValue<R>(
+    body: (UnsafeMutablePointer<Value>)->R
+  ) -> R {
+    return withUnsafeMutablePointers { (v, e) in return body(v) }
+  }
+  
+  /// Call body with an `UnsafeMutablePointer` to the `Element` storage
+  public func withUnsafeMutablePointerToElements<R>(
+    body: (UnsafeMutablePointer<Element>)->R
+  ) -> R {
+    return withUnsafeMutablePointers { return body($0.1) }
+  }
+
+  /// Call body with `UnsafeMutablePointer`\ s to the stored `Value`
+  /// and raw `Element` storage
+  public func withUnsafeMutablePointers<R>(
+    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
+  ) -> R {
+    let result = body(
+      UnsafeMutablePointer(_address + _My._valueOffset),
+      UnsafeMutablePointer(_address + _My._elementOffset)
+    )
+    _fixLifetime(_nativeBuffer)
+    return result
+  }
+  
+  //===--- internal/private API -------------------------------------------===//
+  
+  /// Manage the given `buffer`.
+  ///
+  /// **Note:** it is an error to use the `value` property of the resulting
+  /// instance unless it has been initialized.
+  internal init(_ buffer: ManagedProtoBuffer<Value, Element>) {
+    _nativeBuffer = Builtin.castToNativeObject(buffer)
+  }
+  
+  internal typealias _My = ManagedBufferPointer
+
+  internal static func _checkValidBufferClass(bufferClass: AnyClass) {
+    _debugPrecondition(
+      _class_getInstanceSize(bufferClass)
+      == _class_getInstanceSize(ManagedBuffer<Int,Int>.self),
+      "ManagedBufferPointer buffer class has declared stored properties"
+    )
+    _debugPrecondition(
+      _usesNativeSwiftReferenceCounting(bufferClass),
+      "ManagedBufferPointer buffer class must be non-@objc"
+    )
+  }
+  
+  /// The required alignment for allocations of this type, minus 1
+  internal static var _alignmentMask : Int {
+    return max(
+      alignof(_HeapObject.self),
+      max(alignof(Value.self), alignof(Element.self))) &- 1
+  }
+
+  /// The actual number of bytes allocated for this object.
+  internal var _allocatedByteCount : Int {
+    return Int(bitPattern: malloc_size(_address))
+  }
+  
+  /// The address of this instance in a convenient pointer-to-bytes form
+  internal var _address : UnsafePointer<UInt8> {
+    return UnsafePointer(Builtin.bridgeToRawPointer(_nativeBuffer))
+  }
+
+  /// Offset from the allocated storage for `self` to the stored `Value`
+  internal static var _valueOffset : Int {
+    return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
+  }
+
+  /// Offset from the allocated storage for `self` to the `Element` storage
+  internal static var _elementOffset : Int {
+    return _roundUpToAlignment(
+      _valueOffset + sizeof(Value.self), alignof(Element.self))
+  }
+  
+  internal var _nativeBuffer: Builtin.NativeObject
+}
+
+public func == <Value, Element>(
+  lhs: ManagedBufferPointer<Value, Element>,
+  rhs: ManagedBufferPointer<Value, Element>
+) -> Bool {
+  return lhs._address == rhs._address
 }
 
 // FIXME: when our calling convention changes to pass self at +0,
