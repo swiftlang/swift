@@ -674,6 +674,92 @@ public:
   }
 };
 
+/// Represents an invocation of builtin functionality provided by the code
+/// generator.
+class BuiltinInst : public SILInstruction {
+public:
+  /// The name of the builtin to invoke.
+  Identifier Name;
+  
+  /// The number of tail-allocated substitutions, allocated after the operand
+  /// list's tail allocation.
+  unsigned NumSubstitutions;
+  
+  /// The value arguments to the builtin.
+  TailAllocatedOperandList<0> Operands;
+  
+  Substitution *getSubstitutionsStorage() {
+    return reinterpret_cast<Substitution*>(Operands.asArray().end());
+  }
+  const Substitution *getSubstitutionsStorage() const {
+    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
+  }
+
+  BuiltinInst(SILLocation Loc,
+              Identifier Name,
+              SILType ReturnType,
+              ArrayRef<Substitution> Substitutions,
+              ArrayRef<SILValue> Args);
+  
+public:
+  static BuiltinInst *create(SILLocation Loc,
+                             Identifier Name,
+                             SILType ReturnType,
+                             ArrayRef<Substitution> Substitutions,
+                             ArrayRef<SILValue> Args,
+                             SILFunction &F);
+  
+  /// Return the name of the builtin operation.
+  Identifier getName() const { return Name; }
+  void setName(Identifier I) { Name = I; }
+  
+  /// Currently all builtins have one result, so getType() is OK.
+  /// We may want to change that eventually.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
+  ///
+  /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
+  /// intrinsic. The particular intrinsic functions which correspond to the
+  /// returned value are defined in llvm/Intrinsics.h.
+  const IntrinsicInfo &getIntrinsicInfo() const;
+  
+  /// \brief Looks up the lazily cached identification for the builtin function.
+  const BuiltinInfo &getBuiltinInfo() const;
+
+  /// True if this builtin application has substitutions, which represent type
+  /// parameters to the builtin.
+  bool hasSubstitutions() const {
+    return NumSubstitutions != 0;
+  }
+
+  /// Return the type parameters to the builtin.
+  ArrayRef<Substitution> getSubstitutions() const {
+    return {getSubstitutionsStorage(), NumSubstitutions};
+  }
+  /// Return the type parameters to the builtin.
+  MutableArrayRef<Substitution> getSubstitutions() {
+    return {getSubstitutionsStorage(), NumSubstitutions};
+  }
+  
+  /// The arguments to the builtin.
+  ArrayRef<Operand> getAllOperands() const {
+    return Operands.asArray();
+  }
+  /// The arguments to the builtin.
+  MutableArrayRef<Operand> getAllOperands() {
+    return Operands.asArray();
+  }
+  /// The arguments to the builtin.
+  OperandValueArrayRef getArguments() const {
+    return Operands.asValueArray();
+  }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::BuiltinInst;
+  }
+};
+  
 /// BuiltinFunctionRefInst - Represents a reference to a primitive function from
 /// the Builtin module.
 class BuiltinFunctionRefInst : public LiteralInst {

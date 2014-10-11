@@ -426,6 +426,18 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
     getBuilder().createAllocBox(getOpLocation(Inst->getLoc()),
                                 getOpType(Inst->getElementType())));
 }
+  
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitBuiltinInst(BuiltinInst *Inst) {
+  auto Args = getOpValueArray<8>(Inst->getArguments());
+  doPostProcess(Inst,
+        getBuilder().createBuiltin(getOpLocation(Inst->getLoc()),
+                                   Inst->getName(),
+                                   getOpType(Inst->getType()),
+                                   getOpSubstitutions(Inst->getSubstitutions()),
+                                   Args));
+}
 
 template<typename ImplClass>
 void

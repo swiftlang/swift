@@ -507,6 +507,33 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       (unsigned)ASI->getElementType().getCategory());
     break;
   }
+  case ValueKind::BuiltinInst: {
+    // Format: number of substitutions, the builtin name, result type, and
+    // a list of values for the arguments. Each value in the list
+    // is represented with 4 IDs:
+    //   ValueID, ValueResultNumber, TypeID, TypeCategory.
+    // The record is followed by the substitution list.
+    const BuiltinInst *BI = cast<BuiltinInst>(&SI);
+    SmallVector<ValueID, 4> Args;
+    for (auto Arg : BI->getArguments()) {
+      Args.push_back(addValueRef(Arg));
+      Args.push_back(Arg.getResultNumber());
+      Args.push_back(S.addTypeRef(Arg.getType().getSwiftRValueType()));
+      Args.push_back((unsigned)Arg.getType().getCategory());
+    }
+    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
+                             SILAbbrCodes[SILInstApplyLayout::Code],
+                             2 /*Builtin*/,
+                             0 /*Transparent*/,
+                             BI->getSubstitutions().size(),
+                             S.addTypeRef(BI->getType().getSwiftRValueType()),
+                             (unsigned)BI->getType().getCategory(),
+                             S.addIdentifierRef(BI->getName()),
+                             0,
+                             Args);
+    S.writeSubstitutions(BI->getSubstitutions(), SILAbbrCodes);
+    break;
+  }
   case ValueKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for
@@ -520,7 +547,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(Arg.getResultNumber());
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], 0/*PartialApply*/,
+        SILAbbrCodes[SILInstApplyLayout::Code], 0/*Apply*/,
         (unsigned)AI->isTransparent(),
         AI->getSubstitutions().size(),
         S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),

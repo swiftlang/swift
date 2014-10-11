@@ -100,7 +100,23 @@ protected:
                                                  Inst->getType(),
                                                  Inst->isVolatile()));
   }
+  
+  void visitBuiltinInst(BuiltinInst *Inst) {
+    auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
+    SmallVector<Substitution, 16> TempSubstList;
+    for (auto &Sub : Inst->getSubstitutions()) {
+      TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
+    }
+
+    SILBuilder &Builder = getBuilder();
+    auto N = Builder.createBuiltin(getOpLocation(Inst->getLoc()),
+                                   Inst->getName(),
+                                   getOpType(Inst->getType()),
+                                   TempSubstList, Args);
+    doPostProcess(Inst, N);
+  }
+  
   void visitApplyInst(ApplyInst *Inst) {
     auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 

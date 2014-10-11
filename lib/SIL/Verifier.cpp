@@ -579,6 +579,10 @@ public:
             "builtin_function_ref should have a thin function result");
   }
 
+  void checkBuiltinInst(BuiltinInst *BI) {
+    // intrinsic-specific validation?!
+  }
+  
   bool isValidLinkageForFragileRef(SILLinkage linkage) {
     switch (linkage) {
     case SILLinkage::Private:

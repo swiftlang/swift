@@ -306,7 +306,7 @@ namespace sil_block {
 
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
-    BCFixed<1>,           // is partial apply?
+    BCFixed<2>,           // is partial apply or builtin?
     BCFixed<1>,           // transparent
     BCFixed<31>,          // num substitutions
     TypeIDField,          // callee unsubstituted type

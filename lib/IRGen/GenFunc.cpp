@@ -1225,31 +1225,26 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
     out.add(returned);
 }
 
-static void emitCastBuiltin(IRGenFunction &IGF, CanSILFunctionType substFnType,
+static void emitCastBuiltin(IRGenFunction &IGF, SILType destType,
                             Explosion &result,
                             Explosion &args,
                             llvm::Instruction::CastOps opcode) {
   llvm::Value *input = args.claimNext();
   assert(args.empty() && "wrong operands to cast operation");
 
-  assert(substFnType->getResult().getConvention() == ResultConvention::Unowned);
-  SILType destType = substFnType->getResult().getSILType();
   llvm::Type *destTy = IGF.IGM.getStorageType(destType);
   llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
   result.add(output);
 }
 
 static void emitCastOrBitCastBuiltin(IRGenFunction &IGF,
-                                     CanSILFunctionType substFnType,
+                                     SILType destType,
                                      Explosion &result,
                                      Explosion &args,
                                      BuiltinValueKind BV) {
   llvm::Value *input = args.claimNext();
   assert(args.empty() && "wrong operands to cast operation");
 
-  assert(substFnType->getResult().getConvention() ==
-           ResultConvention::Unowned);
-  SILType destType = substFnType->getResult().getSILType();
   llvm::Type *destTy = IGF.IGM.getStorageType(destType);
   llvm::Value *output;
   switch (BV) {
@@ -1325,13 +1320,9 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
-                            CanSILFunctionType substFnType,
-                            Explosion &args, Explosion *out,
-                            Address indirectOut,
+                            SILType resultType,
+                            Explosion &args, Explosion &out,
                             ArrayRef<Substitution> substitutions) {
-  assert(((out != nullptr) ^ indirectOut.isValid()) &&
-         "cannot emit builtin to both explosion and memory");
-
   // Decompose the function's name into a builtin name and type list.
   const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(FnId);
 
@@ -1340,7 +1331,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions[0].getReplacement());
-    out->add(valueTy.second.getSize(IGF, valueTy.first));
+    out.add(valueTy.second.getSize(IGF, valueTy.first));
     return;
   }
 
@@ -1348,7 +1339,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions[0].getReplacement());
-    out->add(valueTy.second.getStride(IGF, valueTy.first));
+    out.add(valueTy.second.getStride(IGF, valueTy.first));
     return;
   }
 
@@ -1357,7 +1348,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions[0].getReplacement());
     // The alignof value is one greater than the alignment mask.
-    out->add(IGF.Builder.CreateAdd(
+    out.add(IGF.Builder.CreateAdd(
                            valueTy.second.getAlignmentMask(IGF, valueTy.first),
                            IGF.IGM.getSize(Size(1))));
     return;
@@ -1375,7 +1366,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     auto *Zero = llvm::ConstantInt::get(IntTy, 0);
     auto *One = llvm::ConstantInt::get(IntTy, 1);
     llvm::Value *Cmp = IGF.Builder.CreateICmpEQ(StrideOf, Zero);
-    out->add(IGF.Builder.CreateSelect(Cmp, One, StrideOf));
+    out.add(IGF.Builder.CreateSelect(Cmp, One, StrideOf));
     return;
   }
 
@@ -1384,7 +1375,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     llvm::Value *address = args.claimNext();
     llvm::Value *value = IGF.Builder.CreateBitCast(address,
                                                    IGF.IGM.Int8PtrTy);
-    out->add(value);
+    out.add(value);
     return;
   }
 
@@ -1407,7 +1398,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs);
 
     if (!TheCall->getType()->isVoidTy())
-      extractScalarResults(IGF, TheCall->getType(), TheCall, *out);
+      extractScalarResults(IGF, TheCall->getType(), TheCall, out);
 
     return;
   }
@@ -1419,12 +1410,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
 
 #define BUILTIN_CAST_OPERATION(id, name, attrs) \
   if (Builtin.ID == BuiltinValueKind::id) \
-    return emitCastBuiltin(IGF, substFnType, *out, args, \
+    return emitCastBuiltin(IGF, resultType, out, args, \
                            llvm::Instruction::id);
 
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(id, name, attrs) \
   if (Builtin.ID == BuiltinValueKind::id) \
-    return emitCastOrBitCastBuiltin(IGF, substFnType, *out, args, \
+    return emitCastOrBitCastBuiltin(IGF, resultType, out, args, \
                                     BuiltinValueKind::id);
   
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
@@ -1432,7 +1423,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     llvm::Value *lhs = args.claimNext(); \
     llvm::Value *rhs = args.claimNext(); \
     llvm::Value *v = IGF.Builder.Create##id(lhs, rhs); \
-    return out->add(v); \
+    return out.add(v); \
   }
 
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, uncheckedID, attrs, overload) \
@@ -1447,7 +1438,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   IRArgs.push_back(args.claimNext()); \
   args.claimNext();\
   llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs); \
-  extractScalarResults(IGF, TheCall->getType(), TheCall, *out);  \
+  extractScalarResults(IGF, TheCall->getType(), TheCall, out);  \
   return; \
 }
   // FIXME: We could generate the code to dynamically report the overflow if the
@@ -1455,11 +1446,11 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
-    return emitCompareBuiltin(IGF, *out, args, llvm::CmpInst::id);
+    return emitCompareBuiltin(IGF, out, args, llvm::CmpInst::id);
   
 #define BUILTIN_TYPE_TRAIT_OPERATION(id, name) \
   if (Builtin.ID == BuiltinValueKind::id) \
-    return emitTypeTraitBuiltin(IGF, *out, args, substitutions, &TypeBase::name);
+    return emitTypeTraitBuiltin(IGF, out, args, substitutions, &TypeBase::name);
   
 #define BUILTIN(ID, Name, Attrs)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
@@ -1468,7 +1459,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *rhs = args.claimNext();
     llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
     llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
-    return out->add(v);
+    return out.add(v);
   }
   
   if (Builtin.ID == BuiltinValueKind::AllocRaw) {
@@ -1477,7 +1468,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // Translate the alignment to a mask.
     auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
     auto alloc = IGF.emitAllocRawCall(size, alignMask, "builtin-allocRaw");
-    out->add(alloc);
+    out.add(alloc);
     return;
   }
 
@@ -1560,7 +1551,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     if (origTy->isPointerTy())
       value = IGF.Builder.CreateIntToPtr(value, origTy);
 
-    out->add(value);
+    out.add(value);
     return;
   }
   
@@ -1620,7 +1611,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     if (origTy->isPointerTy())
       value = IGF.Builder.CreateIntToPtr(value, origTy);
 
-    out->add(value);
+    out.add(value);
     return;
   }
 
@@ -1629,7 +1620,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     auto vector = args.claimNext();
     auto index = args.claimNext();
-    out->add(IGF.Builder.CreateExtractElement(vector, index));
+    out.add(IGF.Builder.CreateExtractElement(vector, index));
     return;
   }
 
@@ -1639,7 +1630,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto vector = args.claimNext();
     auto newValue = args.claimNext();
     auto index = args.claimNext();
-    out->add(IGF.Builder.CreateInsertElement(vector, newValue, index));
+    out.add(IGF.Builder.CreateInsertElement(vector, newValue, index));
     return;
   }
 
@@ -1673,8 +1664,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                   llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0),
                                   llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1));
     // Return the tuple - the result + the overflow flag.
-    out->add(Res);
-    return out->add(OverflowFlag);
+    out.add(Res);
+    return out.add(OverflowFlag);
   }
 
   if (Builtin.ID == BuiltinValueKind::UToSCheckedTrunc) {
@@ -1700,8 +1691,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                   llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0),
                                   llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1));
     // Return the tuple: (the result, the overflow flag).
-    out->add(Res);
-    return out->add(OverflowFlag);
+    out.add(Res);
+    return out.add(OverflowFlag);
   }
 
   if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
@@ -1716,8 +1707,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *OverflowFlag = IGF.Builder.CreateICmpSLT(Arg, Zero);
 
     // Return the tuple: (the result (same as input), the overflow flag).
-    out->add(Arg);
-    return out->add(OverflowFlag);
+    out.add(Arg);
+    return out.add(OverflowFlag);
   }
 
   // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
@@ -1729,7 +1720,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Truncated = IGF.Builder.CreateTrunc(Arg, TruncTy);
     llvm::Value *V = IGF.Builder.CreateSIToFP(Truncated, ToTy);
-    return out->add(V);
+    return out.add(V);
   }
 
   if (Builtin.ID == BuiltinValueKind::Once) {
@@ -1755,7 +1746,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // Make sure this only happens in a mode where we build a library dylib.
 
     llvm::Value *DebugAssert = IGF.Builder.getInt32(SILOptions::Debug);
-    out->add(DebugAssert);
+    out.add(DebugAssert);
     return;
   }
   
@@ -2542,7 +2533,6 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
 static void emitApplyArgument(IRGenFunction &IGF,
                               SILParameterInfo origParam,
                               SILParameterInfo substParam,
-                              ArrayRef<Substitution> subs,
                               Explosion &in,
                               Explosion &out) {
   bool isSubstituted = (substParam.getSILType() != origParam.getSILType());
@@ -2575,7 +2565,7 @@ static void emitApplyArgument(IRGenFunction &IGF,
   
   reemitAsUnsubstituted(IGF, origParam.getSILType(),
                         substParam.getSILType(),
-                        subs, in, out);
+                        in, out);
 }
 
 
@@ -2631,7 +2621,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
       emitApplyArgument(subIGF, origType->getParameters()[i],
                         outType->getParameters()[i],
-                        subs, origParams, params);
+                        origParams, params);
     }
   }
 
@@ -2685,7 +2675,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       if (origParamI < origType->getParameters().size()) {
         emitApplyArgument(subIGF,
                           origType->getParameters()[origParamI],
-                          substType->getParameters()[origParamI], subs, param, params);
+                          substType->getParameters()[origParamI],
+                          param, params);
         ++origParamI;
       } else {
         params.add(param.claimAll());

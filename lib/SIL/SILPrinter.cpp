@@ -655,6 +655,20 @@ public:
        << QuotedString(BFI->getName().str()) << " : " << BFI->getType();
   }
   
+  void visitBuiltinInst(BuiltinInst *BI) {
+    OS << "builtin " << QuotedString(BI->getName().str())
+       << "(";
+    
+    interleave(BI->getArguments(), [&](SILValue v) {
+      OS << getIDAndType(v);
+    }, [&]{
+      OS << ", ";
+    });
+    
+    OS << ") : ";
+    OS << BI->getType();
+  }
+  
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
     OS << "global_addr #" << GAI->getGlobal()->getName()
        << " : " << GAI->getType();

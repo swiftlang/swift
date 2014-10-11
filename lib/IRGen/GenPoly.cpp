@@ -447,7 +447,6 @@ static SILType applyContextArchetypes(IRGenFunction &IGF,
 /// The substitutions must carry origTy to substTy.
 void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   SILType expectedTy, SILType substTy,
-                                  ArrayRef<Substitution> subs,
                                   Explosion &in, Explosion &out) {
   expectedTy = applyContextArchetypes(IGF, expectedTy);
 

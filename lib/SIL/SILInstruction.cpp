@@ -713,6 +713,36 @@ VarDecl *DebugValueAddrInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
+BuiltinInst *BuiltinInst::create(SILLocation Loc, Identifier Name,
+                                 SILType ReturnType,
+                                 ArrayRef<Substitution> Substitutions,
+                                 ArrayRef<SILValue> Args,
+                                 SILFunction &F) {
+  void *Buffer = F.getModule().allocate(
+                              sizeof(BuiltinInst)
+                                + decltype(Operands)::getExtraSize(Args.size())
+                                + sizeof(Substitution) * Substitutions.size(),
+                              alignof(BuiltinInst));
+  return ::new (Buffer) BuiltinInst(Loc, Name, ReturnType, Substitutions,
+                                    Args);
+}
+
+BuiltinInst::BuiltinInst(SILLocation Loc,
+                         Identifier Name,
+                         SILType ReturnType,
+                         ArrayRef<Substitution> Subs,
+                         ArrayRef<SILValue> Args)
+  : SILInstruction(ValueKind::BuiltinInst, Loc, ReturnType),
+    Name(Name),
+    NumSubstitutions(Subs.size()),
+    Operands(this, Args)
+{
+  static_assert(IsTriviallyCopyable<Substitution>::value,
+                "assuming Substitution is trivially copyable");
+  memcpy(getSubstitutionsStorage(), Subs.begin(),
+         sizeof(Substitution) * Subs.size());  
+}
+
 ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy,
                      SILType Result,

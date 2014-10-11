@@ -560,6 +560,7 @@ public:
 
   void visitApplyInst(ApplyInst *i);
   void visitPartialApplyInst(PartialApplyInst *i);
+  void visitBuiltinInst(BuiltinInst *i);
 
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1570,7 +1571,6 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
 static void emitApplyArgument(IRGenSILFunction &IGF,
                               SILValue arg,
                               SILParameterInfo param,
-                              ArrayRef<Substitution> subs,
                               Explosion &out) {
   bool isSubstituted = (arg.getType() != param.getSILType());
 
@@ -1601,7 +1601,7 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
 
   Explosion temp = IGF.getLoweredExplosion(arg);
   reemitAsUnsubstituted(IGF, param.getSILType(), arg.getType(),
-                        subs, temp, out);
+                        temp, out);
 }
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
@@ -1733,25 +1733,40 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
   auto argValues = i->getArgumentsWithoutIndirectResult();
   auto params = origCalleeType->getParametersWithoutIndirectResult();
   assert(argValues.size() == params.size());
-  auto subs = i->getSubstitutions();
   
   GenericContextScope scope(IGF.IGM,
                             i->getOrigCalleeType()->getGenericSignature());
   Explosion args;
   for (auto index : indices(argValues)) {
-    emitApplyArgument(IGF, argValues[index], params[index], subs, args);
+    emitApplyArgument(IGF, argValues[index], params[index], args);
   }
   
-  if (i->hasIndirectResult()) {
-    Address indirectResult = IGF.getLoweredAddress(i->getIndirectResult());
-    emitBuiltinCall(IGF, builtin, i->getSubstCalleeType(),
-                    args, nullptr, indirectResult, substitutions);
-  } else {
-    Explosion result;
-    emitBuiltinCall(IGF, builtin, i->getSubstCalleeType(),
-                    args, &result, Address(), substitutions);
-    IGF.setLoweredExplosion(SILValue(i,0), result);
+  assert(!i->hasIndirectResult()
+         && "builtins shouldn't have indirect results");
+  Explosion result;
+  emitBuiltinCall(IGF, builtin,
+                  i->getSubstCalleeType()->getResult().getSILType(),
+                  args, result, substitutions);
+  IGF.setLoweredExplosion(SILValue(i,0), result);
+}
+
+void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
+  auto argValues = i->getArguments();
+  Explosion args;
+  for (auto argValue : argValues) {
+    // Builtin arguments should never be substituted, so use the value's type
+    // as the parameter type.
+    emitApplyArgument(*this, argValue,
+                      SILParameterInfo(argValue.getType().getSwiftRValueType(),
+                                       ParameterConvention::Direct_Unowned),
+                      args);
   }
+  
+  Explosion result;
+  emitBuiltinCall(*this, i->getName(), i->getType(),
+                  args, result, i->getSubstitutions());
+  
+  setLoweredExplosion(SILValue(i,0), result);
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
@@ -1813,8 +1828,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   
   // Turn the formal SIL parameters into IR-gen things.
   for (auto index : indices(args)) {
-    emitApplyArgument(*this, args[index], params[index],
-                      i->getSubstitutions(), llArgs);
+    emitApplyArgument(*this, args[index], params[index], llArgs);
   }
 
   // Pass the generic arguments.
@@ -1912,7 +1926,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     GenericContextScope scope(IGM, i->getOrigCalleeType()->getGenericSignature());
     for (auto index : indices(args)) {
       assert(args[index].getType() == params[index].getSILType());
-      emitApplyArgument(*this, args[index], params[index], {}, llArgs);
+      emitApplyArgument(*this, args[index], params[index], llArgs);
       // FIXME: Need to carry the address-ness of each argument alongside
       // the object type's TypeInfo.
       argTypes.push_back(args[index].getType());

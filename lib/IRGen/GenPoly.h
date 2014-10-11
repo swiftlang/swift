@@ -49,7 +49,6 @@ namespace irgen {
   /// The substitutions must carry origTy to substTy.
   void reemitAsUnsubstituted(IRGenFunction &IGF,
                              SILType origTy, SILType substTy,
-                             ArrayRef<Substitution> subs,
                              Explosion &src, Explosion &dest);
 
   /// True if a function's signature in LLVM carries polymorphic parameters.

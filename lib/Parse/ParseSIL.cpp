@@ -1144,6 +1144,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("autorelease_return", ValueKind::AutoreleaseReturnInst)
     .Case("autorelease_value", ValueKind::AutoreleaseValueInst)
     .Case("br", ValueKind::BranchInst)
+    .Case("builtin", ValueKind::BuiltinInst)
     .Case("builtin_function_ref", ValueKind::BuiltinFunctionRefInst)
     .Case("checked_cast_br", ValueKind::CheckedCastBranchInst)
     .Case("checked_cast_addr_br", ValueKind::CheckedCastAddrBranchInst)
@@ -1681,6 +1682,76 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILFunctionRef(InstLoc, B, ResultVal))
       return true;
     break;
+  case ValueKind::BuiltinInst: {
+    if (P.Tok.getKind() != tok::string_literal) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,"builtin name");
+      return true;
+    }
+    StringRef Str = P.Tok.getText();
+    Identifier Id = P.Context.getIdentifier(Str.substr(1, Str.size()-2));
+    P.consumeToken(tok::string_literal);
+    
+    // Find the builtin in the Builtin module
+    SmallVector<ValueDecl*, 2> foundBuiltins;
+    P.Context.TheBuiltinModule->lookupMember(foundBuiltins,
+                                             P.Context.TheBuiltinModule, Id,
+                                             Identifier());
+    if (foundBuiltins.empty()) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,"builtin name");
+      return true;
+    }
+    assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
+    
+    GenericParamList *genericParams
+      = cast<FuncDecl>(foundBuiltins[0])->getGenericParams();
+    
+    SmallVector<ParsedSubstitution, 4> parsedSubs;
+    SmallVector<Substitution, 4> subs;
+    if (parseApplySubstitutions(parsedSubs))
+      return true;
+    
+    if (!parsedSubs.empty()) {
+      if (!genericParams) {
+        P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
+        return true;
+      }
+      if (getApplySubstitutionsFromParsed(*this, genericParams,parsedSubs,subs))
+        return true;
+    }
+    
+    if (P.Tok.getKind() != tok::l_paren) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
+      return true;
+    }
+    P.consumeToken(tok::l_paren);
+
+    SmallVector<SILValue, 4> Args;
+    while (true) {
+      SILValue Val;
+      if (parseTypedValueRef(Val))
+        return true;
+      Args.push_back(Val);
+      if (P.consumeIf(tok::comma))
+        continue;
+      if (P.consumeIf(tok::r_paren))
+        break;
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(' or ',");
+      return true;
+    }
+    
+    if (P.Tok.getKind() != tok::colon) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ":");
+      return true;
+    }
+    P.consumeToken(tok::colon);
+    
+    SILType ResultTy;
+    if (parseSILType(ResultTy))
+      return true;
+    
+    ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subs, Args);
+    break;
+  }
   case ValueKind::BuiltinFunctionRefInst: {
     SILType Ty;
     if (P.Tok.getKind() != tok::string_literal) {

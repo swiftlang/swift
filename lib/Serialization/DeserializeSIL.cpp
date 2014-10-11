@@ -687,8 +687,20 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     unsigned IsPartial;
     SILInstApplyLayout::readRecord(scratch, IsPartial, IsTransparent, NumSubs,
                                    TyID, TyID2, ValID, ValResNum, ListOfValues);
-    OpCode = (unsigned)(IsPartial ? ValueKind::PartialApplyInst :
-                                    ValueKind::ApplyInst);
+    switch (IsPartial) {
+    case 0:
+      OpCode = (unsigned)ValueKind::ApplyInst;
+      break;
+    case 1:
+      OpCode = (unsigned)ValueKind::PartialApplyInst;
+      break;
+    case 2:
+      OpCode = (unsigned)ValueKind::BuiltinInst;
+      break;
+        
+    default:
+      llvm_unreachable("unexpected apply inst kind");
+    }
     break;
   }
   case SIL_INST_NO_OPERAND:
@@ -915,6 +927,29 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,
                                            Substitutions, Args,
                                            closureTy);
+    break;
+  }
+  case ValueKind::BuiltinInst: {
+    auto ASTTy = MF->getType(TyID);
+    auto ResultTy = getSILType(ASTTy, (SILValueCategory)(unsigned)TyID2);
+    SmallVector<SILValue, 4> Args;
+    for (unsigned i = 0, e = ListOfValues.size(); i < e; i += 4) {
+      auto ArgASTTy = MF->getType(ListOfValues[i+2]);
+      auto ArgTy = getSILType(ArgASTTy,
+                              (SILValueCategory)(unsigned)ListOfValues[i+3]);
+      Args.push_back(getLocalValue(ListOfValues[i], ListOfValues[i+1], ArgTy));
+    }
+    unsigned NumSub = NumSubs;
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
+    Identifier Name = MF->getIdentifier(ValID);
+    
+    ResultVal = Builder.createBuiltin(Loc, Name, ResultTy, Substitutions,
+                                      Args);
     break;
   }
   case ValueKind::BuiltinFunctionRefInst: {

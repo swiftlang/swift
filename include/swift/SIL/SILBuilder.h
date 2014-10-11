@@ -229,6 +229,12 @@ public:
     return createBuiltinFunctionRef(loc, getASTContext().getIdentifier(Str),ty);
   }
 
+  BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name,
+                             SILType ResultTy, ArrayRef<Substitution> Subs,
+                             ArrayRef<SILValue> Args) {
+    return insert(BuiltinInst::create(Loc, Name, ResultTy, Subs, Args, F));
+  }
+  
   FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {
     return insert(new (F.getModule()) FunctionRefInst(loc, f));
   }
