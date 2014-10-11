@@ -454,3 +454,17 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
     set(newVal) {}
   }
 }
+
+// Inheritance and availability
+
+@availability(OSX, introduced=10.10)
+protocol ProtocolAvailableOn10_10 {
+}
+
+@availability(OSX, introduced=10.9)
+class SubclassAvailableOn10_9OfClassAvailableOn10_10 : ClassAvailableOn10_10 { // expected-error {{'ClassAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+}
+
+@availability(OSX, introduced=10.9)
+class ClassAvailableOn10_9AdoptingProtocolAvailableOn10_10 : ProtocolAvailableOn10_10 { // expected-error {{'ProtocolAvailableOn10_10' is only available on OS X version 10.10 or greater}}
+}
