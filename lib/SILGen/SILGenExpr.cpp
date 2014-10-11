@@ -6184,21 +6184,11 @@ RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
   // E must have an optional type.
   assert(E->getType().getPointer()->getOptionalObjectType().getPointer());
 
-  DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getSubExpr());
-
-  // For the moment, we only support potentially unavailable global variables.
-  // In the future, we will extend this to other kinds of declarations.
-  assert(DRE);
-  assert(dyn_cast<VarDecl>(DRE->getDecl()));
-
-  // The type of the DeclRefExpr must be an lvalue, for global variables.
-  assert(DRE->getType()->getAs<LValueType>());
+  Expr *unavailExpr = E->getSubExpr();
 
   SILType silOptType = SGF.getLoweredType(E->getType());
   SILLocation loc(E);
-  
-  auto lv = SGF.emitLValue(DRE, AccessKind::Read);
-  
+
   SILValue allocatedOptional = SGF.emitTemporaryAllocation(loc, silOptType);
 
   // Emit the check for availability
@@ -6220,13 +6210,19 @@ RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
   Condition cond = SGF.emitCondition(isAvailable, loc);
   cond.enterTrue(SGF.B);
   {
-    // If the declaration is available, load its value and inject it into
-    // the optional.
-    ManagedValue loadedValue = SGF.emitLoadOfLValue(loc, lv, C);
-    SGF.emitInjectOptionalValueInto(
-        loc, RValueSource(
-                 loc, RValue(SGF, loc, lv.getSubstFormalType(), loadedValue)),
-        allocatedOptional, SGF.getTypeLowering(silOptType));
+    RValueSource source;
+    if (E->getSubExpr()->getType()->getAs<LValueType>()) {
+      // If the unavailable expression is an lvalue, we will load it.
+      auto lval = SGF.emitLValue(unavailExpr, AccessKind::Read);
+      ManagedValue loadedValue = SGF.emitLoadOfLValue(loc, lval, C);
+      source = RValueSource(
+          loc, RValue(SGF, loc, lval.getSubstFormalType(), loadedValue));
+    } else {
+      source = RValueSource(unavailExpr);
+    }
+
+    SGF.emitInjectOptionalValueInto(loc, std::move(source), allocatedOptional,
+                                    SGF.getTypeLowering(silOptType));
   }
   cond.exitTrue(SGF.B);
 
