@@ -6020,6 +6020,20 @@ public:
     if (base->getAttrs().isUnavailable(TC.Context)) {
       TC.diagnose(override, diag::override_unavailable, override->getName());
     }
+    
+    // API availability ranges are contravariant: make sure the version range
+    // of an overriden declaration is fully contained in the range of the
+    // overriding declaration.
+    if (TC.getLangOpts().EnableExperimentalAvailabilityChecking) {
+      VersionRange overrideRange = TypeChecker::availableRange(override,
+                                                               TC.Context);
+      VersionRange baseRange = TypeChecker::availableRange(base, TC.Context);
+      
+      if (!baseRange.isContainedIn(overrideRange)) {
+        TC.diagnose(override, diag::override_less_available, override->getName());
+        TC.diagnose(base, diag::overridden_here);
+      }
+    }
 
     /// Check attributes associated with the base; some may need to merged with
     /// or checked against attributes in the overriding declaration.

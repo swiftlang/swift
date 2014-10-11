@@ -785,6 +785,10 @@ ERROR(missing_override,sema_tcd,none,
 ERROR(override_unavailable,sema_tcd,none,
       "cannot override %0 which has been marked unavailable", (Identifier))
 
+ERROR(override_less_available,sema_tcd,none,
+      "overriding %0 must be as available as declaration it overrides",
+      (Identifier))
+
 ERROR(override_let_property,sema_tcd,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",
       (Identifier))

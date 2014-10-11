@@ -397,3 +397,60 @@ class ClassExtendingUnavailableClass : ClassAvailableOn10_10 { // expected-error
 @availability(OSX, introduced=10.10)
 class UnavailableClassExtendingUnavailableClass : ClassAvailableOn10_10 {
 }
+
+// Method availability is contravariant
+
+class SuperWithAlwaysAvailableMembers {
+  func shouldAlwaysBeAvailableMethod() { // expected-note {{overridden declaration is here}}
+  }
+  
+  var shouldAlwaysBeAvailableProperty: Int { // expected-note {{overridden declaration is here}}
+    get { return 9 }
+    set(newVal) {}
+  }
+}
+
+class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
+  @availability(OSX, introduced=10.10)
+  override func shouldAlwaysBeAvailableMethod() { // expected-error {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
+  }
+  
+  @availability(OSX, introduced=10.10)
+  override var shouldAlwaysBeAvailableProperty: Int { // expected-error {{overriding 'shouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
+    get { return 10 }
+    set(newVal) {}
+  }
+}
+
+class SuperWithLimitedMemberAvailability {
+  @availability(OSX, introduced=10.10)
+  func someMethod() {
+  }
+  
+  @availability(OSX, introduced=10.10)
+  var someProperty: Int {
+    get { return 10 }
+    set(newVal) {}
+  }
+}
+
+class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
+  @availability(OSX, introduced=10.9)
+  override func someMethod() {
+    super.someMethod() // expected-error {{'someMethod()' is only available on OS X version 10.10 or greater}}
+    
+    if #os(OSX >= 10.10) {
+      super.someMethod()
+    }
+  }
+  
+  @availability(OSX, introduced=10.9)
+  override var someProperty: Int {
+    get { 
+      let _ = super.someProperty // expected-error {{'someProperty' is only available on OS X version 10.10 or greater}}
+      
+      return 9
+      }
+    set(newVal) {}
+  }
+}
