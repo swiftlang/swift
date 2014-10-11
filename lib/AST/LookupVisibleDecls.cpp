@@ -393,6 +393,8 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         continue;
       }
       if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+        if (TypeResolver)
+          TypeResolver->resolveDeclSignature(VD);
         // Skip non-optional value requirements from protocols that the type
         // correctly conforms to.  This is done so that we don't return
         // duplicate members.

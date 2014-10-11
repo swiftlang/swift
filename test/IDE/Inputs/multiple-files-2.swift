@@ -1,4 +1,8 @@
-struct FooStruct {
+protocol FooProt {
+    var instanceVar: Int { get }
+}
+
+struct FooStruct : FooProt {
   var instanceVar: Int = 17
   func instanceFunc0() {}
 
