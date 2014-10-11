@@ -101,7 +101,7 @@ namespace {
 /// Return true if the instruction destroys the value at Address.
 ///
 /// This checks for the following cases of deinit:
-/// - 'in' or 'inout' argument
+/// - 'in' argument
 /// - copy_addr [take] src
 /// - copy_addr [!init] dest
 /// - destroy_addr
@@ -126,8 +126,9 @@ public:
   bool visitApplyInst(ApplyInst *Apply) {
     switch (getAddressArgConvention(Apply, Address, Oper)) {
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_Inout:
       return true;
+    case ParameterConvention::Indirect_Inout:
+      return false;
     case ParameterConvention::Indirect_Out:
       llvm_unreachable("copy_addr not released before reinitialization");
     default:
@@ -192,7 +193,7 @@ public:
 /// Return true if the instruction initializes the value at Address.
 ///
 /// We currently check for the following cases of init:
-/// - 'out' or 'inout' argument
+/// - 'out' argument
 /// - copy_addr [init] dest
 /// - copy_addr [!init] dest
 /// - store
@@ -216,8 +217,9 @@ public:
   bool visitApplyInst(ApplyInst *Apply) {
     switch (getAddressArgConvention(Apply, Address, Oper)) {
     case ParameterConvention::Indirect_Out:
-    case ParameterConvention::Indirect_Inout:
       return true;
+    case ParameterConvention::Indirect_Inout:
+      return false;
     case ParameterConvention::Indirect_In:
       llvm_unreachable("copy_addr not destroyed before reinitialization");
     default:
@@ -783,6 +785,13 @@ static void performNRVO(CopyAddrInst *CopyInst) {
 //===----------------------------------------------------------------------===//
 
 namespace {
+#ifndef NDEBUG
+static llvm::cl::opt<int> ForwardStart("copy-forward-start",
+                                       llvm::cl::init(0), llvm::cl::Hidden);
+static llvm::cl::opt<int> ForwardStop("copy-forward-stop",
+                                      llvm::cl::init(-1), llvm::cl::Hidden);
+#endif
+
 class CopyForwardingPass : public SILFunctionTransform
 {
   void run() override {
@@ -828,6 +837,12 @@ class CopyForwardingPass : public SILFunctionTransform
     auto Forwarding = CopyForwarding(PO);
 
     for (SILValue Def : CopiedDefs) {
+#ifndef NDEBUG
+      static unsigned NumDefs = 0;
+      ++NumDefs;
+      if ((int)NumDefs < ForwardStart || NumDefs >= (unsigned)ForwardStop)
+        continue;
+#endif
       // Iterate to forward through chains of copies.
       do {
         Forwarding.forwardCopiesOf(Def, getFunction());
