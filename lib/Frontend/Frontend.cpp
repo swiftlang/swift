@@ -91,13 +91,14 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
+  Optional<unsigned> CodeCompletionBufferID;
   auto CodeCompletePoint = Invocation.getCodeCompletionPoint();
   if (CodeCompletePoint.first) {
     auto MemBuf = CodeCompletePoint.first;
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    unsigned CodeCompletionBufferID = SourceMgr.addMemBufferCopy(MemBuf);
-    BufferIDs.push_back(CodeCompletionBufferID);
-    SourceMgr.setCodeCompletionPoint(CodeCompletionBufferID,
+    CodeCompletionBufferID = SourceMgr.addMemBufferCopy(MemBuf);
+    BufferIDs.push_back(*CodeCompletionBufferID);
+    SourceMgr.setCodeCompletionPoint(*CodeCompletionBufferID,
                                      CodeCompletePoint.second);
   }
 
@@ -193,6 +194,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     if (PrimaryInput && PrimaryInput->isFilename() && PrimaryInput->Index == i)
       PrimaryBufferID = BufferID;
   }
+
+  // Set the primary file to the code-completion point if one exists.
+  if (CodeCompletionBufferID.hasValue())
+    PrimaryBufferID = *CodeCompletionBufferID;
 
   if (MainMode && MainBufferID == NO_SUCH_BUFFER && BufferIDs.size() == 1)
     MainBufferID = BufferIDs.front();
