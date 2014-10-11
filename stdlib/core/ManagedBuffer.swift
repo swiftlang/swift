@@ -34,7 +34,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  public final var allocatedElementCount : Int {
+  public final var allocatedElementCount: Int {
     let p = ManagedBufferPointer<Value,Element>(self)
     return p.allocatedElementCount
   }
@@ -240,7 +240,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  public var allocatedElementCount : Int {
+  public var allocatedElementCount: Int {
     return (
       _allocatedByteCount &- _My._elementOffset &+ sizeof(Element) &- 1
     ) &/ sizeof(Element)
@@ -298,29 +298,29 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
   
   /// The required alignment for allocations of this type, minus 1
-  internal static var _alignmentMask : Int {
+  internal static var _alignmentMask: Int {
     return max(
       alignof(_HeapObject.self),
       max(alignof(Value.self), alignof(Element.self))) &- 1
   }
 
   /// The actual number of bytes allocated for this object.
-  internal var _allocatedByteCount : Int {
+  internal var _allocatedByteCount: Int {
     return Int(bitPattern: malloc_size(_address))
   }
   
   /// The address of this instance in a convenient pointer-to-bytes form
-  internal var _address : UnsafePointer<UInt8> {
+  internal var _address: UnsafePointer<UInt8> {
     return UnsafePointer(Builtin.bridgeToRawPointer(_nativeBuffer))
   }
 
   /// Offset from the allocated storage for `self` to the stored `Value`
-  internal static var _valueOffset : Int {
+  internal static var _valueOffset: Int {
     return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage
-  internal static var _elementOffset : Int {
+  internal static var _elementOffset: Int {
     return _roundUpToAlignment(
       _valueOffset + sizeof(Value.self), alignof(Element.self))
   }

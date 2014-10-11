@@ -375,9 +375,8 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 }
 
 // version for SwiftShims
-unsigned char swift::_swift_usesNativeSwiftReferenceCounting_class(
-  const void *theClass
-) {
+unsigned char
+swift::_swift_usesNativeSwiftReferenceCounting_class(const void *theClass) {
   return usesNativeSwiftReferenceCounting((const ClassMetadata *)theClass);
 }
 

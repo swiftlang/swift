@@ -84,10 +84,10 @@ class MyBuffer<T> {
     }
   }
 
-  var count : Int { 
+  var count: Int {
     return Manager(unsafeBufferObject: self).value.count.value
   }
-  var capacity : Int { 
+  var capacity: Int {
     return Manager(unsafeBufferObject: self).value.capacity
   }
 }
