@@ -38,26 +38,26 @@ enum Archetype<T: AnyObject> {
   case A(T), B(C)
 }
 // can't use spare bits—archetype may be bound to tagged pointer type
-// CHECK: [[ARCHETYPE:%O15enum_spare_bits9Archetype]] = type <{ [8 x i8], [1 x i8] }>
+// CHECK: [[ARCHETYPE:%O15enum_spare_bits9Archetype.*]] = type <{ [8 x i8], [1 x i8] }>
 
-let swiftClass: SwiftClass
-let objcClass: ObjCClass
-let existential: Existential
-let existentialntp: ExistentialNoTaggedPointers
-let archetypeBoundToSwift: Archetype<C>
-let archetypeBoundToObjC: Archetype<NSObject>
+sil_global @swiftClass: $SwiftClass
+sil_global @objcClass: $ObjCClass
+sil_global @existential: $Existential
+sil_global @existentialntp: $ExistentialNoTaggedPointers
+sil_global @archetypeBoundToSwift: $Archetype<C>
+sil_global @archetypeBoundToObjC: $Archetype<NSObject>
 
-// CHECK: @_Tv15enum_spare_bits21archetypeBoundToSwiftGOS_9ArchetypeCS_1C_ = external global [[ARCHETYPE]]
-// CHECK: @_Tv15enum_spare_bits20archetypeBoundToObjCGOS_9ArchetypeCSo8NSObject_ = external global [[ARCHETYPE]]
+// CHECK: @archetypeBoundToSwift = global [[ARCHETYPE]]
+// CHECK: @archetypeBoundToObjC = global [[ARCHETYPE]]
 
 sil @instantiate_globals : $() -> () {
 entry:
-  %a = global_addr #swiftClass : $*SwiftClass
-  %b = global_addr #objcClass : $*ObjCClass
-  %c = global_addr #existential : $*Existential
-  %d = global_addr #existentialntp : $*ExistentialNoTaggedPointers
-  %e = global_addr #archetypeBoundToSwift : $*Archetype<C>
-  %f = global_addr #archetypeBoundToObjC : $*Archetype<NSObject>
+  %a = sil_global_addr @swiftClass : $*SwiftClass
+  %b = sil_global_addr @objcClass : $*ObjCClass
+  %c = sil_global_addr @existential : $*Existential
+  %d = sil_global_addr @existentialntp : $*ExistentialNoTaggedPointers
+  %e = sil_global_addr @archetypeBoundToSwift : $*Archetype<C>
+  %f = sil_global_addr @archetypeBoundToObjC : $*Archetype<NSObject>
   return undef : $()
 }
 

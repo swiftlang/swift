@@ -516,14 +516,14 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %12 = return %9 : $Builtin.RawPointer
 }
 
-var x: Int = 0
+sil_global @x : $Int
 sil @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
 
 // CHECK: $() -> ()
 sil private @global_code : $() -> () {
 bb0:
-  // CHECK: global_addr #x : $*Int
-  %0 = global_addr #x : $*Int
+  // CHECK: sil_global_addr @x : $*Int
+  %0 = sil_global_addr @x : $*Int
   %1 = function_ref @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
   %2 = metatype $@thin Int.Type
   %3 = integer_literal $Builtin.Int128, 0 // CHECK: integer_literal $Builtin.Int128, 0
@@ -1014,12 +1014,12 @@ entry(%0 : $Builtin.Int1):
   return %1 : $()
 }
 
-var staticProp: Int = 0
+sil_global @staticProp: $Int
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
 sil private @globalinit_func0 : $@thin () -> () {
 bb0:
-  %0 = global_addr #staticProp : $*Int
+  %0 = sil_global_addr @staticProp : $*Int
   %1 = mark_uninitialized [var] %0 : $*Int
   %7 = tuple ()
   return %7 : $()
@@ -1037,7 +1037,7 @@ bb0:
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
   // CHECK: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@callee_owned () -> ()) : $()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
-  %6 = global_addr #staticProp : $*Int
+  %6 = sil_global_addr @staticProp : $*Int
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }

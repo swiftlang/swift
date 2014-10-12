@@ -81,7 +81,7 @@ import Builtin
 //    the element type.
 // CHECK: %O4enum20DynamicSinglePayload = type <{}>
 // CHECK: [[DYNAMIC_SINGLE_EMPTY_PAYLOAD:%O4enum20DynamicSinglePayload\.[0-9]+]] = type <{ [1 x i8] }>
-// CHECK: %O4enum16DynamicSingleton = type <{}>
+// CHECK: [[DYNAMIC_SINGLETON:%O4enum16DynamicSingleton.*]] = type <{}>
 
 // -- Dynamic metadata template carries a value witness table pattern
 //    we fill in on instantiation.
@@ -2244,10 +2244,10 @@ typealias AllConcreteTestEnums = (
   MultiPayloadNested,
   MultiPayloadNestedSpareBits)
 
-var x : AllConcreteTestEnums
+sil_global @x : $AllConcreteTestEnums
 
-// CHECK: define void @dynamic_singleton_switch_indirect(%O4enum16DynamicSingleton* noalias, %swift.type* %T) {
-// CHECK:   bitcast %O4enum16DynamicSingleton* %0 to %swift.opaque*
+// CHECK: define void @dynamic_singleton_switch_indirect([[DYNAMIC_SINGLETON]]* noalias, %swift.type* %T) {
+// CHECK:   bitcast [[DYNAMIC_SINGLETON]]* %0 to %swift.opaque*
 // CHECK:   ret void
 // CHECK: }
 sil @dynamic_singleton_switch_indirect : $<T> (@in DynamicSingleton<T>) -> () {
@@ -2261,8 +2261,8 @@ dest:
 }
 
 // Verify that we can instantiate generic enum instances of dynamic size.
-var a : DynamicSingleton<()>
-var b : DynamicSingleton<NoPayloads>
+sil_global @aa : $DynamicSingleton<()>
+sil_global @bb : $DynamicSingleton<NoPayloads>
 
 // CHECK: define void @dynamic_singleton_instance_arg_1()
 sil @dynamic_singleton_instance_arg_1 : $(DynamicSingleton<()>) -> () {
@@ -2280,11 +2280,11 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 sil @force_global_variables_to_materialize : $() -> () {
 entry:
   // Force the global variables to materialize.
-  %x = global_addr #x : $*AllConcreteTestEnums
+  %x = sil_global_addr @x : $*AllConcreteTestEnums
   %y = load %x : $*AllConcreteTestEnums
-  %a = global_addr #a : $*DynamicSingleton<()>
+  %a = sil_global_addr @aa : $*DynamicSingleton<()>
   %q = load %a : $*DynamicSingleton<()>
-  %b = global_addr #b : $*DynamicSingleton<NoPayloads>
+  %b = sil_global_addr @bb : $*DynamicSingleton<NoPayloads>
   %r = load %b : $*DynamicSingleton<NoPayloads>
   %z = tuple ()
   return %z : $()

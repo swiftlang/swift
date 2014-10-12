@@ -586,17 +586,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addIdentifierRef(BFR->getName()), 0);
     break;
   }
-  case ValueKind::GlobalAddrInst: {
-    // Format: VarDecl and type. Use SILOneOperandLayout.
-    const GlobalAddrInst *GAI = cast<GlobalAddrInst>(&SI);
-    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
-        S.addTypeRef(GAI->getType().getSwiftRValueType()),
-        (unsigned)GAI->getType().getCategory(),
-        S.addDeclRef(GAI->getGlobal()), 0);
-    break;
-  }
   case ValueKind::SILGlobalAddrInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     const SILGlobalAddrInst *GAI = cast<SILGlobalAddrInst>(&SI);

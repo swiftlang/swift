@@ -238,9 +238,6 @@ public:
   FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {
     return insert(new (F.getModule()) FunctionRefInst(loc, f));
   }
-  GlobalAddrInst *createGlobalAddr(SILLocation loc, VarDecl *g, SILType ty) {
-    return insert(new (F.getModule()) GlobalAddrInst(loc, g, ty));
-  }
   SILGlobalAddrInst *createSILGlobalAddr(SILLocation loc, SILGlobalVariable *g){
     return insert(new (F.getModule()) SILGlobalAddrInst(loc, g));
   }

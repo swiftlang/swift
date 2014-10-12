@@ -98,8 +98,6 @@ static bool mayRead(SILInstruction *I) {
 /// Check if an address does not depend on other values in a basic block.
 static SILInstruction *addressIndependent(SILValue Addr) {
   Addr = Addr.stripCasts();
-  if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(Addr))
-    return GAI;
   if (SILGlobalAddrInst *SGAI = dyn_cast<SILGlobalAddrInst>(Addr))
     return SGAI;
   if (StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(Addr))

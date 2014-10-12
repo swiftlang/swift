@@ -52,27 +52,6 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   return addr;
 }
 
-/// Emit a global variable.
-///
-/// FIXME: Combine into emitSILGlobalVariable.
-Address IRGenModule::emitGlobalVariable(VarDecl *var,
-                                        const TypeInfo &type) {
-  // If the variable is empty, don't actually emit it; just return undef.
-  // FIXME: global destructors?
-  if (type.isKnownEmpty()) {
-    return type.getUndefAddress();
-  }
-  
-  /// Get the global variable.
-  Address addr = getAddrOfGlobalVariable(var, ForDefinition);
-  
-  // Add a zero-initializer.
-  llvm::GlobalVariable *gvar = cast<llvm::GlobalVariable>(addr.getAddress());
-  gvar->setInitializer(llvm::Constant::getNullValue(type.getStorageType()));
-
-  return addr;
-}
-
 ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
                                               const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.

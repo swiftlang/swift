@@ -425,7 +425,7 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
     return ManagedValue::forLValue(addr);
   }
   
-  // Global variables can be accessed directly with global_addr.  Emit this
+  // Global variables can be accessed directly with sil_global_addr.  Emit this
   // instruction into the prolog of the function so we can memoize/CSE it in
   // VarLocs.
   auto &entryBB = gen.getFunction().getBlocks().front();

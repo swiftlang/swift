@@ -669,14 +669,13 @@ public:
     OS << BI->getType();
   }
   
-  void visitGlobalAddrInst(GlobalAddrInst *GAI) {
-    OS << "global_addr #" << GAI->getGlobal()->getName()
-       << " : " << GAI->getType();
-  }
-
   void visitSILGlobalAddrInst(SILGlobalAddrInst *GAI) {
     OS << "sil_global_addr ";
-    GAI->getReferencedGlobal()->printName(OS);
+    if (GAI->getReferencedGlobal()) {
+      GAI->getReferencedGlobal()->printName(OS);
+    } else {
+      OS << "<<placeholder>>";
+    }
     OS << " : " << GAI->getType();
   }
 

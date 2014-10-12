@@ -245,11 +245,6 @@ namespace {
       return X->getName() == RHS->getName();
     }
 
-    bool visitGlobalAddrInst(const GlobalAddrInst *RHS) {
-      auto *X = cast<GlobalAddrInst>(LHS);
-      return X->getGlobal() == RHS->getGlobal();
-    }
-
     bool visitSILGlobalAddrInst(const SILGlobalAddrInst *RHS) {
       auto *X = cast<SILGlobalAddrInst>(LHS);
       return X->getReferencedGlobal() == RHS->getReferencedGlobal();
@@ -826,6 +821,11 @@ SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)
   : LiteralInst(ValueKind::SILGlobalAddrInst, Loc,
                 Global->getLoweredType().getAddressType()),
     Global(Global)
+{}
+
+SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILType Ty)
+  : LiteralInst(ValueKind::SILGlobalAddrInst, Loc, Ty),
+    Global(nullptr)
 {}
 
 const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() const {

@@ -471,12 +471,6 @@ void IRGenModule::prepare() {
 }
 
 void IRGenModule::emitGlobalTopLevel() {
-  // Emit global variables.
-  for (VarDecl *global : SILMod->getGlobals()) {
-    auto &ti = getTypeInfoForUnlowered(global->getType());
-    emitGlobalVariable(global, ti);
-  }
-  
   for (SILGlobalVariable &v : SILMod->getSILGlobals())
     emitSILGlobalVariable(&v);
   
@@ -1041,38 +1035,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   gvar->setAlignment(gvarAddr.getAlignment().getValue());
   
   return gvarAddr;
-}
-
-/// Find the address of a (fragile, constant-size) global variable
-/// declaration.  The address value is always an llvm::GlobalVariable*.
-Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
-                                             ForDefinition_t forDefinition) {
-  // Check whether we've cached this.
-  LinkEntity entity = LinkEntity::forNonFunction(var);
-  llvm::Constant *&entry = GlobalVars[entity];
-  if (entry) {
-    llvm::GlobalVariable *gv = cast<llvm::GlobalVariable>(entry);
-    if (forDefinition) updateLinkageForDefinition(*this, gv, entity);
-    return Address(gv, Alignment(gv->getAlignment()));
-  }
-
-  const TypeInfo &type = getTypeInfoForUnlowered(var->getType());
-
-  // Okay, we need to rebuild it.
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  DebugTypeInfo DbgTy(var, type);
-  auto addr = link.createVariable(*this, type.StorageType,
-                                  DbgTy, SILLocation(var),
-                                  var->getName().str());
-  // Ask the type to give us an Address.
-  Address result = type.getAddressForPointer(addr);
-
-  // Set that alignment back on the global variable.
-  addr->setAlignment(result.getAlignment().getValue());
-
-  // Write this to the cache and return.
-  entry = addr;
-  return result;
 }
 
 /// Find the entry point for a SIL function.

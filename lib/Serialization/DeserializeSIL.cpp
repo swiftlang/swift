@@ -245,7 +245,7 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
 
   if (!Placeholders[ResultNum])
     Placeholders[ResultNum] =
-      new (SILMod) GlobalAddrInst(SILFileLocation(Loc), nullptr, Type);
+      new (SILMod) SILGlobalAddrInst(SILFileLocation(Loc), Type);
   return Placeholders[ResultNum];
 }
 
@@ -956,14 +956,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Format: FuncDecl and type. Use SILOneOperandLayout.
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createBuiltinFunctionRef(Loc, MF->getIdentifier(ValID),
-                    getSILType(Ty, (SILValueCategory)TyCategory));
-    break;
-  }
-  case ValueKind::GlobalAddrInst: {
-    // Format: VarDecl and type. Use SILOneOperandLayout.
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createGlobalAddr(Loc,
-                    cast<VarDecl>(MF->getDecl(ValID)),
                     getSILType(Ty, (SILValueCategory)TyCategory));
     break;
   }

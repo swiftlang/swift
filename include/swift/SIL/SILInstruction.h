@@ -793,30 +793,6 @@ public:
   }
 };
 
-/// \brief Gives the address of a global variable.
-///
-/// TODO: Fold into SILGlobalAddrInst.
-class GlobalAddrInst : public LiteralInst {
-  VarDecl *Global;
-public:
-  GlobalAddrInst(SILLocation Loc, VarDecl *Global, SILType AddrTy)
-    : LiteralInst(ValueKind::GlobalAddrInst, Loc, AddrTy),
-      Global(Global) {}
-
-  /// Return the referenced global variable decl.
-  VarDecl *getGlobal() const { return Global; }
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::GlobalAddrInst;
-  }
-};
-
 /// Gives the address of a SIL global variable.
 class SILGlobalAddrInst : public LiteralInst {
   SILGlobalVariable *Global;
@@ -824,8 +800,13 @@ class SILGlobalAddrInst : public LiteralInst {
 public:
   SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global);
 
+  /// Create a placeholder instruction with an unset global reference.
+  SILGlobalAddrInst(SILLocation Loc, SILType Ty);
+
   /// Return the referenced global variable.
   SILGlobalVariable *getReferencedGlobal() const { return Global; }
+  
+  void setReferencedGlobal(SILGlobalVariable *v) { Global = v; }
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }

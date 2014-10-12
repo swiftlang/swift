@@ -11,7 +11,7 @@ sil_global private @globalinit_token0 : $Builtin.Word
 // CHECK-NOT: sil_global public @public_global : $Builtin.Word
 sil_global public @public_global : $Builtin.Word
 
-public var staticProp: Int = 0
+sil_global @staticProp : $Int
 sil [fragile] @globalinit_func0 : $@thin () -> ()
 
 // We should not serialize this since it references the private variable globalinit_token0.
@@ -24,7 +24,7 @@ bb0:
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
   // CHECK-NOT: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@callee_owned () -> ()) : $()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
-  %6 = global_addr #staticProp : $*Int
+  %6 = sil_global_addr @staticProp : $*Int
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
@@ -42,7 +42,7 @@ bb0:
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
   // CHECK: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@callee_owned () -> ()) : $()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
-  %6 = global_addr #staticProp : $*Int
+  %6 = sil_global_addr @staticProp : $*Int
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
@@ -477,14 +477,14 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %12 = return %9 : $Builtin.RawPointer
 }
 
-var x : Int = 0
+sil_global @x : $Int
 sil [fragile] @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
 
 // CHECK-LABEL: @global_code : $@thin () -> ()
 sil [fragile] @global_code : $@thin () -> () {
 bb0:
-  // CHECK: global_addr #x : $*Int
-  %0 = global_addr #x : $*Int
+  // CHECK: sil_global_addr @x : $*Int
+  %0 = sil_global_addr @x : $*Int
   %1 = function_ref @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
   %2 = metatype $@thin Int.Type
   %3 = integer_literal $Builtin.Int128, 0 // CHECK: integer_literal $Builtin.Int128, 0

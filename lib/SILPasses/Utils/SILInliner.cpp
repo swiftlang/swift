@@ -220,7 +220,6 @@ static InlineCost instructionInlineCost(SILInstruction &I,
                                         SILFunction *Caller) {
   switch (I.getKind()) {
     case ValueKind::BuiltinFunctionRefInst:
-    case ValueKind::GlobalAddrInst:
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
     case ValueKind::DebugValueInst:

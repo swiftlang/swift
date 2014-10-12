@@ -486,15 +486,6 @@ SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitGlobalAddrInst(GlobalAddrInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createGlobalAddr(getOpLocation(Inst->getLoc()),
-                                  Inst->getGlobal(),
-                                  getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitSILGlobalAddrInst(SILGlobalAddrInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createSILGlobalAddr(getOpLocation(Inst->getLoc()),

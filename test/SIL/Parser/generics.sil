@@ -58,15 +58,15 @@ entry:
   return %g : $@callee_owned (@out Bas) -> ()
 }
 
-var zero: Builtin.Int64
-var f: (Builtin.Int32) -> ()
+sil_global @zero: $Builtin.Int64
+sil_global @f: $@callee_owned (Builtin.Int32) -> ()
 
 // CHECK-LABEL: sil @test_apply
 sil @test_apply : $@thin () -> () {
 bb0:
-  %0 = global_addr #zero : $*Builtin.Int64
+  %0 = sil_global_addr @zero : $*Builtin.Int64
   %1 = mark_uninitialized [var] %0 : $*Builtin.Int64
-  %2 = global_addr #f : $*@callee_owned (Builtin.Int32) -> ()
+  %2 = sil_global_addr @f : $*@callee_owned (Builtin.Int32) -> ()
   %3 = function_ref @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
   %4 = load %1 : $*Builtin.Int64
   %5 = alloc_stack $Builtin.Int64

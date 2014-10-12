@@ -3,15 +3,15 @@
 import Builtin
 import Swift
 
-var startTime: Double
-var sum1: Int
+sil_global @startTime : $Double
+sil_global @sum1 : $Int
 
 // CHECK-LABEl: @sink_cond_fail
 sil @sink_cond_fail : $@thin () -> () {
 // CHECK: bb0
 bb0:
-  %0 = global_addr #startTime : $*Double
-  %1 = global_addr #sum1 : $*Int
+  %0 = sil_global_addr @startTime : $*Double
+  %1 = sil_global_addr @sum1 : $*Int
   %2 = integer_literal $Builtin.Word, 0
   %3 = struct $Int (%2 : $Builtin.Word)
   store %3 to %1 : $*Int

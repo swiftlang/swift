@@ -117,7 +117,7 @@ static bool isIdentifiableObject(SILValue V) {
     return true;
   if (isNoAliasArgument(V))
     return true;
-  if (isa<GlobalAddrInst>(V) || isa<SILGlobalAddrInst>(V))
+  if (isa<SILGlobalAddrInst>(V))
     return true;
   return false;
 }

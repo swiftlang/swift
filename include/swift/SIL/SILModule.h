@@ -135,12 +135,7 @@ private:
   llvm::StringMap<SILGlobalVariable *> GlobalVariableTable;
 
   /// The list of SILGlobalVariables in the module.
-  /// FIXME: Merge with 'globals'.
   GlobalListType silGlobals;
-
-  /// The collection of global variables used in the module.
-  /// FIXME: Remove this when SILGlobalVariable is ready.
-  llvm::SetVector<VarDecl*> globals;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
@@ -248,22 +243,6 @@ public:
   /// optimizations can assume that they see the whole module.
   bool isWholeModule() const {
     return wholeModule;
-  }
-
-  // FIXME: Remove these when SILGlobalVariable is ready to take over.
-
-  using global_iterator = decltype(globals)::const_iterator;
-  using GlobalRange = Range<global_iterator>;
-
-  /// Returns the set of global variables in this module.
-  GlobalRange getGlobals() const {
-    return {globals.begin(), globals.end()};
-  }
-  global_iterator global_begin() const {
-    return globals.begin();
-  }
-  global_iterator global_end() const {
-    return globals.end();
   }
 
   using iterator = FunctionListType::iterator;

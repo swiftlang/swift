@@ -69,7 +69,7 @@
                     "load_weak" "store_weak" "fix_lifetime")
 		  'words) . font-lock-keyword-face)
    ;; Literals
-   `(,(regexp-opt '("function_ref" "builtin_function_ref" "global_addr"
+   `(,(regexp-opt '("function_ref" "builtin_function_ref"
                     "integer_literal" "float_literal" "string_literal"
                     "sil_global_addr"
                     ) 'words) . font-lock-keyword-face)

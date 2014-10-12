@@ -622,15 +622,6 @@ public:
     verifySILFunctionType(fnType);
   }
 
-  void checkGlobalAddrInst(GlobalAddrInst *GAI) {
-    require(GAI->getType().isAddress(),
-            "GlobalAddr must have an address result type");
-    require(GAI->getGlobal()->hasStorage(),
-            "GlobalAddr cannot take the address of a computed variable");
-    require(!GAI->getGlobal()->getDeclContext()->isLocalContext(),
-            "GlobalAddr cannot take the address of a local var");
-  }
-
   void checkSILGlobalAddrInst(SILGlobalAddrInst *GAI) {
     require(GAI->getType().isAddress(),
             "SILGlobalAddr must have an address result type");

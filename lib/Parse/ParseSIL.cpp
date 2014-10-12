@@ -494,7 +494,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
         HadError = true;
         P.diagnose(Name.NameLoc, diag::invalid_sil_value_name_result_number);
         // Make sure to return something of the requested type.
-        return new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
+        return new (SILMod) SILGlobalAddrInst(Loc, Type);
       }
     }
 
@@ -505,7 +505,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
       P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
                  EntryTy.getSwiftRValueType(), Type.getSwiftRValueType());
       // Make sure to return something of the requested type.
-      return new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
+      return new (SILMod) SILGlobalAddrInst(Loc, Type);
     }
 
     return SILValue(Entry, Name.isMRV() ? Name.ResultVal : 0);
@@ -516,7 +516,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
   ForwardRefLocalValues[Name.Name] = Name.NameLoc;
 
   if (!Name.isMRV()) {
-    Entry = new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
+    Entry = new (SILMod) SILGlobalAddrInst(Loc, Type);
     return Entry;
   }
 
@@ -527,7 +527,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
 
   if (!Placeholders[Name.ResultVal])
     Placeholders[Name.ResultVal] =
-      new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
+      new (SILMod) SILGlobalAddrInst(Loc, Type);
   return Placeholders[Name.ResultVal];
 }
 
@@ -1167,7 +1167,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("enum", ValueKind::EnumInst)
     .Case("fix_lifetime", ValueKind::FixLifetimeInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
-    .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
     .Case("index_raw_pointer", ValueKind::IndexRawPointerInst)
     .Case("init_block_storage_header", ValueKind::InitBlockStorageHeaderInst)
@@ -2651,25 +2650,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseTypedValueRef(IndexVal))
       return true;
     ResultVal = B.createIndexRawPointer(InstLoc, Val, IndexVal);
-    break;
-  }
-  case ValueKind::GlobalAddrInst: {
-    Identifier GlobalName;
-    SourceLoc GLoc;
-    SILType Ty;
-    if (P.parseToken(tok::pound, diag::expected_sil_constant) ||
-        parseSILIdentifier(GlobalName, GLoc, diag::expected_sil_constant) ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(Ty))
-      return true;
-    // Find VarDecl for GlobalName.
-    llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, GlobalName);
-    assert(Res.is<ValueDecl*>() && "Global look-up should return a Decl");
-    ValueDecl *VD = Res.get<ValueDecl*>();
-
-    if (!isa<VarDecl>(VD))
-      P.diagnose(GLoc, diag::sil_global_variable_not_found, GlobalName);
-    ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
     break;
   }
   case ValueKind::ObjCProtocolInst: {

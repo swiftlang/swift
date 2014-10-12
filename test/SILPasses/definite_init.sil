@@ -375,14 +375,14 @@ bb0(%0 : $*SomeClass, %1 : $SomeClass):
   return %9 : $()
 }
 
-var int_global : Int
+sil_global @int_global : $Int
 
 
 // CHECK-LABEL: sil @test_tlc
 // CHECK-NOT: mark_uninitialized
 // CHECK: return
 sil @test_tlc : $() -> () {
-  %0 = global_addr #int_global : $*Int
+  %0 = sil_global_addr @int_global : $*Int
   %1 = mark_uninitialized [var] %0 : $*Int
 
   %9 = tuple ()

@@ -564,7 +564,6 @@ public:
 
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
-  void visitGlobalAddrInst(GlobalAddrInst *i);
   void visitSILGlobalAddrInst(SILGlobalAddrInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
@@ -1446,23 +1445,6 @@ void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
   // we don't need to.
   setLoweredStaticFunction(SILValue(i, 0), fnptr,
                            i->getReferencedFunction()->getAbstractCC());
-}
-
-void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
-  VarDecl *global = i->getGlobal();
-  auto &type = getTypeInfoForUnlowered(global->getType());
-  
-  Address addr;
-  
-  // If the variable is empty, don't actually emit it; just return undef.
-  // FIXME: global destructors?
-  if (type.isKnownEmpty()) {
-    addr = type.getUndefAddress();
-  } else {
-    addr = IGM.getAddrOfGlobalVariable(global, NotForDefinition);
-  }
-  
-  setLoweredAddress(SILValue(i, 0), addr);
 }
 
 void IRGenSILFunction::visitSILGlobalAddrInst(SILGlobalAddrInst *i) {

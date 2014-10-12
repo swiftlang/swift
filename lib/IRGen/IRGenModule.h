@@ -418,7 +418,6 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
-  Address emitGlobalVariable(VarDecl *var, const TypeInfo &type);
   Address emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
@@ -438,7 +437,6 @@ public:
 
   llvm::Constant *getSize(Size size);
 
-  Address getAddrOfGlobalVariable(VarDecl *D, ForDefinition_t forDefinition);
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
                                ForDefinition_t forDefinition);
   Address getAddrOfWitnessTableOffset(SILDeclRef fn,
