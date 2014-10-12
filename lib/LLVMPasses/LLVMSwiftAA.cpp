@@ -37,6 +37,7 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
     return NoModRef;
   case RT_Release:
   case RT_ObjCRelease:
+  case RT_UnknownRelease:
   case RT_Unknown:
     break;
   }

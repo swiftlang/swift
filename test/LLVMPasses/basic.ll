@@ -8,6 +8,7 @@ target triple = "x86_64-apple-macosx10.9"
 %objc_object = type opaque
 
 declare void @swift_unknownRetain(%swift.refcounted*)
+declare void @swift_unknownRelease(%swift.refcounted*)
 declare %objc_object* @objc_retain(%objc_object*)
 declare void @objc_release(%objc_object*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
@@ -16,10 +17,14 @@ declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
 declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
 declare { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* , i64, i64 , i64 )
 
-define void @trivial_retain_release(%swift.refcounted* %P) {
+define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O) {
 entry:
   tail call void @swift_retain_noresult(%swift.refcounted* %P)
   tail call void @swift_release(%swift.refcounted* %P) nounwind
+  tail call void @swift_unknownRetain(%swift.refcounted* %P)
+  tail call void @swift_unknownRelease(%swift.refcounted* %P)
+  tail call %objc_object* @objc_retain(%objc_object* %O)
+  tail call void @objc_release(%objc_object* %O)
   ret void
 }
 

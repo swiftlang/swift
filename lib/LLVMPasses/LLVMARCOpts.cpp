@@ -185,6 +185,7 @@ static bool canonicalizeInputFunction(Function &F) {
     switch (classifyInstruction(Inst)) {
     case RT_Unknown:
     case RT_UnknownRetain:
+    case RT_UnknownRelease:
     case RT_AllocObject:
     case RT_NoMemoryAccessed:
       break;
@@ -347,6 +348,9 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
       continue;
+
+    case RT_UnknownRelease:
+    case RT_ObjCRelease:
     case RT_Release: {
       // If we get to a release, we can generally ignore it and scan past it.
       // However, if we get to a release of obviously the same object, we stop
@@ -365,6 +369,8 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       continue;
     }
 
+    case RT_UnknownRetain:
+    case RT_ObjCRetain:
     case RT_RetainNoResult: {  // swift_retain_noresult(obj)
       CallInst &Retain = cast<CallInst>(*BBI);
       Value *RetainedObject = Retain.getArgOperand(0);
@@ -413,9 +419,6 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     }
 
     case RT_Unknown:
-    case RT_UnknownRetain:
-    case RT_ObjCRelease:
-    case RT_ObjCRetain:
       // BBI->dump();
       // Otherwise, we get to something unknown/unhandled.  Bail out for now.
       ++BBI;
@@ -487,33 +490,21 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
       continue;
     }
       
+    case RT_UnknownRelease:
+    case RT_ObjCRelease:
     case RT_Release: {
       // If we get to a release that is provably to this object, then we can zap
       // it and the retain.
       CallInst &ThisRelease = cast<CallInst>(CurInst);
       Value *ThisReleasedObject = ThisRelease.getArgOperand(0);
-      if (!isObjCRetain && ThisReleasedObject == RetainedObject) {
+      if (ThisReleasedObject == RetainedObject) {
         Retain.eraseFromParent();
         ThisRelease.eraseFromParent();
-        ++NumRetainReleasePairs;
-        return true;
-      }
-      
-      // Otherwise, if this is some other pointer, we can only ignore it if we
-      // can prove that the two objects don't alias.
-      // Retain.dump(); ThisRelease.dump(); BB.getParent()->dump();
-      goto OutOfLoop;
-    }
-      
-    case RT_ObjCRelease: {
-      // If we get to an objc_release that is provably to this object, then we
-      // can zap it and the objc_retain.
-      CallInst &ThisRelease = cast<CallInst>(CurInst);
-      Value *ThisReleasedObject = ThisRelease.getArgOperand(0);
-      if (isObjCRetain && ThisReleasedObject == RetainedObject) {
-        Retain.eraseFromParent();
-        ThisRelease.eraseFromParent();
-        ++NumObjCRetainReleasePairs;
+        if (isObjCRetain) {
+          ++NumObjCRetainReleasePairs;
+        } else {
+          ++NumRetainReleasePairs;
+        }
         return true;
       }
       
@@ -643,6 +634,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_ObjCRelease:
       case RT_ObjCRetain:
       case RT_UnknownRetain:
+      case RT_UnknownRelease:
         // Objective-C retain and release can have arbitrary side effects.
         break;
           
@@ -741,6 +733,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     case RT_ObjCRelease:
     case RT_ObjCRetain:
     case RT_UnknownRetain:
+    case RT_UnknownRelease:
 
       // Otherwise, this really is some unhandled instruction.  Bail out.
       return false;
@@ -817,10 +810,13 @@ static bool performGeneralOptimizations(Function &F) {
       case RT_AllocObject:
         Changed |= performStoreOnlyObjectElimination(cast<CallInst>(I), BBI);
         break;
+      case RT_ObjCRelease:
+      case RT_UnknownRelease:
       case RT_Release:
         Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
         break;
       case RT_RetainNoResult:
+      case RT_UnknownRetain:
       case RT_ObjCRetain: {
         // Retain motion is a forward pass over the block.  Make sure we don't
         // invalidate our iterators by parking it on the instruction before I.
@@ -1120,6 +1116,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       case RT_Release:
       case RT_AllocObject:
       case RT_NoMemoryAccessed:
+      case RT_UnknownRelease:
       case RT_UnknownRetain:
       case RT_ObjCRelease:
       case RT_ObjCRetain:  // TODO: Could chain together objc_retains.
