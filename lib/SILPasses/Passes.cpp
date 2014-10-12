@@ -157,7 +157,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.add(createGlobalLoadStoreOpts());
-  PM.add(createCodeMotion());
+  PM.add(createCodeMotion(false /* HoistReleases */));
   PM.add(createGlobalARCOpts());
 
   // Devirtualize.
@@ -180,6 +180,9 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
       break;
   }
   PM.add(createSimplifyCFG());
+  // Only hoist releases very late.
+  PM.add(createCodeMotion(OpLevel ==
+                          OptimizationLevelKind::LowLevel /* HoistReleases */));
   PM.add(createGlobalARCOpts());
 }
 

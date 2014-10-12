@@ -69,7 +69,7 @@ namespace swift {
   SILTransform *createSROA();
   SILTransform *createMem2Reg();
   SILTransform *createCSE();
-  SILTransform *createCodeMotion();
+  SILTransform *createCodeMotion(bool HoistReleases);
   SILTransform *createPerfInliner();
   SILTransform *createEarlyInliner();
   SILTransform *createLateInliner();

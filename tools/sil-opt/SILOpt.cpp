@@ -415,7 +415,7 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       PM.add(createEarlyInliner());
       break;
     case PassKind::CodeMotion:
-      PM.add(createCodeMotion());
+      PM.add(createCodeMotion(true));
       break;
     case PassKind::LowerAggregateInstrs:
       PM.add(createLowerAggregate());

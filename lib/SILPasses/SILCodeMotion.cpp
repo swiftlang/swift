@@ -45,15 +45,22 @@ using namespace swift::arc;
 //===----------------------------------------------------------------------===//
 
 static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
-                                       EnumElementDecl *EnumDecl) {
+                                       EnumElementDecl *EnumDecl,
+                                       SILValue DefOfEnum = SILValue()) {
   assert(EnumDecl->hasArgumentType() &&
          "We assume enumdecl has an argument type");
 
   SILModule &Mod = I->getModule();
-  SILType ArgType =
-      I->getOperand(0).getType().getEnumElementType(EnumDecl, Mod);
-  auto *UEDI = Builder.createUncheckedEnumData(I->getLoc(), I->getOperand(0),
-                                               EnumDecl, ArgType);
+
+  // The enum value is either passed as an extra argument if we are moving an
+  // retain that does not refer to the enum typed value - otherwise it is the
+  // argument to the refcount instruction.
+  SILValue EnumVal = DefOfEnum ? DefOfEnum : I->getOperand(0);
+
+  SILType ArgType = EnumVal.getType().getEnumElementType(EnumDecl, Mod);
+
+  auto *UEDI =
+      Builder.createUncheckedEnumData(I->getLoc(), EnumVal, EnumDecl, ArgType);
 
   SILType UEDITy = UEDI->getType();
 
@@ -423,7 +430,8 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
 /// predecessor.
 static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
                                           SILBasicBlock::iterator RV,
-                                          AliasAnalysis *AA) {
+                                          AliasAnalysis *AA,
+                                          RCIdentityAnalysis *RCIA) {
   // If this instruction is not a retain_value, there is nothing left for us to
   // do... bail...
   if (!isa<RetainValueInst>(RV))
@@ -445,7 +453,8 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
 
   // If the retain value's argument is not the switch's argument, we can't do
   // anything with our simplistic analysis... bail...
-  if (Ptr != Switch->getOperand())
+  if (RCIA->getRCIdentityRoot(Ptr) !=
+      RCIA->getRCIdentityRoot(Switch->getOperand()))
     return false;
 
   // If S has a default case bail since the default case could represent
@@ -466,7 +475,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
     SILBasicBlock *Succ = Case.second;
     Builder.setInsertionPoint(&*Succ->begin());
     if (Enum->hasArgumentType())
-      createRefCountOpForPayload(Builder, RV, Enum);
+      createRefCountOpForPayload(Builder, RV, Enum, Switch->getOperand());
   }
 
   RV->eraseFromParent();
@@ -480,7 +489,8 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
 /// predecessor.
 static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
                                               SILBasicBlock::iterator I,
-                                              AliasAnalysis *AA) {
+                                              AliasAnalysis *AA,
+                                              RCIdentityAnalysis *RCIA) {
   // If this instruction is not a retain_value, there is nothing left for us to
   // do... bail...
   if (!isa<RetainValueInst>(I))
@@ -502,6 +512,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   // can decrement our ptr value, we can move the retain over the ref count
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
   // not move it.
+
   SILValue Ptr = I->getOperand(0);
   SILBasicBlock::iterator CondBrIter = CondBr;
   if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, std::next(I),
@@ -512,7 +523,8 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
 
   // If the retain value's argument is not the cond_br's argument, we can't do
   // anything with our simplistic analysis... bail...
-  if (Ptr != SEI->getEnumOperand())
+  if (RCIA->getRCIdentityRoot(Ptr) !=
+      RCIA->getRCIdentityRoot(SEI->getEnumOperand()))
     return false;
   
   // Work out which enum element is the true branch, and which is false.
@@ -549,7 +561,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
     SILBasicBlock *Succ = i == 0 ? CondBr->getTrueBB() : CondBr->getFalseBB();
     Builder.setInsertionPoint(&*Succ->begin());
     if (Enum->hasArgumentType())
-      createRefCountOpForPayload(Builder, I, Enum);
+      createRefCountOpForPayload(Builder, I, Enum, SEI->getEnumOperand());
   }
 
   I->eraseFromParent();
@@ -560,7 +572,8 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
 static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
                                   SILBasicBlock::iterator I,
                                   bool CanSinkToSuccessors,
-                                  AliasAnalysis *AA) {
+                                  AliasAnalysis *AA,
+                                  RCIdentityAnalysis *RCIA) {
   // The following methods should only be attempted if we can sink to our
   // successor.
   if (CanSinkToSuccessors) {
@@ -569,13 +582,13 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
     // properly sink ref counts over switch_enums so we might as well exit
     // early.
     if (auto *S = dyn_cast<SwitchEnumInst>(T))
-      return tryToSinkRefCountAcrossSwitch(S, I, AA);
+      return tryToSinkRefCountAcrossSwitch(S, I, AA, RCIA);
 
     // In contrast, even if we do not sink ref counts across a cond_br from a
     // select_enum, we may be able to sink anyways. So we do not return on a
     // failure case.
     if (auto *CondBr = dyn_cast<CondBranchInst>(T))
-      if (tryToSinkRefCountAcrossSelectEnum(CondBr, I, AA))
+      if (tryToSinkRefCountAcrossSelectEnum(CondBr, I, AA, RCIA))
         return true;
   }
 
@@ -628,7 +641,8 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
 
 /// Try sink a retain as far as possible.  This is either to sucessor BBs,
 /// or as far down the current BB as possible
-static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA) {
+static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
+                                  RCIdentityAnalysis *RCIA) {
 
   // Make sure that each one of our successors only has one predecessor,
   // us.
@@ -661,11 +675,11 @@ static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA) {
     //      terminator, sink the ref count inst into either our successors.
     //   2. If there are such decrements, move the retain right before that
     //      decrement.
-    Changed |= tryToSinkRefCountInst(S, Inst, CanSinkToSuccessor, AA);
+    Changed |= tryToSinkRefCountInst(S, Inst, CanSinkToSuccessor, AA, RCIA);
   }
 
   // Handle the first instruction in the BB.
-  Changed |= tryToSinkRefCountInst(S, &*SI, CanSinkToSuccessor, AA);
+  Changed |= tryToSinkRefCountInst(S, &*SI, CanSinkToSuccessor, AA, RCIA);
   return Changed;
 }
 
@@ -1314,7 +1328,8 @@ sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA, RCIdentityAnalysis *RCIA) {
 
 static bool processFunction(SILFunction *F, AliasAnalysis *AA,
                             PostOrderAnalysis *POTA,
-                            RCIdentityAnalysis *RCIA) {
+                            RCIdentityAnalysis *RCIA,
+                            bool HoistReleases) {
 
   bool Changed = false;
 
@@ -1343,7 +1358,10 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     // regions.
     DEBUG(llvm::dbgs() << "    Attempting to move releases into "
           "predecessors!\n");
-    Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
+
+    if (HoistReleases)
+      Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
+
     Changed |= State.sinkIncrementsOutOfSwitchRegions(AA, RCIA);
 
 
@@ -1360,7 +1378,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= State.process();
 
     // Finally we try to sink retain instructions from this BB to the next BB.
-    Changed |= sinkRefCountIncrement(State.getBB(), AA);
+    Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA);
   }
 
   return Changed;
@@ -1368,6 +1386,12 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
 
 namespace {
 class SILCodeMotion : public SILFunctionTransform {
+
+  bool HoistReleases;
+
+public:
+
+  SILCodeMotion(bool TryReleaseHoisting) : HoistReleases(TryReleaseHoisting) {}
 
   /// The entry point to the transformation.
   void run() {
@@ -1379,7 +1403,7 @@ class SILCodeMotion : public SILFunctionTransform {
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F->getName() <<
           " *****\n");
 
-    if (processFunction(F, AA, POTA, RCIA))
+    if (processFunction(F, AA, POTA, RCIA, HoistReleases))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
@@ -1387,6 +1411,6 @@ class SILCodeMotion : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-SILTransform *swift::createCodeMotion() {
-  return new SILCodeMotion();
+SILTransform *swift::createCodeMotion(bool HoistReleases) {
+  return new SILCodeMotion(HoistReleases);
 }

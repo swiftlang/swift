@@ -1398,3 +1398,32 @@ bb2:
   %1 = tuple()
   return %1 : $()
 }
+
+// CHECK-LABEL: sil @sink_retain_over_switch_enum_cast
+// CHECK: bb0(
+// CHECK-NOT: retain_value
+// CHECK: switch_enum
+// CHECK: bb1:
+// CHECK-NOT: retain_value
+// CHECK: br bb3
+// CHECK: bb2:
+// CHECK-NOT: retain_value
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK: retain_value
+sil @sink_retain_over_switch_enum_cast : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  retain_value %0 : $Builtin.NativeObject
+  %1 = unchecked_ref_bit_cast %0 : $Builtin.NativeObject to $FakeOptional<Builtin.NativeObject>
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = tuple()
+  return %4 : $()
+}
