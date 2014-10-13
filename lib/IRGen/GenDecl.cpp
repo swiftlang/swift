@@ -730,7 +730,8 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     if (isWeakImported)
       return RESULT(ExternalWeak, Default);
     return RESULT(External, Default);
-  case SILLinkage::HiddenExternal: {
+  case SILLinkage::HiddenExternal:
+  case SILLinkage::PrivateExternal: {
     auto visibility = isFragile ? llvm::GlobalValue::DefaultVisibility
                                 : llvm::GlobalValue::HiddenVisibility;
     if (isDefinition) {
@@ -742,10 +743,6 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     }
     return {llvm::GlobalValue::ExternalLinkage, visibility};
   }
-  case SILLinkage::PrivateExternal:
-    // Fall through. The linkage should never be PrivateExternal for resilient
-    // (non-fragile) entities.
-    break;
   }
   llvm_unreachable("bad SIL linkage");
 }

@@ -150,6 +150,21 @@ inline bool hasSharedVisibility(SILLinkage linkage) {
   }
 }
 
+inline bool hasPrivateVisibility(SILLinkage linkage) {
+  switch (linkage) {
+  case SILLinkage::Private:
+  case SILLinkage::PrivateExternal:
+    return true;
+  case SILLinkage::Public:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::Hidden:
+  case SILLinkage::HiddenExternal:
+  case SILLinkage::Shared:
+  case SILLinkage::SharedExternal:
+    return false;
+  }
+}
+
 /// Returns true if l1 is less visible than l2.
 inline bool isLessVisibleThan(SILLinkage l1, SILLinkage l2) {
   if (l1 == SILLinkage::PublicExternal)

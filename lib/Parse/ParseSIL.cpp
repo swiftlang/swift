@@ -618,6 +618,7 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 ///     'private'
 ///     'public_external'
 ///     'hidden_external'
+///     'private_external'
 static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
   if (P.Tok.is(tok::kw_public)) {
     // Unfortunate collision with access control keywords.
@@ -642,6 +643,9 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
     P.consumeToken(tok::identifier);
   } else if (P.Tok.getText() == "shared_external") {
     Result = SILLinkage::SharedExternal;
+    P.consumeToken(tok::identifier);
+  } else if (P.Tok.getText() == "private_external") {
+    Result = SILLinkage::PrivateExternal;
     P.consumeToken(tok::identifier);
   } else {
     Result = None;

@@ -2340,9 +2340,20 @@ void SILFunction::verify() const {
     assert(!hasSharedVisibility(getLinkage()) &&
            "external declarations of SILFunctions with shared visiblity is not "
            "allowed");
-    return;
   }
-  SILVerifier(*this).verify();
+  if (getLinkage() == SILLinkage::PrivateExternal) {
+    // FIXME: uncomment these checks.
+    // <rdar://problem/18635841> SILGen can create non-fragile external
+    // private_external declarations
+    //
+    // assert(!isExternalDeclaration() &&
+    //        "PrivateExternal should not be an external declaration");
+    // assert(isFragile() &&
+    //        "PrivateExternal should be fragile (otherwise, how did it appear "
+    //        "in this module?)");
+  }
+  if (!isExternalDeclaration())
+    SILVerifier(*this).verify();
 #endif
 }
 
