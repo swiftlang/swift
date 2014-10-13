@@ -227,6 +227,20 @@ static NSString *_getDescription(SwiftObject *obj) {
   return swift::swift_retainCount(reinterpret_cast<HeapObject *>(self));
 }
 
+// Retaining the class object itself is a no-op.
++ (id)retain {
+  return self;
+}
++ (void)release {
+  /* empty */
+}
++ (id)autorelease {
+  return self;
+}
++ (NSUInteger)retainCount {
+  return 1;
+}
+
 - (void)dealloc {
   _swift_deallocClassInstance(reinterpret_cast<HeapObject *>(self));
 }
