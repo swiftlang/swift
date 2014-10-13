@@ -20,6 +20,20 @@ extern NSUInteger SomeCrazyAppExtensionForbiddenAPI(void) __attribute__((availab
 
 NS_SWIFT_UNAVAILABLE void NSSwiftUnavailableFunction();
 
+__attribute__((availability(macosx,introduced=10.10)))
+@interface NSAvailableOn10_10 : NSObject
+- (instancetype)init;
+- (instancetype)initWithStringOn10_11:(NSString *)s __attribute__((availability(macosx,introduced=10.11)));
+
+@property NSInteger propertyOn10_11 __attribute__((availability(macosx,introduced=10.11)));
+
+- (void)methodAvailableOn10_11 __attribute__((availability(macosx,introduced=10.11)));
+@end
+
+__attribute__((availability(macosx,introduced=10.10)))
+@protocol NSProtocolAvailableOn10_10
+
+@end
 
 @class NSString, NSArray, NSDictionary, NSEnumerator;
 
