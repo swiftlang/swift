@@ -331,8 +331,6 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
     otherPA->Representative = known->second.front();
     otherPA->SameTypeSource = RequirementSource(RequirementSource::Inferred,
                                                 source.getLoc());
-    builder.Impl->SameTypeRequirements.push_back({ otherPA,
-                                                   known->second.front() });
     known->second.push_back(otherPA);
   }
 
@@ -408,8 +406,6 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
           pa->Representative = nested.front();
           pa->SameTypeSource = RequirementSource(RequirementSource::Inferred,
                                                  SourceLoc());
-
-          builder.Impl->SameTypeRequirements.push_back({ pa, nested.front() });
         }
 
         // Add this resolved nested type.
