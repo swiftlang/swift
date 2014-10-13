@@ -118,6 +118,8 @@ struct LangOptions final {
   ///   |  aaa
   /// \code
   bool IgnoreUniformIndentation = false;
+
+  bool ExperimentalInlineMarkupParsing = true;
 };
 
 class ReSTContext final {
@@ -143,15 +145,20 @@ public:
     return MutableArrayRef<T>(allocateCopy<T>(Array.begin(), Array.end()),
                               Array.size());
   }
+
+  StringRef allocateCopy(StringRef Str) {
+    ArrayRef<char> Result =
+        allocateCopy(llvm::makeArrayRef(Str.data(), Str.size()));
+    return StringRef(Result.data(), Result.size());
+  }
 };
 
 Document *parseDocument(ReSTContext &C, LineListRef LL);
 
 void convertToDocutilsXML(const Document *D, raw_ostream &OS);
 
-std::pair<LinePart, LinePart> extractWord(LinePart LP);
-std::pair<LinePart, LineListRef> extractWord(LineListRef LL);
-LinePart extractWord(TextAndInline *TAI);
+Optional<std::pair<LinePart, LinePart>> extractWord(LinePart LP);
+Optional<LinePart> extractWord(TextAndInline *TAI);
 
 } // namespace rest
 } // namespace llvm

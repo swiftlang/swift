@@ -22,10 +22,15 @@ namespace rest {
 class ReSTContext;
 
 #define REST_AST_NODE(Id, Parent) class Id;
+#define ABSTRACT_REST_AST_NODE(Id, Parent) class Id;
+#define REST_AST_NODE_RANGE(Id, FirstId, LastId)
 #include "swift/ReST/ASTNodes.def"
 
 enum class ASTNodeKind : uint8_t {
 #define REST_AST_NODE(Id, Parent) Id,
+#define ABSTRACT_REST_AST_NODE(Id, Parent)
+#define REST_AST_NODE_RANGE(Id, FirstId, LastId)                               \
+  First_##Id = FirstId, Last_##Id = LastId,
 #include "swift/ReST/ASTNodes.def"
 };
 
@@ -524,47 +529,272 @@ public:
 };
 
 class TextAndInline final : public ReSTASTNode {
-  // FIXME: use a more specific AST node here?
-  ArrayRef<ReSTASTNode *> Children;
+  unsigned NumChildren;
 
-  // FIXME: temporary while we don't parse inline markup.
-  union {
-    LineListRef LL;
-    LinePart LP;
-  };
-  bool IsLinePart;
+  InlineContent **getChildrenBuffer() {
+    return reinterpret_cast<InlineContent **>(this + 1);
+  }
+  const InlineContent *const *getChildrenBuffer() const {
+    return reinterpret_cast<const InlineContent *const *>(this + 1);
+  }
+
+  TextAndInline(ArrayRef<InlineContent *> Children);
 
 public:
-  TextAndInline(LineListRef LL)
-      : ReSTASTNode(ASTNodeKind::TextAndInline), LL(LL), IsLinePart(false) {}
+  static TextAndInline *create(ReSTContext &C,
+                               ArrayRef<InlineContent *> Children);
 
-  TextAndInline(LinePart LP)
-      : ReSTASTNode(ASTNodeKind::TextAndInline), LP(LP), IsLinePart(true) {}
-
-  bool isLinePart() const { return IsLinePart; }
-
-  LineListRef getLines() const {
-    assert(!IsLinePart);
-    return LL;
+  ArrayRef<InlineContent *> getChildren() {
+    return ArrayRef<InlineContent *>(getChildrenBuffer(), NumChildren);
   }
-
-  void setLines(LineListRef LL) {
-    assert(!IsLinePart);
-    this->LL = LL;
-  }
-
-  LinePart getLinePart() const {
-    assert(IsLinePart);
-    return LP;
-  }
-
-  void setLinePart(LinePart LP) {
-    assert(IsLinePart);
-    this->LP = LP;
+  ArrayRef<const InlineContent *> getChildren() const {
+    return ArrayRef<const InlineContent *>(getChildrenBuffer(), NumChildren);
   }
 
   static bool classof(const ReSTASTNode *N) {
     return N->getKind() == ASTNodeKind::TextAndInline;
+  }
+};
+
+class InlineContent : public ReSTASTNode {
+public:
+  InlineContent(ASTNodeKind Kind) : ReSTASTNode(Kind) {}
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() >= ASTNodeKind::First_InlineContent &&
+           N->getKind() <= ASTNodeKind::Last_InlineContent;
+  }
+};
+
+class PlainText final : public InlineContent {
+  LinePart LP;
+
+public:
+  PlainText(LinePart LP) : InlineContent(ASTNodeKind::PlainText), LP(LP) {}
+
+  LinePart getLinePart() const { return LP; }
+  void setLinePart(LinePart LP) { this->LP = LP; }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::PlainText;
+  }
+};
+
+class Emphasis final : public InlineContent {
+  unsigned NumChildren;
+
+  InlineContent **getChildrenBuffer() {
+    return reinterpret_cast<InlineContent **>(this + 1);
+  }
+  const InlineContent *const *getChildrenBuffer() const {
+    return reinterpret_cast<const InlineContent *const *>(this + 1);
+  }
+
+  Emphasis(ArrayRef<InlineContent *> Children);
+
+public:
+  static Emphasis *create(ReSTContext &C, ArrayRef<InlineContent *> Children);
+
+  ArrayRef<InlineContent *> getChildren() {
+    return ArrayRef<InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+  ArrayRef<const InlineContent *> getChildren() const {
+    return ArrayRef<const InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::Emphasis;
+  }
+};
+
+class StrongEmphasis final : public InlineContent {
+  unsigned NumChildren;
+
+  InlineContent **getChildrenBuffer() {
+    return reinterpret_cast<InlineContent **>(this + 1);
+  }
+  const InlineContent *const *getChildrenBuffer() const {
+    return reinterpret_cast<const InlineContent *const *>(this + 1);
+  }
+
+  StrongEmphasis(ArrayRef<InlineContent *> Children);
+
+public:
+  static StrongEmphasis *create(ReSTContext &C,
+                                ArrayRef<InlineContent *> Children);
+
+  ArrayRef<InlineContent *> getChildren() {
+    return ArrayRef<InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+  ArrayRef<const InlineContent *> getChildren() const {
+    return ArrayRef<const InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::StrongEmphasis;
+  }
+};
+
+class InterpretedText final : public InlineContent {
+  // FIXME: role.
+  unsigned NumChildren;
+
+  InlineContent **getChildrenBuffer() {
+    return reinterpret_cast<InlineContent **>(this + 1);
+  }
+  const InlineContent *const *getChildrenBuffer() const {
+    return reinterpret_cast<const InlineContent *const *>(this + 1);
+  }
+
+  InterpretedText(ArrayRef<InlineContent *> Children);
+
+public:
+  static InterpretedText *create(ReSTContext &C,
+                                 ArrayRef<InlineContent *> Children);
+
+  ArrayRef<InlineContent *> getChildren() {
+    return ArrayRef<InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+  ArrayRef<const InlineContent *> getChildren() const {
+    return ArrayRef<const InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::InterpretedText;
+  }
+};
+
+class InlineLiteral final : public InlineContent {
+  unsigned NumChildren;
+
+  InlineContent **getChildrenBuffer() {
+    return reinterpret_cast<InlineContent **>(this + 1);
+  }
+  const InlineContent *const *getChildrenBuffer() const {
+    return reinterpret_cast<const InlineContent *const *>(this + 1);
+  }
+
+  InlineLiteral(ArrayRef<InlineContent *> Children);
+
+public:
+  static InlineLiteral *create(ReSTContext &C,
+                               ArrayRef<InlineContent *> Children);
+
+  ArrayRef<InlineContent *> getChildren() {
+    return ArrayRef<InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+  ArrayRef<const InlineContent *> getChildren() const {
+    return ArrayRef<const InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::InlineLiteral;
+  }
+};
+
+class HyperlinkReference final : public InlineContent {
+  unsigned NumChildren;
+  // FIXME: link target.
+
+  InlineContent **getChildrenBuffer() {
+    return reinterpret_cast<InlineContent **>(this + 1);
+  }
+  const InlineContent *const *getChildrenBuffer() const {
+    return reinterpret_cast<const InlineContent *const *>(this + 1);
+  }
+
+  HyperlinkReference(ArrayRef<InlineContent *> Children);
+
+public:
+  static HyperlinkReference *create(ReSTContext &C,
+                                    ArrayRef<InlineContent *> Children);
+
+  ArrayRef<InlineContent *> getChildren() {
+    return ArrayRef<InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+  ArrayRef<const InlineContent *> getChildren() const {
+    return ArrayRef<const InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::HyperlinkReference;
+  }
+};
+
+class InlineHyperlinkTarget final : public InlineContent {
+  unsigned NumChildren;
+  // FIXME: link name.
+
+  InlineContent **getChildrenBuffer() {
+    return reinterpret_cast<InlineContent **>(this + 1);
+  }
+  const InlineContent *const *getChildrenBuffer() const {
+    return reinterpret_cast<const InlineContent *const *>(this + 1);
+  }
+
+  InlineHyperlinkTarget(ArrayRef<InlineContent *> Children);
+
+public:
+  static InlineHyperlinkTarget *create(ReSTContext &C,
+                                       ArrayRef<InlineContent *> Children);
+
+  ArrayRef<InlineContent *> getChildren() {
+    return ArrayRef<InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+  ArrayRef<const InlineContent *> getChildren() const {
+    return ArrayRef<const InlineContent *>(getChildrenBuffer(), NumChildren);
+  }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::InlineHyperlinkTarget;
+  }
+};
+
+class FootnoteReference final : public InlineContent {
+  LinePart FootnoteName;
+  // FIXME: link to the footnote.
+
+public:
+  FootnoteReference(LinePart FootnoteName)
+      : InlineContent(ASTNodeKind::FootnoteReference),
+        FootnoteName(FootnoteName) {}
+
+  LinePart getFootnoteName() const { return FootnoteName; }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::FootnoteReference;
+  }
+};
+
+class CitationReference final : public InlineContent {
+  LinePart CitationName;
+  // FIXME: link to the citation.
+
+public:
+  CitationReference(LinePart CitationName)
+      : InlineContent(ASTNodeKind::CitationReference),
+        CitationName(CitationName) {}
+
+  LinePart getCitationName() const { return CitationName; }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::CitationReference;
+  }
+};
+
+class SubstitutionReference final : public InlineContent {
+  LinePart SubstitutionName;
+  // FIXME: expanded contents.
+
+public:
+  SubstitutionReference(LinePart SubstitutionName)
+      : InlineContent(ASTNodeKind::SubstitutionReference),
+        SubstitutionName(SubstitutionName) {}
+
+  LinePart getSubstitutionName() const { return SubstitutionName; }
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::SubstitutionReference;
   }
 };
 

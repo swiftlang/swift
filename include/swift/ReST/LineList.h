@@ -22,6 +22,7 @@
 namespace llvm {
 namespace rest {
 class ReSTContext;
+class LineListRefIndex;
 
 /// A 0-based column number.
 struct ColumnNum {
@@ -290,6 +291,9 @@ class LineList {
 public:
   LineList(MutableArrayRef<Line> Lines) : Lines(Lines) {}
 
+  LineList(const LineList &) = default;
+  LineList &operator=(const LineList &) = default;
+
   Line &operator[](unsigned i) {
     assert(i < Lines.size());
     return Lines[i];
@@ -340,7 +344,9 @@ class LineListRef {
 
 public:
   LineListRef(LineList LL) : LL(LL), StartIdx(0), Size(LL.size()) {}
-  LineListRef(const LineListRef &LL) = default;
+
+  LineListRef(const LineListRef &) = default;
+  LineListRef &operator=(const LineListRef &) = default;
 
   Line &operator[](unsigned i) {
     if (i == 0 && isFirstLineTruncated())
@@ -392,7 +398,132 @@ public:
     return Result;
   }
 
+  LinePart getLinePart(LineListRefIndex Begin, LineListRefIndex End) const;
+
   bool isFirstLineTruncated() const { return FirstLine.hasValue(); }
+
+  LineListRefIndex begin(unsigned LineIndex) const;
+  LineListRefIndex end(unsigned LineIndex) const;
+};
+
+class LineListRefIndex {
+  friend class LineListRef;
+
+  struct IterationState {
+    unsigned CurrentLine;
+    unsigned CurrentLineByte;
+  };
+
+  LineListRef LL;
+  IterationState State;
+
+  static bool isEndImpl(const LineListRef &LL, IterationState State) {
+    return State.CurrentLineByte == LL[State.CurrentLine].Text.size();
+  }
+
+  static std::pair<unsigned, unsigned>
+  decodeUnicodeScalar(const LineListRef &LL, IterationState State) {
+    assert(!isEndImpl(LL, State));
+    const Line &L = LL[State.CurrentLine];
+    unsigned Byte = L.Text[State.CurrentLineByte];
+    if (Byte <= 0x7f) {
+      // Fast path for ASCII encoded in UTF-8.
+      return std::make_pair(Byte, 1);
+    }
+    return decodeUnicodeScalarNonASCII(
+        L.Text.drop_front(State.CurrentLineByte));
+  }
+
+  static std::pair<unsigned, unsigned> decodeUnicodeScalarNonASCII(StringRef S);
+
+  static std::pair<Optional<unsigned>, IterationState>
+  getPossiblyEscapedUnicodeScalarSlow(const LineListRef &LL,
+                                      IterationState State);
+
+  static IterationState advanceState(const LineListRef &LL,
+                                     IterationState State, unsigned Bytes) {
+    assert(!isEndImpl(LL, State));
+    auto Result = State;
+    // Advance position within the line.
+    Result.CurrentLineByte += Bytes;
+    assert(Result.CurrentLineByte <= LL[Result.CurrentLine].Text.size() &&
+           "Can only advance by one Unicode scalar");
+    return Result;
+  }
+
+public:
+  LineListRefIndex(const LineListRef &LL, unsigned LineIndex)
+      : LL(LL), State{LineIndex, LL[LineIndex].FirstTextByte} {}
+
+  LineListRefIndex(const LineListRefIndex &) = default;
+  LineListRefIndex &operator=(const LineListRefIndex &) = default;
+
+  bool isStart() const {
+    return State.CurrentLine == 0 &&
+           State.CurrentLineByte == LL[0].FirstTextByte;
+  }
+
+  bool isEnd() const { return isEndImpl(LL, State); }
+
+  unsigned getUnicodeScalar() const {
+    return decodeUnicodeScalar(LL, State).first;
+  }
+
+  Optional<unsigned> getPossiblyEscapedUnicodeScalar() const {
+    if (isEnd())
+      return None;
+
+    auto ScalarAndLength = decodeUnicodeScalar(LL, State);
+    if (ScalarAndLength.first != static_cast<unsigned>('\\')) {
+      // Not an escape sequence.
+      return ScalarAndLength.first;
+    }
+    // We found an escape sequence.
+    return getPossiblyEscapedUnicodeScalarSlow(LL, State).first;
+  }
+
+  unsigned consumeUnicodeScalar() {
+    assert(!isEnd());
+    auto ScalarAndLength = decodeUnicodeScalar(LL, State);
+    State = advanceState(LL, State, ScalarAndLength.second);
+    return ScalarAndLength.first;
+  }
+
+  Optional<unsigned> consumePossiblyEscapedUnicodeScalar() {
+    if (isEnd())
+      return None;
+
+    auto ScalarAndLength = decodeUnicodeScalar(LL, State);
+    if (ScalarAndLength.first != static_cast<unsigned>('\\')) {
+      // Not an escape sequence.
+      return ScalarAndLength.first;
+    }
+    // We found an escape sequence.
+    auto NextState = advanceState(LL, State, ScalarAndLength.second);
+    auto ScalarAndNewState = getPossiblyEscapedUnicodeScalarSlow(LL, NextState);
+    State = ScalarAndNewState.second;
+    return ScalarAndNewState.first;
+  }
+
+  friend bool operator==(const LineListRefIndex &LHS,
+                         const LineListRefIndex &RHS) {
+    return LHS.State.CurrentLine == RHS.State.CurrentLine &&
+           LHS.State.CurrentLineByte == RHS.State.CurrentLineByte;
+  }
+
+  friend bool operator!=(const LineListRefIndex &LHS,
+                         const LineListRefIndex &RHS) {
+    return !(LHS == RHS);
+  }
+};
+
+class LineListBuilder {
+  std::vector<Line> Lines;
+
+public:
+  void addLine(StringRef Text, SourceRange Range);
+
+  LineList takeLineList(ReSTContext &Context);
 };
 
 inline LineListRef LineList::subList(unsigned StartIndex, unsigned Size) const {
@@ -404,14 +535,27 @@ inline LineListRef LineList::subList(unsigned StartIndex, unsigned Size) const {
   return Result;
 }
 
-class LineListBuilder {
-  std::vector<Line> Lines;
+inline LinePart LineListRef::getLinePart(LineListRefIndex Begin,
+                                         LineListRefIndex End) const {
+  assert(Begin.State.CurrentLine == End.State.CurrentLine);
+  unsigned NumBytes = End.State.CurrentLineByte - Begin.State.CurrentLineByte;
+  LinePart Result;
+  const Line &TheLine = (*this)[Begin.State.CurrentLine];
+  Result.Text = TheLine.Text.substr(Begin.State.CurrentLineByte, NumBytes);
+  SourceLoc StartLoc = TheLine.Range.Start.getAdvancedLoc(NumBytes);
+  Result.Range = SourceRange(StartLoc, StartLoc.getAdvancedLoc(NumBytes));
+  return Result;
+}
 
-public:
-  void addLine(StringRef Text, SourceRange Range);
+inline LineListRefIndex LineListRef::begin(unsigned LineIndex) const {
+  return LineListRefIndex(LL, LineIndex);
+}
 
-  LineList takeLineList(ReSTContext &Context);
-};
+inline LineListRefIndex LineListRef::end(unsigned LineIndex) const {
+  auto I = LineListRefIndex(LL, LineIndex);
+  I.State.CurrentLineByte = (*this)[LineIndex].Text.size();
+  return I;
+}
 
 } // namespace rest
 } // namespace llvm

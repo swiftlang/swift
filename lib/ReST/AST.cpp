@@ -153,3 +153,104 @@ BlockQuote *BlockQuote::create(ReSTContext &C,
   return new (Mem) BlockQuote(Children);
 }
 
+TextAndInline::TextAndInline(ArrayRef<InlineContent *> Children)
+    : ReSTASTNode(ASTNodeKind::TextAndInline), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getChildrenBuffer());
+}
+
+TextAndInline *TextAndInline::create(ReSTContext &C,
+                                     ArrayRef<InlineContent *> Children) {
+  void *Mem = C.allocate(sizeof(TextAndInline) +
+                             Children.size() * sizeof(InlineContent *),
+                         alignof(TextAndInline));
+  return new (Mem) TextAndInline(Children);
+}
+
+Emphasis::Emphasis(ArrayRef<InlineContent *> Children)
+    : InlineContent(ASTNodeKind::Emphasis), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getChildrenBuffer());
+}
+
+Emphasis *Emphasis::create(ReSTContext &C, ArrayRef<InlineContent *> Children) {
+  void *Mem =
+      C.allocate(sizeof(Emphasis) + Children.size() * sizeof(InlineContent *),
+                 alignof(Emphasis));
+  return new (Mem) Emphasis(Children);
+}
+
+StrongEmphasis::StrongEmphasis(ArrayRef<InlineContent *> Children)
+    : InlineContent(ASTNodeKind::StrongEmphasis), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getChildrenBuffer());
+}
+
+StrongEmphasis *StrongEmphasis::create(ReSTContext &C,
+                                       ArrayRef<InlineContent *> Children) {
+  void *Mem = C.allocate(sizeof(StrongEmphasis) +
+                             Children.size() * sizeof(InlineContent *),
+                         alignof(StrongEmphasis));
+  return new (Mem) StrongEmphasis(Children);
+}
+
+InterpretedText::InterpretedText(ArrayRef<InlineContent *> Children)
+    : InlineContent(ASTNodeKind::InterpretedText),
+      NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getChildrenBuffer());
+}
+
+InterpretedText *InterpretedText::create(ReSTContext &C,
+                                         ArrayRef<InlineContent *> Children) {
+  void *Mem = C.allocate(sizeof(InterpretedText) +
+                             Children.size() * sizeof(InlineContent *),
+                         alignof(InterpretedText));
+  return new (Mem) InterpretedText(Children);
+}
+
+InlineLiteral::InlineLiteral(ArrayRef<InlineContent *> Children)
+    : InlineContent(ASTNodeKind::InlineLiteral), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getChildrenBuffer());
+}
+
+InlineLiteral *InlineLiteral::create(ReSTContext &C,
+                                     ArrayRef<InlineContent *> Children) {
+  void *Mem = C.allocate(sizeof(InlineLiteral) +
+                             Children.size() * sizeof(InlineContent *),
+                         alignof(InlineLiteral));
+  return new (Mem) InlineLiteral(Children);
+}
+
+HyperlinkReference::HyperlinkReference(ArrayRef<InlineContent *> Children)
+    : InlineContent(ASTNodeKind::HyperlinkReference),
+      NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getChildrenBuffer());
+}
+
+HyperlinkReference *
+HyperlinkReference::create(ReSTContext &C, ArrayRef<InlineContent *> Children) {
+  void *Mem = C.allocate(sizeof(HyperlinkReference) +
+                             Children.size() * sizeof(InlineContent *),
+                         alignof(HyperlinkReference));
+  return new (Mem) HyperlinkReference(Children);
+}
+
+InlineHyperlinkTarget::InlineHyperlinkTarget(ArrayRef<InlineContent *> Children)
+    : InlineContent(ASTNodeKind::InlineHyperlinkTarget),
+      NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getChildrenBuffer());
+}
+
+InlineHyperlinkTarget *
+InlineHyperlinkTarget::create(ReSTContext &C,
+                              ArrayRef<InlineContent *> Children) {
+  void *Mem = C.allocate(sizeof(InlineHyperlinkTarget) +
+                             Children.size() * sizeof(InlineContent *),
+                         alignof(InlineHyperlinkTarget));
+  return new (Mem) InlineHyperlinkTarget(Children);
+}
+

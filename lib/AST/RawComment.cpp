@@ -280,14 +280,15 @@ CommentContext::~CommentContext() {
 
 static bool isFieldNamed(const llvm::rest::Field *F, StringRef Name) {
   const llvm::rest::TextAndInline *ActualName = F->getName();
-  if (ActualName->isLinePart()) {
-    return ActualName->getLinePart().Text == Name;
-  } else {
-    llvm::rest::LineListRef LL = ActualName->getLines();
-    if (LL.size() != 1)
-      return false;
-    return LL[0].Text.drop_front(LL[0].FirstTextByte) == Name;
+  // FIXME: not correct.  We should concatenate text from all children without
+  // markup.
+  if (ActualName->getChildren().size() != 1)
+    return false;
+  if (auto *TextChild =
+          dyn_cast<llvm::rest::PlainText>(ActualName->getChildren().front())) {
+    return TextChild->getLinePart().Text == Name;
   }
+  return false;
 }
 
 namespace {
@@ -337,11 +338,12 @@ comments::ParamField *CommentSema::actOnParam(llvm::rest::Field *F) {
   llvm::rest::LinePart ParamName;
   auto BodyChildren = F->getBodyChildren();
   if (!BodyChildren.empty()) {
-    auto *P = dyn_cast<llvm::rest::Paragraph>(BodyChildren[0]);
-    if (P) {
-      auto *TAI = dyn_cast<llvm::rest::TextAndInline>(P->getMutableContent());
-      if (TAI)
-        ParamName = extractWord(TAI);
+    if (auto *P = dyn_cast<llvm::rest::Paragraph>(BodyChildren[0])) {
+      if (auto *TAI = dyn_cast<llvm::rest::TextAndInline>(P->getMutableContent())) {
+        auto MaybeParamName = extractWord(TAI);
+        if (MaybeParamName)
+          ParamName = MaybeParamName.getValue();
+      }
     }
   }
   return new (Context.TheReSTContext)

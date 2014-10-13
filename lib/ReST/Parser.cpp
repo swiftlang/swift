@@ -310,6 +310,12 @@ class Parser {
 
   unsigned parseLevel(LineListRef LL, SmallVectorImpl<ReSTASTNode *> &Children);
 
+  unsigned parseLevelFromListItem(LineListRef LL,
+                                  SmallVectorImpl<ReSTASTNode *> &Children,
+                                  ColumnNum BulletIndentation);
+
+  TextAndInline *parseInlineContent(LineListRef LL);
+
 public:
   Parser(ReSTContext &Context) : Context(Context) {}
 
@@ -346,7 +352,7 @@ Parser::parseParagraph(LineListRef LL, ColumnNum BaseIndentation) {
     case LineKind::Blank: {
       // Paragraph ends at a blank line.
       auto *P = new (Context)
-          Paragraph(new (Context) TextAndInline(LL.subList(0, i)));
+          Paragraph(parseInlineContent(LL.subList(0, i)));
       return { P, i };
     }
 
@@ -376,7 +382,7 @@ Parser::parseParagraph(LineListRef LL, ColumnNum BaseIndentation) {
     }
   }
   auto *P =
-      new (Context) Paragraph(new (Context) TextAndInline(LL.subList(0, i)));
+      new (Context) Paragraph(parseInlineContent(LL.subList(0, i)));
   assert(i != 0);
   return { P, i };
 }
@@ -450,15 +456,16 @@ std::pair<ReSTASTNode *, unsigned> Parser::parseBulletList(LineListRef LL) {
     SubLL.fromFirstLineDropFront(
         LL[i].getClassification().getBulletAndWhitespaceBytes());
     SmallVector<ReSTASTNode *, 4> CurrItemChildren;
-    unsigned NumLines = parseLevel(SubLL, CurrItemChildren);
+    unsigned NumLines =
+        parseLevelFromListItem(SubLL, CurrItemChildren, BulletIndentation);
     i += NumLines;
-    ItemInfos.push_back({ static_cast<unsigned>(ItemChildren.size()),
-                          static_cast<unsigned>(CurrItemChildren.size()) });
+    ItemInfos.push_back({static_cast<unsigned>(ItemChildren.size()),
+                         static_cast<unsigned>(CurrItemChildren.size())});
     ItemChildren.append(CurrItemChildren.begin(), CurrItemChildren.end());
   }
 
   auto *BL = BulletList::create(Context, ItemInfos, ItemChildren);
-  return { BL, i };
+  return {BL, i};
 }
 
 std::pair<ReSTASTNode *, unsigned> Parser::parseEnumeratedList(LineListRef LL) {
@@ -567,7 +574,7 @@ std::pair<ReSTASTNode *, unsigned> Parser::parseDefinitionList(LineListRef LL) {
       break;
 
     // FIXME: parse the term line into term and classifiers.
-    auto Term = new (Context) TextAndInline(LL.subList(i, 1));
+    auto Term = parseInlineContent(LL.subList(i, 1));
 
     ColumnNum ItemBaseIndentation = LL[i + 1].FirstTextCol;
     SmallVector<ReSTASTNode *, 4> ItemChildren;
@@ -605,10 +612,12 @@ std::pair<ReSTASTNode *, unsigned> Parser::parseFieldList(LineListRef LL) {
     if (LL[i].getClassification().Kind != LineKind::FieldList)
       break;
 
-    LinePart FieldNameText =
+    LinePart FieldNameLinePart =
         LL.getLinePart(i, LL[i].FirstTextByte + 1,
                        LL[i].getClassification().getFieldNameBytes());
-    auto FieldName = new (Context) TextAndInline(FieldNameText);
+    // FIXME: parse inline markup?
+    auto FieldNamePlainText = new (Context) PlainText(FieldNameLinePart);
+    auto FieldName = TextAndInline::create(Context, {FieldNamePlainText});
 
     // [ReST/Syntax Details/Body Elements/Field Lists]
     // Quote:
@@ -644,7 +653,7 @@ std::pair<ReSTASTNode *, unsigned> Parser::parseFieldList(LineListRef LL) {
 
   auto *FL = FieldList::create(Context, Children);
   assert(i != 0);
-  return { FL, i };
+  return {FL, i};
 }
 
 std::pair<ReSTASTNode *, unsigned>
@@ -779,6 +788,432 @@ unsigned Parser::parseLevel(LineListRef LL,
                         /*IgnoreIndentationOfTheFirstLine=*/false, nullptr);
 }
 
+unsigned
+Parser::parseLevelFromListItem(LineListRef LL,
+                               SmallVectorImpl<ReSTASTNode *> &Children,
+                               ColumnNum BulletIndentation) {
+  // The text that follows the bullet determines the indentation.  Find that
+  // text.
+  unsigned DroppedLines = 0;
+  while (LL.size() != 0 && LL[0].getClassification().Kind == LineKind::Blank) {
+    LL = LL.dropFrontLines(1);
+    ++DroppedLines;
+  }
+  if (LL.size() == 0 || LL[0].FirstTextCol <= BulletIndentation)
+    return DroppedLines == 0 ? 0 : 1;
+  return parseLevel(LL, Children) + DroppedLines;
+}
+
+static inline bool canPrecedeInlineMarkupStartString(unsigned C) {
+  // [ReST/Syntax Details/Inline Markup]
+  // Quote:
+  //    1. Inline markup start-strings must start a text block or be
+  //       immediately preceded by
+  //       * whitespace,
+  //       * one of the ASCII characters - : / ' " < ( [ { or
+  //       * a non-ASCII punctuation character with Unicode category
+  //         Pd (Dash), Po (Other), Ps (Open), Pi (Initial quote), or
+  //         Pf (Final quote) [8].
+
+  if (isReSTWhitespace(C))
+    return true;
+
+  switch (C) {
+  case '-':
+  case ':':
+  case '/':
+  case '\'':
+  case '\"':
+  case '<':
+  case '(':
+  case '[':
+  case '{':
+    return true;
+
+  // FIXME: Unicode.
+  default:
+    return false;
+  }
+}
+
+static inline bool canFollowInlineMarkupEndString(unsigned C) {
+  // [ReST/Syntax Details/Inline Markup]
+  // Quote:
+  //    4. Inline markup end-strings must end a text block or be immediately
+  //       followed by
+  //       * whitespace,
+  //       * one of the ASCII characters - . , : ; ! ? \ / ' " ) ] } > or
+  //       * a non-ASCII punctuation character with Unicode category
+  //         Pd (Dash), Po (Other), Pe (Close), Pf (Final quote), or
+  //         Pi (Initial quote) [8].
+  //
+  if (isReSTWhitespace(C))
+    return true;
+
+  switch (C) {
+  case '-':
+  case '.':
+  case ',':
+  case ':':
+  case ';':
+  case '!':
+  case '?':
+  case '\\':
+  case '/':
+  case '\'':
+  case '\"':
+  case ')':
+  case ']':
+  case '}':
+  case '>':
+    return true;
+
+  // FIXME: Unicode.
+  default:
+    return false;
+  }
+}
+
+namespace {
+enum class InlineMarkupStartStringKind {
+  Emphasis,
+  StrongEmphasis,
+  InterpretedText_HyperlinkReference,
+  InlineLiteral,
+  InlineHyperlinkTarget,
+  FootnoteReference,
+  SubstitutionReference,
+};
+
+enum class InlineMarkupKind {
+  Emphasis,
+  StrongEmphasis,
+  InterpretedText,
+  InlineLiteral,
+  HyperlinkReference,
+  InlineHyperlinkTarget,
+  FootnoteReference,
+  // No CitationReference because the markup start-string and end-string are the
+  // same as for FootnoteReference.
+  SubstitutionReference,
+};
+} // unnamed namespace
+
+static Optional<
+    std::tuple<LineListRefIndex, LineListRefIndex, InlineMarkupStartStringKind>>
+findInlineMarkupStart(LineListRefIndex I) {
+  // [ReST/Syntax Details/Inline Markup]
+  // Quote:
+  //    1. Inline markup start-strings must start a text block or be
+  //       immediately preceded by
+  //       * whitespace,
+  //         [...]
+  //
+  // If the index points to the start of the text block, then pretend that the
+  // previous character is whitespace.
+  unsigned PrevCh = static_cast<unsigned>(I.isStart() ? ' ' : 'x');
+  while (true) {
+    if (I.isEnd())
+      break;
+
+    // Try to identify a start-string at the current position.
+    Optional<InlineMarkupStartStringKind> StartStringKind = None;
+    auto MarkupStart = I;
+    unsigned FirstCh = I.consumeUnicodeScalar();
+    switch (FirstCh) {
+    case '\\':
+      // Consume the escape sequence completely.
+      if (!I.isEnd())
+        FirstCh = I.consumeUnicodeScalar();
+      StartStringKind = None;
+      break;
+
+    case '*': // emphasis or strong emphasis
+      if (!I.isEnd() && I.getUnicodeScalar() == '*') {
+        I.consumeUnicodeScalar();
+        FirstCh = '*';
+        StartStringKind = InlineMarkupStartStringKind::StrongEmphasis;
+      } else
+        StartStringKind = InlineMarkupStartStringKind::Emphasis;
+      break;
+
+    case '`': // interpreted text or inline literal or hyperlink reference
+      if (!I.isEnd() && I.getUnicodeScalar() == '`') {
+        I.consumeUnicodeScalar();
+        FirstCh = '`';
+        StartStringKind = InlineMarkupStartStringKind::InlineLiteral;
+      } else
+        StartStringKind =
+            InlineMarkupStartStringKind::InterpretedText_HyperlinkReference;
+      break;
+
+    case '_': // maybe inline hyperlink target
+      if (!I.isEnd() && I.getUnicodeScalar() == '`') {
+        I.consumeUnicodeScalar();
+        FirstCh = '`';
+        StartStringKind = InlineMarkupStartStringKind::InlineHyperlinkTarget;
+      }
+      break;
+
+    case '[': // footnote reference
+      StartStringKind = InlineMarkupStartStringKind::FootnoteReference;
+      break;
+
+    case '|': // substitution reference
+      StartStringKind = InlineMarkupStartStringKind::SubstitutionReference;
+      break;
+    }
+    if (!StartStringKind) {
+      PrevCh = FirstCh;
+      continue;
+    }
+
+    // [ReST/Syntax Details/Inline Markup]
+    // Quote:
+    //    2. Inline markup start-strings must be immediately followed by
+    //       non-whitespace.
+    if (I.isEnd())
+      break;
+    if (isReSTWhitespace(I.getUnicodeScalar())) {
+      // FIXME: write a test for not consuming this.
+      I.consumeUnicodeScalar();
+      continue;
+    }
+
+    if (!canPrecedeInlineMarkupStartString(PrevCh))
+      continue;
+
+    return std::make_tuple(MarkupStart, I, StartStringKind.getValue());
+  }
+  return None;
+}
+
+static Optional<
+    std::tuple<LineListRefIndex, LineListRefIndex, InlineMarkupKind>>
+findInlineMarkupEnd(LineListRefIndex I,
+                    InlineMarkupStartStringKind StartStringKind) {
+  // [ReST/Syntax Details/Inline Markup]
+  // Quote:
+  //    6. An inline markup end-string must be separated by at least one
+  //       character from the start-string.
+  auto MaybePrevCh = I.consumePossiblyEscapedUnicodeScalar();
+  if (!MaybePrevCh)
+    return None;
+
+  while (true) {
+    // 3. Inline markup end-strings must be immediately preceded by
+    //    non-whitespace.
+    if (I.isEnd())
+      break;
+    unsigned FirstCh = I.consumeUnicodeScalar();
+    if (FirstCh == '\\') {
+      if (I.isEnd())
+        continue;
+      // Consume the escape sequence completely.
+      FirstCh = I.consumeUnicodeScalar();
+    }
+    if (isReSTWhitespace(FirstCh))
+      continue;
+
+    Optional<InlineMarkupKind> MarkupKind = None;
+    if (I.isEnd())
+      continue;
+    auto MarkupEndString = I;
+    FirstCh = I.consumeUnicodeScalar();
+    switch (FirstCh) {
+    case '\\':
+      // Consume the escape sequence completely.
+      if (!I.isEnd())
+        FirstCh = I.consumeUnicodeScalar();
+      break;
+
+    case '*': // emphasis or strong emphasis
+      if (StartStringKind == InlineMarkupStartStringKind::Emphasis) {
+        MarkupKind = InlineMarkupKind::Emphasis;
+      } else if (StartStringKind ==
+                     InlineMarkupStartStringKind::StrongEmphasis &&
+                 !I.isEnd() && I.getUnicodeScalar() == '*') {
+        FirstCh = I.consumeUnicodeScalar();
+        MarkupKind = InlineMarkupKind::StrongEmphasis;
+      }
+      break;
+
+    case '`': // interpreted text or inline literal or inline hyperlink target
+              // or hyperlink reference
+      if (StartStringKind ==
+          InlineMarkupStartStringKind::InterpretedText_HyperlinkReference) {
+        if (!I.isEnd() && I.getUnicodeScalar() == '_') {
+          FirstCh = I.consumeUnicodeScalar();
+          MarkupKind = InlineMarkupKind::HyperlinkReference;
+        } else
+          MarkupKind = InlineMarkupKind::InterpretedText;
+      } else if (StartStringKind ==
+                     InlineMarkupStartStringKind::InlineLiteral &&
+                 !I.isEnd() && I.getUnicodeScalar() == '`') {
+        FirstCh = I.consumeUnicodeScalar();
+        MarkupKind = InlineMarkupKind::InlineLiteral;
+      } else if (StartStringKind ==
+                 InlineMarkupStartStringKind::InlineHyperlinkTarget) {
+        MarkupKind = InlineMarkupKind::InlineHyperlinkTarget;
+      }
+      break;
+
+    case ']': // footnote reference
+      if (StartStringKind ==
+              InlineMarkupStartStringKind::SubstitutionReference &&
+          !I.isEnd() && I.getUnicodeScalar() == '_') {
+        FirstCh = I.consumeUnicodeScalar();
+        MarkupKind = InlineMarkupKind::SubstitutionReference;
+      }
+      break;
+
+    case '|': // substitution reference
+      if (StartStringKind == InlineMarkupStartStringKind::SubstitutionReference)
+        MarkupKind = InlineMarkupKind::SubstitutionReference;
+      break;
+    }
+    if (!MarkupKind) {
+      // We have consumed some characters assuming we have found an end-string.
+      // Restore the pointer back.
+      I = MarkupEndString;
+      continue;
+    }
+
+    // [ReST/Syntax Details/Inline Markup]
+    // Quote:
+    //    4. Inline markup end-strings must end a text block or [...]
+    if (I.isEnd())
+      return std::make_tuple(MarkupEndString, I, MarkupKind.getValue());
+
+    if (!canFollowInlineMarkupEndString(I.getUnicodeScalar()))
+      continue;
+
+    return std::make_tuple(MarkupEndString, I, MarkupKind.getValue());
+  }
+  return None;
+}
+
+TextAndInline *Parser::parseInlineContent(LineListRef LL) {
+  if (!Context.LangOpts.ExperimentalInlineMarkupParsing)
+    return TextAndInline::create(Context, {});
+
+  SmallVector<InlineContent *, 8> ItemChildren;
+  Optional<std::pair<LineListRefIndex, LineListRefIndex>> StartStringRange =
+      None;
+  SmallVector<InlineContent *, 4> CurrentMarkupChildren;
+  Optional<InlineMarkupStartStringKind> StartStringKind = None;
+  for (unsigned LineIndex = 0, LineIndexEnd = LL.size();
+       LineIndex != LineIndexEnd; ++LineIndex) {
+    auto I = LineListRefIndex(LL, LineIndex);
+    while (true) {
+      LineListRefIndex MarkupStartString = I;
+      if (!StartStringKind) {
+        auto StartStringSearchResult = findInlineMarkupStart(I);
+        if (!StartStringSearchResult)
+          break;
+
+        if (I != std::get<0>(StartStringSearchResult.getValue())) {
+          auto Remainder = LL.getLinePart(
+              I, std::get<0>(StartStringSearchResult.getValue()));
+          ItemChildren.push_back(new (Context) PlainText(Remainder));
+        }
+
+        StartStringKind = InlineMarkupStartStringKind::Emphasis;
+        std::tie(MarkupStartString, I, *StartStringKind) =
+            StartStringSearchResult.getValue();
+
+        // If there is no end-string at all, then we need to parse the
+        // start-string as plain text.  Save the range to decide later.
+        StartStringRange = std::make_pair(MarkupStartString, I);
+      }
+
+      auto EndStringSearchResult =
+          findInlineMarkupEnd(I, StartStringKind.getValue());
+      if (!EndStringSearchResult) {
+        // There is no end-string in this line.  Try to find it later.
+        break;
+      }
+
+      auto Part =
+          LL.getLinePart(I, std::get<0>(EndStringSearchResult.getValue()));
+      CurrentMarkupChildren.push_back(new (Context) PlainText(Part));
+
+      LineListRefIndex MarkupEndString = I;
+      InlineMarkupKind FoundMarkupKind;
+      std::tie(MarkupEndString, I, FoundMarkupKind) =
+          EndStringSearchResult.getValue();
+
+      switch (FoundMarkupKind) {
+      case InlineMarkupKind::Emphasis:
+        ItemChildren.push_back(
+            Emphasis::create(Context, CurrentMarkupChildren));
+        break;
+      case InlineMarkupKind::StrongEmphasis:
+        ItemChildren.push_back(
+            StrongEmphasis::create(Context, CurrentMarkupChildren));
+        break;
+      case InlineMarkupKind::InterpretedText:
+        ItemChildren.push_back(
+            InterpretedText::create(Context, CurrentMarkupChildren));
+        break;
+      case InlineMarkupKind::InlineLiteral:
+        ItemChildren.push_back(
+            InlineLiteral::create(Context, CurrentMarkupChildren));
+        break;
+      case InlineMarkupKind::HyperlinkReference:
+        ItemChildren.push_back(
+            HyperlinkReference::create(Context, CurrentMarkupChildren));
+        break;
+      case InlineMarkupKind::InlineHyperlinkTarget:
+        ItemChildren.push_back(
+            InlineHyperlinkTarget::create(Context, CurrentMarkupChildren));
+        break;
+      case InlineMarkupKind::FootnoteReference:
+        // FIXME: tell apart FootnoteReference and CitationReference.
+        // ItemChildren.push_back(FootnoteReference::create(Context,
+        // CurrentMarkupChildren));
+        break;
+      case InlineMarkupKind::SubstitutionReference:
+        // FIXME: don't create a SubstitutionReference node because we
+        // don't know how to resolve substitution references.
+        //
+        // ItemChildren.push_back(SubstitutionReference::create(Context,
+        // CurrentMarkupChildren));
+
+        auto Part = LL.getLinePart(MarkupStartString, I);
+        ItemChildren.push_back(new (Context) PlainText(Part));
+        break;
+      }
+      CurrentMarkupChildren.clear();
+      StartStringKind = None;
+    }
+
+    auto Remainder = LL.getLinePart(I, LL.end(LineIndex));
+    CurrentMarkupChildren.push_back(new (Context) PlainText(Remainder));
+
+    if (LineIndex != LineIndexEnd - 1) {
+      LinePart Newline;
+      Newline.Text = "\n";
+      Newline.Range = {Remainder.Range.End, Remainder.Range.End};
+      CurrentMarkupChildren.push_back(new (Context) PlainText(Newline));
+    }
+    if (!StartStringKind) {
+      ItemChildren.append(CurrentMarkupChildren.begin(),
+                          CurrentMarkupChildren.end());
+      CurrentMarkupChildren.clear();
+    }
+  }
+
+  if (StartStringKind) {
+    auto StartStringText = LL.getLinePart(StartStringRange.getValue().first,
+                                          StartStringRange.getValue().second);
+    ItemChildren.push_back(new (Context) PlainText(StartStringText));
+  }
+  ItemChildren.append(CurrentMarkupChildren.begin(),
+                      CurrentMarkupChildren.end());
+  return TextAndInline::create(Context, ItemChildren);
+}
+
 Document *Parser::parseDocument(LineListRef LL) {
   unsigned i = 0;
   for (unsigned e = LL.size(); i != e; ++i) {
@@ -859,6 +1294,35 @@ struct CommentToDocutilsXMLConverter {
     case ASTNodeKind::TextAndInline:
       printTextAndInline(cast<TextAndInline>(N));
       break;
+    case ASTNodeKind::PlainText:
+      printPlainText(cast<PlainText>(N));
+      break;
+    case ASTNodeKind::Emphasis:
+      printEmphasis(cast<Emphasis>(N));
+      break;
+    case ASTNodeKind::StrongEmphasis:
+      printStrongEmphasis(cast<StrongEmphasis>(N));
+      break;
+    case ASTNodeKind::InterpretedText:
+      printInterpretedText(cast<InterpretedText>(N));
+      break;
+    case ASTNodeKind::InlineLiteral:
+      printInlineLiteral(cast<InlineLiteral>(N));
+      break;
+    case ASTNodeKind::HyperlinkReference:
+      printHyperlinkReference(cast<HyperlinkReference>(N));
+      break;
+    case ASTNodeKind::InlineHyperlinkTarget:
+      printInlineHyperlinkTarget(cast<InlineHyperlinkTarget>(N));
+      break;
+
+    case ASTNodeKind::FootnoteReference:
+      llvm_unreachable("implement");
+    case ASTNodeKind::CitationReference:
+      llvm_unreachable("implement");
+    case ASTNodeKind::SubstitutionReference:
+      llvm_unreachable("implement");
+
     case ASTNodeKind::PrivateExtension:
       printPrivateExtension(cast<PrivateExtension>(N));
       break;
@@ -963,18 +1427,68 @@ struct CommentToDocutilsXMLConverter {
   }
 
   void printTextAndInline(const TextAndInline *T) {
-    if (T->isLinePart()) {
-      LinePart LP = T->getLinePart();
-      appendWithXMLEscaping(OS, LP.Text);
-    } else {
-      LineListRef LL = T->getLines();
-      for (unsigned i = 0, e = LL.size(); i != e; ++i) {
-        appendWithXMLEscaping(OS, LL[i].Text.drop_front(LL[i].FirstTextByte));
-        if (i != e - 1)
-          OS << '\n';
-      }
+    for (const auto *IC : T->getChildren()) {
+      printASTNode(IC);
     }
   }
+
+  void printPlainText(const PlainText *PT) {
+    LinePart LP = PT->getLinePart();
+    appendWithXMLEscaping(OS, LP.Text);
+  }
+
+  void printEmphasis(const Emphasis *E) {
+    OS << "<emphasis>";
+    for (const auto *N : E->getChildren()) {
+      printASTNode(N);
+    }
+    OS << "</emphasis>";
+  }
+
+  void printStrongEmphasis(const StrongEmphasis *SE) {
+    OS << "<strong>";
+    for (const auto *N : SE->getChildren()) {
+      printASTNode(N);
+    }
+    OS << "</strong>";
+  }
+
+  void printInterpretedText(const InterpretedText *SE) {
+    // FIXME: print role.
+    OS << "<interpreted_text>";
+    for (const auto *N : SE->getChildren()) {
+      printASTNode(N);
+    }
+    OS << "</interpreted_text>";
+  }
+
+  void printInlineLiteral(const InlineLiteral *IL) {
+    OS << "<literal>";
+    for (const auto *N : IL->getChildren()) {
+      printASTNode(N);
+    }
+    OS << "</literal>";
+  }
+
+  void printHyperlinkReference(const HyperlinkReference *IHT) {
+    OS << "<reference>";
+    for (const auto *N : IHT->getChildren()) {
+      printASTNode(N);
+    }
+    OS << "</reference>";
+  }
+
+  void printInlineHyperlinkTarget(const InlineHyperlinkTarget *IHT) {
+    OS << "<target>";
+    for (const auto *N : IHT->getChildren()) {
+      printASTNode(N);
+    }
+    OS << "</target>";
+  }
+
+  // ASTNodeKind::FootnoteReference:
+  // ASTNodeKind::CitationReference:
+  // ASTNodeKind::SubstitutionReference:
 
   void printPrivateExtension(const PrivateExtension *PE) {
     OS << "<llvm:private_extension />";
@@ -1010,12 +1524,13 @@ static unsigned measureReSTWord(StringRef Text) {
   return i;
 }
 
-std::pair<LinePart, LinePart> llvm::rest::extractWord(LinePart LP) {
+Optional<std::pair<LinePart, LinePart>> llvm::rest::extractWord(LinePart LP) {
   unsigned NumWordBytes = measureReSTWord(LP.Text);
+  if (NumWordBytes == 0)
+    return None;
+
   unsigned NumWhitespaceBytes =
-      (NumWordBytes == 0)
-          ? 0
-          : measureReSTWhitespace(LP.Text.drop_front(NumWordBytes));
+      measureReSTWhitespace(LP.Text.drop_front(NumWordBytes));
   LinePart Word = {
       LP.Text.substr(0, NumWordBytes),
       SourceRange(LP.Range.Start, LP.Range.Start.getAdvancedLoc(NumWordBytes))};
@@ -1024,40 +1539,19 @@ std::pair<LinePart, LinePart> llvm::rest::extractWord(LinePart LP) {
                                    NumWordBytes + NumWhitespaceBytes),
                                LP.Range.End)};
 
-  return {Word, Rest};
+  return std::make_pair(Word, Rest);
 }
 
-std::pair<LinePart, LineListRef> llvm::rest::extractWord(LineListRef LL) {
-  for (unsigned i = 0, e = LL.size(); i != e; ++i) {
-    const Line &L = LL[i];
-    StringRef Text = L.Text.drop_front(L.FirstTextByte);
-    if (Text.empty())
-      continue;
-    unsigned NumWordBytes = measureReSTWord(Text);
-    unsigned NumWhitespaceBytes =
-        (NumWordBytes == 0)
-            ? 0
-            : measureReSTWhitespace(Text.drop_front(NumWordBytes));
-
-    LinePart Word = {
-        Text.substr(0, NumWordBytes),
-        SourceRange(L.Range.Start, L.Range.Start.getAdvancedLoc(NumWordBytes))};
-    LineListRef Rest = LL.subList(i, LL.size() - i);
-    Rest.fromFirstLineDropFront(NumWordBytes + NumWhitespaceBytes);
-    return {Word, Rest};
+Optional<LinePart> llvm::rest::extractWord(TextAndInline *TAI) {
+  if (TAI->getChildren().empty())
+    return None;
+  if (auto *FirstTextChild = dyn_cast<PlainText>(TAI->getChildren().front())) {
+    auto WordAndRest = ::extractWord(FirstTextChild->getLinePart());
+    if (!WordAndRest)
+      return None;
+    FirstTextChild->setLinePart(WordAndRest.getValue().second);
+    return WordAndRest.getValue().first;
   }
-  return {LinePart(), LL};
-}
-
-LinePart llvm::rest::extractWord(TextAndInline *TAI) {
-  if (TAI->isLinePart()) {
-    auto WordAndRest = ::extractWord(TAI->getLinePart());
-    TAI->setLinePart(WordAndRest.second);
-    return WordAndRest.first;
-  } else {
-    auto WordAndRest = ::extractWord(TAI->getLines());
-    TAI->setLines(WordAndRest.second);
-    return WordAndRest.first;
-  }
+  return None;
 }
 

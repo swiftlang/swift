@@ -31,6 +31,10 @@ static inline bool isReSTWhitespace(char C) {
   return clang::isHorizontalWhitespace(C);
 }
 
+static inline bool isReSTWhitespace(unsigned C) {
+  return C <= 0x7f && isReSTWhitespace(static_cast<char>(C));
+}
+
 } // namespace detail
 } // namespace rest
 } // namespace llvm
