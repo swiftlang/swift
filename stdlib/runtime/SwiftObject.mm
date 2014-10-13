@@ -233,7 +233,7 @@ static NSString *_getDescription(SwiftObject *obj) {
   return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
 }
 - (BOOL)allowsWeakReference {
-  return YES;
+  return !swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
 }
 - (BOOL)retainWeakReference {
   return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
