@@ -16,10 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 /// REST_AST_NODE(Id, Parent)
-///
-/// ABSTRACT_REST_AST_NODE(Id, Parent)
-///
-/// REST_AST_NODE_RANGE(Id, FirstId, LastId)
 
 REST_AST_NODE(Document, ReSTASTNode)
 REST_AST_NODE(Section, ReSTASTNode)
@@ -37,21 +33,7 @@ REST_AST_NODE(Field, ReSTASTNode)
 REST_AST_NODE(FieldList, ReSTASTNode)
 REST_AST_NODE(BlockQuote, ReSTASTNode)
 REST_AST_NODE(TextAndInline, ReSTASTNode)
-ABSTRACT_REST_AST_NODE(InlineContent, ReSTASTNode)
-  REST_AST_NODE(PlainText, InlineContent)
-  REST_AST_NODE(Emphasis, InlineContent)
-  REST_AST_NODE(StrongEmphasis, InlineContent)
-  REST_AST_NODE(InterpretedText, InlineContent)
-  REST_AST_NODE(InlineLiteral, InlineContent)
-  REST_AST_NODE(HyperlinkReference, InlineContent)
-  REST_AST_NODE(InlineHyperlinkTarget, InlineContent)
-  REST_AST_NODE(FootnoteReference, InlineContent)
-  REST_AST_NODE(CitationReference, InlineContent)
-  REST_AST_NODE(SubstitutionReference, InlineContent)
-  REST_AST_NODE_RANGE(InlineContent, PlainText, SubstitutionReference)
 REST_AST_NODE(PrivateExtension, ReSTASTNode)
 
 #undef REST_AST_NODE
-#undef ABSTRACT_REST_AST_NODE
-#undef REST_AST_NODE_RANGE
 

@@ -87,20 +87,6 @@ struct CommentToXMLConverter {
     case ASTNodeKind::TextAndInline:
       printTextAndInline(cast<TextAndInline>(N));
       break;
-    case ASTNodeKind::PlainText:
-      printPlainText(cast<PlainText>(N));
-      break;
-
-    case ASTNodeKind::Emphasis:
-    case ASTNodeKind::StrongEmphasis:
-    case ASTNodeKind::InterpretedText:
-    case ASTNodeKind::InlineLiteral:
-    case ASTNodeKind::HyperlinkReference:
-    case ASTNodeKind::InlineHyperlinkTarget:
-    case ASTNodeKind::FootnoteReference:
-    case ASTNodeKind::CitationReference:
-    case ASTNodeKind::SubstitutionReference:
-      llvm_unreachable("implement");
 
     case ASTNodeKind::PrivateExtension:
       llvm_unreachable("implement");
@@ -187,13 +173,17 @@ struct CommentToXMLConverter {
   }
 
   void printTextAndInline(const TextAndInline *T) {
-    for (const auto *IC : T->getChildren()) {
-      printASTNode(IC);
+    if (T->isLinePart()) {
+      LinePart LP = T->getLinePart();
+      appendWithXMLEscaping(OS, LP.Text);
+    } else {
+      LineListRef LL = T->getLines();
+      for (unsigned i = 0, e = LL.size(); i != e; ++i) {
+        appendWithXMLEscaping(OS, LL[i].Text.drop_front(LL[i].FirstTextByte));
+        if (i != e - 1)
+          OS << " ";
+      }
     }
-  }
-
-  void printPlainText(const PlainText *PT) {
-    appendWithXMLEscaping(OS, PT->getLinePart().Text);
   }
 
   void printOrphanField(const Field *F) {
@@ -443,20 +433,6 @@ struct CommentToDoxygenConverter {
     case ASTNodeKind::TextAndInline:
       printTextAndInline(cast<TextAndInline>(N));
       break;
-    case ASTNodeKind::PlainText:
-      printPlainText(cast<PlainText>(N));
-      break;
-
-    case ASTNodeKind::Emphasis:
-    case ASTNodeKind::StrongEmphasis:
-    case ASTNodeKind::InterpretedText:
-    case ASTNodeKind::InlineLiteral:
-    case ASTNodeKind::HyperlinkReference:
-    case ASTNodeKind::InlineHyperlinkTarget:
-    case ASTNodeKind::FootnoteReference:
-    case ASTNodeKind::CitationReference:
-    case ASTNodeKind::SubstitutionReference:
-      llvm_unreachable("implement");
 
     case ASTNodeKind::PrivateExtension:
       llvm_unreachable("implement");
@@ -545,13 +521,17 @@ struct CommentToDoxygenConverter {
   }
 
   void printTextAndInline(const TextAndInline *T) {
-    for (const auto *IC : T->getChildren()) {
-      printASTNode(IC);
+    if (T->isLinePart()) {
+      LinePart LP = T->getLinePart();
+      print(LP.Text);
+    } else {
+      LineListRef LL = T->getLines();
+      for (unsigned i = 0, e = LL.size(); i != e; ++i) {
+        print(LL[i].Text.drop_front(LL[i].FirstTextByte));
+        if (i != e - 1)
+          printNewline();
+      }
     }
-  }
-
-  void printPlainText(const PlainText *PT) {
-    print(PT->getLinePart().Text);
   }
 
   void printOrphanField(const Field *F) {

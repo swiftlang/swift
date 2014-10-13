@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ReST/LineList.h"
-#include "Detail.h"
 #include "swift/ReST/Parser.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Unicode.h"
@@ -96,39 +95,5 @@ void LineListRef::fromFirstLineDropFront(unsigned Bytes) {
   FirstLine->FirstTextCol =
       measureColumnWidth(OrigFirstLine.Text.substr(0, BytesToDrop));
   FirstLine->FirstTextByte = BytesToDrop;
-}
-
-std::pair<unsigned, unsigned>
-LineListRefIndex::decodeUnicodeScalarNonASCII(StringRef S) {
-  assert(!S.empty());
-
-  const UTF8 *SourceStart = reinterpret_cast<const UTF8 *>(S.data());
-
-  const UTF8 *SourceNext = SourceStart;
-  UTF32 C;
-  UTF32 *TargetStart = &C;
-
-  ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart,
-                     TargetStart + 1, lenientConversion);
-  assert(TargetStart == &C + 1);
-
-  return std::make_pair(C, unsigned(SourceNext - SourceStart));
-}
-
-std::pair<Optional<unsigned>, LineListRefIndex::IterationState>
-LineListRefIndex::getPossiblyEscapedUnicodeScalarSlow(const LineListRef &LL,
-                                                      IterationState State) {
-  while (true) {
-    if (isEndImpl(LL, State))
-      return std::make_pair(None, State);
-
-    auto EscapedScalarAndLength = decodeUnicodeScalar(LL, State);
-    State = advanceState(LL, State, EscapedScalarAndLength.second);
-    if (isReSTWhitespace(EscapedScalarAndLength.first)) {
-      // Escaped whitespace is ignored.
-      continue;
-    }
-    return std::make_pair(EscapedScalarAndLength.first, State);
-  }
 }
 

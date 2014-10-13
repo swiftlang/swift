@@ -23,56 +23,6 @@ using namespace llvm::rest::detail;
 // In the tests below, test cases that are marked "correct" produce completely
 // correct results and should not be changed without a good reason.
 
-struct ExtractBriefTestData {
-  std::vector<const char *> InText;
-  std::string Brief;
-  std::string DocutilsXML;
-};
-
-static StringRef stripDocumentTag(StringRef DocutilsXML) {
-  if (DocutilsXML.startswith("<document>"))
-    DocutilsXML = DocutilsXML.drop_front(10);
-  if (DocutilsXML.endswith("</document>"))
-    DocutilsXML = DocutilsXML.drop_back(11);
-  return DocutilsXML;
-}
-
-static std::string replaceAll(std::string S, std::string Original,
-                              std::string Replacement) {
-  size_t I = S.find(Original);
-  while (I != std::string::npos) {
-    S.replace(I, Original.size(), Replacement);
-    I = S.find(Original, I + Replacement.size());
-  }
-  return S;
-}
-
-static std::vector<std::string> replaceAll(std::vector<std::string> Strings,
-                                           std::string Original,
-                                           std::string Replacement) {
-  for (size_t i = 0, e = Strings.size(); i != e; ++i)
-    Strings[i] = replaceAll(Strings[i], Original, Replacement);
-  return Strings;
-}
-
-static bool inlineMarkupDelimitersMatch(StringRef StartString,
-                                        StringRef EndString) {
-  if (StartString == "*" || StartString == "**" || StartString == "``" ||
-      StartString == "|")
-    return StartString == EndString;
-
-  if (StartString == "`")
-    return EndString == "`" || EndString == "`_";
-
-  if (StartString == "_`")
-    return EndString == "`";
-
-  if (StartString == "[")
-    return EndString == "]_";
-
-  llvm_unreachable("invalid arguments");
-}
-
 struct ReSTTest : public ::testing::Test {
   SourceManager<unsigned> SM;
 
@@ -88,50 +38,6 @@ struct ReSTTest : public ::testing::Test {
       Result.addLine(S, SM.registerLine(S, 0));
     }
     return Result.takeLineList(Context);
-  }
-
-  LineList toLineList(ReSTContext &Context, std::vector<std::string> Lines) {
-    LineListBuilder Result;
-    for (auto S : Lines) {
-      StringRef Copy = Context.allocateCopy(S);
-      Result.addLine(Copy, SM.registerLine(Copy, 0));
-    }
-    return Result.takeLineList(Context);
-  }
-
-  void checkInlineMarkupWithReplacement(const ExtractBriefTestData &Test,
-                                        std::string StartString,
-                                        std::string EndString) {
-    std::vector<std::string> InText;
-    for (auto Line : Test.InText)
-      InText.push_back(Line);
-    InText = replaceAll(InText, "S", StartString);
-    InText = replaceAll(InText, "E", EndString);
-
-    std::string ExpectedBrief = Test.Brief;
-    ExpectedBrief = replaceAll(ExpectedBrief, "S", StartString);
-    ExpectedBrief = replaceAll(ExpectedBrief, "E", EndString);
-
-    std::string ExpectedDocutilsXML = Test.DocutilsXML;
-    ExpectedDocutilsXML = replaceAll(ExpectedDocutilsXML, "S", StartString);
-    ExpectedDocutilsXML = replaceAll(ExpectedDocutilsXML, "E", EndString);
-
-    ReSTContext Context;
-    auto LL = toLineList(Context, InText);
-    llvm::SmallString<64> Str;
-
-    extractBrief(LL, Str);
-    EXPECT_EQ(ExpectedBrief, Str.str().str());
-    Str.clear();
-
-    auto *TheDocument = parseDocument(Context, LL);
-    {
-      llvm::raw_svector_ostream OS(Str);
-      convertToDocutilsXML(TheDocument, OS);
-    }
-    StringRef DocutilsXML = stripDocumentTag(Str.str());
-    EXPECT_EQ(ExpectedDocutilsXML, DocutilsXML.str())
-        << "ReST document: " << ::testing::PrintToString(InText);
   }
 };
 
@@ -545,6 +451,12 @@ INSTANTIATE_TEST_CASE_P(
     ReSTTest, ClassifyLineFieldListTest,
     ::testing::ValuesIn(ClassifyLineFieldListTests));
 
+struct ExtractBriefTestData {
+  std::vector<const char *> InText;
+  std::string Brief;
+  std::string DocutilsXML;
+};
+
 struct ExtractBriefTest
     : public ReSTTest,
       public ::testing::WithParamInterface<ExtractBriefTestData> {};
@@ -564,7 +476,11 @@ TEST_P(ExtractBriefTest, Test) {
     llvm::raw_svector_ostream OS(Str);
     convertToDocutilsXML(TheDocument, OS);
   }
-  StringRef DocutilsXML = stripDocumentTag(Str.str());
+  StringRef DocutilsXML = Str.str();
+  if (DocutilsXML.startswith("<document>"))
+    DocutilsXML = DocutilsXML.drop_front(10);
+  if (DocutilsXML.endswith("</document>"))
+    DocutilsXML = DocutilsXML.drop_back(11);
   EXPECT_EQ(Test.DocutilsXML, DocutilsXML.str())
       << "ReST document: " << ::testing::PrintToString(Test.InText);
 }
@@ -778,22 +694,6 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
     "<bullet_list>"
       "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
       "<list_item><paragraph>ccc</paragraph></list_item>"
-    "</bullet_list>" }, // Correct.
-
-  // Bullet lists without text immediately after the bullet.
-  { { "*" },
-    "",
-    "<bullet_list>"
-      "<list_item></list_item>"
-    "</bullet_list>" }, // Correct.
-  { { "*",
-      "*",
-      "*" },
-    "",
-    "<bullet_list>"
-      "<list_item></list_item>"
-      "<list_item></list_item>"
-      "<list_item></list_item>"
     "</bullet_list>" }, // Correct.
 
 
@@ -1672,10 +1572,10 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
       "  bbb" }, "",
     "<definition_list>"
       "<definition_list_item>"
-        "<term><literal>aaa</literal> : xxx</term>"
+        "<term>``aaa`` : xxx</term>"
         "<definition><paragraph>bbb</paragraph></definition>"
       "</definition_list_item>"
-    "</definition_list>" }, // Incorrect: classifiers.
+    "</definition_list>" }, // Incorrect: classifiers, inline markup.
   { { "aaa : ``xxx``",
       "  bbb" }, "",
     // REST-FIXME: The spec states that:
@@ -1689,35 +1589,35 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
     // everywhere in the term line.  So does LLVM ReST.
     "<definition_list>"
       "<definition_list_item>"
-        "<term>aaa : <literal>xxx</literal></term>"
+        "<term>aaa : ``xxx``</term>"
         "<definition><paragraph>bbb</paragraph></definition>"
       "</definition_list_item>"
-    "</definition_list>" }, // Incorrect: classifiers.
+    "</definition_list>" }, // Incorrect: classifiers, inline markup.
   { { "``aaa`` : ``xxx``",
       "  bbb" }, "",
     "<definition_list>"
       "<definition_list_item>"
-        "<term><literal>aaa</literal> : <literal>xxx</literal></term>"
+        "<term>``aaa`` : ``xxx``</term>"
         "<definition><paragraph>bbb</paragraph></definition>"
       "</definition_list_item>"
-    "</definition_list>" }, // Incorrect: classifiers.
+    "</definition_list>" }, // Incorrect: classifiers, inline markup.
   { { "``aaa`` : ``xxx`` : **yyy**",
       "  bbb" }, "",
     "<definition_list>"
       "<definition_list_item>"
-        "<term><literal>aaa</literal> : <literal>xxx</literal> : <strong>yyy</strong></term>"
+        "<term>``aaa`` : ``xxx`` : **yyy**</term>"
         "<definition><paragraph>bbb</paragraph></definition>"
       "</definition_list_item>"
-    "</definition_list>" }, // Incorrect: classifiers.
+    "</definition_list>" }, // Incorrect: classifiers, inline markup.
   { { "``aaa : xxx``",
       "  bbb" }, "",
     // Classifier delimiter inside inline markup is not recognized.
     "<definition_list>"
       "<definition_list_item>"
-        "<term><literal>aaa : xxx</literal></term>"
+        "<term>``aaa : xxx``</term>"
         "<definition><paragraph>bbb</paragraph></definition>"
       "</definition_list_item>"
-    "</definition_list>" }, // Correct.
+    "</definition_list>" }, // Incorrect: inline markup.
 
   // Block quotes.
   { { "  aaa",
@@ -1806,391 +1706,19 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
       "</enumerated_list>"
     "</block_quote>" }, // Correct.
 
-  //
-  // Inline markup.
-  //
-
-  // FIXME: filter inline markup from brief comments.
-
-  // FIXME (before commit): tests for Unicode.
-
-  // Every kind of inline markup with 0, 1, 2 and 3 characters between markup
-  // markers.
-  // Emphasis.
-  // REST-FIXME: LLVM-REST-DIFFERENCE: Docutils emits a diagnostic (no
-  // end-string), but it is pointless in this case.
-  { { "**" }, "**", "<paragraph>**</paragraph>" }, // Correct.
-  { { "*x*" }, "*x*",
-    "<paragraph><emphasis>x</emphasis></paragraph>" }, // Correct.
-  { { "*xy*" }, "*xy*",
-    "<paragraph><emphasis>xy</emphasis></paragraph>" }, // Correct.
-  { { "*xyz*" }, "*xyz*",
-    "<paragraph><emphasis>xyz</emphasis></paragraph>" }, // Correct.
-
-  { { "** aaa" }, "** aaa",
-    "<paragraph>** aaa</paragraph>" }, // Correct.
-  { { "*x* aaa" }, "*x* aaa",
-    "<paragraph><emphasis>x</emphasis> aaa</paragraph>" }, // Correct.
-  { { "*xy* aaa" }, "*xy* aaa",
-    "<paragraph><emphasis>xy</emphasis> aaa</paragraph>" }, // Correct.
-  { { "*xyz* aaa" }, "*xyz* aaa",
-    "<paragraph><emphasis>xyz</emphasis> aaa</paragraph>" }, // Correct.
-
-  { { "aaa ** bbb" }, "aaa ** bbb",
-    "<paragraph>aaa ** bbb</paragraph>" }, // Correct.
-  { { "aaa *x* bbb" }, "aaa *x* bbb",
-    "<paragraph>aaa <emphasis>x</emphasis> bbb</paragraph>" }, // Correct.
-  { { "aaa *xy* bbb" }, "aaa *xy* bbb",
-    "<paragraph>aaa <emphasis>xy</emphasis> bbb</paragraph>" }, // Correct.
-  { { "aaa *xyz* bbb" }, "aaa *xyz* bbb",
-    "<paragraph>aaa <emphasis>xyz</emphasis> bbb</paragraph>" }, // Correct.
-
-  { { "aaa *xyz",
-      "xyz* bbb" },
-    "aaa *xyz xyz* bbb",
-    "<paragraph>aaa <emphasis>xyz\nxyz</emphasis> bbb</paragraph>"
-  }, // Correct.
-  { { "aaa *bbb* ccc *xyz",
-      "xyz* ddd *eee* fff" },
-    "aaa *bbb* ccc *xyz xyz* ddd *eee* fff",
-    "<paragraph>"
-      "aaa <emphasis>bbb</emphasis> ccc <emphasis>xyz\n"
-      "xyz</emphasis> ddd <emphasis>eee</emphasis> fff"
-    "</paragraph>"
-  }, // Correct.
-  { { "aaa *x",
-      "z* bbb" },
-    "aaa *x z* bbb",
-    "<paragraph>aaa <emphasis>x\nz</emphasis> bbb</paragraph>"
-  }, // Correct.
-  { { "aaa *bbb* ccc *x",
-      "z* ddd *eee* fff" },
-    "aaa *bbb* ccc *x z* ddd *eee* fff",
-    "<paragraph>"
-      "aaa <emphasis>bbb</emphasis> ccc <emphasis>x\n"
-      "z</emphasis> ddd <emphasis>eee</emphasis> fff"
-    "</paragraph>"
-  }, // Correct.
-  { { "aaa *xyz",
-      "xyz bbb*" },
-    "aaa *xyz xyz bbb*",
-    "<paragraph>aaa <emphasis>xyz\nxyz bbb</emphasis></paragraph>"
-  }, // Correct.
-  { { "aaa *bbb* *xyz",
-      "xyz ccc*" },
-    "aaa *bbb* *xyz xyz ccc*",
-    "<paragraph>"
-      "aaa <emphasis>bbb</emphasis> <emphasis>xyz\n"
-      "xyz ccc</emphasis>"
-    "</paragraph>"
-  }, // Correct.
-  { { "aaa *xyz",
-      "bbb ccc",
-      "xyz ddd* eee" },
-    "aaa *xyz bbb ccc xyz ddd* eee",
-    "<paragraph>"
-      "aaa <emphasis>xyz\n"
-      "bbb ccc\n"
-      "xyz ddd</emphasis> eee"
-    "</paragraph>"
-  }, // Correct.
-
-  // FIXME: missing diagnostic (no end-string).
-  { { "aaa *x",
-      "* bbb" },
-    "aaa *x * bbb",
-    "<paragraph>aaa *x\n* bbb</paragraph>"
-  }, // Correct, missing diagnostic.
-  { { "aaa *",
-      "x* bbb" },
-    "aaa * x* bbb",
-    "<paragraph>aaa *\nx* bbb</paragraph>"
-  }, // Correct, no diagnostic required.
-  { { "aaa *",
-      "* bbb" },
-    "aaa * * bbb",
-    "<paragraph>aaa *\n* bbb</paragraph>"
-  }, // Correct, no diagnostic required.
-
-  // Strong emphasis.
-  { { "****" }, "****", "<paragraph>****</paragraph>" }, // Correct.
-  { { "**x**" }, "**x**",
-    "<paragraph><strong>x</strong></paragraph>" }, // Correct.
-  { { "**xy**" }, "**xy**",
-    "<paragraph><strong>xy</strong></paragraph>" }, // Correct.
-  { { "**xyz**" }, "**xyz**",
-    "<paragraph><strong>xyz</strong></paragraph>" }, // Correct.
-
-  { { "**** aaa" }, "**** aaa",
-    "<paragraph>**** aaa</paragraph>" }, // Correct.
-  { { "**x** aaa" }, "**x** aaa",
-    "<paragraph><strong>x</strong> aaa</paragraph>" }, // Correct.
-  { { "**xy** aaa" }, "**xy** aaa",
-    "<paragraph><strong>xy</strong> aaa</paragraph>" }, // Correct.
-  { { "**xyz** aaa" }, "**xyz** aaa",
-    "<paragraph><strong>xyz</strong> aaa</paragraph>" }, // Correct.
-
-  { { "aaa **** bbb" }, "aaa **** bbb",
-    "<paragraph>aaa **** bbb</paragraph>" }, // Correct.
-  { { "aaa **x** bbb" }, "aaa **x** bbb",
-    "<paragraph>aaa <strong>x</strong> bbb</paragraph>" }, // Correct.
-  { { "aaa **xy** bbb" }, "aaa **xy** bbb",
-    "<paragraph>aaa <strong>xy</strong> bbb</paragraph>" }, // Correct.
-  { { "aaa **xyz** bbb" }, "aaa **xyz** bbb",
-    "<paragraph>aaa <strong>xyz</strong> bbb</paragraph>" }, // Correct.
-
-  { { "aaa **bbb** ccc **xyz",
-      "xyz** ddd **eee** fff" },
-    "aaa **bbb** ccc **xyz xyz** ddd **eee** fff",
-    "<paragraph>"
-      "aaa <strong>bbb</strong> ccc <strong>xyz\n"
-      "xyz</strong> ddd <strong>eee</strong> fff"
-    "</paragraph>"
-  }, // Correct.
-
-  // Interpreted text.
-  { { "``" }, "``", "<paragraph>``</paragraph>" }, // Correct.
-  { { "`x`" }, "`x`",
-    "<paragraph><interpreted_text>x</interpreted_text></paragraph>"
-  }, // Correct.
-  { { "`xy`" }, "`xy`",
-    "<paragraph><interpreted_text>xy</interpreted_text></paragraph>"
-  }, // Correct.
-  { { "`xyz`" }, "`xyz`",
-    "<paragraph><interpreted_text>xyz</interpreted_text></paragraph>"
-  }, // Correct.
-
-  { { "`` aaa" }, "`` aaa",
-    "<paragraph>`` aaa</paragraph>" }, // Correct.
-  { { "`x` aaa" }, "`x` aaa",
-    "<paragraph><interpreted_text>x</interpreted_text> aaa</paragraph>"
-  }, // Correct.
-  { { "`xy` aaa" }, "`xy` aaa",
-    "<paragraph><interpreted_text>xy</interpreted_text> aaa</paragraph>"
-  }, // Correct.
-  { { "`xyz` aaa" }, "`xyz` aaa",
-    "<paragraph><interpreted_text>xyz</interpreted_text> aaa</paragraph>"
-  }, // Correct.
-
-  { { "aaa `` bbb" }, "aaa `` bbb",
-    "<paragraph>aaa `` bbb</paragraph>" }, // Correct.
-  { { "aaa `x` bbb" }, "aaa `x` bbb",
-    "<paragraph>aaa <interpreted_text>x</interpreted_text> bbb</paragraph>"
-  }, // Correct.
-  { { "aaa `xy` bbb" }, "aaa `xy` bbb",
-    "<paragraph>aaa <interpreted_text>xy</interpreted_text> bbb</paragraph>"
-  }, // Correct.
-  { { "aaa `xyz` bbb" }, "aaa `xyz` bbb",
-    "<paragraph>aaa <interpreted_text>xyz</interpreted_text> bbb</paragraph>"
-  }, // Correct.
-
-  { { "aaa `bbb` ccc `xyz",
-      "xyz` ddd `eee` fff" },
-    "aaa `bbb` ccc `xyz xyz` ddd `eee` fff",
-    "<paragraph>"
-      "aaa <interpreted_text>bbb</interpreted_text> ccc <interpreted_text>xyz\n"
-      "xyz</interpreted_text> ddd <interpreted_text>eee</interpreted_text> fff"
-    "</paragraph>"
-  }, // Correct.
-
-
-  // Inline literal.
-  { { "````" }, "````", "<paragraph>````</paragraph>" }, // Correct.
-  { { "``x``" }, "``x``",
-    "<paragraph><literal>x</literal></paragraph>" }, // Correct.
-  { { "``xy``" }, "``xy``",
-    "<paragraph><literal>xy</literal></paragraph>" }, // Correct.
-  { { "``xyz``" }, "``xyz``",
-    "<paragraph><literal>xyz</literal></paragraph>" }, // Correct.
-
-  { { "```` aaa" }, "```` aaa",
-    "<paragraph>```` aaa</paragraph>" }, // Correct.
-  { { "``x`` aaa" }, "``x`` aaa",
-    "<paragraph><literal>x</literal> aaa</paragraph>" }, // Correct.
-  { { "``xy`` aaa" }, "``xy`` aaa",
-    "<paragraph><literal>xy</literal> aaa</paragraph>" }, // Correct.
-  { { "``xyz`` aaa" }, "``xyz`` aaa",
-    "<paragraph><literal>xyz</literal> aaa</paragraph>" }, // Correct.
-
-  { { "aaa ```` bbb" }, "aaa ```` bbb",
-    "<paragraph>aaa ```` bbb</paragraph>" }, // Correct.
-  { { "aaa ``x`` bbb" }, "aaa ``x`` bbb",
-    "<paragraph>aaa <literal>x</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa ``xy`` bbb" }, "aaa ``xy`` bbb",
-    "<paragraph>aaa <literal>xy</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa ``xyz`` bbb" }, "aaa ``xyz`` bbb",
-    "<paragraph>aaa <literal>xyz</literal> bbb</paragraph>" }, // Correct.
-
-  { { "aaa ``bbb`` ccc ``xyz",
-      "xyz`` ddd ``eee`` fff" },
-    "aaa ``bbb`` ccc ``xyz xyz`` ddd ``eee`` fff",
-    "<paragraph>"
-      "aaa <literal>bbb</literal> ccc <literal>xyz\n"
-      "xyz</literal> ddd <literal>eee</literal> fff"
-    "</paragraph>"
-  }, // Correct.
-
-  // Hyperlink reference.
-  { { "``_" }, "``_", "<paragraph>``_</paragraph>" }, // Correct.
-  { { "`x`_" }, "`x`_",
-    "<paragraph><reference>x</reference></paragraph>" }, // Correct.
-  { { "`xy`_" }, "`xy`_",
-    "<paragraph><reference>xy</reference></paragraph>" }, // Correct.
-  { { "`xyz`_" }, "`xyz`_",
-    "<paragraph><reference>xyz</reference></paragraph>" }, // Correct.
-
-  { { "``_ aaa" }, "``_ aaa",
-    "<paragraph>``_ aaa</paragraph>" }, // Correct.
-  { { "`x`_ aaa" }, "`x`_ aaa",
-    "<paragraph><reference>x</reference> aaa</paragraph>" }, // Correct.
-  { { "`xy`_ aaa" }, "`xy`_ aaa",
-    "<paragraph><reference>xy</reference> aaa</paragraph>" }, // Correct.
-  { { "`xyz`_ aaa" }, "`xyz`_ aaa",
-    "<paragraph><reference>xyz</reference> aaa</paragraph>" }, // Correct.
-
-  { { "aaa ``_ bbb" }, "aaa ``_ bbb",
-    "<paragraph>aaa ``_ bbb</paragraph>" }, // Correct.
-  { { "aaa `x`_ bbb" }, "aaa `x`_ bbb",
-    "<paragraph>aaa <reference>x</reference> bbb</paragraph>" }, // Correct.
-  { { "aaa `xy`_ bbb" }, "aaa `xy`_ bbb",
-    "<paragraph>aaa <reference>xy</reference> bbb</paragraph>" }, // Correct.
-  { { "aaa `xyz`_ bbb" }, "aaa `xyz`_ bbb",
-    "<paragraph>aaa <reference>xyz</reference> bbb</paragraph>" }, // Correct.
-
-  { { "aaa `bbb`_ ccc `xyz",
-      "xyz`_ ddd `eee`_ fff" },
-    "aaa `bbb`_ ccc `xyz xyz`_ ddd `eee`_ fff",
-    "<paragraph>"
-      "aaa <reference>bbb</reference> ccc <reference>xyz\n"
-      "xyz</reference> ddd <reference>eee</reference> fff"
-    "</paragraph>"
-  }, // Correct.
-
-  // Inline hyperlink target.
-  { { "_``" }, "_``", "<paragraph>_``</paragraph>" }, // Correct.
-  { { "_`x`" }, "_`x`",
-    "<paragraph><target>x</target></paragraph>" }, // Correct.
-  { { "_`xy`" }, "_`xy`",
-    "<paragraph><target>xy</target></paragraph>" }, // Correct.
-  { { "_`xyz`" }, "_`xyz`",
-    "<paragraph><target>xyz</target></paragraph>" }, // Correct.
-
-  { { "_`` aaa" }, "_`` aaa",
-    "<paragraph>_`` aaa</paragraph>" }, // Correct.
-  { { "_`x` aaa" }, "_`x` aaa",
-    "<paragraph><target>x</target> aaa</paragraph>" }, // Correct.
-  { { "_`xy` aaa" }, "_`xy` aaa",
-    "<paragraph><target>xy</target> aaa</paragraph>" }, // Correct.
-  { { "_`xyz` aaa" }, "_`xyz` aaa",
-    "<paragraph><target>xyz</target> aaa</paragraph>" }, // Correct.
-
-  { { "aaa _`` bbb" }, "aaa _`` bbb",
-    "<paragraph>aaa _`` bbb</paragraph>" }, // Correct.
-  { { "aaa _`x` bbb" }, "aaa _`x` bbb",
-    "<paragraph>aaa <target>x</target> bbb</paragraph>" }, // Correct.
-  { { "aaa _`xy` bbb" }, "aaa _`xy` bbb",
-    "<paragraph>aaa <target>xy</target> bbb</paragraph>" }, // Correct.
-  { { "aaa _`xyz` bbb" }, "aaa _`xyz` bbb",
-    "<paragraph>aaa <target>xyz</target> bbb</paragraph>" }, // Correct.
-
-  { { "aaa _`bbb` ccc _`xyz",
-      "xyz` ddd _`eee` fff" },
-    "aaa _`bbb` ccc _`xyz xyz` ddd _`eee` fff",
-    "<paragraph>"
-      "aaa <target>bbb</target> ccc <target>xyz\n"
-      "xyz</target> ddd <target>eee</target> fff"
-    "</paragraph>"
-  }, // Correct.
-
-  /* FIXME (before commit)
-  // Footnote reference.
-  { { "[]_" }, "[]_", "<paragraph>[]_</paragraph>" }, // Correct.
-  { { "[x]_" }, "[x]_",
-    "<paragraph><literal>x</literal></paragraph>" }, // Correct.
-  { { "[xy]_" }, "[xy]_",
-    "<paragraph><literal>xy</literal></paragraph>" }, // Correct.
-  { { "[xyz]_" }, "[xyz]_",
-    "<paragraph><literal>xyz</literal></paragraph>" }, // Correct.
-
-  { { "[]_ aaa" }, "[]_ aaa",
-    "<paragraph>[]_ aaa</paragraph>" }, // Correct.
-  { { "[x]_ aaa" }, "[x]_ aaa",
-    "<paragraph><literal>x</literal> aaa</paragraph>" }, // Correct.
-  { { "[xy]_ aaa" }, "[xy]_ aaa",
-    "<paragraph><literal>xy</literal> aaa</paragraph>" }, // Correct.
-  { { "[xyz]_ aaa" }, "[xyz]_ aaa",
-    "<paragraph><literal>xyz</literal> aaa</paragraph>" }, // Correct.
-
-  { { "aaa []_ bbb" }, "aaa []_ bbb",
-    "<paragraph>aaa []_ bbb</paragraph>" }, // Correct.
-  { { "aaa [x]_ bbb" }, "aaa [x]_ bbb",
-    "<paragraph>aaa <literal>x</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa [xy]_ bbb" }, "aaa [xy]_ bbb",
-    "<paragraph>aaa <literal>xy</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa [xyz]_ bbb" }, "aaa [xyz]_ bbb",
-    "<paragraph>aaa <literal>xyz</literal> bbb</paragraph>" }, // Correct.
-
-  { { "aaa [bbb]_ ccc [xyz",
-      "xyz]_ ddd [eee]_ fff" },
-    "aaa [bbb]_ ccc [xyz xyz]_ ddd [eee]_ fff",
-    "<paragraph>"
-      "aaa <target>bbb</target> ccc <target>xyz\n"
-      "xyz</target> ddd <target>eee</target> fff"
-    "</paragraph>"
-  }, // FIXME: verify
-
-  // FIXME: citation reference.
-
-  // Substitution reference.
-  { { "||" }, "||", "<paragraph>||</paragraph>" }, // Correct.
-  { { "|x|" }, "|x|",
-    "<paragraph><literal>x</literal></paragraph>" }, // Correct.
-  { { "|xy|" }, "|xy|",
-    "<paragraph><literal>xy</literal></paragraph>" }, // Correct.
-  { { "|xyz|" }, "|xyz|",
-    "<paragraph><literal>xyz</literal></paragraph>" }, // Correct.
-
-  { { "|| aaa" }, "|| aaa",
-    "<paragraph>|| aaa</paragraph>" }, // Correct.
-  { { "|x| aaa" }, "|x| aaa",
-    "<paragraph><literal>x</literal> aaa</paragraph>" }, // Correct.
-  { { "|xy| aaa" }, "|xy| aaa",
-    "<paragraph><literal>xy</literal> aaa</paragraph>" }, // Correct.
-  { { "|xyz| aaa" }, "|xyz| aaa",
-    "<paragraph><literal>xyz</literal> aaa</paragraph>" }, // Correct.
-
-  { { "aaa || bbb" }, "aaa || bbb",
-    "<paragraph>aaa || bbb</paragraph>" }, // Correct.
-  { { "aaa |x| bbb" }, "aaa |x| bbb",
-    "<paragraph>aaa <literal>x</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa |xy| bbb" }, "aaa |xy| bbb",
-    "<paragraph>aaa <literal>xy</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa |xyz| bbb" }, "aaa |xyz| bbb",
-    "<paragraph>aaa <literal>xyz</literal> bbb</paragraph>" }, // Correct.
-
-  { { "aaa |bbb| ccc |xyz",
-      "xyz| ddd |eee| fff" },
-    "aaa |bbb| ccc |xyz xyz| ddd |eee| fff",
-    "<paragraph>"
-      "aaa <target>bbb</target> ccc <target>xyz\n"
-      "xyz</target> ddd <target>eee</target> fff"
-    "</paragraph>"
-  }, // FIXME: verify
-
-  */
-
-  // FIXME: missing diagnostic (no end-string).
-  { { "aaa _`xyz`_ bbb" }, "aaa _`xyz`_ bbb",
-    "<paragraph>aaa _`xyz`_ bbb</paragraph>" }, // Correct.
-
+  // FIXME: removing inline markup.
+  { { "*aaa*" }, "*aaa*", "<paragraph>*aaa*</paragraph>" },
+  { { "**aaa**" }, "**aaa**", "<paragraph>**aaa**</paragraph>" },
+  { { "`aaa`" }, "`aaa`", "<paragraph>`aaa`</paragraph>" },
+  { { "``aaa``" }, "``aaa``", "<paragraph>``aaa``</paragraph>" },
 
   // FIXME: substitution references sholud be substituted.
   { { "|aaa|" }, "|aaa|", "<paragraph>|aaa|</paragraph>" },
   { { "|aaa|_" }, "|aaa|_", "<paragraph>|aaa|_</paragraph>" },
   { { "|aaa|__" }, "|aaa|__", "<paragraph>|aaa|__</paragraph>" },
 
-  // FIXME: remove inline markup from brief comments.
-  { { "_`aaa`" }, "_`aaa`", "<paragraph><target>aaa</target></paragraph>" },
+  // FIXME: removing inline markup.
+  { { "_`aaa`" }, "_`aaa`", "<paragraph>_`aaa`</paragraph>" },
   { { "[1]_" }, "[1]_", "<paragraph>[1]_</paragraph>" },
   { { "[12]_" }, "[12]_", "<paragraph>[12]_</paragraph>" },
   { { "[#]_" }, "[#]_", "<paragraph>[#]_</paragraph>" },
@@ -2198,14 +1726,12 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
   { { "[*]_" }, "[*]_", "<paragraph>[*]_</paragraph>" },
   { { "[aaa]_" }, "[aaa]_", "<paragraph>[aaa]_</paragraph>" },
   { { "aaa_" }, "aaa_", "<paragraph>aaa_</paragraph>" },
-  { { "`aaa`_" }, "`aaa`_", "<paragraph><reference>aaa</reference></paragraph>" },
+  { { "`aaa`_" }, "`aaa`_", "<paragraph>`aaa`_</paragraph>" },
   { { "aaa__" }, "aaa__", "<paragraph>aaa__</paragraph>" },
   { { "`aaa`__" }, "`aaa`__", "<paragraph>`aaa`__</paragraph>" },
   { { "`aaa <http://example.org/>`_" },
     "`aaa <http://example.org/>`_",
-    "<paragraph>"
-      "<reference>aaa &lt;http://example.org/&gt;</reference>"
-    "</paragraph>" },
+    "<paragraph>`aaa &lt;http://example.org/&gt;`_</paragraph>"},
   { { "`aaa <foo.txt\\_>`__" },
     "`aaa <foo.txt\\_>`__",
     "<paragraph>`aaa &lt;foo.txt\\_&gt;`__</paragraph>" },
@@ -2214,163 +1740,85 @@ INSTANTIATE_TEST_CASE_P(
     ReSTTest, ExtractBriefTest,
     ::testing::ValuesIn(ExtractBriefTests));
 
-struct ExtractBriefTest_UnterminatedInlineMarkup
-    : public ReSTTest,
-      public ::testing::WithParamInterface<ExtractBriefTestData> {};
-
-TEST_P(ExtractBriefTest_UnterminatedInlineMarkup, Test) {
-  const auto &Test = GetParam();
-
-  std::vector<std::pair<std::string, std::string>> StartEndStrings = {
-      {"*", "*"},
-      {"**", "**"},
-      {"`", "`"},
-      {"``", "``"},
-      {"|", "|"},
-      {"_`", "`"},
-      {"[", "]_"},
-      {"`", "`_"},
-  };
-
-  for (auto Start : StartEndStrings) {
-    auto StartString = Start.first;
-    for (auto End : StartEndStrings) {
-      auto EndString = End.second;
-      if (inlineMarkupDelimitersMatch(StartString, EndString))
-        continue;
-      checkInlineMarkupWithReplacement(Test, StartString, EndString);
-    }
-  }
-}
-
-struct ExtractBriefTestData ExtractBriefTests_UnterminatedInlineMarkup[] = {
-  // Unterminated markup.
-  // FIXME: missing diagnostic (no end-string).
-  { { "*" }, "",
-    "<bullet_list><list_item></list_item></bullet_list>" }, // Correct.
-  { { "**" }, "**", "<paragraph>**</paragraph>" }, // Correct.
-  { { "`" }, "`", "<paragraph>`</paragraph>" }, // Correct.
-  { { "``" }, "``", "<paragraph>``</paragraph>" }, // Correct.
-  { { "|" }, "|", "<paragraph>|</paragraph>" }, // Incorrect: line block.
-  { { "_`" }, "_`", "<paragraph>_`</paragraph>" }, // Correct.
-  { { "[" }, "[", "<paragraph>[</paragraph>" }, // Correct.
-
-  { { "Sxyz" }, "Sxyz",
-    "<paragraph>Sxyz</paragraph>" },
-  { { "SxyzE" }, "SxyzE",
-    "<paragraph>SxyzE</paragraph>" },
-  { { "Sxyz aaa" }, "Sxyz aaa",
-    "<paragraph>Sxyz aaa</paragraph>" },
-  { { "SxyzE aaa" }, "SxyzE aaa",
-    "<paragraph>SxyzE aaa</paragraph>" },
-  { { "aaa SxyzE bbb" }, "aaa SxyzE bbb",
-    "<paragraph>aaa SxyzE bbb</paragraph>" },
-  { { "SxyzE aaa",
-      "bbbE ccc" },
-    "SxyzE aaa bbbE ccc",
-    "<paragraph>SxyzE aaa\nbbbE ccc</paragraph>" },
-  { { "aaa SxyzE bbb",
-      "cccE ddd" },
-    "aaa SxyzE bbb cccE ddd",
-    "<paragraph>aaa SxyzE bbb\ncccE ddd</paragraph>" },
-  { { "aaa bbb",
-      "SxyzE cccE" },
-    "aaa bbb SxyzE cccE",
-    "<paragraph>aaa bbb\nSxyzE cccE</paragraph>" },
-};
-INSTANTIATE_TEST_CASE_P(
-    ReSTTest, ExtractBriefTest_UnterminatedInlineMarkup,
-    ::testing::ValuesIn(ExtractBriefTests_UnterminatedInlineMarkup));
-
-struct ExtractBriefTest_NestedMarkup
-    : public ReSTTest,
-      public ::testing::WithParamInterface<ExtractBriefTestData> {};
-
-TEST_P(ExtractBriefTest_NestedMarkup, Test) {
-  const auto &Test = GetParam();
-
-  std::vector<std::pair<std::string, std::string>> StartEndStrings = {
-      {"*", "*"},
-      {"**", "**"},
-      {"`", "`"},
-      {"``", "``"},
-      {"|", "|"},
-      {"_`", "`"},
-      {"[", "]_"},
-      {"`", "`_"},
-  };
-
-  for (auto StartEnd : StartEndStrings) {
-    auto StartString = StartEnd.first;
-    auto EndString = StartEnd.second;
-    if (StringRef(Test.InText.front()).startswith(StartString) ||
-        StringRef(Test.InText.back()).endswith(EndString))
-      return;
-    checkInlineMarkupWithReplacement(Test, StartString, EndString);
-  }
-}
-
-struct ExtractBriefTestData ExtractBriefTests_NestedMarkup[] = {
-  // Nested inline markup should not be recognized.
-  { { "*aaa SxyzE bbb*" }, "*aaa SxyzE bbb*",
-    "<paragraph><emphasis>aaa SxyzE bbb</emphasis></paragraph>" },
-  { { "**aaa SxyzE bbb**" }, "**aaa SxyzE bbb**",
-    "<paragraph><strong>aaa SxyzE bbb</strong></paragraph>" },
-  { { "`aaa SxyzE bbb`" }, "`aaa SxyzE bbb`",
-    "<paragraph><interpreted_text>aaa SxyzE bbb</interpreted_text></paragraph>" },
-  { { "``aaa SxyzE bbb``" }, "``aaa SxyzE bbb``",
-    "<paragraph><literal>aaa SxyzE bbb</literal></paragraph>" },
-  { { "`aaa SxyzE bbb`_" }, "`aaa SxyzE bbb`_",
-    "<paragraph><reference>aaa SxyzE bbb</reference></paragraph>" },
-  { { "_`aaa SxyzE bbb`" }, "_`aaa SxyzE bbb`",
-    "<paragraph><target>aaa SxyzE bbb</target></paragraph>" },
-  { { "[aaa SxyzE bbb]_" }, "[aaa SxyzE bbb]_",
-    "<paragraph>[aaa SxyzE bbb]_</paragraph>" },
-  // FIXME: citation reference.
-  { { "|aaa SxyzE bbb|" }, "|aaa SxyzE bbb|",
-    "<paragraph>|aaa SxyzE bbb|</paragraph>" },
-};
-INSTANTIATE_TEST_CASE_P(
-    ReSTTest, ExtractBriefTest_NestedMarkup,
-    ::testing::ValuesIn(ExtractBriefTests_NestedMarkup));
-
 TEST_F(ReSTTest, ExtractWord_LinePart) {
   auto ToLinePart = [&](StringRef S) {
     return LinePart{S, SM.registerLine(S, 0)};
   };
   {
     LinePart LP = ToLinePart("");
-    EXPECT_FALSE(extractWord(LP).hasValue());
+    auto R = extractWord(LP);
+    EXPECT_EQ("", R.first.Text);
+    EXPECT_EQ("", R.second.Text);
   }
   {
     LinePart LP = ToLinePart("a");
-    auto R = extractWord(LP).getValue();
+    auto R = extractWord(LP);
     EXPECT_EQ("a", R.first.Text);
     EXPECT_EQ("", R.second.Text);
   }
   {
     LinePart LP = ToLinePart("abc");
-    auto R = extractWord(LP).getValue();
+    auto R = extractWord(LP);
     EXPECT_EQ("abc", R.first.Text);
     EXPECT_EQ("", R.second.Text);
   }
   {
     LinePart LP = ToLinePart("a ");
-    auto R = extractWord(LP).getValue();
+    auto R = extractWord(LP);
     EXPECT_EQ("a", R.first.Text);
     EXPECT_EQ("", R.second.Text);
   }
   {
     LinePart LP = ToLinePart("abc d");
-    auto R = extractWord(LP).getValue();
+    auto R = extractWord(LP);
     EXPECT_EQ("abc", R.first.Text);
     EXPECT_EQ("d", R.second.Text);
   }
   {
     LinePart LP = ToLinePart("abc \td");
-    auto R = extractWord(LP).getValue();
+    auto R = extractWord(LP);
     EXPECT_EQ("abc", R.first.Text);
     EXPECT_EQ("d", R.second.Text);
+  }
+}
+
+TEST_F(ReSTTest, ExtractWord_LineListRef) {
+  ReSTContext Context;
+  {
+    LineList LL = toLineList(Context, std::vector<const char *>());
+    auto R = extractWord(LL);
+    EXPECT_EQ("", R.first.Text);
+    EXPECT_EQ(0u, R.second.size());
+  }
+  {
+    LineList LL = toLineList(Context, std::vector<const char *>{"a"});
+    auto R = extractWord(LL);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+  {
+    LineList LL = toLineList(Context, {"a", ""});
+    auto R = extractWord(LL);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+  {
+    LineList LL = toLineList(Context, {"a ", ""});
+    auto R = extractWord(LL);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+  {
+    LineList LL = toLineList(Context, {"", "a", ""});
+    auto R = extractWord(LL);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+  {
+    LineList LL = toLineList(Context, {"abc d", ""});
+    auto R = extractWord(LL);
+    EXPECT_EQ("abc", R.first.Text);
+    EXPECT_EQ("d", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
   }
 }
 
@@ -2410,6 +1858,11 @@ TEST_F(ReSTTest, ExtractWord_LinePart) {
 
 // Bullet lists without text immediately after the bullet:
 //
+// "*"
+// "*"
+// "*"
+// ok: bullet list with three empty items
+//
 // "* "
 // "aaa"
 // warning: unexpected unindent
@@ -2433,6 +1886,9 @@ TEST_F(ReSTTest, ExtractWord_LinePart) {
 // "       bbb"
 // ok: bullet list item with (text "aaa" + block quote "bbb")
 //
+// "*"
+// " aaa"
+// ok: bullet list item with text "aaa"
 // REST-FIXME: arguably, this is a bug ether in docutils, or in the spec.
 // According to [ReST/Syntax Details/Body Elements/Bullet Lists], the bullet
 // character should be immediately followed by whitespace.  In order to avoid
