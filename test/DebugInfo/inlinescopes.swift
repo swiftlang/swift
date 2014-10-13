@@ -23,4 +23,4 @@ let y = square(c)
 println(y)
 
 // Check if the inlined and removed square function still has the correct linkage name in the debug info.
-// CHECK-DAG: metadata !{{.*}}\00_TF4main6squareFSiSi\00
+// CHECK-DAG: [ DW_TAG_subprogram ] {{.*}}[_TF4main6squareFSiSi]
