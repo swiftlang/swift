@@ -226,6 +226,18 @@ static NSString *_getDescription(SwiftObject *obj) {
 - (NSUInteger)retainCount {
   return swift::swift_retainCount(reinterpret_cast<HeapObject *>(self));
 }
+- (BOOL)_isDeallocating {
+  return swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
+}
+- (BOOL)_tryRetain {
+  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
+}
+- (BOOL)allowsWeakReference {
+  return YES;
+}
+- (BOOL)retainWeakReference {
+  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
+}
 
 // Retaining the class object itself is a no-op.
 + (id)retain {
@@ -238,7 +250,19 @@ static NSString *_getDescription(SwiftObject *obj) {
   return self;
 }
 + (NSUInteger)retainCount {
-  return 1;
+  return ULONG_MAX;
+}
++ (BOOL)_isDeallocating {
+  return NO;
+}
++ (BOOL)_tryRetain {
+  return YES;
+}
++ (BOOL)allowsWeakReference {
+  return YES;
+}
++ (BOOL)retainWeakReference {
+  return YES;
 }
 
 - (void)dealloc {

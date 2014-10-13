@@ -32,11 +32,6 @@
 
 using namespace swift;
 
-namespace swift {
-  extern "C" HeapObject *swift_tryRetain(HeapObject *object);
-};
-
-
 HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
@@ -330,6 +325,17 @@ static HeapObject *_swift_tryRetain_(HeapObject *object) {
   return object;
 }
 auto swift::_swift_tryRetain = _swift_tryRetain_;
+
+bool swift::swift_isDeallocating(HeapObject *object) {
+  return _swift_isDeallocating(object);
+}
+static bool _swift_isDeallocating_(HeapObject *object) {
+  if (!object) return false;
+  uint32_t count
+    = reinterpret_cast<std::atomic<uint32_t>*>(&object->refCount)->load();
+  return count & RC_DEALLOCATING_BIT;
+}
+auto swift::_swift_isDeallocating = _swift_isDeallocating_;
 
 #endif
 

@@ -28,6 +28,7 @@ extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 
 extern "C" HeapObject *(*_swift_retain)(HeapObject *object);
 extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);
+extern "C" bool (*_swift_isDeallocating)(HeapObject *object);
 extern "C" void (*_swift_release)(HeapObject *object);
 
 
