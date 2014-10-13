@@ -110,8 +110,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
     // We can skip the check if TargetElement happens to be AnyObject
     if !(AnyObject.self is TargetElement.Type) {
       for element in a {
-        // FIXME: unsafeBitCast works around <rdar://problem/16953026>
-        if !(unsafeBitCast(element, AnyObject.self) is TargetElement) {
+        if !(element is TargetElement) {
           return nil
         }
       }
