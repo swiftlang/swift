@@ -100,7 +100,7 @@ func random${t}(count: Int) -> ${t}<Int> {
 %     comparePredicate = ", <" if p else ""
 %     name = "lessPredicate" if p else "noPredicate"
 
-Algorithm.test("sorted/%{name}") {
+Algorithm.test("sorted/${name}") {
   let count = 1000
   var ary = random${t}(count)
   var sortedAry1 = [Int]()
