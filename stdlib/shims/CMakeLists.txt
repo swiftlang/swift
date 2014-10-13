@@ -10,7 +10,7 @@ foreach(input ${sources})
     "${output_dir}/${input}")
 endforeach()
 
-add_custom_command(OUTPUT ${outputs}
+add_custom_command(OUTPUT "${output_dir}" ${outputs}
   COMMAND ${CMAKE_COMMAND} -E make_directory "${output_dir}"
   ${commands}
   DEPENDS ${sources}
@@ -20,7 +20,7 @@ add_custom_command(OUTPUT ${outputs}
 
 add_custom_target(
   copy_shim_headers
-  DEPENDS ${outputs}
+  DEPENDS "${output_dir}" ${outputs}
   SOURCES ${sources}
   )
 
