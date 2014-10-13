@@ -707,11 +707,6 @@ llvm::GlobalValue::VISIBILITY##Visibility }
         linkage = SILLinkage::Public;
         break;
 
-      case SILLinkage::PrivateExternal:
-        // Just handle it like a hidden symbol.
-        linkage = SILLinkage::HiddenExternal;
-        break;
-
       default:
         break;
     }
@@ -735,15 +730,18 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     if (isWeakImported)
       return RESULT(ExternalWeak, Default);
     return RESULT(External, Default);
-  case SILLinkage::HiddenExternal:
+  case SILLinkage::HiddenExternal: {
+    auto visibility = isFragile ? llvm::GlobalValue::DefaultVisibility
+                                : llvm::GlobalValue::HiddenVisibility;
     if (isDefinition) {
       // FIXME: Work around problems linking available_externally symbols in the
       // REPL. <rdar://problem/16094902>
       if (IGM.Opts.UseJIT)
-        return RESULT(LinkOnceODR, Hidden);
-      return RESULT(AvailableExternally, Hidden);
+        return {llvm::GlobalValue::LinkOnceODRLinkage, visibility};
+      return {llvm::GlobalValue::AvailableExternallyLinkage, visibility};
     }
-    return RESULT(External, Hidden);
+    return {llvm::GlobalValue::ExternalLinkage, visibility};
+  }
   case SILLinkage::PrivateExternal:
     // Fall through. The linkage should never be PrivateExternal for resilient
     // (non-fragile) entities.
