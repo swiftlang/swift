@@ -91,7 +91,19 @@ bb7(%19 : $Int64):                                // Preds: bb6 bb5
 //   enum b = (a ? _true : _false)
 //   if b == _true { return 42 } else { return 17 }
 //
-/// CHECK-LABEL: sil @testThread
+
+/// CHECK-LABEL: sil @testThread2
+/// CHECK: bb0([[COND:%.*]] : {{.*}}):
+/// CHECK: cond_br [[COND]], bb1, bb2
+/// CHECK: bb1:
+/// CHECK:  integer_literal $Builtin.Int64, 42
+/// CHeCK:  br bb3
+/// CHECK: bb2:
+/// CHECK:  integer_literal $Builtin.Int64, 17
+/// CHECK:  br bb3
+/// CHECK: bb3
+/// CHECK:  return
+
 sil @testThread2 : $@thin (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
   %t = integer_literal $Builtin.Int1, 1
@@ -99,21 +111,14 @@ bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 
 bb1:                                              // Preds: bb0
-/// CHECK: bb1:
-/// CHECK: [[ENUM1:%.*]] = select_enum
-/// CHECK: cond_br [[ENUM1]], bb3, bb4
   %4 = enum $BoolLike, #BoolLike.true_!enumelt          // user: %5
   br bb3(%4 : $BoolLike)                      // id: %5
 
 bb2:                                              // Preds: bb0
-/// CHECK: bb2:
-/// CHECK: [[ENUM2:%.*]] = select_enum
-/// CHECK: cond_br [[ENUM2]], bb3, bb4
   %8 = enum $BoolLike, #BoolLike.false_!enumelt           // user: %9
   br bb3(%8 : $BoolLike)                      // id: %9
 
 bb3(%6 : $BoolLike):                          // Preds: bb3 bb1
-/// CHECK: bb3:
   %100 = select_enum %6 : $BoolLike, case #BoolLike.true_!enumelt: %t, case #BoolLike.false_!enumelt: %f : $Builtin.Int1
   br bb4                                          // id: %7
 
@@ -140,7 +145,20 @@ bb7(%19 : $Int64):                                // Preds: bb6 bb5
 //   (enum b, val) = (a ? (_true, 16) : (_false, 17))
 //   if b == true { return 42 } else { return v } }
 //
+
+
 /// CHECK-LABEL: sil @testThread3
+/// CHECK: bb0([[COND:%.*]] : {{.*}}):
+/// CHECK: cond_br [[COND]], bb1, bb2
+/// CHECK: bb1:
+/// CHECK:  integer_literal $Builtin.Int64, 42
+/// CHeCK:  br bb3
+/// CHECK: bb2:
+/// CHECK:  integer_literal $Builtin.Int64, 17
+/// CHECK:  br bb3
+/// CHECK: bb3
+/// CHECK:  return
+
 sil @testThread3 : $@thin (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
   %t = integer_literal $Builtin.Int1, 1
@@ -148,19 +166,11 @@ bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 
 bb1:                                              // Preds: bb0
-/// CHECK: bb1:
-/// CHECK: [[VAL1:%.*]] = integer_literal $Builtin.Int64, 16
-/// CHECK: [[ENUM1:%.*]] = select_enum
-/// CHECK: cond_br [[ENUM1]], bb3, bb4([[VAL1]] : $Builtin.Int64)
   %4 = enum $BoolLike, #BoolLike.true_!enumelt          // user: %5
   %40 = integer_literal $Builtin.Int64, 16
   br bb3(%4 : $BoolLike, %40 : $Builtin.Int64)                      // id: %5
 
 bb2:                                              // Preds: bb0
-/// CHECK: bb2:
-/// CHECK: [[VAL2:%.*]] = integer_literal $Builtin.Int64, 17
-/// CHECK: [[ENUM2:%.*]] = select_enum
-/// CHECK: cond_br [[ENUM2]], bb3, bb4([[VAL2]] : $Builtin.Int64)
   %8 = enum $BoolLike, #BoolLike.false_!enumelt           // user: %9
   %80 = integer_literal $Builtin.Int64, 17
   br bb3(%8 : $BoolLike, %80 : $Builtin.Int64)                      // id: %9
@@ -173,24 +183,17 @@ bb4:                                              // Preds: bb2
   cond_br %100, bb5, bb6                            // id: %10
 
 bb5:                                              // Preds: bb4
-/// CHECK: bb3:
-/// CHECK: %{{.*}} = integer_literal $Builtin.Int64, 42
-/// CHECK: br bb5({{.*}})
   %11 = metatype $@thin Int64.Type
   %12 = integer_literal $Builtin.Int64, 42        // user: %13
   %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
   br bb7(%13 : $Int64)                            // id: %14
 
 bb6:                                              // Preds: bb4
-/// CHECK: bb4(%{{.*}} : $Builtin.Int64):
-/// CHECK: br bb5({{.*}})
   %15 = metatype $@thin Int64.Type
   %17 = struct $Int64 (%60 : $Builtin.Int64)      // user: %18
   br bb7(%17 : $Int64)                            // id: %18
 
 bb7(%19 : $Int64):                                // Preds: bb6 bb5
-/// CHECK: bb5(%{{.*}} : $Int64):
-/// CHECK: return
   return %19 : $Int64                             // id: %21
 }
 

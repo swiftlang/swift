@@ -839,8 +839,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // First simplify instructions generating branch operands since that
   // can expose CFG simplifications.
-  simplifyBranchOperands(BI->getTrueArgs());
-  simplifyBranchOperands(BI->getFalseArgs());
+  simplifyBranchOperands(OperandValueArrayRef(BI->getAllOperands()));
   auto *ThisBB = BI->getParent();
 
   // If the condition is an integer literal, we can constant fold the branch.
