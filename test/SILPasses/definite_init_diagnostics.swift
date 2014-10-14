@@ -808,12 +808,12 @@ struct rdar17207456Struct {
   var x: Int
 
   init() {
-    //use(self.dynamicType)
+    use(self.dynamicType)
     x = 0
   }
 
   init(a : Int) {
-    //use(self.dynamicType)
+    use(self.dynamicType)
     self.init()
   }
 }

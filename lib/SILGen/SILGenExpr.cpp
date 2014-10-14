@@ -6240,15 +6240,39 @@ RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
   return RValueEmitter(*this).visit(E, C);
 }
 
+// Evaluate the expression as an lvalue or rvalue, discarding the result.
 void SILGenFunction::emitIgnoredExpr(Expr *E) {
   FullExpr scope(Cleanups, CleanupLocation(E));
-  // Evaluate the expression as an lvalue or rvalue, discarding the result.
   if (E->getType()->is<LValueType>()) {
     emitLValue(E, AccessKind::Read);
-  } else {
-    // If it is convenient to avoid loading the result, don't bother.
-    emitRValue(E, SGFContext::AllowPlusZero);
+    return;
   }
+
+  // If this is a load expression, we try hard not to actually do the load
+  // (which could materialize a potentially expensive value with cleanups).
+  if (auto *LE = dyn_cast<LoadExpr>(E)) {
+    LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
+    // If the lvalue is purely physical, then it won't have any side effects,
+    // and we don't need to drill into it.
+    if (lv.isPhysical())
+      return;
+
+    // If the last component is physical, then we just need to drill through
+    // side effects in the lvalue, but don't need to perform the final load.
+    if (lv.isLastComponentPhysical()) {
+      emitAddressOfLValue(E, lv, AccessKind::Read);
+      return;
+    }
+
+    // Otherwise, we must call the ultimate getter to get its potential side
+    // effect.
+    emitLoadOfLValue(E, lv, SGFContext::AllowPlusZero);
+    return;
+  }
+
+  // Otherwise, emit the result (to get any side effects), but produce it at +0
+  // if that allows simplification.
+  emitRValue(E, SGFContext::AllowPlusZero);
 }
 
 /// Emit the given expression as an r-value, then (if it is a tuple), combine

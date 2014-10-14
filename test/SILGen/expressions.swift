@@ -508,3 +508,15 @@ func dynamicTypePlusZero(a : Super1) -> Super1.Type {
 // CHECK-NOT: retain
 // CHECK: value_metatype  $@thick Super1.Type, %0 : $Super1
 
+struct NonTrivialStruct { var c : Super1 }
+
+func dontEmitIgnoredLoadExpr(a : NonTrivialStruct) -> NonTrivialStruct.Type {
+  return a.dynamicType
+}
+// CHECK-LABEL: dontEmitIgnoredLoadExpr
+// CHECK: bb0(%0 : $NonTrivialStruct):
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: %2 = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: release_value %0
+// CHECK-NEXT: return %2 : $@thin NonTrivialStruct.Type
+
