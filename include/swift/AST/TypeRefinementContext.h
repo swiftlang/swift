@@ -126,6 +126,14 @@ public:
   TypeRefinementContext *findMostRefinedSubContext(SourceLoc Loc,
                                                    SourceManager &SM);
 
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(SourceManager &SrcMgr) const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+  void dump(raw_ostream &OS, SourceManager &SrcMgr) const;
+  void print(raw_ostream &OS, SourceManager &SrcMgr, unsigned Indent = 0) const;
+  
+  static StringRef getReasonName(Reason R);
+  
   // Only allow allocation of TypeRefinementContext using the allocator in
   // ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,

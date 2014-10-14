@@ -664,6 +664,12 @@ class TypeRefinementContextBuilder : private ASTWalker {
   std::vector<TypeRefinementContext *> ContextStack;
   ASTContext &AC;
   
+  /// A mapping from abstract storage declarations with accessors to
+  /// to the type refinement contexts for those declarations. We refer to
+  /// this map to determine the appopriate parent TRC to use when
+  /// walking the accessor function.
+  llvm::DenseMap<AbstractStorageDecl *, TypeRefinementContext *>
+      StorageContexts;
 
   TypeRefinementContext *getCurrentTRC() {
     assert(ContextStack.size() > 0);
@@ -683,6 +689,29 @@ public:
 
 private:
   virtual bool walkToDeclPre(Decl *D) override {
+    TypeRefinementContext *DeclTRC = getContextForWalkOfDecl(D);
+    ContextStack.push_back(DeclTRC);
+    return true;
+  }
+  
+  virtual bool walkToDeclPost(Decl *D) override {
+    assert(ContextStack.size() > 0);
+    ContextStack.pop_back();
+    return true;
+  }
+  
+  TypeRefinementContext *getContextForWalkOfDecl(Decl *D) {
+    if (auto FD = dyn_cast<FuncDecl>(D)) {
+      if (FD->isAccessor()) {
+        // Use TRC of the storage rather the current TRC when walking this
+        // function.
+        auto it = StorageContexts.find(FD->getAccessorStorageDecl());
+        if (it != StorageContexts.end()) {
+          return it->second;
+        }
+      }
+    }
+    
     TypeRefinementContext *NewTRC = nullptr;
     if (declarationIntroducesNewContext(D)) {
       NewTRC = buildDeclarationRefinementContext(D);
@@ -690,15 +719,7 @@ private:
       NewTRC = getCurrentTRC();
     }
     
-    ContextStack.push_back(NewTRC);
-    return true;
-  }
-  
-  virtual bool walkToDeclPost(Decl *D) override {
-    assert(ContextStack.size() > 0);
-    ContextStack.pop_back();
-    
-    return true;
+    return NewTRC;
   }
 
   /// Builds the type refinement hierarchy for the body of the function.
@@ -713,12 +734,21 @@ private:
     VersionRange DeclVersionRange = TypeChecker::availableRange(D, AC);
     DeclVersionRange.meetWith(getCurrentTRC()->getPotentialVersions());
     
-    TypeRefinementContext *newTRC =
+    TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(AC, D, getCurrentTRC(),
                                              DeclVersionRange,
                                              refinementSourceRangeForDecl(D));
     
-    return newTRC;
+    // Record the TRC for this storage declaration so that
+    // when we process the accessor, we can use this TRC as the
+    // parent.
+    if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
+      if (StorageDecl->hasAccessorFunctions()) {
+        StorageContexts[StorageDecl] = NewTRC;
+      }
+    }
+    
+    return NewTRC;
   }
   
   /// Returns true if the declaration should introduce a new refinement context.

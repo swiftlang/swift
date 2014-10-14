@@ -251,6 +251,10 @@ class ClassWithUnavailableProperties {
     get {
       let _: Int = availableOn10_10Stored // expected-error {{'availableOn10_10Stored' is only available on OS X version 10.10 or greater}}
       
+      if #os(OSX >= 10.10) {
+        let _: Int = availableOn10_10Stored
+      }
+      
       return availableOn10_9Stored
     }
     set(newVal) {
@@ -448,6 +452,10 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
   override var someProperty: Int {
     get { 
       let _ = super.someProperty // expected-error {{'someProperty' is only available on OS X version 10.10 or greater}}
+      
+      if #os(OSX >= 10.10) {
+        let _ = super.someProperty
+      }
       
       return 9
       }

@@ -92,3 +92,54 @@ TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
   // must be the inner-most context.
   return this;
 }
+
+void TypeRefinementContext::dump(SourceManager &SrcMgr) const {
+  dump(llvm::errs(), SrcMgr);
+}
+
+void TypeRefinementContext::dump(raw_ostream &OS, SourceManager &SrcMgr) const {
+  print(OS, SrcMgr, 0);
+  OS << '\n';
+}
+
+void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
+                                  unsigned Indent) const {
+  OS.indent(Indent);
+  OS << "(" << getReasonName(getReason());
+
+  OS << " versions=" << PotentialVersions.getAsString();
+
+  if (getReason() == Reason::Decl) {
+    Decl *D = getIntroductionNode().get<Decl *>();
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      OS << " decl=";
+      VD->dumpRef(OS);
+    }
+  }
+
+  auto R = getSourceRange();
+  if (R.isValid()) {
+    OS << " src_range=";
+    R.print(OS, SrcMgr, /*PrintText=*/false);
+  }
+
+  for (TypeRefinementContext *Child : Children) {
+    OS << '\n';
+    Child->print(OS, SrcMgr, Indent + 2);
+  }
+  OS.indent(Indent);
+  OS << ")";
+}
+
+StringRef TypeRefinementContext::getReasonName(Reason R) {
+  switch (R) {
+  case Reason::Root:
+    return "root";
+
+  case Reason::Decl:
+    return "decl";
+
+  case Reason::IfStmtThenBranch:
+    return "if_then";
+  }
+}
