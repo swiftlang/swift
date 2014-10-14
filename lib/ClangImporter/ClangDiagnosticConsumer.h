@@ -62,14 +62,14 @@ private:
   //
   // This is not using SmallPtrSet or similar because we need the
   // IntrusiveRefCntPtr to stay a ref-counting pointer.
-  SmallVector<llvm::IntrusiveRefCntPtr<clang::SourceManager>, 4>
+  SmallVector<llvm::IntrusiveRefCntPtr<const clang::SourceManager>, 4>
     sourceManagersWithDiagnostics;
 
   const clang::IdentifierInfo *CurrentImport = nullptr;
   SourceLoc DiagLoc;
   const bool DumpToStderr;
 
-  SourceLoc resolveSourceLocation(clang::SourceManager &clangSrcMgr,
+  SourceLoc resolveSourceLocation(const clang::SourceManager &clangSrcMgr,
                                   clang::SourceLocation clangLoc);
 
 public:

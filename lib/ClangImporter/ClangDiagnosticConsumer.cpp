@@ -23,7 +23,7 @@ using namespace swift;
 
 namespace {
   class ClangDiagRenderer final : public clang::DiagnosticNoteRenderer {
-    const std::function<void(clang::SourceLocation,
+    const std::function<void(clang::FullSourceLoc,
                              clang::DiagnosticsEngine::Level,
                              StringRef)> callback;
 
@@ -47,7 +47,7 @@ namespace {
       if (StringRef(SM->getBufferName(Loc)) ==
           ClangImporter::Implementation::bridgingHeaderBufferName)
         return;
-      callback(Loc, Level, Message);
+      callback(clang::FullSourceLoc(Loc, *SM), Level, Message);
     }
 
     void emitDiagnosticLoc(clang::SourceLocation Loc, clang::PresumedLoc PLoc,
@@ -92,7 +92,7 @@ static SourceLoc findEndOfLine(SourceManager &SM, SourceLoc loc,
 }
 
 SourceLoc ClangDiagnosticConsumer::resolveSourceLocation(
-    clang::SourceManager &clangSrcMgr,
+    const clang::SourceManager &clangSrcMgr,
     clang::SourceLocation clangLoc) {
   SourceManager &swiftSrcMgr = ImporterImpl.SwiftContext.SourceMgr;
   SourceLoc loc;
@@ -134,13 +134,13 @@ SourceLoc ClangDiagnosticConsumer::resolveSourceLocation(
     swiftSrcMgr.closeVirtualFile(endOfLine);
   }
 
-  using SourceManagerRef = llvm::IntrusiveRefCntPtr<clang::SourceManager>;
+  using SourceManagerRef = llvm::IntrusiveRefCntPtr<const clang::SourceManager>;
   auto iter = std::lower_bound(sourceManagersWithDiagnostics.begin(),
                                sourceManagersWithDiagnostics.end(),
                                &clangSrcMgr,
                                [](const SourceManagerRef &inArray,
-                                  clang::SourceManager *toInsert) {
-    return std::less<clang::SourceManager *>()(inArray.get(), toInsert);
+                                  const clang::SourceManager *toInsert) {
+    return std::less<const clang::SourceManager *>()(inArray.get(), toInsert);
   });
   if (iter->get() != &clangSrcMgr)
     sourceManagersWithDiagnostics.insert(iter, &clangSrcMgr);
@@ -180,7 +180,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
     DiagnosticConsumer::HandleDiagnostic(clangDiagLevel, clangDiag);
 
   // FIXME: Map over source ranges in the diagnostic.
-  auto emitDiag = [&](clang::SourceLocation clangNoteLoc,
+  auto emitDiag = [&ctx, this](clang::FullSourceLoc clangNoteLoc,
                       clang::DiagnosticsEngine::Level clangDiagLevel,
                       StringRef message) {
     decltype(diag::error_from_clang) diagKind;
@@ -205,7 +205,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
     SourceLoc noteLoc;
     if (clangNoteLoc.isValid())
-      noteLoc = resolveSourceLocation(clangDiag.getSourceManager(),
+      noteLoc = resolveSourceLocation(clangNoteLoc.getManager(),
                                       clangNoteLoc);
     ctx.Diags.diagnose(noteLoc, diagKind, message);
   };
@@ -213,15 +213,15 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   llvm::SmallString<128> message;
   clangDiag.FormatDiagnostic(message);
 
+  clang::SourceManager *clangSrcMgr =
+  clangDiag.hasSourceManager() ? &clangDiag.getSourceManager() : nullptr;
   if (clangDiag.getLocation().isInvalid()) {
     // Diagnostic about the compiler arguments.
-    emitDiag(clangDiag.getLocation(), clangDiagLevel, message);
+    emitDiag(clang::FullSourceLoc(clangDiag.getLocation(), *clangSrcMgr),
+             clangDiagLevel, message);
   } else {
     ClangDiagRenderer renderer(ImporterImpl.getClangASTContext(),
                                std::cref(emitDiag));
-    clang::SourceManager *clangSrcMgr =
-        clangDiag.hasSourceManager() ? &clangDiag.getSourceManager() : nullptr;
-
     renderer.emitDiagnostic(clangDiag.getLocation(), clangDiagLevel, message,
                             clangDiag.getRanges(), clangDiag.getFixItHints(),
                             clangSrcMgr);
