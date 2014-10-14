@@ -200,11 +200,24 @@ SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
 //                                 Cost Model
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// For now Free is 0 and Expensive is 1. This can be changed in the future by
+// adding more categories.
+enum class InlineCost : unsigned {
+  Free = 0,
+  Expensive = 1,
+  CannotBeInlined = UINT_MAX,
+};
+
+} // end anonymous namespace
+
 /// For now just assume that every SIL instruction is one to one with an LLVM
 /// instruction. This is of course very much so not true.
 ///
 /// TODO: Fill this out.
-InlineCost swift::instructionInlineCost(SILInstruction &I) {
+static InlineCost instructionInlineCost(SILInstruction &I,
+                                        SILFunction *Caller) {
   switch (I.getKind()) {
     case ValueKind::BuiltinFunctionRefInst:
     case ValueKind::IntegerLiteralInst:
@@ -378,7 +391,7 @@ unsigned swift::getFunctionCost(SILFunction *F, SILFunction *Caller,
   unsigned Cost = 0;
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      auto ICost = instructionInlineCost(I);
+      auto ICost = instructionInlineCost(I, Caller);
       if (ICost == InlineCost::CannotBeInlined)
         return UINT_MAX;
 

@@ -27,18 +27,6 @@ namespace swift {
 /// passes that want to compare against a threshold.
 unsigned getFunctionCost(SILFunction *F, SILFunction *Callee, unsigned Cutoff);
 
-// For now Free is 0 and Expensive is 1. This can be changed in the future by
-// adding more categories.
-enum class InlineCost : unsigned {
-  Free = 0,
-  Expensive = 1,
-  CannotBeInlined = UINT_MAX,
-};
-
-/// Return the 'cost' of one instruction. Instructions that are expected to
-/// disappear at the LLVM IR level are assigned a cost of 'Free'.
-InlineCost instructionInlineCost(SILInstruction &I);
-
 class SILInliner : public TypeSubstCloner<SILInliner> {
 public:
   friend class SILVisitor<SILInliner>;
