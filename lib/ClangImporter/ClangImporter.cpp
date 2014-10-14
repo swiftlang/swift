@@ -221,9 +221,6 @@ ClangImporter::create(ASTContext &ctx,
     // Don't emit LLVM IR.
     "-fsyntax-only",
 
-    // Silence warnings from imported headers.
-    "-w",
-
     "-femit-all-decls",
     "-target", irGenOpts.Triple,
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,

@@ -1,4 +1,6 @@
+#ifdef FOO
 #import <Another/Another.h>
+#endif
 
 int *Module_Sub2;
 
