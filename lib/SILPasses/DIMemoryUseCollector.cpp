@@ -980,7 +980,8 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
 
     // super_method always looks at the metatype for the class, not at any of
     // its stored properties, so it doesn't have any DI requirements.
-    if (isa<SuperMethodInst>(User)) continue;
+    if (isa<SuperMethodInst>(User))
+      continue;
 
 
     // ref_element_addr P, #field lookups up a field.
@@ -1002,7 +1003,7 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
       Releases.push_back(User);
       continue;
     }
-    
+
     // If this is an upcast instruction, it is a conversion of self to the base.
     // This is either part of a super.init sequence, or a general superclass
     // access.
@@ -1023,9 +1024,14 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // If this is a ValueMetatypeInst, check to see if it's part of a
     // self.init call to a factory initializer in a delegating
     // initializer.
-    if (auto *VMI = dyn_cast<ValueMetatypeInst>(User))
+    if (auto *VMI = dyn_cast<ValueMetatypeInst>(User)) {
       if (isSelfInitUse(VMI))
         Kind = DIUseKind::SelfInit;
+      else
+        // Otherwise, this is a simple reference to "dynamicType", which is
+        // always fine, even if self is uninitialized.
+        continue;
+    }
 
     Uses.push_back(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }
@@ -1108,9 +1114,14 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         // If this is a ValueMetatypeInst, check to see if it's part of a
         // self.init call to a factory initializer in a delegating
         // initializer.
-        if (auto *VMI = dyn_cast<ValueMetatypeInst>(User))
+        if (auto *VMI = dyn_cast<ValueMetatypeInst>(User)) {
           if (isSelfInitUse(VMI))
             Kind = DIUseKind::SelfInit;
+          else
+            // Otherwise, this is a simple reference to "dynamicType", which is
+            // always fine, even if self is uninitialized.
+            continue;
+        }
 
         Uses.push_back(DIMemoryUse(User, Kind, 0, 1));
       }

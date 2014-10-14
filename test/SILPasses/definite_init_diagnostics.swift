@@ -775,3 +775,46 @@ struct rdar18414728Struct {
 }
 
 
+// <rdar://problem/17207456> Unable to access dynamicType of an object in a class initializer that isn't done
+func use(a : Any) {}
+
+class rdar17207456Base {
+  var x: Int
+
+  init() {
+    use(self.dynamicType)
+    x = 0
+  }
+
+  convenience init(a : Int) {
+    use(self.dynamicType)
+    self.init()
+  }
+}
+
+class rdar17207456Derived : rdar17207456Base {
+  override init() {
+    //use(self.dynamicType)
+    super.init()
+  }
+
+  convenience init(a : Int) {
+    use(self.dynamicType)
+    self.init()
+  }
+}
+
+struct rdar17207456Struct {
+  var x: Int
+
+  init() {
+    //use(self.dynamicType)
+    x = 0
+  }
+
+  init(a : Int) {
+    //use(self.dynamicType)
+    self.init()
+  }
+}
+

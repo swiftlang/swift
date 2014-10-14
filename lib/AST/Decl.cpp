@@ -2746,7 +2746,7 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
   }
   
   // If the self type is the result of an upstream error, return it
-  if(selfTy->is<ErrorType>())
+  if (selfTy->is<ErrorType>())
     return selfTy;
   
   // Capture the generic parameters, if requested.
