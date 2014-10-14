@@ -162,9 +162,6 @@ static inline HeapObject *_swift_retain_inlined(HeapObject *object) {
 /// already been destroyed. Returns nil if the object is dead.
 extern "C" HeapObject *swift_tryRetain(HeapObject *object);
 
-/// Returns true if an object is in the process of being deallocated.
-extern "C" bool swift_isDeallocating(HeapObject *object);
-  
 /// Atomically decrements the retain count of an object.  If the
 /// retain count reaches zero, the object is destroyed as follows:
 ///

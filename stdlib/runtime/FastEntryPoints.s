@@ -195,19 +195,6 @@ BEGIN_FUNC _swift_tryRetain
   int3
 END_FUNC
 
-BEGIN_FUNC _swift_isDeallocating
-  test %rdi, %rdi
-  jz 1f
-  movl RC_OFFSET(%rdi), %eax
-  testb $RC_DEALLOCATING_BIT, %al
-  setnz %al
-  movzxl %al, %eax
-  ret
-1:
-  xor %eax, %eax
-  ret
-END_FUNC
-
 BEGIN_FUNC _swift_weakRetain
   test  %rdi, %rdi
   jz    1f
