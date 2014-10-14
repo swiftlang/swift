@@ -33,6 +33,7 @@ namespace {
     SILValue visitTupleExtractInst(TupleExtractInst *TEI);
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
+    SILValue visitSelectEnumInst(SelectEnumInst *SEI);
     SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
     SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
@@ -175,6 +176,26 @@ static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
     return SILValue();
 
   return UEDI->getOperand();
+}
+
+SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
+  // Simplify a select_enum on a enum instruction.
+  //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
+  //   %28 = integer_literal $Builtin.Int1, -1
+  //   %29 = integer_literal $Builtin.Int1, 0
+  //   %30 = select_enum %27 : $Optional<Int>, case #Optional.None!enumelt: %28,
+  //                                         case #Optional.Some!enumelt.1: %29
+  // We will return %29.
+
+  auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
+  if (!EI)
+    return SILValue();
+
+  // Check matching types.
+  if (EI->getType() != SEI->getEnumOperand().getType())
+    return SILValue();
+
+  return SEI->getCaseResult(EI->getElement());
 }
 
 SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
