@@ -322,8 +322,8 @@ if [[ "${RUN_WITH_ASAN_COMPILER}" ]]; then
         -DCMAKE_C_COMPILER="${RUN_WITH_ASAN_COMPILER}"
         -DCMAKE_CXX_COMPILER="${RUN_WITH_ASAN_COMPILER}++"
     )
-    CMAKE_C_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer"
-    CMAKE_CXX_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer"
+    CMAKE_C_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer -mllvm -asan-globals=0"
+    CMAKE_CXX_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer -mllvm -asan-globals=0"
     CMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
     CMAKE_SHARED_LINKER_FLAGS="-fsanitize=address"
 fi
