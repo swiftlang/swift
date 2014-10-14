@@ -794,7 +794,7 @@ class rdar17207456Base {
 
 class rdar17207456Derived : rdar17207456Base {
   override init() {
-    //use(self.dynamicType)
+    use(self.dynamicType)
     super.init()
   }
 

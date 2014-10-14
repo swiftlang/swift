@@ -41,8 +41,7 @@ func direct_to_static_method(var obj: AnyObject) {
   // CHECK-NEXT: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: store [[OBJ]] to [[OBJBOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[OBJBOX]]#1 : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJCOPY]] : $AnyObject
-  // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject // users: %6, %7
+  // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJMETA]] : $@thick AnyObject.Type, #X.staticF!1.foreign : X.Type -> () -> (), $@cc(objc_method) @thin (@thick AnyObject.Type) -> ()
   // CHECK: apply [[METHOD]]([[OBJMETA]]) : $@cc(objc_method) @thin (@thick AnyObject.Type) -> ()
   obj.dynamicType.staticF!()
@@ -104,7 +103,6 @@ func opt_to_static_method(var obj: AnyObject) {
   // CHECK-NEXT: store [[OBJ]] to [[OBJBOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[OBJBOX]]#1 : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OBJMETA]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<() -> ()>
