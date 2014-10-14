@@ -1,4 +1,4 @@
-// RUN: env SWIFTC=%swiftc_driver_plain INPUT_DIR="%S/Inputs/" OUTPUT_BASE="%t" /bin/sh %S/Inputs/parseable_output_unicode_runner.sh 2>&1 | FileCheck %s
+// RUN: %swiftc_driver_plain -emit-executable "%S/Inputs/你好.swift" -o %t.out -emit-module -emit-module-path %t.swiftmodule -emit-objc-header-path %t.h -serialize-diagnostics -emit-dependencies -parseable-output -driver-skip-execution 2>&1 | FileCheck %s
 
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
