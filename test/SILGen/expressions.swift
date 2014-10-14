@@ -499,3 +499,12 @@ func testDiscardLValue() {
   _ = a
 }
 
+
+func dynamicTypePlusZero(a : Super1) -> Super1.Type {
+  return a.dynamicType
+}
+// CHECK-LABEL: dynamicTypePlusZero
+// CHECK: bb0(%0 : $Super1):
+// CHECK-NOT: retain
+// CHECK: value_metatype  $@thick Super1.Type, %0 : $Super1
+

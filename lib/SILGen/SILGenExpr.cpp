@@ -2730,20 +2730,10 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base,
 }
 
 RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
-  // Evaluate the base if present.
-  SILValue metatype;
-  
-  auto *base = E->getBase();
-
-  // We can get the metatype for an existential or archetype without
-  // materializing it as a +1 value.
-  SGFContext Ctx;
-  if (base->getType()->isAnyExistentialType() ||
-      base->getType()->is<ArchetypeType>())
-    Ctx = SGFContext::AllowPlusZero;
-
-  SILValue baseVal = SGF.emitRValueAsSingleValue(base, Ctx).getValue();
-  metatype = SGF.emitMetatypeOfValue(E, baseVal, E->getBase()->getType());
+  auto base = SGF.emitRValueAsSingleValue(E->getBase(),
+                                          SGFContext::AllowPlusZero);
+  auto metatype = SGF.emitMetatypeOfValue(E, base.getValue(),
+                                          E->getBase()->getType());
   return RValue(SGF, E, ManagedValue::forUnmanaged(metatype));
 }
 
