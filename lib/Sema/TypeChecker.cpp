@@ -890,6 +890,8 @@ private:
   /// availability query.
   TypeRefinementContext *refinedThenContextForQuery(AvailabilityQueryExpr *E,
                                                     IfStmt *IS) {
+    TypeRefinementContext *CurTRC = getCurrentTRC();
+    
     VersionConstraintAvailabilitySpec *Spec = bestActiveSpecForQuery(E);
     if (!Spec) {
       // We couldn't find an appropriate spec for the current platform,
@@ -898,7 +900,7 @@ private:
       AC.Diags.diagnose(E->getLoc(),
                         diag::availability_query_required_for_platform,
                         platformString(targetPlatform(AC.LangOpts)));
-      return getCurrentTRC();
+      return CurTRC;
     }
 
     
@@ -908,10 +910,20 @@ private:
     // If the version range for the current TRC is completely contained in
     // the range for the spec, then the query can never be false, so the
     // spec is useless. If so, report this.
-    if (getCurrentTRC()->getPotentialVersions().isContainedIn(range)) {
-      AC.Diags.diagnose(E->getLoc(),
-                        diag::availability_query_useless,
-                        platformString(targetPlatform(AC.LangOpts)));
+    if (CurTRC->getPotentialVersions().isContainedIn(range)) {
+      DiagnosticEngine &Diags = AC.Diags;
+      if (CurTRC->getReason() == TypeRefinementContext::Reason::Root) {
+        Diags.diagnose(E->getLoc(),
+                       diag::availability_query_useless_min_deployment,
+                       platformString(targetPlatform(AC.LangOpts)));
+      } else {
+        Diags.diagnose(E->getLoc(),
+                       diag::availability_query_useless_enclosing_scope,
+                       platformString(targetPlatform(AC.LangOpts)));
+        Diags.diagnose(CurTRC->getIntroductionLoc(),
+                       diag::availability_query_useless_enclosing_scope_here);
+        
+      }
     }
     
     return TypeRefinementContext::createForIfStmtThen(AC, IS, getCurrentTRC(),

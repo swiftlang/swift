@@ -1720,8 +1720,16 @@ ERROR(availability_query_repeated_platform, sema_avail, none,
 ERROR(availability_query_required_for_platform, sema_avail, none,
       "condition required for target platform '%0'", (StringRef))
 
-WARNING(availability_query_useless, sema_avail, none,
-        "unnecessary check for '%0'; guard will always pass", (StringRef))
+WARNING(availability_query_useless_min_deployment, sema_avail, none,
+        "unnecessary check for '%0'; minimum deployment target ensures guard "
+        "will always pass", (StringRef))
+
+WARNING(availability_query_useless_enclosing_scope, sema_avail, none,
+        "unnecessary check for '%0'; enclosing scope ensures guard "
+        "will always pass", (StringRef))
+
+NOTE(availability_query_useless_enclosing_scope_here, sema_avail, none,
+     "enclosing scope here", ())
 
 ERROR(availability_query_outside_if_stmt_guard, sema_avail, none,
       "check can only be used as guard of if statement", ())

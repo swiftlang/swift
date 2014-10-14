@@ -102,6 +102,19 @@ void TypeRefinementContext::dump(raw_ostream &OS, SourceManager &SrcMgr) const {
   OS << '\n';
 }
 
+SourceLoc TypeRefinementContext::getIntroductionLoc() const {
+  switch (getReason()) {
+  case Reason::Decl:
+    return Node.get<Decl *>()->getLoc();
+
+  case Reason::IfStmtThenBranch:
+    return Node.get<IfStmt *>()->getIfLoc();
+
+  case Reason::Root:
+    return SourceLoc();
+  }
+}
+
 void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
                                   unsigned Indent) const {
   OS.indent(Indent);

@@ -42,6 +42,7 @@ namespace swift {
 /// to refine.
 class TypeRefinementContext {
 
+public:
   /// Describes the reason a type refinement context was introduced.
   enum class Reason {
     /// The root refinement context.
@@ -57,6 +58,7 @@ class TypeRefinementContext {
 
   using IntroNode = llvm::PointerUnion3<SourceFile *, Decl *, IfStmt *>;
 
+private:
   /// The AST node that introduced this context.
   IntroNode Node;
 
@@ -107,6 +109,11 @@ public:
   /// IfStmt as the introduction node (and its reason as IfStmtThenBranch)
   /// but its source range will cover the Then branch.
   IntroNode getIntroductionNode() const { return Node; }
+  
+  /// Returns the location of the node that introduced this refinement context
+  /// or an invalid location if the context reflects the minimum deployment
+  // target.
+  SourceLoc getIntroductionLoc() const;
   
   /// Returns the source range on which this context refines types.
   SourceRange getSourceRange() const { return SrcRange; }

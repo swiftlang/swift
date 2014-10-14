@@ -482,26 +482,26 @@ class ClassAvailableOn10_9AdoptingProtocolAvailableOn10_10 : ProtocolAvailableOn
 func functionWithDefaultAvailabilityAndUselessCheck() {
 // Default availability reflects minimum deployment: 10.9 and up
 
-  if #os(OSX >= 10.9) { // expected-warning {{unnecessary check for 'OSX'; guard will always pass}}
+  if #os(OSX >= 10.9) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always pass}}
     let _ = globalAvailableOn10_9
   }
   
-  if #os(OSX >= 10.10) {
+  if #os(OSX >= 10.10) { // expected-note {{enclosing scope here}}
     let _ = globalAvailableOn10_10
     
-    if #os(OSX >= 10.10) { // expected-warning {{unnecessary check for 'OSX'; guard will always pass}}
+    if #os(OSX >= 10.10) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always pass}}
       let _ = globalAvailableOn10_10 
     }
   }
 }
 
 @availability(OSX, introduced=10.10)
-func functionWithSpecifiedAvailabilityAndUselessCheck() {
-  if #os(OSX >= 10.9) { // expected-warning {{unnecessary check for 'OSX'; guard will always pass}}
+func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{enclosing scope here}}
+  if #os(OSX >= 10.9) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always pass}}
     let _ = globalAvailableOn10_9
   }
   
-  if #os(OSX >= 10.10) { // expected-warning {{unnecessary check for 'OSX'; guard will always pass}}
+  if #os(OSX >= 10.10) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always pass}}
     let _ = globalAvailableOn10_10 
   }
 }
