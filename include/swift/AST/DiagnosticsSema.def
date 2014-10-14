@@ -1722,11 +1722,11 @@ ERROR(availability_query_required_for_platform, sema_avail, none,
 
 WARNING(availability_query_useless_min_deployment, sema_avail, none,
         "unnecessary check for '%0'; minimum deployment target ensures guard "
-        "will always pass", (StringRef))
+        "will always be true", (StringRef))
 
 WARNING(availability_query_useless_enclosing_scope, sema_avail, none,
         "unnecessary check for '%0'; enclosing scope ensures guard "
-        "will always pass", (StringRef))
+        "will always be true", (StringRef))
 
 NOTE(availability_query_useless_enclosing_scope_here, sema_avail, none,
      "enclosing scope here", ())
