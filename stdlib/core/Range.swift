@@ -230,7 +230,6 @@ public func ... <Pos : ForwardIndexType where Pos: Comparable> (
   return Range(start: start, end: end.successor())
 }
 
-// FIXME: This doesn't work yet: <rdar://problem/17668465> 
 public func ~= <I : ForwardIndexType where I: Comparable> (
   pattern: Range<I>, value: I
 ) -> Bool {

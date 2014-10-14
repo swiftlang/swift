@@ -59,10 +59,9 @@ RangeTestSuite.test("Printing") {
 
 RangeTestSuite.test("Pattern matching") {
   let x = 0..<20
-  // FIXME: These don't work yet: <rdar://problem/17668465>
-  // expectTrue(x ~= 10)
-  // expectFalse(x ~= 20)
-  // expectFalse(x ~= -1)
+  expectTrue(x ~= 10)
+  expectFalse(x ~= 20)
+  expectFalse(x ~= -1)
 }
 
 RangeTestSuite.test("stride") {
