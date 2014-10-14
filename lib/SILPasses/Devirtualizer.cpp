@@ -509,12 +509,12 @@ static ClassDecl *getClassFromAccessControl(ClassMethodInst *CMI) {
   if (!FD->hasAccessibility())
     return nullptr;
 
-  // Only consider 'private' members, unless associatedDC is the entire module.
+  // Only consider 'private' members, unless we are in whole-module compilation.
   switch (FD->getAccessibility()) {
   case Accessibility::Public:
     return nullptr;
   case Accessibility::Internal:
-    if (associatedDC != CMI->getModule().getSwiftModule())
+    if (!CMI->getModule().isWholeModule())
       return nullptr;
     break;
   case Accessibility::Private:
@@ -745,13 +745,12 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   if (!CD->hasAccessibility())
     return false;
 
-  // Only consider 'private' members, unless the associated DC is
-  // the entire module.
+  // Only consider 'private' members, unless we are in whole-module compilation.
   switch (CD->getAccessibility()) {
   case Accessibility::Public:
     return false;
   case Accessibility::Internal:
-    if (DC != AI->getModule().getSwiftModule())
+    if (!AI->getModule().isWholeModule())
       return false;
     break;
   case Accessibility::Private:
