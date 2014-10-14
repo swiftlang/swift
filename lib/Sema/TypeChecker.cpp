@@ -904,6 +904,15 @@ private:
     VersionRange range = rangeForSpec(Spec);
     E->setAvailableRange(range);
     
+    // If the version range for the current TRC is completely contained in
+    // the range for the spec, then the query can never be false, so the
+    // spec is useless. If so, report this.
+    if (getCurrentTRC()->getPotentialVersions().isContainedIn(range)) {
+      AC.Diags.diagnose(E->getLoc(),
+                        diag::availability_query_useless,
+                        platformString(targetPlatform(AC.LangOpts)));
+    }
+    
     return TypeRefinementContext::createForIfStmtThen(AC, IS, getCurrentTRC(),
                                                       range);
   }

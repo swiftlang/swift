@@ -1720,6 +1720,9 @@ ERROR(availability_query_repeated_platform, sema_avail, none,
 ERROR(availability_query_required_for_platform, sema_avail, none,
       "condition required for target platform '%0'", (StringRef))
 
+WARNING(availability_query_useless, sema_avail, none,
+        "unnecessary check for '%0'; guard will always pass", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

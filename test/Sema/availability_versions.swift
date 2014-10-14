@@ -476,3 +476,32 @@ class SubclassAvailableOn10_9OfClassAvailableOn10_10 : ClassAvailableOn10_10 { /
 @availability(OSX, introduced=10.9)
 class ClassAvailableOn10_9AdoptingProtocolAvailableOn10_10 : ProtocolAvailableOn10_10 { // expected-error {{'ProtocolAvailableOn10_10' is only available on OS X version 10.10 or greater}}
 }
+
+// Useless #os(...) checks
+
+func functionWithDefaultAvailabilityAndUselessCheck() {
+// Default availability reflects minimum deployment: 10.9 and up
+
+  if #os(OSX >= 10.9) { // expected-warning {{unnecessary check for 'OSX'; guard will always pass}}
+    let _ = globalAvailableOn10_9
+  }
+  
+  if #os(OSX >= 10.10) {
+    let _ = globalAvailableOn10_10
+    
+    if #os(OSX >= 10.10) { // expected-warning {{unnecessary check for 'OSX'; guard will always pass}}
+      let _ = globalAvailableOn10_10 
+    }
+  }
+}
+
+@availability(OSX, introduced=10.10)
+func functionWithSpecifiedAvailabilityAndUselessCheck() {
+  if #os(OSX >= 10.9) { // expected-warning {{unnecessary check for 'OSX'; guard will always pass}}
+    let _ = globalAvailableOn10_9
+  }
+  
+  if #os(OSX >= 10.10) { // expected-warning {{unnecessary check for 'OSX'; guard will always pass}}
+    let _ = globalAvailableOn10_10 
+  }
+}
