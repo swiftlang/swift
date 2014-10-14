@@ -2709,12 +2709,16 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
   return result;
 }
 
-SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base,
-                                             Type formalBaseType) {
+SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
+  Type formalBaseType = baseExpr->getType()->getLValueOrInOutObjectType();
   CanType baseTy = formalBaseType->getCanonicalType();
+
   // For class, archetype, and protocol types, look up the dynamic metatype.
   if (baseTy.isAnyExistentialType()) {
-    SILType metaTy = getLoweredLoadableType(CanExistentialMetatypeType::get(baseTy));
+    SILType metaTy = getLoweredLoadableType(
+                                      CanExistentialMetatypeType::get(baseTy));
+    auto base = emitRValueAsSingleValue(baseExpr,
+                                        SGFContext::AllowPlusZero).getValue();
     return B.createExistentialMetatype(loc, metaTy, base);
   }
 
@@ -2722,18 +2726,19 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base,
   // If the lowered metatype has a thick representation, we need to derive it
   // dynamically from the instance.
   if (metaTy.castTo<MetatypeType>()->getRepresentation()
-        != MetatypeRepresentation::Thin)
+          != MetatypeRepresentation::Thin) {
+    auto base = emitRValueAsSingleValue(baseExpr,
+                                        SGFContext::AllowPlusZero).getValue();
     return B.createValueMetatype(loc, metaTy, base);
+  }
   
   // Otherwise, ignore the base and return the static thin metatype.
+  emitIgnoredExpr(baseExpr);
   return B.createMetatype(loc, metaTy);
 }
 
 RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
-  auto base = SGF.emitRValueAsSingleValue(E->getBase(),
-                                          SGFContext::AllowPlusZero);
-  auto metatype = SGF.emitMetatypeOfValue(E, base.getValue(),
-                                          E->getBase()->getType());
+  auto metatype = SGF.emitMetatypeOfValue(E, E->getBase());
   return RValue(SGF, E, ManagedValue::forUnmanaged(metatype));
 }
 

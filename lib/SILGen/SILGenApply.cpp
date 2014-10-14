@@ -1266,14 +1266,14 @@ public:
 
     // Load the 'self' argument.
     Expr *arg = expr->getArg();
-    ManagedValue self = gen.emitRValueAsSingleValue(arg);
+    ManagedValue self;
 
     // If we're using the allocating constructor, we need to pass along the
     // metatype.
     if (useAllocatingCtor) {
-      SILValue selfMeta = gen.emitMetatypeOfValue(expr, self.getValue(),
-                                  arg->getType()->getLValueOrInOutObjectType());
-      self = ManagedValue::forUnmanaged(selfMeta);
+      self = ManagedValue::forUnmanaged(gen.emitMetatypeOfValue(expr, arg));
+    } else {
+      self = gen.emitRValueAsSingleValue(arg);
     }
 
     CanType selfFormalType = arg->getType()->getCanonicalType();

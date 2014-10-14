@@ -790,7 +790,7 @@ public:
                        SILDeclRef methodConstant,
                        ArrayRef<Substitution> innerSubstitutions);
   
-  SILValue emitMetatypeOfValue(SILLocation loc, SILValue base, Type formalType);
+  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
   
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
