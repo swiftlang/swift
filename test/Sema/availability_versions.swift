@@ -505,3 +505,13 @@ func functionWithSpecifiedAvailabilityAndUselessCheck() {
     let _ = globalAvailableOn10_10 
   }
 }
+
+// #os(...) outside if statement guards
+
+let _ = #os(OSX >= 10.10) // expected-error {{check can only be used as guard of if statement}}
+
+// For the moment, we don't allow #os() in IfExprs.
+(#os(OSX >= 10.10) ? 1 : 0) // expected-error {{check can only be used as guard of if statement}}
+
+if #os(OSX >= 10.10) && #os(OSX >= 10.11) { // expected-error 2{{check can only be used as guard of if statement}}
+}

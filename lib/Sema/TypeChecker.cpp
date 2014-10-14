@@ -850,8 +850,9 @@ private:
     
     validateAvailabilityQuery(QueryExpr);
 
-    // Traverse the guard in the current context.
-    build(CondExpr);
+    // There is no need to traverse the guard condition explicitly
+    // in the current context because AvailabilityQueryExprs do not have
+    // sub expressions.
 
     // Create a new context for the Then branch and traverse it in that new
     // context.
@@ -941,6 +942,23 @@ private:
       return VersionRange::allGTE(Spec->getVersion());
     }
   }
+  
+  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    auto QueryExpr = dyn_cast<AvailabilityQueryExpr>(E);
+    if (!QueryExpr)
+      return std::make_pair(true, E);
+    
+    // If we have gotten here, it means we encountered #os(...) in a context
+    // other than if #os(...) { }, so we emit an error. We may want to loosen
+    // this restriction in the future (to, e.g., IfExprs) -- but, in general,
+    // we don't want #os() to appear where static analysis cannot easily
+    // determine its effect.
+    AC.Diags.diagnose(E->getLoc(),
+                      diag::availability_query_outside_if_stmt_guard);
+    
+    return std::make_pair(false, E);
+  }
+  
 };
   
 }

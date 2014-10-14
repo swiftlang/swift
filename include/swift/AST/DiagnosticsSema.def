@@ -1723,6 +1723,9 @@ ERROR(availability_query_required_for_platform, sema_avail, none,
 WARNING(availability_query_useless, sema_avail, none,
         "unnecessary check for '%0'; guard will always pass", (StringRef))
 
+ERROR(availability_query_outside_if_stmt_guard, sema_avail, none,
+      "check can only be used as guard of if statement", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
