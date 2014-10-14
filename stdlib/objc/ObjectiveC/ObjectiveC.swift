@@ -76,10 +76,12 @@ extension ObjCBool : Printable {
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-public func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+public // COMPILER_INTRINSIC
+func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
-public func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+public // COMPILER_INTRINSIC
+func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return Bool(x)
 }
 

@@ -175,7 +175,8 @@ func _fatalErrorMessage(prefix: StaticString, message: StaticString,
 /// Prints a fatal error message when a unimplemented initializer gets
 /// called by the Objective-C runtime.
 @transparent @noreturn
-public func _unimplemented_initializer(className: StaticString,
+public // COMPILER_INTRINSIC
+func _unimplemented_initializer(className: StaticString,
                                 initName: StaticString = __FUNCTION__,
                                 file: StaticString = __FILE__,
                                 line: UWord = __LINE__,

@@ -401,7 +401,8 @@ extension String {
   /// implementation in the runtime library.  Constructs a String in
   /// resultStorage containing the given UTF-8.
   @asmname("swift_stringFromUTF8InRawMemory")
-  public static func _fromUTF8InRawMemory(
+  public // COMPILER_INTRINSIC
+  static func _fromUTF8InRawMemory(
     resultStorage: UnsafeMutablePointer<String>,
     start: UnsafeMutablePointer<UTF8.CodeUnit>, utf8Count: Int
   ) {

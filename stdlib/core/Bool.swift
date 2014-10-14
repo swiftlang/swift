@@ -61,7 +61,7 @@ extension Bool : Printable {
 
 // This is a magic entrypoint known to the compiler.
 @transparent
-public // INTRINSIC
+public // COMPILER_INTRINSIC
 func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }
 
 //===----------------------------------------------------------------------===//

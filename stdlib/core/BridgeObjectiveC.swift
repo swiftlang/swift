@@ -350,7 +350,8 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   : Equatable, NilLiteralConvertible, _PointerType {
   public let _rawValue: Builtin.RawPointer
 
-  @transparent public
+  @transparent
+  public // COMPILER_INTRINSIC
   init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }

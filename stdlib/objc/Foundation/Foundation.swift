@@ -87,12 +87,14 @@ class NSSimpleCString {}
 @availability(*, unavailable, message="Please use String or NSString") public
 class NSConstantString {}
 
-@asmname("swift_convertStringToNSString") public
+@asmname("swift_convertStringToNSString")
+public // COMPILER_INTRINSIC
 func _convertStringToNSString(string: String) -> NSString {
   return string._bridgeToObjectiveC()
 }
 
-public func _convertNSStringToString(nsstring: NSString) -> String {
+public // COMPILER_INTRINSIC
+func _convertNSStringToString(nsstring: NSString) -> String {
   var result: String?
   String._forceBridgeFromObjectiveC(nsstring, result: &result)
   return result!
@@ -139,7 +141,8 @@ extension NSString : _CocoaStringType {}
 /// bridge Cocoa strings properly.  Currently invoked by a HACK in
 /// Misc.mm; a better mechanism may be needed.
 @asmname("__swift_initializeCocoaStringBridge") 
-public func __swift_initializeCocoaStringBridge() -> COpaquePointer {
+public // COMPILER_INTRINSIC
+func __swift_initializeCocoaStringBridge() -> COpaquePointer {
   _cocoaStringToContiguous = _cocoaStringToContiguousImpl
   _cocoaStringReadAll = _cocoaStringReadAllImpl
   _cocoaStringLength = _cocoaStringLengthImpl

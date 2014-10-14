@@ -35,7 +35,8 @@ public struct ExecuteSwiftClosureContext<Argument, Result> {
 /// :param: closureAndArg closure and its argument.  The function takes
 ///   ownership of this pointer.
 @asmname("swift_stdlib_executeSwiftClosure")
-public func _stdlib_executeSwiftClosure<Param, Result>(
+public // COMPILER_INTRINSIC
+func _stdlib_executeSwiftClosure<Param, Result>(
   context: UnsafeMutablePointer<ExecuteSwiftClosureContext<Param, Result>>
 ) -> UnsafeMutablePointer<Result> {
   let closure = context.memory.closure
