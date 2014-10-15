@@ -36,8 +36,8 @@ where
 /// Compute the prefix sum of `seq`.
 func scan<
   S : SequenceType, U
->(seq: S, initial: U, combine: (U, S.Generator.Element) -> U) -> [U] {
-  var result = [U]()
+>(seq: S, initial: U, combine: (U, S.Generator.Element) -> U) -> ContiguousArray<U> {
+  var result = ContiguousArray<U>()
   result.reserveCapacity(underestimateCount(seq))
   var runningResult = initial
   for element in seq {
@@ -47,7 +47,7 @@ func scan<
   return result
 }
 
-public func _stdlib_randomShuffle<T>(a: [T]) -> [T] {
+public func _stdlib_randomShuffle<T>(a: ContiguousArray<T>) -> ContiguousArray<T> {
   var result = a
   for var i = a.count - 1; i != 0; --i {
     // FIXME: 32 bits are not enough in general case!
@@ -57,8 +57,8 @@ public func _stdlib_randomShuffle<T>(a: [T]) -> [T] {
   return result
 }
 
-public func _stdlib_gather<T>(a: [T], idx: [Int]) -> [T] {
-  var result = [T]()
+public func _stdlib_gather<T>(a: ContiguousArray<T>, idx: ContiguousArray<Int>) -> ContiguousArray<T> {
+  var result = ContiguousArray<T>()
   result.reserveCapacity(a.count)
   for i in 0..<a.count {
     result.append(a[idx[i]])
@@ -66,7 +66,7 @@ public func _stdlib_gather<T>(a: [T], idx: [Int]) -> [T] {
   return result
 }
 
-public func _stdlib_scatter<T>(a: [T], idx: [Int]) -> [T] {
+public func _stdlib_scatter<T>(a: ContiguousArray<T>, idx: ContiguousArray<Int>) -> ContiguousArray<T> {
   var result = a
   for i in 0..<a.count {
     result[idx[i]] = a[i]
@@ -82,10 +82,10 @@ func findSubstring(string: String, substring: String) -> String.Index? {
 }
 
 func withArrayOfCStrings<R>(
-  args: [String], body: (Array<UnsafeMutablePointer<CChar>>) -> R
+  args: ContiguousArray<String>, body: (Array<UnsafeMutablePointer<CChar>>) -> R
 ) -> R {
 
-  let argsLengths = Array(map(args) { count($0.utf8) + 1 })
+  let argsLengths = ContiguousArray(map(args) { count($0.utf8) + 1 })
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 
@@ -99,7 +99,7 @@ func withArrayOfCStrings<R>(
   return argsBuffer.withUnsafeBufferPointer {
     (argsBuffer) in
     let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress)
-    var cStrings = Array(map(argsOffsets) { ptr + $0 })
+    var cStrings = map(argsOffsets) { ptr + $0 }
     cStrings[cStrings.count - 1] = nil
     return body(cStrings)
   }
