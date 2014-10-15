@@ -1533,3 +1533,36 @@ class SimplifyCFGPass : public SILFunctionTransform {
 SILTransform *swift::createSimplifyCFG() {
   return new SimplifyCFGPass();
 }
+
+namespace {
+class SplitCriticalEdges : public SILFunctionTransform {
+  bool OnlyNonCondBrEdges;
+
+public:
+  SplitCriticalEdges(bool SplitOnlyNonCondBrEdges)
+      : OnlyNonCondBrEdges(SplitOnlyNonCondBrEdges) {}
+
+  void run() {
+    auto &Fn = *getFunction();
+
+    // Split all critical egdes from all or non only cond_br terminators.
+    bool Changed =
+        splitAllCriticalEdges(Fn, OnlyNonCondBrEdges, nullptr, nullptr);
+
+    if (Changed)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+  }
+
+  StringRef getName() override { return "Split Critical Edges"; }
+};
+} // End anonymous namespace.
+
+/// Splits all critical edges in a function.
+SILTransform *swift::createSplitAllCriticalEdges() {
+  return new SplitCriticalEdges(false);
+}
+
+/// Splits all critical edges from non cond_br terminators in a function.
+SILTransform *swift::createSplitNonCondBrCriticalEdges() {
+  return new SplitCriticalEdges(true);
+}

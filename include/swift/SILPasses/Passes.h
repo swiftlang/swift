@@ -102,6 +102,8 @@ namespace swift {
   SILTransform *createIVInfoPrinter();
   SILTransform *createSILCFGPrinter();
   SILTransform *createLoopRotatePass();
+  SILTransform *createSplitAllCriticalEdges();
+  SILTransform *createSplitNonCondBrCriticalEdges();
 } // end namespace swift
 
 #endif

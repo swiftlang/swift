@@ -82,6 +82,7 @@ enum class PassKind {
   ClosureSpecialization,
   CapturePropagation,
   CopyForwarding,
+  SplitAllCriticalEdges,
 };
 
 enum class OptGroup {
@@ -271,6 +272,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::CopyForwarding,
                                    "copy-forwarding",
                                    "Copy Forwarding."),
+                        clEnumValN(PassKind::SplitAllCriticalEdges,
+                                   "split-critical-edges",
+                                   "Split all critical edges"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -482,6 +486,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::CopyForwarding:
       PM.add(createCopyForwarding());
+      break;
+    case PassKind::SplitAllCriticalEdges:
+      PM.add(createSplitAllCriticalEdges());
       break;
     }
   }
