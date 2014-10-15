@@ -1,16 +1,15 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
-//
-// RUN: echo "public typealias TestFloat = Float" > %t/float_type.swift
-// RUN: %target-build-swift %s -I %t -Xfrontend -enable-source-import -o %t/float.out
+// RUN: rm -rf %t &&mkdir %t
+// RUN: cp %s %t/main.swift
+
+// RUN: echo "typealias TestFloat = Float" > %t/float_type.swift
+// RUN: %target-build-swift %t/main.swift %t/float_type.swift -o %t/float.out
 // RUN: %target-run %t/float.out | FileCheck %s
 
-// RUN: echo "public typealias TestFloat = Double" > %t/float_type.swift
-// RUN: %target-build-swift %s -I %t -Xfrontend -enable-source-import -o %t/double.out
+// RUN: echo "typealias TestFloat = Double" > %t/double_type.swift
+// RUN: %target-build-swift %t/main.swift %t/double_type.swift -o %t/double.out
 // RUN: %target-run %t/double.out | FileCheck %s
 
 import Darwin
-import float_type
 
 //===---
 // Helpers

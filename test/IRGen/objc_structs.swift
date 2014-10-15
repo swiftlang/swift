@@ -1,5 +1,6 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import -primary-file %s -emit-ir | FileCheck %s
+// RUN: rm -rf %t && mkdir %t
+// RUN: %build-irgen-test-overlays
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck %s
 import Foundation
 import gizmo
 

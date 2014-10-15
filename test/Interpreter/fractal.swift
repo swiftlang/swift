@@ -3,6 +3,7 @@
 // REQUIRES: swift_interpreter
 
 // FIXME: iOS: -enable-source-import plus %target-build-swift equals link errors
+// FIXME: This test uses IRGen with -enable-source-import; it may fail with -g.
 
 import complex
 

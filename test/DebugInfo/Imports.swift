@@ -1,7 +1,9 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %swift -emit-ir -module-name Foo %s -I %S -enable-source-import -g -o - | FileCheck %s
-// RUN: %swift -c -module-name Foo %s -I %S -enable-source-import -g -o - | llvm-dwarfdump - | FileCheck --check-prefix=DWARF %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %swift -emit-module-path %t/basic.swiftmodule %S/basic.swift
+
+// RUN: %swift -emit-ir -module-name Foo %s -I %t -g -o - | FileCheck %s
+// RUN: %swift -c -module-name Foo %s -I %t -g -o - | llvm-dwarfdump - | FileCheck --check-prefix=DWARF %s
+
 // CHECK-DAG: ![[FOOMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Foo]
 // CHECK-DAG: metadata !{metadata !"0x3a\001\00", metadata ![[THISFILE:[0-9]+]], metadata ![[FOOMODULE]]} ; [ DW_TAG_imported_module ]
 // CHECK-DAG: ![[THISFILE]] = metadata {{.*}}[ DW_TAG_file_type ] [{{.*}}test/DebugInfo/Imports.swift]

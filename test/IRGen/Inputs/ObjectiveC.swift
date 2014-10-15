@@ -15,21 +15,17 @@ public struct ObjCBool : Printable {
   }
 }
 
-public struct Selector : StringLiteralConvertible {
+public struct Selector {
   private var ptr : COpaquePointer
-
-  public static func convertFromStringLiteral(str: String) -> Selector {
-    return sel_registerName(str)
-  }
 }
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
 internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
-  return x
+  return ObjCBool(value: x ? 1 : 0)
 }
 internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
-  return x
+  return x.boolValue
 }
 
 

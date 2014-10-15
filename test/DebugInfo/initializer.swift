@@ -1,6 +1,4 @@
-// RUN: %swift %clang-importer-sdk -enable-source-import -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-
-import Foundation
+// RUN: %swift -disable-objc-attr-requires-foundation-module -target x86_64-apple-macosx10.9 %s -import-objc-header %S/Inputs/serialized-objc-header.h -emit-ir -g -o - | FileCheck %s
 
 protocol Named {
     var name : String { get }
@@ -67,7 +65,7 @@ func test() {
     var tuple = (i8, i16, i32, i64, string)
     var person = Person()
     var point = Point(x: 10.0, y: 20.0)
-    var object = NSObject()
+    var object = ObjCClass()
 
     var arrayInt = [10, 20, 30]
     var arrayOptionalInt : [Int?] = [10, .None, 30, .None, 20]
