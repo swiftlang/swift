@@ -170,6 +170,21 @@ bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
   return true;
 }
 
+template <class SwitchEnumTy, class SwitchEnumCaseTy>
+SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
+                                     SmallVectorImpl<SwitchEnumCaseTy> &Cases,
+                                     unsigned EdgeIdx, SILBasicBlock *NewDest) {
+    auto *DefaultBB = S->hasDefault() ? S->getDefaultBB() : nullptr;
+    for (unsigned i = 0, e = S->getNumCases(); i != e; ++i)
+      if (EdgeIdx != i)
+        Cases.push_back(S->getCase(i));
+      else
+        Cases.push_back(std::make_pair(S->getCase(i).first, NewDest));
+    if (EdgeIdx == S->getNumCases())
+      DefaultBB = NewDest;
+    return DefaultBB;
+}
+
 static void changeBranchTargetAndStripArgs(TermInst *T, unsigned EdgeIdx,
                                            SILBasicBlock *NewDest) {
   SILBuilder B(T);
@@ -201,19 +216,133 @@ static void changeBranchTargetAndStripArgs(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  // For now this utility is only used to split critical edges involving
-  // cond_br.
-  llvm_unreachable("Not yet implemented");
+  if (auto SII = dyn_cast<SwitchIntInst>(T)) {
+    SmallVector<std::pair<APInt, SILBasicBlock *>, 8> Cases;
+    auto *DefaultBB = replaceSwitchDest(SII, Cases, EdgeIdx, NewDest);
+    B.createSwitchInt(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
+    SII->eraseFromParent();
+    return;
+  }
+
+  if (auto SEI = dyn_cast<SwitchEnumInst>(T)) {
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+    auto *DefaultBB = replaceSwitchDest(SEI, Cases, EdgeIdx, NewDest);
+    B.createSwitchEnum(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
+    SEI->eraseFromParent();
+    return;
+  }
+
+  if (auto SEI = dyn_cast<SwitchEnumAddrInst>(T)) {
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+    auto *DefaultBB = replaceSwitchDest(SEI, Cases, EdgeIdx, NewDest);
+    B.createSwitchEnumAddr(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
+    SEI->eraseFromParent();
+    return;
+  }
+
+  if (auto DMBI = dyn_cast<DynamicMethodBranchInst>(T)) {
+    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
+    auto HasMethodBB = !EdgeIdx ? NewDest : DMBI->getHasMethodBB();
+    auto NoMethodBB = EdgeIdx ? NewDest : DMBI->getNoMethodBB();
+    B.createDynamicMethodBranch(DMBI->getLoc(), DMBI->getOperand(),
+                                DMBI->getMember(), HasMethodBB, NoMethodBB);
+    DMBI->eraseFromParent();
+    return;
+  }
+
+  if (auto CBI = dyn_cast<CheckedCastBranchInst>(T)) {
+    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
+    auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
+    auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
+    B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
+                              CBI->getCastType(), SuccessBB, FailureBB);
+    CBI->eraseFromParent();
+    return;
+  }
+
+  if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
+    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
+    auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
+    auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
+    B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
+                                  CBI->getSrc(), CBI->getSourceType(),
+                                  CBI->getDest(), CBI->getTargetType(),
+                                  SuccessBB, FailureBB);
+    CBI->eraseFromParent();
+    return;
+  }
+
+  llvm_unreachable("Missing implementation");
 }
 
-static OperandValueArrayRef getEdgeArgs(TermInst *T, unsigned EdgeIdx) {
+template<class SwitchInstTy>
+SILBasicBlock *getNthEdgeBlock(SwitchInstTy *S, unsigned EdgeIdx) {
+  if (S->getNumCases() == EdgeIdx)
+    return S->getDefaultBB();
+  return S->getCase(EdgeIdx).second;
+}
+
+static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
+                        SmallVectorImpl<SILValue> &Args) {
   if (auto Br = dyn_cast<BranchInst>(T)) {
-    return Br->getArgs();
+    for (auto V : Br->getArgs())
+      Args.push_back(V);
+    return;
   }
 
   if (auto CondBr = dyn_cast<CondBranchInst>(T)) {
     assert(EdgeIdx < 2);
-    return EdgeIdx ? CondBr->getFalseArgs() : CondBr->getTrueArgs();
+    auto OpdArgs = EdgeIdx ? CondBr->getFalseArgs() : CondBr->getTrueArgs();
+    for (auto V: OpdArgs)
+      Args.push_back(V);
+    return;
+  }
+
+  if (auto SEI = dyn_cast<SwitchIntInst>(T)) {
+    auto *SuccBB = getNthEdgeBlock(SEI, EdgeIdx);
+    assert(SuccBB->getNumBBArg() == 0 && "Can't take an argument");
+    return;
+  }
+
+  // A switch_enum can implicitly pass the enum payload. We need to look at the
+  // destination block to figure this out.
+  if (auto SEI = dyn_cast<SwitchEnumInstBase>(T)) {
+    auto *SuccBB = getNthEdgeBlock(SEI, EdgeIdx);
+    assert(SuccBB->getNumBBArg() < 2 && "Can take at most one argument");
+    if (!SuccBB->getNumBBArg())
+      return;
+    Args.push_back(
+        SILValue(NewEdgeBB->createArgument(SuccBB->getBBArg(0)->getType()), 0));
+    return;
+  }
+
+  // A dynamic_method_br passes the function to the first basic block.
+  if (auto DMBI = dyn_cast<DynamicMethodBranchInst>(T)) {
+    auto *SuccBB =
+        (EdgeIdx == 0) ? DMBI->getHasMethodBB() : DMBI->getNoMethodBB();
+    if (!SuccBB->getNumBBArg())
+      return;
+    Args.push_back(
+        SILValue(NewEdgeBB->createArgument(SuccBB->getBBArg(0)->getType()), 0));
+    return;
+  }
+
+  /// A checked_cast_br passes the result of the cast to the first basic block.
+  if (auto CBI = dyn_cast<CheckedCastBranchInst>(T)) {
+    auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
+    if (!SuccBB->getNumBBArg())
+      return;
+    Args.push_back(
+        SILValue(NewEdgeBB->createArgument(SuccBB->getBBArg(0)->getType()), 0));
+    return;
+  }
+  if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
+    auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
+    if (!SuccBB->getNumBBArg())
+      return;
+    Args.push_back(
+        SILValue(NewEdgeBB->createArgument(SuccBB->getBBArg(0)->getType()), 0));
+    return;
   }
 
   // For now this utility is only used to split critical edges involving
@@ -263,13 +392,11 @@ SILBasicBlock *swift::splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
 
   SILBasicBlock *DestBB = T->getSuccessors()[EdgeIdx];
 
-  auto EdgeArgs = getEdgeArgs(T, EdgeIdx);
-  SmallVector<SILValue, 8> Args;
-  for (auto Arg : EdgeArgs)
-    Args.push_back(Arg);
-
   // Create a new basic block in the edge, and insert it after the SrcBB.
   auto *EdgeBB = new (Fn->getModule()) SILBasicBlock(Fn, SrcBB);
+
+  SmallVector<SILValue, 16> Args;
+  getEdgeArgs(T, EdgeIdx, EdgeBB, Args);
 
   // Connect it to the successor with the args of the old edge.
   auto &InstList = EdgeBB->getInstList();
