@@ -9,7 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift | FileCheck %s
 import Swift
 
 //===--- class Tracked ----------------------------------------------------===//
@@ -115,6 +115,10 @@ struct MrMcArray<T> : CollectionType, _ArrayType {
     return _buffer[i]
   }
 
+  func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<T> {
+    return _buffer
+  }
+
   var _buffer: _Buffer
 }
 
@@ -145,20 +149,20 @@ func test() {
 
   // CHECK-NEXT: using collection API
   let n1 = MrMcRange(3..<23)~>_copyToNativeArrayBuffer()
-  // CHECK-NEXT: <3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22>
+  // CHECK: <3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22>
   printSequence(n1)
 
   //===--- _ArrayTypes get asked for a NativeBuffer -----------------------===//
 
   let a0 = MrMcArray<Tracked>(n1)
 
-  let n2 = a0~>_copyToNativeArrayBuffer()
-  // CHECK-NEXT: true
+  let cp = _copyToNativeArrayBuffer()
+  let n2 = a0~>cp
 
-  // TODO: The following check is currently disabled because the === function
-  // is not public. But this test() function is not called anyway.
-  // println(n1 === n2)
+  // CHECK-NEXT: true
+  println(n1._base == n2._base)
 }
+test()
 
 // CHECK-NEXT: trackedCount = 0
 println("trackedCount = \(trackedCount)")

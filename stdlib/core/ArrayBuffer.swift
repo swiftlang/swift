@@ -194,9 +194,9 @@ extension _ArrayBuffer {
     return Swift._isUniquelyReferenced(&storage) && _hasMutableBuffer
   }
   
-  /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
-  /// Otherwise, return nil.  Note: the result's baseAddress may
-  /// not match ours, if we are a _SliceBuffer.
+  /// If this buffer is backed by a `_ContiguousArrayBuffer`
+  /// containing the same number of elements as `self`, return it.
+  /// Otherwise, return `nil`.
   public func requestNativeBuffer() -> NativeBuffer? {
     if !_isClassOrObjCExistential(T.self) {
       return _native
@@ -412,14 +412,18 @@ extension _ArrayBuffer {
     return _fastPath(_isNative) ? _native._storage : _nonNative!
   }
   
-  /// A value that identifies first mutable element, if any.  Two
-  /// arrays compare === iff they are both empty or if their buffers
-  /// have the same identity and count.
-  public
-  var identity: Word {
-    let p = baseAddress
-    return p != nil
-      ? unsafeBitCast(p, Word.self) : unsafeBitCast(owner, Word.self)
+  /// A value that identifies the exact elements covered by the buffer
+  public var identity: Range<UnsafePointer<UInt8>> {
+    if _isNative {
+      return ContiguousArray(_native)._buffer.identity
+    }
+    else if let cocoa = _nonNative {
+      let id = unsafeAddressOf(cocoa)
+      return UnsafePointer(id)..<UnsafePointer(id)
+    }
+    else {
+      return UnsafePointer()..<UnsafePointer()
+    }
   }
   
   //===--- CollectionType conformance -------------------------------------===//

@@ -258,9 +258,9 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return isUniquelyReferenced()
   }
 
-  /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
-  /// Otherwise, return nil.  Note: the result's baseAddress may
-  /// not match ours, if we are a _SliceBuffer.
+  /// If this buffer is backed by a `_ContiguousArrayBuffer`
+  /// containing the same number of elements as `self`, return it.
+  /// Otherwise, return `nil`.
   public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     return self
   }
@@ -399,13 +399,13 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return _storage
   }
 
-  /// A value that identifies first mutable element, if any.  Two
-  /// arrays compare === iff they are both empty, or if their buffers
-  /// have the same identity and count.
-  public var identity: Word {
-    return unsafeBitCast(baseAddress, Word.self)
+  /// A value that identifies the exact elements covered by the buffer
+  public var identity: Range<UnsafePointer<UInt8>> {
+    return withUnsafeBufferPointer {
+      UnsafePointer($0.baseAddress)..<UnsafePointer($0.baseAddress + self.count)
+    }
   }
-
+  
   /// Return true iff we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
@@ -539,8 +539,8 @@ public func ~> <
 }
 
 public func ~> <
-  C: CollectionType
-    where C.Generator.Element == C._Element
+  C: protocol<_CollectionType, _Sequence_Type>
+  where C._Element == C.Generator.Element
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
 ) -> _ContiguousArrayBuffer<C.Generator.Element>
@@ -549,8 +549,8 @@ public func ~> <
 }
 
 func _copyCollectionToNativeArrayBuffer<
-  C: CollectionType
-    where C.Generator.Element == C._Element
+  C: protocol<_CollectionType, _Sequence_Type>
+  where C._Element == C.Generator.Element
 >(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
 {
   let count: Int = numericCast(Swift.count(source))
@@ -570,11 +570,4 @@ func _copyCollectionToNativeArrayBuffer<
   }
   _expectEnd(i, source)
   return result
-}
-
-protocol _ArrayType : CollectionType {
-  var count: Int {get}
-
-  typealias _Buffer : _ArrayBufferType
-  var _buffer: _Buffer {get}
 }

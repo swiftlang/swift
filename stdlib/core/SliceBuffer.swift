@@ -100,15 +100,11 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     setLocalCount(oldCount + growth)
     _invariantCheck()
   }
-  
-  /// A value that identifies first mutable element, if any.  Two
-  /// arrays compare === iff they are both empty, or if their buffers
-  /// have the same identity and count.
-  public
-  var identity: Word {
-    return unsafeBitCast(start, Word.self)
+
+  /// A value that identifies the exact elements covered by the buffer
+  public var identity: Range<UnsafePointer<UInt8> > {
+    return UnsafePointer(start)..<UnsafePointer(start + count)
   }
-  
   
   /// An object that keeps the elements stored in this buffer alive
   public
@@ -162,14 +158,17 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return _hasNativeBuffer && isUniquelyReferenced()
   }
 
-  /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
-  /// Otherwise, return nil.  Note: the result's baseAddress may
-  /// not match ours, since we are a _SliceBuffer.
+  /// If this buffer is backed by a `_ContiguousArrayBuffer`
+  /// containing the same number of elements as `self`, return it.
+  /// Otherwise, return `nil`.
   public
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer) {
-      return  unsafeBitCast(owner, NativeBuffer.self)
+      let n = unsafeBitCast(owner, NativeBuffer.self)
+      if n.count == count {
+        return n
+      }
     }
     return nil
   }

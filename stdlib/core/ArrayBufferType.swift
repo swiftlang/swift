@@ -56,9 +56,9 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// unnecessary reallocation.
   mutating func isMutableAndUniquelyReferenced() -> Bool
 
-  /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
-  /// Otherwise, return nil.  Note: the result's baseAddress may
-  /// not match ours, if we are a _SliceBuffer.
+  /// If this buffer is backed by a `_ContiguousArrayBuffer`
+  /// containing the same number of elements as `self`, return it.
+  /// Otherwise, return `nil`.
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>?
   
   /// Replace the given subRange with the first newCount elements of
@@ -101,8 +101,6 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// element. Otherwise, nil.
   var baseAddress: UnsafeMutablePointer<Element> {get}
 
-  /// A value that identifies first mutable element, if any.  Two
-  /// arrays compare === iff they are both empty, or if their buffers
-  /// have the same identity and count.
-  var identity: Word {get}
+  /// A value that identifies the exact elements covered by the buffer
+  var identity: Range<UnsafePointer<UInt8>> {get}
 }

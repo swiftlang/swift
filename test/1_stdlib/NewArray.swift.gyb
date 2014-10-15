@@ -184,26 +184,28 @@ func testAsArray() {
   
   let x = ContiguousArray(w)
   println(bufferID(w) == bufferID(x))
-  // CHECK-NEXT: false
+  // CHECK-NEXT: true
   
   let y = Array(x)
   println(bufferID(x) == bufferID(y))
-  // CHECK-NEXT: false
+  // CHECK-NEXT: true
 
   // Because of their indirection, arrays of classes can share
   // buffers.  
   let y1 = Array(y)
   println(bufferID(y1) == bufferID(y))
-  // However, I'm not implementing that optimization yet, thus false.
-  // CHECK-NEXT: false
+  // CHECK-NEXT: true
   
   let z = Slice(y)
   println(bufferID(y) == bufferID(z))
-  // CHECK-NEXT: false
+  // CHECK-NEXT: true
 
   w = ContiguousArray(z)
   println(bufferID(w) == bufferID(z))
-  // CHECK-NEXT: false
+  // CHECK-NEXT: true
+
+  let zz = y[0..<2]
+  println(bufferID(zz))
 }
 testAsArray()
 

@@ -292,6 +292,12 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   public var _buffer: _Buffer
 }
 
+extension ${Self} : _ArrayType {
+  public func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<T> {
+    return _extractOrCopyToNativeArrayBuffer(self._buffer)
+  }
+}
+
 extension ${Self} : ArrayLiteralConvertible {
 %if Self == 'Array':
   // Optimized implementation for Array
@@ -708,7 +714,7 @@ func _arrayOutOfPlaceReplace<
 /// A _debugPrecondition check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
-internal func _expectEnd<C: CollectionType>(
+internal func _expectEnd<C: _CollectionType>(
   i: C.Index, s: C
 ) {
   _debugPrecondition(

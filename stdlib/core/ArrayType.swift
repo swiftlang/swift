@@ -10,6 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 
+public protocol _ArrayType : _CollectionType {
+  var count: Int {get}
+
+  typealias _Buffer : _ArrayBufferType
+  var _buffer: _Buffer {get}
+  
+  func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<_Element>
+}
+
+public func ~> <
+  A: protocol<_ArrayType, _Sequence_Type>
+  where A._Element == A.Generator.Element
+>(
+  source: A, _: (_CopyToNativeArrayBuffer,())
+) -> _ContiguousArrayBuffer<A.Generator.Element> {
+  return source._doCopyToNativeArrayBuffer()
+}
+
 internal protocol ArrayType
   : _ArrayType,
     RangeReplaceableCollectionType,
