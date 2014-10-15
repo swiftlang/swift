@@ -107,6 +107,10 @@ ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
                                          "stdin."));
 
 static llvm::cl::opt<std::string>
+ResourceDir("resource-dir",
+    llvm::cl::desc("The directory that holds the compiler resource files"));
+
+static llvm::cl::opt<std::string>
 SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
                               "importer."),
         llvm::cl::init(""));
@@ -528,6 +532,8 @@ int main(int argc, char **argv) {
     Invocation.setSDKPath(SDKPath);
   if (!Target.empty())
     Invocation.setTargetTriple(Target);
+  if (!ResourceDir.empty())
+    Invocation.setRuntimeResourcePath(ResourceDir);
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
