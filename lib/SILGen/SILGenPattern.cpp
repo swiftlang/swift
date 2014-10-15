@@ -1655,10 +1655,12 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
   // Emit the switch instruction.
   bool addressOnlyEnum = src.getType().isAddress();
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
+  SILLocation loc = TheSwitch;
+  loc.setDebugLoc(rows[0].Pattern);
   if (addressOnlyEnum) {
-    SGF.B.createSwitchEnumAddr(TheSwitch, srcValue, defaultBB, caseBBs);
+    SGF.B.createSwitchEnumAddr(loc, srcValue, defaultBB, caseBBs);
   } else {
-    SGF.B.createSwitchEnum(TheSwitch, srcValue, defaultBB, caseBBs);
+    SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs);
   }
 
   // Okay, now emit all the cases.

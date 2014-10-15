@@ -251,10 +251,16 @@ public:
     return SpecificLoc.SILFileSourceLoc;
   }
 
-  void setHasDebugLoc() {
+  /// \brief Add an ASTNode to use as the location for debugging
+  /// purposes if this location is different from the location used
+  /// for diagnostics.
+  template <typename T>
+  void setDebugLoc(T *ASTNodeForDebugging) {
+    assert(!hasDebugLoc() && "DebugLoc already present");
     assert(!hasSILFileSourceLoc() &&
            "SILFileSourceLoc and DebugLoc are mutually exclusive");
     KindData |= (1 << HasDebugLoc);
+    SpecificLoc.DebugLoc = ASTNodeForDebugging;
   }
   bool hasDebugLoc() const {
     return KindData & (1 << HasDebugLoc);
