@@ -353,8 +353,8 @@ public func == <Value, Element>(
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
 
-/// Returns `true` iff `object` is a non-\ `@objc` class with a single
-/// strong reference.
+/// Returns `true` iff `object` is a non-\ `@objc` class instance with
+/// a single strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
 ///   implementation artifact.
@@ -386,7 +386,7 @@ public func isUniquelyReferencedNonObjC<T: AnyObject>(inout object: T) -> Bool {
   return result != 0
 }
 
-/// Returns `true` iff `object` is a non-\ `@objc` class with a single
+/// Returns `true` iff `object` is a non-\ `@objc` class instance with a single
 /// strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -415,6 +415,41 @@ public func isUniquelyReferenced<T: NonObjectiveCBase>(
   // extra reference will be held during the check below
   let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(object))
   let result = _swift_isUniquelyReferenced_nonNull_native(o)
+  Builtin.fixLifetime(object)
+  return result != 0
+}
+
+/// Returns `true` iff `object` is a non-\ `@objc` class instance with
+/// a single strong reference.
+///
+/// * Does *not* modify `object`; the use of `inout` is an
+///   implementation artifact.
+/// * If `object` is an Objective-C class instance, returns `false`.
+/// * Weak references do not affect the result of this function.
+///  
+/// Useful for implementing the copy-on-write optimization for the
+/// deep storage of value types::
+///
+///   mutating func modifyMe(arg: X) {
+///     if isUniquelyReferencedNonObjC(&myStorage) {
+///       myStorage.modifyInPlace(arg)
+///     }
+///     else {
+///       myStorage = self.createModified(myStorage, arg)
+///     }
+///   }
+///
+/// This function is safe to use for `mutating` functions in
+/// multithreaded code because a false positive would imply that there
+/// is already a user-level data race on the value being mutated.
+public func isUniquelyReferencedNonObjC<T: AnyObject>(
+  inout object: T?
+) -> Bool {
+  
+  // Note: the pointer must be extracted in a separate step or an
+  // extra reference will be held during the check below
+  let o = Builtin.reinterpretCast(object) as UnsafePointer<Void>
+  let result = _swift_isUniquelyReferencedNonObjC(o)
   Builtin.fixLifetime(object)
   return result != 0
 }

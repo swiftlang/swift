@@ -23,6 +23,7 @@
 namespace swift { extern "C" {
 #endif
 
+unsigned char _swift_isUniquelyReferencedNonObjC(const void*);
 unsigned char _swift_isUniquelyReferencedNonObjC_nonNull(const void*);
 unsigned char _swift_usesNativeSwiftReferenceCounting_nonNull(const void*);
 unsigned char _swift_usesNativeSwiftReferenceCounting_class(const void*);

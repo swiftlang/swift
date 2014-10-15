@@ -169,7 +169,7 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(T.self) {
       return true
     }
-    return indirect.isMutable && Swift._isUniquelyReferenced(&indirect.buffer)
+    return indirect.isMutable && isUniquelyReferencedNonObjC(&indirect.buffer)
   }
 
   /// If this buffer is backed by a uniquely-referenced mutable

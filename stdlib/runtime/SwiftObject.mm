@@ -737,6 +737,15 @@ unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull(
     _swift_isUniquelyReferenced_nonNull_native((HeapObject*)object);
 }
 
+// Given an object reference, return true iff it is non-nil and refers
+// to a native swift object with strong reference count of 1.
+unsigned char swift::_swift_isUniquelyReferencedNonObjC(
+  const void* object
+) {
+  return object != nullptr
+    && _swift_isUniquelyReferencedNonObjC_nonNull(object);
+}
+
 //===----------------------------------------------------------------------===//
 // FIXME: this should return bool but it chokes the compiler
 // <rdar://problem/18573806>
