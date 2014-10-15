@@ -640,7 +640,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   assert(OI.CompilerOutputType != types::ID::TY_INVALID);
 
-  OI.ShouldGenerateDebugInfo = Args.hasArg(options::OPT_g);
+  if (const Arg *A = Args.getLastArg(options::OPT_g_Group)) {
+    if (A->getOption().matches(options::OPT_g)) {
+      OI.ShouldGenerateDebugInfo = true;
+    } else {
+      assert(A->getOption().matches(options::OPT_gnone) &&
+             "unknown -g<kind> option");
+    }
+  }
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
     // The user has requested a module, so generate one and treat it as

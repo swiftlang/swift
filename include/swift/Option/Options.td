@@ -109,8 +109,6 @@ def j : JoinedOrSeparate<["-"], "j">,
 
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
-def g : Flag<["-"], "g">, Flags<[FrontendOption]>,
-  HelpText<"Emit debug info">;
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Specifies one or more build configuration options">;
@@ -238,6 +236,15 @@ def O : Flag<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>,
 def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
   Flags<[FrontendOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;
+
+// Debug info options
+
+def g_Group : OptionGroup<"<debug info options>">;
+
+def g : Flag<["-"], "g">, Group<g_Group>, Flags<[FrontendOption]>,
+  HelpText<"Emit debug info">;
+def gnone : Flag<["-"], "gnone">, Group<g_Group>, Flags<[FrontendOption]>,
+  HelpText<"Don't emit debug info">;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,

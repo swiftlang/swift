@@ -892,14 +892,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            StringRef ResourceDir) {
   using namespace options;
 
-  if (Args.hasArg(OPT_g)) {
-    Opts.DebugInfo = true;
-    ArgStringList RenderedArgs;
-    for (auto A : Args)
-      A->render(Args, RenderedArgs);
-    CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
-                                             RenderedArgs, SDKPath,
-                                             ResourceDir);
+  if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
+    if (A->getOption().matches(OPT_g)) {
+      Opts.DebugInfo = true;
+      ArgStringList RenderedArgs;
+      for (auto A : Args)
+        A->render(Args, RenderedArgs);
+      CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
+                                               RenderedArgs, SDKPath,
+                                               ResourceDir);
+    } else {
+      assert(A->getOption().matches(options::OPT_gnone) &&
+             "unknown -g<kind> option");
+    }
   }
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_l, OPT_framework),

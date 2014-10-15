@@ -34,11 +34,15 @@
 // EXEC-AND-MODULE: 3: link, {1}, image
 
 // RUN: %swiftc_driver -driver-print-actions -g %s 2>&1 | FileCheck %s -check-prefix=DEBUG
+// RUN: %swiftc_driver -driver-print-actions -gnone -g %s 2>&1 | FileCheck %s -check-prefix=DEBUG
 // DEBUG: 0: input, "{{.*}}actions.swift", swift
 // DEBUG: 1: compile, {0}, object
 // DEBUG: 2: merge-module, {1}, swiftmodule
 // DEBUG: 3: link, {1, 2}, image
 // DEBUG: 4: generate-dSYM, {3}, dSYM
+
+// RUN: %swiftc_driver -driver-print-actions -gnone %s 2>&1 | FileCheck %s -check-prefix=BASIC
+// RUN: %swiftc_driver -driver-print-actions -g -gnone %s 2>&1 | FileCheck %s -check-prefix=BASIC
 
 // RUN: %swiftc_driver -driver-print-actions -g -c %s 2>&1 | FileCheck %s -check-prefix=DEBUG-OBJECT
 // DEBUG-OBJECT: 0: input, "{{.*}}actions.swift", swift
@@ -46,11 +50,15 @@
 // DEBUG-OBJECT-NOT: merge-module
 
 // RUN: %swiftc_driver -driver-print-actions -g -emit-executable -emit-module %s 2>&1 | FileCheck %s -check-prefix=DEBUG-MODULE
+// RUN: %swiftc_driver -driver-print-actions -gnone -g -emit-executable -emit-module %s 2>&1 | FileCheck %s -check-prefix=DEBUG-MODULE
 // DEBUG-MODULE: 0: input, "{{.*}}actions.swift", swift
 // DEBUG-MODULE: 1: compile, {0}, object
 // DEBUG-MODULE: 2: merge-module, {1}, swiftmodule
 // DEBUG-MODULE: 3: link, {1, 2}, image
 // DEBUG-MODULE: 4: generate-dSYM, {3}, dSYM
+
+// RUN: %swiftc_driver -driver-print-actions -gnone -emit-executable -emit-module %s 2>&1 | FileCheck %s -check-prefix=EXEC-AND-MODULE
+// RUN: %swiftc_driver -driver-print-actions -g -gnone -emit-executable -emit-module %s 2>&1 | FileCheck %s -check-prefix=EXEC-AND-MODULE
 
 // RUN: %swiftc_driver -driver-print-actions %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions 2>&1 | FileCheck %s -check-prefix=MULTI
 // MULTI: 0: input, "{{.*}}Inputs/main.swift", swift
