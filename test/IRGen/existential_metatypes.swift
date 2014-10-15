@@ -32,3 +32,20 @@ func test0() {
 
 // CHECK-NEXT: ret void
 }
+
+// CHECK: define hidden void @_TF21existential_metatypes5test1FGSqPMPS_8Kindable__T_(i128)
+// CHECK:     [[TYPE_WORD:%.*]] = trunc i128 %0 to i64
+// CHECK:     [[TYPE_WORD:%.*]] = trunc i128 %0 to i64
+// CHECK:     [[TYPE:%.*]] = inttoptr i64 [[TYPE_WORD]] to %swift.type*
+// CHECK:     [[WITNESS_SHIFT:%.*]] = lshr i128 %0, 64
+// CHECK:     [[WITNESS_WORD:%.*]] = trunc i128 [[WITNESS_SHIFT]] to i64
+// CHECK:     [[WITNESS:%.*]] = inttoptr i64 [[WITNESS_WORD]] to i8**
+func use(t: Kindable.Type) {}
+func test1(opt: Kindable.Type?) {
+  switch opt {
+  case .Some(let t):
+    use(t)
+  case .None:
+    break
+  }
+}

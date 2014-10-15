@@ -1050,7 +1050,9 @@ namespace {
                             unsigned offset) const override {
       UnpackEnumPayload unpack(IGF, payload);
       unpack.moveToOffset(offset);
-      dest.add(unpack.claim(IGF.IGM.UnknownRefCountedPtrTy));
+      ExplosionSchema schema;
+      getSchema(schema);
+      dest.add(unpack.claim(schema[0].getScalarType()));
       for (unsigned i = 0; i < getNumStoredProtocols(); ++i)
         dest.add(unpack.claim(IGF.IGM.WitnessTablePtrTy));
     }
