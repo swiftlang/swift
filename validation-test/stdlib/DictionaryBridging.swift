@@ -3,10 +3,10 @@
 //
 // FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
 //
-// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/../../test/stdlib/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/../../test/1_stdlib/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 //
 // RUN: cp %s %t/main.swift
-// RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/../../test/stdlib/Inputs/SlurpFastEnumeration/ %t/main.swift %S/../../test/stdlib/Inputs/DictionaryKeyValueTypes.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
+// RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/../../test/1_stdlib/Inputs/SlurpFastEnumeration/ %t/main.swift %S/../../test/1_stdlib/Inputs/DictionaryKeyValueTypes.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
 // RUN: %target-run %t.out
 
 import StdlibUnittest
