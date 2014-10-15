@@ -1676,8 +1676,8 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     // We're in conditionally-executed code; enter a scope.
     Scope scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(loc));
       
-    // Create a BB argument or 'unchecked_take_enum_data_addr' instruction to receive
-    // the enum case data if it has any.
+    // Create a BB argument or 'unchecked_take_enum_data_addr'
+    // instruction to receive the enum case data if it has any.
 
     SILType eltTy;
     bool hasElt = false;
