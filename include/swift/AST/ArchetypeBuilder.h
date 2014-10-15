@@ -62,6 +62,9 @@ public:
     /// The requirement was explicitly stated in the generic parameter
     /// clause.
     Explicit,
+    /// The requirement was explicitly stated in the generic parameter clause
+    /// but is redundant with some other requirement.
+    Redundant,
     /// The requirement was part of a protocol requirement, e.g., an
     /// inherited protocol or a requirement on an associated type.
     Protocol,
@@ -78,6 +81,9 @@ public:
 
   /// Retrieve the kind of requirement source.
   Kind getKind() const { return StoredKind; }
+
+  /// Set the kind of the requirement source.
+  void setKind(Kind kind) { StoredKind = kind; }
 
   /// Retrieve the source location at which the requirement originated.
   SourceLoc getLoc() const { return Loc; }

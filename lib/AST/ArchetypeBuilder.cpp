@@ -45,6 +45,10 @@ void RequirementSource::dump(llvm::raw_ostream &out,
     out << "explicit";
     break;
 
+  case Redundant:
+    out << "redundant";
+    break;
+
   case Protocol:
     out << "protocol";
     break;
@@ -64,92 +68,64 @@ void RequirementSource::dump(llvm::raw_ostream &out,
   }
 }
 
-namespace {
-  /// A class whose instances capture the potential update of an
-  /// existing requirement source when another equivalent requirement
-  /// is found.
-  class UpdateRequirementSource {
-    RequirementSource &Source;
-    const RequirementSource &NewSource;
-    bool IsRedundant = false;
-    bool ShouldUpdate = false;
-    bool OriginalIsRedundant = false;
-
-  public:
-    UpdateRequirementSource(RequirementSource &source,
-                            const RequirementSource &newSource);
-
-    ~UpdateRequirementSource() {
-      if (ShouldUpdate)
-        Source = NewSource;
-    }
-
-    /// Determine whether one of the requirements is considered
-    /// redundant, which can be diagnosed.
-    explicit operator bool() const { return IsRedundant; }
-
-    /// Determine whether it is the original source (vs. the new
-    /// source) that is redundant.
-    bool originalIsRedundant() const { return OriginalIsRedundant; }
-  };
-}
-
-UpdateRequirementSource::UpdateRequirementSource(
-                           RequirementSource &source,
-                           const RequirementSource &newSource)
-  : Source(source), NewSource(newSource) 
-{
-  // If one of the requirements is explicit, it is redundant.
-  if (source.getKind() == RequirementSource::Explicit ||
-      newSource.getKind() == RequirementSource::Explicit) {
-    IsRedundant = true;
-    
-    // If the new source isn't explicit, override the old source
-    // with the new. We don't maintain redundant explicit
-    // requirements.
-    if (newSource.getKind() != RequirementSource::Explicit) {
-      ShouldUpdate = true;
-      OriginalIsRedundant = true;
-    }
-
-    return;
-  }
-
-  // If the source kinds are the same, there is nothing to do.
-  if (source.getKind() == newSource.getKind())
-    return;
-
+/// Update the recorded requirement source when a new requirement
+/// source provides the same requirement.
+static void updateRequirementSource(RequirementSource &source,
+                                    const RequirementSource &newSource) {
   switch (newSource.getKind()) {
   case RequirementSource::Explicit:
-    llvm_unreachable("Handled above");
-
-  case RequirementSource::Inferred:
-    // A new inferred source will never override an existing source.
-    return;
-
-  case RequirementSource::Protocol: {
-    // A new protocol source will override an inferred source.
+  case RequirementSource::Redundant:
+    // Nothing to do; the new source is always redundant.
     switch (source.getKind()) {
     case RequirementSource::Explicit:
-    case RequirementSource::Protocol:
-      llvm_unreachable("Handled above");
-
-    case RequirementSource::OuterScope:
-      return;
+    case RequirementSource::Redundant:
+      // Nothing to do.
+      break;
 
     case RequirementSource::Inferred:
-      ShouldUpdate = true;
-      return;
+    case RequirementSource::Protocol:
+      // Mark the original source as redundant.
+      source = RequirementSource(RequirementSource::Redundant,
+                                 newSource.getLoc());
+      break;
+
+    case RequirementSource::OuterScope:
+      // Leave the outer scope in place.
+      break;
     }
+    break;
+  
+  case RequirementSource::Inferred:
+    // A new inferred source will never override an existing source.
+    break;
+
+  case RequirementSource::Protocol: {
+    switch (source.getKind()) {
+    case RequirementSource::Explicit:
+    case RequirementSource::Redundant:
+      // The original source is redundant.
+      source.setKind(RequirementSource::Redundant);
+      break;
+
+    case RequirementSource::Protocol:
+    case RequirementSource::OuterScope:
+      // Keep the original source.
+      break;
+
+    case RequirementSource::Inferred:
+      // Replace the inferred source with the protocol source.
+      source = newSource;
+      break;
+    }
+
+    break;
   }
 
   case RequirementSource::OuterScope:
     // An outer-scope source always overrides an existing source.
-    ShouldUpdate = true;
-    return;
+    source = newSource;
+    break;
   }
-
-  return;
 }
 
 /// The identifying information for a generic parameter.
@@ -301,7 +277,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
   if (known != ConformsTo.end()) {
     // We already have this requirement. Update the requirement source
     // appropriately.
-    UpdateRequirementSource(known->second, source);
+    updateRequirementSource(known->second, source);
     return false;
   }
 
@@ -747,8 +723,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
       return true;
     }
 
-    UpdateRequirementSource update(*T->SuperclassSource, Source);
-
+    updateRequirementSource(*T->SuperclassSource, Source);
     return false;
   }
 
