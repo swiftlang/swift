@@ -42,7 +42,9 @@ case Verbatim, Explicit
 public func _arrayForceCast<SourceElement, TargetElement>(
   source: Array<SourceElement>
 ) -> Array<TargetElement> {
-  switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
+  switch (
+    _ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)
+  ) {
   case (.Reference, .Verbatim):
     let native = source._buffer.requestNativeBuffer()
     
@@ -62,12 +64,18 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     return result!
     
   case (.Value, .Verbatim):
-    var buf = _ContiguousArrayBuffer<TargetElement>(count: source.count, minimumCapacity: 0)
-    var p = buf._unsafeElementStorage
-    for value in source {
-      let bridged: AnyObject? = _bridgeToObjectiveC(value)
-      _precondition(bridged != nil, "array element cannot be bridged to Objective-C")
-      p++.initialize(unsafeBitCast(bridged!, TargetElement.self))
+    var buf = _ContiguousArrayBuffer<TargetElement>(
+      count: source.count, minimumCapacity: 0)
+    
+    let _: Void = buf.withUnsafeMutableBufferPointer {
+      var p = $0.baseAddress
+      for value in source {
+        let bridged: AnyObject? = _bridgeToObjectiveC(value)
+        _precondition(
+          bridged != nil, "array element cannot be bridged to Objective-C")
+        // FIXME: should be an unsafeDowncast, but for <rdar://problem/18638230>
+        p++.initialize(unsafeBitCast(bridged!, TargetElement.self))
+      }
     }
     return Array(_ArrayBuffer(buf))
     
