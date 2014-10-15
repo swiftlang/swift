@@ -22,6 +22,7 @@
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Utils/SILInliner.h"
 #include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -620,7 +621,8 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   for (auto &Inst : DestBB->getInstList()) {
     // This is a really trivial cost model, which is only intended as a starting
     // point.
-    if (++Cost == 4) return false;
+    if (instructionInlineCost(Inst) != InlineCost::Free)
+      if (++Cost == 4) return false;
 
     // If there is an instruction in the block that has used outside the block,
     // duplicating it would require constructing SSA, which we're not prepared
