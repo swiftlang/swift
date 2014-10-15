@@ -92,6 +92,19 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
     } else if (isa<IntegerLiteralInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
+    } else if (auto MI = dyn_cast<MethodInst>(Inst)) {
+      if (MI->isVolatile())
+        continue;
+      Move.push_back(Inst);
+      Invariant.insert(Inst);
+    } else if (isa<OpenExistentialInst>(Inst) ||
+               isa<OpenExistentialRefInst>(Inst) ||
+               isa<OpenExistentialMetatypeInst>(Inst)) {
+      // Don't know how to clone these properly yet. Inst.clone() per
+      // instruction does not work. Because the follow-up instructions need to
+      // reuse the same archetype uuid which would only work if we used a
+      // cloner.
+      return false;
     } else if (!Inst->mayHaveSideEffects() &&
                !Inst->mayReadFromMemory() &&
                !isa<TermInst>(Inst) &&
