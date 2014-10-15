@@ -99,23 +99,9 @@ struct ReSTTest : public ::testing::Test {
     return Result.takeLineList(Context);
   }
 
-  void checkInlineMarkupWithReplacement(const ExtractBriefTestData &Test,
-                                        std::string StartString,
-                                        std::string EndString) {
-    std::vector<std::string> InText;
-    for (auto Line : Test.InText)
-      InText.push_back(Line);
-    InText = replaceAll(InText, "S", StartString);
-    InText = replaceAll(InText, "E", EndString);
-
-    std::string ExpectedBrief = Test.Brief;
-    ExpectedBrief = replaceAll(ExpectedBrief, "S", StartString);
-    ExpectedBrief = replaceAll(ExpectedBrief, "E", EndString);
-
-    std::string ExpectedDocutilsXML = Test.DocutilsXML;
-    ExpectedDocutilsXML = replaceAll(ExpectedDocutilsXML, "S", StartString);
-    ExpectedDocutilsXML = replaceAll(ExpectedDocutilsXML, "E", EndString);
-
+  void checkInlineMarkup(const std::vector<std::string> &InText,
+                         const std::string &ExpectedBrief,
+                         const std::string &ExpectedDocutilsXML) {
     ReSTContext Context;
     auto LL = toLineList(Context, InText);
     llvm::SmallString<64> Str;
@@ -132,6 +118,32 @@ struct ReSTTest : public ::testing::Test {
     StringRef DocutilsXML = stripDocumentTag(Str.str());
     EXPECT_EQ(ExpectedDocutilsXML, DocutilsXML.str())
         << "ReST document: " << ::testing::PrintToString(InText);
+  }
+
+  void replaceText(std::vector<std::string> &InText, std::string &ExpectedBrief,
+                   std::string &ExpectedDocutilsXML,
+                   const std::string &Original,
+                   const std::string &Replacement) {
+    InText = replaceAll(InText, Original, Replacement);
+    ExpectedBrief = replaceAll(ExpectedBrief, Original, Replacement);
+    ExpectedDocutilsXML =
+        replaceAll(ExpectedDocutilsXML, Original, Replacement);
+  }
+
+  void checkInlineMarkupWithReplacement(const ExtractBriefTestData &Test,
+                                        std::string StartString,
+                                        std::string EndString) {
+    std::vector<std::string> InText;
+    for (auto Line : Test.InText)
+      InText.push_back(Line);
+
+    std::string ExpectedBrief = Test.Brief;
+    std::string ExpectedDocutilsXML = Test.DocutilsXML;
+
+    replaceText(InText, ExpectedBrief, ExpectedDocutilsXML, "S", StartString);
+    replaceText(InText, ExpectedBrief, ExpectedDocutilsXML, "E", EndString);
+
+    checkInlineMarkup(InText, ExpectedBrief, ExpectedDocutilsXML);
   }
 };
 
@@ -1871,378 +1883,6 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
   // Inline markup.
   //
 
-  // FIXME: filter inline markup from brief comments.
-
-  // FIXME: tests for Unicode.
-
-  // Every kind of inline markup with 0, 1, 2 and 3 characters between markup
-  // markers.
-  // Emphasis.
-  // REST-FIXME: LLVM-REST-DIFFERENCE: Docutils emits a diagnostic (no
-  // end-string), but it is pointless in this case.
-  { { "**" }, "**", "<paragraph>**</paragraph>" }, // Correct.
-  { { "*x*" }, "*x*",
-    "<paragraph><emphasis>x</emphasis></paragraph>" }, // Correct.
-  { { "*xy*" }, "*xy*",
-    "<paragraph><emphasis>xy</emphasis></paragraph>" }, // Correct.
-  { { "*xyz*" }, "*xyz*",
-    "<paragraph><emphasis>xyz</emphasis></paragraph>" }, // Correct.
-
-  { { "** aaa" }, "** aaa",
-    "<paragraph>** aaa</paragraph>" }, // Correct.
-  { { "*x* aaa" }, "*x* aaa",
-    "<paragraph><emphasis>x</emphasis> aaa</paragraph>" }, // Correct.
-  { { "*xy* aaa" }, "*xy* aaa",
-    "<paragraph><emphasis>xy</emphasis> aaa</paragraph>" }, // Correct.
-  { { "*xyz* aaa" }, "*xyz* aaa",
-    "<paragraph><emphasis>xyz</emphasis> aaa</paragraph>" }, // Correct.
-
-  { { "aaa ** bbb" }, "aaa ** bbb",
-    "<paragraph>aaa ** bbb</paragraph>" }, // Correct.
-  { { "aaa *x* bbb" }, "aaa *x* bbb",
-    "<paragraph>aaa <emphasis>x</emphasis> bbb</paragraph>" }, // Correct.
-  { { "aaa *xy* bbb" }, "aaa *xy* bbb",
-    "<paragraph>aaa <emphasis>xy</emphasis> bbb</paragraph>" }, // Correct.
-  { { "aaa *xyz* bbb" }, "aaa *xyz* bbb",
-    "<paragraph>aaa <emphasis>xyz</emphasis> bbb</paragraph>" }, // Correct.
-
-  { { "aaa *xyz",
-      "xyz* bbb" },
-    "aaa *xyz xyz* bbb",
-    "<paragraph>aaa <emphasis>xyz\nxyz</emphasis> bbb</paragraph>"
-  }, // Correct.
-  { { "aaa *bbb* ccc *xyz",
-      "xyz* ddd *eee* fff" },
-    "aaa *bbb* ccc *xyz xyz* ddd *eee* fff",
-    "<paragraph>"
-      "aaa <emphasis>bbb</emphasis> ccc <emphasis>xyz\n"
-      "xyz</emphasis> ddd <emphasis>eee</emphasis> fff"
-    "</paragraph>"
-  }, // Correct.
-  { { "aaa *x",
-      "z* bbb" },
-    "aaa *x z* bbb",
-    "<paragraph>aaa <emphasis>x\nz</emphasis> bbb</paragraph>"
-  }, // Correct.
-  { { "aaa *bbb* ccc *x",
-      "z* ddd *eee* fff" },
-    "aaa *bbb* ccc *x z* ddd *eee* fff",
-    "<paragraph>"
-      "aaa <emphasis>bbb</emphasis> ccc <emphasis>x\n"
-      "z</emphasis> ddd <emphasis>eee</emphasis> fff"
-    "</paragraph>"
-  }, // Correct.
-  { { "aaa *xyz",
-      "xyz bbb*" },
-    "aaa *xyz xyz bbb*",
-    "<paragraph>aaa <emphasis>xyz\nxyz bbb</emphasis></paragraph>"
-  }, // Correct.
-  { { "aaa *bbb* *xyz",
-      "xyz ccc*" },
-    "aaa *bbb* *xyz xyz ccc*",
-    "<paragraph>"
-      "aaa <emphasis>bbb</emphasis> <emphasis>xyz\n"
-      "xyz ccc</emphasis>"
-    "</paragraph>"
-  }, // Correct.
-  { { "aaa *xyz",
-      "bbb ccc",
-      "xyz ddd* eee" },
-    "aaa *xyz bbb ccc xyz ddd* eee",
-    "<paragraph>"
-      "aaa <emphasis>xyz\n"
-      "bbb ccc\n"
-      "xyz ddd</emphasis> eee"
-    "</paragraph>"
-  }, // Correct.
-
-  // FIXME: missing diagnostic (no end-string).
-  { { "aaa *x",
-      "* bbb" },
-    "aaa *x * bbb",
-    "<paragraph>aaa *x\n* bbb</paragraph>"
-  }, // Correct, missing diagnostic.
-  { { "aaa *",
-      "x* bbb" },
-    "aaa * x* bbb",
-    "<paragraph>aaa *\nx* bbb</paragraph>"
-  }, // Correct, no diagnostic required.
-  { { "aaa *",
-      "* bbb" },
-    "aaa * * bbb",
-    "<paragraph>aaa *\n* bbb</paragraph>"
-  }, // Correct, no diagnostic required.
-
-  // Strong emphasis.
-  { { "****" }, "****", "<paragraph>****</paragraph>" }, // Correct.
-  { { "**x**" }, "**x**",
-    "<paragraph><strong>x</strong></paragraph>" }, // Correct.
-  { { "**xy**" }, "**xy**",
-    "<paragraph><strong>xy</strong></paragraph>" }, // Correct.
-  { { "**xyz**" }, "**xyz**",
-    "<paragraph><strong>xyz</strong></paragraph>" }, // Correct.
-
-  { { "**** aaa" }, "**** aaa",
-    "<paragraph>**** aaa</paragraph>" }, // Correct.
-  { { "**x** aaa" }, "**x** aaa",
-    "<paragraph><strong>x</strong> aaa</paragraph>" }, // Correct.
-  { { "**xy** aaa" }, "**xy** aaa",
-    "<paragraph><strong>xy</strong> aaa</paragraph>" }, // Correct.
-  { { "**xyz** aaa" }, "**xyz** aaa",
-    "<paragraph><strong>xyz</strong> aaa</paragraph>" }, // Correct.
-
-  { { "aaa **** bbb" }, "aaa **** bbb",
-    "<paragraph>aaa **** bbb</paragraph>" }, // Correct.
-  { { "aaa **x** bbb" }, "aaa **x** bbb",
-    "<paragraph>aaa <strong>x</strong> bbb</paragraph>" }, // Correct.
-  { { "aaa **xy** bbb" }, "aaa **xy** bbb",
-    "<paragraph>aaa <strong>xy</strong> bbb</paragraph>" }, // Correct.
-  { { "aaa **xyz** bbb" }, "aaa **xyz** bbb",
-    "<paragraph>aaa <strong>xyz</strong> bbb</paragraph>" }, // Correct.
-
-  { { "aaa **bbb** ccc **xyz",
-      "xyz** ddd **eee** fff" },
-    "aaa **bbb** ccc **xyz xyz** ddd **eee** fff",
-    "<paragraph>"
-      "aaa <strong>bbb</strong> ccc <strong>xyz\n"
-      "xyz</strong> ddd <strong>eee</strong> fff"
-    "</paragraph>"
-  }, // Correct.
-
-  // Interpreted text.
-  { { "``" }, "``", "<paragraph>``</paragraph>" }, // Correct.
-  { { "`x`" }, "`x`",
-    "<paragraph><interpreted_text>x</interpreted_text></paragraph>"
-  }, // Correct.
-  { { "`xy`" }, "`xy`",
-    "<paragraph><interpreted_text>xy</interpreted_text></paragraph>"
-  }, // Correct.
-  { { "`xyz`" }, "`xyz`",
-    "<paragraph><interpreted_text>xyz</interpreted_text></paragraph>"
-  }, // Correct.
-
-  { { "`` aaa" }, "`` aaa",
-    "<paragraph>`` aaa</paragraph>" }, // Correct.
-  { { "`x` aaa" }, "`x` aaa",
-    "<paragraph><interpreted_text>x</interpreted_text> aaa</paragraph>"
-  }, // Correct.
-  { { "`xy` aaa" }, "`xy` aaa",
-    "<paragraph><interpreted_text>xy</interpreted_text> aaa</paragraph>"
-  }, // Correct.
-  { { "`xyz` aaa" }, "`xyz` aaa",
-    "<paragraph><interpreted_text>xyz</interpreted_text> aaa</paragraph>"
-  }, // Correct.
-
-  { { "aaa `` bbb" }, "aaa `` bbb",
-    "<paragraph>aaa `` bbb</paragraph>" }, // Correct.
-  { { "aaa `x` bbb" }, "aaa `x` bbb",
-    "<paragraph>aaa <interpreted_text>x</interpreted_text> bbb</paragraph>"
-  }, // Correct.
-  { { "aaa `xy` bbb" }, "aaa `xy` bbb",
-    "<paragraph>aaa <interpreted_text>xy</interpreted_text> bbb</paragraph>"
-  }, // Correct.
-  { { "aaa `xyz` bbb" }, "aaa `xyz` bbb",
-    "<paragraph>aaa <interpreted_text>xyz</interpreted_text> bbb</paragraph>"
-  }, // Correct.
-
-  { { "aaa `bbb` ccc `xyz",
-      "xyz` ddd `eee` fff" },
-    "aaa `bbb` ccc `xyz xyz` ddd `eee` fff",
-    "<paragraph>"
-      "aaa <interpreted_text>bbb</interpreted_text> ccc <interpreted_text>xyz\n"
-      "xyz</interpreted_text> ddd <interpreted_text>eee</interpreted_text> fff"
-    "</paragraph>"
-  }, // Correct.
-
-
-  // Inline literal.
-  { { "````" }, "````", "<paragraph>````</paragraph>" }, // Correct.
-  { { "``x``" }, "``x``",
-    "<paragraph><literal>x</literal></paragraph>" }, // Correct.
-  { { "``xy``" }, "``xy``",
-    "<paragraph><literal>xy</literal></paragraph>" }, // Correct.
-  { { "``xyz``" }, "``xyz``",
-    "<paragraph><literal>xyz</literal></paragraph>" }, // Correct.
-
-  { { "```` aaa" }, "```` aaa",
-    "<paragraph>```` aaa</paragraph>" }, // Correct.
-  { { "``x`` aaa" }, "``x`` aaa",
-    "<paragraph><literal>x</literal> aaa</paragraph>" }, // Correct.
-  { { "``xy`` aaa" }, "``xy`` aaa",
-    "<paragraph><literal>xy</literal> aaa</paragraph>" }, // Correct.
-  { { "``xyz`` aaa" }, "``xyz`` aaa",
-    "<paragraph><literal>xyz</literal> aaa</paragraph>" }, // Correct.
-
-  { { "aaa ```` bbb" }, "aaa ```` bbb",
-    "<paragraph>aaa ```` bbb</paragraph>" }, // Correct.
-  { { "aaa ``x`` bbb" }, "aaa ``x`` bbb",
-    "<paragraph>aaa <literal>x</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa ``xy`` bbb" }, "aaa ``xy`` bbb",
-    "<paragraph>aaa <literal>xy</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa ``xyz`` bbb" }, "aaa ``xyz`` bbb",
-    "<paragraph>aaa <literal>xyz</literal> bbb</paragraph>" }, // Correct.
-
-  { { "aaa ``bbb`` ccc ``xyz",
-      "xyz`` ddd ``eee`` fff" },
-    "aaa ``bbb`` ccc ``xyz xyz`` ddd ``eee`` fff",
-    "<paragraph>"
-      "aaa <literal>bbb</literal> ccc <literal>xyz\n"
-      "xyz</literal> ddd <literal>eee</literal> fff"
-    "</paragraph>"
-  }, // Correct.
-
-  // Hyperlink reference.
-  { { "``_" }, "``_", "<paragraph>``_</paragraph>" }, // Correct.
-  { { "`x`_" }, "`x`_",
-    "<paragraph><reference>x</reference></paragraph>" }, // Correct.
-  { { "`xy`_" }, "`xy`_",
-    "<paragraph><reference>xy</reference></paragraph>" }, // Correct.
-  { { "`xyz`_" }, "`xyz`_",
-    "<paragraph><reference>xyz</reference></paragraph>" }, // Correct.
-
-  { { "``_ aaa" }, "``_ aaa",
-    "<paragraph>``_ aaa</paragraph>" }, // Correct.
-  { { "`x`_ aaa" }, "`x`_ aaa",
-    "<paragraph><reference>x</reference> aaa</paragraph>" }, // Correct.
-  { { "`xy`_ aaa" }, "`xy`_ aaa",
-    "<paragraph><reference>xy</reference> aaa</paragraph>" }, // Correct.
-  { { "`xyz`_ aaa" }, "`xyz`_ aaa",
-    "<paragraph><reference>xyz</reference> aaa</paragraph>" }, // Correct.
-
-  { { "aaa ``_ bbb" }, "aaa ``_ bbb",
-    "<paragraph>aaa ``_ bbb</paragraph>" }, // Correct.
-  { { "aaa `x`_ bbb" }, "aaa `x`_ bbb",
-    "<paragraph>aaa <reference>x</reference> bbb</paragraph>" }, // Correct.
-  { { "aaa `xy`_ bbb" }, "aaa `xy`_ bbb",
-    "<paragraph>aaa <reference>xy</reference> bbb</paragraph>" }, // Correct.
-  { { "aaa `xyz`_ bbb" }, "aaa `xyz`_ bbb",
-    "<paragraph>aaa <reference>xyz</reference> bbb</paragraph>" }, // Correct.
-
-  { { "aaa `bbb`_ ccc `xyz",
-      "xyz`_ ddd `eee`_ fff" },
-    "aaa `bbb`_ ccc `xyz xyz`_ ddd `eee`_ fff",
-    "<paragraph>"
-      "aaa <reference>bbb</reference> ccc <reference>xyz\n"
-      "xyz</reference> ddd <reference>eee</reference> fff"
-    "</paragraph>"
-  }, // Correct.
-
-  // Inline hyperlink target.
-  { { "_``" }, "_``", "<paragraph>_``</paragraph>" }, // Correct.
-  { { "_`x`" }, "_`x`",
-    "<paragraph><target>x</target></paragraph>" }, // Correct.
-  { { "_`xy`" }, "_`xy`",
-    "<paragraph><target>xy</target></paragraph>" }, // Correct.
-  { { "_`xyz`" }, "_`xyz`",
-    "<paragraph><target>xyz</target></paragraph>" }, // Correct.
-
-  { { "_`` aaa" }, "_`` aaa",
-    "<paragraph>_`` aaa</paragraph>" }, // Correct.
-  { { "_`x` aaa" }, "_`x` aaa",
-    "<paragraph><target>x</target> aaa</paragraph>" }, // Correct.
-  { { "_`xy` aaa" }, "_`xy` aaa",
-    "<paragraph><target>xy</target> aaa</paragraph>" }, // Correct.
-  { { "_`xyz` aaa" }, "_`xyz` aaa",
-    "<paragraph><target>xyz</target> aaa</paragraph>" }, // Correct.
-
-  { { "aaa _`` bbb" }, "aaa _`` bbb",
-    "<paragraph>aaa _`` bbb</paragraph>" }, // Correct.
-  { { "aaa _`x` bbb" }, "aaa _`x` bbb",
-    "<paragraph>aaa <target>x</target> bbb</paragraph>" }, // Correct.
-  { { "aaa _`xy` bbb" }, "aaa _`xy` bbb",
-    "<paragraph>aaa <target>xy</target> bbb</paragraph>" }, // Correct.
-  { { "aaa _`xyz` bbb" }, "aaa _`xyz` bbb",
-    "<paragraph>aaa <target>xyz</target> bbb</paragraph>" }, // Correct.
-
-  { { "aaa _`bbb` ccc _`xyz",
-      "xyz` ddd _`eee` fff" },
-    "aaa _`bbb` ccc _`xyz xyz` ddd _`eee` fff",
-    "<paragraph>"
-      "aaa <target>bbb</target> ccc <target>xyz\n"
-      "xyz</target> ddd <target>eee</target> fff"
-    "</paragraph>"
-  }, // Correct.
-
-  /* FIXME
-  // Footnote reference.
-  { { "[]_" }, "[]_", "<paragraph>[]_</paragraph>" }, // Correct.
-  { { "[x]_" }, "[x]_",
-    "<paragraph><literal>x</literal></paragraph>" }, // Correct.
-  { { "[xy]_" }, "[xy]_",
-    "<paragraph><literal>xy</literal></paragraph>" }, // Correct.
-  { { "[xyz]_" }, "[xyz]_",
-    "<paragraph><literal>xyz</literal></paragraph>" }, // Correct.
-
-  { { "[]_ aaa" }, "[]_ aaa",
-    "<paragraph>[]_ aaa</paragraph>" }, // Correct.
-  { { "[x]_ aaa" }, "[x]_ aaa",
-    "<paragraph><literal>x</literal> aaa</paragraph>" }, // Correct.
-  { { "[xy]_ aaa" }, "[xy]_ aaa",
-    "<paragraph><literal>xy</literal> aaa</paragraph>" }, // Correct.
-  { { "[xyz]_ aaa" }, "[xyz]_ aaa",
-    "<paragraph><literal>xyz</literal> aaa</paragraph>" }, // Correct.
-
-  { { "aaa []_ bbb" }, "aaa []_ bbb",
-    "<paragraph>aaa []_ bbb</paragraph>" }, // Correct.
-  { { "aaa [x]_ bbb" }, "aaa [x]_ bbb",
-    "<paragraph>aaa <literal>x</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa [xy]_ bbb" }, "aaa [xy]_ bbb",
-    "<paragraph>aaa <literal>xy</literal> bbb</paragraph>" }, // Correct.
-  { { "aaa [xyz]_ bbb" }, "aaa [xyz]_ bbb",
-    "<paragraph>aaa <literal>xyz</literal> bbb</paragraph>" }, // Correct.
-
-  { { "aaa [bbb]_ ccc [xyz",
-      "xyz]_ ddd [eee]_ fff" },
-    "aaa [bbb]_ ccc [xyz xyz]_ ddd [eee]_ fff",
-    "<paragraph>"
-      "aaa <target>bbb</target> ccc <target>xyz\n"
-      "xyz</target> ddd <target>eee</target> fff"
-    "</paragraph>"
-  }, // FIXME: verify
-  */
-
-  // FIXME: citation reference.
-
-  // Substitution reference.
-  // FIXME: should resolve substitutions.
-  { { "||" }, "||", "<paragraph>||</paragraph>" }, // Correct.
-  { { "|x|" }, "|x|",
-    "<paragraph>|x|</paragraph>" }, // Wrong.
-  { { "|xy|" }, "|xy|",
-    "<paragraph>|xy|</paragraph>" }, // Wrong.
-  { { "|xyz|" }, "|xyz|",
-    "<paragraph>|xyz|</paragraph>" }, // Wrong.
-
-  { { "|| aaa" }, "|| aaa",
-    "<paragraph>|| aaa</paragraph>" }, // Wrong.
-  { { "|x| aaa" }, "|x| aaa",
-    "<paragraph>|x| aaa</paragraph>" }, // Wrong.
-  { { "|xy| aaa" }, "|xy| aaa",
-    "<paragraph>|xy| aaa</paragraph>" }, // Wrong.
-  { { "|xyz| aaa" }, "|xyz| aaa",
-    "<paragraph>|xyz| aaa</paragraph>" }, // Wrong.
-
-  { { "aaa || bbb" }, "aaa || bbb",
-    "<paragraph>aaa || bbb</paragraph>" }, // Wrong.
-  { { "aaa |x| bbb" }, "aaa |x| bbb",
-    "<paragraph>aaa |x| bbb</paragraph>" }, // Wrong.
-  { { "aaa |xy| bbb" }, "aaa |xy| bbb",
-    "<paragraph>aaa |xy| bbb</paragraph>" }, // Wrong.
-  { { "aaa |xyz| bbb" }, "aaa |xyz| bbb",
-    "<paragraph>aaa |xyz| bbb</paragraph>" }, // Wrong.
-
-  /*
-  { { "aaa |bbb| ccc |xyz",
-      "xyz| ddd |eee| fff" },
-    "aaa |bbb| ccc |xyz xyz| ddd |eee| fff",
-    "<paragraph>"
-      "aaa <target>bbb</target> ccc <target>xyz\n"
-      "xyz</target> ddd <target>eee</target> fff"
-    "</paragraph>"
-  }, // FIXME: verify
-
-  */
-
   // Special cases where text inside inline markup could be confused for the
   // markup itself.
   //
@@ -2414,6 +2054,432 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
 INSTANTIATE_TEST_CASE_P(
     ReSTTest, ExtractBriefTest,
     ::testing::ValuesIn(ExtractBriefTests));
+
+struct ExtractBriefTest_UnicodeSubstitutions
+    : public ReSTTest,
+      public ::testing::WithParamInterface<ExtractBriefTestData> {};
+
+TEST_P(ExtractBriefTest_UnicodeSubstitutions, Test) {
+  const auto &Test = GetParam();
+
+  std::vector<std::string> Replacements = {
+    // U+0041 LATIN CAPITAL LETTER A
+    "\x41",
+
+    // U+0283 LATIN SMALL LETTER ESH
+    "\xca\x83",
+
+    // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
+    "\xe4\xbe\x8b",
+
+    // U+E0100 VARIATION SELECTOR-17
+    "\xf3\xa0\x84\x80",
+  };
+
+  for (auto XReplacement : Replacements) {
+    for (auto YReplacement : Replacements) {
+      for (auto ZReplacement : Replacements) {
+        std::vector<std::string> InText;
+        for (auto Line : Test.InText)
+          InText.push_back(Line);
+
+        std::string ExpectedBrief = Test.Brief;
+        std::string ExpectedDocutilsXML = Test.DocutilsXML;
+
+        replaceText(InText, ExpectedBrief, ExpectedDocutilsXML,
+                    "X", XReplacement);
+        replaceText(InText, ExpectedBrief, ExpectedDocutilsXML,
+                    "Y", YReplacement);
+        replaceText(InText, ExpectedBrief, ExpectedDocutilsXML,
+                    "Z", ZReplacement);
+
+        checkInlineMarkup(InText, ExpectedBrief, ExpectedDocutilsXML);
+      }
+    }
+  }
+}
+
+struct ExtractBriefTestData ExtractBriefTests_UnicodeSubstitutions[] = {
+  { { "XYZ" },
+    "XYZ",
+    "<paragraph>XYZ</paragraph>" },
+
+  //
+  // Inline markup.
+  //
+
+  // FIXME: filter inline markup from brief comments.
+
+  // Every kind of inline markup with 0, 1, 2 and 3 characters between markup
+  // markers.
+  // Emphasis.
+  // REST-FIXME: LLVM-REST-DIFFERENCE: Docutils emits a diagnostic (no
+  // end-string), but it is pointless in this case.
+  { { "**" }, "**", "<paragraph>**</paragraph>" }, // Correct.
+  { { "*X*" }, "*X*",
+    "<paragraph><emphasis>X</emphasis></paragraph>" }, // Correct.
+  { { "*XY*" }, "*XY*",
+    "<paragraph><emphasis>XY</emphasis></paragraph>" }, // Correct.
+  { { "*XYZ*" }, "*XYZ*",
+    "<paragraph><emphasis>XYZ</emphasis></paragraph>" }, // Correct.
+
+  { { "** aaa" }, "** aaa",
+    "<paragraph>** aaa</paragraph>" }, // Correct.
+  { { "*X* aaa" }, "*X* aaa",
+    "<paragraph><emphasis>X</emphasis> aaa</paragraph>" }, // Correct.
+  { { "*XY* aaa" }, "*XY* aaa",
+    "<paragraph><emphasis>XY</emphasis> aaa</paragraph>" }, // Correct.
+  { { "*XYZ* aaa" }, "*XYZ* aaa",
+    "<paragraph><emphasis>XYZ</emphasis> aaa</paragraph>" }, // Correct.
+
+  { { "aaa ** bbb" }, "aaa ** bbb",
+    "<paragraph>aaa ** bbb</paragraph>" }, // Correct.
+  { { "aaa *X* bbb" }, "aaa *X* bbb",
+    "<paragraph>aaa <emphasis>X</emphasis> bbb</paragraph>" }, // Correct.
+  { { "aaa *XY* bbb" }, "aaa *XY* bbb",
+    "<paragraph>aaa <emphasis>XY</emphasis> bbb</paragraph>" }, // Correct.
+  { { "aaa *XYZ* bbb" }, "aaa *XYZ* bbb",
+    "<paragraph>aaa <emphasis>XYZ</emphasis> bbb</paragraph>" }, // Correct.
+
+  { { "aaa *XYZ",
+      "XYZ* bbb" },
+    "aaa *XYZ XYZ* bbb",
+    "<paragraph>aaa <emphasis>XYZ\nXYZ</emphasis> bbb</paragraph>"
+  }, // Correct.
+  { { "aaa *bbb* ccc *XYZ",
+      "XYZ* ddd *eee* fff" },
+    "aaa *bbb* ccc *XYZ XYZ* ddd *eee* fff",
+    "<paragraph>"
+      "aaa <emphasis>bbb</emphasis> ccc <emphasis>XYZ\n"
+      "XYZ</emphasis> ddd <emphasis>eee</emphasis> fff"
+    "</paragraph>"
+  }, // Correct.
+  { { "aaa *X",
+      "Z* bbb" },
+    "aaa *X Z* bbb",
+    "<paragraph>aaa <emphasis>X\nZ</emphasis> bbb</paragraph>"
+  }, // Correct.
+  { { "aaa *bbb* ccc *X",
+      "Z* ddd *eee* fff" },
+    "aaa *bbb* ccc *X Z* ddd *eee* fff",
+    "<paragraph>"
+      "aaa <emphasis>bbb</emphasis> ccc <emphasis>X\n"
+      "Z</emphasis> ddd <emphasis>eee</emphasis> fff"
+    "</paragraph>"
+  }, // Correct.
+  { { "aaa *XYZ",
+      "XYZ bbb*" },
+    "aaa *XYZ XYZ bbb*",
+    "<paragraph>aaa <emphasis>XYZ\nXYZ bbb</emphasis></paragraph>"
+  }, // Correct.
+  { { "aaa *bbb* *XYZ",
+      "XYZ ccc*" },
+    "aaa *bbb* *XYZ XYZ ccc*",
+    "<paragraph>"
+      "aaa <emphasis>bbb</emphasis> <emphasis>XYZ\n"
+      "XYZ ccc</emphasis>"
+    "</paragraph>"
+  }, // Correct.
+  { { "aaa *XYZ",
+      "bbb ccc",
+      "XYZ ddd* eee" },
+    "aaa *XYZ bbb ccc XYZ ddd* eee",
+    "<paragraph>"
+      "aaa <emphasis>XYZ\n"
+      "bbb ccc\n"
+      "XYZ ddd</emphasis> eee"
+    "</paragraph>"
+  }, // Correct.
+
+  // FIXME: missing diagnostic (no end-string).
+  { { "aaa *X",
+      "* bbb" },
+    "aaa *X * bbb",
+    "<paragraph>aaa *X\n* bbb</paragraph>"
+  }, // Correct, missing diagnostic.
+  { { "aaa *",
+      "X* bbb" },
+    "aaa * X* bbb",
+    "<paragraph>aaa *\nX* bbb</paragraph>"
+  }, // Correct, no diagnostic required.
+  { { "aaa *",
+      "* bbb" },
+    "aaa * * bbb",
+    "<paragraph>aaa *\n* bbb</paragraph>"
+  }, // Correct, no diagnostic required.
+
+  // Strong emphasis.
+  { { "****" }, "****", "<paragraph>****</paragraph>" }, // Correct.
+  { { "**X**" }, "**X**",
+    "<paragraph><strong>X</strong></paragraph>" }, // Correct.
+  { { "**XY**" }, "**XY**",
+    "<paragraph><strong>XY</strong></paragraph>" }, // Correct.
+  { { "**XYZ**" }, "**XYZ**",
+    "<paragraph><strong>XYZ</strong></paragraph>" }, // Correct.
+
+  { { "**** aaa" }, "**** aaa",
+    "<paragraph>**** aaa</paragraph>" }, // Correct.
+  { { "**X** aaa" }, "**X** aaa",
+    "<paragraph><strong>X</strong> aaa</paragraph>" }, // Correct.
+  { { "**XY** aaa" }, "**XY** aaa",
+    "<paragraph><strong>XY</strong> aaa</paragraph>" }, // Correct.
+  { { "**XYZ** aaa" }, "**XYZ** aaa",
+    "<paragraph><strong>XYZ</strong> aaa</paragraph>" }, // Correct.
+
+  { { "aaa **** bbb" }, "aaa **** bbb",
+    "<paragraph>aaa **** bbb</paragraph>" }, // Correct.
+  { { "aaa **X** bbb" }, "aaa **X** bbb",
+    "<paragraph>aaa <strong>X</strong> bbb</paragraph>" }, // Correct.
+  { { "aaa **XY** bbb" }, "aaa **XY** bbb",
+    "<paragraph>aaa <strong>XY</strong> bbb</paragraph>" }, // Correct.
+  { { "aaa **XYZ** bbb" }, "aaa **XYZ** bbb",
+    "<paragraph>aaa <strong>XYZ</strong> bbb</paragraph>" }, // Correct.
+
+  { { "aaa **bbb** ccc **XYZ",
+      "XYZ** ddd **eee** fff" },
+    "aaa **bbb** ccc **XYZ XYZ** ddd **eee** fff",
+    "<paragraph>"
+      "aaa <strong>bbb</strong> ccc <strong>XYZ\n"
+      "XYZ</strong> ddd <strong>eee</strong> fff"
+    "</paragraph>"
+  }, // Correct.
+
+  // Interpreted text.
+  { { "``" }, "``", "<paragraph>``</paragraph>" }, // Correct.
+  { { "`X`" }, "`X`",
+    "<paragraph><interpreted_text>X</interpreted_text></paragraph>"
+  }, // Correct.
+  { { "`XY`" }, "`XY`",
+    "<paragraph><interpreted_text>XY</interpreted_text></paragraph>"
+  }, // Correct.
+  { { "`XYZ`" }, "`XYZ`",
+    "<paragraph><interpreted_text>XYZ</interpreted_text></paragraph>"
+  }, // Correct.
+
+  { { "`` aaa" }, "`` aaa",
+    "<paragraph>`` aaa</paragraph>" }, // Correct.
+  { { "`X` aaa" }, "`X` aaa",
+    "<paragraph><interpreted_text>X</interpreted_text> aaa</paragraph>"
+  }, // Correct.
+  { { "`XY` aaa" }, "`XY` aaa",
+    "<paragraph><interpreted_text>XY</interpreted_text> aaa</paragraph>"
+  }, // Correct.
+  { { "`XYZ` aaa" }, "`XYZ` aaa",
+    "<paragraph><interpreted_text>XYZ</interpreted_text> aaa</paragraph>"
+  }, // Correct.
+
+  { { "aaa `` bbb" }, "aaa `` bbb",
+    "<paragraph>aaa `` bbb</paragraph>" }, // Correct.
+  { { "aaa `X` bbb" }, "aaa `X` bbb",
+    "<paragraph>aaa <interpreted_text>X</interpreted_text> bbb</paragraph>"
+  }, // Correct.
+  { { "aaa `XY` bbb" }, "aaa `XY` bbb",
+    "<paragraph>aaa <interpreted_text>XY</interpreted_text> bbb</paragraph>"
+  }, // Correct.
+  { { "aaa `XYZ` bbb" }, "aaa `XYZ` bbb",
+    "<paragraph>aaa <interpreted_text>XYZ</interpreted_text> bbb</paragraph>"
+  }, // Correct.
+
+  { { "aaa `bbb` ccc `XYZ",
+      "XYZ` ddd `eee` fff" },
+    "aaa `bbb` ccc `XYZ XYZ` ddd `eee` fff",
+    "<paragraph>"
+      "aaa <interpreted_text>bbb</interpreted_text> ccc <interpreted_text>XYZ\n"
+      "XYZ</interpreted_text> ddd <interpreted_text>eee</interpreted_text> fff"
+    "</paragraph>"
+  }, // Correct.
+
+
+  // Inline literal.
+  { { "````" }, "````", "<paragraph>````</paragraph>" }, // Correct.
+  { { "``X``" }, "``X``",
+    "<paragraph><literal>X</literal></paragraph>" }, // Correct.
+  { { "``XY``" }, "``XY``",
+    "<paragraph><literal>XY</literal></paragraph>" }, // Correct.
+  { { "``XYZ``" }, "``XYZ``",
+    "<paragraph><literal>XYZ</literal></paragraph>" }, // Correct.
+
+  { { "```` aaa" }, "```` aaa",
+    "<paragraph>```` aaa</paragraph>" }, // Correct.
+  { { "``X`` aaa" }, "``X`` aaa",
+    "<paragraph><literal>X</literal> aaa</paragraph>" }, // Correct.
+  { { "``XY`` aaa" }, "``XY`` aaa",
+    "<paragraph><literal>XY</literal> aaa</paragraph>" }, // Correct.
+  { { "``XYZ`` aaa" }, "``XYZ`` aaa",
+    "<paragraph><literal>XYZ</literal> aaa</paragraph>" }, // Correct.
+
+  { { "aaa ```` bbb" }, "aaa ```` bbb",
+    "<paragraph>aaa ```` bbb</paragraph>" }, // Correct.
+  { { "aaa ``X`` bbb" }, "aaa ``X`` bbb",
+    "<paragraph>aaa <literal>X</literal> bbb</paragraph>" }, // Correct.
+  { { "aaa ``XY`` bbb" }, "aaa ``XY`` bbb",
+    "<paragraph>aaa <literal>XY</literal> bbb</paragraph>" }, // Correct.
+  { { "aaa ``XYZ`` bbb" }, "aaa ``XYZ`` bbb",
+    "<paragraph>aaa <literal>XYZ</literal> bbb</paragraph>" }, // Correct.
+
+  { { "aaa ``bbb`` ccc ``XYZ",
+      "XYZ`` ddd ``eee`` fff" },
+    "aaa ``bbb`` ccc ``XYZ XYZ`` ddd ``eee`` fff",
+    "<paragraph>"
+      "aaa <literal>bbb</literal> ccc <literal>XYZ\n"
+      "XYZ</literal> ddd <literal>eee</literal> fff"
+    "</paragraph>"
+  }, // Correct.
+
+  // HYperlink reference.
+  { { "``_" }, "``_", "<paragraph>``_</paragraph>" }, // Correct.
+  { { "`X`_" }, "`X`_",
+    "<paragraph><reference>X</reference></paragraph>" }, // Correct.
+  { { "`XY`_" }, "`XY`_",
+    "<paragraph><reference>XY</reference></paragraph>" }, // Correct.
+  { { "`XYZ`_" }, "`XYZ`_",
+    "<paragraph><reference>XYZ</reference></paragraph>" }, // Correct.
+
+  { { "``_ aaa" }, "``_ aaa",
+    "<paragraph>``_ aaa</paragraph>" }, // Correct.
+  { { "`X`_ aaa" }, "`X`_ aaa",
+    "<paragraph><reference>X</reference> aaa</paragraph>" }, // Correct.
+  { { "`XY`_ aaa" }, "`XY`_ aaa",
+    "<paragraph><reference>XY</reference> aaa</paragraph>" }, // Correct.
+  { { "`XYZ`_ aaa" }, "`XYZ`_ aaa",
+    "<paragraph><reference>XYZ</reference> aaa</paragraph>" }, // Correct.
+
+  { { "aaa ``_ bbb" }, "aaa ``_ bbb",
+    "<paragraph>aaa ``_ bbb</paragraph>" }, // Correct.
+  { { "aaa `X`_ bbb" }, "aaa `X`_ bbb",
+    "<paragraph>aaa <reference>X</reference> bbb</paragraph>" }, // Correct.
+  { { "aaa `XY`_ bbb" }, "aaa `XY`_ bbb",
+    "<paragraph>aaa <reference>XY</reference> bbb</paragraph>" }, // Correct.
+  { { "aaa `XYZ`_ bbb" }, "aaa `XYZ`_ bbb",
+    "<paragraph>aaa <reference>XYZ</reference> bbb</paragraph>" }, // Correct.
+
+  { { "aaa `bbb`_ ccc `XYZ",
+      "XYZ`_ ddd `eee`_ fff" },
+    "aaa `bbb`_ ccc `XYZ XYZ`_ ddd `eee`_ fff",
+    "<paragraph>"
+      "aaa <reference>bbb</reference> ccc <reference>XYZ\n"
+      "XYZ</reference> ddd <reference>eee</reference> fff"
+    "</paragraph>"
+  }, // Correct.
+
+  // Inline hyperlink target.
+  { { "_``" }, "_``", "<paragraph>_``</paragraph>" }, // Correct.
+  { { "_`X`" }, "_`X`",
+    "<paragraph><target>X</target></paragraph>" }, // Correct.
+  { { "_`XY`" }, "_`XY`",
+    "<paragraph><target>XY</target></paragraph>" }, // Correct.
+  { { "_`XYZ`" }, "_`XYZ`",
+    "<paragraph><target>XYZ</target></paragraph>" }, // Correct.
+
+  { { "_`` aaa" }, "_`` aaa",
+    "<paragraph>_`` aaa</paragraph>" }, // Correct.
+  { { "_`X` aaa" }, "_`X` aaa",
+    "<paragraph><target>X</target> aaa</paragraph>" }, // Correct.
+  { { "_`XY` aaa" }, "_`XY` aaa",
+    "<paragraph><target>XY</target> aaa</paragraph>" }, // Correct.
+  { { "_`XYZ` aaa" }, "_`XYZ` aaa",
+    "<paragraph><target>XYZ</target> aaa</paragraph>" }, // Correct.
+
+  { { "aaa _`` bbb" }, "aaa _`` bbb",
+    "<paragraph>aaa _`` bbb</paragraph>" }, // Correct.
+  { { "aaa _`X` bbb" }, "aaa _`X` bbb",
+    "<paragraph>aaa <target>X</target> bbb</paragraph>" }, // Correct.
+  { { "aaa _`XY` bbb" }, "aaa _`XY` bbb",
+    "<paragraph>aaa <target>XY</target> bbb</paragraph>" }, // Correct.
+  { { "aaa _`XYZ` bbb" }, "aaa _`XYZ` bbb",
+    "<paragraph>aaa <target>XYZ</target> bbb</paragraph>" }, // Correct.
+
+  { { "aaa _`bbb` ccc _`XYZ",
+      "XYZ` ddd _`eee` fff" },
+    "aaa _`bbb` ccc _`XYZ XYZ` ddd _`eee` fff",
+    "<paragraph>"
+      "aaa <target>bbb</target> ccc <target>XYZ\n"
+      "XYZ</target> ddd <target>eee</target> fff"
+    "</paragraph>"
+  }, // Correct.
+
+  /* FIXME
+  // Footnote reference.
+  { { "[]_" }, "[]_", "<paragraph>[]_</paragraph>" }, // Correct.
+  { { "[X]_" }, "[X]_",
+    "<paragraph><literal>X</literal></paragraph>" }, // Correct.
+  { { "[XY]_" }, "[XY]_",
+    "<paragraph><literal>XY</literal></paragraph>" }, // Correct.
+  { { "[XYZ]_" }, "[XYZ]_",
+    "<paragraph><literal>XYZ</literal></paragraph>" }, // Correct.
+
+  { { "[]_ aaa" }, "[]_ aaa",
+    "<paragraph>[]_ aaa</paragraph>" }, // Correct.
+  { { "[X]_ aaa" }, "[X]_ aaa",
+    "<paragraph><literal>X</literal> aaa</paragraph>" }, // Correct.
+  { { "[XY]_ aaa" }, "[XY]_ aaa",
+    "<paragraph><literal>XY</literal> aaa</paragraph>" }, // Correct.
+  { { "[XYZ]_ aaa" }, "[XYZ]_ aaa",
+    "<paragraph><literal>XYZ</literal> aaa</paragraph>" }, // Correct.
+
+  { { "aaa []_ bbb" }, "aaa []_ bbb",
+    "<paragraph>aaa []_ bbb</paragraph>" }, // Correct.
+  { { "aaa [X]_ bbb" }, "aaa [X]_ bbb",
+    "<paragraph>aaa <literal>X</literal> bbb</paragraph>" }, // Correct.
+  { { "aaa [XY]_ bbb" }, "aaa [XY]_ bbb",
+    "<paragraph>aaa <literal>XY</literal> bbb</paragraph>" }, // Correct.
+  { { "aaa [XYZ]_ bbb" }, "aaa [XYZ]_ bbb",
+    "<paragraph>aaa <literal>XYZ</literal> bbb</paragraph>" }, // Correct.
+
+  { { "aaa [bbb]_ ccc [XYZ",
+      "XYZ]_ ddd [eee]_ fff" },
+    "aaa [bbb]_ ccc [XYZ XYZ]_ ddd [eee]_ fff",
+    "<paragraph>"
+      "aaa <target>bbb</target> ccc <target>XYZ\n"
+      "XYZ</target> ddd <target>eee</target> fff"
+    "</paragraph>"
+  }, // FIXME: verify
+  */
+
+  // FIXME: citation reference.
+
+  // Substitution reference.
+  // FIXME: should resolve substitutions.
+  { { "||" }, "||", "<paragraph>||</paragraph>" }, // Correct.
+  { { "|X|" }, "|X|",
+    "<paragraph>|X|</paragraph>" }, // Wrong.
+  { { "|XY|" }, "|XY|",
+    "<paragraph>|XY|</paragraph>" }, // Wrong.
+  { { "|XYZ|" }, "|XYZ|",
+    "<paragraph>|XYZ|</paragraph>" }, // Wrong.
+
+  { { "|| aaa" }, "|| aaa",
+    "<paragraph>|| aaa</paragraph>" }, // Wrong.
+  { { "|X| aaa" }, "|X| aaa",
+    "<paragraph>|X| aaa</paragraph>" }, // Wrong.
+  { { "|XY| aaa" }, "|XY| aaa",
+    "<paragraph>|XY| aaa</paragraph>" }, // Wrong.
+  { { "|XYZ| aaa" }, "|XYZ| aaa",
+    "<paragraph>|XYZ| aaa</paragraph>" }, // Wrong.
+
+  { { "aaa || bbb" }, "aaa || bbb",
+    "<paragraph>aaa || bbb</paragraph>" }, // Wrong.
+  { { "aaa |X| bbb" }, "aaa |X| bbb",
+    "<paragraph>aaa |X| bbb</paragraph>" }, // Wrong.
+  { { "aaa |XY| bbb" }, "aaa |XY| bbb",
+    "<paragraph>aaa |XY| bbb</paragraph>" }, // Wrong.
+  { { "aaa |XYZ| bbb" }, "aaa |XYZ| bbb",
+    "<paragraph>aaa |XYZ| bbb</paragraph>" }, // Wrong.
+
+  /*
+  { { "aaa |bbb| ccc |XYZ",
+      "XYZ| ddd |eee| fff" },
+    "aaa |bbb| ccc |XYZ XYZ| ddd |eee| fff",
+    "<paragraph>"
+      "aaa <target>bbb</target> ccc <target>XYZ\n"
+      "XYZ</target> ddd <target>eee</target> fff"
+    "</paragraph>"
+  }, // FIXME: verify
+  */
+};
+INSTANTIATE_TEST_CASE_P(
+    ReSTTest, ExtractBriefTest_UnicodeSubstitutions,
+    ::testing::ValuesIn(ExtractBriefTests_UnicodeSubstitutions));
 
 struct ExtractBriefTest_UnterminatedInlineMarkup
     : public ReSTTest,
