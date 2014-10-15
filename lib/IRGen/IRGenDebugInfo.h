@@ -98,6 +98,11 @@ class IRGenDebugInfo {
   FullLocation LastLoc;     /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
   bool IsLibrary;           /// Whether this is a libary or a top level module.
+#ifndef NDEBUG
+  /// The basic block where the location was last changed.
+  llvm::BasicBlock *LastBasicBlock;
+  bool lineNumberIsSane(IRBuilder &Builder, unsigned Line);
+#endif
 
   SmallVector<std::pair<FullLocation, SILDebugScope *>, 8>
   LocationStack; /// Used by pushLoc.

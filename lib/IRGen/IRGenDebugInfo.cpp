@@ -389,6 +389,19 @@ static bool parentScopesAreSane(SILDebugScope *DS) {
   }
   return true;
 }
+
+bool IRGenDebugInfo::lineNumberIsSane(IRBuilder &Builder, unsigned Line) {
+  if (IGM.Opts.Optimize)
+    return true;
+
+  // Assert monotonically increasing line numbers within the same basic block;
+  llvm::BasicBlock *CurBasicBlock = Builder.GetInsertBlock();
+  if (CurBasicBlock == LastBasicBlock) {
+    return Line >= LastLoc.LocForLinetable.Line;
+  }
+  LastBasicBlock = CurBasicBlock;
+  return true;
+}
 #endif
 
 void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
@@ -433,6 +446,10 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
     // scope to get a more contiguous line table.
     L = LastLoc;
   }
+
+  //FIXME: Enable this assertion.
+  //assert(lineNumberIsSane(Builder, L.LocForLinetable.Line) &&
+  //       "-Onone, but line numbers are not monotonically increasing within bb");
   LastLoc = L;
   LastScope = DS;
 
