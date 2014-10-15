@@ -472,3 +472,31 @@ SILBasicBlock *swift::splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
 
   return EdgeBB;
 }
+
+/// Split all critical edges in the function updating the dominator tree and
+/// loop information (if they are not set to null).
+bool swift::splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
+                                  DominanceInfo *DT, SILLoopInfo *LI) {
+  bool Changed = false;
+
+  std::vector<SILBasicBlock*> Blocks;
+  Blocks.reserve(F.size());
+
+  for (auto &It : F)
+    Blocks.push_back(&It);
+
+  for (auto It : Blocks) {
+    // Only split critical edges for terminators that don't support block
+    // arguments.
+    if (OnlyNonCondBr && isa<CondBranchInst>(It->getTerminator()))
+      continue;
+
+    if (isa<BranchInst>(It->getTerminator()))
+      continue;
+
+    for (unsigned Idx = 0, e = It->getSuccs().size(); Idx != e; ++Idx)
+      Changed |=
+        (splitCriticalEdge(It->getTerminator(), Idx, DT, LI) != nullptr);
+  }
+  return Changed;
+}

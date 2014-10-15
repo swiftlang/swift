@@ -71,5 +71,12 @@ bool rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
 SILBasicBlock *splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
                                         DominanceInfo *DT, SILLoopInfo *LI);
 
+/// \brief Split all critical edges in the function updating the dominator tree
+/// and loop information (if they are not set to null). If \p OnlyNonCondBr is
+/// true this will not split cond_br edges (Only edges which can't carry
+/// arguments will be split).
+bool splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
+                           DominanceInfo *DT, SILLoopInfo *LI);
+
 } // End namespace swift.
 #endif
