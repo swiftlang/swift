@@ -87,6 +87,36 @@ struct CommentToXMLConverter {
     case ASTNodeKind::TextAndInline:
       printTextAndInline(cast<TextAndInline>(N));
       break;
+    case ASTNodeKind::PlainText:
+      printPlainText(cast<PlainText>(N));
+      break;
+    case ASTNodeKind::Emphasis:
+      printEmphasis(cast<Emphasis>(N));
+      break;
+    case ASTNodeKind::StrongEmphasis:
+      printStrongEmphasis(cast<StrongEmphasis>(N));
+      break;
+    case ASTNodeKind::InterpretedText:
+      printInterpretedText(cast<InterpretedText>(N));
+      break;
+    case ASTNodeKind::InlineLiteral:
+      printInlineLiteral(cast<InlineLiteral>(N));
+      break;
+    case ASTNodeKind::HyperlinkReference:
+      printHyperlinkReference(cast<HyperlinkReference>(N));
+      break;
+    case ASTNodeKind::InlineHyperlinkTarget:
+      printInlineHyperlinkTarget(cast<InlineHyperlinkTarget>(N));
+      break;
+    case ASTNodeKind::FootnoteReference:
+      printFootnoteReference(cast<FootnoteReference>(N));
+      break;
+    case ASTNodeKind::CitationReference:
+      printCitationReference(cast<CitationReference>(N));
+      break;
+    case ASTNodeKind::SubstitutionReference:
+      printSubstitutionReference(cast<SubstitutionReference>(N));
+      break;
 
     case ASTNodeKind::PrivateExtension:
       llvm_unreachable("implement");
@@ -173,17 +203,72 @@ struct CommentToXMLConverter {
   }
 
   void printTextAndInline(const TextAndInline *T) {
-    if (T->isLinePart()) {
-      LinePart LP = T->getLinePart();
-      appendWithXMLEscaping(OS, LP.Text);
-    } else {
-      LineListRef LL = T->getLines();
-      for (unsigned i = 0, e = LL.size(); i != e; ++i) {
-        appendWithXMLEscaping(OS, LL[i].Text.drop_front(LL[i].FirstTextByte));
-        if (i != e - 1)
-          OS << " ";
-      }
+    for (const auto *IC : T->getChildren()) {
+      printASTNode(IC);
     }
+  }
+
+  void printPlainText(const PlainText *PT) {
+    appendWithXMLEscaping(OS, PT->getLinePart().Text);
+  }
+
+  void printEmphasis(const Emphasis *E) {
+    printRawHTML("<em>");
+    for (const auto *IC : E->getChildren()) {
+      printASTNode(IC);
+    }
+    printRawHTML("</em>");
+  }
+
+  void printStrongEmphasis(const StrongEmphasis *SE) {
+    printRawHTML("<strong>");
+    for (const auto *IC : SE->getChildren()) {
+      printASTNode(IC);
+    }
+    printRawHTML("</strong>");
+  }
+
+  void printInterpretedText(const InterpretedText *IT) {
+    // FIXME: check role.
+    printRawHTML("<code>");
+    for (const auto *IC : IT->getChildren()) {
+      printASTNode(IC);
+    }
+    printRawHTML("</code>");
+  }
+
+  void printInlineLiteral(const InlineLiteral *IL) {
+    printRawHTML("<code>");
+    for (const auto *IC : IL->getChildren()) {
+      printASTNode(IC);
+    }
+    printRawHTML("</code>");
+  }
+
+  void printHyperlinkReference(const HyperlinkReference *HR) {
+    // FIXME: print as a hyperlink.
+    for (const auto *IC : HR->getChildren()) {
+      printASTNode(IC);
+    }
+  }
+
+  void printInlineHyperlinkTarget(const InlineHyperlinkTarget *IHT) {
+    // FIXME: print link anchor.
+    for (const auto *IC : IHT->getChildren()) {
+      printASTNode(IC);
+    }
+  }
+
+  void printFootnoteReference(const FootnoteReference *FR) {
+    // FIXME: XML format does not support footnotes.  Skip them for now.
+  }
+
+  void printCitationReference(const CitationReference *CR) {
+    // FIXME: XML format does not support citations.  Skip them for now.
+  }
+
+  void printSubstitutionReference(const SubstitutionReference *SR) {
+    // FIXME: we don't resolve substitutions yet.
   }
 
   void printOrphanField(const Field *F) {
@@ -433,6 +518,36 @@ struct CommentToDoxygenConverter {
     case ASTNodeKind::TextAndInline:
       printTextAndInline(cast<TextAndInline>(N));
       break;
+    case ASTNodeKind::PlainText:
+      printPlainText(cast<PlainText>(N));
+      break;
+    case ASTNodeKind::Emphasis:
+      printEmphasis(cast<Emphasis>(N));
+      break;
+    case ASTNodeKind::StrongEmphasis:
+      printStrongEmphasis(cast<StrongEmphasis>(N));
+      break;
+    case ASTNodeKind::InterpretedText:
+      printInterpretedText(cast<InterpretedText>(N));
+      break;
+    case ASTNodeKind::InlineLiteral:
+      printInlineLiteral(cast<InlineLiteral>(N));
+      break;
+    case ASTNodeKind::HyperlinkReference:
+      printHyperlinkReference(cast<HyperlinkReference>(N));
+      break;
+    case ASTNodeKind::InlineHyperlinkTarget:
+      printInlineHyperlinkTarget(cast<InlineHyperlinkTarget>(N));
+      break;
+    case ASTNodeKind::FootnoteReference:
+      printFootnoteReference(cast<FootnoteReference>(N));
+      break;
+    case ASTNodeKind::CitationReference:
+      printCitationReference(cast<CitationReference>(N));
+      break;
+    case ASTNodeKind::SubstitutionReference:
+      printSubstitutionReference(cast<SubstitutionReference>(N));
+      break;
 
     case ASTNodeKind::PrivateExtension:
       llvm_unreachable("implement");
@@ -521,17 +636,75 @@ struct CommentToDoxygenConverter {
   }
 
   void printTextAndInline(const TextAndInline *T) {
-    if (T->isLinePart()) {
-      LinePart LP = T->getLinePart();
-      print(LP.Text);
-    } else {
-      LineListRef LL = T->getLines();
-      for (unsigned i = 0, e = LL.size(); i != e; ++i) {
-        print(LL[i].Text.drop_front(LL[i].FirstTextByte));
-        if (i != e - 1)
-          printNewline();
-      }
+    for (const auto *IC : T->getChildren()) {
+      printASTNode(IC);
     }
+  }
+
+  void printPlainText(const PlainText *PT) {
+    if (PT->getLinePart().Text == "\n")
+      printNewline();
+    else
+      print(PT->getLinePart().Text);
+  }
+
+  void printEmphasis(const Emphasis *E) {
+    print("<em>");
+    for (const auto *IC : E->getChildren()) {
+      printASTNode(IC);
+    }
+    print("</em>");
+  }
+
+  void printStrongEmphasis(const StrongEmphasis *SE) {
+    print("<strong>");
+    for (const auto *IC : SE->getChildren()) {
+      printASTNode(IC);
+    }
+    print("</strong>");
+  }
+
+  void printInterpretedText(const InterpretedText *IT) {
+    // FIXME: check role.
+    print("<code>");
+    for (const auto *IC : IT->getChildren()) {
+      printASTNode(IC);
+    }
+    print("</code>");
+  }
+
+  void printInlineLiteral(const InlineLiteral *IL) {
+    print("<code>");
+    for (const auto *IC : IL->getChildren()) {
+      printASTNode(IC);
+    }
+    print("</code>");
+  }
+
+  void printHyperlinkReference(const HyperlinkReference *HR) {
+    // FIXME: print as a hyperlink.
+    for (const auto *IC : HR->getChildren()) {
+      printASTNode(IC);
+    }
+  }
+
+  void printInlineHyperlinkTarget(const InlineHyperlinkTarget *IHT) {
+    // FIXME: print link anchor.
+    for (const auto *IC : IHT->getChildren()) {
+      printASTNode(IC);
+    }
+  }
+
+  void printFootnoteReference(const FootnoteReference *FR) {
+    // Doxygen does not support footnotes.
+  }
+
+  void printCitationReference(const CitationReference *CR) {
+    // Doxygen does not support citations.
+  }
+
+  void printSubstitutionReference(const SubstitutionReference *SR) {
+    // FIXME: we don't resolve substitutions yet.
   }
 
   void printOrphanField(const Field *F) {

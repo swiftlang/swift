@@ -112,7 +112,7 @@ enum A012_AttachToEntities {
   /// :param: second Ccc.  Ddd.
   ///   Eee.
   func f0(first: Int, second: Double) {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0(_:second:)</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f0FS0_FTSi6secondSd_T_</USR><Declaration>func f0(first: Int, second: Double)</Declaration><Abstract><Para>Aaa. f0.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ccc. Ddd. Eee.</Para></Discussion></Parameter></Parameters></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0(_:second:)</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f0FS0_FTSi6secondSd_T_</USR><Declaration>func f0(first: Int, second: Double)</Declaration><Abstract><Para>Aaa. f0.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ccc. Ddd.\nEee.</Para></Discussion></Parameter></Parameters></Function>]
 
   /// Aaa.  f1.
   ///
@@ -121,7 +121,7 @@ enum A012_AttachToEntities {
   /// :returns: Ccc.
   ///   Ddd.
   func f1(first: Int) {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f1 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f1(_:)</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f1FS0_FSiT_</USR><Declaration>func f1(first: Int)</Declaration><Abstract><Para>Aaa.  f1.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>Ccc. Ddd.</Para></ResultDiscussion></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f1 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f1(_:)</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f1FS0_FSiT_</USR><Declaration>func f1(first: Int)</Declaration><Abstract><Para>Aaa.  f1.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>Ccc.\nDdd.</Para></ResultDiscussion></Function>]
 
   /// Aaa.  f2.
   ///
@@ -134,7 +134,7 @@ enum A012_AttachToEntities {
   ///           third
   ///           Bbb.
   func f2(first: Int, second: Double, third: Float) {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f2 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f2(_:second:third:)</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f2FS0_FTSi6secondSd5thirdSf_T_</USR><Declaration>func f2(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f2.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para></Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para></Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para> Bbb.</Para></Discussion></Parameter></Parameters></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f2 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f2(_:second:third:)</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f2FS0_FTSi6secondSd5thirdSf_T_</USR><Declaration>func f2(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f2.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para></Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para></Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para>\nBbb.</Para></Discussion></Parameter></Parameters></Function>]
 
   /// Aaa.  f3.
   ///
@@ -153,7 +153,7 @@ enum A012_AttachToEntities {
   /// :returns: Eee.
   ///   Fff.
   func f4() {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f4 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f4()</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f4FS0_FT_T_</USR><Declaration>func f4()</Declaration><Abstract><Para>Aaa.  f4.</Para></Abstract><ResultDiscussion><Para>Ccc. Ddd.</Para><Para>Eee. Fff.</Para></ResultDiscussion></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f4 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f4()</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f4FS0_FT_T_</USR><Declaration>func f4()</Declaration><Abstract><Para>Aaa.  f4.</Para></Abstract><ResultDiscussion><Para>Ccc.\nDdd.</Para><Para>Eee.\nFff.</Para></ResultDiscussion></Function>]
 }
 
 @objc class A210_BulletList {
@@ -162,7 +162,7 @@ enum A012_AttachToEntities {
   /// * Bbb.
   ///   Ccc.
   func f0() {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A210_BulletList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test15A210_BulletList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><Para><rawHTML><![CDATA[<ul>]]></rawHTML><rawHTML><![CDATA[<li>]]></rawHTML>Aaa.<rawHTML><![CDATA[</li>]]></rawHTML><rawHTML><![CDATA[<li>]]></rawHTML>Bbb. Ccc.<rawHTML><![CDATA[</li>]]></rawHTML><rawHTML><![CDATA[</ul>]]></rawHTML></Para></Discussion></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A210_BulletList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test15A210_BulletList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><Para><rawHTML><![CDATA[<ul>]]></rawHTML><rawHTML><![CDATA[<li>]]></rawHTML>Aaa.<rawHTML><![CDATA[</li>]]></rawHTML><rawHTML><![CDATA[<li>]]></rawHTML>Bbb.\nCcc.<rawHTML><![CDATA[</li>]]></rawHTML><rawHTML><![CDATA[</ul>]]></rawHTML></Para></Discussion></Function>]
 }
 
 @objc class A220_EnumeratedList {
@@ -171,7 +171,7 @@ enum A012_AttachToEntities {
   /// 2. Bbb.
   ///    Ccc.
   func f0() {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A220_EnumeratedList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test19A220_EnumeratedList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><Para><rawHTML><![CDATA[<ol>]]></rawHTML><rawHTML><![CDATA[<li>]]></rawHTML>Aaa.<rawHTML><![CDATA[</li>]]></rawHTML><rawHTML><![CDATA[<li>]]></rawHTML>Bbb. Ccc.<rawHTML><![CDATA[</li>]]></rawHTML><rawHTML><![CDATA[</ol>]]></rawHTML></Para></Discussion></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A220_EnumeratedList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test19A220_EnumeratedList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><Para><rawHTML><![CDATA[<ol>]]></rawHTML><rawHTML><![CDATA[<li>]]></rawHTML>Aaa.<rawHTML><![CDATA[</li>]]></rawHTML><rawHTML><![CDATA[<li>]]></rawHTML>Bbb.\nCcc.<rawHTML><![CDATA[</li>]]></rawHTML><rawHTML><![CDATA[</ol>]]></rawHTML></Para></Discussion></Function>]
 }
 
 @objc class A230_DefinitionList {
@@ -187,14 +187,14 @@ enum A012_AttachToEntities {
   /// ``Hhh``
   ///   Jjj.
   func f0() {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A230_DefinitionList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test19A230_DefinitionList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><Para><rawHTML><![CDATA[<dl>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>Aaa<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Bbb.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>Ccc<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Ddd.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>Eee : Fff<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Ggg.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>``Hhh``<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Jjj.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[</dl>]]></rawHTML></Para></Discussion></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A230_DefinitionList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test19A230_DefinitionList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><Para><rawHTML><![CDATA[<dl>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>Aaa<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Bbb.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>Ccc<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Ddd.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>Eee : Fff<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Ggg.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML><rawHTML><![CDATA[<code>]]></rawHTML>Hhh<rawHTML><![CDATA[</code>]]></rawHTML><rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Jjj.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[</dl>]]></rawHTML></Para></Discussion></Function>]
 }
 
 @objc class A240_FieldList {
   /// :unknown: Aaa.
   ///   Bbb.
   func f0() {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A240_FieldList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test14A240_FieldList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><Para><rawHTML><![CDATA[<dl>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>unknown<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Aaa. Bbb.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[</dl>]]></rawHTML></Para></Discussion></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A240_FieldList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test14A240_FieldList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><Para><rawHTML><![CDATA[<dl>]]></rawHTML><rawHTML><![CDATA[<dt>]]></rawHTML>unknown<rawHTML><![CDATA[</dt>]]></rawHTML><rawHTML><![CDATA[<dd>]]></rawHTML>Aaa.\nBbb.<rawHTML><![CDATA[</dd>]]></rawHTML><rawHTML><![CDATA[</dl>]]></rawHTML></Para></Discussion></Function>]
 
   /// * Aaa.
   ///
@@ -212,7 +212,7 @@ enum A012_AttachToEntities {
   /// -b   Bbb.
   ///      Ccc.
   func f0() {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A250_OptionList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test15A250_OptionList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>-a   Aaa. -b   Bbb.</Para></Abstract><Discussion><Para><rawHTML><![CDATA[<blockquote>]]></rawHTML>Ccc.<rawHTML><![CDATA[</blockquote>]]></rawHTML></Para></Discussion></Function>]
+// CHECK: swift:[[@LINE-1]]:8: Func/A250_OptionList.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test15A250_OptionList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>-a   Aaa.\n-b   Bbb.</Para></Abstract><Discussion><Para><rawHTML><![CDATA[<blockquote>]]></rawHTML>Ccc.<rawHTML><![CDATA[</blockquote>]]></rawHTML></Para></Discussion></Function>]
 }
 
 @objc class A260_BlockQuote {
@@ -223,5 +223,55 @@ enum A012_AttachToEntities {
   ///  Ccc.
   func f0() {}
 // CHECK: swift:[[@LINE-1]]:8: Func/A260_BlockQuote.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test15A260_BlockQuote2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para><rawHTML><![CDATA[<blockquote>]]></rawHTML>Bbb.Ccc.<rawHTML><![CDATA[</blockquote>]]></rawHTML></Para></Discussion></Function>]
+}
+
+@objc class A300_Emphasis {
+  /// Aaa *bbb* ccc.
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A300_Emphasis.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test13A300_Emphasis2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <rawHTML><![CDATA[<em>]]></rawHTML>bbb<rawHTML><![CDATA[</em>]]></rawHTML> ccc.</Para></Abstract></Function>]
+}
+
+@objc class A310_StrongEmphasis {
+  /// Aaa **bbb** ccc.
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A310_StrongEmphasis.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test19A310_StrongEmphasis2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <rawHTML><![CDATA[<strong>]]></rawHTML>bbb<rawHTML><![CDATA[</strong>]]></rawHTML> ccc.</Para></Abstract></Function>]
+}
+
+@objc class A320_InterpretedText {
+  /// Aaa `bbb` ccc.
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A320_InterpretedText.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test20A320_InterpretedText2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <rawHTML><![CDATA[<code>]]></rawHTML>bbb<rawHTML><![CDATA[</code>]]></rawHTML> ccc.</Para></Abstract></Function>]
+}
+
+@objc class A330_InlineLiteral {
+  /// Aaa ``bbb`` ccc.
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A330_InlineLiteral.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test18A330_InlineLiteral2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <rawHTML><![CDATA[<code>]]></rawHTML>bbb<rawHTML><![CDATA[</code>]]></rawHTML> ccc.</Para></Abstract></Function>]
+}
+
+@objc class A340_HyperlinkReference {
+  /// Aaa `bbb`_ ccc.
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A340_HyperlinkReference.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test23A340_HyperlinkReference2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa bbb ccc.</Para></Abstract></Function>]
+}
+
+@objc class A350_InlineHyperlinkTarget {
+  /// Aaa _`bbb` ccc.
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A350_InlineHyperlinkTarget.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test26A350_InlineHyperlinkTarget2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa bbb ccc.</Para></Abstract></Function>]
+}
+
+@objc class A360_FootnoteReference {
+  /// Aaa [bbb]_ ccc.
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A360_FootnoteReference.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test22A360_FootnoteReference2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa [bbb]_ ccc.</Para></Abstract></Function>]
+}
+
+// FIXME: Citation reference.
+
+@objc class A380_SubstitutionReference {
+  /// Aaa |bbb| ccc.
+  func f0() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A380_SubstitutionReference.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test26A380_SubstitutionReference2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa |bbb| ccc.</Para></Abstract></Function>]
 }
 

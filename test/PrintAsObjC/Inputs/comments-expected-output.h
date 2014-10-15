@@ -153,7 +153,7 @@ SWIFT_CLASS("_TtC8comments19A220_EnumeratedList")
 SWIFT_CLASS("_TtC8comments19A230_DefinitionList")
 @interface A230_DefinitionList
 
-/// <dl><dt>Aaa</dt><dd><p>Bbb.</p></dd><dt>Ccc</dt><dd><p>Ddd.</p></dd><dt>Eee : Fff</dt><dd><p>Ggg.</p></dd><dt>``Hhh``</dt><dd><p>Jjj.</p></dd></dl>
+/// <dl><dt>Aaa</dt><dd><p>Bbb.</p></dd><dt>Ccc</dt><dd><p>Ddd.</p></dd><dt>Eee : Fff</dt><dd><p>Ggg.</p></dd><dt><code>Hhh</code></dt><dd><p>Jjj.</p></dd></dl>
 - (void)f0;
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
@@ -190,6 +190,78 @@ SWIFT_CLASS("_TtC8comments15A260_BlockQuote")
 /// Aaa.
 ///
 /// <blockquote><p>Bbb.</p><p>Ccc.</p></blockquote>
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments13A300_Emphasis")
+@interface A300_Emphasis
+
+/// Aaa <em>bbb</em> ccc.
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments19A310_StrongEmphasis")
+@interface A310_StrongEmphasis
+
+/// Aaa <strong>bbb</strong> ccc.
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments20A320_InterpretedText")
+@interface A320_InterpretedText
+
+/// Aaa <code>bbb</code> ccc.
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments18A330_InlineLiteral")
+@interface A330_InlineLiteral
+
+/// Aaa <code>bbb</code> ccc.
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments23A340_HyperlinkReference")
+@interface A340_HyperlinkReference
+
+/// Aaa bbb ccc.
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments26A350_InlineHyperlinkTarget")
+@interface A350_InlineHyperlinkTarget
+
+/// Aaa bbb ccc.
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments22A360_FootnoteReference")
+@interface A360_FootnoteReference
+
+/// Aaa [bbb]_ ccc.
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments26A380_SubstitutionReference")
+@interface A380_SubstitutionReference
+
+/// Aaa |bbb| ccc.
 - (void)f0;
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
