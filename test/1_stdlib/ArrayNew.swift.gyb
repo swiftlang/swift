@@ -17,19 +17,19 @@ all_array_types = [ 'ContiguousArray', 'Slice', 'Array' ]
 }%
 
 extension Array {
-  var identity: Range<UnsafePointer<UInt8> > {
+  var identity: UnsafePointer<Void> {
     return self._buffer.identity
   }
 }
 
 extension Slice {
-  var identity: Range<UnsafePointer<UInt8> > {
+  var identity: UnsafePointer<Void> {
     return self._buffer.identity
   }
 }
 
 extension ContiguousArray {
-  var identity: Range<UnsafePointer<UInt8> > {
+  var identity: UnsafePointer<Void> {
     return self._buffer.identity
   }
 }
@@ -122,7 +122,7 @@ ArrayTestSuite.test("${array_type}/emptyAllocation") {
   expectEqual(arr0._buffer.identity, arr1._buffer.identity)
   
   // Only non-literal empty Slices have nil buffers
-  let hasNilBuffer = arr1.identity == nil..<nil
+  let hasNilBuffer = arr1.identity == nil
   expect${array_type == 'Slice'}(hasNilBuffer)
 
   let arr2: ${array_type}<TestValueTy> = []

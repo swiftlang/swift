@@ -412,17 +412,18 @@ extension _ArrayBuffer {
     return _fastPath(_isNative) ? _native._storage : _nonNative!
   }
   
-  /// A value that identifies the exact elements covered by the buffer
-  public var identity: Range<UnsafePointer<UInt8>> {
+  /// A value that identifies the storage used by the buffer.  Two
+  /// buffers address the same elements when they have the same
+  /// identity and count.
+  public var identity: UnsafePointer<Void> {
     if _isNative {
-      return ContiguousArray(_native)._buffer.identity
+      return _native.identity
     }
     else if let cocoa = _nonNative {
-      let id = unsafeAddressOf(cocoa)
-      return UnsafePointer(id)..<UnsafePointer(id)
+      return unsafeAddressOf(cocoa)
     }
     else {
-      return UnsafePointer()..<UnsafePointer()
+      return nil
     }
   }
   

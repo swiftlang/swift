@@ -76,13 +76,15 @@ func printSequence<T: SequenceType>(x: T) {
   println("]")
 }
 
-func bufferID<T : ArrayType>(x: T) -> Int {
-  return unsafeBitCast(x._buffer.baseAddress, Int.self)
+typealias BufferID = UnsafePointer<Void>
+
+func bufferID<T : ArrayType>(x: T) -> BufferID {
+  return x._buffer.identity
 }
 
 func checkReallocation<T : ArrayType>(
-  x: T, lastBuffer: Int, reallocationExpected: Bool
-) -> Int {
+  x: T, lastBuffer: BufferID, reallocationExpected: Bool
+) -> BufferID {
   let currentBuffer = bufferID(x)
   if (currentBuffer != lastBuffer) != reallocationExpected {
     let message = reallocationExpected ? "lack of" : ""

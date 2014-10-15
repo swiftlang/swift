@@ -101,6 +101,8 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// element. Otherwise, nil.
   var baseAddress: UnsafeMutablePointer<Element> {get}
 
-  /// A value that identifies the exact elements covered by the buffer
-  var identity: Range<UnsafePointer<UInt8>> {get}
+  /// A value that identifies the storage used by the buffer.  Two
+  /// buffers address the same elements when they have the same
+  /// identity and count.
+  var identity: UnsafePointer<Void> {get}
 }

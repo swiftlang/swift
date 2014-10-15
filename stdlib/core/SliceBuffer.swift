@@ -101,9 +101,11 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     _invariantCheck()
   }
 
-  /// A value that identifies the exact elements covered by the buffer
-  public var identity: Range<UnsafePointer<UInt8> > {
-    return UnsafePointer(start)..<UnsafePointer(start + count)
+  /// A value that identifies the storage used by the buffer.  Two
+  /// buffers address the same elements when they have the same
+  /// identity and count.
+  public var identity: UnsafePointer<Void> {
+    return UnsafePointer(start)
   }
   
   /// An object that keeps the elements stored in this buffer alive

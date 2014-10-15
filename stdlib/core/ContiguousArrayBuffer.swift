@@ -399,11 +399,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return _storage
   }
 
-  /// A value that identifies the exact elements covered by the buffer
-  public var identity: Range<UnsafePointer<UInt8>> {
-    return withUnsafeBufferPointer {
-      UnsafePointer($0.baseAddress)..<UnsafePointer($0.baseAddress + self.count)
-    }
+  /// A value that identifies the storage used by the buffer.  Two
+  /// buffers address the same elements when they have the same
+  /// identity and count.
+  public var identity: UnsafePointer<Void> {
+    return withUnsafeBufferPointer { UnsafePointer($0.baseAddress) }
   }
   
   /// Return true iff we have storage for elements of the given
