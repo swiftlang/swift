@@ -27,6 +27,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "llvm/ADT/DenseSet.h"
@@ -613,6 +614,8 @@ void StackAllocationPromoter::run() {
 
 bool MemoryToRegisters::run() {
   bool Changed = false;
+
+  Changed = splitAllCriticalEdges(F, true, DT, nullptr);
   for (auto &BB : F) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
