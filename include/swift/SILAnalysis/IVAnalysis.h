@@ -34,11 +34,11 @@ public:
   /// (phi node) and an increment by an integer literal.
   class IVDesc {
   public:
-    ApplyInst *Inc;
+    BuiltinInst *Inc;
     IntegerLiteralInst *IncVal;
 
     IVDesc() : Inc(nullptr), IncVal(nullptr) {}
-    IVDesc(ApplyInst *AI, IntegerLiteralInst *I) : Inc(AI), IncVal(I) {}
+    IVDesc(BuiltinInst *AI, IntegerLiteralInst *I) : Inc(AI), IncVal(I) {}
 
     operator bool() { return Inc != nullptr && IncVal != nullptr; }
     static IVDesc invalidIV() { return IVDesc(); }

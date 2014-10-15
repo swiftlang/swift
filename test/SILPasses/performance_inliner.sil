@@ -22,18 +22,16 @@ import Swift
 
 sil @test1_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
 
 // CHECK-LABEL: sil @test1
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64)
-// CHECK: [[MUL_BUILTIN:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
 // CHECK: integer_literal $Builtin.Int1, 0 {{.*}}
-// CHECK: [[MUL_TUPLE_RESULT:%[0-9]+]] = apply [[MUL_BUILTIN]]([[INPUT]], [[INPUT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[MUL_TUPLE_RESULT:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]]
 // CHECK: [[MUL_RESULT:%[0-9]+]] = tuple_extract [[MUL_TUPLE_RESULT]]
 // CHECK: return [[MUL_RESULT]]
 sil @test1 : $@thin (Builtin.Int64) -> Builtin.Int64 {
@@ -52,18 +50,16 @@ bb0(%0 : $Builtin.Int64):
 
 sil @test2_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
 
 sil @test2_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
@@ -79,14 +75,11 @@ bb0(%0 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @test2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
 // bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
-// CHECK: [[UADD_FUN:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = apply [[UADD_FUN]]([[INPUT]], [[INPUT]], {{.*}} : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]]
 // CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]] : $(Builtin.Int64, Builtin.Int1), 0
-// CHECK: [[UADD_FUN2:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UADD_RESULT_TUPLE2:%[0-9]+]] = apply [[UADD_FUN2]]([[UADD_RESULT]], [[UADD_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE2:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[UADD_RESULT]] : {{.*}}, [[UADD_RESULT]]
 // CHECK: [[UADD_RESULT2:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE2]]
-// CHECK: [[UMUL_FUN:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = apply [[UMUL_FUN]]([[UADD_RESULT2]], [[UADD_RESULT2]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UADD_RESULT2]] : {{.*}}, [[UADD_RESULT2]]
 // CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
 // CHECK: return [[UMUL_RESULT]] : $Builtin.Int64
 sil @test2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
@@ -110,27 +103,24 @@ bb0(%0 : $Builtin.Int64):
 
 sil @test3_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
 
 sil @test3_sub_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "usub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
 
 sil @test3_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
@@ -155,17 +145,13 @@ bb0(%0 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @test3 : $@thin (Builtin.Int64) -> Builtin.Int64
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
-// CHECK: [[USUB_FUN:%[0-9]+]] = builtin_function_ref "usub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[USUB_RESULT_TUPLE:%[0-9]+]] = apply [[USUB_FUN]]([[INPUT]], [[INPUT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[USUB_RESULT_TUPLE:%[0-9]+]] = builtin "usub_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]] : {{.*}}
 // CHECK: [[USUB_RESULT:%[0-9]+]] = tuple_extract [[USUB_RESULT_TUPLE]]
-// CHECK: [[UMUL_FUN:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = apply [[UMUL_FUN]]([[USUB_RESULT]], [[USUB_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[USUB_RESULT]] : {{.*}}, [[USUB_RESULT]]
 // CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
-// CHECK: [[UADD_FUN:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = apply [[UADD_FUN]]([[UMUL_RESULT]], [[UMUL_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[UMUL_RESULT]] : {{.*}}, [[UMUL_RESULT]]
 // CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]]
-// CHECK: [[UMUL_FUN2:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UMUL_RESULT_TUPLE2:%[0-9]+]] = apply [[UMUL_FUN2]]([[UADD_RESULT]], [[UADD_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE2:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UADD_RESULT]] : {{.*}}, [[UADD_RESULT]]
 // CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE2]]
 // CHECK: return [[UMUL_RESULT]]
 sil @test3 : $@thin (Builtin.Int64) -> Builtin.Int64 {
@@ -189,27 +175,24 @@ bb0(%0 : $Builtin.Int64):
 
 sil @test4_add_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
 
 sil @test4_sub_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "usub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
 
 sil @test4_multiply_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
@@ -234,22 +217,17 @@ bb0(%0 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @test4 : $@thin (Builtin.Int64) -> Builtin.Int64
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
-// CHECK: [[UADD_FUN:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = apply [[UADD_FUN]]([[INPUT]], [[INPUT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]]
 // CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]]
-// CHECK: [[UMUL_FUN:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = apply [[UMUL_FUN]]([[UADD_RESULT]], [[UADD_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UADD_RESULT]] : {{.*}}, [[UADD_RESULT]]
 // CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
 
-// CHECK: [[UADD_FUN2:%[0-9]+]] = builtin_function_ref "uadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UADD_RESULT_TUPLE2:%[0-9]+]] = apply [[UADD_FUN2]]([[UMUL_RESULT]], [[UMUL_RESULT]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UADD_RESULT_TUPLE2:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[UMUL_RESULT]] : {{.*}}, [[UMUL_RESULT]]
 // CHECK: [[UADD_RESULT2:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE2]]
-// CHECK: [[UMUL_FUN2:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UMUL_RESULT_TUPLE2:%[0-9]+]] = apply [[UMUL_FUN2]]([[UADD_RESULT2]], [[UADD_RESULT2]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE2:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UADD_RESULT2]] : {{.*}}, [[UADD_RESULT2]]
 // CHECK: [[UMUL_RESULT2:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE2]]
 
-// CHECK: [[UMUL_FUN3:%[0-9]+]] = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK: [[UMUL_RESULT_TUPLE3:%[0-9]+]] = apply [[UMUL_FUN3]]([[UMUL_RESULT2]], [[UMUL_RESULT2]], {{.*}}) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+// CHECK: [[UMUL_RESULT_TUPLE3:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UMUL_RESULT2]] : {{.*}}, [[UMUL_RESULT2]]
 // CHECK: [[UMUL_RESULT3:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE3]]
 // CHECK: return [[UMUL_RESULT3]] : $Builtin.Int64
 sil @test4 : $@thin (Builtin.Int64) -> Builtin.Int64 {
@@ -540,10 +518,9 @@ bb0(%0 : $Builtin.NativeObject):
 // Make sure SILCloner does not get into an infinite loop here.
 sil @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UWord, UWord) -> UWord {
 bb0(%0 : $UWord, %1 : $UWord):
-  %2 = builtin_function_ref "xor_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %5
   %3 = struct_extract %0 : $UWord, #UWord.value   // user: %5
   %4 = struct_extract %1 : $UWord, #UWord.value   // user: %5
-  %5 = apply %2(%3, %4) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %6
+  %5 = builtin "xor_Word"(%3 : $Builtin.Word, %4 : $Builtin.Word) : $Builtin.Word // user: %6
   %6 = struct $UWord (%5 : $Builtin.Word)         // user: %7
   return %6 : $UWord                              // id: %7
 }
@@ -923,9 +900,8 @@ sil @coldcall_caller : $@thin (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_stack $Bool                          // users: %7, %9, %11
   %2 = integer_literal $Builtin.Word, 0           // user: %5
-  %3 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %5
   %4 = struct_extract %0 : $Int, #Int.value       // user: %5
-  %5 = apply %3(%4, %2) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %6
+  %5 = builtin "cmp_eq_Word"(%4 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1 // user: %6
   %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7
   store %6 to %1#1 : $*Bool                       // id: %7
   %8 = function_ref @_TTSSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool // user: %9

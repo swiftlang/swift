@@ -126,21 +126,18 @@ static void diagnoseStaticReports(const SILInstruction *I,
                                   SILModule &M) {
 
   // Find out if we are dealing with Builtin.staticReport().
-  if (const ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
-    if (const BuiltinFunctionRefInst *FR =
-        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
-      const BuiltinInfo &B = FR->getBuiltinInfo();
-      if (B.ID == BuiltinValueKind::StaticReport) {
+  if (auto *BI = dyn_cast<BuiltinInst>(I)) {
+    const BuiltinInfo &B = BI->getBuiltinInfo();
+    if (B.ID == BuiltinValueKind::StaticReport) {
 
-        // Report diagnostic if the first argument has been folded to '1'.
-        OperandValueArrayRef Args = AI->getArguments();
-        IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
-        if (!V || V->getValue() != 1)
-          return;
+      // Report diagnostic if the first argument has been folded to '1'.
+      OperandValueArrayRef Args = BI->getArguments();
+      IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+      if (!V || V->getValue() != 1)
+        return;
 
-        diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
-                 diag::static_report_error);
-      }
+      diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+               diag::static_report_error);
     }
   }
 }

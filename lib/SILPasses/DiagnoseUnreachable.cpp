@@ -398,11 +398,21 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
         Use->set(SILUndef::get(Use->get().getType(), Mod));
 }
 
-static const ApplyInst *getAsCallToNoReturn(const SILInstruction *I,
-                                            SILBasicBlock &BB) {
-  if (const ApplyInst *AI = dyn_cast<ApplyInst>(I))
+static SILInstruction *getAsCallToNoReturn(SILInstruction *I,
+                                           SILBasicBlock &BB) {
+  if (auto *AI = dyn_cast<ApplyInst>(I))
     if (AI->getOrigCalleeType()->isNoReturn())
       return AI;
+  
+  if (auto *BI = dyn_cast<BuiltinInst>(I)) {
+    // TODO: We should have an "isNoReturn" bit on Swift's BuiltinInfo, but for
+    // now, let's recognize noreturn intrinsics and builtins specially here.
+    if (BI->getIntrinsicInfo().hasAttribute(llvm::Attribute::NoReturn))
+      return BI;
+    if (BI->getBuiltinInfo().ID == BuiltinValueKind::Unreachable
+        || BI->getBuiltinInfo().ID == BuiltinValueKind::CondUnreachable)
+      return BI;
+  }
   return nullptr;
 }
 
@@ -410,12 +420,12 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
                                      UnreachableUserCodeReportingState *State) {
   auto I = BB.begin(), E = BB.end();
   bool DiagnosedUnreachableCode = false;
-  const ApplyInst *NoReturnCall = nullptr;
+  SILInstruction *NoReturnCall = nullptr;
 
   // Collection of all instructions that should be deleted.
   llvm::SmallVector<SILInstruction*, 32> ToBeDeleted;
 
-  // Does this block conatin a call to a noreturn function?
+  // Does this block contain a call to a noreturn function?
   while (I != E) {
     auto CurrentInst = I;
     // Move the iterator before we remove instructions to avoid iterator
@@ -464,10 +474,9 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
   
   // If the call is to the 'unreachable' builtin, then remove the call,
   // as it is redundant with the actual unreachable terminator.
-  auto Callee = NoReturnCall->getCallee();
-  if (auto Builtin = dyn_cast<BuiltinFunctionRefInst>(Callee)) {
+  if (auto Builtin = dyn_cast<BuiltinInst>(NoReturnCall)) {
     if (Builtin->getName().str() == "unreachable")
-      ToBeDeleted.push_back(const_cast<ApplyInst*>(NoReturnCall));
+      ToBeDeleted.push_back(NoReturnCall);
   }
   
   // Record the diagnostic info.

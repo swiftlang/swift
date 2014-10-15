@@ -71,9 +71,8 @@ enum class ArrayBoundsEffect {
 };
 
 static bool mayHaveSideEffects(SILInstruction *I) {
-  if (auto *AI = dyn_cast<ApplyInst>(I))
-    if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      return !isSideEffectFree(BFRI);
+  if (auto *BI = dyn_cast<BuiltinInst>(I))
+    return !isSideEffectFree(BI);
   return I->mayHaveSideEffects();
 }
 
@@ -433,7 +432,7 @@ static CondFailInst *hasCondFailUse(SILInstruction *I) {
 
 /// Checks whether the apply instruction is checked for overflow by looking for
 /// a cond_fail on the second result.
-static CondFailInst *isOverflowChecked(ApplyInst *AI) {
+static CondFailInst *isOverflowChecked(BuiltinInst *AI) {
   for (auto *Op : AI->getUses()) {
     SILValue Extract;
     if (!match(Op->getUser(), m_TupleExtractInst(m_ValueBase(), 1)))
@@ -539,8 +538,8 @@ static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
 }
 
 /// Get a builtin compare function reference.
-static SILValue getCmpFunction(SILLocation Loc, StringRef Name,
-                               SILType IntSILTy, SILBuilder &B) {
+static Identifier getCmpFunction(SILLocation Loc, StringRef Name,
+                                 SILType IntSILTy, SILBuilder &B) {
   CanType IntTy = IntSILTy.getSwiftRValueType();
   auto BuiltinIntTy = cast<BuiltinIntegerType>(IntTy);
   std::string NameStr = Name;
@@ -551,22 +550,7 @@ static SILValue getCmpFunction(SILLocation Loc, StringRef Name,
     NameStr += "_Int" + llvm::utostr(NumBits);
   }
 
-  auto ExtInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          FunctionType::Representation::Thin,
-                                          /*noreturn*/ false,
-                                          /*autoclosure*/ false);
-  SILParameterInfo Params[] = {
-      SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned),
-      SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned)};
-
-  Type Int1Ty = BuiltinIntegerType::get(1, B.getASTContext());
-  SILResultInfo Result(Int1Ty->getCanonicalType(), ResultConvention::Unowned);
-
-  auto FnType = SILFunctionType::get(nullptr, ExtInfo,
-                                     ParameterConvention::Direct_Unowned,
-                                     Params, Result, B.getASTContext());
-  auto Ty = SILType::getPrimitiveObjectType(FnType);
-  return B.createBuiltinFunctionRef(Loc, NameStr, Ty);
+  return B.getASTContext().getIdentifier(NameStr);
 }
 
 /// Subtract a constant from a builtin integer value.
@@ -582,40 +566,29 @@ static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
     NameStr += "_Int" + llvm::utostr(NumBits);
   }
 
-  auto ExtInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          FunctionType::Representation::Thin,
-                                          /*noreturn*/ false,
-                                          /*autoclosure*/ false);
   CanType Int1Ty =
       BuiltinIntegerType::get(1, B.getASTContext())->getCanonicalType();
-  SILParameterInfo Params[] = {
-      SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned),
-      SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned),
-      SILParameterInfo(Int1Ty, ParameterConvention::Direct_Unowned)};
 
   TupleTypeElt ResultElts[] = {IntTy, Int1Ty};
   Type ResultTy = TupleType::get(ResultElts, B.getASTContext());
-  SILResultInfo Result(ResultTy->getCanonicalType(), ResultConvention::Unowned);
-
-  auto FnType = SILFunctionType::get(nullptr, ExtInfo,
-                                     ParameterConvention::Direct_Unowned,
-                                     Params, Result, B.getASTContext());
-  auto Ty = SILType::getPrimitiveObjectType(FnType);
-  auto FR = B.createBuiltinFunctionRef(Loc, NameStr, Ty);
-
+  SILType ResultSILTy = SILType::getPrimitiveObjectType(
+                                                  ResultTy->getCanonicalType());
   SmallVector<SILValue, 4> Args(1, Val);
   Args.push_back(B.createIntegerLiteral(Loc, Val.getType(), SubVal));
   Args.push_back(B.createIntegerLiteral(
       Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), -1));
 
-  auto AI = B.createApply(Loc, FR, Args);
+  auto NameID = B.getASTContext().getIdentifier(NameStr);
+  
+  auto AI = B.createBuiltin(Loc, NameID, ResultSILTy,
+                            {}, Args);
   return B.createTupleExtract(Loc, AI, 0);
 }
 
 /// A cannonical induction variable incremented by one from Start to End-1.
 struct InductionInfo {
   SILArgument *HeaderVal;
-  ApplyInst *Inc;
+  BuiltinInst *Inc;
   SILValue Start;
   SILValue End;
   BuiltinValueKind Cmp;
@@ -624,7 +597,7 @@ struct InductionInfo {
   InductionInfo()
       : Cmp(BuiltinValueKind::None), IsOverflowCheckInserted(false) {}
 
-  InductionInfo(SILArgument *HV, ApplyInst *I, SILValue S, SILValue E,
+  InductionInfo(SILArgument *HV, BuiltinInst *I, SILValue S, SILValue E,
                 BuiltinValueKind C, bool IsOverflowChecked = false)
       : HeaderVal(HV), Inc(I), Start(S), End(E), Cmp(C),
         IsOverflowCheckInserted(IsOverflowChecked) {}
@@ -649,17 +622,19 @@ struct InductionInfo {
       return;
 
     auto Loc = Inc->getLoc();
-    auto FR = getCmpFunction(Loc, "cmp_sge", Start.getType(), Builder);
+    auto FName = getCmpFunction(Loc, "cmp_sge", Start.getType(), Builder);
 
     SmallVector<SILValue, 4> Args(1, Start);
     Args.push_back(End);
-    auto CmpSGE = Builder.createApply(Loc, FR, Args);
+    auto CmpSGE = Builder.createBuiltin(Loc, FName,
+                    SILType::getBuiltinIntegerType(1, Builder.getASTContext()),
+                    {}, Args);    
     Builder.createCondFail(Loc, CmpSGE);
     IsOverflowCheckInserted = true;
 
     // We can now remove the cond fail on the increment the above comparison
     // guarantuees that the addition won't overflow.
-    auto *CondFail = isOverflowChecked(cast<ApplyInst>(Inc));
+    auto *CondFail = isOverflowChecked(cast<BuiltinInst>(Inc));
     if (CondFail)
       CondFail->eraseFromParent();
   }
@@ -722,7 +697,7 @@ public:
 private:
 
   /// Analyse one potential induction variable starting at Arg.
-  InductionInfo *analyseIndVar(SILArgument *HeaderVal, ApplyInst *Inc,
+  InductionInfo *analyseIndVar(SILArgument *HeaderVal, BuiltinInst *Inc,
                                IntegerLiteralInst *IncVal) {
     if (IncVal->getValue() != 1)
       return nullptr;
@@ -781,8 +756,8 @@ private:
 
 /// A block in the loop is guarantueed to be excuted if it dominates the exiting
 /// block.
-static bool isGuarantueedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
-                                      SILBasicBlock *ExitingBlk) {
+static bool isGuaranteedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
+                                     SILBasicBlock *ExitingBlk) {
   return DT->dominates(Block, ExitingBlk);
 }
 
@@ -876,7 +851,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 
   bool Changed = false;
   auto *CurBB = DTNode->getBlock();
-  if (!isGuarantueedToBeExecuted(DT, CurBB, ExitingBlk))
+  if (!isGuaranteedToBeExecuted(DT, CurBB, ExitingBlk))
       return false;
 
   for (auto Iter = CurBB->begin(); Iter != CurBB->end();) {

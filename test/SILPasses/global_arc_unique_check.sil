@@ -20,16 +20,14 @@ bb0(%0 : $MD5):
 
 // CHECK: bb1
 bb1(%5 : $Builtin.Word):
-  %6 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
-  %7 = apply %6(%5, %2) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %7 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
   cond_br %7, bb3, bb2
 
 // CHECK: bb2
 bb2:
   %9 = integer_literal $Builtin.Word, 1
-  %10 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %11 = integer_literal $Builtin.Int1, -1
-  %12 = apply %10(%5, %9, %11) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %12 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %9 : $Builtin.Word, %11 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %13 = tuple_extract %12 : $(Builtin.Word, Builtin.Int1), 0
   // CHECK-NOT: strong_retain
   // CHECK-NOT: strong_release

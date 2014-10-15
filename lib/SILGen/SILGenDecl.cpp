@@ -1963,7 +1963,7 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
   
   // When we see a variable binding, emit its global accessor.
   void visitNamedPattern(NamedPattern *P) {
-    SGM.emitGlobalAccessor(P->getDecl(), BuiltinOnceDecl, OnceToken, OnceFunc);
+    SGM.emitGlobalAccessor(P->getDecl(), OnceToken, OnceFunc);
   }
   
 #define INVALID_PATTERN(Id, Parent) \

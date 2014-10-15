@@ -5,8 +5,7 @@
 import Builtin
 
 sil @remove_assert_configuration : $@thin () -> Builtin.Int32 {
-  %0 = builtin_function_ref "assert_configuration" : $@thin () -> Builtin.Int32
-  %1 = apply %0() : $@thin () -> Builtin.Int32
+  %1 = builtin "assert_configuration"() : $Builtin.Int32
   return %1 : $Builtin.Int32
 }
 

@@ -266,10 +266,12 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
 
   assert(!LocalFunctions.count(constant) &&
          "emitting ref to local constant without context?!");
+  // Builtins must be fully applied at the point of reference.
   if (constant.hasDecl() &&
       isa<BuiltinUnit>(constant.getDecl()->getDeclContext())) {
-    return B.createBuiltinFunctionRef(loc, constant.getDecl()->getName(),
-                                      constantInfo.getSILType());
+    SGM.diagnose(loc.getSourceLoc(), diag::not_implemented,
+                 "delayed application of builtin");
+    return SILUndef::get(constantInfo.getSILType(), SGM.M);
   }
   
   // If the constant is a curry thunk we haven't emitted yet, emit it.
@@ -4585,16 +4587,8 @@ void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding) {
 }
 
 void SILGenFunction::emitGlobalAccessor(VarDecl *global,
-                                        FuncDecl *builtinOnceDecl,
                                         SILGlobalVariable *onceToken,
                                         SILFunction *onceFunc) {
-  // Emit a reference to Builtin.once.
-  SILDeclRef builtinOnceConstant(builtinOnceDecl, SILDeclRef::Kind::Func);
-  auto builtinOnceSILTy = SGM.Types.getConstantType(builtinOnceConstant);
-  auto builtinOnce = B.createBuiltinFunctionRef(global,
-                                                builtinOnceDecl->getName(),
-                                                builtinOnceSILTy);
-
   SILType rawPointerSILTy
     = getLoweredLoadableType(getASTContext().TheRawPointerType);
 
@@ -4615,11 +4609,8 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
 
   // Call Builtin.once.
   SILValue onceArgs[] = {onceTokenAddr, onceFuncRef};
-  auto resultTy = builtinOnceSILTy.castTo<SILFunctionType>()
-                                            ->getResult().getSILType();
-
-  B.createApply(global, builtinOnce, builtinOnceSILTy, resultTy,
-                {}, onceArgs);
+  B.createBuiltin(global, getASTContext().getIdentifier("once"),
+                  SGM.Types.getEmptyTupleType(), {}, onceArgs);
   
   // Return the address of the global variable.
   // FIXME: It'd be nice to be able to return a SIL address directly.

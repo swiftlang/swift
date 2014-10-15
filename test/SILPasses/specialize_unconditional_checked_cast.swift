@@ -36,19 +36,17 @@ ArchetypeToArchetype(t: b, t2: b)
 // x -> y where x is not a class but y is.
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8_C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast20ArchetypeToArchetypeU___FT1tQ_2t2Q0__Q0_ : $@thin (@out C, @in UInt8, @in C) -> () {
 // CHECK-NOT: unconditional_checked_cast_addr
-// CHECK: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NOT: unconditional_checked_cast_addr
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK:     builtin "int_trap"
 // CHECK-NOT: unconditional_checked_cast_addr
 ArchetypeToArchetype(t: b, t2: c)
 
 // y -> x where x is not a class but y is.
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C_VSs5UInt8___TF37specialize_unconditional_checked_cast20ArchetypeToArchetypeU___FT1tQ_2t2Q0__Q0_ : $@thin (@out UInt8, @in C, @in UInt8) -> () {
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK-NEXT: retain
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK:      retain
+// CHECK-NEXT: builtin "int_trap"
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 ArchetypeToArchetype(t: c, t2: b)
 
@@ -67,19 +65,17 @@ ArchetypeToArchetype(t: d, t2: c)
 // x -> y where x and y are unrelated classes.
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C_CS_1E___TF37specialize_unconditional_checked_cast20ArchetypeToArchetypeU___FT1tQ_2t2Q0__Q0_ : $@thin (@out E, @in C, @in E) -> () {
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK-NEXT: retain
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK:      retain
+// CHECK-NEXT: builtin "int_trap"
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 ArchetypeToArchetype(t: c, t2: e)
 
 // x -> y where x and y are unrelated non classes.
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8_VSs6UInt64___TF37specialize_unconditional_checked_cast20ArchetypeToArchetypeU___FT1tQ_2t2Q0__Q0_ : $@thin (@out UInt64, @in UInt8, @in UInt64) -> () {
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK:      builtin "int_trap"
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 ArchetypeToArchetype(t: b, t2: f)
 
@@ -111,16 +107,14 @@ ArchetypeToConcreteConvertUInt8(t: b)
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in C) -> UInt8 {
 // CHECK: bb0
 // CHECK-NEXT: load
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ArchetypeToConcreteConvertUInt8(t: c)
 
 // x -> y where x,y are not classes and x is a different type from y.
 // CHECK-LABEL: sil shared @_TTSVSs6UInt64___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in UInt64) -> UInt8 {
 // CHECK: bb0
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ArchetypeToConcreteConvertUInt8(t: f)
 
 // x -> x where x is a class.
@@ -133,8 +127,7 @@ ArchetypeToConcreteConvertC(t: c)
 // x -> y where x is a class but y is not.
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertCU__FT1tQ__CS_1C : $@thin (@in UInt8) -> @owned C {
 // CHECK: bb0
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ArchetypeToConcreteConvertC(t: b)
 
 // x -> y where x,y are classes and x is a super class of y.
@@ -149,9 +142,8 @@ ArchetypeToConcreteConvertC(t: d)
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertCU__FT1tQ__CS_1C : $@thin (@in E) -> @owned C {
 // CHECK: bb0
 // CHECK-NEXT: load
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ArchetypeToConcreteConvertC(t: e)
 
 // x -> y where x,y are classes and x is a sub class of y.
@@ -177,9 +169,8 @@ ArchetypeToConcreteConvertD(t: c)
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
 // CHECK: bb0
 // CHECK-NEXT: load
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ArchetypeToConcreteConvertE(t: c)
 
 ///////////////////////////
@@ -207,15 +198,13 @@ ConcreteToArchetypeConvertUInt8(t: b, t2: b)
 // x -> y where x is not a class but y is a class.
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@thin (@out C, UInt8, @in C) -> () {
 // CHECK: bb0
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ConcreteToArchetypeConvertUInt8(t: b, t2: c)
 
 // x -> y where x,y are different non class types.
 // CHECK-LABEL: sil shared @_TTSVSs6UInt64___TF37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@thin (@out UInt64, UInt8, @in UInt64) -> () {
 // CHECK: bb0
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ConcreteToArchetypeConvertUInt8(t: b, t2: f)
 
 // x -> x where x is a class.
@@ -231,8 +220,7 @@ ConcreteToArchetypeConvertC(t: c, t2: c)
 // x -> y where x is a class but y is not.
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertCU__FT1tCS_1C2t2Q__Q_ : $@thin (@out UInt8, @owned C, @in UInt8) -> () {
 // CHECK: bb0
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ConcreteToArchetypeConvertC(t: c, t2: b)
 
 // x -> y where x is a super class of y.
@@ -251,9 +239,8 @@ ConcreteToArchetypeConvertC(t: c, t2: d)
 // x -> y where x and y are unrelated classes.
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertCU__FT1tCS_1C2t2Q__Q_ : $@thin (@out E, @owned C, @in E) -> () {
 // CHECK: bb0
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 ConcreteToArchetypeConvertC(t: c, t2: e)
 
 // x -> y where x is a subclass of y.
@@ -298,8 +285,7 @@ SuperToArchetypeC(c: c, t: d)
 // x -> y where x is a class and y is not.
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF37specialize_unconditional_checked_cast17SuperToArchetypeCU__FT1cCS_1C1tQ__Q_ : $@thin (@out UInt8, @owned C, @in UInt8) -> () {
 // CHECK: bb0
-// CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
-// CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: builtin "int_trap"
 SuperToArchetypeC(c: c, t: b)
 
 // *NOTE* The frontend is smart enough to turn this into an upcast. When this

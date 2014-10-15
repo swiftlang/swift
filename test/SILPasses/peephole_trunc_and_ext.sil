@@ -14,10 +14,10 @@ bb0:
 
 // peephole: Word(Int64(x >> 1)) -> (x >> 1)
 // CHECK-LABEL: sil @_TF4test29test_trunc_u_to_s_zext_lshr_1FSuSi : $@thin (UInt) -> Int
-// CHECK: builtin_function_ref "lshr_Word"
-// CHECK-NOT: builtin_function_ref "zextOrBitCast_Word_Int64"
-// CHECK-NOT: builtin_function_ref "u_to_s_checked_conversion_Int64"
-// CHECK-NOT: builtin_function_ref "truncOrBitCast_Int64_Word"
+// CHECK: builtin "lshr_Word"
+// CHECK-NOT: builtin "zextOrBitCast_Word_Int64"
+// CHECK-NOT: builtin "u_to_s_checked_conversion_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
 // test.test_trunc_u_to_s_zext_lshr_1 (Swift.UInt) -> Swift.Int
 sil @_TF4test29test_trunc_u_to_s_zext_lshr_1FSuSi : $@thin (UInt) -> Int {
@@ -30,25 +30,21 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %4
 
 bb2:                                              // Preds: bb1
-  %5 = builtin_function_ref "lshr_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %7
   %6 = struct_extract %0 : $UInt, #UInt.value     // user: %7
-  %7 = apply %5(%6, %2) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %8
+  %7 = builtin "lshr_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word // user: %8
   %8 = struct $UInt (%7 : $Builtin.Word)          // user: %11
   br bb3                                          // id: %9
 
 bb3:                                              // Preds: bb2
-  %10 = builtin_function_ref "zextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64 // user: %12
   %11 = struct_extract %8 : $UInt, #UInt.value    // user: %12
-  %12 = apply %10(%11) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %14
-  %13 = builtin_function_ref "u_to_s_checked_conversion_Int64" : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // user: %14
-  %14 = apply %13(%12) : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // users: %15, %16
+  %12 = builtin "zextOrBitCast_Word_Int64"(%11 : $Builtin.Word) : $Builtin.Int64 // user: %14
+  %14 = builtin "u_to_s_checked_conversion_Int64"(%12 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %15, %16
   %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 0 // user: %18
   %16 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
   cond_fail %16 : $Builtin.Int1                   // id: %17
   %18 = struct $Int64 (%15 : $Builtin.Int64)      // user: %19
   %19 = struct_extract %18 : $Int64, #Int64.value // user: %21
-  %20 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word // user: %21
-  %21 = apply %20(%19) : $@thin (Builtin.Int64) -> Builtin.Word // user: %22
+  %21 = builtin "truncOrBitCast_Int64_Word"(%19 : $Builtin.Int64) : $Builtin.Word // user: %22
   %22 = struct $Int (%21 : $Builtin.Word)         // users: %23, %24
   debug_value %22 : $Int  // let v1               // id: %23
   return %22 : $Int                               // id: %24
@@ -57,10 +53,10 @@ bb3:                                              // Preds: bb2
 
 // peephole: Word(Int64(x >> 10)) -> (x >> 1)
 // CHECK-LABEL: sil @_TF4test30test_trunc_u_to_s_zext_lshr_10FSuSi : $@thin (UInt) -> Int
-// CHECK: builtin_function_ref "lshr_Word"
-// CHECK-NOT: builtin_function_ref "zextOrBitCast_Word_Int64"
-// CHECK-NOT: builtin_function_ref "u_to_s_checked_conversion_Int64"
-// CHECK-NOT: builtin_function_ref "truncOrBitCast_Int64_Word"
+// CHECK: builtin "lshr_Word"
+// CHECK-NOT: builtin "zextOrBitCast_Word_Int64"
+// CHECK-NOT: builtin "u_to_s_checked_conversion_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
 // test.test_trunc_u_to_s_zext_lshr_10 (Swift.UInt) -> Swift.Int
 sil @_TF4test30test_trunc_u_to_s_zext_lshr_10FSuSi : $@thin (UInt) -> Int {
@@ -73,25 +69,21 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %4
 
 bb2:                                              // Preds: bb1
-  %5 = builtin_function_ref "lshr_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %7
   %6 = struct_extract %0 : $UInt, #UInt.value     // user: %7
-  %7 = apply %5(%6, %2) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %8
+  %7 = builtin "lshr_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word // user: %8
   %8 = struct $UInt (%7 : $Builtin.Word)          // user: %11
   br bb3                                          // id: %9
 
 bb3:                                              // Preds: bb2
-  %10 = builtin_function_ref "zextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64 // user: %12
   %11 = struct_extract %8 : $UInt, #UInt.value    // user: %12
-  %12 = apply %10(%11) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %14
-  %13 = builtin_function_ref "u_to_s_checked_conversion_Int64" : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // user: %14
-  %14 = apply %13(%12) : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // users: %15, %16
+  %12 = builtin "zextOrBitCast_Word_Int64"(%11 : $Builtin.Word) : $Builtin.Int64 // user: %14
+  %14 = builtin "u_to_s_checked_conversion_Int64"(%12 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %15, %16
   %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 0 // user: %18
   %16 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
   cond_fail %16 : $Builtin.Int1                   // id: %17
   %18 = struct $Int64 (%15 : $Builtin.Int64)      // user: %19
   %19 = struct_extract %18 : $Int64, #Int64.value // user: %21
-  %20 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word // user: %21
-  %21 = apply %20(%19) : $@thin (Builtin.Int64) -> Builtin.Word // user: %22
+  %21 = builtin "truncOrBitCast_Int64_Word"(%19 : $Builtin.Int64) : $Builtin.Word // user: %22
   %22 = struct $Int (%21 : $Builtin.Word)         // users: %23, %24
   debug_value %22 : $Int  // let v1               // id: %23
   return %22 : $Int                               // id: %24
@@ -100,8 +92,8 @@ bb3:                                              // Preds: bb2
 // no peephole: Word(Int64(x >> c)), where c is a variable
 // This should not trigger the optimization as it is not known if c > 0
 // CHECK-LABEL: sil @_TF4test31test_trunc_u_to_s_zext_lshr_varFTSuSu_Si : $@thin (UInt, UInt) -> Int
-// CHECK: builtin_function_ref "u_to_s_checked_conversion_Int64"
-// CHECK: builtin_function_ref "truncOrBitCast_Int64_Word"
+// CHECK: builtin "u_to_s_checked_conversion_Int64"
+// CHECK: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
 // test.test_trunc_u_to_s_zext_lshr_var (Swift.UInt, Swift.UInt) -> Swift.Int
 sil @_TF4test31test_trunc_u_to_s_zext_lshr_varFTSuSu_Si : $@thin (UInt, UInt) -> Int {
@@ -121,19 +113,16 @@ bb0(%0 : $UInt, %1 : $UInt):
 
 bb1:                                              // Preds: bb0
   %14 = integer_literal $Builtin.Word, 64         // user: %17
-  %15 = builtin_function_ref "cmp_ult_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %17
   %16 = struct_extract %1 : $UInt, #UInt.value    // user: %17
-  %17 = apply %15(%16, %14) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %20
+  %17 = builtin "cmp_ult_Word"(%16 : $Builtin.Word, %14 : $Builtin.Word) : $Builtin.Int1 // user: %20
   %18 = integer_literal $Builtin.Int1, -1         // user: %20
-  %19 = builtin_function_ref "int_expect_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 // user: %20
-  %20 = apply %19(%17, %18) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 // user: %21
+  %20 = builtin "int_expect_Int1"(%17 : $Builtin.Int1, %18 : $Builtin.Int1) : $Builtin.Int1 // user: %21
   cond_br %20, bb2, bb3                           // id: %21
 
 bb2:                                              // Preds: bb1
-  %22 = builtin_function_ref "lshr_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %25
   %23 = struct_extract %0 : $UInt, #UInt.value    // user: %25
   %24 = struct_extract %1 : $UInt, #UInt.value    // user: %25
-  %25 = apply %22(%23, %24) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %26
+  %25 = builtin "lshr_Word"(%23 : $Builtin.Word, %24 : $Builtin.Word) : $Builtin.Word // user: %26
   %26 = struct $UInt (%25 : $Builtin.Word)        // user: %35
   br bb4                                          // id: %27
 
@@ -147,18 +136,15 @@ bb3:                                              // Preds: bb1
   unreachable                                     // id: %33
 
 bb4:                                              // Preds: bb2
-  %34 = builtin_function_ref "zextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64 // user: %36
   %35 = struct_extract %26 : $UInt, #UInt.value   // user: %36
-  %36 = apply %34(%35) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %38
-  %37 = builtin_function_ref "u_to_s_checked_conversion_Int64" : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // user: %38
-  %38 = apply %37(%36) : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // users: %39, %40
+  %36 = builtin "zextOrBitCast_Word_Int64"(%35 : $Builtin.Word) : $Builtin.Int64 // user: %38
+  %38 = builtin "u_to_s_checked_conversion_Int64"(%36 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %39, %40
   %39 = tuple_extract %38 : $(Builtin.Int64, Builtin.Int1), 0 // user: %42
   %40 = tuple_extract %38 : $(Builtin.Int64, Builtin.Int1), 1 // user: %41
   cond_fail %40 : $Builtin.Int1                   // id: %41
   %42 = struct $Int64 (%39 : $Builtin.Int64)      // user: %43
   %43 = struct_extract %42 : $Int64, #Int64.value // user: %45
-  %44 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word // user: %45
-  %45 = apply %44(%43) : $@thin (Builtin.Int64) -> Builtin.Word // user: %46
+  %45 = builtin "truncOrBitCast_Int64_Word"(%43 : $Builtin.Int64) : $Builtin.Word // user: %46
   %46 = struct $Int (%45 : $Builtin.Word)         // users: %47, %48
   debug_value %46 : $Int  // let v1               // id: %47
   return %46 : $Int                               // id: %48
@@ -166,9 +152,9 @@ bb4:                                              // Preds: bb2
 
 // peephole: UInt16(Int32(x >> 1)) -> (x >> 1)
 // CHECK-LABEL: sil @_TF4test36test_uint16_trunc_u_to_s_zext_lshr_1FVSs6UInt16S0_ : $@thin (UInt16) -> UInt16
-// CHECK: builtin_function_ref "lshr_Int16"
-// CHECK-NOT: builtin_function_ref "zext_Int16_Int32"
-// CHECK-NOT: builtin_function_ref "s_to_u_checked_trunc_Int32_Int16"
+// CHECK: builtin "lshr_Int16"
+// CHECK-NOT: builtin "zext_Int16_Int32"
+// CHECK-NOT: builtin "s_to_u_checked_trunc_Int32_Int16"
 // CHECK-NOT: tuple_extract
 // CHECK: return
 // test.test_uint16_trunc_u_to_s_zext_lshr_1 (Swift.UInt16) -> Swift.UInt16
@@ -182,20 +168,17 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %4
 
 bb2:                                              // Preds: bb1
-  %5 = builtin_function_ref "lshr_Int16" : $@thin (Builtin.Int16, Builtin.Int16) -> Builtin.Int16 // user: %7
   %6 = struct_extract %0 : $UInt16, #UInt16.value // user: %7
-  %7 = apply %5(%6, %2) : $@thin (Builtin.Int16, Builtin.Int16) -> Builtin.Int16 // user: %8
+  %7 = builtin "lshr_Int16"(%6 : $Builtin.Int16, %2 : $Builtin.Int16) : $Builtin.Int16 // user: %8
   %8 = struct $UInt16 (%7 : $Builtin.Int16)       // user: %10
   br bb3                                          // id: %9
 
 bb3:                                              // Preds: bb2
   %10 = struct_extract %8 : $UInt16, #UInt16.value // user: %12
-  %11 = builtin_function_ref "zext_Int16_Int32" : $@thin (Builtin.Int16) -> Builtin.Int32 // user: %12
-  %12 = apply %11(%10) : $@thin (Builtin.Int16) -> Builtin.Int32 // user: %13
+  %12 = builtin "zext_Int16_Int32"(%10 : $Builtin.Int16) : $Builtin.Int32 // user: %13
   %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %14
   %14 = struct_extract %13 : $Int32, #Int32.value // user: %16
-  %15 = builtin_function_ref "s_to_u_checked_trunc_Int32_Int16" : $@thin (Builtin.Int32) -> (Builtin.Int16, Builtin.Int1) // user: %16
-  %16 = apply %15(%14) : $@thin (Builtin.Int32) -> (Builtin.Int16, Builtin.Int1) // users: %17, %18
+  %16 = builtin "s_to_u_checked_trunc_Int32_Int16"(%14 : $Builtin.Int32) : $(Builtin.Int16, Builtin.Int1) // users: %17, %18
   %17 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 0 // user: %20
   %18 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 1 // user: %19
   cond_fail %18 : $Builtin.Int1                   // id: %19
@@ -207,9 +190,9 @@ bb3:                                              // Preds: bb2
 
 // peephole: Int16(Int32(x >> 1)) -> (x >> 1)
 // CHECK-LABEL: sil @_TF4test35test_int16_trunc_u_to_s_zext_lshr_1FVSs6UInt16VSs5Int16 : $@thin (UInt16) -> Int16
-// CHECK: builtin_function_ref "lshr_Int16"
-// CHECK-NOT: builtin_function_ref "zext_Int16_Int32"
-// CHECK-NOT: builtin_function_ref "s_to_u_checked_trunc_Int32_Int16"
+// CHECK: builtin "lshr_Int16"
+// CHECK-NOT: builtin "zext_Int16_Int32"
+// CHECK-NOT: builtin "s_to_u_checked_trunc_Int32_Int16"
 // CHECK-NOT: tuple_extract
 // CHECK: return
 // test.test_int16_trunc_u_to_s_zext_lshr_1 (Swift.UInt16) -> Swift.Int16
@@ -223,20 +206,17 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %4
 
 bb2:                                              // Preds: bb1
-  %5 = builtin_function_ref "lshr_Int16" : $@thin (Builtin.Int16, Builtin.Int16) -> Builtin.Int16 // user: %7
   %6 = struct_extract %0 : $UInt16, #UInt16.value // user: %7
-  %7 = apply %5(%6, %2) : $@thin (Builtin.Int16, Builtin.Int16) -> Builtin.Int16 // user: %8
+  %7 = builtin "lshr_Int16"(%6 : $Builtin.Int16, %2 : $Builtin.Int16) : $Builtin.Int16 // user: %8
   %8 = struct $UInt16 (%7 : $Builtin.Int16)       // user: %10
   br bb3                                          // id: %9
 
 bb3:                                              // Preds: bb2
   %10 = struct_extract %8 : $UInt16, #UInt16.value // user: %12
-  %11 = builtin_function_ref "zext_Int16_Int32" : $@thin (Builtin.Int16) -> Builtin.Int32 // user: %12
-  %12 = apply %11(%10) : $@thin (Builtin.Int16) -> Builtin.Int32 // user: %13
+  %12 = builtin "zext_Int16_Int32"(%10 : $Builtin.Int16) : $Builtin.Int32 // user: %13
   %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %14
   %14 = struct_extract %13 : $Int32, #Int32.value // user: %16
-  %15 = builtin_function_ref "s_to_s_checked_trunc_Int32_Int16" : $@thin (Builtin.Int32) -> (Builtin.Int16, Builtin.Int1) // user: %16
-  %16 = apply %15(%14) : $@thin (Builtin.Int32) -> (Builtin.Int16, Builtin.Int1) // users: %17, %18
+  %16 = builtin "s_to_s_checked_trunc_Int32_Int16"(%14 : $Builtin.Int32) : $(Builtin.Int16, Builtin.Int1) // users: %17, %18
   %17 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 0 // user: %20
   %18 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 1 // user: %19
   cond_fail %18 : $Builtin.Int1                   // id: %19
@@ -248,26 +228,23 @@ bb3:                                              // Preds: bb2
 // No peephole for UInt(UInt64(x)), because it is not known if top bit of x is set
 // CHECK-LABEL: sil @_TF4test26test_trunc_s_to_u_zext_varFSiSu : $@thin (Int) -> UInt
 // This should not trigger the optimization as it is not known if top bit of x is set
-// CHECK: builtin_function_ref "zextOrBitCast_Word_Int64"
-// CHECK: builtin_function_ref "s_to_u_checked_conversion_Int64"
-// CHECK: builtin_function_ref "truncOrBitCast_Int64_Word"
+// CHECK: builtin "zextOrBitCast_Word_Int64"
+// CHECK: builtin "s_to_u_checked_conversion_Int64"
+// CHECK: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
 // test.test_trunc_s_to_u_zext_var (Swift.Int) -> Swift.UInt
 sil @_TF4test26test_trunc_s_to_u_zext_varFSiSu : $@thin (Int) -> UInt {
 bb0(%0 : $Int):
   debug_value %0 : $Int  // let x                 // id: %1
-  %2 = builtin_function_ref "zextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64 // user: %4
   %3 = struct_extract %0 : $Int, #Int.value       // user: %4
-  %4 = apply %2(%3) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %6
-  %5 = builtin_function_ref "s_to_u_checked_conversion_Int64" : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // user: %6
-  %6 = apply %5(%4) : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // users: %7, %8
+  %4 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64 // user: %6
+  %6 = builtin "s_to_u_checked_conversion_Int64"(%4 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %7, %8
   %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0 // user: %10
   %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
   cond_fail %8 : $Builtin.Int1                    // id: %9
   %10 = struct $UInt64 (%7 : $Builtin.Int64)      // user: %11
   %11 = struct_extract %10 : $UInt64, #UInt64.value // user: %13
-  %12 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word // user: %13
-  %13 = apply %12(%11) : $@thin (Builtin.Int64) -> Builtin.Word // user: %14
+  %13 = builtin "truncOrBitCast_Int64_Word"(%11 : $Builtin.Int64) : $Builtin.Word // user: %14
   %14 = struct $UInt (%13 : $Builtin.Word)        // user: %15
   return %14 : $UInt                              // id: %15
 }
@@ -276,31 +253,27 @@ bb0(%0 : $Int):
 // sizeof is known to return strictly positive values
 // peephole: UInt(UInt64(sizeof(Int))) -> sizeof(Int)
 // CHECK-LABEL: sil @_TF4test29test_trunc_s_to_u_zext_sizeofFT_Su : $@thin () -> UInt
-// CHECK: builtin_function_ref "sizeof"
-// CHECK-NOT: builtin_function_ref "zextOrBitCast_Word_Int64"
-// CHECK-NOT: builtin_function_ref "s_to_u_checked_conversion_Int64"
-// CHECK-NOT: builtin_function_ref "truncOrBitCast_Int64_Word"
+// CHECK: builtin "sizeof"
+// CHECK-NOT: builtin "zextOrBitCast_Word_Int64"
+// CHECK-NOT: builtin "s_to_u_checked_conversion_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Word"
 // CHECK: return
 // test.test_trunc_s_to_u_zext_sizeof () -> Swift.UInt
 sil @_TF4test29test_trunc_s_to_u_zext_sizeofFT_Su : $@thin () -> UInt {
 bb0:
   %0 = metatype $@thin Int.Type
-  %1 = builtin_function_ref "sizeof" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word // user: %3
   %2 = metatype $@thick Int.Type                  // user: %3
-  %3 = apply %1<(Int)>(%2) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word // user: %4
+  %3 = builtin "sizeof"<(Int)>(%2 : $@thick (Int).Type) : $Builtin.Word // user: %4
   %4 = struct $Int (%3 : $Builtin.Word)           // user: %6
-  %5 = builtin_function_ref "zextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64 // user: %7
   %6 = struct_extract %4 : $Int, #Int.value       // user: %7
-  %7 = apply %5(%6) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %9
-  %8 = builtin_function_ref "s_to_u_checked_conversion_Int64" : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // user: %9
-  %9 = apply %8(%7) : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) // users: %10, %11
+  %7 = builtin "zextOrBitCast_Word_Int64"(%6 : $Builtin.Word) : $Builtin.Int64 // user: %9
+  %9 = builtin "s_to_u_checked_conversion_Int64"(%7 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %10, %11
   %10 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 0 // user: %13
   %11 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
   cond_fail %11 : $Builtin.Int1                   // id: %12
   %13 = struct $UInt64 (%10 : $Builtin.Int64)     // user: %14
   %14 = struct_extract %13 : $UInt64, #UInt64.value // user: %16
-  %15 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word // user: %16
-  %16 = apply %15(%14) : $@thin (Builtin.Int64) -> Builtin.Word // user: %17
+  %16 = builtin "truncOrBitCast_Int64_Word"(%14 : $Builtin.Int64) : $Builtin.Word // user: %17
   %17 = struct $UInt (%16 : $Builtin.Word)        // user: %18
   return %17 : $UInt                              // id: %18
 }
@@ -310,30 +283,26 @@ bb0:
 // But Word->Int64 is not a safe conversion
 // No peephole for UInt16(UInt32(sizeof(Int)))
 // CHECK-LABEL: sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_VSs6UInt16 : $@thin () -> UInt16
-// CHECK: builtin_function_ref "zextOrBitCast_Word_Int64"
-// CHECK: builtin_function_ref "s_to_u_checked_trunc_Int64_Int32"
-// CHECK: builtin_function_ref "u_to_u_checked_trunc_Int32_Int16"
+// CHECK: builtin "zextOrBitCast_Word_Int64"
+// CHECK: builtin "s_to_u_checked_trunc_Int64_Int32"
+// CHECK: builtin "u_to_u_checked_trunc_Int32_Int16"
 // CHECK: return
 // test.test_int16_trunc_s_to_u_zext_sizeof () -> Swift.UInt16
 sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_VSs6UInt16 : $@thin () -> UInt16 {
 bb0:
   %0 = metatype $@thin Int.Type
-  %1 = builtin_function_ref "sizeof" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word // user: %3
   %2 = metatype $@thick Int.Type                  // user: %3
-  %3 = apply %1<(Int)>(%2) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word // user: %4
+  %3 = builtin "sizeof"<(Int)>(%2 : $@thick (Int).Type) : $Builtin.Word // user: %4
   %4 = struct $Int (%3 : $Builtin.Word)           // user: %6
-  %5 = builtin_function_ref "zextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64 // user: %7
   %6 = struct_extract %4 : $Int, #Int.value       // user: %7
-  %7 = apply %5(%6) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %9
-  %8 = builtin_function_ref "s_to_u_checked_trunc_Int64_Int32" : $@thin (Builtin.Int64) -> (Builtin.Int32, Builtin.Int1) // user: %9
-  %9 = apply %8(%7) : $@thin (Builtin.Int64) -> (Builtin.Int32, Builtin.Int1) // users: %10, %11
+  %7 = builtin "zextOrBitCast_Word_Int64"(%6 : $Builtin.Word) : $Builtin.Int64 // user: %9
+  %9 = builtin "s_to_u_checked_trunc_Int64_Int32"(%7 : $Builtin.Int64) : $(Builtin.Int32, Builtin.Int1) // users: %10, %11
   %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %13
   %11 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 1 // user: %12
   cond_fail %11 : $Builtin.Int1                   // id: %12
   %13 = struct $UInt32 (%10 : $Builtin.Int32)     // user: %14
   %14 = struct_extract %13 : $UInt32, #UInt32.value // user: %16
-  %15 = builtin_function_ref "u_to_u_checked_trunc_Int32_Int16" : $@thin (Builtin.Int32) -> (Builtin.Int16, Builtin.Int1) // user: %16
-  %16 = apply %15(%14) : $@thin (Builtin.Int32) -> (Builtin.Int16, Builtin.Int1) // users: %17, %18
+  %16 = builtin "u_to_u_checked_trunc_Int32_Int16"(%14 : $Builtin.Int32) : $(Builtin.Int16, Builtin.Int1) // users: %17, %18
   %17 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 0 // user: %20
   %18 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 1 // user: %19
   cond_fail %18 : $Builtin.Int1                   // id: %19
@@ -344,11 +313,11 @@ bb0:
 
 // peephole: UInt16(UInt32(Int16(x>>1))) -> x>>1
 // CHECK-LABEL: sil @_TF4test34test_int16_trunc_s_to_u_zext_int16FVSs6UInt16S0_ : $@thin (UInt16) -> UInt16
-// CHECK: builtin_function_ref "lshr_Int16"
-// CHECK-NOT: builtin_function_ref "u_to_s_checked_conversion_Int16"
-// CHECK-NOT: builtin_function_ref "s_to_u_checked_conversion_Int16"
-// CHECK-NOT: builtin_function_ref "sext_Int16_Int32"
-// CHECK-NOT: builtin_function_ref "u_to_u_checked_trunc_Int32_Int16"
+// CHECK: builtin "lshr_Int16"
+// CHECK-NOT: builtin "u_to_s_checked_conversion_Int16"
+// CHECK-NOT: builtin "s_to_u_checked_conversion_Int16"
+// CHECK-NOT: builtin "sext_Int16_Int32"
+// CHECK-NOT: builtin "u_to_u_checked_trunc_Int32_Int16"
 // CHECK-NOT: tuple_extract
 // CHECK: return
 // test.test_int16_trunc_s_to_u_zext_int16 (Swift.UInt16) -> Swift.UInt16
@@ -362,32 +331,27 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %4
 
 bb2:                                              // Preds: bb1
-  %5 = builtin_function_ref "lshr_Int16" : $@thin (Builtin.Int16, Builtin.Int16) -> Builtin.Int16 // user: %7
   %6 = struct_extract %0 : $UInt16, #UInt16.value // user: %7
-  %7 = apply %5(%6, %2) : $@thin (Builtin.Int16, Builtin.Int16) -> Builtin.Int16 // user: %8
+  %7 = builtin "lshr_Int16"(%6 : $Builtin.Int16, %2 : $Builtin.Int16) : $Builtin.Int16 // user: %8
   %8 = struct $UInt16 (%7 : $Builtin.Int16)       // user: %10
   br bb3                                          // id: %9
 
 bb3:                                              // Preds: bb2
   %10 = struct_extract %8 : $UInt16, #UInt16.value // user: %12
-  %11 = builtin_function_ref "u_to_s_checked_conversion_Int16" : $@thin (Builtin.Int16) -> (Builtin.Int16, Builtin.Int1) // user: %12
-  %12 = apply %11(%10) : $@thin (Builtin.Int16) -> (Builtin.Int16, Builtin.Int1) // users: %13, %14
+  %12 = builtin "u_to_s_checked_conversion_Int16"(%10 : $Builtin.Int16) : $(Builtin.Int16, Builtin.Int1) // users: %13, %14
   %13 = tuple_extract %12 : $(Builtin.Int16, Builtin.Int1), 0 // user: %16
   %14 = tuple_extract %12 : $(Builtin.Int16, Builtin.Int1), 1 // user: %15
   cond_fail %14 : $Builtin.Int1                   // id: %15
   %16 = struct $Int16 (%13 : $Builtin.Int16)      // user: %17
   %17 = struct_extract %16 : $Int16, #Int16.value // user: %19
-  %18 = builtin_function_ref "s_to_u_checked_conversion_Int16" : $@thin (Builtin.Int16) -> (Builtin.Int16, Builtin.Int1) // user: %19
-  %19 = apply %18(%17) : $@thin (Builtin.Int16) -> (Builtin.Int16, Builtin.Int1) // users: %20, %21
+  %19 = builtin "s_to_u_checked_conversion_Int16"(%17 : $Builtin.Int16) : $(Builtin.Int16, Builtin.Int1) // users: %20, %21
   %20 = tuple_extract %19 : $(Builtin.Int16, Builtin.Int1), 0 // user: %24
   %21 = tuple_extract %19 : $(Builtin.Int16, Builtin.Int1), 1 // user: %22
   cond_fail %21 : $Builtin.Int1                   // id: %22
-  %23 = builtin_function_ref "sext_Int16_Int32" : $@thin (Builtin.Int16) -> Builtin.Int32 // user: %24
-  %24 = apply %23(%20) : $@thin (Builtin.Int16) -> Builtin.Int32 // user: %25
+  %24 = builtin "sext_Int16_Int32"(%20 : $Builtin.Int16) : $Builtin.Int32 // user: %25
   %25 = struct $UInt32 (%24 : $Builtin.Int32)     // user: %26
   %26 = struct_extract %25 : $UInt32, #UInt32.value // user: %28
-  %27 = builtin_function_ref "u_to_u_checked_trunc_Int32_Int16" : $@thin (Builtin.Int32) -> (Builtin.Int16, Builtin.Int1) // user: %28
-  %28 = apply %27(%26) : $@thin (Builtin.Int32) -> (Builtin.Int16, Builtin.Int1) // users: %29, %30
+  %28 = builtin "u_to_u_checked_trunc_Int32_Int16"(%26 : $Builtin.Int32) : $(Builtin.Int16, Builtin.Int1) // users: %29, %30
   %29 = tuple_extract %28 : $(Builtin.Int16, Builtin.Int1), 0 // user: %32
   %30 = tuple_extract %28 : $(Builtin.Int16, Builtin.Int1), 1 // user: %31
   cond_fail %30 : $Builtin.Int1                   // id: %31
@@ -397,8 +361,8 @@ bb3:                                              // Preds: bb2
 
 // peephole: Int8(x & 127) -> remove overflow check
 // CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVSs5Int32VSs4Int8 : $@thin (Int32) -> Int8
-// CHECK: builtin_function_ref "and_Int32"
-// CHECK: builtin_function_ref "s_to_s_checked_trunc_Int32_Int8"
+// CHECK: builtin "and_Int32"
+// CHECK: builtin "s_to_s_checked_trunc_Int32_Int8"
 // CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_s_to_s_checked_trunc_of_and (Swift.Int32) -> Swift.Int8
@@ -406,13 +370,11 @@ sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVSs5Int32VSs4
 bb0(%0 : $Int32):
   debug_value %0 : $Int32  // let x               // id: %1
   %2 = integer_literal $Builtin.Int32, 127        // user: %5
-  %3 = builtin_function_ref "and_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %5
   %4 = struct_extract %0 : $Int32, #Int32.value   // user: %5
-  %5 = apply %3(%4, %2) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %6
+  %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
   %6 = struct $Int32 (%5 : $Builtin.Int32)        // user: %7
   %7 = struct_extract %6 : $Int32, #Int32.value   // user: %9
-  %8 = builtin_function_ref "s_to_s_checked_trunc_Int32_Int8" : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // user: %9
-  %9 = apply %8(%7) : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %9 = builtin "s_to_s_checked_trunc_Int32_Int8"(%7 : $Builtin.Int32) : $(Builtin.Int8, Builtin.Int1) // users: %10, %11
   %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
   %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
   cond_fail %11 : $Builtin.Int1                   // id: %12
@@ -422,8 +384,8 @@ bb0(%0 : $Int32):
 
 // peephole: UInt8(x & 255) -> remove overflow check
 // CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVSs5Int32VSs5UInt8 : $@thin (Int32) -> UInt8
-// CHECK: builtin_function_ref "and_Int32"
-// CHECK: builtin_function_ref "s_to_u_checked_trunc_Int32_Int8"
+// CHECK: builtin "and_Int32"
+// CHECK: builtin "s_to_u_checked_trunc_Int32_Int8"
 // CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_s_to_u_checked_trunc_of_and (Swift.Int32) -> Swift.UInt8
@@ -431,13 +393,11 @@ sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVSs5Int32VSs5
 bb0(%0 : $Int32):
   debug_value %0 : $Int32  // let x               // id: %1
   %2 = integer_literal $Builtin.Int32, 255        // user: %5
-  %3 = builtin_function_ref "and_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %5
   %4 = struct_extract %0 : $Int32, #Int32.value   // user: %5
-  %5 = apply %3(%4, %2) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %6
+  %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
   %6 = struct $Int32 (%5 : $Builtin.Int32)        // user: %7
   %7 = struct_extract %6 : $Int32, #Int32.value   // user: %9
-  %8 = builtin_function_ref "s_to_u_checked_trunc_Int32_Int8" : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // user: %9
-  %9 = apply %8(%7) : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %9 = builtin "s_to_u_checked_trunc_Int32_Int8"(%7 : $Builtin.Int32) : $(Builtin.Int8, Builtin.Int1) // users: %10, %11
   %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
   %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
   cond_fail %11 : $Builtin.Int1                   // id: %12
@@ -447,8 +407,8 @@ bb0(%0 : $Int32):
 
 // peephole: UInt8(x & 255) -> remove overflow check
 // CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVSs6UInt32VSs5UInt8 : $@thin (UInt32) -> UInt8
-// CHECK: builtin_function_ref "and_Int32"
-// CHECK: builtin_function_ref "u_to_u_checked_trunc_Int32_Int8"
+// CHECK: builtin "and_Int32"
+// CHECK: builtin "u_to_u_checked_trunc_Int32_Int8"
 // CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_u_to_u_checked_trunc_of_and (Swift.UInt32) -> Swift.UInt8
@@ -456,13 +416,11 @@ sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVSs6UInt32VSs
 bb0(%0 : $UInt32):
   debug_value %0 : $UInt32  // let x              // id: %1
   %2 = integer_literal $Builtin.Int32, 255        // user: %5
-  %3 = builtin_function_ref "and_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %5
   %4 = struct_extract %0 : $UInt32, #UInt32.value // user: %5
-  %5 = apply %3(%4, %2) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %6
+  %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
   %6 = struct $UInt32 (%5 : $Builtin.Int32)       // user: %7
   %7 = struct_extract %6 : $UInt32, #UInt32.value // user: %9
-  %8 = builtin_function_ref "u_to_u_checked_trunc_Int32_Int8" : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // user: %9
-  %9 = apply %8(%7) : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %9 = builtin "u_to_u_checked_trunc_Int32_Int8"(%7 : $Builtin.Int32) : $(Builtin.Int8, Builtin.Int1) // users: %10, %11
   %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
   %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
   cond_fail %11 : $Builtin.Int1                   // id: %12
@@ -472,8 +430,8 @@ bb0(%0 : $UInt32):
 
 // peephole: Int8(x & 127) -> remove overflow check
 // CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVSs6UInt32VSs4Int8 : $@thin (UInt32) -> Int8
-// CHECK: builtin_function_ref "and_Int32"
-// CHECK: builtin_function_ref "u_to_s_checked_trunc_Int32_Int8"
+// CHECK: builtin "and_Int32"
+// CHECK: builtin "u_to_s_checked_trunc_Int32_Int8"
 // CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_u_to_s_checked_trunc_of_and (Swift.UInt32) -> Swift.Int8
@@ -481,13 +439,11 @@ sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVSs6UInt32VSs
 bb0(%0 : $UInt32):
   debug_value %0 : $UInt32  // let x              // id: %1
   %2 = integer_literal $Builtin.Int32, 127        // user: %5
-  %3 = builtin_function_ref "and_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %5
   %4 = struct_extract %0 : $UInt32, #UInt32.value // user: %5
-  %5 = apply %3(%4, %2) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 // user: %6
+  %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
   %6 = struct $UInt32 (%5 : $Builtin.Int32)       // user: %7
   %7 = struct_extract %6 : $UInt32, #UInt32.value // user: %9
-  %8 = builtin_function_ref "u_to_s_checked_trunc_Int32_Int8" : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // user: %9
-  %9 = apply %8(%7) : $@thin (Builtin.Int32) -> (Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %9 = builtin "u_to_s_checked_trunc_Int32_Int8"(%7 : $Builtin.Int32) : $(Builtin.Int8, Builtin.Int1) // users: %10, %11
   %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
   %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
   cond_fail %11 : $Builtin.Int1                   // id: %12

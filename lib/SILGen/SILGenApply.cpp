@@ -725,6 +725,34 @@ public:
     }
     llvm_unreachable("bad callee kind");
   }
+  
+  /// Return the builtin identifier, if the callee is a builtin.
+  Identifier
+  getBuiltinIdentifier(SILGenModule &SGM,
+                       unsigned uncurryLevel) const {
+    switch (kind) {
+    case Kind::StandaloneFunction: {
+      auto decl = standaloneFunction.getDecl();
+      if (!isa<BuiltinUnit>(decl->getDeclContext()))
+        return Identifier();
+      
+      if (!isa<BuiltinUnit>(decl->getDeclContext()))
+        return Identifier();
+
+      // Currently we have no curried builtins.
+      assert(uncurryLevel == 0 && "curried builtin?!");
+
+      return decl->getName();
+    }
+    case Kind::IndirectValue:
+    case Kind::ClassMethod:
+    case Kind::SuperMethod:
+    case Kind::WitnessMethod:
+    case Kind::DynamicMethod:
+      return Identifier();
+    }
+    llvm_unreachable("bad callee kind");
+  }
 };
   
 /// An ASTVisitor for building SIL function calls.
@@ -2117,6 +2145,7 @@ namespace {
       // Get either the specialized emitter for a known function, or the
       // function value for a normal callee.
       Callee::SpecializedEmitter specializedEmitter = nullptr;
+      Identifier builtinName;
       CanSILFunctionType substFnType;
       ManagedValue mv;
       bool transparent;
@@ -2128,7 +2157,11 @@ namespace {
       auto maybeEmitter = callee.getSpecializedEmitter(gen.SGM, uncurryLevel);
       if (maybeEmitter) {
         specializedEmitter = maybeEmitter.getValue();
-
+      } else {
+        builtinName = callee.getBuiltinIdentifier(gen.SGM, uncurryLevel);
+      }
+      
+      if (maybeEmitter || builtinName.get()) {
         // We want to emit the arguments as fully-substituted values
         // because that's what the specialized emitters expect.
         origFormalType = AbstractionPattern(formalType);
@@ -2173,13 +2206,24 @@ namespace {
       // Emit the uncurried call.
       ManagedValue result;
 
-      if (specializedEmitter)
+      if (specializedEmitter) {
         result = specializedEmitter(gen,
                                     uncurriedLoc.getValue(),
                                     callee.getSubstitutions(),
                                     uncurriedArgs,
                                     uncurriedContext);
-      else
+      } else if (builtinName.get()) {
+        SmallVector<SILValue, 4> consumedArgs;
+        for (auto arg : uncurriedArgs) {
+          consumedArgs.push_back(arg.forward(gen));
+        }
+        auto resultVal =
+          gen.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
+                              substFnType->getResult().getSILType(),
+                              callee.getSubstitutions(),
+                              consumedArgs);
+        result = gen.emitManagedRValueWithCleanup(resultVal);
+      } else {
         result = gen.emitApply(uncurriedLoc.getValue(), mv,
                            callee.getSubstitutions(),
                            uncurriedArgs,
@@ -2188,6 +2232,7 @@ namespace {
                            uncurriedSites.back().getSubstResultType(),
                            transparent, None,
                            uncurriedContext);
+      }
       
       // End the initial writeback scope, if any.
       initialWritebackScope.reset();
@@ -2620,24 +2665,6 @@ namespace {
     return ManagedValue(out, args[0].getCleanup());
   }
   
-  /// The type of trait builtins.
-  static SILType getTypeTraitSILType(ASTContext &C) {
-    auto param = CanGenericTypeParamType::get(0, 0, C);
-    auto reqt = Requirement(RequirementKind::WitnessMarker,
-                            param, param);
-    auto metaTy = CanMetatypeType::get(param, MetatypeRepresentation::Thick);
-    auto sig = GenericSignature::get(param.getPointer(), reqt)
-      ->getCanonicalSignature();
-    auto int8Ty = BuiltinIntegerType::get(8, C)->getCanonicalType();
-    auto fnTy = SILFunctionType::get(sig,
-                 AnyFunctionType::ExtInfo()
-                   .withRepresentation(FunctionType::Representation::Thin),
-                 ParameterConvention::Direct_Unowned,
-                 SILParameterInfo(metaTy, ParameterConvention::Direct_Unowned),
-                 SILResultInfo(int8Ty, ResultConvention::Unowned), C);
-    return SILType::getPrimitiveObjectType(fnTy);
-  }
-  
   /// Specialized emitter for type traits.
   template<TypeTraitResult (TypeBase::*Trait)(),
            BuiltinValueKind Kind>
@@ -2668,17 +2695,12 @@ namespace {
     // eliminate it later, or we'll lower it away at IRGen time.
     case TypeTraitResult::CanBe: {
       auto &C = gen.getASTContext();
-      auto builtin = gen.B.createBuiltinFunctionRef(loc,
-                                          C.getIdentifier(getBuiltinName(Kind)),
-                                          getTypeTraitSILType(C));
-      auto builtinTy = builtin->getType().castTo<SILFunctionType>();
-      auto substTy = builtinTy->substGenericArgs(gen.SGM.M,
-                                    gen.SGM.M.getSwiftModule(), substitutions);
+      auto int8Ty = BuiltinIntegerType::get(8, C)->getCanonicalType();
+      auto apply = gen.B.createBuiltin(loc,
+                                       C.getIdentifier(getBuiltinName(Kind)),
+                                       SILType::getPrimitiveObjectType(int8Ty),
+                                       substitutions, args[0].getValue());
       
-      auto apply = gen.B.createApply(loc, builtin,
-                                 SILType::getPrimitiveObjectType(substTy),
-                                 builtinTy->getResult().getSILType(),
-                                 substitutions, args[0].getValue());
       return ManagedValue::forUnmanaged(apply);
     }
     }

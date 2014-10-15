@@ -156,13 +156,12 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
 
       // If I is an apply calling a builtin that does not have side effects, we
       // can ignore it.
-      if (auto *AI = dyn_cast<ApplyInst>(&I))
-        if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(&*AI->getCallee()))
-          if (isSideEffectFree(FR)) {
-            DEBUG(llvm::dbgs() << "            SAFE! No side effect "
-                  "builtin.\n");
-            continue;
-          }
+      if (auto *BI = dyn_cast<BuiltinInst>(&I))
+        if (isSideEffectFree(BI)) {
+          DEBUG(llvm::dbgs() << "            SAFE! No side effect "
+                "builtin.\n");
+          continue;
+        }
 
       // Storing into the object can be ignored.
       if (auto *SI = dyn_cast<StoreInst>(&I))

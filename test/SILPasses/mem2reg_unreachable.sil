@@ -10,10 +10,9 @@ bb0(%0 : $Int, %1 : $Int):
   debug_value %0 : $Int  // let x                 // id: %2
   debug_value %1 : $Int  // let y                 // id: %3
   %4 = alloc_stack $Int  // var g                 // users: %14, %18, %20, %21
-  %5 = builtin_function_ref "cmp_sgt_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %8
   %6 = struct_extract %1 : $Int, #Int.value       // user: %8
   %7 = struct_extract %0 : $Int, #Int.value       // user: %8
-  %8 = apply %5(%6, %7) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %9
+  %8 = builtin "cmp_sgt_Word"(%6 : $Builtin.Word, %7 : $Builtin.Word) : $Builtin.Int1 // user: %9
   %9 = struct $Bool (%8 : $Builtin.Int1)          // user: %10
   %10 = struct_extract %9 : $Bool, #Bool.value    // user: %11
   br bb2                                          // id: %11

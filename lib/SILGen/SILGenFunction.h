@@ -442,7 +442,6 @@ public:
   /// Generate a global accessor, using the given initializer token and
   /// function
   void emitGlobalAccessor(VarDecl *global,
-                          FuncDecl *builtinOnceDecl,
                           SILGlobalVariable *onceToken,
                           SILFunction *onceFunc);
   

@@ -55,11 +55,11 @@ namespace swift {
   /// dead when this instruction is removed.
   void eraseUsesOfInstruction(SILInstruction *Inst);
 
-  /// Does the passed in BuiltinFunctionRefInst have any side effects?
-  bool isSideEffectFree(BuiltinFunctionRefInst *FR);
+  /// Does the passed in BuiltinInst have any side effects?
+  bool isSideEffectFree(BuiltinInst *FR);
 
-  /// Does the passed in BuiltinFunctionRefInst touch memory at all?
-  bool isReadNone(BuiltinFunctionRefInst *FR);
+  /// Does the passed in BuiltinInst touch memory at all?
+  bool isReadNone(BuiltinInst *FR);
 
   /// Does the passed in FunctionRefInst touch memory at all?
   bool isReadNone(FunctionRefInst *FR);

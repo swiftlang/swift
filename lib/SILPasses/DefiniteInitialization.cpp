@@ -1163,64 +1163,26 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   ConditionalDestroys.push_back({ ReleaseID, Availability });
 }
 
-static SILValue getBinaryFunction(StringRef Name, SILType IntSILTy,
-                                  SILLocation Loc, SILBuilder &B) {
+static Identifier getBinaryFunction(StringRef Name, SILType IntSILTy,
+                                    ASTContext &C) {
   CanType IntTy = IntSILTy.getSwiftRValueType();
   unsigned NumBits =
     cast<BuiltinIntegerType>(IntTy)->getWidth().getFixedWidth();
   // Name is something like: add_Int64
   std::string NameStr = Name;
   NameStr += "_Int" + llvm::utostr(NumBits);
-  
-  // Woo, boilerplate to produce a function type.
-  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          FunctionType::Representation::Thin,
-                                          /*noreturn*/ false,
-                                          /*autoclosure*/ false);
-  
-  SILParameterInfo Params[] = {
-    SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned),
-    SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned)
-  };
-  SILResultInfo Result(IntTy, ResultConvention::Unowned);
-  
-  auto FnType = SILFunctionType::get(nullptr, extInfo,
-                                     ParameterConvention::Direct_Owned,
-                                     Params, Result,
-                                     B.getASTContext());
-  auto Ty = SILType::getPrimitiveObjectType(FnType);
-  return B.createBuiltinFunctionRef(Loc, NameStr, Ty);
+
+  return C.getIdentifier(NameStr);
 }
-static SILValue getTruncateToI1Function(SILType IntSILTy, SILLocation Loc,
-                                        SILBuilder &B) {
+static Identifier getTruncateToI1Function(SILType IntSILTy, ASTContext &C) {
   CanType IntTy = IntSILTy.getSwiftRValueType();
   unsigned NumBits =
     cast<BuiltinIntegerType>(IntTy)->getWidth().getFixedWidth();
 
   // Name is something like: trunc_Int64_Int8
   std::string NameStr = "trunc_Int" + llvm::utostr(NumBits) + "_Int1";
-
-  // Woo, boilerplate to produce a function type.
-  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          FunctionType::Representation::Thin,
-                                          /*noreturn*/ false,
-                                          /*autoclosure*/ false);
-  
-  SILParameterInfo Param(IntTy, ParameterConvention::Direct_Unowned);
-  Type Int1Ty = BuiltinIntegerType::get(1, B.getASTContext());
-  SILResultInfo Result(Int1Ty->getCanonicalType(),
-                       ResultConvention::Unowned);
-  
-  auto FnType = SILFunctionType::get(nullptr, extInfo,
-                                     ParameterConvention::Direct_Owned,
-                                     Param, Result,
-                                     B.getASTContext());
-  auto Ty = SILType::getPrimitiveObjectType(FnType);
-
-  
-  return B.createBuiltinFunctionRef(Loc, NameStr, Ty);
+  return C.getIdentifier(NameStr);
 }
-
 
 /// handleConditionalInitAssign - This memory object has some stores
 /// into (some element of) it that is either an init or an assign based on the
@@ -1256,7 +1218,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, AllocAddr);
   
-  SILValue OrFn;
+  Identifier OrFn;
 
   // At each initialization, mark the initialized elements live.  At each
   // conditional assign, resolve the ambiguity by inserting a CFG diamond.
@@ -1291,13 +1253,11 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       // load/or/store sequence to mask in the bits.
       if (!Bitmask.isAllOnesValue()) {
         SILValue Tmp = B.createLoad(Loc, AllocAddr);
-        if (!OrFn) {
-          SILBuilder FnB(TheMemory.getFunctionEntryPoint());
-          OrFn = getBinaryFunction("or", Tmp.getType(), Loc, FnB);
-        }
+        if (!OrFn.get())
+          OrFn = getBinaryFunction("or", Tmp.getType(), B.getASTContext());
         
         SILValue Args[] = { Tmp, MaskVal };
-        MaskVal = B.createApply(Loc, OrFn, Args);
+        MaskVal = B.createBuiltin(Loc, OrFn, Tmp.getType(), {}, Args);
       }
       B.createStore(Loc, MaskVal, AllocAddr);
       continue;
@@ -1320,7 +1280,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // If we have multiple tuple elements, we'll have to do some shifting and
     // truncating of the mask value.  These values cache the function_ref so we
     // don't emit multiple of them.
-    SILValue ShiftRightFn, TruncateFn;
+    Identifier ShiftRightFn, TruncateFn;
     
     // If the memory object has multiple tuple elements, we need to destroy any
     // live subelements, since they can each be in a different state of
@@ -1332,16 +1292,22 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       if (NumMemoryElements != 1) {
         // Shift the mask down to this element.
         if (Elt != 0) {
-          if (!ShiftRightFn)
-            ShiftRightFn = getBinaryFunction("lshr", Bitmask.getType(), Loc, B);
+          if (!ShiftRightFn.get())
+            ShiftRightFn = getBinaryFunction("lshr", Bitmask.getType(),
+                                             B.getASTContext());
           SILValue Amt = B.createIntegerLiteral(Loc, Bitmask.getType(), Elt);
           SILValue Args[] = { CondVal, Amt };
-          CondVal = B.createApply(Loc, ShiftRightFn, Args);
+          CondVal = B.createBuiltin(Loc, ShiftRightFn, Bitmask.getType(),
+          {}, Args);
         }
         
-        if (!TruncateFn)
-          TruncateFn = getTruncateToI1Function(Bitmask.getType(), Loc, B);
-        CondVal = B.createApply(Loc, TruncateFn, CondVal);
+        if (!TruncateFn.get())
+          TruncateFn = getTruncateToI1Function(Bitmask.getType(),
+                                               B.getASTContext());
+        CondVal = B.createBuiltin(Loc, TruncateFn,
+                                  SILType::getBuiltinIntegerType(1,
+                                                             B.getASTContext()),
+                                  {}, CondVal);
       }
       
       SILBasicBlock *TrueBB, *ContBB;
@@ -1378,7 +1344,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilder B(TheMemory.MemoryInst);
-  SILValue ShiftRightFn, TruncateFn;
+  Identifier ShiftRightFn, TruncateFn;
 
   unsigned NumMemoryElements = TheMemory.getNumMemoryElements();
 
@@ -1444,21 +1410,24 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       if (NumMemoryElements != 1) {
         // Shift the mask down to this element.
         if (Elt != 0) {
-          if (!ShiftRightFn) {
-            SILBuilder FB(TheMemory.getFunctionEntryPoint());
+          if (!ShiftRightFn.get())
             ShiftRightFn = getBinaryFunction("lshr", CondVal.getType(),
-                                             Loc, FB);
-          }
+                                             B.getASTContext());
           SILValue Amt = B.createIntegerLiteral(Loc, CondVal.getType(), Elt);
           SILValue Args[] = { CondVal, Amt };
-          CondVal = B.createApply(Loc, ShiftRightFn, Args);
+          
+          CondVal = B.createBuiltin(Loc, ShiftRightFn,
+                                    CondVal.getType(), {},
+                                    Args);
         }
         
-        if (!TruncateFn) {
-          SILBuilder FB(TheMemory.getFunctionEntryPoint());
-          TruncateFn = getTruncateToI1Function(CondVal.getType(), Loc, FB);
-        }
-        CondVal = B.createApply(Loc, TruncateFn, CondVal);
+        if (!TruncateFn.get())
+          TruncateFn = getTruncateToI1Function(CondVal.getType(),
+                                               B.getASTContext());
+        CondVal = B.createBuiltin(Loc, TruncateFn,
+                                  SILType::getBuiltinIntegerType(1,
+                                                             B.getASTContext()),
+                                  {}, CondVal);
       }
       
       SILBasicBlock *CondDestroyBlock, *ContBlock;

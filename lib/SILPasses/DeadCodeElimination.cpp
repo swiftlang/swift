@@ -35,10 +35,8 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  if (const ApplyInst *AI = dyn_cast<ApplyInst>(I))
-    if (BuiltinFunctionRefInst *FR =
-        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      return !isSideEffectFree(FR);
+  if (auto *BI = dyn_cast<BuiltinInst>(I))
+    return !isSideEffectFree(BI);
 
   if (I->mayHaveSideEffects())
     return true;

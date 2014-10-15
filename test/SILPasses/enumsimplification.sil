@@ -436,11 +436,10 @@ bb2:
   br bb3
 
 bb3:
-  %1 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %2 = integer_literal $Builtin.Word, 2
   %3 = integer_literal $Builtin.Word, 3
   %4 = integer_literal $Builtin.Int1, 0
-  %5 = apply %1(%2, %3, %4) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %5 = builtin "sadd_with_overflow_Word"(%2 : $Builtin.Word, %3 : $Builtin.Word, %4 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   release_value %0 : $FakeOptionalClass
   %9998 = function_ref @unknown : $@thin () -> ()
   apply %9998() : $@thin () -> ()

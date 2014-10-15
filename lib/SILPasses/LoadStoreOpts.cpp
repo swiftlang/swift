@@ -583,13 +583,12 @@ bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI,
       continue;
     }
 
-    if (auto *AI = dyn_cast<ApplyInst>(Inst))
-      if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(&*AI->getCallee()))
-        if (isReadNone(BI)) {
-          DEBUG(llvm::dbgs() << "        Found readnone builtin, does not "
-                "affect loads and stores.\n");
-          continue;
-        }
+    if (auto *BI = dyn_cast<BuiltinInst>(Inst))
+      if (isReadNone(BI)) {
+        DEBUG(llvm::dbgs() << "        Found readnone builtin, does not "
+              "affect loads and stores.\n");
+        continue;
+      }
 
     // All other instructions that read from the memory location of the store
     // invalidates the store.

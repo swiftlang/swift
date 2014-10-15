@@ -266,7 +266,7 @@ protected:
     // runtime as the spec for the instruction requires and propagate
     // undef to all uses.
     case DynamicCastFeasibility::WillFail:
-      B.createApply(loc, B.createBuiltinTrap(loc), {});
+      B.createBuiltinTrap(loc);
       ValueMap.insert({SILValue(inst),
                        SILValue(SILUndef::get(targetType, inst->getModule()))});
       return;
@@ -307,7 +307,7 @@ protected:
     // runtime as the spec for the instruction requires and propagate
     // undef to all uses.
     case DynamicCastFeasibility::WillFail: {
-      auto newInst = B.createApply(loc, B.createBuiltinTrap(loc), {});
+      auto newInst = B.createBuiltinTrap(loc);
       doPostProcess(inst, newInst);
 
       // mem2reg's invariants get unhappy if we don't try to

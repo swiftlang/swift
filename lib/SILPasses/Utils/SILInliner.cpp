@@ -206,7 +206,7 @@ SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
 /// TODO: Fill this out.
 InlineCost swift::instructionInlineCost(SILInstruction &I) {
   switch (I.getKind()) {
-    case ValueKind::BuiltinFunctionRefInst:
+    case ValueKind::BuiltinFunctionRefInst: // XXX
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
     case ValueKind::DebugValueInst:

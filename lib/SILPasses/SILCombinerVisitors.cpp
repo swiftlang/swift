@@ -481,30 +481,30 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
   return eraseInstFromFunction(*AI);
 }
 
-SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
-  assert(AI->hasSubstitutions() && "Expected substitutions for canBeClass");
+SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
+  assert(BI->hasSubstitutions() && "Expected substitutions for canBeClass");
 
-  auto const &Subs = AI->getSubstitutions();
+  auto const &Subs = BI->getSubstitutions();
   assert((Subs.size() == 1) &&
          "Expected one substitution in call to canBeClass");
 
   auto Ty = Subs[0].getReplacement()->getCanonicalType();
   switch (Ty->canBeClass()) {
   case TypeTraitResult::IsNot:
-    return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
-                                      APInt(8, 0), *AI->getFunction());
+    return IntegerLiteralInst::create(BI->getLoc(), BI->getType(),
+                                      APInt(8, 0), *BI->getFunction());
   case TypeTraitResult::Is:
-    return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
-                                      APInt(8, 1), *AI->getFunction());
+    return IntegerLiteralInst::create(BI->getLoc(), BI->getType(),
+                                      APInt(8, 1), *BI->getFunction());
   case TypeTraitResult::CanBe:
     return nullptr;
   }
 }
 
-SILInstruction *SILCombiner::optimizeBuiltinCompareEq(ApplyInst *AI,
-                                                       bool NegateResult) {
-  IsZeroKind LHS = isZeroValue(AI->getArgument(0));
-  IsZeroKind RHS = isZeroValue(AI->getArgument(1));
+SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
+                                                      bool NegateResult) {
+  IsZeroKind LHS = isZeroValue(BI->getArguments()[0]);
+  IsZeroKind RHS = isZeroValue(BI->getArguments()[1]);
 
   // Can't handle unknown values.
   if (LHS == IsZeroKind::Unknown || RHS == IsZeroKind::Unknown)
@@ -517,8 +517,8 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(ApplyInst *AI,
   // Set to true if both sides are zero. Set to false if only one side is zero.
   bool Val = (LHS == RHS) ^ NegateResult;
 
-  return IntegerLiteralInst::create(AI->getLoc(), AI->getType(), APInt(1, Val),
-                                    *AI->getFunction());
+  return IntegerLiteralInst::create(BI->getLoc(), BI->getType(), APInt(1, Val),
+                                    *BI->getFunction());
 }
 
 SILInstruction *
@@ -885,21 +885,64 @@ static bool recursivelyCollectArrayWritesInstr(UserListTy &Uses,
   return true;
 }
 
+SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
+    return optimizeBuiltinCanBeObjCClass(I);
+
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::ICMP_EQ)
+    return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ false);
+
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::ICMP_NE)
+    return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ true);
+  
+  // Optimize sub(x - x) -> 0.
+  if (I->getNumOperands() == 2 &&
+      match(I, m_ApplyInst(BuiltinValueKind::Sub, m_ValueBase())) &&
+      I->getOperand(0) == I->getOperand(1))
+    if (auto DestTy = I->getType().getAs<BuiltinIntegerType>())
+      return IntegerLiteralInst::create(I->getLoc(), I->getType(),
+                                        APInt(DestTy->getGreatestWidth(), 0),
+                                        *I->getFunction());
+
+  // Optimize sub(ptrtoint(index_raw_pointer(v, x)), ptrtoint(v)) -> x.
+  BuiltinInst *Bytes2;
+  IndexRawPointerInst *Indexraw;
+  if (I->getNumOperands() == 2 &&
+      match(I, m_BuiltinInst(BuiltinValueKind::Sub,
+                            m_BuiltinInst(BuiltinValueKind::PtrToInt,
+                                        m_IndexRawPointerInst(Indexraw)),
+                            m_BuiltinInst(Bytes2)))) {
+    if (match(Bytes2, m_BuiltinInst(BuiltinValueKind::PtrToInt, m_ValueBase()))) {
+      if (Indexraw->getOperand(0) == Bytes2->getOperand(0) &&
+          Indexraw->getOperand(1).getType() == I->getType()) {
+        replaceInstUsesWith(*I, Indexraw->getOperand(1).getDef());
+        return eraseInstFromFunction(*I);
+      }
+    }
+  }
+
+  // Canonicalize multiplication by a stride to be such that the stride is
+  // always the second argument.
+  if (I->getNumOperands() != 3)
+    return nullptr;
+  
+  if (match(I, m_ApplyInst(BuiltinValueKind::SMulOver,
+                            m_ApplyInst(BuiltinValueKind::Strideof),
+                            m_ValueBase(), m_IntegerLiteralInst())) ||
+      match(I, m_ApplyInst(BuiltinValueKind::SMulOver,
+                            m_ApplyInst(BuiltinValueKind::StrideofNonZero),
+                            m_ValueBase(), m_IntegerLiteralInst()))) {
+    I->swapOperands(0, 1);
+    return I;
+  }
+
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
     return optimizeApplyOfPartialApply(AI, PAI);
-
-  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
-    if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
-      return optimizeBuiltinCanBeObjCClass(AI);
-
-    if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::ICMP_EQ)
-      return optimizeBuiltinCompareEq(AI, /*Negate Eq result*/ false);
-
-    if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::ICMP_NE)
-      return optimizeBuiltinCompareEq(AI, /*Negate Eq result*/ true);
-  }
 
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
@@ -949,31 +992,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     }
   }
 
-  // Optimize sub(x - x) -> 0.
-  if (AI->getNumOperands() == 3 &&
-      match(AI, m_ApplyInst(BuiltinValueKind::Sub, m_ValueBase())) &&
-      AI->getOperand(1) == AI->getOperand(2))
-    if (auto DestTy = AI->getType().getAs<BuiltinIntegerType>())
-      return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
-                                        APInt(DestTy->getGreatestWidth(), 0),
-                                        *AI->getFunction());
-
-  // Optimize sub(ptrtoint(index_raw_pointer(v, x)), ptrtoint(v)) -> x.
-  ApplyInst *Bytes2;
-  IndexRawPointerInst *Indexraw;
-  if (AI->getNumOperands() == 3 &&
-      match(AI, m_ApplyInst(BuiltinValueKind::Sub,
-                            m_ApplyInst(BuiltinValueKind::PtrToInt,
-                                        m_IndexRawPointerInst(Indexraw)),
-                            m_ApplyInst(Bytes2)))) {
-    if (match(Bytes2, m_ApplyInst(BuiltinValueKind::PtrToInt, m_ValueBase()))) {
-      if (Indexraw->getOperand(0) == Bytes2->getOperand(1) &&
-          Indexraw->getOperand(1).getType() == AI->getType()) {
-        replaceInstUsesWith(*AI, Indexraw->getOperand(1).getDef());
-        return eraseInstFromFunction(*AI);
-      }
-    }
-  }
 
   // (apply (thin_to_thick_function f)) to (apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
@@ -992,21 +1010,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                              AI->getSubstitutions(), Arguments,
                              AI->isTransparent(),
                              *AI->getFunction());
-  }
-
-  // Canonicalize multiplication by a stride to be such that the stride is
-  // always the second argument.
-  if (AI->getNumOperands() != 4)
-    return nullptr;
-
-  if (match(AI, m_ApplyInst(BuiltinValueKind::SMulOver,
-                            m_ApplyInst(BuiltinValueKind::Strideof),
-                            m_ValueBase(), m_IntegerLiteralInst())) ||
-      match(AI, m_ApplyInst(BuiltinValueKind::SMulOver,
-                            m_ApplyInst(BuiltinValueKind::StrideofNonZero),
-                            m_ValueBase(), m_IntegerLiteralInst()))) {
-    AI->swapOperands(1, 2);
-    return AI;
   }
 
   return nullptr;
@@ -1187,11 +1190,11 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //   %addr = pointer_to_address %ptr, $T
   //   %result = index_addr %addr, %distance
   //
-  ApplyInst *Bytes;
+  BuiltinInst *Bytes;
   MetatypeInst *Metatype;
   if (match(PTAI->getOperand(),
             m_IndexRawPointerInst(m_ValueBase(),
-                                  m_TupleExtractInst(m_ApplyInst(Bytes), 0)))) {
+                                  m_TupleExtractInst(m_BuiltinInst(Bytes), 0)))) {
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),
@@ -1210,7 +1213,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 
       auto IRPI = cast<IndexRawPointerInst>(PTAI->getOperand().getDef());
       SILValue Ptr = IRPI->getOperand(0);
-      SILValue Distance = Bytes->getArgument(0);
+      SILValue Distance = Bytes->getArguments()[0];
       auto *NewPTAI =
           Builder->createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType());
       return new (PTAI->getModule())
@@ -1573,8 +1576,8 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
   if (TEI->getFieldNo() != 1)
     return nullptr;
 
-  if (auto *AI = dyn_cast<ApplyInst>(TEI->getOperand()))
-    if (!canOverflow(AI))
+  if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
+    if (!canOverflow(BI))
       return IntegerLiteralInst::create(TEI->getLoc(), TEI->getType(),
                                         APInt(1, 0), *TEI->getFunction());
   return nullptr;

@@ -45,9 +45,9 @@ IsZeroKind isZeroValue(SILValue Value);
 /// infrastructure for the Swift compiler.
 Optional<bool> computeSignBit(SILValue Value);
 
-/// Check if execution of a given Apply instruction can result in overflows.
+/// Check if execution of a given builtin instruction can result in overflows.
 /// Returns true of an overflow can happen. Otherwise returns false.
-bool canOverflow(ApplyInst *AI);
+bool canOverflow(BuiltinInst *BI);
 
 } // end namespace swift
 

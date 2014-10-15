@@ -36,6 +36,6 @@ SILValue simplifyInstruction(SILInstruction *I);
 /// no overflow. Therefore the overflow flag is known to have a value of 0 if
 /// simplification was successful.
 /// In case when a simplification is not possible, a null SILValue is returned.
-SILValue simplifyOverflowBuiltinInstruction(ApplyInst *AI);
+SILValue simplifyOverflowBuiltinInstruction(BuiltinInst *BI);
 
 } // end namespace swift

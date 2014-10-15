@@ -17,8 +17,7 @@ bb0:
 
 bb1(%3 : $Builtin.Word):
   %4 = struct $Int (%3 : $Builtin.Word)
-  %5 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
-  %6 = apply %5(%3, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %6 = builtin "cmp_eq_Word"(%3 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
   cond_br %6, bb2, bb3
 
 bb2:
@@ -27,9 +26,8 @@ bb2:
 
 bb3:
   %10 = integer_literal $Builtin.Word, 1
-  %11 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %12 = integer_literal $Builtin.Int1, -1
-  %13 = apply %11(%3, %10, %12) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %13 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %10 : $Builtin.Word, %12 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %14 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 0
   %15 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 1
   cond_fail %15 : $Builtin.Int1
@@ -58,15 +56,13 @@ bb0:
 
 bb1(%3 : $Builtin.Word):
   %4 = struct $Int (%3 : $Builtin.Word)
-  %5 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
-  %6 = apply %5(%3, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %6 = builtin "cmp_eq_Word"(%3 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
   cond_br %6, bb3, bb2
 
 bb2:
   %8 = integer_literal $Builtin.Word, 1
-  %9 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %10 = integer_literal $Builtin.Int1, -1
-  %11 = apply %9(%3, %8, %10) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %11 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %8 : $Builtin.Word, %10 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %12 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 0
   %13 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 1
   cond_fail %13 : $Builtin.Int1
@@ -89,15 +85,13 @@ bb0:
   br bb1(%0 : $Builtin.Word)
 
 bb1(%3 : $Builtin.Word):
-  %4 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
-  %5 = apply %4(%3, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %5 = builtin "cmp_eq_Word"(%3 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
   cond_br %5, bb3, bb2
 
 bb2:
   %7 = integer_literal $Builtin.Word, 1
-  %8 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %9 = integer_literal $Builtin.Int1, -1
-  %10 = apply %8(%3, %7, %9) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %10 = builtin "sadd_with_overflow_Word"(%3 : $Builtin.Word, %7 : $Builtin.Word, %9 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %11 = tuple_extract %10 : $(Builtin.Word, Builtin.Int1), 0
   %12 = tuple_extract %10 : $(Builtin.Word, Builtin.Int1), 1
   cond_fail %12 : $Builtin.Int1
@@ -109,14 +103,13 @@ bb3:
   return %16 : $()
 
 bb4(%18 : $Builtin.Word):
-  %19 = apply %4(%18, %14) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %19 = builtin "cmp_eq_Word"(%18 : $Builtin.Word, %14 : $Builtin.Word) : $Builtin.Int1
   cond_br %19, bb6, bb5
 
 bb5:
   %21 = integer_literal $Builtin.Word, 1
-  %22 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %23 = integer_literal $Builtin.Int1, -1
-  %24 = apply %22(%18, %21, %23) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %24 = builtin "sadd_with_overflow_Word"(%18 : $Builtin.Word, %21 : $Builtin.Word, %23 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %25 = tuple_extract %24 : $(Builtin.Word, Builtin.Int1), 0
   %26 = tuple_extract %24 : $(Builtin.Word, Builtin.Int1), 1
   cond_fail %26 : $Builtin.Int1

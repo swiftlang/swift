@@ -44,14 +44,13 @@ namespace {
     SILValue visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI);
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
-    SILValue visitApplyInst(ApplyInst *AI);
+    SILValue visitBuiltinInst(BuiltinInst *AI);
     SILValue visitUpcastInst(UpcastInst *UI);
     SILValue visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
 
-    SILValue simplifyOverflowBuiltin(ApplyInst *AI,
-                                     BuiltinFunctionRefInst *FR);
+    SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
 } // end anonymous namespace
 
@@ -133,9 +132,8 @@ SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
   // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x
   if (TEI->getFieldNo() == 0)
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(TEI->getOperand()))
-      if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-        return simplifyOverflowBuiltin(AI, BFRI);
+    if (BuiltinInst *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
+      return simplifyOverflowBuiltin(BI);
 
   return SILValue();
 }
@@ -341,9 +339,8 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
 }
 
 
-static SILValue simplifyBuiltin(ApplyInst *AI,
-                                BuiltinFunctionRefInst *FR) {
-  const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
+static SILValue simplifyBuiltin(BuiltinInst *BI) {
+  const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
 
   switch (Intrinsic.ID) {
   default:
@@ -356,14 +353,14 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
     // there is nothing left to expect so propagate the input, i.e.,
     //
     // apply(expect, constant, _) -> constant.
-    if (auto *Literal = dyn_cast<IntegerLiteralInst>(AI->getArgument(0)))
+    if (auto *Literal = dyn_cast<IntegerLiteralInst>(BI->getArguments()[0]))
       return Literal;
     return SILValue();
   }
 
   // Otherwise, it should be one of the builtin functions.
-  OperandValueArrayRef Args = AI->getArguments();
-  const BuiltinInfo &Builtin = FR->getBuiltinInfo();
+  OperandValueArrayRef Args = BI->getArguments();
+  const BuiltinInfo &Builtin = BI->getBuiltinInfo();
 
   switch (Builtin.ID) {
   default: break;
@@ -374,7 +371,7 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
     // trunc(extOrBitCast(x)) -> x
     if (match(Op, m_ExtOrBitCast(m_SILValue(Result)))) {
       // Truncated back to the same bits we started with.
-      if (Result.getType() == AI->getType())
+      if (Result.getType() == BI->getType())
         return Result;
     }
 
@@ -384,7 +381,7 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
                      m_ExtOrBitCast(m_SILValue(Result))), 0))) {
       // If the top bit of Result is known to be 0, then
       // it is safe to replace the whole patterb by original bits of x
-      if (Result.getType() == AI->getType()) {
+      if (Result.getType() == BI->getType()) {
         if (auto signBit = computeSignBit(Result))
           if (!signBit.getValue())
             return Result;
@@ -398,11 +395,8 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
 
 /// Simplify an apply of the builtin canBeClass to either 0 or 1
 /// when we can statically determine the result.
-SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
-  auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-  if (BFRI)
-    return simplifyBuiltin(AI, BFRI);
-  return SILValue();
+SILValue InstSimplifier::visitBuiltinInst(BuiltinInst *BI) {
+  return simplifyBuiltin(BI);
 }
 
 /// \brief Simplify arithmetic intrinsics with overflow and known identity
@@ -410,9 +404,9 @@ SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
 /// If this returns a value other than SILValue() then the instruction was
 /// simplified to a value which doesn't overflow.  The overflow case is handled
 /// in SILCombine.
-static SILValue simplifyBinaryWithOverflow(ApplyInst *AI,
+static SILValue simplifyBinaryWithOverflow(BuiltinInst *BI,
                                            llvm::Intrinsic::ID ID) {
-  OperandValueArrayRef Args = AI->getArguments();
+  OperandValueArrayRef Args = BI->getArguments();
   assert(Args.size() >= 2);
 
   const SILValue &Op1 = Args[0];
@@ -470,9 +464,8 @@ static SILValue simplifyBinaryWithOverflow(ApplyInst *AI,
 /// is OK, because this function is invoked only internally when processing
 /// tuple_extract instructions. Therefore the result of this function
 /// is used for simplifications like tuple_extract(x, 0) -> simplified(x)
-SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
-                                                 BuiltinFunctionRefInst *FR) {
-  const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
+SILValue InstSimplifier::simplifyOverflowBuiltin(BuiltinInst *BI) {
+  const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
 
   // If it's an llvm intrinsic, fold the intrinsic.
   switch (Intrinsic.ID) {
@@ -486,26 +479,26 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
   case llvm::Intrinsic::usub_with_overflow:
   case llvm::Intrinsic::smul_with_overflow:
   case llvm::Intrinsic::umul_with_overflow:
-    return simplifyBinaryWithOverflow(AI, Intrinsic.ID);
+    return simplifyBinaryWithOverflow(BI, Intrinsic.ID);
   }
 
   // Otherwise, it should be one of the builtin functions.
-  const BuiltinInfo &Builtin = FR->getBuiltinInfo();
+  const BuiltinInfo &Builtin = BI->getBuiltinInfo();
 
   switch (Builtin.ID) {
   default: break;
 
   case BuiltinValueKind::SUCheckedConversion:
   case BuiltinValueKind::USCheckedConversion: {
-    OperandValueArrayRef Args = AI->getArguments();
+    OperandValueArrayRef Args = BI->getArguments();
     const SILValue &Op = Args[0];
     if (auto signBit = computeSignBit(Op))
       if (!signBit.getValue())
         return Op;
     SILValue Result;
     // CheckedConversion(ExtOrBitCast(x)) -> x
-    if (match(AI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
-      if (Result.getType() == AI->getType().getTupleElementType(0)) {
+    if (match(BI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
+      if (Result.getType() == BI->getType().getTupleElementType(0)) {
         assert (!computeSignBit(Result).getValue() && "Sign bit should be 0");
         return Result;
       }
@@ -518,8 +511,8 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
   case BuiltinValueKind::SToSCheckedTrunc: {
     SILValue Result;
     // CheckedTrunc(Ext(x)) -> x
-    if (match(AI, m_CheckedTrunc(m_Ext(m_SILValue(Result)))))
-      if (Result.getType() == AI->getType().getTupleElementType(0))
+    if (match(BI, m_CheckedTrunc(m_Ext(m_SILValue(Result)))))
+      if (Result.getType() == BI->getType().getTupleElementType(0))
         if (auto signBit = computeSignBit(Result))
           if (!signBit.getValue())
             return Result;
@@ -531,7 +524,7 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
 case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      return simplifyBinaryWithOverflow(AI,
+      return simplifyBinaryWithOverflow(BI,
                           getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID));
 
   }
@@ -555,8 +548,6 @@ SILValue swift::simplifyInstruction(SILInstruction *I) {
 /// no overflow. Therefore the overflow flag is known to have a value of 0 if
 /// simplification was successful.
 /// In case when a simplification is not possible, a null SILValue is returned.
-SILValue swift::simplifyOverflowBuiltinInstruction(ApplyInst *AI) {
-  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-    return InstSimplifier().simplifyOverflowBuiltin(AI, BFRI);
-  return SILValue();
+SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
+  return InstSimplifier().simplifyOverflowBuiltin(BI);
 }

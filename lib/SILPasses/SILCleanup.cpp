@@ -33,16 +33,14 @@ static void cleanFunction(SILFunction &Fn) {
       SILInstruction *Inst = I++;
 
       // Remove calls to Builtin.staticReport().
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
-        if (BuiltinFunctionRefInst *FR =
-            dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
-          const BuiltinInfo &B = FR->getBuiltinInfo();
-          if (B.ID == BuiltinValueKind::StaticReport) {
-            // The call to the builtin should get removed before we reach
-            // IRGen.
-            recursivelyDeleteTriviallyDeadInstructions(AI, /* Force */true);
-          }
+      if (BuiltinInst *BI = dyn_cast<BuiltinInst>(Inst)) {
+        const BuiltinInfo &B = BI->getBuiltinInfo();
+        if (B.ID == BuiltinValueKind::StaticReport) {
+          // The call to the builtin should get removed before we reach
+          // IRGen.
+          recursivelyDeleteTriviallyDeadInstructions(BI, /* Force */true);
         }
+      }
     }
   }
 

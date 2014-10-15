@@ -79,15 +79,14 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // In release mode keep succinct library precondition checks (trap).
 // RELEASE-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
 // RELEASE-NOT:  "fatal error"
-// RELEASE:  %[[V1:.+]] = builtin_function_ref "xor_Int1"
-// RELEASE:  %[[V2:.+]] = apply %[[V1]](%{{.+}}, %{{.+}})
+// RELEASE:  %[[V2:.+]] = builtin "xor_Int1"(%{{.+}}, %{{.+}})
 // RELEASE:  cond_fail %[[V2]]
 // RELEASE:  return
 
 // In unchecked mode remove library precondition checks.
 // UNCHECKED-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
 // UNCHECKED-NOT:  "fatal error"
-// UNCHECKED-NOT:  builtin_function_ref "int_trap"
+// UNCHECKED-NOT:  builtin "int_trap"
 // UNCHECKED-NOT:  unreachable
 // UNCHECKED:  return
 
@@ -103,13 +102,13 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // In release mode remove partial safety checks.
 // RELEASE-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
 // RELEASE-NOT:  "fatal error"
-// RELEASE-NOT:  builtin_function_ref "int_trap"
+// RELEASE-NOT:  builtin "int_trap"
 // RELEASE-NOT:  unreachable
 // RELEASE: return
 
 // In fast mode remove partial safety checks.
 // FAST-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
 // FAST-NOT:  "fatal error"
-// FAST-NOT:  builtin_function_ref "int_trap"
+// FAST-NOT:  builtin "int_trap"
 // FAST-NOT:  unreachable
 // FAST: return

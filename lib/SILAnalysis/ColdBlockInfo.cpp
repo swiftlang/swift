@@ -35,22 +35,28 @@ enum BranchHint : unsigned {
 } // namespace
 
 /// \return a BranHint if this call is a builtin branch hint.
-static BranchHint getBranchHint(const ApplyInst *AI) {
+static BranchHint getBranchHint(SILValue Cond) {
   // Handle the fully inlined Builtin.
-  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
-    if (BFRI->getIntrinsicInfo().ID == llvm::Intrinsic::expect) {
+  if (auto *BI = dyn_cast<BuiltinInst>(Cond)) {
+    if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect) {
       // peek through an extract of Bool.value.
-      SILValue ExpectedValue = getCondition(AI->getArgument(1));
+      SILValue ExpectedValue = getCondition(BI->getArguments()[1]);
       if (auto *Literal = dyn_cast<IntegerLiteralInst>(ExpectedValue)) {
         return (Literal->getValue() == 0)
           ? BranchHint::LikelyFalse : BranchHint::LikelyTrue;
       }
     }
+    return BranchHint::None;
   }
+  
   // Handle the @semantic function used for branch hints. The generic
   // fast/slowPath calls are frequently only inlined one level down to
   // _branchHint before inlining the call sites that they guard.
-  else if (auto *FunctionRef = dyn_cast<FunctionRefInst>(AI->getCallee())) {
+  auto AI = dyn_cast<ApplyInst>(Cond);
+  if (!AI)
+    return BranchHint::None;
+  
+  if (auto *FunctionRef = dyn_cast<FunctionRefInst>(AI->getCallee())) {
     SILFunction *F = FunctionRef->getReferencedFunction();
     if (F->hasDefinedSemantics()) {
       if (F->getSemanticsString() == "branchhint") {
@@ -85,11 +91,7 @@ static bool isSlowPath(const SILBasicBlock *FromBB, const SILBasicBlock *ToBB) {
 
   SILValue C = getCondition(CBI->getCondition());
 
-  auto *AI = dyn_cast<ApplyInst>(C);
-  if (!AI)
-    return false;
-
-  BranchHint hint = getBranchHint(AI);
+  BranchHint hint = getBranchHint(C);
   if (hint == BranchHint::None)
     return false;
 

@@ -34,7 +34,7 @@ SILArgument *IVInfo::isInductionSequence(SCCType &SCC) {
   if (SCC.size() == 1)
     return nullptr;
 
-  ApplyInst *FoundApply = nullptr;
+  BuiltinInst *FoundBuiltin = nullptr;
   SILArgument *FoundArgument = nullptr;
   IntegerLiteralInst *IncValue = nullptr;
   for (unsigned long i = 0, e = SCC.size(); i != e; ++i) {
@@ -48,15 +48,15 @@ SILArgument *IVInfo::isInductionSequence(SCCType &SCC) {
 
     auto *I = cast<SILInstruction>(SCC[i]);
     switch (I->getKind()) {
-    case ValueKind::ApplyInst: {
-      if (FoundApply)
+    case ValueKind::BuiltinInst: {
+      if (FoundBuiltin)
         return nullptr;
 
-      FoundApply = cast<ApplyInst>(I);
+      FoundBuiltin = cast<BuiltinInst>(I);
 
       SILValue L, R;
-      if (!match(FoundApply, m_ApplyInst(BuiltinValueKind::SAddOver,
-                                         m_SILValue(L), m_SILValue(R))))
+      if (!match(FoundBuiltin, m_ApplyInst(BuiltinValueKind::SAddOver,
+                                           m_SILValue(L), m_SILValue(R))))
         return nullptr;
 
       if (match(L, m_IntegerLiteralInst(IncValue)))
@@ -78,10 +78,10 @@ SILArgument *IVInfo::isInductionSequence(SCCType &SCC) {
       return nullptr;
     }
   }
-  if (!FoundApply || !FoundArgument || !IncValue)
+  if (!FoundBuiltin || !FoundArgument || !IncValue)
     return nullptr;
 
-  InductionInfoMap[FoundArgument] = IVDesc(FoundApply, IncValue);
+  InductionInfoMap[FoundArgument] = IVDesc(FoundBuiltin, IncValue);
   return FoundArgument;
 }
 

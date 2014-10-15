@@ -118,8 +118,7 @@ struct B : Subscriptable {
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int
 // CHECK:   integer_literal $Builtin.Word, 7
 // CHECK:   load
-// CHECK:   [[T0:%.*]] = builtin_function_ref "or_Word"
-// CHECK:   [[T1:%.*]] = apply [[T0]]
+// CHECK:   [[T1:%.*]] = builtin "or_Word"
 // CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : $Builtin.Word)
 // CHECK:   store [[T2]] to [[ADDR]] : $*Int
 func test_B(inout b: B) {

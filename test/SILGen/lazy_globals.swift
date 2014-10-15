@@ -4,15 +4,14 @@
 // CHECK:   [[XADDR:%.*]] = sil_global_addr @_Tv12lazy_globals1xSi : $*Int
 // CHECK:   store {{%.*}} to [[XADDR]] : $*Int
 // CHECK: sil hidden [global_init] @_TF12lazy_globalsa1xSi : $@thin () -> Builtin.RawPointer {
-// CHECK:   %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
-// CHECK:   %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word
-// CHECK:   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
-// CHECK:   %3 = function_ref @globalinit_func0 : $@thin () -> ()
-// CHECK:   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
-// CHECK:   %5 = apply %0(%2, %4) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
-// CHECK:   %6 = sil_global_addr @_Tv12lazy_globals1xSi : $*Int
-// CHECK:   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
-// CHECK:   return %7 : $Builtin.RawPointer
+// CHECK:   [[TOKEN_ADDR:%.*]] = sil_global_addr @globalinit_token0 : $*Builtin.Word
+// CHECK:   [[TOKEN_PTR:%.*]] = address_to_pointer [[TOKEN_ADDR]] : $*Builtin.Word to $Builtin.RawPointer
+// CHECK:   [[INIT_FUNC:%.*]] = function_ref @globalinit_func0 : $@thin () -> ()
+// CHECK:   [[INIT_FUNC_THICK:%.*]] = thin_to_thick_function [[INIT_FUNC]] : $@thin () -> () to $@callee_owned () -> ()
+// CHECK:   builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC_THICK]] : $@callee_owned () -> ()) : $()
+// CHECK:   [[GLOBAL_ADDR:%.*]] = sil_global_addr @_Tv12lazy_globals1xSi : $*Int
+// CHECK:   [[GLOBAL_PTR:%.*]] = address_to_pointer [[GLOBAL_ADDR]] : $*Int to $Builtin.RawPointer
+// CHECK:   return [[GLOBAL_PTR]] : $Builtin.RawPointer
 // CHECK: }
 var x: Int = 0
 

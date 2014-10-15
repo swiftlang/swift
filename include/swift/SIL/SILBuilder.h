@@ -218,15 +218,15 @@ public:
                                            Subs, Args, ClosureTy, F));
   }
 
-  BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc,
+  BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc, // XXX
                                                    Identifier Id,
                                                    SILType ty) {
-    return insert(new (F.getModule()) BuiltinFunctionRefInst(loc, Id, ty));
+    return insert(new (F.getModule()) BuiltinFunctionRefInst(loc, Id, ty)); // XXX
   }
-  BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc,
+  BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc, // XXX
                                                    StringRef Str,
                                                    SILType ty) {
-    return createBuiltinFunctionRef(loc, getASTContext().getIdentifier(Str),ty);
+    return createBuiltinFunctionRef(loc, getASTContext().getIdentifier(Str),ty); // XXX
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name,
@@ -785,20 +785,12 @@ public:
     return insert(new (F.getModule()) CondFailInst(Loc, Operand));
   }
 
-  BuiltinFunctionRefInst *createBuiltinTrap(SILLocation Loc) {
+  BuiltinInst *createBuiltinTrap(SILLocation Loc) {
     ASTContext &AST = F.getModule().getASTContext();
-    // builtin_function_ref "int_trap" : $@thin @noreturn () -> ()
-    auto bfrInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          SILFunctionType::Representation::Thin,
-                                          /*noreturn*/ true,
-                                          /*autoclosure*/ false);
-    SILResultInfo Result(TupleType::getEmpty(AST), ResultConvention::Unowned);
-    auto bfrFnType = SILFunctionType::get(nullptr, bfrInfo,
-                                          ParameterConvention::Direct_Owned,
-                                          ArrayRef<SILParameterInfo>(), Result,
-                                          AST);
-    return createBuiltinFunctionRef(Loc, "int_trap",
-                                    SILType::getPrimitiveObjectType(bfrFnType));
+    auto Id_trap  = AST.getIdentifier("int_trap");
+    return createBuiltin(Loc, Id_trap,
+                         F.getModule().Types.getEmptyTupleType(),
+                         {}, {});
   }
 
   //===--------------------------------------------------------------------===//

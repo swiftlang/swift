@@ -21,7 +21,7 @@ func condUnreachable() {
 // RAW:       [[YEA]]:
 // RAW:         function_ref @foo
 // RAW:       [[NAY]]:
-// RAW:         builtin_function_ref "conditionallyUnreachable"
+// RAW:         builtin "conditionallyUnreachable"
 
 // DEBUG-LABEL: sil hidden @_TF25conditionally_unreachable15condUnreachableFT_T_ 
 // DEBUG-NOT:     cond_br
@@ -33,5 +33,5 @@ func condUnreachable() {
 // RELEASE-NOT:     cond_br
 // RELEASE-NOT:     function_ref @foo
 // RELEASE-NOT:     return
-// RELEASE-NOT:     builtin_function_ref
+// RELEASE-NOT:     builtin
 // RELEASE:         unreachable

@@ -84,7 +84,7 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
   llvm::DenseSet<SILInstruction *> Invariant;
   for (auto &I : *Blk) {
     auto *Inst = &I;
-    if (isa<FunctionRefInst>(Inst) || isa<BuiltinFunctionRefInst>(Inst)) {
+    if (isa<FunctionRefInst>(Inst) || isa<BuiltinFunctionRefInst>(Inst)) { // XXX
       Move.push_back(Inst);
       Invariant.insert(Inst);
     } else if (isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst)) {

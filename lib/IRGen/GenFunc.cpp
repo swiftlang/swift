@@ -1752,7 +1752,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   
   if (Builtin.ID == BuiltinValueKind::DestroyArray) {
     // The input type is (T.Type, Builtin.RawPointer, Builtin.Word).
-    /* metatype */ args.claimNext();
+    /* metatype (which may be thin) */
+    if (args.size() == 3)
+      args.claimNext();
     llvm::Value *ptr = args.claimNext();
     llvm::Value *count = args.claimNext();
     
@@ -1770,7 +1772,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       || Builtin.ID == BuiltinValueKind::TakeArrayFrontToBack
       || Builtin.ID == BuiltinValueKind::TakeArrayBackToFront) {
     // The input type is (T.Type, Builtin.RawPointer, Builtin.RawPointer, Builtin.Word).
-    /* metatype */ args.claimNext();
+    /* metatype (which may be thin) */
+    if (args.size() == 4)
+      args.claimNext();
     llvm::Value *dest = args.claimNext();
     llvm::Value *src = args.claimNext();
     llvm::Value *count = args.claimNext();

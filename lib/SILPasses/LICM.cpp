@@ -80,17 +80,15 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 }
 
 static bool mayHaveSideEffects(SILInstruction *I) {
-  if (auto *AI = dyn_cast<ApplyInst>(I))
-    if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      return !isSideEffectFree(BFRI);
+  if (auto *BI = dyn_cast<BuiltinInst>(I))
+    return !isSideEffectFree(BI);
 
   return I->mayHaveSideEffects();
 }
 
 static bool mayRead(SILInstruction *I) {
-  if (auto *AI = dyn_cast<ApplyInst>(I))
-    if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      return !isReadNone(BFRI);
+  if (auto *BI = dyn_cast<BuiltinInst>(I))
+    return !isReadNone(BI);
 
   return I->mayReadFromMemory();
 }

@@ -36,13 +36,8 @@ SILValue swift::getUnderlyingObject(SILValue V) {
 
 /// Returns true if the ValueBase inside V is an apply whose callee is a no read
 /// builtin_function_ref.
-static bool isNoReadApplyInst(SILValue V) {
-  auto *AI = dyn_cast<ApplyInst>(V);
-  if (!AI)
-    return false;
-
-  auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-
+static bool isNoReadBuiltinInst(SILValue V) {
+  auto *BI = dyn_cast<BuiltinInst>(V);
   return BI && isReadNone(BI);
 }
 
@@ -57,7 +52,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::BuiltinInst:
   case ValueKind::ApplyInst:
   case ValueKind::WitnessMethodInst:
-  case ValueKind::BuiltinFunctionRefInst:
+  case ValueKind::BuiltinFunctionRefInst: // XXX
   case ValueKind::CopyAddrInst:
   case ValueKind::RetainValueInst:
   case ValueKind::DeallocBoxInst:
@@ -237,7 +232,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
     // memory in some manner?
     // TODO: Add in knowledge about how parameters work on swift to make this
     // more aggressive.
-    if (isNoReadApplyInst(Inst))
+    if (isNoReadBuiltinInst(Inst))
       continue;
 
     // Loading from a pointer does not cause it to be captured.
@@ -301,7 +296,7 @@ bool swift::isNonEscapingLocalObject(SILValue V) {
   // If this is a local allocation, or the result of a no read apply inst (which
   // can not affect memory in the caller), check to see if the allocation
   // escapes.
-  if (isa<AllocationInst>(*V) || isNoReadApplyInst(V))
+  if (isa<AllocationInst>(*V) || isNoReadBuiltinInst(V))
     return !valueMayBeCaptured(V, CaptureException::ReturnsCannotCapture);
 
   // If this is a no alias argument then it has not escaped before entering the
@@ -342,26 +337,23 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
   }
 
   // Inspect casts.
-  if (auto *AI = dyn_cast<ApplyInst>(Value.getDef())) {
-    auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-    if (!FR)
-      return IsZeroKind::Unknown;
-    switch (FR->getBuiltinInfo().ID) {
+  if (auto *BI = dyn_cast<BuiltinInst>(Value.getDef())) {
+    switch (BI->getBuiltinInfo().ID) {
       case BuiltinValueKind::IntToPtr:
       case BuiltinValueKind::PtrToInt:
       case BuiltinValueKind::ZExt:
-        return isZeroValue(AI->getArgument(0));
+        return isZeroValue(BI->getArguments()[0]);
       case BuiltinValueKind::UDiv:
       case BuiltinValueKind::SDiv: {
-        if (IsZeroKind::Zero == isZeroValue(AI->getArgument(0)))
+        if (IsZeroKind::Zero == isZeroValue(BI->getArguments()[0]))
           return IsZeroKind::Zero;
         return IsZeroKind::Unknown;
       }
       case BuiltinValueKind::Mul:
       case BuiltinValueKind::SMulOver:
       case BuiltinValueKind::UMulOver: {
-        IsZeroKind LHS = isZeroValue(AI->getArgument(0));
-        IsZeroKind RHS = isZeroValue(AI->getArgument(1));
+        IsZeroKind LHS = isZeroValue(BI->getArguments()[0]);
+        IsZeroKind RHS = isZeroValue(BI->getArguments()[1]);
         if (LHS == IsZeroKind::Zero || RHS == IsZeroKind::Zero)
           return IsZeroKind::Zero;
 
@@ -379,15 +371,11 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
     if (T->getFieldNo() != 0)
       return IsZeroKind::Unknown;
 
-    ApplyInst *CAI = dyn_cast<ApplyInst>(T->getOperand());
-    if (!CAI)
+    BuiltinInst *BI = dyn_cast<BuiltinInst>(T->getOperand());
+    if (!BI)
       return IsZeroKind::Unknown;
 
-    // Check that this is a builtin function.
-    if (!isa<BuiltinFunctionRefInst>(CAI->getCallee()))
-      return IsZeroKind::Unknown;
-
-    return isZeroValue(T->getOperand());
+    return isZeroValue(BI);
   }
 
   //Inspect allocations and pointer literals.
@@ -421,11 +409,8 @@ Optional<bool> swift::computeSignBit(SILValue V) {
       break;
     }
 
-    if (auto *AI = dyn_cast<ApplyInst>(Def)) {
-      auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-      if (!FR)
-        return None;
-      switch (FR->getBuiltinInfo().ID) {
+    if (auto *BI = dyn_cast<BuiltinInst>(Def)) {
+      switch (BI->getBuiltinInfo().ID) {
       // Sizeof always returns non-negative results.
       case BuiltinValueKind::Sizeof:
         return false;
@@ -440,14 +425,14 @@ Optional<bool> swift::computeSignBit(SILValue V) {
         return false;
       case BuiltinValueKind::LShr: {
         // If count is provably >= 1, then top bit is not set.
-        auto *ILShiftCount = dyn_cast<IntegerLiteralInst>(AI->getArgument(1));
+        auto *ILShiftCount = dyn_cast<IntegerLiteralInst>(BI->getArguments()[1]);
         if (ILShiftCount) {
           if (ILShiftCount->getValue().isStrictlyPositive()) {
             return false;
           }
         }
         // May be top bit is not set in the value being shifted.
-        Value = AI->getArgument(0);
+        Value = BI->getArguments()[0];
         continue;
       }
 
@@ -457,7 +442,7 @@ Optional<bool> swift::computeSignBit(SILValue V) {
       // The sign bit of a result is 0 only if the sign
       // bit of a source operand is 0.
       case BuiltinValueKind::SUCheckedConversion:
-        Value = AI->getArgument(0);
+        Value = BI->getArguments()[0];
         continue;
 
       // Source and target type sizes are the same.
@@ -467,12 +452,12 @@ Optional<bool> swift::computeSignBit(SILValue V) {
       // The sign bit of a result is 0 only if the sign
       // bit of a source operand is 0.
       case BuiltinValueKind::USCheckedConversion:
-        Value = AI->getArgument(0);
+        Value = BI->getArguments()[0];
         continue;
 
       // Sign bit of the operand is promoted.
       case BuiltinValueKind::SExt:
-        Value = AI->getArgument(0);
+        Value = BI->getArguments()[0];
         continue;
 
       // Source type is always smaller than the target type.
@@ -482,19 +467,19 @@ Optional<bool> swift::computeSignBit(SILValue V) {
 
       // Sign bit of the operand is promoted.
       case BuiltinValueKind::SExtOrBitCast:
-        Value = AI->getArgument(0);
+        Value = BI->getArguments()[0];
         continue;
 
       // TODO: If source type size is smaller than the target type
       // the result will be always false.
       case BuiltinValueKind::ZExtOrBitCast:
-        Value = AI->getArgument(0);
+        Value = BI->getArguments()[0];
         continue;
 
       // Inspect casts.
       case BuiltinValueKind::IntToPtr:
       case BuiltinValueKind::PtrToInt:
-        Value = AI->getArgument(0);
+        Value = BI->getArguments()[0];
         continue;
       default:
         return None;
@@ -508,9 +493,9 @@ Optional<bool> swift::computeSignBit(SILValue V) {
 /// Check if a checked trunc instruction can overflow.
 /// Returns false if it can be proven that no overflow can happen.
 /// Otherwise returns true.
-static bool checkTruncOverflow(ApplyInst *AI, BuiltinFunctionRefInst *BFRI) {
+static bool checkTruncOverflow(BuiltinInst *BI) {
   SILValue Left, Right;
-  if (match(AI, m_CheckedTrunc(m_And(m_SILValue(Left),
+  if (match(BI, m_CheckedTrunc(m_And(m_SILValue(Left),
                                m_SILValue(Right))))) {
     // [US]ToSCheckedTrunc(And(x, mask)) cannot overflow
     // if mask has the following properties:
@@ -521,12 +506,12 @@ static bool checkTruncOverflow(ApplyInst *AI, BuiltinFunctionRefInst *BFRI) {
     // if mask has the following properties:
     // Only the first N bits are allowed to be set, where N is the width
     // of the trunc result type.
-    if (auto BITy = AI->getType().
+    if (auto BITy = BI->getType().
                         getTupleElementType(0).
                         getAs<BuiltinIntegerType>()) {
       unsigned Width = BITy->getFixedWidth();
 
-      switch (BFRI->getBuiltinInfo().ID) {
+      switch (BI->getBuiltinInfo().ID) {
       case BuiltinValueKind::SToSCheckedTrunc:
       case BuiltinValueKind::UToSCheckedTrunc:
         // If it is a trunc to a signed value
@@ -557,14 +542,13 @@ static bool checkTruncOverflow(ApplyInst *AI, BuiltinFunctionRefInst *BFRI) {
 
 /// Check if execution of a given Apply instruction can result in overflows.
 /// Returns true if an overflow can happen. Otherwise returns false.
-bool swift::canOverflow(ApplyInst *AI) {
-  if (simplifyOverflowBuiltinInstruction(AI) != SILValue())
+bool swift::canOverflow(BuiltinInst *BI) {
+  if (simplifyOverflowBuiltinInstruction(BI) != SILValue())
     return false;
 
-  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
-    if (!checkTruncOverflow(AI, BFRI))
+  if (!checkTruncOverflow(BI))
       return false;
-  }
+
   // Conservatively assume that an overflow can happen
   return true;
 }

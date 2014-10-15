@@ -318,23 +318,6 @@ bb0(%0 : $*Builtin.Int8):
   return %3 : $()
 }
 
-// CHECK-LABEL: builtinfunctionrefinst
-// CHECK: bb0
-// CHECK: builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-// CHECK-NOT: builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-sil @builtinfunctionrefinst : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int64) {
-bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
-  %3 = integer_literal $Builtin.Int1, 0
-  %4 = builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-  %5 = builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-  %6 = apply %4(%0, %1, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-  %7 = apply %5(%1, %2, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-  %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
-  %9 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 0
-  %10 = tuple(%8 : $Builtin.Int64, %9 : $Builtin.Int64)
-  return %10 : $(Builtin.Int64, Builtin.Int64)
-}
-
 sil_global @global_target : $Builtin.Int64
 
 // CHECK-LABEL: globaladdr_inst
@@ -347,9 +330,8 @@ sil @globaladdr_inst : $@thin () -> (Builtin.Int64) {
   %1 = sil_global_addr @global_target : $*Builtin.Int64
   %2 = load %0 : $*Builtin.Int64
   %3 = load %1 : $*Builtin.Int64
-  %4 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %5 = integer_literal $Builtin.Int1, 0
-  %6 = apply %4(%2, %3, %5) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %6 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
   return %7 : $(Builtin.Int64)
 }
@@ -360,8 +342,7 @@ sil @globaladdr_inst : $@thin () -> (Builtin.Int64) {
 sil @floatliteral : $@thin () -> (Builtin.FPIEEE32) {
   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000
   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000
-  %2 = builtin_function_ref "fadd_FPIEEE32" : $@thin (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 // user: %5
-  %4 = apply %2(%0, %1) : $@thin (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 // user: %6
+  %4 = builtin "fadd_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %6
   return %4 : $(Builtin.FPIEEE32)
 }
 
@@ -460,9 +441,8 @@ sil @tupleextract_test : $@thin () -> (Builtin.Int32) {
   %1 = apply %0() : $@thin () -> ((Builtin.Int32, Builtin.Int32))
   %2 = tuple_extract %1 : $(Builtin.Int32, Builtin.Int32), 0
   %3 = tuple_extract %1 : $(Builtin.Int32, Builtin.Int32), 0
-  %4 = builtin_function_ref "sadd_with_overflow_Int32" : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
   %5 = integer_literal $Builtin.Int1, 0
-  %6 = apply %4 (%2, %3, %5) : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
+  %6 = builtin "sadd_with_overflow_Int32" (%2 : $Builtin.Int32, %3 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0
   return %7 : $(Builtin.Int32)
 }
@@ -478,11 +458,10 @@ sil @tupleelementaddr_test : $@thin () -> (Builtin.Int32) {
   apply %1(%0#1) : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()
   %2 = tuple_element_addr %0#1 : $*(Builtin.Int32, Builtin.Int32), 0
   %3 = tuple_element_addr %0#1 : $*(Builtin.Int32, Builtin.Int32), 0
-  %4 = builtin_function_ref "sadd_with_overflow_Int32" : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
   %5 = integer_literal $Builtin.Int1, 0
   %6 = load %2 : $*Builtin.Int32
   %7 = load %3 : $*Builtin.Int32
-  %8 = apply %4 (%6, %7, %5) : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
+  %8 = builtin "sadd_with_overflow_Int32" (%6 : $Builtin.Int32, %7 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0
   dealloc_stack %0#0 : $* @local_storage (Builtin.Int32, Builtin.Int32)
   return %9 : $(Builtin.Int32)

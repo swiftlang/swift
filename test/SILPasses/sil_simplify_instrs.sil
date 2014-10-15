@@ -5,63 +5,55 @@ import Builtin
 // Simplify arithmetic where one operand is a zero and the other is not a constant
 sil @fold_add_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
- %1 = builtin_function_ref "int_sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %0 = integer_literal $Builtin.Int64, 0
- %18 = apply %1(%x, %0) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %18 = builtin "int_sadd_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil @fold_add_with_overflow_zeros
-// CHECK-NOT: builtin_function_ref "int_sadd_with_overflow_Int64"
 // CHECK-NOT: integer_literal $Builtin.Int64, 0
-// CHECK-NOT: apply
+// CHECK-NOT: builtin "int_sadd_with_overflow_Int64"
 // CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
 sil @fold_add_with_overflow_zeros2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
- %1 = builtin_function_ref "int_sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %0 = integer_literal $Builtin.Int64, 0
- %18 = apply %1(%0, %x) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %18 = builtin "int_sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %x : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil @fold_add_with_overflow_zeros2
-// CHECK-NOT: builtin_function_ref "int_sadd_with_overflow_Int64"
 // CHECK-NOT: integer_literal $Builtin.Int64, 0
-// CHECK-NOT: apply
+// CHECK-NOT: builtin "int_sadd_with_overflow_Int64"
 // CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
 sil @fold_sub_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
- %1 = builtin_function_ref "int_ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %0 = integer_literal $Builtin.Int64, 0
- %18 = apply %1(%x, %0) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %18 = builtin "int_ssub_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil @fold_sub_with_overflow_zeros
-// CHECK-NOT: builtin_function_ref "int_ssub_with_overflow_Int64"
 // CHECK-NOT: integer_literal $Builtin.Int64, 0
-// CHECK-NOT: apply
+// CHECK-NOT: builtin "int_ssub_with_overflow_Int64"
 // CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
 sil @fold_mul_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
- %1 = builtin_function_ref "int_smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %0 = integer_literal $Builtin.Int64, 0
- %18 = apply %1(%x, %0) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %18 = builtin "int_smul_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil @fold_mul_with_overflow_zeros
-// CHECK-NOT: builtin_function_ref "int_smul_with_overflow_Int64"
-// CHECK-NOT: apply
+// CHECK-NOT: builtin "int_smul_with_overflow_Int64"
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 0
 // CHECK-NEXT: return [[RES:%.*]] : $Builtin.Int64
 }
@@ -69,45 +61,37 @@ bb0(%x : $Builtin.Int64):
 // Simplify arithmetic where one operand is a one and the other is not a constant
 sil @fold_mul_with_overflow_ones : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
- %1 = builtin_function_ref "int_smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %0 = integer_literal $Builtin.Int64, 1
- %18 = apply %1(%x, %0) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %18 = builtin "int_smul_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil @fold_mul_with_overflow_ones
-// CHECK-NOT: builtin_function_ref "int_smul_with_overflow_Int64"
-// CHECK-NOT: apply
+// CHECK-NOT: builtin "int_smul_with_overflow_Int64"
 // CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify trunc(zext(x)) -> x
 sil @fold_trunc_zext : $@thin (Builtin.Word) -> Builtin.Word {
 bb0(%x : $Builtin.Word):
-  %77 = builtin_function_ref "zextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64
-  %78 = apply %77(%x) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %80
-  %79 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word
-  %80 = apply %79(%78) : $@thin (Builtin.Int64) -> Builtin.Word // users: %81, %85
+  %78 = builtin "zextOrBitCast_Word_Int64"(%x : $Builtin.Word) : $Builtin.Int64 // user: %80
+  %80 = builtin "truncOrBitCast_Int64_Word"(%78 : $Builtin.Int64) : $Builtin.Word // users: %81, %85
   return %80 : $Builtin.Word
 
 // CHECK-LABEL: sil @fold_trunc_zext
-// CHECK-NOT: builtin_function_ref
-// CHECK-NOT: apply
+// CHECK-NOT: builtin
 // CHECK: return %0 : $Builtin.Word
 }
 
 // Simplify trunc(sext(x)) -> x
 sil @fold_trunc_sext : $@thin (Builtin.Word) -> Builtin.Word {
 bb0(%x : $Builtin.Word):
-  %77 = builtin_function_ref "sextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64
-  %78 = apply %77(%x) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %80
-  %79 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word
-  %80 = apply %79(%78) : $@thin (Builtin.Int64) -> Builtin.Word // users: %81, %85
+  %78 = builtin "sextOrBitCast_Word_Int64"(%x : $Builtin.Word) : $Builtin.Int64 // user: %80
+  %80 = builtin "truncOrBitCast_Int64_Word"(%78 : $Builtin.Int64) : $Builtin.Word // users: %81, %85
   return %80 : $Builtin.Word
 
 // CHECK-LABEL: sil @fold_trunc_sext
-// CHECK-NOT: builtin_function_ref
-// CHECK-NOT: apply
+// CHECK-NOT: builtin
 // CHECK: return %0 : $Builtin.Word
 }
 

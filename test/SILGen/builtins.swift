@@ -7,7 +7,7 @@ protocol ClassProto : class { }
 
 // CHECK-LABEL: sil hidden @_TF8builtins3foo
 func foo(x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
-  // CHECK: builtin_function_ref "cmp_eq_Int1"
+  // CHECK: builtin "cmp_eq_Int1"
   return Builtin.cmp_eq_Int1(x, y)
 }
 
@@ -296,8 +296,7 @@ func canBeClass<T>() {
   // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(MixedCompo.self)
 
-  // CHECK: [[CAN_BE:%.*]] = builtin_function_ref "canBeClass"
-  // CHECK: apply [[CAN_BE]]<T>
+  // CHECK: builtin "canBeClass"<T>
   Builtin.canBeClass(T.self)
 }
 
@@ -329,8 +328,7 @@ func canBeClassMetatype<T>() {
   // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(MixedCompoT.self)
 
-  // CHECK: [[CAN_BE:%.*]] = builtin_function_ref "canBeClass"
-  // CHECK: apply [[CAN_BE]]<T.Type>
+  // CHECK: builtin "canBeClass"<T.Type>
   typealias TT = T.Type
   Builtin.canBeClass(TT.self)
 }
@@ -344,8 +342,7 @@ func fixLifetime(c: C) {
 // CHECK-LABEL: sil hidden @_TF8builtins20assert_configuration
 func assert_configuration() -> Builtin.Int32 {
   return Builtin.assert_configuration()
-  // CHECK: [[FUNREF:%.*]] = builtin_function_ref "assert_configuration" : $@thin () -> Builtin.Int32
-  // CHECK: [[APPLY:%.*]] = apply [[FUNREF]]() : $@thin () -> Builtin.Int32
+  // CHECK: [[APPLY:%.*]] = builtin "assert_configuration"() : $Builtin.Int32
   // CHECK: return [[APPLY]] : $Builtin.Int32
 }
 
@@ -359,11 +356,10 @@ func autorelease(o: O) {
 // diagnostics.
 
 // CHECK-LABEL: sil hidden @_TF8builtins11unreachable
-// CHECK:         [[UNREACHABLE:%.*]] = builtin_function_ref "unreachable" : $@thin @noreturn () -> () // user: %1
-// CHECK:         apply [[UNREACHABLE]]()
+// CHECK:         builtin "unreachable"()
 // CHECK:         return
 // CANONICAL-LABEL: sil hidden @_TF8builtins11unreachableFT_T_ : $@thin @noreturn () -> () {
-// CANONICAL-NOT:     builtin_function_ref "unreachable"
+// CANONICAL-NOT:     builtin "unreachable"
 // CANONICAL-NOT:     return
 // CANONICAL:         unreachable
 @noreturn func unreachable() {

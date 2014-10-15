@@ -225,7 +225,6 @@ public:
   /// This ensures the lazy initializer has been run before returning the
   /// address of the variable.
   void emitGlobalAccessor(VarDecl *global,
-                          FuncDecl *builtinOnceDecl,
                           SILGlobalVariable *onceToken,
                           SILFunction *onceFunc);
   

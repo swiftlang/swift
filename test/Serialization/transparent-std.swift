@@ -9,8 +9,7 @@
 import def_transparent_std
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF19def_transparent_std3fooFT1xBi1_1yBi1__Bi1_ : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
-// SIL: builtin_function_ref "cmp_eq_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-// SIL: = apply {{.*}}(%0, %1) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+// SIL: = builtin "cmp_eq_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
 func test_foo(x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
   var a = foo(x: x, y: y)
   return a

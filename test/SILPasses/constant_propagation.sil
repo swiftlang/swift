@@ -22,27 +22,21 @@ struct UInt64 {
 // Compute an expression using a chain of arithmetic with overflow instructions: 2 * (2 + 3) - 3
 sil @fold_arithmetic_with_overflow : $@thin () -> Builtin.Int64 {
 bb0:
- %1 = builtin_function_ref "int_sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
- %2 = builtin_function_ref "int_smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
- %3 = builtin_function_ref "int_ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
  %0 = integer_literal $Builtin.Int64, 2
  %110 = integer_literal $Builtin.Int64, 3
- %18 = apply %1(%0, %110) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %18 = builtin "int_sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %110 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
- %20 = apply %2(%0, %19) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %20 = builtin "int_smul_with_overflow_Int64"(%0 : $Builtin.Int64, %19 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
- %22 = apply %3(%21, %110) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %22 = builtin "int_ssub_with_overflow_Int64"(%21 : $Builtin.Int64, %110 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
  %23 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 0
  return %23 : $Builtin.Int64
 
 // CHECK-LABEL: sil @fold_arithmetic_with_overflow
-// CHECK-NOT: builtin_function_ref "int_sadd_with_overflow_Int64"
-// CHECK-NOT: builtin_function_ref "int_smul_with_overflow_Int64"
-// CHECK-NOT: builtin_function_ref "int_ssub_with_overflow_Int64"
 // CHECK-NOT: integer_literal $Builtin.Int64, 2
 // CHECK-NOT: integer_literal $Builtin.Int64, 3
 // CHECK-NOT: integer_literal $Builtin.Int64, 0
-// CHECK-NOT: apply
+// CHECK-NOT: builtin
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 7
 // CHECK-NEXT: return [[RES:%.*]] : $Builtin.Int64
 }
@@ -51,20 +45,17 @@ bb0:
 sil @fold_trunc : $@thin () -> Builtin.Int64 {
 bb0:
  %0 = integer_literal $Builtin.Int128, 22
- %1 = builtin_function_ref "trunc_Int128_Int64" : $@thin Builtin.Int128 -> Builtin.Int64
- %2 = apply %1(%0) : $@thin Builtin.Int128 -> Builtin.Int64
+ %2 = builtin "trunc_Int128_Int64"(%0 : $Builtin.Int128) : $Builtin.Int64
  br bb4(%2 : $Builtin.Int64)
 
 bb1:
  %3 = integer_literal $Builtin.Int8, 23
- %4 = builtin_function_ref "sext_Int8_Int64" : $@thin Builtin.Int8 -> Builtin.Int64
- %5 = apply %4(%3) : $@thin Builtin.Int8 -> Builtin.Int64
+ %5 = builtin "sext_Int8_Int64"(%3 : $Builtin.Int8) : $Builtin.Int64
  br bb4(%5 : $Builtin.Int64)
 
 bb2:
  %6 = integer_literal $Builtin.Int8, 24
- %7 = builtin_function_ref "zext_Int8_Int64" : $@thin Builtin.Int8 -> Builtin.Int64
- %8 = apply %7(%6) : $@thin Builtin.Int8 -> Builtin.Int64
+ %8 = builtin "zext_Int8_Int64"(%6 : $Builtin.Int8) : $Builtin.Int64
  br bb4(%8 : $Builtin.Int64)
 
 bb4(%100 : $Builtin.Int64):
@@ -143,11 +134,10 @@ bb0:
 
 sil @testChainingCCP : $@thin () -> Builtin.Int1 {
 bb0:
-  %1 = builtin_function_ref "trunc_Int64_Int1" : $@thin Builtin.Int64 -> Builtin.Int1
   %2 = integer_literal $Builtin.Int64, 0
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   %4 = struct_extract %3 : $Int64, #Int64.value
-  %5 = apply %1(%4) : $@thin Builtin.Int64 -> Builtin.Int1
+  %5 = builtin "trunc_Int64_Int1"(%4 : $Builtin.Int64) : $Builtin.Int1
   return %5 : $Builtin.Int1
 
 // CHECK-LABEL: sil @testChainingCCP
@@ -159,10 +149,9 @@ bb0:
 
 sil @testDivision : $@thin () -> Builtin.Int8 {
 bb0:
-  %0 = builtin_function_ref "sdiv_Int8" : $@thin (Builtin.Int8, Builtin.Int8) -> Builtin.Int8
   %1 = integer_literal $Builtin.Int8, 6
   %2 = integer_literal $Builtin.Int8, 3
-  %3 = apply [transparent] %0(%1, %2) : $@thin (Builtin.Int8, Builtin.Int8) -> Builtin.Int8
+  %3 = builtin "sdiv_Int8"(%1: $Builtin.Int8, %2: $Builtin.Int8) : $Builtin.Int8
   return %3 : $Builtin.Int8
 
 // CHECK-LABEL: sil @testDivision
@@ -174,10 +163,9 @@ bb0:
 
 sil @testRem : $@thin () -> Builtin.Int64 {
 bb0:
-  %0 = builtin_function_ref "urem_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   %1 = integer_literal $Builtin.Int64, 10
   %2 = integer_literal $Builtin.Int64, 2
-  %3 = apply [transparent] %0(%1, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %3 = builtin "urem_Int64"(%1 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
   return %3 : $Builtin.Int64
 
 // CHECK-LABEL: sil @testRem
@@ -191,16 +179,12 @@ sil @testFoldingIntBinaryPredicates : $@thin () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int1, 1
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = builtin_function_ref "cmp_eq_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-  %4 = apply %3(%1, %2) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %4 = builtin "cmp_eq_Int1"(%1 : $Builtin.Int1, %2 : $Builtin.Int1) : $Builtin.Int1
   %11 = integer_literal $Builtin.Int32, 21
   %12 = integer_literal $Builtin.Int32, 12
-  %13 = builtin_function_ref "cmp_ne_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
-  %14 = apply %13(%11, %12) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
-  %15 = builtin_function_ref "cmp_sgt_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
-  %16 = apply %15(%12, %11) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
-  %17 = builtin_function_ref "cmp_ult_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
-  %18 = apply %17(%12, %11) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int1
+  %14 = builtin "cmp_ne_Int32"(%11 : $Builtin.Int32, %12 : $Builtin.Int32) : $Builtin.Int1
+  %16 = builtin "cmp_sgt_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
+  %18 = builtin "cmp_ult_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
   %5 = tuple ()
   return %5 : $()
 // CHECK-LABEL: sil @testFoldingIntBinaryPredicates
@@ -218,12 +202,9 @@ sil @fold_binary_bitwise : $@thin () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 1          // users: %7, %6, %5
   %1 = integer_literal $Builtin.Int64, 0          // users: %7, %6, %5
-  %2 = builtin_function_ref "and_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %5
-  %3 = builtin_function_ref "or_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %6
-  %4 = builtin_function_ref "xor_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %7
-  %5 = apply %2(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  %6 = apply %3(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  %7 = apply %4(%0, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %8
+  %5 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %6 = builtin "or_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %7 = builtin "xor_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64 // user: %8
   return %7 : $Builtin.Int64                      // id: %8
 
 // CHECK-LABEL: sil @fold_binary_bitwise
@@ -242,14 +223,11 @@ bb0:
   %2 = integer_literal $Builtin.Int64, 3          // users: %11, %10, %9, %8
   %3 = integer_literal $Builtin.Int64, 1          // user: %12
   %4 = integer_literal $Builtin.Int64, 5          // user: %12
-  %5 = builtin_function_ref "ashr_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %10, %8
-  %6 = builtin_function_ref "lshr_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // users: %11, %9
-  %7 = builtin_function_ref "shl_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %12
-  %8 = apply %5(%0, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  %9 = apply %6(%0, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  %10 = apply %5(%1, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  %11 = apply %6(%1, %2) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  %12 = apply %7(%3, %4) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 // user: %13
+  %8 = builtin "ashr_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  %9 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  %10 = builtin "ashr_Int64"(%1 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  %11 = builtin "lshr_Int64"(%1 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  %12 = builtin "shl_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int64 // user: %13
   return %12 : $Builtin.Int64                     // id: %13
 
 // CHECK-LABEL: sil @fold_shifts
@@ -267,14 +245,10 @@ sil @fold_float_operations : $@thin () -> Builtin.FPIEEE64 {
 bb0:
   %4 = float_literal $Builtin.FPIEEE64, 0x402E4CCCCCCCCCCD // 15.15
   %11 = float_literal $Builtin.FPIEEE64, 0x400A666666666666 // 3.2999999999999998 // user: %12
-  %0 = builtin_function_ref "fadd_FPIEEE64" : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %1 = builtin_function_ref "fdiv_FPIEEE64" : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %2 = builtin_function_ref "fsub_FPIEEE64" : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %3 = builtin_function_ref "fmul_FPIEEE64" : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %8 = apply %0(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %9 = apply %1(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %10 = apply %2(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
-  %13 = apply %3(%4, %11) : $@thin (Builtin.FPIEEE64, Builtin.FPIEEE64) -> Builtin.FPIEEE64
+  %8 = builtin "fadd_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  %9 = builtin "fdiv_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  %10 = builtin "fsub_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  %13 = builtin "fmul_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
   return %13 : $Builtin.FPIEEE64
 
 // CHECK-LABEL: sil @fold_float_operations
@@ -291,20 +265,17 @@ bb0:
 sil @fold_condfail_instructions : $@thin () -> Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int2048, 1        // user: %2
-  %1 = builtin_function_ref "s_to_s_checked_trunc_Int2048_Int64" : $@thin (Builtin.Int2048) -> (Builtin.Int64, Builtin.Int1) // user: %2
-  %2 = apply %1(%0) : $@thin (Builtin.Int2048) -> (Builtin.Int64, Builtin.Int1) // user: %3
+  %2 = builtin "s_to_s_checked_trunc_Int2048_Int64"(%0 : $Builtin.Int2048) : $(Builtin.Int64, Builtin.Int1) // user: %3
   %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0 // user: %4
   %4 = struct $Int64 (%3 : $Builtin.Int64)        // users: %14, %5
   %6 = integer_literal $Builtin.Int2048, 2        // user: %8
-  %7 = builtin_function_ref "s_to_s_checked_trunc_Int2048_Int64" : $@thin (Builtin.Int2048) -> (Builtin.Int64, Builtin.Int1) // user: %8
-  %8 = apply %7(%6) : $@thin (Builtin.Int2048) -> (Builtin.Int64, Builtin.Int1) // user: %9
+  %8 = builtin "s_to_s_checked_trunc_Int2048_Int64"(%6 : $Builtin.Int2048) : $(Builtin.Int64, Builtin.Int1) // user: %9
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0 // user: %10
   %10 = struct $Int64 (%9 : $Builtin.Int64)       // users: %15, %11
   %12 = integer_literal $Builtin.Int1, -1         // user: %16
-  %13 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // user: %16
   %14 = struct_extract %4 : $Int64, #Int64.value  // user: %16
   %15 = struct_extract %10 : $Int64, #Int64.value // user: %16
-  %16 = apply %13(%14, %15, %12) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // users: %18, %17
+  %16 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %12 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // users: %18, %17
   %17 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 0 // user: %19
   %18 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 1 // user: %20
   %19 = struct $Int64 (%17 : $Builtin.Int64)      // user: %21
@@ -320,7 +291,7 @@ bb0:
 }
 
 // Make sure that we properly handle functions eliminated by CCP by removing
-// from the worklist. If we dont't the following (reduced) test case will blow
+// from the worklist. If we don't the following (reduced) test case will blow
 // up.
 
 // CHECK-LABEL: sil @properly_handle_eliminated_instructions_in_worklist : $@cc(method) @thin (Bool, @inout UInt) -> () {
@@ -328,38 +299,32 @@ sil @properly_handle_eliminated_instructions_in_worklist : $@cc(method) @thin (B
 bb0(%0 : $Bool, %1 : $*UInt):
   %2 = load %1 : $*UInt
   %3 = integer_literal $Builtin.Int2048, 1
-  %4 = builtin_function_ref "s_to_u_checked_trunc_Int2048_Word" : $@thin (Builtin.Int2048) -> (Builtin.Word, Builtin.Int1)
-  %5 = apply %4(%3) : $@thin (Builtin.Int2048) -> (Builtin.Word, Builtin.Int1)
+  %5 = builtin "s_to_u_checked_trunc_Int2048_Word"(%3 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
   %7 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 1
   %8 = struct $UInt (%6 : $Builtin.Word)
   %9 = integer_literal $Builtin.Int2048, 0
-  %10 = builtin_function_ref "s_to_u_checked_trunc_Int2048_Word" : $@thin (Builtin.Int2048) -> (Builtin.Word, Builtin.Int1)
-  %11 = apply %10(%9) : $@thin (Builtin.Int2048) -> (Builtin.Word, Builtin.Int1)
+  %11 = builtin "s_to_u_checked_trunc_Int2048_Word"(%9 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
   %12 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 0
   %13 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 1
   %14 = struct $UInt (%12 : $Builtin.Word)
   %15 = integer_literal $Builtin.Int2048, 1
-  %16 = builtin_function_ref "s_to_u_checked_trunc_Int2048_Word" : $@thin (Builtin.Int2048) -> (Builtin.Word, Builtin.Int1)
-  %17 = apply %16(%15) : $@thin (Builtin.Int2048) -> (Builtin.Word, Builtin.Int1)
+  %17 = builtin "s_to_u_checked_trunc_Int2048_Word"(%15 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
   %18 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 0
   %19 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 1
   %20 = struct $UInt (%18 : $Builtin.Word)
-  %21 = builtin_function_ref "usub_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %22 = struct_extract %14 : $UInt, #UInt.value
   %23 = struct_extract %20 : $UInt, #UInt.value
-  %24 = builtin_function_ref "trunc_Word_Int1" : $@thin (Builtin.Word) -> Builtin.Int1
   %25 = integer_literal $Builtin.Int2048, 0
-  %26 = builtin_function_ref "s_to_s_checked_trunc_Int2048_Word" : $@thin (Builtin.Int2048) -> (Builtin.Word, Builtin.Int1)
-  %27 = apply %26(%25) : $@thin (Builtin.Int2048) -> (Builtin.Word, Builtin.Int1)
+  %27 = builtin "s_to_s_checked_trunc_Int2048_Word"(%25 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
   %28 = tuple_extract %27 : $(Builtin.Word, Builtin.Int1), 0
   %29 = tuple_extract %27 : $(Builtin.Word, Builtin.Int1), 1
   %30 = struct $Int (%28 : $Builtin.Word)
   %31 = struct_extract %30 : $Int, #Int.value
-  %32 = apply %24(%31) : $@thin (Builtin.Word) -> Builtin.Int1
+  %32 = builtin "trunc_Word_Int1"(%31 : $Builtin.Word) : $Builtin.Int1
   %33 = struct $Bool (%32 : $Builtin.Int1)
   %34 = struct_extract %33 : $Bool, #Bool.value
-  %35 = apply %21(%22, %23, %34) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %35 = builtin "usub_with_overflow_Word"(%22 : $Builtin.Word, %23 : $Builtin.Word, %34 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %36 = tuple_extract %35 : $(Builtin.Word, Builtin.Int1), 0
   %37 = tuple_extract %35 : $(Builtin.Word, Builtin.Int1), 1
   %38 = struct $UInt (%36 : $Builtin.Word)
@@ -367,15 +332,13 @@ bb0(%0 : $Bool, %1 : $*UInt):
   %40 = tuple (%38 : $UInt, %39 : $Bool)
   %41 = tuple_extract %40 : $(UInt, Bool), 0
   %42 = tuple_extract %40 : $(UInt, Bool), 1
-  %43 = builtin_function_ref "xor_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
   %44 = struct_extract %8 : $UInt, #UInt.value
   %45 = struct_extract %41 : $UInt, #UInt.value
-  %46 = apply %43(%44, %45) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
+  %46 = builtin "xor_Word"(%44 : $Builtin.Word, %45 : $Builtin.Word) : $Builtin.Word
   %47 = struct $UInt (%46 : $Builtin.Word)
-  %48 = builtin_function_ref "and_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
   %49 = struct_extract %2 : $UInt, #UInt.value
   %50 = struct_extract %47 : $UInt, #UInt.value
-  %51 = apply %48(%49, %50) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
+  %51 = builtin "and_Word"(%49 : $Builtin.Word, %50 : $Builtin.Word) : $Builtin.Word
   %52 = struct $UInt (%51 : $Builtin.Word)
   %53 = tuple ()
   return %53 : $()
@@ -399,13 +362,9 @@ bb0:
   %4 = integer_literal $Builtin.Int32, 400
   %5 = integer_literal $Builtin.Int64, 5000
 
-  %6 = builtin_function_ref "int_expect_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-  %7 = builtin_function_ref "int_expect_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
-  %8 = builtin_function_ref "int_expect_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-
-  %9 = apply %6(%0, %3) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-  %10 = apply %7(%1, %4) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
-  %11 = apply %8(%2, %5) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %9 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %3 : $Builtin.Int1) : $Builtin.Int1
+  %10 = builtin "int_expect_Int32"(%1 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int32
+  %11 = builtin "int_expect_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64
 
   %12 = tuple (%9 : $Builtin.Int1, %10 : $Builtin.Int32, %11 : $Builtin.Int64)
   return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)

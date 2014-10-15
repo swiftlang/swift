@@ -679,14 +679,13 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
 }
 
 void SILGenModule::emitGlobalAccessor(VarDecl *global,
-                                      FuncDecl *builtinOnceDecl,
                                       SILGlobalVariable *onceToken,
                                       SILFunction *onceFunc) {
   SILDeclRef accessor(global, SILDeclRef::Kind::GlobalAccessor);
   SILFunction *f = preEmitFunction(accessor, global, global);
   PrettyStackTraceSILFunction X("silgen emitGlobalAccessor", f);
   SILGenFunction(*this, *f)
-    .emitGlobalAccessor(global, builtinOnceDecl, onceToken, onceFunc);
+    .emitGlobalAccessor(global, onceToken, onceFunc);
   postEmitFunction(accessor, f);
 }
   

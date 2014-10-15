@@ -23,7 +23,7 @@
 using namespace swift;
 
 bool
-swift::isSideEffectFree(BuiltinFunctionRefInst *FR) {
+swift::isSideEffectFree(BuiltinInst *FR) {
 
   // First, check if we are dealing with a swift builtin.
   const BuiltinInfo &BInfo = FR->getBuiltinInfo();
@@ -42,7 +42,7 @@ swift::isSideEffectFree(BuiltinFunctionRefInst *FR) {
   llvm_unreachable("All cases are covered.");
 }
 
-bool swift::isReadNone(BuiltinFunctionRefInst *FR) {
+bool swift::isReadNone(BuiltinInst *FR) {
   // First, check if we are dealing with a swift builtin.
   const BuiltinInfo &BInfo = FR->getBuiltinInfo();
   if (BInfo.ID != BuiltinValueKind::None)
@@ -74,15 +74,15 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
 
   // We know that some calls do not have side effects.
   if (const ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
-    if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
-      return isSideEffectFree(BFRI);
-    }
-
     if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
       // If we call an apply inst to a global initializer, but the value is not
       // used it is safe to remove it.
       if (FRI->getReferencedFunction()->isGlobalInit())
         return true;
+  }
+
+  if (auto *BI = dyn_cast<BuiltinInst>(I)) {
+    return isSideEffectFree(BI);
   }
 
   // condfail instructions that obviously can't fail are dead.

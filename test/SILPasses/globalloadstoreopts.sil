@@ -54,22 +54,20 @@ bb0(%0 : $B):
 // CHECK-LABEL: sil @eliminate_duplicate_loads_over_noread_builtins
 // CHECK: bb0
 // CHECK-NEXT: [[LOAD_RESULT:%[0-9]+]] = load
-// CHECK-NEXT: builtin_function_ref
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: apply {{%[0-9]+}}([[LOAD_RESULT]], [[LOAD_RESULT]]
+// CHECK-NEXT: builtin "sadd_with_overflow_Int64"([[LOAD_RESULT]] : ${{.*}}, [[LOAD_RESULT]]
 // CHECK-NEXT: [[APPLY_RESULT:%[0-9]+]] = tuple_extract
-// CHECK-NEXT: apply {{%[0-9]+}}([[LOAD_RESULT]], [[APPLY_RESULT]]
+// CHECK-NEXT: builtin "sadd_with_overflow_Int64"([[LOAD_RESULT]] : ${{.*}}, [[APPLY_RESULT]]
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: return
 sil @eliminate_duplicate_loads_over_noread_builtins : $@thin (@inout Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $*Builtin.Int64):
   %1 = load %0 : $*Builtin.Int64
-  %2 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %3 = integer_literal $Builtin.Int1, 0
-  %4 = apply %2(%1, %1, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = builtin "sadd_with_overflow_Int64"(%1 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %5 = load %0 : $*Builtin.Int64
   %6 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0
-  %7 = apply %2(%5, %6, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %7 = builtin "sadd_with_overflow_Int64"(%5 : $Builtin.Int64, %6 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 0
   return %8 : $Builtin.Int64
 }
@@ -78,8 +76,7 @@ bb0(%0 : $*Builtin.Int64):
 // CHECK: bb0
 // CHECK-NEXT: load
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: builtin_function_ref
-// CHECK-NEXT: apply
+// CHECK-NEXT: builtin
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: store
 // CHECK-NEXT: tuple
@@ -87,13 +84,11 @@ bb0(%0 : $*Builtin.Int64):
 sil @dead_store_elimination_over_noread_builtins : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
 bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
   %2 = load %0 : $*Builtin.Int64
-  %3 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %4 = integer_literal $Builtin.Int1, 0
-  %5 = apply %3(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %5 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
   store %6 to %1 : $*Builtin.Int64
-  %7 = builtin_function_ref "smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-  %8 = apply %7(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
   store %9 to %1 : $*Builtin.Int64
   %10 = tuple()
@@ -103,30 +98,26 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
 // CHECK-LABEL: sil @load_store_forwarding_over_noread_builtins
 // CHECK: bb0
 // CHECK-NEXT: load
-// CHECK-NEXT: builtin_function_ref
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: apply
+// CHECK-NEXT: builtin
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: store
-// CHECK-NEXT: builtin_function_ref
-// CHECK-NEXT: apply
+// CHECK-NEXT: builtin
 // CHECK-NEXT: tuple_extract
-// CHECK-NEXT: apply
+// CHECK-NEXT: builtin
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: return
 sil @load_store_forwarding_over_noread_builtins : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
   %2 = load %0 : $*Builtin.Int64
-  %3 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %4 = integer_literal $Builtin.Int1, 0
-  %5 = apply %3(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %5 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
   store %6 to %1 : $*Builtin.Int64
-  %7 = builtin_function_ref "smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
-  %8 = apply %7(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
   %10 = load %1 : $*Builtin.Int64
-  %11 = apply %3(%10, %9, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %11 = builtin "sadd_with_overflow_Int64"(%10 : $Builtin.Int64, %9 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
   return %12 : $Builtin.Int64
 }
@@ -460,28 +451,27 @@ bb5:
 sil @load_to_load_conflicting_branches_diamond : $@thin (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = load %0 : $*Builtin.Int32
-  %2 = builtin_function_ref "trunc" : $@thin (Builtin.Int32) -> Builtin.Int1
-  apply %2(%1) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%1 : $Builtin.Int32) : $Builtin.Int1
   cond_br undef, bb1, bb2
 
 bb1:
   %3 = load %0 : $*Builtin.Int32
   %4 = integer_literal $Builtin.Int32, 2
-  apply %2(%3) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%3 : $Builtin.Int32) : $Builtin.Int1
   store %4 to %0 : $*Builtin.Int32
-  apply %2(%3) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%3 : $Builtin.Int32) : $Builtin.Int1
   %5 = load %0 : $*Builtin.Int32
-  apply %2(%5) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%5 : $Builtin.Int32) : $Builtin.Int1
   br bb3
 
 bb2:
   %6 = load %0 : $*Builtin.Int32
-  apply %2(%6) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%6 : $Builtin.Int32) : $Builtin.Int1
   br bb3
 
 bb3:
   %7 = load %0 : $*Builtin.Int32
-  apply %2(%7) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%7 : $Builtin.Int32) : $Builtin.Int1
   %9999 = tuple()
   return %9999 : $()
 }
@@ -499,28 +489,27 @@ bb3:
 sil @load_to_load_irreducible_loop : $@thin (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = load %0 : $*Builtin.Int32
-  %2 = builtin_function_ref "trunc" : $@thin (Builtin.Int32) -> Builtin.Int1
-  apply %2(%1) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%1 : $Builtin.Int32) : $Builtin.Int1
   cond_br undef, bb1, bb2
 
 bb1:
   %3 = load %0 : $*Builtin.Int32
   %4 = integer_literal $Builtin.Int32, 2
-  apply %2(%3) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%3 : $Builtin.Int32) : $Builtin.Int1
   store %4 to %0 : $*Builtin.Int32
-  apply %2(%3) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%3 : $Builtin.Int32) : $Builtin.Int1
   %5 = load %0 : $*Builtin.Int32
-  apply %2(%5) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%5 : $Builtin.Int32) : $Builtin.Int1
   cond_br undef, bb2, bb3
 
 bb2:
   %6 = load %0 : $*Builtin.Int32
-  apply %2(%6) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%6 : $Builtin.Int32) : $Builtin.Int1
   cond_br undef, bb1, bb3
 
 bb3:
   %7 = load %0 : $*Builtin.Int32
-  apply %2(%7) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%7 : $Builtin.Int32) : $Builtin.Int1
   %9999 = tuple()
   return %9999 : $()
 }
@@ -538,25 +527,24 @@ sil @load_to_load_loop : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> 
 bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
   %2 = load %0 : $*Builtin.Int32
   %99 = load %1 : $*Builtin.Int32
-  %3 = builtin_function_ref "trunc" : $@thin (Builtin.Int32) -> Builtin.Int1
-  apply %3(%2) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%2 : $Builtin.Int32) : $Builtin.Int1
   br bb1
 
 bb1:
   %4 = load %0 : $*Builtin.Int32
   %5 = integer_literal $Builtin.Int32, 2
-  apply %3(%4) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
   store %5 to %0 : $*Builtin.Int32
-  apply %3(%4) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
   %6 = load %0 : $*Builtin.Int32
-  apply %3(%6) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%6 : $Builtin.Int32) : $Builtin.Int1
   cond_br undef, bb1, bb2
 
 bb2:
   %7 = load %0 : $*Builtin.Int32
-  apply %3(%7) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%7 : $Builtin.Int32) : $Builtin.Int1
   %8 = load %1 : $*Builtin.Int32
-  apply %3(%8) : $@thin (Builtin.Int32) -> Builtin.Int1
+  builtin "trunc_Int32_Int1"(%8 : $Builtin.Int32) : $Builtin.Int1
   %9999 = tuple()
   return %9999 : $()
 }

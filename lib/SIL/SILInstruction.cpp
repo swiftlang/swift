@@ -240,8 +240,8 @@ namespace {
       return X->getReferencedFunction() == RHS->getReferencedFunction();
     }
 
-    bool visitBuiltinFunctionRefInst(const BuiltinFunctionRefInst *RHS) {
-      auto *X = cast<BuiltinFunctionRefInst>(LHS);
+    bool visitBuiltinFunctionRefInst(const BuiltinFunctionRefInst *RHS) { // XXX
+      auto *X = cast<BuiltinFunctionRefInst>(LHS); // XXX
       return X->getName() == RHS->getName();
     }
 
@@ -379,6 +379,13 @@ namespace {
     bool visitApplyInst(ApplyInst *RHS) {
       auto *X = cast<ApplyInst>(LHS);
       if (X->isTransparent() != RHS->isTransparent())
+        return false;
+      return X->getSubstitutions() == RHS->getSubstitutions();
+    }
+      
+    bool visitBuiltinInst(BuiltinInst *RHS) {
+      auto *X = cast<BuiltinInst>(LHS);
+      if (X->getName() != RHS->getName())
         return false;
       return X->getSubstitutions() == RHS->getSubstitutions();
     }
@@ -828,11 +835,19 @@ SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILType Ty)
     Global(nullptr)
 {}
 
-const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() const {
+const IntrinsicInfo &BuiltinInst::getIntrinsicInfo() const {
   return getModule().getIntrinsicInfo(getName());
 }
 
-const BuiltinInfo &BuiltinFunctionRefInst::getBuiltinInfo() const {
+const BuiltinInfo &BuiltinInst::getBuiltinInfo() const {
+  return getModule().getBuiltinInfo(getName());
+}
+
+const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() const { // XXX
+  return getModule().getIntrinsicInfo(getName());
+}
+
+const BuiltinInfo &BuiltinFunctionRefInst::getBuiltinInfo() const { // XXX
   return getModule().getBuiltinInfo(getName());
 }
 

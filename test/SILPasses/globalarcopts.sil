@@ -83,28 +83,24 @@ bb0(%0 : $S):
 
 // CHECK-LABEL: sil @delete_retain_over_non_side_effect_instructions : $@thin (Builtin.NativeObject, Builtin.Int64) -> Builtin.Int1
 // CHECK: bb0
-// CHECK-NEXT: builtin_function_ref
-// CHECK-NEXT: apply
+// CHECK-NEXT: builtin
 // CHECK-NEXT: return
 sil @delete_retain_over_non_side_effect_instructions : $@thin (Builtin.NativeObject, Builtin.Int64) -> (Builtin.Int1) {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int64):
   strong_retain %0 : $Builtin.NativeObject
-  %2 = builtin_function_ref "cmp_eq_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
-  %3 = apply %2(%1, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
+  %3 = builtin "cmp_eq_Int64"(%1 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
   strong_release %0 : $Builtin.NativeObject
   return %3 : $Builtin.Int1
 }
 
 // CHECK-LABEL: sil @delete_copyvalue_over_non_side_effect_instructions : $@thin (S, Builtin.Int64) -> Builtin.Int1
 // CHECK: bb0
-// CHECK-NEXT: builtin_function_ref
-// CHECK-NEXT: apply
+// CHECK-NEXT: builtin
 // CHECK-NEXT: return
 sil @delete_copyvalue_over_non_side_effect_instructions : $@thin (S, Builtin.Int64) -> (Builtin.Int1) {
 bb0(%0 : $S, %1 : $Builtin.Int64):
   retain_value %0 : $S
-  %2 = builtin_function_ref "cmp_eq_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
-  %3 = apply %2(%1, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
+  %3 = builtin "cmp_eq_Int64"(%1 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
   release_value %0 : $S
   return %3 : $Builtin.Int1
 }
@@ -232,7 +228,6 @@ bb0(%0 : $S):
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: builtin_function_ref
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: string_literal
 // CHECK-NEXT: tuple ()
@@ -243,7 +238,6 @@ bb0(%0 : $Builtin.NativeObject):
   %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
   apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
   %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
-  %3 = builtin_function_ref "sextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64
   %4 = integer_literal $Builtin.Int64, 0
   %5 = string_literal utf8 "123"
   strong_release %0 : $Builtin.NativeObject
@@ -1066,8 +1060,7 @@ bb1:
   return %1 : $()
 
 bb2:
-  %2 = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
-  %3 = apply %2() : $@thin @noreturn @callee_owned () -> ()
+  %3 = builtin "int_trap"() : $()
   unreachable
 }
 

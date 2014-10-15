@@ -575,9 +575,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);
     break;
   }
-  case ValueKind::BuiltinFunctionRefInst: {
+  case ValueKind::BuiltinFunctionRefInst: { // XXX
     // Format: FuncDecl and type. Use SILOneOperandLayout.
-    const BuiltinFunctionRefInst *BFR = cast<BuiltinFunctionRefInst>(&SI);
+    const BuiltinFunctionRefInst *BFR = cast<BuiltinFunctionRefInst>(&SI); // XXX
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,

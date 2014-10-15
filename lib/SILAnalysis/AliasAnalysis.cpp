@@ -151,16 +151,19 @@ static bool isAliasingFunctionArgument(SILValue V) {
 
 /// Returns true if V is an apply inst that may read or write to memory.
 static bool isReadWriteApplyInst(SILValue V) {
-  // Attempt to convert the ValueBase inside of V to an ApplyInst.
-  auto *AI = dyn_cast<ApplyInst>(V);
+  // See if this is a normal function application.
+  if (isa<ApplyInst>(V)) {
+    // FIXME: Function attributes.
+    return true;
+  }
+  
+  // Next, see if this is a builtin.
+  if (auto *BI = dyn_cast<BuiltinInst>(V)) {
+    return !isReadNone(BI);
+  }
 
   // If we fail, bail...
-  if (!AI)
-    return false;
-
-  // If we succeed, check if AI's callee is a builtin that is not read none.
-  auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-  return !BI || !isReadNone(BI);
+  return false;
 }
 
 /// Return true if the pointer is one which would have been considered an escape
@@ -614,6 +617,7 @@ public:
   MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
   MemBehavior visitApplyInst(ApplyInst *AI);
+  MemBehavior visitBuiltinInst(BuiltinInst *BI);
 
   // Instructions which are none if our SILValue does not alias one of its
   // arguments. If we can not prove such a thing, return the relevant memory
@@ -739,29 +743,23 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
                         "Returning MayWrite.\n");
   return MemBehavior::MayWrite;
 }
-
-MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
-  // If the ApplyInst is from a no-read builtin it can not read or write and
-  // if it comes from a no-side effect builtin, it can only read.
-  auto *BFR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-
+  
+MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
   // If our callee is not a builtin, be conservative and return may have side
   // effects.
-  if (!BFR) {
-    DEBUG(llvm::dbgs() << "  Found apply we don't understand returning "
-                          "MHSF.\n");
+  if (!BI) {
     return MemBehavior::MayHaveSideEffects;
   }
 
   // If the builtin is read none, it does not read or write memory.
-  if (isReadNone(BFR)) {
+  if (isReadNone(BI)) {
     DEBUG(llvm::dbgs() << "  Found apply of read none builtin. Returning"
                           " None.\n");
     return MemBehavior::None;
   }
 
   // If the builtin is side effect free, then it can only read memory.
-  if (isSideEffectFree(BFR)) {
+  if (isSideEffectFree(BI)) {
     DEBUG(llvm::dbgs() << "  Found apply of side effect free builtin. "
                           "Returning MayRead.\n");
     return MemBehavior::MayRead;
@@ -774,6 +772,12 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
   // Otherwise be conservative and return that we may have side effects.
   DEBUG(llvm::dbgs() << "  Found apply of side effect builtin. "
                         "Returning MayHaveSideEffects.\n");
+  return MemBehavior::MayHaveSideEffects;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
+    DEBUG(llvm::dbgs() << "  Found apply we don't understand returning "
+                          "MHSF.\n");
   return MemBehavior::MayHaveSideEffects;
 }
 

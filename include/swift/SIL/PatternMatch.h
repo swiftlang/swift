@@ -479,15 +479,11 @@ struct Callee_match<BuiltinValueKind> {
 
   template <typename ITy>
   bool match(ITy *V) {
-    auto *AI = dyn_cast<ApplyInst>(V);
-    if (!AI)
+    auto *BI = dyn_cast<BuiltinInst>(V);
+    if (!BI)
       return false;
 
-    auto *BuiltinRef = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-    if (!BuiltinRef)
-      return false;
-
-    return BuiltinRef->getBuiltinInfo().ID == Kind;
+    return BI->getBuiltinInfo().ID == Kind;
   }
 };
 
@@ -499,15 +495,11 @@ struct Callee_match<llvm::Intrinsic::ID> {
 
   template <typename ITy>
   bool match(ITy *V) {
-    auto *AI = dyn_cast<ApplyInst>(V);
-    if (!AI)
+    auto *BI = dyn_cast<BuiltinInst>(V);
+    if (!BI)
       return false;
 
-    auto *BuiltinRef = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-    if (!BuiltinRef)
-      return false;
-
-    return BuiltinRef->getIntrinsicInfo().ID == IntrinsicID;
+    return BI->getIntrinsicInfo().ID == IntrinsicID;
   }
 };
 
@@ -533,11 +525,13 @@ struct Argument_match {
 
   template <typename ITy>
   bool match(ITy *V) {
-    auto *Apply = dyn_cast<ApplyInst>(V);
-    if (!Apply)
-      return false;
-
-    return Val.match(Apply->getArgument(OpI).getDef());
+    if (auto *Apply = dyn_cast<ApplyInst>(V)) {
+      return Val.match(Apply->getArgument(OpI).getDef());
+    }
+    if (auto *Builtin = dyn_cast<BuiltinInst>(V)) {
+      return Val.match(Builtin->getArguments()[OpI].getDef());
+    }
+    return false;
   }
 };
 
@@ -550,11 +544,13 @@ struct Argument_match<silvalue_bind> {
 
   template <typename ITy>
   bool match(ITy *V) {
-    auto *Apply = dyn_cast<ApplyInst>(V);
-    if (!Apply)
-      return false;
-
-    return Val.match(Apply->getArgument(OpI));
+    if (auto *Apply = dyn_cast<ApplyInst>(V)) {
+      return Val.match(Apply->getArgument(OpI));
+    }
+    if (auto *Builtin = dyn_cast<BuiltinInst>(V)) {
+      return Val.match(Builtin->getArguments()[OpI]);
+    }
+    return false;
   }
 };
 
@@ -613,6 +609,29 @@ m_ApplyInst(CalleeTy Callee, const T0 &Op0, const Arguments &...Args) {
                       m_Argument<Index>(Op0));
 }
 
+/// Match only a BuiltinInst's callee.
+inline typename Apply_match<BuiltinValueKind>::Ty
+m_BuiltinInst(BuiltinValueKind Callee) {
+  return Callee;
+}
+  
+/// Match a BuiltinInst's Callee and first argument.
+template <unsigned Index=0, typename T0>
+inline typename Apply_match<BuiltinValueKind, T0>::Ty
+m_BuiltinInst(BuiltinValueKind Callee, const T0 &Op0) {
+  return m_CombineAnd(m_Callee(Callee), m_Argument<Index>(Op0));
+}
+
+/// Match an ApplyInst's Callee and up to the ApplyInsts Nth argument, where N
+/// is sizeof...(Arguments) + 1.
+template <unsigned Index=0, typename T0,
+          typename ...Arguments>
+inline typename Apply_match<BuiltinValueKind, T0, Arguments ...>::Ty
+m_BuiltinInst(BuiltinValueKind Callee, const T0 &Op0, const Arguments &...Args) {
+  return m_CombineAnd(m_BuiltinInst<Index+1>(Callee, Args...),
+                      m_Argument<Index>(Op0));
+}
+  
 //===----------------------------------------------------------------------===//
 //                             Builtin Instructions
 //===----------------------------------------------------------------------===//

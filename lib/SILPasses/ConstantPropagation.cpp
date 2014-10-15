@@ -33,20 +33,19 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 }
 
 /// \brief Construct (int, overflow) result tuple.
-static SILInstruction *constructResultWithOverflowTuple(ApplyInst *AI,
+static SILInstruction *constructResultWithOverflowTuple(BuiltinInst *BI,
                                                         APInt Res,
                                                         bool Overflow) {
   // Get the SIL subtypes of the returned tuple type.
-  SILType FuncResType
-    = AI->getSubstCalleeType()->getResult().getSILType();
+  SILType FuncResType = BI->getType();
   assert(FuncResType.castTo<TupleType>()->getNumElements() == 2);
   SILType ResTy1 = FuncResType.getTupleElementType(0);
   SILType ResTy2 = FuncResType.getTupleElementType(1);
 
   // Construct the folded instruction - a tuple of two literals, the
   // result and overflow.
-  SILBuilder B(AI);
-  SILLocation Loc = AI->getLoc();
+  SILBuilder B(BI);
+  SILLocation Loc = BI->getLoc();
   SILValue Result[] = {
     B.createIntegerLiteral(Loc, ResTy1, Res),
     B.createIntegerLiteral(Loc, ResTy2, Overflow)
@@ -56,10 +55,10 @@ static SILInstruction *constructResultWithOverflowTuple(ApplyInst *AI,
 
 /// \brief Fold arithmetic intrinsics with overflow.
 static SILInstruction *
-constantFoldBinaryWithOverflow(ApplyInst *AI, llvm::Intrinsic::ID ID,
+constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
                                bool ReportOverflow,
                                Optional<bool> &ResultsInError) {
-  OperandValueArrayRef Args = AI->getArguments();
+  OperandValueArrayRef Args = BI->getArguments();
   assert(Args.size() >= 2);
 
   IntegerLiteralInst *Op1 = dyn_cast<IntegerLiteralInst>(Args[0]);
@@ -114,7 +113,7 @@ constantFoldBinaryWithOverflow(ApplyInst *AI, llvm::Intrinsic::ID ID,
     // two arguments of the same type, use the type of the LHS argument.
     // This would detect '+'/'+=' and such.
     Type OpType;
-    SILLocation Loc = AI->getLoc();
+    SILLocation Loc = BI->getLoc();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
     if (CE) {
       const TupleExpr *Args = dyn_cast_or_null<TupleExpr>(CE->getArg());
@@ -127,7 +126,7 @@ constantFoldBinaryWithOverflow(ApplyInst *AI, llvm::Intrinsic::ID ID,
     }
 
     if (!OpType.isNull()) {
-      diagnose(AI->getModule().getASTContext(),
+      diagnose(BI->getModule().getASTContext(),
                Loc.getSourceLoc(),
                diag::arithmetic_operation_overflow,
                LHSInt.toString(/*Radix*/ 10, Signed),
@@ -136,7 +135,7 @@ constantFoldBinaryWithOverflow(ApplyInst *AI, llvm::Intrinsic::ID ID,
                OpType);
     } else {
       // If we cannot get the type info in an expected way, describe the type.
-      diagnose(AI->getModule().getASTContext(),
+      diagnose(BI->getModule().getASTContext(),
                Loc.getSourceLoc(),
                diag::arithmetic_operation_overflow_generic_type,
                LHSInt.toString(/*Radix*/ 10, Signed),
@@ -148,29 +147,29 @@ constantFoldBinaryWithOverflow(ApplyInst *AI, llvm::Intrinsic::ID ID,
     ResultsInError = Optional<bool>(true);
   }
 
-  return constructResultWithOverflowTuple(AI, Res, Overflow);
+  return constructResultWithOverflowTuple(BI, Res, Overflow);
 }
 
 static SILInstruction *
-constantFoldBinaryWithOverflow(ApplyInst *AI, BuiltinValueKind ID,
+constantFoldBinaryWithOverflow(BuiltinInst *BI, BuiltinValueKind ID,
                                Optional<bool> &ResultsInError) {
-  OperandValueArrayRef Args = AI->getArguments();
+  OperandValueArrayRef Args = BI->getArguments();
   IntegerLiteralInst *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
-  return constantFoldBinaryWithOverflow(AI,
+  return constantFoldBinaryWithOverflow(BI,
            getLLVMIntrinsicIDForBuiltinWithOverflow(ID),
            ShouldReportFlag && (ShouldReportFlag->getValue() == 1),
            ResultsInError);
 }
 
-static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
+static SILInstruction *constantFoldIntrinsic(BuiltinInst *BI,
                                              llvm::Intrinsic::ID ID,
                                              Optional<bool> &ResultsInError) {
   switch (ID) {
   default: break;
   case llvm::Intrinsic::expect: {
     // An expect of an integral constant is the constant itself.
-    assert(AI->getNumArguments() == 2 && "Expect should have 2 args.");
-    auto *Op1 = dyn_cast<IntegerLiteralInst>(AI->getArgument(0));
+    assert(BI->getArguments().size() == 2 && "Expect should have 2 args.");
+    auto *Op1 = dyn_cast<IntegerLiteralInst>(BI->getArguments()[0]);
     if (!Op1)
       return nullptr;
     return Op1;
@@ -182,16 +181,16 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
   case llvm::Intrinsic::usub_with_overflow:
   case llvm::Intrinsic::smul_with_overflow:
   case llvm::Intrinsic::umul_with_overflow:
-    return constantFoldBinaryWithOverflow(AI, ID,
+    return constantFoldBinaryWithOverflow(BI, ID,
                                           /* ReportOverflow */ false,
                                           ResultsInError);
   }
   return nullptr;
 }
 
-static SILInstruction *constantFoldCompare(ApplyInst *AI,
+static SILInstruction *constantFoldCompare(BuiltinInst *BI,
                                            BuiltinValueKind ID) {
-  OperandValueArrayRef Args = AI->getArguments();
+  OperandValueArrayRef Args = BI->getArguments();
 
   // Fold for integer constant arguments.
   IntegerLiteralInst *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
@@ -213,15 +212,15 @@ static SILInstruction *constantFoldCompare(ApplyInst *AI,
     case BuiltinValueKind::ICMP_ULE: Res = V1.ule(V2); break;
     case BuiltinValueKind::ICMP_UGE: Res = V1.uge(V2); break;
     }
-    SILBuilder B(AI);
-    return B.createIntegerLiteral(AI->getLoc(), AI->getType(), Res);
+    SILBuilder B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
   }
 
   return nullptr;
 }
 
 static SILInstruction *
-constantFoldAndCheckDivision(ApplyInst *AI, BuiltinValueKind ID,
+constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
                              Optional<bool> &ResultsInError) {
   assert(ID == BuiltinValueKind::SDiv ||
          ID == BuiltinValueKind::ExactSDiv ||
@@ -230,8 +229,8 @@ constantFoldAndCheckDivision(ApplyInst *AI, BuiltinValueKind ID,
          ID == BuiltinValueKind::ExactUDiv ||
          ID == BuiltinValueKind::URem);
 
-  OperandValueArrayRef Args = AI->getArguments();
-  SILModule &M = AI->getModule();
+  OperandValueArrayRef Args = BI->getArguments();
+  SILModule &M = BI->getModule();
 
   // Get the denominator.
   IntegerLiteralInst *Denom = dyn_cast<IntegerLiteralInst>(Args[1]);
@@ -247,7 +246,7 @@ constantFoldAndCheckDivision(ApplyInst *AI, BuiltinValueKind ID,
 
     // Otherwise emit a diagnosis error and set ResultsInError to true.
     diagnose(M.getASTContext(),
-             AI->getLoc().getSourceLoc(),
+             BI->getLoc().getSourceLoc(),
              diag::division_by_zero);
     ResultsInError = Optional<bool>(true);
     return nullptr;
@@ -288,7 +287,7 @@ constantFoldAndCheckDivision(ApplyInst *AI, BuiltinValueKind ID,
     // Otherwise emit the diagnostic, set ResultsInError to be true, and return
     // nullptr.
     diagnose(M.getASTContext(),
-             AI->getLoc().getSourceLoc(),
+             BI->getLoc().getSourceLoc(),
              diag::division_overflow,
              NumVal.toString(/*Radix*/ 10, /*Signed*/true),
              "/",
@@ -298,15 +297,15 @@ constantFoldAndCheckDivision(ApplyInst *AI, BuiltinValueKind ID,
   }
 
   // Add the literal instruction to represnet the result of the division.
-  SILBuilder B(AI);
-  return B.createIntegerLiteral(AI->getLoc(), AI->getType(), ResVal);
+  SILBuilder B(BI);
+  return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResVal);
 }
 
 /// \brief Fold binary operations.
 ///
 /// The list of operations we constant fold might not be complete. Start with
 /// folding the operations used by the standard library.
-static SILInstruction *constantFoldBinary(ApplyInst *AI,
+static SILInstruction *constantFoldBinary(BuiltinInst *BI,
                                           BuiltinValueKind ID,
                                           Optional<bool> &ResultsInError) {
   switch (ID) {
@@ -320,7 +319,7 @@ static SILInstruction *constantFoldBinary(ApplyInst *AI,
   case BuiltinValueKind::UDiv:
   case BuiltinValueKind::ExactUDiv:
   case BuiltinValueKind::URem: {
-    return constantFoldAndCheckDivision(AI, ID, ResultsInError);
+    return constantFoldAndCheckDivision(BI, ID, ResultsInError);
   }
 
   // Are there valid uses for these in stdlib?
@@ -335,7 +334,7 @@ static SILInstruction *constantFoldBinary(ApplyInst *AI,
   case BuiltinValueKind::Or:
   case BuiltinValueKind::Shl:
   case BuiltinValueKind::Xor: {
-    OperandValueArrayRef Args = AI->getArguments();
+    OperandValueArrayRef Args = BI->getArguments();
     IntegerLiteralInst *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
     IntegerLiteralInst *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
     if (!RHS || !LHS)
@@ -365,14 +364,14 @@ static SILInstruction *constantFoldBinary(ApplyInst *AI,
       break;
     }
     // Add the literal instruction to represent the result.
-    SILBuilder B(AI);
-    return B.createIntegerLiteral(AI->getLoc(), AI->getType(), ResI);
+    SILBuilder B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResI);
   }
   case BuiltinValueKind::FAdd:
   case BuiltinValueKind::FDiv:
   case BuiltinValueKind::FMul:
   case BuiltinValueKind::FSub: {
-    OperandValueArrayRef Args = AI->getArguments();
+    OperandValueArrayRef Args = BI->getArguments();
     FloatLiteralInst *LHS = dyn_cast<FloatLiteralInst>(Args[0]);
     FloatLiteralInst *RHS = dyn_cast<FloatLiteralInst>(Args[1]);
     if (!RHS || !LHS)
@@ -396,8 +395,8 @@ static SILInstruction *constantFoldBinary(ApplyInst *AI,
     }
 
     // Add the literal instruction to represent the result.
-    SILBuilder B(AI);
-    return B.createFloatLiteral(AI->getLoc(), AI->getType(), LHSF);
+    SILBuilder B(BI);
+    return B.createFloatLiteral(BI->getLoc(), BI->getType(), LHSF);
   }
   }
 }
@@ -417,7 +416,7 @@ static std::pair<bool, bool> getTypeSigndness(const BuiltinInfo &Builtin) {
 }
 
 static SILInstruction *
-constantFoldAndCheckIntegerConversions(ApplyInst *AI,
+constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
                                        const BuiltinInfo &Builtin,
                                        Optional<bool> &ResultsInError) {
   assert(Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
@@ -428,7 +427,7 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
          Builtin.ID == BuiltinValueKind::USCheckedConversion);
 
   // Check if we are converting a constant integer.
-  OperandValueArrayRef Args = AI->getArguments();
+  OperandValueArrayRef Args = BI->getArguments();
   IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
   if (!V)
     return nullptr;
@@ -492,8 +491,8 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
     if (!ResultsInError.hasValue())
       return nullptr;
 
-    SILLocation Loc = AI->getLoc();
-    SILModule &M = AI->getModule();
+    SILLocation Loc = BI->getLoc();
+    SILModule &M = BI->getModule();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
     Type UserSrcTy;
     Type UserDstTy;
@@ -581,23 +580,22 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
   }
 
   // The call to the builtin should be replaced with the constant value.
-  return constructResultWithOverflowTuple(AI, Result, false);
+  return constructResultWithOverflowTuple(BI, Result, false);
 
 }
 
-static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
-                                           BuiltinFunctionRefInst *FR,
+static SILInstruction *constantFoldBuiltin(BuiltinInst *BI,
                                            Optional<bool> &ResultsInError) {
-  const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
-  SILModule &M = AI->getModule();
+  const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
+  SILModule &M = BI->getModule();
 
   // If it's an llvm intrinsic, fold the intrinsic.
   if (Intrinsic.ID != llvm::Intrinsic::not_intrinsic)
-    return constantFoldIntrinsic(AI, Intrinsic.ID, ResultsInError);
+    return constantFoldIntrinsic(BI, Intrinsic.ID, ResultsInError);
 
   // Otherwise, it should be one of the builtin functions.
-  OperandValueArrayRef Args = AI->getArguments();
-  const BuiltinInfo &Builtin = FR->getBuiltinInfo();
+  OperandValueArrayRef Args = BI->getArguments();
+  const BuiltinInfo &Builtin = BI->getBuiltinInfo();
 
   switch (Builtin.ID) {
   default: break;
@@ -607,20 +605,20 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return constantFoldBinaryWithOverflow(AI, Builtin.ID, ResultsInError);
+    return constantFoldBinaryWithOverflow(BI, Builtin.ID, ResultsInError);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
 case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      return constantFoldBinary(AI, Builtin.ID, ResultsInError);
+      return constantFoldBinary(BI, Builtin.ID, ResultsInError);
 
 // Fold comparison predicates.
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
 case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      return constantFoldCompare(AI, Builtin.ID);
+      return constantFoldCompare(BI, Builtin.ID);
 
   case BuiltinValueKind::Trunc:
   case BuiltinValueKind::ZExt:
@@ -662,8 +660,8 @@ case BuiltinValueKind::id:
     }
 
     // Add the literal instruction to represent the result of the cast.
-    SILBuilder B(AI);
-    return B.createIntegerLiteral(AI->getLoc(), AI->getType(), CastResV);
+    SILBuilder B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), CastResV);
   }
 
   // Process special builtins that are designed to check for overflows in
@@ -674,7 +672,7 @@ case BuiltinValueKind::id:
   case BuiltinValueKind::UToSCheckedTrunc:
   case BuiltinValueKind::SUCheckedConversion:
   case BuiltinValueKind::USCheckedConversion: {
-    return constantFoldAndCheckIntegerConversions(AI, Builtin, ResultsInError);
+    return constantFoldAndCheckIntegerConversions(BI, Builtin, ResultsInError);
   }
 
   case BuiltinValueKind::IntToFPWithOverflow: {
@@ -692,7 +690,7 @@ case BuiltinValueKind::id:
     APFloat::opStatus ConversionStatus = TruncVal.convertFromAPInt(
         SrcVal, /*isSigned=*/true, APFloat::rmNearestTiesToEven);
 
-    SILLocation Loc = AI->getLoc();
+    SILLocation Loc = BI->getLoc();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
 
     // Check for overflow.
@@ -710,8 +708,8 @@ case BuiltinValueKind::id:
     }
 
     // The call to the builtin should be replaced with the constant value.
-    SILBuilder B(AI);
-    return B.createFloatLiteral(Loc, AI->getType(), TruncVal);
+    SILBuilder B(BI);
+    return B.createFloatLiteral(Loc, BI->getType(), TruncVal);
   }
   }
   return nullptr;
@@ -720,10 +718,8 @@ case BuiltinValueKind::id:
 static SILValue constantFoldInstruction(SILInstruction &I,
                                         Optional<bool> &ResultsInError) {
   // Constant fold function calls.
-  if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
-    // Constant fold calls to builtins.
-    if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      return constantFoldBuiltin(AI, FR, ResultsInError);
+  if (BuiltinInst *BI = dyn_cast<BuiltinInst>(&I)) {
+    return constantFoldBuiltin(BI, ResultsInError);
     return SILValue();
   }
 
@@ -749,10 +745,9 @@ static SILValue constantFoldInstruction(SILInstruction &I,
 }
 
 static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
-  if (auto *AI = dyn_cast<ApplyInst>(&I))
-    if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      if (FR->getBuiltinInfo().ID == kind)
-        return true;
+  if (auto *BI = dyn_cast<BuiltinInst>(&I))
+    if (BI->getBuiltinInfo().ID == kind)
+      return true;
   return false;
 }
 
@@ -771,7 +766,7 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
   bool InstantiateAssertConfiguration =
       (AssertConfiguration != SILOptions::DisableReplacement);
 
-  // The list of instructions whose evaluation resulted in errror or warning.
+  // The list of instructions whose evaluation resulted in error or warning.
   // This is used to avoid duplicate error reporting in case we reach the same
   // instruction from different entry points in the WorkList.
   llvm::DenseSet<SILInstruction *> ErrorSet;
@@ -801,25 +796,25 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
     // Replace assert_configuration instructions by their constant value. We
     // want them to be replace even if we can't fully propagate the constant.
     if (InstantiateAssertConfiguration)
-      if (auto *AI = dyn_cast<ApplyInst>(I)) {
-        if (isApplyOfBuiltin(*AI, BuiltinValueKind::AssertConf)) {
+      if (auto *BI = dyn_cast<BuiltinInst>(I)) {
+        if (isApplyOfBuiltin(*BI, BuiltinValueKind::AssertConf)) {
           // Instantiate the constant.
-          SILBuilder B(AI);
+          SILBuilder B(BI);
           auto AssertConfInt = B.createIntegerLiteral(
-            AI->getLoc(), AI->getType(0), AssertConfiguration);
-          AI->replaceAllUsesWith(AssertConfInt);
+            BI->getLoc(), BI->getType(), AssertConfiguration);
+          BI->replaceAllUsesWith(AssertConfInt);
           // Schedule users for constant folding.
           WorkList.insert(AssertConfInt);
           // Delete the call.
-          recursivelyDeleteTriviallyDeadInstructions(AI);
+          recursivelyDeleteTriviallyDeadInstructions(BI);
           continue;
         }
         
         // Kill calls to conditionallyUnreachable if we've folded assert
         // configuration calls.
-        if (isApplyOfBuiltin(*AI, BuiltinValueKind::CondUnreachable)) {
-          assert(AI->use_empty() && "use of conditionallyUnreachable?!");
-          recursivelyDeleteTriviallyDeadInstructions(AI, /*force*/ true);
+        if (isApplyOfBuiltin(*BI, BuiltinValueKind::CondUnreachable)) {
+          assert(BI->use_empty() && "use of conditionallyUnreachable?!");
+          recursivelyDeleteTriviallyDeadInstructions(BI, /*force*/ true);
           continue;
         }
       }

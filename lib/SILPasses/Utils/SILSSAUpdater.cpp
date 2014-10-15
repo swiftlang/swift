@@ -101,14 +101,6 @@ void SILSSAUpdater::RewriteUse(Operand &Op) {
     auto *NewFR = FR->clone(User);
     Op.set(SILValue(NewFR, Op.get().getResultNumber()));
     return;
-  } else if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(
-                 getAvailVals(AV).begin()->second.getDef())) {
-    assert(areIdentical(getAvailVals(AV)) &&
-           "The function_refs need to have the same value");
-    SILInstruction *User = Op.getUser();
-    auto *NewFR = FR->clone(User);
-    Op.set(SILValue(NewFR, Op.get().getResultNumber()));
-    return;
   } else if (auto *IL = dyn_cast<IntegerLiteralInst>(
                   getAvailVals(AV).begin()->second.getDef()))
     if (areIdentical(getAvailVals(AV))) {

@@ -77,7 +77,7 @@ protected:
 
   // Update UnhandledOnceCallee and InitializerCount by going through all "once"
   // calls.
-  void collectOnceCall(ApplyInst *AI);
+  void collectOnceCall(BuiltinInst *AI);
   // Set the static initializer and remove "once" from addressor if a global can
   // be statically initialized.
   void optimizeInitializer(SILFunction *AddrF);
@@ -98,12 +98,12 @@ void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
 }
 
 /// Return the callee of a once call.
-static SILFunction *getCalleeOfOnceCall(ApplyInst *AI) {
-  assert(AI->getNumOperands() == 3 && "once call should have 3 operands.");
-  if (auto *TTTF = dyn_cast<ThinToThickFunctionInst>(AI->getOperand(2))) {
+static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
+  assert(BI->getNumOperands() == 2 && "once call should have 3 operands.");
+  if (auto *TTTF = dyn_cast<ThinToThickFunctionInst>(BI->getOperand(1))) {
     if (auto *FR = dyn_cast<FunctionRefInst>(TTTF->getOperand()))
        return FR->getReferencedFunction();
-  } else if (auto *FR = dyn_cast<FunctionRefInst>(AI->getOperand(2))) {
+  } else if (auto *FR = dyn_cast<FunctionRefInst>(BI->getOperand(1))) {
     return FR->getReferencedFunction();
   }
   return nullptr;
@@ -111,18 +111,15 @@ static SILFunction *getCalleeOfOnceCall(ApplyInst *AI) {
 
 /// Update UnhandledOnceCallee and InitializerCount by going through all "once"
 /// calls.
-void SILGlobalOpt::collectOnceCall(ApplyInst *AI) {
+void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
   if (UnhandledOnceCallee)
     return;
 
-  auto *BFR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-  if (!BFR)
-    return;
-  const BuiltinInfo &Builtin = Module->getBuiltinInfo(BFR->getName());
+  const BuiltinInfo &Builtin = Module->getBuiltinInfo(BI->getName());
   if (Builtin.ID != BuiltinValueKind::Once)
     return;
 
-  SILFunction *Callee = getCalleeOfOnceCall(AI);
+  SILFunction *Callee = getCalleeOfOnceCall(BI);
   if (!Callee) {
     DEBUG(llvm::dbgs() << "GlobalOpt: unhandled once callee\n");
     UnhandledOnceCallee = true;
@@ -133,7 +130,7 @@ void SILGlobalOpt::collectOnceCall(ApplyInst *AI) {
 
   // We currently disable optimizing the intializer if a globalinit_func
   // is called by "once" from multiple locations.
-  if (!AI->getParent()->getParent()->isGlobalInit())
+  if (!BI->getParent()->getParent()->isGlobalInit())
     // If a globalinit_func is called by "once" from a function that is not
     // an addressor, we set count to 2 to disable optimizing the initializer.
     InitializerCount[Callee] = 2;
@@ -226,7 +223,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 
 /// Find the globalinit_func by analyzing the body of the addressor.
 static SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
-                                    ApplyInst *&CallToOnce) {
+                                    BuiltinInst *&CallToOnce) {
   // We only handle a single SILBasicBlock for now.
   if (AddrF->size() != 1)
     return nullptr;
@@ -234,12 +231,9 @@ static SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
   CallToOnce = nullptr;
   SILBasicBlock *BB = &AddrF->front();
   for (auto &I : *BB) {
-    // Find the ApplyInst on built-in "once".
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
-      auto *BFR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-      if (!BFR)
-        continue;
-      const BuiltinInfo &Builtin = Module->getBuiltinInfo(BFR->getName());
+    // Find the builtin "once" call.
+    if (BuiltinInst *BI = dyn_cast<BuiltinInst>(&I)) {
+      const BuiltinInfo &Builtin = Module->getBuiltinInfo(BI->getName());
       if (Builtin.ID != BuiltinValueKind::Once)
         continue;
 
@@ -247,7 +241,7 @@ static SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
       if (CallToOnce)
         return nullptr;
 
-      CallToOnce = AI;
+      CallToOnce = BI;
     }
   }
   if (!CallToOnce)
@@ -263,7 +257,7 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF) {
     return;
 
   // Find the initializer and the SILGlobalVariable.
-  ApplyInst *CallToOnce;
+  BuiltinInst *CallToOnce;
 
   // If the addressor contains a single "once" call, it calls globalinit_func,
   // and the globalinit_func is called by "once" from a single location,
@@ -295,9 +289,10 @@ bool SILGlobalOpt::run() {
     for (auto &BB : F) {
       bool IsCold = ColdBlocks.isCold(&BB);
       for (auto &I : BB)
-        if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
+        if (BuiltinInst *BI = dyn_cast<BuiltinInst>(&I)) {
           if (EnableStaticInitializer)
-            collectOnceCall(AI);
+            collectOnceCall(BI);
+        } else if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
           if (!IsCold)
             collectGlobalInitCall(AI);
         }

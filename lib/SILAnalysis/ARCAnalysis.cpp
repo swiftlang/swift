@@ -35,25 +35,8 @@ static bool isKnownToNotDecrementRefCount(FunctionRefInst *FRI) {
      .Default(false);
 }
 
-static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
+static bool canApplyDecrementRefCount(OperandValueArrayRef Ops, SILValue Ptr,
                                       AliasAnalysis *AA) {
-  // Ignore any thick functions for now due to us not handling the ref-counted
-  // nature of its context.
-  if (auto FTy = AI->getCallee().getType().getAs<SILFunctionType>())
-    if (FTy->getExtInfo().hasContext())
-      return true;
-
-  // If we have a builtin that is side effect free, we can commute the
-  // ApplyInst and the retain.
-  if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-    if (isSideEffectFree(BI))
-      return false;
-
-  // swift_keepAlive can not retain values. Remove this when we get rid of that.
-  if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-    if (isKnownToNotDecrementRefCount(FRI))
-      return false;
-
   // Ok, this apply *MAY* decrement ref counts. Now our strategy is to attempt
   // to use properties of the pointer, the function's arguments, and the
   // function itself to prove that the pointer can not have its ref count be
@@ -72,7 +55,7 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
   // make sure that the apply can not affect the pointer directly via the
   // applies arguments by proving that the pointer can not alias any of the
   // functions arguments.
-  for (auto Op : AI->getArgumentsWithoutIndirectResult()) {
+  for (auto Op : Ops) {
     for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
       if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
         return true;
@@ -81,6 +64,33 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
 
   // Success! The apply inst can not affect the reference count of ptr!
   return false;
+}
+
+static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
+                                      AliasAnalysis *AA) {
+  // Ignore any thick functions for now due to us not handling the ref-counted
+  // nature of its context.
+  if (auto FTy = AI->getCallee().getType().getAs<SILFunctionType>())
+    if (FTy->getExtInfo().hasContext())
+      return true;
+
+  // swift_keepAlive can not retain values. Remove this when we get rid of that.
+  if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+    if (isKnownToNotDecrementRefCount(FRI))
+      return false;
+
+  return canApplyDecrementRefCount(AI->getArgumentsWithoutIndirectResult(),
+                                   Ptr, AA);
+}
+
+static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
+                                      AliasAnalysis *AA) {
+  // If we have a builtin that is side effect free, we can commute the
+  // builtin and the retain.
+  if (isSideEffectFree(BI))
+    return false;
+  
+  return canApplyDecrementRefCount(BI->getArguments(), Ptr, AA);
 }
 
 /// Is the may have side effects user by the definition of its value kind unable
@@ -137,6 +147,8 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
   // prove that the callee is unable to affect Ptr.
   if (auto *AI = dyn_cast<ApplyInst>(User))
     return canApplyDecrementRefCount(AI, Ptr, AA);
+  if (auto *BI = dyn_cast<BuiltinInst>(User))
+    return canApplyDecrementRefCount(BI, Ptr, AA);
 
   // We can not conservatively prove that this instruction can not decrement the
   // ref count of Ptr. So assume that it does.
@@ -162,14 +174,13 @@ bool swift::arc::canCheckRefCount(SILInstruction *User) {
 /// non-trivial types via the arguments. The reason why we care about taking
 /// non-trivial types as arguments is that we want to be careful in the face of
 /// intrinsics that may be equivalent to bitcast and inttoptr operations.
-static bool canApplyOfBuiltinUseNonTrivialValues(ApplyInst *AI,
-                                                 BuiltinFunctionRefInst *BFRI) {
-  SILModule &Mod = AI->getModule();
+static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
+  SILModule &Mod = BInst->getModule();
 
-  auto &II = BFRI->getIntrinsicInfo();
+  auto &II = BInst->getIntrinsicInfo();
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
     if (II.hasAttribute(llvm::Attribute::ReadNone)) {
-      for (auto &Op : AI->getArgumentOperands()) {
+      for (auto &Op : BInst->getAllOperands()) {
         if (!Op.get().getType().isTrivial(Mod)) {
           return false;
         }
@@ -179,9 +190,9 @@ static bool canApplyOfBuiltinUseNonTrivialValues(ApplyInst *AI,
     return true;
   }
 
-  auto &BI = BFRI->getBuiltinInfo();
+  auto &BI = BInst->getBuiltinInfo();
   if (BI.isReadNone()) {
-    for (auto &Op : AI->getArgumentOperands()) {
+    for (auto &Op : BInst->getAllOperands()) {
       if (!Op.get().getType().isTrivial(Mod)) {
         return false;
       }
@@ -196,7 +207,7 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   // These instructions do not use other values.
   case ValueKind::FunctionRefInst:
-  case ValueKind::BuiltinFunctionRefInst:
+  case ValueKind::BuiltinFunctionRefInst: // XXX
   case ValueKind::IntegerLiteralInst:
   case ValueKind::FloatLiteralInst:
   case ValueKind::StringLiteralInst:
@@ -274,14 +285,11 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   case ValueKind::CondFailInst:
     return true;
 
-  case ValueKind::ApplyInst: {
-    auto *AI = cast<ApplyInst>(Inst);
+  case ValueKind::BuiltinInst: {
+    auto *BI = cast<BuiltinInst>(Inst);
 
     // Certain builtin function refs we know can never use non-trivial values.
-    if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      return canApplyOfBuiltinUseNonTrivialValues(AI, BFRI);
-
-    return false;
+    return canApplyOfBuiltinUseNonTrivialValues(BI);
   }
 
   default:
@@ -397,16 +405,6 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 //===----------------------------------------------------------------------===//
 
 static bool ignoreableApplyInstInUnreachableBlock(ApplyInst *AI) {
-  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
-    const BuiltinInfo &BInfo = BFRI->getBuiltinInfo();
-    if (BInfo.ID == BuiltinValueKind::CondUnreachable)
-      return true;
-
-    const IntrinsicInfo &IInfo = BFRI->getIntrinsicInfo();
-    if (IInfo.ID == llvm::Intrinsic::trap)
-      return true;
-  }
-
   const char *fatalName =
     "_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_";
   auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
@@ -414,6 +412,18 @@ static bool ignoreableApplyInstInUnreachableBlock(ApplyInst *AI) {
     return false;
 
   return true;
+}
+
+static bool ignoreableBuiltinInstInUnreachableBlock(BuiltinInst *BI) {
+  const BuiltinInfo &BInfo = BI->getBuiltinInfo();
+  if (BInfo.ID == BuiltinValueKind::CondUnreachable)
+    return true;
+
+  const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
+  if (IInfo.ID == llvm::Intrinsic::trap)
+    return true;
+  
+  return false;
 }
 
 /// Match a call to a trap BB with no ARC relevant side effects.
@@ -438,6 +448,13 @@ bool swift::arc::isARCInertTrapBB(SILBasicBlock *BB) {
     // Check for apply insts that we can ignore.
     if (auto *AI = dyn_cast<ApplyInst>(&*II)) {
       if (ignoreableApplyInstInUnreachableBlock(AI)) {
+        ++II;
+        continue;
+      }
+    }
+    
+    if (auto *BI = dyn_cast<BuiltinInst>(&*II)) {
+      if (ignoreableBuiltinInstInUnreachableBlock(BI)) {
         ++II;
         continue;
       }

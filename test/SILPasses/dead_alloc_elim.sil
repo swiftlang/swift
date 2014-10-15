@@ -30,8 +30,7 @@ bb0(%0 : $TrivialDestructor):
   // Calling a builtin without side effects should not disrupt
   // elimination of the alloc_ref.
   %4 = integer_literal $Builtin.Int32, 0
-  %5 = builtin_function_ref "xor_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
-  %6 = apply %5 (%4, %3) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %6 = builtin "xor_Int32" (%4 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int32
 
   // Calling dealloc ref on self should not disrupt elimination of the
   // alloc_ref.

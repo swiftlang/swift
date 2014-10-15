@@ -178,6 +178,7 @@ public:
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
+  SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -208,11 +209,11 @@ public:
   SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
 
   /// Instruction visitor helpers.
-  SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
+  SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
 
   // Optimize the "cmp_eq_XXX" builtin. If \p NegateResult is true then negate
   // the result bit.
-  SILInstruction *optimizeBuiltinCompareEq(ApplyInst *AI, bool NegateResult);
+  SILInstruction *optimizeBuiltinCompareEq(BuiltinInst *AI, bool NegateResult);
 
   SILInstruction *optimizeApplyOfPartialApply(ApplyInst *AI,
                                               PartialApplyInst *PAI);

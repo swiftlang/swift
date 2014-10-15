@@ -811,10 +811,8 @@ sil @generic_is_objc : $@thin <T> (@in T) -> Int8 {
 bb0(%0 : $*T):
 // CHECK: [[TYPE:%[a-zA-Z0-9]+]] = metatype $@thick [[ARCH:[a-zA-Z]+]].Type
   %1 = metatype $@thick T.Type                    // user: %3
-// CHECK: [[FUNCTION:%[a-zA-Z0-9]+]] = builtin_function_ref "canBeClass"
-  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %3
-// CHECK: apply [[FUNCTION]]<[[ARCH]]>([[TYPE]])
-  %3 = apply %2<T>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %4
+// CHECK: builtin "canBeClass"<[[ARCH]]>([[TYPE]] : $@thick [[ARCH]].Type)
+  %3 = builtin "canBeClass"<T>(%1 : $@thick T.Type) : $Builtin.Int8 // user: %4
   %4 = struct $Int8 (%3 : $Builtin.Int8)          // user: %6
   destroy_addr %0 : $*T                           // id: %5
   return %4 : $Int8                               // id: %6
@@ -824,10 +822,9 @@ bb0(%0 : $*T):
 sil @is_int_objc : $@thin (Int) -> Int8 {
 bb0(%0 : $Int):
   %1 = metatype $@thick Int.Type                  // user: %3
-// CHECK-NOT: builtin_function_ref "canBeClass"
-  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %3
+// CHECK-NOT: builtin "canBeClass"
 // CHECK-NOT: apply
-  %3 = apply %2<Int>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %4
+  %3 = builtin "canBeClass"<Int>(%1 : $@thick Int.Type) : $Builtin.Int8 // user: %4
 // CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 0
 // CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
   %4 = struct $Int8 (%3 : $Builtin.Int8)          // user: %5
@@ -842,10 +839,8 @@ bb0(%0 : $Int):
 sil @is_objc_class_objc : $@thin (@owned MyClass) -> Int8 {
 bb0(%0 : $MyClass):
   %1 = metatype $@thick MyClass.Type              // user: %3
-// CHECK-NOT: builtin_function_ref "canBeClass"
-  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %3
-// CHECK-NOT: apply
-  %3 = apply %2<MyClass>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %4
+// CHECK-NOT: builtin "canBeClass"
+  %3 = builtin "canBeClass"<MyClass>(%1 : $@thick MyClass.Type) : $Builtin.Int8 // user: %4
 // CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 1
 // CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
   %4 = struct $Int8 (%3 : $Builtin.Int8)          // user: %6
@@ -872,13 +867,9 @@ bb0:
   %4 = integer_literal $Builtin.Int32, 400
   %5 = integer_literal $Builtin.Int64, 5000
 
-  %6 = builtin_function_ref "int_expect_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-  %7 = builtin_function_ref "int_expect_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
-  %8 = builtin_function_ref "int_expect_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-
-  %9 = apply %6(%0, %3) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-  %10 = apply %7(%1, %4) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
-  %11 = apply %8(%2, %5) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  %9 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %3 : $Builtin.Int1) : $Builtin.Int1
+  %10 = builtin "int_expect_Int32"(%1 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int32
+  %11 = builtin "int_expect_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64
 
   %12 = tuple (%9 : $Builtin.Int1, %10 : $Builtin.Int32, %11 : $Builtin.Int64)
   return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
@@ -890,8 +881,7 @@ bb0:
 sil @_TF6expect3fooFSiSi : $@thin (Builtin.Int1) -> Int {
 bb0(%0 : $Builtin.Int1):
   %5 = integer_literal $Builtin.Int1, -1
-  %8 = builtin_function_ref "xor_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-  %9 = apply %8(%0, %5) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %9 = builtin "xor_Int1"(%0 : $Builtin.Int1, %5 : $Builtin.Int1) : $Builtin.Int1
   cond_br %9, bb1, bb2                            // id: %10
 
 bb1:                                              // Preds: bb0
@@ -1197,12 +1187,10 @@ bb0(%0 : $*E, %1 : $E, %2 : $*E):
 // CHECK-NEXT: return
 sil @indexrawpointer_to_indexaddr : $@thin (Builtin.RawPointer, Builtin.Word) -> Int8 {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  %2 = builtin_function_ref "strideof" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
   %3 = metatype $@thick Int8.Type
-  %4 = apply %2<Int8>(%3) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
-  %5 = builtin_function_ref "smul_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %4 = builtin "strideof"<Int8>(%3 : $@thick Int8.Type) : $Builtin.Word
   %6 = integer_literal $Builtin.Int1, -1
-  %7 = apply %5(%4, %1, %6) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
   %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int8
@@ -1218,12 +1206,10 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK-NEXT: return
 sil @indexrawpointer_to_indexaddr_strideof_nonzero : $@thin (Builtin.RawPointer, Builtin.Word) -> Int8 {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  %2 = builtin_function_ref "strideof_nonzero" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
   %3 = metatype $@thick Int8.Type
-  %4 = apply %2<Int8>(%3) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
-  %5 = builtin_function_ref "smul_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %4 = builtin "strideof_nonzero"<Int8>(%3 : $@thick Int8.Type) : $Builtin.Word
   %6 = integer_literal $Builtin.Int1, -1
-  %7 = apply %5(%4, %1, %6) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
   %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int8
@@ -1235,12 +1221,10 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK-NOT: index_addr
 sil @indexrawpointer_to_indexaddr_mismatched_metatype : $@thin (Builtin.RawPointer, Builtin.Word) -> Int32 {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  %2 = builtin_function_ref "strideof" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
   %3 = metatype $@thick Int8.Type
-  %4 = apply %2<Int8>(%3) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
-  %5 = builtin_function_ref "smul_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %4 = builtin "strideof"<Int8>(%3 : $@thick Int8.Type) : $Builtin.Word
   %6 = integer_literal $Builtin.Int1, -1
-  %7 = apply %5(%4, %1, %6) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
   %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int32
@@ -1369,11 +1353,9 @@ sil @sub_pointers : $@thin (Builtin.RawPointer) -> Builtin.Word {
 bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Word, 0
   %23 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
-  %24 = builtin_function_ref "sub_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
-  %25 = builtin_function_ref "ptrtoint_Word" : $@thin (Builtin.RawPointer) -> Builtin.Word
-  %26 = apply %25(%23) : $@thin (Builtin.RawPointer) -> Builtin.Word
-  %27 = apply %25(%0) : $@thin (Builtin.RawPointer) -> Builtin.Word
-  %28 = apply %24(%26, %27) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
+  %26 = builtin "ptrtoint_Word"(%23 : $Builtin.RawPointer) : $Builtin.Word
+  %27 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %28 = builtin "sub_Word"(%26 : $Builtin.Word, %27 : $Builtin.Word) : $Builtin.Word
   return %28 : $Builtin.Word
 }
 
@@ -1383,10 +1365,8 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT: return
 sil @sub_same_value : $@thin (Builtin.RawPointer) -> Builtin.Word {
 bb0(%0 : $Builtin.RawPointer):
-  %24 = builtin_function_ref "sub_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
-  %25 = builtin_function_ref "ptrtoint_Word" : $@thin (Builtin.RawPointer) -> Builtin.Word
-  %27 = apply %25(%0) : $@thin (Builtin.RawPointer) -> Builtin.Word
-  %28 = apply %24(%27, %27) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
+  %27 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %28 = builtin "sub_Word"(%27 : $Builtin.Word, %27 : $Builtin.Word) : $Builtin.Word
   return %28 : $Builtin.Word
 }
 
@@ -1530,10 +1510,8 @@ sil @remove_pointer_compare_to_zero : $@thin (Int) -> () {
 bb0(%0 : $Int):
   %1 = string_literal utf16 "ss"
   %2 = integer_literal $Builtin.Word, 0
-  %3 = builtin_function_ref "inttoptr_Word" : $@thin (Builtin.Word) -> Builtin.RawPointer
-  %4 = apply %3(%2) : $@thin (Builtin.Word) -> Builtin.RawPointer
-  %5 = builtin_function_ref "cmp_eq_RawPointer" : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
-  %6 = apply %5(%1, %4) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  %4 = builtin "inttoptr_Word"(%2 : $Builtin.Word) : $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%1 : $Builtin.RawPointer, %4 : $Builtin.RawPointer) : $Builtin.Int1
   cond_fail %6 : $Builtin.Int1
   %8 = tuple ()
   return %8 : $()
@@ -1547,10 +1525,8 @@ sil @remove_pointer_compare_to_zero_NE : $@thin (Int) -> () {
 bb0(%0 : $Int):
   %1 = string_literal utf16 "ss"
   %2 = integer_literal $Builtin.Word, 0
-  %3 = builtin_function_ref "inttoptr_Word" : $@thin (Builtin.Word) -> Builtin.RawPointer
-  %4 = apply %3(%2) : $@thin (Builtin.Word) -> Builtin.RawPointer
-  %5 = builtin_function_ref "cmp_ne_RawPointer" : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
-  %6 = apply %5(%1, %4) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  %4 = builtin "inttoptr_Word"(%2 : $Builtin.Word) : $Builtin.RawPointer
+  %6 = builtin "cmp_ne_RawPointer"(%1 : $Builtin.RawPointer, %4 : $Builtin.RawPointer) : $Builtin.Int1
   cond_fail %6 : $Builtin.Int1
   %8 = tuple ()
   return %8 : $()
@@ -1567,13 +1543,10 @@ bb0(%0 : $Builtin.Word):
   %2 = integer_literal $Builtin.Word, 0
   %3 = integer_literal $Builtin.Word, 4
   %4 = integer_literal $Builtin.Int1, -1
-  %5 = builtin_function_ref "smul_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
-  %6 = apply %5(%0, %2, %4) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %6 = builtin "smul_with_overflow_Word"(%0 : $Builtin.Word, %2 : $Builtin.Word, %4 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %7 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 0
-  %8 = builtin_function_ref "inttoptr_Word" : $@thin (Builtin.Word) -> Builtin.RawPointer
-  %9 = apply %8(%7) : $@thin (Builtin.Word) -> Builtin.RawPointer
-  %10 = builtin_function_ref "cmp_eq_RawPointer" : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
-  %11 = apply %10(%1, %9) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  %9 = builtin "inttoptr_Word"(%7 : $Builtin.Word) : $Builtin.RawPointer
+  %11 = builtin "cmp_eq_RawPointer"(%1 : $Builtin.RawPointer, %9 : $Builtin.RawPointer) : $Builtin.Int1
   cond_fail %11 : $Builtin.Int1
   %13 = tuple ()
   return %13 : $()

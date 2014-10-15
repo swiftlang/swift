@@ -662,8 +662,8 @@ sil @_swift_isUniquelyReferenced_native_spareBits : $@thin (Int) -> Bool
 // The retains here aren't able to be moved to a successor BB.  But we still want to move them as far
 // as possible down the current BB.  The first retain should be moved to above the release_value.
 // The second retain shouldn't move at all
-// The third retain should move below the sadd builtin_function_ref
-// The fourth retain should move below the arc_user builtin_function_ref, but above the apply
+// The third retain should move below the sadd builtin
+// The fourth retain should move below the arc_user builtin, but above the apply
 // The fifth retain should *NOT* move below the apply to
 // _swift_isUniquelyReferenced_native_spareBits, unless we can prove that the pointers do not
 // alias.
@@ -671,11 +671,9 @@ sil @_swift_isUniquelyReferenced_native_spareBits : $@thin (Int) -> Bool
 //
 // CHECK-LABEL: sil @move_retain_down_bb : $@thin (FakeOptional<Builtin.Int32>, FakeOptional<Builtin.Int32>, FakeOptional<Builtin.Int32>, FakeOptional<Builtin.Int32>, FakeOptional<Builtin.Int32>) -> (Builtin.Int64, Builtin.Int1) {
 // CHECK: bb0({{.*}}):
-// CHECK-NEXT: builtin_function_ref
 // CHECK-NEXT: retain_value %1
 // CHECK-NEXT: retain_value %0
 // CHECK-NEXT: release_value %4
-// CHECK-NEXT: builtin_function_ref
 // CHECK-NEXT: function_ref arc_user
 // CHECK-NEXT: function_ref @arc_user
 // CHECK-NEXT: retain_value %3
@@ -694,11 +692,9 @@ sil @_swift_isUniquelyReferenced_native_spareBits : $@thin (Int) -> Bool
 sil @move_retain_down_bb : $@thin (FakeOptional<Builtin.Int32>, FakeOptional<Builtin.Int32>, FakeOptional<Builtin.Int32>, FakeOptional<Builtin.Int32>, FakeOptional<Builtin.Int32>) -> (Builtin.Int64, Builtin.Int1) {
 bb0(%0 : $FakeOptional<Builtin.Int32>, %1 : $FakeOptional<Builtin.Int32>, %2 : $FakeOptional<Builtin.Int32>, %3 : $FakeOptional<Builtin.Int32>, %4 : $FakeOptional<Builtin.Int32>):
   retain_value %0 : $FakeOptional<Builtin.Int32>
-  %13 = builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   retain_value %1 : $FakeOptional<Builtin.Int32>
   release_value %4 : $FakeOptional<Builtin.Int32>
   retain_value %2 : $FakeOptional<Builtin.Int32>
-  %14 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   retain_value %3 : $FakeOptional<Builtin.Int32>
   %1000 = function_ref @arc_user : $@thin () -> ()
   apply %1000 () : $@thin () -> ()
@@ -715,14 +711,14 @@ bb1:
   %100 = integer_literal $Builtin.Int64, 1
   %101 = integer_literal $Builtin.Int64, 2
   %102 = integer_literal $Builtin.Int1, 1
-  %10 = apply %13(%100, %101, %102) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %10 = builtin "ssub_with_overflow_Int64"(%100 : $Builtin.Int64, %101 : $Builtin.Int64, %102 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   br bb3(%10 : $(Builtin.Int64, Builtin.Int1))
 
 bb2:
   %200 = integer_literal $Builtin.Int64, 3
   %201 = integer_literal $Builtin.Int64, 4
   %202 = integer_literal $Builtin.Int1, 1
-  %11 = apply %14(%200, %201, %202) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %11 = builtin "sadd_with_overflow_Int64"(%200 : $Builtin.Int64, %201 : $Builtin.Int64, %202 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   br bb3(%11 : $(Builtin.Int64, Builtin.Int1))
 
 bb3(%12 : $(Builtin.Int64, Builtin.Int1)):
@@ -1197,11 +1193,10 @@ bb2:
   br bb3
 
 bb3:
-  %1 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %2 = integer_literal $Builtin.Word, 2
   %3 = integer_literal $Builtin.Word, 3
   %4 = integer_literal $Builtin.Int1, 0
-  %5 = apply %1(%2, %3, %4) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %5 = builtin "sadd_with_overflow_Word"(%2 : $Builtin.Word, %3 : $Builtin.Word, %4 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   release_value %0 : $FakeOptional<C>
   %9998 = function_ref @unknown : $@thin () -> ()
   apply %9998() : $@thin () -> ()

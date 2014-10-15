@@ -18,7 +18,6 @@ import Swift
 sil @memset : $@thin (@inout Builtin.NativeObject, Int) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Int):
   %5 = integer_literal $Builtin.Int1, -1
-  %43 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
   %46 = integer_literal $Builtin.Word, 0
   br bb2(%46 : $Builtin.Word)
 
@@ -28,8 +27,7 @@ bb1:
 
 bb2(%54 : $Builtin.Word):
   %55 = integer_literal $Builtin.Word, 1
-  %56 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
-  %57 = apply %56(%54, %55, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %57 = builtin "sadd_with_overflow_Word"(%54 : $Builtin.Word, %55 : $Builtin.Word, %5 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %58 = tuple_extract %57 : $(Builtin.Word, Builtin.Int1), 0
   %59 = load %0 : $*Builtin.NativeObject
   %60 = integer_literal $Builtin.Word, 100
@@ -38,7 +36,7 @@ bb2(%54 : $Builtin.Word):
   %98 = pointer_to_address %97 : $Builtin.RawPointer to $*Int
   %99 = index_addr %98 : $*Int, %54 : $Builtin.Word
   store %1 to %99 : $*Int
-  %101 = apply %43(%58, %60) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
   cond_br %101, bb1, bb2(%58 : $Builtin.Word)
 }
 
@@ -62,7 +60,6 @@ sil @must_move_condfail : $@thin (@inout Builtin.NativeObject, Int, Builtin.Word
 bb0(%0 : $*Builtin.NativeObject, %1 : $Int, %2: $Builtin.Word):
   %5 = integer_literal $Builtin.Int1, -1
   %6 = load %0 : $*Builtin.NativeObject
-  %43 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
   %46 = integer_literal $Builtin.Word, 0
   br bb2(%46 : $Builtin.Word)
 
@@ -71,14 +68,12 @@ bb1:
   return %102 : $()
 
 bb2(%48 : $Builtin.Word):
-  %50 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
-  %51 = apply %50(%2, %46, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %51 = builtin "sadd_with_overflow_Word"(%2 : $Builtin.Word, %46 : $Builtin.Word, %5 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %52 = tuple_extract %51 : $(Builtin.Word, Builtin.Int1), 0
   %53 = tuple_extract %51 : $(Builtin.Word, Builtin.Int1), 1
   cond_fail %53 : $Builtin.Int1
   %55 = integer_literal $Builtin.Word, 1
-  %56 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
-  %57 = apply %56(%48, %55, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %57 = builtin "sadd_with_overflow_Word"(%48 : $Builtin.Word, %55 : $Builtin.Word, %5 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %58 = tuple_extract %57 : $(Builtin.Word, Builtin.Int1), 0
   %60 = integer_literal $Builtin.Word, 100
   %61 = ref_to_raw_pointer %6 : $Builtin.NativeObject to $Builtin.RawPointer
@@ -90,6 +85,6 @@ bb2(%48 : $Builtin.Word):
   %98 = pointer_to_address %97 : $Builtin.RawPointer to $*Int
   %99 = index_addr %98 : $*Int, %48 : $Builtin.Word
   store %1 to %99 : $*Int
-  %101 = apply %43(%58, %60) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
   cond_br %101, bb1, bb2(%58 : $Builtin.Word)
 }

@@ -562,7 +562,7 @@ public:
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitBuiltinInst(BuiltinInst *i);
 
-  void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i);
+  void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i); // XXX
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitSILGlobalAddrInst(SILGlobalAddrInst *i);
 
@@ -1432,7 +1432,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-void IRGenSILFunction::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i) {
+void IRGenSILFunction::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i) { // XXX
   setLoweredBuiltinValue(SILValue(i, 0), i->getName());
 }
 

@@ -47,10 +47,9 @@ bb0:
   store %5 to %10 : $*Int
   %12 = struct_element_addr %8 : $*Int, #Int.value
   %13 = struct_element_addr %10 : $*Int, #Int.value
-  %14 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
   %15 = load %12 : $*Builtin.Word
   %16 = load %13 : $*Builtin.Word
-  %17 = apply %14(%15, %16) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %17 = builtin "cmp_eq_Word"(%15 : $Builtin.Word, %16 : $Builtin.Word) : $Builtin.Int1
   cond_br %17, bb3, bb1
 
 // CHECK: {{bb[0-9]+}}(%{{[0-9]+}} : $Builtin.Word, [[Phi1:%[0-9]+]] : $Int, [[Phi2:%[0-9]+]] : $Int):
@@ -61,9 +60,8 @@ bb2(%20 : $Builtin.Word):
   // LICM: load
   %21 = load %12 : $*Builtin.Word
   %22 = integer_literal $Builtin.Word, 1
-  %23 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %24 = integer_literal $Builtin.Int1, -1
-  %25 = apply %23(%20, %22, %24) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %25 = builtin "sadd_with_overflow_Word"(%20 : $Builtin.Word, %22 : $Builtin.Word, %24 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %26 = tuple_extract %25 : $(Builtin.Word, Builtin.Int1), 0
   %27 = tuple_extract %25 : $(Builtin.Word, Builtin.Int1), 1
   cond_fail %27 : $Builtin.Int1
@@ -74,7 +72,7 @@ bb2(%20 : $Builtin.Word):
   // CHECK: struct_extract [[Phi2]]
   // LICM: load
   %32 = load %31 : $*Builtin.Word
-  %33 = apply %23(%32, %21, %24) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %33 = builtin "sadd_with_overflow_Word"(%32 : $Builtin.Word, %21 : $Builtin.Word, %24 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %34 = tuple_extract %33 : $(Builtin.Word, Builtin.Int1), 0
   %35 = tuple_extract %33 : $(Builtin.Word, Builtin.Int1), 1
   cond_fail %35 : $Builtin.Int1
@@ -85,8 +83,8 @@ bb2(%20 : $Builtin.Word):
   %39 = load %12 : $*Builtin.Word
   // CHECK: load
   %40 = load %13 : $*Builtin.Word
-  // LICM-NEXT: apply
-  %41 = apply %14(%39, %40) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  // LICM-NEXT: builtin
+  %41 = builtin "cmp_eq_Word"(%39 : $Builtin.Word, %40 : $Builtin.Word) : $Builtin.Int1
   cond_br %41, bb3, bb2(%39 : $Builtin.Word)
 
 // LICM: bb{{[0-9]+}}:

@@ -59,14 +59,15 @@ struct SimpleValue {
 
   static bool canHandle(SILInstruction *Inst) {
     if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
-      auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-      if (BFRI) return isReadNone(BFRI);
       auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
       if (FRI) return isReadNone(FRI);
     }
+    if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
+      return isReadNone(BI);
+    }
     switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:
-    case ValueKind::BuiltinFunctionRefInst:
+    case ValueKind::BuiltinFunctionRefInst: // XXX
     case ValueKind::SILGlobalAddrInst:
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
@@ -152,7 +153,7 @@ public:
     return llvm::hash_combine(X->getKind(), X->getReferencedFunction());
   }
 
-  hash_code visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *X) {
+  hash_code visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *X) { // XXX
     return llvm::hash_combine(X->getKind(), X->getName().get());
   }
 
@@ -279,6 +280,14 @@ public:
                               X->hasSubstitutions(), X->isTransparent());
   }
 
+  hash_code visitBuiltinInst(BuiltinInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(X->getKind(), X->getName().get(),
+                              llvm::hash_combine_range(Operands.begin(),
+                                                       Operands.end()),
+                              X->hasSubstitutions());
+  }
+  
   hash_code visitEnumInst(EnumInst *X) {
     // We hash the enum by hashing its kind, element, and operand if it has one.
     if (!X->hasOperand())

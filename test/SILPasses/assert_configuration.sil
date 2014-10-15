@@ -5,8 +5,7 @@
 import Builtin
 
 sil @assert_configuration : $@thin () -> Builtin.Int32 {
-  %0 = builtin_function_ref "assert_configuration" : $@thin () -> Builtin.Int32
-  %1 = apply %0() : $@thin () -> Builtin.Int32
+  %1 = builtin "assert_configuration"() : $Builtin.Int32
   return %1 : $Builtin.Int32
 }
 
@@ -14,8 +13,7 @@ sil @assert_configuration : $@thin () -> Builtin.Int32 {
 // id.
 
 // DISABLED-LABEL: @assert_configuration
-// DISABLED: [[REF:%.*]] = builtin_function_ref "assert_configuration"
-// DISABLED: [[AP:%.*]] = apply [[REF]]
+// DISABLED: [[AP:%.*]] = builtin "assert_configuration"
 // DISABLED: return [[AP]]
 
 // ONE-LABEL: @assert_configuration

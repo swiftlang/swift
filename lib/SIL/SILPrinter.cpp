@@ -656,8 +656,9 @@ public:
   }
   
   void visitBuiltinInst(BuiltinInst *BI) {
-    OS << "builtin " << QuotedString(BI->getName().str())
-       << "(";
+    OS << "builtin " << QuotedString(BI->getName().str());
+    printSubstitutions(BI->getSubstitutions());
+    OS << "(";
     
     interleave(BI->getArguments(), [&](SILValue v) {
       OS << getIDAndType(v);

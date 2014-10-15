@@ -18,11 +18,10 @@ bb0:
 // CHECK-LABEL: [always_inline] @noinlin_callee
 sil [always_inline] @noinlin_callee : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = builtin_function_ref "umul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = apply %1(%0, %0, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
-  %5 = apply %1(%4, %4, %2) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %5 = builtin "umul_with_overflow_Int64"(%4 : $Builtin.Int64, %4 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
   return %6 : $Builtin.Int64
 }

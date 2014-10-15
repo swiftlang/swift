@@ -8,11 +8,10 @@ import Swift
 sil @square : $@thin (Int32) -> Int32 {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32  // let x                 // id: %1
-  %2 = builtin_function_ref "smul_with_overflow_Int32" : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1) // user: %6
   %3 = struct_extract %0 : $Int32, #Int32.value       // user: %6
   %4 = struct_extract %0 : $Int32, #Int32.value       // user: %6
   %5 = integer_literal $Builtin.Int1, -1          // user: %6
-  %6 = apply %2(%3, %4, %5) : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1) // users: %7, %8
+  %6 = builtin "smul_with_overflow_Int32"(%3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %7, %8
   %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0 // user: %10
   %8 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 1 // user: %9
   cond_fail %8 : $Builtin.Int1                    // id: %9
