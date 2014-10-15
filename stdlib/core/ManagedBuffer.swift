@@ -132,7 +132,7 @@ public class ManagedBuffer<Value, Element>
 ///
 /// A valid buffer class is non-`@objc`, with no declared stored
 ///   properties.  Its `deinit` must destroy its
-///   stored `Value` and any constructed `Elements`.
+///   stored `Value` and any constructed `Element`\ s.
 ///
 /// Example Buffer Class
 /// --------------------
@@ -164,7 +164,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// for at least `minimumCapacity` `element`\ s.
   ///
   /// :param: `bufferClass` the class of the object used for storage.
-  /// :param: `minimumCapacity` the minimum number of `Elements` that
+  /// :param: `minimumCapacity` the minimum number of `Element`\ s that
   ///   must be able to be stored in the new buffer.
   /// :param: `initialValue` a function that produces the initial
   ///   `Value` instance stored in the buffer, given the `buffer`
@@ -174,13 +174,13 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// Requires: minimumCapacity >= 0, and the type indicated by
   /// `bufferClass` is a non-`@objc` class with no declared stored
   /// properties.  The `deinit` of `bufferClass` must destroy its
-  /// stored `Value` and any constructed `Elements`.
+  /// stored `Value` and any constructed `Element`\ s.
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
     initialValue: (buffer: AnyObject, allocatedCount: (AnyObject)->Int)->Value
   ) {
-    ManagedBufferPointer._checkValidBufferClass(bufferClass)
+    ManagedBufferPointer._checkValidBufferClass(bufferClass, creating: true)
     _precondition(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
@@ -206,9 +206,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Manage the given `buffer`.
   ///
-  /// Requires: `buffer` is an instance of a non-`@objc` class with no
-  /// declared stored properties, whose `deinit` destroys its
-  /// stored `Value` and any constructed `Elements`.
+  /// Requires: `buffer` is an instance of a non-`@objc` class whose
+  /// `deinit` destroys its stored `Value` and any constructed
+  /// `Element`\ s.
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
@@ -227,7 +227,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     // FIXME: <rdar://problem/18619176> replace get/set with
     // addressors => link error
     get { return withUnsafeMutablePointerToValue { $0.memory } }
-    set { withUnsafeMutablePointerToValue { $0.memory = newValue } }
+    nonmutating set { withUnsafeMutablePointerToValue { $0.memory = newValue } }
   }
 
   /// Return the object instance being used for storage.
@@ -272,6 +272,16 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     _fixLifetime(_nativeBuffer)
     return result
   }
+
+  /// Returns true iff `self` holds the only strong reference to its buffer.
+  ///
+  /// See `isUniquelyReferenced` for details.
+  public mutating func holdsUniqueReference() -> Bool {
+    let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(_nativeBuffer))
+    let result = _swift_isUniquelyReferenced_nonNull_native(o)
+    _fixLifetime(_nativeBuffer)
+    return result != 0
+  }
   
   //===--- internal/private API -------------------------------------------===//
   
@@ -285,11 +295,16 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   
   internal typealias _My = ManagedBufferPointer
 
-  internal static func _checkValidBufferClass(bufferClass: AnyClass) {
+  internal static func _checkValidBufferClass(
+    bufferClass: AnyClass, creating: Bool = false
+  ) {
     _debugPrecondition(
-      _class_getInstanceSize(bufferClass)
-      == _class_getInstanceSize(ManagedBuffer<Int,Int>.self),
-      "ManagedBufferPointer buffer class has declared stored properties"
+      _class_getInstanceSize(bufferClass) == sizeof(_HeapObject.self)
+      || (
+        !creating
+        && _class_getInstanceSize(bufferClass)
+          == _valueOffset + sizeof(Value.self)),
+      "ManagedBufferPointer buffer class has illegal stored properties"
     )
     _debugPrecondition(
       _usesNativeSwiftReferenceCounting(bufferClass),

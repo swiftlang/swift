@@ -142,9 +142,11 @@ tests.test("ManagedBufferPointer") {
       CountAndCapacity(
         count: LifetimeTracked(0), capacity: getRealCapacity(buffer))
     }
+    expectTrue(mgr.holdsUniqueReference())
 
     let buf = mgr.buffer as? TestManagedBuffer<LifetimeTracked>
     expectTrue(buf != nil)
+    expectFalse(mgr.holdsUniqueReference())
     
     let s = buf!
     expectEqual(0, s.count)
@@ -173,10 +175,13 @@ tests.test("ManagedBufferPointer") {
       minimumCapacity: 0
     ) { _, _ in CountAndCapacity(count: LifetimeTracked(0), capacity: 99) }
 
+    expectTrue(mgr.holdsUniqueReference())
     expectEqual(mgr.value.count.value, 0)
     expectEqual(mgr.value.capacity, 99)
 
     let s2 = mgr.buffer as MyBuffer<LifetimeTracked>
+    expectFalse(mgr.holdsUniqueReference())
+    
     let val = mgr.withUnsafeMutablePointerToValue { $0 }.memory
     expectEqual(val.count.value, 0)
     expectEqual(val.capacity, 99)
