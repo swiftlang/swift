@@ -20,6 +20,7 @@
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -675,6 +676,11 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   }
 
   if (HasDestBBDefsUsedOutsideBlock) {
+    // We are updating SSA form. This means we need to be able to insert phi
+    // nodes. To make sure we can do this split all critical edges from
+    // instructions that don't support block arguments.
+    splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
+
     SILSSAUpdater SSAUp;
     for (auto AvailValPair : Cloner.AvailVals) {
       ValueBase *Inst = AvailValPair.first;

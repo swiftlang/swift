@@ -154,16 +154,9 @@ bb3:
 }
 
 class Node {
-  @sil_stored var index: Int { get set }
-  init(index: Int)
-  func check() -> Int
-  @objc deinit 
 }
 
 class ParentNode : Node {
-  init(left: Node, right: Node, index: Int)
-  @objc deinit 
-  override init(index: Int)
 }
 
 // CHECK-LABEL: sil @test_checked_cast_br
