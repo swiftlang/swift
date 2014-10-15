@@ -130,6 +130,24 @@ tests.test("basic") {
   expectEqual(0, LifetimeTracked.instances)
 }
 
+tests.test("ManagedBufferPointer/SizeValidation/TestmanagedBuffer") {
+  let x = ManagedBufferPointer<CountAndCapacity, LifetimeTracked>(
+    bufferClass: TestManagedBuffer<LifetimeTracked>.self,
+    minimumCapacity: 10
+  ) {
+    buffer, getRealCapacity in 
+    CountAndCapacity(
+      count: LifetimeTracked(0), capacity: getRealCapacity(buffer))
+  }
+}
+
+tests.test("ManagedBufferPointer/SizeValidation/MyBuffer") {
+  let x = ManagedBufferPointer<CountAndCapacity, LifetimeTracked>(
+    bufferClass:  MyBuffer<LifetimeTracked>.self,
+    minimumCapacity: 0
+  ) { _, _ in CountAndCapacity(count: LifetimeTracked(0), capacity: 99) }
+}
+
 tests.test("ManagedBufferPointer") {
   typealias Manager = ManagedBufferPointer<CountAndCapacity, LifetimeTracked>
 
