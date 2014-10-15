@@ -1655,10 +1655,11 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
   // Emit the switch instruction.
   bool addressOnlyEnum = src.getType().isAddress();
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
+  SILLocation loc = rows[0].Pattern;
   if (addressOnlyEnum) {
-    SGF.B.createSwitchEnumAddr(TheSwitch, srcValue, defaultBB, caseBBs);
+    SGF.B.createSwitchEnumAddr(loc, srcValue, defaultBB, caseBBs);
   } else {
-    SGF.B.createSwitchEnum(TheSwitch, srcValue, defaultBB, caseBBs);
+    SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs);
   }
 
   // Okay, now emit all the cases.
@@ -1674,8 +1675,8 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     // We're in conditionally-executed code; enter a scope.
     Scope scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(loc));
       
-    // Create a BB argument or 'unchecked_take_enum_data_addr' instruction to receive
-    // the enum case data if it has any.
+    // Create a BB argument or 'unchecked_take_enum_data_addr'
+    // instruction to receive the enum case data if it has any.
 
     SILType eltTy;
     bool hasElt = false;

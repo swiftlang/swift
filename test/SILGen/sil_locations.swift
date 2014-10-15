@@ -292,8 +292,8 @@ func test_isa_2(p: P) {
 
   // CHECK-LABEL: sil hidden @_TF13sil_locations10test_isa_2
   // CHECK: alloc_stack $(P, Int)                                  {{.*}} line:[[@LINE-10]]:10
-  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 0                 {{.*}} line:[[@LINE-10]]:8
-  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 1                 {{.*}} line:[[@LINE-11]]:8
+  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 0                 {{.*}} line:[[@LINE-11]]:10
+  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 1                 {{.*}} line:[[@LINE-12]]:10
   // CHECK: load                                                     {{.*}} line:[[@LINE-12]]:8
   //
   // CHECK: checked_cast_addr_br                                     {{.*}} line:[[@LINE-14]]:9
@@ -319,7 +319,7 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   
   // CHECK_LABEL: sil hidden @_TF13sil_locations29printSinglePayloadAddressOnly
   // CHECK: bb0
-  // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-10]]:3
+  // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-9]]:8
   // CHECK: [[FALSE_BB]]:
   // CHECK: br {{.*}}                                        {{.*}} line:[[@LINE-9]]:3
 
