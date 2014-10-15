@@ -20,11 +20,12 @@ func classifyPoint2(p: (Double, Double)) {
           println("on the X axis")
         case (var x, var y) where
           // CHECK:   call double {{.*}}return_same{{.*}}, !dbg ![[LOC1:.*]]
-          // CHECK: br {{.*}}, label {{.*}}, label {{.*}}, !dbg ![[LOC1]]
-          // CHECK: builtinStringLiteral{{.*}}, !dbg ![[LOC2:.*]]
-          // CHECK: ![[LOC1]] = metadata !{i32 [[@LINE+1]], i32
-                            return_same(x) == return_same(y):
+          // CHECK: br {{.*}}, label {{.*}}, label {{.*}}, !dbg ![[LOC2:.*]]
+          // CHECK: builtinStringLiteral{{.*}}, !dbg ![[LOC3:.*]]
+          // CHECK: ![[LOC1]] = metadata !{i32 [[@LINE+2]], i32
           // CHECK: ![[LOC2]] = metadata !{i32 [[@LINE+1]], i32
+                            return_same(x) == return_same(y):
+          // CHECK: ![[LOC3]] = metadata !{i32 [[@LINE+1]], i32
           println("(\(x), \(y)) is on the + diagonal")
           // SIL-CHECK:  dealloc_stack{{.*}}line:[[@LINE-1]]:54:cleanup
           // Verify that the branch has a location >= the cleanup.
