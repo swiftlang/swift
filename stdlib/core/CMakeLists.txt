@@ -29,6 +29,7 @@ set(SWIFTLIB_ESSENTIAL
   Bool.swift
   BooleanType.swift
   BridgeObjectiveC.swift
+  BridgeStorage.swift
   Builtin.swift
   BuiltinMath.swift.gyb
   CString.swift

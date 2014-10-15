@@ -1,4 +1,4 @@
-//===--- DiscriminatedBridgeObject.swift ----------------------------------===//
+//===--- BridgeStorage.swift.gyb ------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,9 +12,7 @@
 //
 //  Bridged types are notionally single-word beasts that either store
 //  an objc class or a native Swift class.  We'd like to be able to
-//  distinguish these cases efficiently, which is why we have
-//  <rdar://problem/18125016>.  This prototype contains two emulations
-//  of the type requested in that radar.
+//  distinguish these cases efficiently.
 //
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
@@ -38,75 +36,11 @@ protocol BridgeStorage {
   var spareBits: Int {get}
 }
 
-// on i386, we have 2 spare bits.  Other platforms have more.
-enum DiscriminatedBridgeStorage<
-  NativeType: AnyObject, CocoaType: AnyObject
-> : BridgeStorage {
-  typealias Native = NativeType
-  typealias Cocoa = CocoaType
-  
-case Native0(Native)
-case Native1(Native)
-case Native2(Native)
-case Cocoa0(CocoaType)
+extension _BridgeStorage : BridgeStorage {}
 
-  init(_ native: Native, bits: Int) {
-    switch bits {
-    case 0: self = .Native0(native)
-    case 1: self = .Native1(native)
-    case 2: self = .Native2(native)
-    default:
-      _sanityCheckFailure(
-        "BridgeStorage can't store bits outside the range 0-2")
-    }
-  }
-  
-  init(_ cocoa: Cocoa) {
-    self = .Cocoa0(cocoa)
-  }
-  
-  var native: Native? {
-    switch self {
-    case Native0(let x):
-      return x
-    case Native1(let x):
-      return x
-    case Native2(let x):
-      return x
-    default:
-      return nil
-    }
-  }
-  
-  var cocoa: Cocoa? {
-    switch self {
-    case Cocoa0(let x):
-      return x
-    default:
-      return nil
-    }
-  }
-  
-  var spareBits: Int {
-    switch self {
-    case Native1:
-      return 1
-    case Native2:
-      return 2
-    default:
-      return 0
-    }
-  }
-  
-  mutating func isUniquelyReferenced() -> Bool {
-    if let raw = native.map({ Builtin.bridgeToRawPointer($0) }) {
-      return _swift_isUniquelyReferenced_nonNull_native(UnsafePointer(raw)) != 0
-    }
-    return false
-  }
-}
 
-struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject> : BridgeStorage {
+struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject>
+  : BridgeStorage {
   
   typealias Native = NativeType
   typealias Cocoa = CocoaType
@@ -220,7 +154,7 @@ var unTaggedNSString : NSString {
   return expectTagged("fûtbōl" as NSString, false)
 }
 
-% for Self in 'DiscriminatedBridgeStorage', 'BridgeObject':
+% for Self in '_BridgeStorage', 'BridgeObject':
 allTests.test("${Self}") {
   typealias B = ${Self}<C,NSString>
   
