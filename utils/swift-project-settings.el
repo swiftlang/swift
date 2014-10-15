@@ -240,6 +240,9 @@ takes precedence for files in the Swift project"
 (push `(swift-stdlibunittest "^\\(?:out\\|err\\)>>>.* \\(?:failed\\(?: at\\|.*file\\)\\|.*: file\\) \\(.+\\), line \\([0-9]+\\)$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
+(push `(swift-stdlibunittest "^\\(?:out\\|err\\)>>> *#[0-9]+: \\(.+\\):\\([0-9]+\\)$"
+              1 2 ,(not :column) ,(not :just-a-warning))
+      compilation-error-regexp-alist-alist)
     
 (provide 'swift-project-settings)
 ;; end of swift-project-settings.el
