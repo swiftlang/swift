@@ -116,8 +116,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create a target machine.
   llvm::TargetMachine *TargetMachine
-    = Target->createTargetMachine(Opts.Triple, ClangOpts.CPU,
-                                  std::move(targetFeatures),
+    = Target->createTargetMachine(Opts.Triple, ClangOpts.CPU, targetFeatures,
                                   TargetOpts, Reloc::PIC_,
                                   CodeModel::Default, OptLevel);
   if (!TargetMachine) {
