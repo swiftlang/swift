@@ -149,11 +149,11 @@ func withInoutT<T>(inout x: T, body: (inout x: T) -> ()) {
 %   for array_type in all_array_types:
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
-  var a = ${array_type}([ [
+  var a: ${array_type}<${array_type}<${element_type}>> = [ [
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70)
-  ] ])
+  ] ]
   let identityOuter = a.identity
   var identityInner = a[0].identity
 
@@ -182,14 +182,14 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a) {
-    (inout x: ${array_type}<[${element_type}]>) in
+    (inout x: ${array_type}<${array_type}<${element_type}>>) in
     x[0][2].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0]) {
-    (inout x: [${element_type}]) in
+    (inout x: ${array_type}<${element_type}>) in
     x[3].value += 1000
   }
 
@@ -219,11 +219,11 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
 }
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW") {
-  var a = ${array_type}([ [
+  var a: ${array_type}<${array_type}<${element_type}>> = [ [
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70), ${element_type}(80), ${element_type}(90),
-  ] ])
+  ] ]
   let identityOuter = a.identity
   var identityInner = a[0].identity
 
@@ -257,21 +257,21 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a) {
-    (inout x: ${array_type}<[${element_type}]>) in
+    (inout x: ${array_type}<${array_type}<${element_type}>>) in
     x[0..<1][0][2].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1]) {
-    (inout x: Slice<[${element_type}]>) in
+    (inout x: Slice<${array_type}<${element_type}>>) in
     x[0][3].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1][0]) {
-    (inout x: [${element_type}]) in
+    (inout x: ${array_type}<${element_type}>) in
     x[4].value += 1000
   }
 
