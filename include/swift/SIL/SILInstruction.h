@@ -3027,6 +3027,11 @@ public:
     assert(HasDefault && "doesn't have a default");
     return getSuccessorBuf()[NumCases];
   }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() >= ValueKind::SwitchEnumInst &&
+           V->getKind() <= ValueKind::SwitchEnumAddrInst;
+  }
 };
 
 /// A switch on a loadable enum's discriminator. The data for each case is
