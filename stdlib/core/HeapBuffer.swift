@@ -42,7 +42,7 @@ public struct HeapBuffer<Value,Element> {}
 /// construct and---if necessary---destroy Elements there yourself,
 /// either in a derived class, or it can be in some manager object
 /// that owns the _HeapBuffer.
-internal class _HeapBufferStorage<Value,Element> {
+internal class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
   /// The type used to actually manage instances of
   /// `_HeapBufferStorage<Value,Element>`
   typealias Buffer = _HeapBuffer<Value, Element>
@@ -75,9 +75,13 @@ internal class _HeapBufferStorage<Value,Element> {
 // to be in that case, without affecting its reference count.  Instead
 // we accept everything; unsafeBitCast will at least catch
 // inappropriately-sized things at runtime.
-internal func _isUniquelyReferenced<T>(inout x: T) -> Bool {
-  return _swift_isUniquelyReferenced_native_spareBits(
-    unsafeBitCast(x, UWord.self)) != 0
+internal func _isUniquelyReferenced_native(
+  inout x: Builtin.NativeObject?
+) -> Bool {
+  let p: UnsafePointer<_HeapObject> = Builtin.reinterpretCast(x)
+  let result = _swift_isUniquelyReferenced_native(p) != 0
+  Builtin.fixLifetime(x)
+  return result
 }
 
 /// Management API for `_HeapBufferStorage<Value, Element>`
@@ -193,11 +197,10 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    if storage == nil {
-      return false
-    }
-    var workaroundForRadar16119895 = unsafeBitCast(storage, COpaquePointer.self)
-    return Swift._isUniquelyReferenced(&workaroundForRadar16119895)
+    let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(storage)
+    let result = _swift_isUniquelyReferenced_native(o)
+    Builtin.fixLifetime(storage)
+    return result != 0
   }
 }
 

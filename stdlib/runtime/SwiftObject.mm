@@ -724,6 +724,15 @@ unsigned char swift::_swift_isUniquelyReferenced_nonNull_native(
   return object->refCount < 2 * RC_INTERVAL;
 }
 
+// Given a non-@objc object reference, return true iff the
+// object has a strong reference count of 1.
+unsigned char swift::_swift_isUniquelyReferenced_native(
+  const HeapObject* object
+) {
+  return object != nullptr
+    && _swift_isUniquelyReferenced_nonNull_native(object);
+}
+
 // Given a non-nil object reference, return true iff the object is a
 // native swift object with strong reference count of 1.
 unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull(

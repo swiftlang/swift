@@ -538,7 +538,7 @@ extension _StringCore : ExtensibleCollectionType {
   
   public mutating func reserveCapacity(n: Int) {
     if _fastPath(!hasCocoaBuffer) {
-      if _fastPath(_isUniquelyReferenced(&_owner)) {
+      if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
         
         let subRange: Range<UnsafePointer<RawByte>>
           = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(count))
@@ -632,7 +632,7 @@ extension _StringCore : RangeReplaceableCollectionType {
     let appending = subRange.startIndex == endIndex
 
     let existingStorage = !hasCocoaBuffer && (
-      appending || _isUniquelyReferenced(&_owner)
+      appending || isUniquelyReferencedNonObjC(&_owner)
     ) ? _claimCapacity(newCount, minElementWidth: width).1 : nil
 
     if _fastPath(existingStorage != nil) {

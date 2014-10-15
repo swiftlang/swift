@@ -151,7 +151,7 @@ extension _ArrayBuffer {
   
   /// Return true iff this buffer's storage is uniquely-referenced.
   mutating func isUniquelyReferenced() -> Bool {
-    return Swift._isUniquelyReferenced(&storage)
+    return _isUniquelyReferenced_native(&storage)
   }
 
   /// Convert to an NSArray.
@@ -180,7 +180,7 @@ extension _ArrayBuffer {
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
-    if _fastPath(Swift._isUniquelyReferenced(&storage) && _hasMutableBuffer) {
+    if _fastPath(isUniquelyReferenced() && _hasMutableBuffer) {
       let b = _native
       if _fastPath(b.capacity >= minimumCapacity) {
         return b
@@ -191,7 +191,7 @@ extension _ArrayBuffer {
 
   public
   mutating func isMutableAndUniquelyReferenced() -> Bool {
-    return Swift._isUniquelyReferenced(&storage) && _hasMutableBuffer
+    return isUniquelyReferenced() && _hasMutableBuffer
   }
   
   /// If this buffer is backed by a `_ContiguousArrayBuffer`

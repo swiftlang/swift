@@ -237,7 +237,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    return Swift._isUniquelyReferenced(&owner)
+    return isUniquelyReferencedNonObjC(&owner)
   }
 
   /// Access the element at `position`.
