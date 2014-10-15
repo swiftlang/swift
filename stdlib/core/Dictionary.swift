@@ -1951,9 +1951,7 @@ public struct Dictionary<
 
   var _variantStorage: _VariantStorage
 
-  /// Create a dictionary with at least the given number of
-  /// elements worth of storage.  The actual capacity will be the
-  /// smallest power of 2 that's >= `minimumCapacity`.
+  /// Create an empty dictionary.
   public init() {
     _variantStorage =
         .Native(_NativeStorage.Owner(minimumCapacity: 2))
