@@ -78,13 +78,18 @@ public:
   };
 
 protected:
-  /// \brief Primary AST location.
+  /// \brief Primary AST location, always used for diagnostics.
   ASTNodeTy ASTNode;
 
-  // If coming from a .sil file, this is the location in the .sil file.
-  // FIXME: We should be able to reuse the ASTNodes memory to store this. We
-  // could just store Value.getPointer() in the pointer union.
-  SourceLoc SILFileSourceLoc;
+  union SpecificLoc {
+    SpecificLoc() {}
+    // If coming from a .sil file, this is the location in the .sil file.
+    SourceLoc SILFileSourceLoc;
+    /// \brief Sometimes the location for diagnostics needs to be
+    /// different than the one used to emit the line table. If
+    /// HasDebugLoc is set, this is used for the debug info.
+    ASTNodeTy DebugLoc;
+  } SpecificLoc;
 
   /// \brief The kind of this SIL location.
   unsigned KindData;
@@ -110,7 +115,15 @@ protected:
 
     /// \brief Marks this instruction as belonging to the
     /// function prologue.
-    IsInPrologue = 9
+    IsInPrologue = 9,
+
+    /// \brief Indicates that SILFileSourceLoc is present.
+    HasSILFileSourceLoc = 10,
+
+    /// \brief Indicates that DebugLoc should be used for emitting
+    /// debug info.
+    HasDebugLoc = 11
+
   };
 
   template <typename T>
@@ -163,6 +176,11 @@ private:
   void setKind(LocationKind K) { KindData |= (K & BaseMask); }
   unsigned getSpecialFlags() const { return unsigned(KindData) & ~BaseMask; }
   void setSpecialFlags(unsigned Flags) { KindData |= (Flags & ~BaseMask); }
+
+  SourceLoc getSourceLoc(ASTNodeTy N) const;
+  SourceLoc getStartSourceLoc(ASTNodeTy N) const;
+  SourceLoc getEndSourceLoc(ASTNodeTy N) const;
+
 public:
 
   /// When an ASTNode gets implicitely converted into a SILLocation we
@@ -178,7 +196,9 @@ public:
   ///
   /// Artificial locations and the top-level module locations will be null.
   bool isNull() const {
-    return ASTNode.isNull() && SILFileSourceLoc.isInvalid();
+    if (hasSILFileSourceLoc())
+      return SpecificLoc.SILFileSourceLoc.isInvalid();
+    return ASTNode.isNull();
   }
   LLVM_EXPLICIT operator bool() const { return !isNull(); }
 
@@ -216,6 +236,29 @@ public:
 
   /// \brief Check is this location is part of a function's implicit prologue.
   bool isInPrologue() const { return KindData & (1 << IsInPrologue); }
+
+  void setHasSILFileSourceLoc() {
+    assert(!hasDebugLoc() &&
+           "SILFileSourceLoc and DebugLoc are mutually exclusive");
+    KindData |= (1 << HasSILFileSourceLoc);
+  }
+  bool hasSILFileSourceLoc() const {
+    return KindData & (1 << HasSILFileSourceLoc);
+  }
+
+  SourceLoc getSILFileSourceLoc() const {
+    assert(hasSILFileSourceLoc() && "no SILFileSourceLoc");
+    return SpecificLoc.SILFileSourceLoc;
+  }
+
+  void setHasDebugLoc() {
+    assert(!hasSILFileSourceLoc() &&
+           "SILFileSourceLoc and DebugLoc are mutually exclusive");
+    KindData |= (1 << HasDebugLoc);
+  }
+  bool hasDebugLoc() const {
+    return KindData & (1 << HasDebugLoc);
+  }
 
   bool hasASTLocation() const { return !ASTNode.isNull(); }
 
@@ -268,6 +311,15 @@ public:
   template <typename T>
   T *castToASTNode() const { return castNodeTo<T>(ASTNode); }
 
+  /// \brief If the DebugLoc is of the specified AST unit type T,
+  /// return it, otherwise return null.
+  template <typename T>
+  T *getDebugLocAsASTNode() const {
+    assert(hasDebugLoc() && "no debug location");
+    return getNodeAs<T>(SpecificLoc.DebugLoc);
+  }
+
+  SourceLoc getDebugSourceLoc() const;
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;
   SourceLoc getEndSourceLoc() const;
@@ -283,7 +335,8 @@ public:
   inline bool operator==(const SILLocation& R) const {
     return KindData == R.KindData &&
       ASTNode.getOpaqueValue() == R.ASTNode.getOpaqueValue() &&
-      SILFileSourceLoc == R.SILFileSourceLoc;
+      SpecificLoc.DebugLoc.getOpaqueValue() ==
+        R.SpecificLoc.DebugLoc.getOpaqueValue();
   }
 };
 
@@ -413,14 +466,8 @@ public:
   /// Constructs an inlined location when the call site is represented by a
   /// SILFile location.
   InlinedLocation(SourceLoc L) : SILLocation(InlinedKind) {
-    SILFileSourceLoc = L;
-  }
-
-  /// \brief If this location represents a SIL file location, returns the source
-  /// location.
-  SourceLoc getFileLocation() {
-    assert(ASTNode.isNull());
-    return SILFileSourceLoc;
+    setHasSILFileSourceLoc();
+    SpecificLoc.SILFileSourceLoc = L;
   }
 
   static InlinedLocation getInlinedLocation(SILLocation L);
@@ -437,7 +484,8 @@ private:
   InlinedLocation(Pattern *P, unsigned F) : SILLocation(P, InlinedKind, F) {}
   InlinedLocation(Decl *D, unsigned F) : SILLocation(D, InlinedKind, F) {}
   InlinedLocation(SourceLoc L, unsigned F) : SILLocation(InlinedKind, F) {
-    SILFileSourceLoc = L;
+    setHasSILFileSourceLoc();
+    SpecificLoc.SILFileSourceLoc = L;
   }
 
 };
@@ -460,14 +508,8 @@ public:
   /// Constructs an inlined location when the call site is represented by a
   /// SILFile location.
   MandatoryInlinedLocation(SourceLoc L) : SILLocation(MandatoryInlinedKind) {
-    SILFileSourceLoc = L;
-  }
-
-  /// \brief If this location represents a SIL file location, returns the source
-  /// location.
-  SourceLoc getFileLocation() {
-    assert(ASTNode.isNull());
-    return SILFileSourceLoc;
+    setHasSILFileSourceLoc();
+    SpecificLoc.SILFileSourceLoc = L;
   }
 
   static MandatoryInlinedLocation getMandatoryInlinedLocation(SILLocation L);
@@ -498,7 +540,8 @@ private:
                                                      F) {}
   MandatoryInlinedLocation(SourceLoc L,
                            unsigned F) : SILLocation(MandatoryInlinedKind, F) {
-    SILFileSourceLoc = L;
+    setHasSILFileSourceLoc();
+    SpecificLoc.SILFileSourceLoc = L;
   }
 };
 
@@ -566,11 +609,8 @@ private:
 class SILFileLocation : public SILLocation {
 public:
   SILFileLocation(SourceLoc L) : SILLocation(SILFileKind) {
-    SILFileSourceLoc = L;
-  }
-
-  SourceLoc getFileLocation() {
-    return SILFileSourceLoc;
+    setHasSILFileSourceLoc();
+    SpecificLoc.SILFileSourceLoc = L;
   }
 
 private:
@@ -578,7 +618,10 @@ private:
   static bool isKind(const SILLocation& L) {
     return L.getKind() == SILFileKind;
   }
-  SILFileLocation() : SILLocation(SILFileKind) {}
+  SILFileLocation() : SILLocation(SILFileKind) {
+    setHasSILFileSourceLoc();
+    SpecificLoc.SILFileSourceLoc = SourceLoc();
+  }
 };
 
 } // end swift namespace

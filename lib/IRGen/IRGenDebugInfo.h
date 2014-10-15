@@ -95,7 +95,7 @@ class IRGenDebugInfo {
   TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
   llvm::MDNode *InternalType;      /// Catch-all type for upaque internal types.
 
-  FullLocation LastLoc;     /// The last location that was emitted.
+  Location LastDebugLoc;    /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
   bool IsLibrary;           /// Whether this is a libary or a top level module.
 #ifndef NDEBUG
@@ -104,8 +104,8 @@ class IRGenDebugInfo {
   bool lineNumberIsSane(IRBuilder &Builder, unsigned Line);
 #endif
 
-  SmallVector<std::pair<FullLocation, SILDebugScope *>, 8>
-  LocationStack; /// Used by pushLoc.
+  /// Used by pushLoc.
+  SmallVector<std::pair<Location, SILDebugScope *>, 8> LocationStack;
 
 public:
   IRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
@@ -120,7 +120,7 @@ public:
                      Optional<SILLocation> Loc = None);
 
   void clearLoc(IRBuilder &Builder) {
-    LastLoc = {};
+    LastDebugLoc = {};
     LastScope = nullptr;
     Builder.SetCurrentDebugLocation(llvm::DebugLoc());
   }
@@ -128,14 +128,14 @@ public:
   /// Push the current debug location onto a stack and initialize the
   /// IRBuilder to an empty location.
   void pushLoc() {
-    LocationStack.push_back(std::make_pair(LastLoc, LastScope));
-    LastLoc = {};
+    LocationStack.push_back(std::make_pair(LastDebugLoc, LastScope));
+    LastDebugLoc = {};
     LastScope = nullptr;
   }
 
   /// Restore the current debug location from the stack.
   void popLoc() {
-    std::tie(LastLoc, LastScope) = LocationStack.pop_back_val();
+    std::tie(LastDebugLoc, LastScope) = LocationStack.pop_back_val();
   }
 
   /// Emit debug info for an import declaration.

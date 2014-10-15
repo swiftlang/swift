@@ -30,11 +30,11 @@ func foo(var a: Int, var b: Int) -> Int {
      if b != 0 {
        // CHECK-DAG: \00[[@LINE-1]]\00{{.*}}DW_TAG_lexical_block
        // Transparent inlined multiply:
-       // CHECK-DAG: smul{{.*}}, !dbg ![[DIV:[0-9]+]]
-       // CHECK-DAG: [[DIV]] = metadata !{i32 [[@LINE+4]], i32 15,
+       // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
+       // CHECK-DAG: [[MUL]] = metadata !{i32 [[@LINE+4]], i32 16,
        // Runtime call to multiply function:
-       // CHECK-NOSIL: @_TFSsoi1mFTSiSi_Si{{.*}}, !dbg ![[DIV:[0-9]+]]
-       // CHECK-NOSIL: [[DIV]] = metadata !{i32 [[@LINE+1]], i32 15,
+       // CHECK-NOSIL: @_TFSsoi1mFTSiSi_Si{{.*}}, !dbg ![[MUL:[0-9]+]]
+       // CHECK-NOSIL: [[MUL]] = metadata !{i32 [[@LINE+1]], i32 16,
        return a*b
      } else {
        // CHECK-DAG: [[PARENT:[0-9]+]] = {{.*}}\00[[@LINE-1]]\0013\00{{.*}}DW_TAG_lexical_block
