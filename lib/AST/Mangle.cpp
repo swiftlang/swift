@@ -1444,18 +1444,3 @@ void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern,
   mangleType(ty, ResilienceExpansion::Minimal, 0);
 }
 
-void Mangler::mangleGlobalInit(VarDecl *decl, int counter, bool isInitFunc) {
-  auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-  auto fileUnit = cast<FileUnit>(topLevelContext);
-  Identifier discriminator = fileUnit->getDiscriminatorForPrivateValue(decl);
-  assert(!discriminator.empty());
-  assert(!isNonAscii(discriminator.str()) &&
-         "discriminator contains non-ASCII characters");
-  assert(!clang::isDigit(discriminator.str().front()) &&
-         "not a valid identifier");
-  
-  Buffer << "globalinit_";
-  mangleIdentifier(discriminator);
-  Buffer << (isInitFunc ? "_func" : "_token");
-  Buffer << counter;
-}

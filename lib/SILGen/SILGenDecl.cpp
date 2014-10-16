@@ -1995,19 +1995,12 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
   // Emit the lazy initialization token for the initialization expression.
   auto counter = anonymousSymbolCounter++;
   
-  // Pick one variable of the pattern. Usually it's only one variable, but it
-  // can also be something like: var (a, b) = ...
-  Pattern *pattern = pd->getPattern();
-  VarDecl *varDecl = nullptr;
-  pattern->forEachVariable([&](VarDecl *D) {
-    varDecl = D;
-  });
-  assert(varDecl);
-  
-  llvm::SmallString<20> onceTokenBuffer;
-  llvm::raw_svector_ostream onceTokenStream(onceTokenBuffer);
-  Mangler tokenMangler(onceTokenStream);
-  tokenMangler.mangleGlobalInit(varDecl, counter, false);
+  llvm::SmallString<20> onceTokenName;
+  {
+    llvm::raw_svector_ostream os(onceTokenName);
+    os << "globalinit_token" << counter;
+    os.flush();
+  }
   
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
   auto onceSILTy
@@ -2016,17 +2009,19 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
   // TODO: include the module in the onceToken's name mangling.
   // Then we can make it fragile.
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
-                                             makeModuleFragile,
-                                             onceTokenStream.str(), onceSILTy);
+                                             false,
+                                             onceTokenName, onceSILTy);
   onceToken->setDeclaration(false);
   
   // Emit the initialization code into a function.
-  llvm::SmallString<20> onceFuncBuffer;
-  llvm::raw_svector_ostream onceFuncStream(onceFuncBuffer);
-  Mangler funcMangler(onceFuncStream);
-  funcMangler.mangleGlobalInit(varDecl, counter, true);
+  llvm::SmallString<20> onceFuncName;
+  {
+    llvm::raw_svector_ostream os(onceFuncName);
+    os << "globalinit_func" << counter;
+    os.flush();
+  }
   
-  SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncStream.str(), pd);
+  SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncName, pd);
   
   // Generate accessor functions for all of the declared variables, which
   // Builtin.once the lazy global initializer we just generated then return

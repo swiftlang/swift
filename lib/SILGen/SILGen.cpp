@@ -301,7 +301,12 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
         F->setLinkage(constant.getLinkage(ForDefinition));
       }
       if (makeModuleFragile) {
-        F->setFragile(IsFragile);
+        if (constant.isGlobal()) {
+          // This is because globals are currently not fragile. See TODO below.
+          F->setLinkage(SILLinkage::Public);
+        } else {
+          F->setFragile(IsFragile);
+        }
       }
     }
     return F;
@@ -321,6 +326,14 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     IsFrag = IsFragile;
   }
 
+  if (makeModuleFragile && constant.isGlobal()) {
+    // TODO: make global variables fragile. For this we need to mangle the
+    // module name into the global name to ensure that the initialization tokens
+    // are unique (or can be eliminated).
+    linkage = forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal;
+    IsFrag = IsNotFragile;
+  }
+  
   EffectsKind EK = constant.hasEffectsAttribute() ?
   constant.getEffectsAttribute() : EffectsKind::Unspecified;
 
@@ -651,7 +664,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
     SILFunction::create(M, SILLinkage::Private, funcName,
                         initSILType, nullptr, SILLocation(binding),
                         IsNotBare, IsNotTransparent,
-                        makeModuleFragile ? IsFragile : IsNotFragile,
+                        IsNotFragile,
                         InlineDefault);
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(binding->getInit()), *f));
