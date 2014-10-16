@@ -156,14 +156,8 @@ InlinedLocation InlinedLocation::getInlinedLocation(SILLocation L) {
   if (Decl *D = L.getAsASTNode<Decl>())
     return InlinedLocation(D, L.getSpecialFlags());
 
-  if (Optional<SILFileLocation> FileLoc = L.getAs<SILFileLocation>())
-    return InlinedLocation(FileLoc.getValue().getSILFileSourceLoc(),
-                           L.getSpecialFlags());
-  // Otherwise, it can be an inlined location wrapping a file location.
-  if (Optional<InlinedLocation> InlinedLoc = L.getAs<InlinedLocation>()) {
-    return InlinedLocation(InlinedLoc.getValue().getSILFileSourceLoc(),
-                           L.getSpecialFlags());
-  }
+  if (L.hasSILFileSourceLoc())
+    return InlinedLocation(L.getSILFileSourceLoc(), L.getSpecialFlags());
 
   llvm_unreachable("Cannot construct Inlined loc from the given location.");
 }
@@ -179,15 +173,9 @@ MandatoryInlinedLocation::getMandatoryInlinedLocation(SILLocation L) {
   if (Decl *D = L.getAsASTNode<Decl>())
     return MandatoryInlinedLocation(D, L.getSpecialFlags());
 
-  if (Optional<SILFileLocation> FileLoc = L.getAs<SILFileLocation>())
-    return MandatoryInlinedLocation(FileLoc.getValue().getSILFileSourceLoc(),
+  if (L.hasSILFileSourceLoc())
+    return MandatoryInlinedLocation(L.getSILFileSourceLoc(),
                                     L.getSpecialFlags());
-  // Otherwise, it can be an inlined location wrapping a file location.
-  if (Optional<MandatoryInlinedLocation> InlinedLoc =
-      L.getAs<MandatoryInlinedLocation>()) {
-    return MandatoryInlinedLocation(InlinedLoc.getValue().getSILFileSourceLoc(),
-                                    L.getSpecialFlags());
-  }
 
   if (L.isInTopLevel())
     return MandatoryInlinedLocation::getModuleLocation(L.getSpecialFlags());
