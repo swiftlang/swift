@@ -159,6 +159,9 @@ InlinedLocation InlinedLocation::getInlinedLocation(SILLocation L) {
   if (L.hasSILFileSourceLoc())
     return InlinedLocation(L.getSILFileSourceLoc(), L.getSpecialFlags());
 
+  if (L.isInTopLevel())
+    return InlinedLocation::getModuleLocation(L.getSpecialFlags());
+
   llvm_unreachable("Cannot construct Inlined loc from the given location.");
 }
 

@@ -494,6 +494,12 @@ private:
     SpecificLoc.SILFileSourceLoc = L;
   }
 
+  static InlinedLocation getModuleLocation(unsigned Flags) {
+    auto L = InlinedLocation();
+    L.setSpecialFlags(Flags);
+    return L;
+  }
+
 };
 
 /// \brief Marks instructions that correspond to inlined function body and
