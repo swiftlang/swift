@@ -650,11 +650,6 @@ public:
     OS << " : " << FRI->getType();
   }
   
-  void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    OS << "builtin_function_ref "
-       << QuotedString(BFI->getName().str()) << " : " << BFI->getType();
-  }
-  
   void visitBuiltinInst(BuiltinInst *BI) {
     OS << "builtin " << QuotedString(BI->getName().str());
     printSubstitutions(BI->getSubstitutions());

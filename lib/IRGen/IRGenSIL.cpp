@@ -108,15 +108,6 @@ public:
   }
 };
   
-/// Represents a builtin function.
-class BuiltinValue {
-  Identifier Id;
-public:
-  BuiltinValue(Identifier Id) : Id(Id) {}
-  
-  Identifier getId() const { return Id; }
-};
-  
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
 /// - an Explosion of (unmanaged) Values, corresponding to a SIL "register"; or
@@ -139,10 +130,7 @@ public:
       /// A value that represents an Objective-C method that must be called with
       /// a form of objc_msgSend.
       ObjCMethod,
-    
-      /// A builtin function.
-      BuiltinValue,
-    Value_Last = BuiltinValue
+    Value_Last = ObjCMethod,
   };
   
   Kind kind;
@@ -157,7 +145,6 @@ private:
     } explosion;
     StaticFunction staticFunction;
     ObjCMethod objcMethod;
-    BuiltinValue builtinValue;
   };
 
 public:
@@ -171,10 +158,6 @@ public:
 
   LoweredValue(ObjCMethod &&objcMethod)
     : kind(Kind::ObjCMethod), objcMethod(std::move(objcMethod))
-  {}
-  
-  LoweredValue(BuiltinValue &&builtinValue)
-    : kind(Kind::BuiltinValue), builtinValue(std::move(builtinValue))
   {}
   
   LoweredValue(Explosion &e)
@@ -198,9 +181,6 @@ public:
       break;
     case Kind::ObjCMethod:
       ::new (&objcMethod) ObjCMethod(std::move(lv.objcMethod));
-      break;
-    case Kind::BuiltinValue:
-      ::new (&builtinValue) BuiltinValue(std::move(lv.builtinValue));
       break;
     }
   }
@@ -240,11 +220,6 @@ public:
     return objcMethod;
   }
   
-  const BuiltinValue &getBuiltinValue() const {
-    assert(kind == Kind::BuiltinValue && "not a builtin");
-    return builtinValue;
-  }
-  
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
@@ -258,9 +233,6 @@ public:
       break;
     case Kind::ObjCMethod:
       objcMethod.~ObjCMethod();
-      break;
-    case Kind::BuiltinValue:
-      builtinValue.~BuiltinValue();
       break;
     }
   }
@@ -372,10 +344,6 @@ public:
     setLoweredValue(v, ObjCMethod{method, searchType, startAtSuper});
   }
 
-  void setLoweredBuiltinValue(SILValue v, Identifier builtin) {
-    setLoweredValue(v, BuiltinValue{builtin});
-  }
-  
   LoweredValue &getUndefLoweredValue(SILType t) {
     auto found = LoweredUndefs.find(t);
     if (found != LoweredUndefs.end())
@@ -562,7 +530,6 @@ public:
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitBuiltinInst(BuiltinInst *i);
 
-  void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i); // XXX
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitSILGlobalAddrInst(SILGlobalAddrInst *i);
 
@@ -736,9 +703,6 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   case Kind::ObjCMethod:
     ex.add(objcMethod.getExplosionValue(IGF));
     break;
-  
-  case Kind::BuiltinValue:
-    llvm_unreachable("reifying builtin function not yet supported");
   }
 }
 
@@ -1432,10 +1396,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-void IRGenSILFunction::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i) { // XXX
-  setLoweredBuiltinValue(SILValue(i, 0), i->getName());
-}
-
 void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
   llvm::Function *fnptr =
     IGM.getAddrOfSILFunction(i->getReferencedFunction(), NotForDefinition);
@@ -1662,9 +1622,6 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       
   case LoweredValue::Kind::Address:
     llvm_unreachable("sil address isn't a valid callee");
-  
-  case LoweredValue::Kind::BuiltinValue:
-    llvm_unreachable("builtins should be handled before reaching here");
   }
   
   Callee callee = Callee::forKnownFunction(origCalleeType, substCalleeType,
@@ -1681,7 +1638,6 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   
   case LoweredValue::Kind::ObjCMethod:
   case LoweredValue::Kind::StaticFunction:
-  case LoweredValue::Kind::BuiltinValue:
     llvm_unreachable("function isn't a valid metatype");
   
   // If we have a Swift metatype, map it to the heap metadata, which will be
@@ -1754,13 +1710,6 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   const LoweredValue &calleeLV = getLoweredValue(i->getCallee());
   
-  // Handle builtin calls separately.
-  if (calleeLV.kind == LoweredValue::Kind::BuiltinValue) {
-    auto &builtin = calleeLV.getBuiltinValue();
-    return emitBuiltinApplyInst(*this, builtin.getId(), i,
-                                i->getSubstitutions());
-  }
-
   auto origCalleeType = i->getOrigCalleeType();
   auto substCalleeType = i->getSubstCalleeType();
   
@@ -1870,8 +1819,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     }
     return std::make_tuple(lv.getStaticFunction().getFunction(),
                            nullptr, v.getType().castTo<SILFunctionType>());
-  case LoweredValue::Kind::Explosion:
-  case LoweredValue::Kind::BuiltinValue: {
+  case LoweredValue::Kind::Explosion: {
     Explosion ex = lv.getExplosion(IGF);
     llvm::Value *fn = ex.claimNext();
     llvm::Value *context = nullptr;

@@ -207,7 +207,6 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   // These instructions do not use other values.
   case ValueKind::FunctionRefInst:
-  case ValueKind::BuiltinFunctionRefInst: // XXX
   case ValueKind::IntegerLiteralInst:
   case ValueKind::FloatLiteralInst:
   case ValueKind::StringLiteralInst:

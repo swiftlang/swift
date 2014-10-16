@@ -760,39 +760,6 @@ public:
   }
 };
   
-/// BuiltinFunctionRefInst - Represents a reference to a primitive function from
-/// the Builtin module.
-class BuiltinFunctionRefInst : public LiteralInst {
-  Identifier Name;
-public:
-  BuiltinFunctionRefInst(SILLocation Loc, Identifier Name, SILType Ty)
-    : LiteralInst(ValueKind::BuiltinFunctionRefInst, Loc, Ty),
-      Name(Name)
-  {}
-
-  /// Return the referenced function.
-  Identifier getName() const { return Name; }
-
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
-  ///
-  /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
-  /// intrinsic. The particular intrinsic functions which correspond to the
-  /// returned value are defined in llvm/Intrinsics.h.
-  const IntrinsicInfo &getIntrinsicInfo() const;
-
-  /// \brief Looks up the lazily cached identification for the builtin function.
-  const BuiltinInfo &getBuiltinInfo() const;
-
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::BuiltinFunctionRefInst;
-  }
-};
-
 /// Gives the address of a SIL global variable.
 class SILGlobalAddrInst : public LiteralInst {
   SILGlobalVariable *Global;

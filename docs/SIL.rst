@@ -2033,19 +2033,6 @@ function_ref
 
 Creates a reference to a SIL function.
 
-builtin_function_ref
-````````````````````
-::
-
-  sil-instruction ::= 'builtin_function_ref' sil-identifier ':' sil-type
-
-  %1 = builtin_function_ref "foo" : $@thin T -> U
-  // "foo" must name a function in the Builtin module
-  // $@thin T -> U must be a thin function type
-  // %1 has type $@thin T -> U
-
-Creates a reference to a compiler builtin function.
-
 sil_global_addr
 ```````````````
 
@@ -2396,6 +2383,21 @@ lowers to an uncurried entry point and is curried in the enclosing function::
     release %bar : $(Int) -> Int
     return %ret : $Int
   }
+
+builtin
+```````
+::
+
+  sil-instruction ::= 'builtin' string-literal
+                        sil-apply-substitution-list?
+                        '(' (sil-operand (',' sil-operand)*)? ')'
+                        ':' sil-type
+
+  %1 = builtin "foo"(%1 : $T, %2 : $U) : $V
+  // "foo" must name a function in the Builtin module
+
+Invokes functionality built into the backend code generator, such as LLVM-
+level instructions and intrinsics.
 
 Metatypes
 ~~~~~~~~~

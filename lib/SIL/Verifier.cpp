@@ -565,14 +565,6 @@ public:
     }
   }
 
-  void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    auto fnType = requireObjectType(SILFunctionType, BFI,
-                                    "result of builtin_function_ref");
-    require(fnType->getRepresentation()
-              == FunctionType::Representation::Thin,
-            "builtin_function_ref should have a thin function result");
-  }
-
   void checkBuiltinInst(BuiltinInst *BI) {
     // Check for special constraints on llvm intrinsics.
     if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic)

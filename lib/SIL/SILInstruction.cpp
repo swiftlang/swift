@@ -240,11 +240,6 @@ namespace {
       return X->getReferencedFunction() == RHS->getReferencedFunction();
     }
 
-    bool visitBuiltinFunctionRefInst(const BuiltinFunctionRefInst *RHS) { // XXX
-      auto *X = cast<BuiltinFunctionRefInst>(LHS); // XXX
-      return X->getName() == RHS->getName();
-    }
-
     bool visitSILGlobalAddrInst(const SILGlobalAddrInst *RHS) {
       auto *X = cast<SILGlobalAddrInst>(LHS);
       return X->getReferencedGlobal() == RHS->getReferencedGlobal();
@@ -840,14 +835,6 @@ const IntrinsicInfo &BuiltinInst::getIntrinsicInfo() const {
 }
 
 const BuiltinInfo &BuiltinInst::getBuiltinInfo() const {
-  return getModule().getBuiltinInfo(getName());
-}
-
-const IntrinsicInfo &BuiltinFunctionRefInst::getIntrinsicInfo() const { // XXX
-  return getModule().getIntrinsicInfo(getName());
-}
-
-const BuiltinInfo &BuiltinFunctionRefInst::getBuiltinInfo() const { // XXX
   return getModule().getBuiltinInfo(getName());
 }
 

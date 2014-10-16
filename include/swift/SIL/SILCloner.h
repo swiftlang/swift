@@ -468,15 +468,6 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *Inst){ // XXX
-  doPostProcess(Inst,
-    getBuilder().createBuiltinFunctionRef(getOpLocation(Inst->getLoc()), // XXX
-                                          Inst->getName(),
-                                          getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
   SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
   doPostProcess(Inst,

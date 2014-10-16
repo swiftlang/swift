@@ -124,7 +124,7 @@ static bool isIdentifiableObject(SILValue V) {
 
 /// Is this a literal which we know can not refer to a global object?
 ///
-/// FIXME: function_ref?, builtin_function_ref?
+/// FIXME: function_ref?
 static bool isLocalLiteral(SILValue V) {
   switch (V->getKind()) {
   case ValueKind::IntegerLiteralInst:

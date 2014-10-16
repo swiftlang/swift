@@ -69,7 +69,7 @@
                     "load_weak" "store_weak" "fix_lifetime")
 		  'words) . font-lock-keyword-face)
    ;; Literals
-   `(,(regexp-opt '("function_ref" "builtin_function_ref"
+   `(,(regexp-opt '("function_ref"
                     "integer_literal" "float_literal" "string_literal"
                     "sil_global_addr"
                     ) 'words) . font-lock-keyword-face)
@@ -78,7 +78,7 @@
                     "dynamic_method")
                   'words) . font-lock-keyword-face)
    ;; Function Application
-   `(,(regexp-opt '("apply" "partial_apply")
+   `(,(regexp-opt '("apply" "partial_apply" "builtin")
 		  'words) . font-lock-keyword-face)
    ;; Metatypes
    `(,(regexp-opt '("metatype" "value_metatype"

@@ -218,17 +218,6 @@ public:
                                            Subs, Args, ClosureTy, F));
   }
 
-  BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc, // XXX
-                                                   Identifier Id,
-                                                   SILType ty) {
-    return insert(new (F.getModule()) BuiltinFunctionRefInst(loc, Id, ty)); // XXX
-  }
-  BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc, // XXX
-                                                   StringRef Str,
-                                                   SILType ty) {
-    return createBuiltinFunctionRef(loc, getASTContext().getIdentifier(Str),ty); // XXX
-  }
-
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name,
                              SILType ResultTy, ArrayRef<Substitution> Subs,
                              ArrayRef<SILValue> Args) {

@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 154; // Last change: add SIL builtin instruction
+const uint16_t VERSION_MINOR = 155; // Last change: remove SIL builtin_function_ref instruction
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;

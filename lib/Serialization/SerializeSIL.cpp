@@ -575,17 +575,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);
     break;
   }
-  case ValueKind::BuiltinFunctionRefInst: { // XXX
-    // Format: FuncDecl and type. Use SILOneOperandLayout.
-    const BuiltinFunctionRefInst *BFR = cast<BuiltinFunctionRefInst>(&SI); // XXX
-    SILOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0,
-        S.addTypeRef(BFR->getType().getSwiftRValueType()),
-        (unsigned)BFR->getType().getCategory(),
-        S.addIdentifierRef(BFR->getName()), 0);
-    break;
-  }
   case ValueKind::SILGlobalAddrInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     const SILGlobalAddrInst *GAI = cast<SILGlobalAddrInst>(&SI);

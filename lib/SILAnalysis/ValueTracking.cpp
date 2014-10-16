@@ -35,7 +35,7 @@ SILValue swift::getUnderlyingObject(SILValue V) {
 }
 
 /// Returns true if the ValueBase inside V is an apply whose callee is a no read
-/// builtin_function_ref.
+/// builtin.
 static bool isNoReadBuiltinInst(SILValue V) {
   auto *BI = dyn_cast<BuiltinInst>(V);
   return BI && isReadNone(BI);
@@ -52,7 +52,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::BuiltinInst:
   case ValueKind::ApplyInst:
   case ValueKind::WitnessMethodInst:
-  case ValueKind::BuiltinFunctionRefInst: // XXX
   case ValueKind::CopyAddrInst:
   case ValueKind::RetainValueInst:
   case ValueKind::DeallocBoxInst:

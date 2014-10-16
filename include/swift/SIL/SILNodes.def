@@ -113,7 +113,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Literals
   ABSTRACT_VALUE(LiteralInst, SILInstruction)
     INST(FunctionRefInst, LiteralInst, None)
-    INST(BuiltinFunctionRefInst, LiteralInst, None)
     INST(SILGlobalAddrInst, LiteralInst, None)
     INST(IntegerLiteralInst, LiteralInst, None)
     INST(FloatLiteralInst, LiteralInst, None)

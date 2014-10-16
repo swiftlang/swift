@@ -67,7 +67,6 @@ struct SimpleValue {
     }
     switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:
-    case ValueKind::BuiltinFunctionRefInst: // XXX
     case ValueKind::SILGlobalAddrInst:
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
@@ -151,10 +150,6 @@ public:
 
   hash_code visitFunctionRefInst(FunctionRefInst *X) {
     return llvm::hash_combine(X->getKind(), X->getReferencedFunction());
-  }
-
-  hash_code visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *X) { // XXX
-    return llvm::hash_combine(X->getKind(), X->getName().get());
   }
 
   hash_code visitSILGlobalAddrInst(SILGlobalAddrInst *X) {

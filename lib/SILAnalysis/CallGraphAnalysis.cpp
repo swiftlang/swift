@@ -125,7 +125,6 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
     break;
   }
 
-  case ValueKind::BuiltinFunctionRefInst: // XXX
   case ValueKind::BuiltinInst: {
     ++NumCallSitesOfBuiltins;
     break;

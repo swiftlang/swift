@@ -61,8 +61,7 @@ public:
   ///
   /// The canonical form of a trap is:
   ///
-  ///   %0 = builtin_function_ref "int_trap"
-  ///   apply %0()
+  ///   builtin "int_trap"() : $()
   ///   unreachable
   ///
   /// This can not have any uses of reference counted values since the frontend

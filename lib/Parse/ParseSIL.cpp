@@ -1149,7 +1149,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("autorelease_value", ValueKind::AutoreleaseValueInst)
     .Case("br", ValueKind::BranchInst)
     .Case("builtin", ValueKind::BuiltinInst)
-    .Case("builtin_function_ref", ValueKind::BuiltinFunctionRefInst) // XXX
     .Case("checked_cast_br", ValueKind::CheckedCastBranchInst)
     .Case("checked_cast_addr_br", ValueKind::CheckedCastAddrBranchInst)
     .Case("class_method", ValueKind::ClassMethodInst)
@@ -1756,22 +1755,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     
     ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subs, Args);
-    break;
-  }
-  case ValueKind::BuiltinFunctionRefInst: { // XXX
-    SILType Ty;
-    if (P.Tok.getKind() != tok::string_literal) {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,"builtin_function_ref");
-      return true;
-    }
-    StringRef Str = P.Tok.getText();
-    Identifier Id = P.Context.getIdentifier(Str.substr(1, Str.size()-2));
-    P.consumeToken(tok::string_literal);
-
-    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(Ty))
-      return true;
-    ResultVal = B.createBuiltinFunctionRef(InstLoc, Id, Ty); // XXX
     break;
   }
   case ValueKind::OpenExistentialInst:
