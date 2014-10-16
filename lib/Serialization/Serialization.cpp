@@ -1479,8 +1479,17 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
 bool Serializer::isDeclXRef(const Decl *D) const {
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
-  return (topLevel->getParentModule() != M ||
-          (SF && topLevel != SF && !isForced(D, DeclIDs)));
+  if (topLevel->getParentModule() != M)
+    return true;
+  if (!SF || topLevel == SF)
+    return false;
+  // Special-case for SIL generic parameter decls, which don't have a real
+  // DeclContext.
+  if (!isa<FileUnit>(topLevel)) {
+    assert(isa<GenericTypeParamDecl>(D) && "unexpected decl kind");
+    return false;
+  }
+  return !isForced(D, DeclIDs);
 }
 
 void Serializer::writeDecl(const Decl *D) {
