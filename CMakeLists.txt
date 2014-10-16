@@ -1360,11 +1360,12 @@ endmacro(add_swift_library)
 #                                     # depends on
 #     [EXCLUDE_FROM_ALL]              # Whether to exclude this executable from
 #                                     # the ALL_BUILD target
-#     [OPT_FLAGS]                      # Optimization flags (overrides SWIFT_OPTIMIZE)
+#     [OPT_FLAGS]                     # Optimization flags (overrides SWIFT_OPTIMIZE)
+#     [DONT_STRIP_NON_MAIN_SYMBOLS]   # Should we not strip non main symbols. 
 #     source1 [source2 source3 ...])  # Sources to add into this library
 macro(add_swift_executable name)
   # Parse the arguments we were given.
-  parse_arguments(SWIFTEXE  "DEPENDS;COMPONENT_DEPENDS;OPT_FLAGS" "EXCLUDE_FROM_ALL"
+  parse_arguments(SWIFTEXE  "DEPENDS;COMPONENT_DEPENDS;OPT_FLAGS" "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS"
     ${ARGN})
   set(SWIFTEXE)
   
@@ -1418,8 +1419,10 @@ macro(add_swift_executable name)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     # ASan does not play well with exported_symbol option. This should be fixed soon.
     if(NOT SWIFT_ASAN_BUILD)
-      set_property(TARGET ${name} APPEND_STRING PROPERTY
-        LINK_FLAGS " -Xlinker -exported_symbol -Xlinker _main")
+      if (NOT SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS)
+        set_property(TARGET ${name} APPEND_STRING PROPERTY
+          LINK_FLAGS " -Xlinker -exported_symbol -Xlinker _main")
+      endif()
     endif()
   endif()
 endmacro(add_swift_executable)
