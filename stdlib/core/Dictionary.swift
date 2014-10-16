@@ -2439,8 +2439,13 @@ public protocol _SwiftNSCopyingType {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 }
 
+/// The "core operations" of NSArray
+///
+/// We use layout-compatible type substitutions in these signatures
+/// where necessary to prevent a dependency on Foundation in the core
+/// stdlib.
 @unsafe_no_objc_tagged_pointer @objc
-public protocol _SwiftNSArrayRequiredOverridesType :
+public protocol _NSArrayCoreType :
     _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
 
   func objectAtIndex(index: Int) -> AnyObject
@@ -2455,11 +2460,6 @@ public protocol _SwiftNSArrayRequiredOverridesType :
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 
   var count: Int { get }
-}
-
-@unsafe_no_objc_tagged_pointer @objc
-public protocol _SwiftNSArrayType : _SwiftNSArrayRequiredOverridesType {
-  func indexOfObject(anObject: AnyObject) -> Int
 }
 
 @objc

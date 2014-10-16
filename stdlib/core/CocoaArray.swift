@@ -14,15 +14,15 @@
 //  a little bit with Cocoa.  Because we want to keep the core
 //  decoupled from the Foundation module, we can't use NSArray
 //  directly.  We _can_, however, use an @objc protocol with a
-//  compatible API.  That's _SwiftNSArrayRequiredOverridesType.
+//  compatible API.  That's _NSArrayCoreType.
 //
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
 
-/// A wrapper around any `_SwiftNSArrayRequiredOverridesType` that gives it
+/// A wrapper around any `_NSArrayCoreType` that gives it
 /// `CollectionType` conformance.  Why not make
-/// `_SwiftNSArrayRequiredOverridesType` conform directly?  It's a class, and I
+/// `_NSArrayCoreType` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
 internal struct _CocoaArrayWrapper : CollectionType {
   var startIndex: Int {
@@ -70,10 +70,10 @@ internal struct _CocoaArrayWrapper : CollectionType {
   }
 
   @transparent
-  init(_ buffer: _SwiftNSArrayRequiredOverridesType) {
+  init(_ buffer: _NSArrayCoreType) {
     self.buffer = buffer
   }
 
-  var buffer: _SwiftNSArrayRequiredOverridesType
+  var buffer: _NSArrayCoreType
 }
 
