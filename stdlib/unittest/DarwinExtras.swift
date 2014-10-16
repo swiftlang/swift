@@ -83,7 +83,7 @@ func _stdlib_select(
 
 /// Calls POSIX `pipe()`.
 func posixPipe() -> (readFD: CInt, writeFD: CInt) {
-  var fds: ContiguousArray<CInt> = [ -1, -1 ]
+  var fds: [CInt] = [ -1, -1 ]
   var _: Void = fds.withUnsafeMutableBufferPointer {
     (fds) in
     let ptr = fds.baseAddress
@@ -96,7 +96,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.
-func spawnChild(args: ContiguousArray<String>)
+func spawnChild(args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
   var fileActions = posix_spawn_file_actions_t()
   if posix_spawn_file_actions_init(&fileActions) != 0 {
@@ -143,7 +143,7 @@ func spawnChild(args: ContiguousArray<String>)
   }
 
   var pid: pid_t = -1
-  let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] as ContiguousArray + args) {
+  let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] + args) {
     posix_spawn(
       &pid, Process.arguments[0], &fileActions, nil, $0, _NSGetEnviron().memory)
   }
@@ -175,7 +175,7 @@ func spawnChild(args: ContiguousArray<String>)
 }
 
 func readAll(fd: CInt) -> String {
-  var buffer = ContiguousArray<UInt8>(count: 1024, repeatedValue: 0)
+  var buffer = [UInt8](count: 1024, repeatedValue: 0)
   var usedBytes = 0
   while true {
     let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
@@ -246,7 +246,7 @@ func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   preconditionFailure("did not understand what happened to child process")
 }
 
-func runChild(args: ContiguousArray<String>)
+func runChild(args: [String])
   -> (stdout: String, stderr: String, status: ProcessTerminationStatus) {
   let (pid, _, stdoutFD, stderrFD) = spawnChild(args)
 
