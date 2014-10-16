@@ -1,7 +1,7 @@
 // REQUIRES: X86
 // REQUIRES: ARM
-// RUN: %swift -target i386-apple-ios7 %s -emit-ir | FileCheck %s
-// RUN: %swift -target armv7-apple-ios7 %s -emit-ir | FileCheck %s
+// RUN: %swift -target i386-apple-ios7 %s -gnone -emit-ir | FileCheck %s
+// RUN: %swift -target armv7-apple-ios7 %s -gnone -emit-ir | FileCheck %s
 
 // Check that we correctly lay out single-payload enums with a class reference
 // payload as nullable pointers. <rdar://problem/16093103>
