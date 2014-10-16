@@ -720,10 +720,6 @@ llvm::GlobalValue::VISIBILITY##Visibility }
   case SILLinkage::Private: return RESULT(Internal, Default);
   case SILLinkage::PublicExternal:
     if (isDefinition) {
-      // FIXME: Work around problems linking available_externally symbols in the
-      // REPL. <rdar://problem/16094902>
-      if (IGM.Opts.UseJIT)
-        return RESULT(LinkOnceODR, Default);
       return RESULT(AvailableExternally, Default);
     }
 
@@ -735,10 +731,6 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     auto visibility = isFragile ? llvm::GlobalValue::DefaultVisibility
                                 : llvm::GlobalValue::HiddenVisibility;
     if (isDefinition) {
-      // FIXME: Work around problems linking available_externally symbols in the
-      // REPL. <rdar://problem/16094902>
-      if (IGM.Opts.UseJIT)
-        return {llvm::GlobalValue::LinkOnceODRLinkage, visibility};
       return {llvm::GlobalValue::AvailableExternallyLinkage, visibility};
     }
     return {llvm::GlobalValue::ExternalLinkage, visibility};
