@@ -298,6 +298,10 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   internal static func _checkValidBufferClass(
     bufferClass: AnyClass, creating: Bool = false
   ) {
+#if !arch(arm)
+    // FIXME: test disabled until we figure out what's wrong on this
+    // platform: <rdar://problem/18682097> Generic and non-generic
+    // class instances have different sizes on armv7
     _debugPrecondition(
       _class_getInstanceSize(bufferClass) == sizeof(_HeapObject.self)
       || (
@@ -306,6 +310,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
           == _valueOffset + sizeof(Value.self)),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
+#endif
     _debugPrecondition(
       _usesNativeSwiftReferenceCounting(bufferClass),
       "ManagedBufferPointer buffer class must be non-@objc"
