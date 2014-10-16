@@ -21,7 +21,10 @@
 // ensure that hash values differ between executions.
 //
 
+public // @testable
 struct _HashingDetail {
+
+  public // @testable
   static var fixedSeedOverride: UInt64 = 0
 
   @transparent
