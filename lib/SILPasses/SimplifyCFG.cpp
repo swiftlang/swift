@@ -1253,6 +1253,10 @@ bool SimplifyCFG::run() {
     RU.run();
     return true;
   }
+
+  // Split all critical edges from non cond_br terminators.
+  Changed |= splitAllCriticalEdges(Fn, true, nullptr, nullptr);
+
   return Changed;
 }
 

@@ -88,6 +88,8 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   PM.add(createDiagnosticConstantPropagation());
   PM.add(createDiagnoseUnreachable());
   PM.add(createEmitDFDiagnostics());
+  // Canonical swift requires all non cond_br critical edges to be split.
+  PM.add(createSplitNonCondBrCriticalEdges());
   PM.run();
 
   // Generate diagnostics.

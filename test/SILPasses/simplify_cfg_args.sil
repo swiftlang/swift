@@ -1,5 +1,5 @@
 // RUN: %sil-opt %s -simplify-cfg | FileCheck %s
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 import Swift

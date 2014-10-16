@@ -1,5 +1,8 @@
 // RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
-sil_stage canonical
+
+// We have to claim this is raw SIL because there are critical edges from non
+// cond_br instructions.
+sil_stage raw
 
 import Builtin
 import Swift

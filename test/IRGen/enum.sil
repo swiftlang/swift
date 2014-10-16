@@ -1,6 +1,8 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -gnone -emit-ir -enable-dynamic-value-type-layout | FileCheck %s
 
-sil_stage canonical
+// We have to claim this is raw SIL because there are critical edges from non
+// cond_br instructions.
+sil_stage raw
 
 import Builtin
 
@@ -518,9 +520,9 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:   switch i64 %0, label %[[DFLT:[0-9]+]] [
 // CHECK:     i64 0, label %[[Y_DEST:[0-9]+]]
 // CHECK:     i64 1, label %[[Z_DEST:[0-9]+]]
-// CHECK:     i64 2, label %[[END:[0-9]+]]
-// CHECK:     i64 3, label %[[END]]
-// CHECK:     i64 4, label %[[END]]
+// CHECK:     i64 2, label %[[SPLITEDGE:[0-9]+]]
+// CHECK:     i64 3, label %[[SPLITEDGE]]
+// CHECK:     i64 4, label %[[SPLITEDGE]]
 // CHECK:   ]
 // CHECK: ; <label>:[[DFLT]]
 // CHECK:   unreachable
@@ -528,6 +530,8 @@ entry(%u : $SinglePayloadNoXI2):
 
 // CHECK: ; <label>:[[X_PREDEST]]
 // CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[SPLITEDGE]]
+// CHECK:   br label %[[END:[0-9]+]]
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   {{%.*}} = phi i64 [ %0, %[[X_PREDEST]] ]
 x_dest(%u2 : $Builtin.Int64):

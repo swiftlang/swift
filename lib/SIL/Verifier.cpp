@@ -2342,6 +2342,35 @@ void SILFunction::verify() const {
   }
   if (!isExternalDeclaration())
     SILVerifier(*this).verify();
+
+  // Verify that there is no non_condbr critical edge.
+  if (getModule().getStage() == SILStage::Canonical) {
+
+    auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
+      assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
+
+      // A critical edge has more than one outgoing edges from the source
+      // block.
+      auto SrcSuccs = T->getSuccessors();
+      if (SrcSuccs.size() <= 1)
+        return false;
+
+      // And its destination block has more than one predecessor.
+      SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
+      assert(!DestBB->pred_empty() && "There should be a predecessor");
+      if (DestBB->getSinglePredecessor())
+        return false;
+
+      return true;
+    };
+
+    for (auto &BB : *this)
+      if (!isa<CondBranchInst>(BB.getTerminator()))
+        for (unsigned Idx = 0, e = BB.getSuccs().size(); Idx != e; ++Idx)
+          assert(!isCriticalEdgePred(BB.getTerminator(), Idx) &&
+                 "non cond_br critical edges not allowed");
+  }
+
 #endif
 }
 
