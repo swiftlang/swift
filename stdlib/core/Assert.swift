@@ -12,8 +12,8 @@
 
 /// User code assertions.
 ///
-/// User code assertions and fatal errors are only enabled in debug mode. In
-/// release or fast mode these checks are disabled. This means they may have no
+/// User code assertions are only enabled in debug mode. In release and
+/// unchecked modes these checks are disabled.  This means they may have no
 /// effect on program semantics, depending on the assert configuration.
 
 /// Traditional C-style assert with an optional message.
