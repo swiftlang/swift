@@ -33,6 +33,7 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
   case RT_RetainAndReturnThree:
   case RT_ObjCRetain:
   case RT_UnknownRetain:
+  case RT_FixLifetime:
     // These entrypoints don't modify any compiler-visible state.
     return NoModRef;
   case RT_Release:

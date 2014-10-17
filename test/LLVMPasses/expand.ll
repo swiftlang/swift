@@ -13,6 +13,11 @@ declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
 declare { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* , i64, i64 , i64 )
 
 ; rdar://11563395 - Synthesize calls to swift_retainAndReturnThree for better codegen
+
+; CHECK-LABEL: @retain3_test1
+; CHECK: tail call {{.*}} @swift_retainAndReturnThree
+; CHECK: ret
+
 define { i8*, i64, %swift.refcounted* } @retain3_test1(i8*, i64, %swift.refcounted*) nounwind {
 entry:
   %3 = bitcast i32 0 to i32
@@ -22,11 +27,6 @@ entry:
   %6 = insertvalue { i8*, i64, %swift.refcounted* } %5, %swift.refcounted* %2, 2
   ret { i8*, i64, %swift.refcounted* } %6
 }
-
-; CHECK: @retain3_test1
-; CHECK: tail call {{.*}} @swift_retainAndReturnThree
-; CHECK: ret
-
 
 ; retain3_test2 - This shows a case where something else (eg inlining an already
 ; optimized function) has given us a swift_retainAndReturnThree that we need to
@@ -40,7 +40,7 @@ entry:
   ret { i8*, i64, %swift.refcounted* } %5
 }
 
-; CHECK: @retain3_test2
+; CHECK-LABEL: @retain3_test2
 ; CHECK: tail call {{.*}} @swift_retainAndReturnThree
 ; CHECK: ret
 
@@ -55,7 +55,17 @@ entry:
   ret { i8*, i64, %swift.refcounted* } %5
 }
 
-; CHECK: @retain3_test3
+; CHECK-LABEL: @retain3_test3
 ; CHECK: tail call {{.*}} @swift_retainAndReturnThree
 ; CHECK: ret
 
+declare void @swift_fixLifetime(%swift.refcounted*)
+
+; CHECK-LABEL: define void @fixlifetime_removal(i8*) {
+; CHECK-NOT: call void swift_fixLifetime
+define void @fixlifetime_removal(i8*) {
+entry:
+  %1 = bitcast i8* %0 to %swift.refcounted*
+  call void @swift_fixLifetime(%swift.refcounted* %1)
+  ret void
+}

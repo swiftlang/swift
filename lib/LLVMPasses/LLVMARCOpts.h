@@ -49,6 +49,9 @@ enum RT_Kind {
   /// void swift_unknownRelease(%swift.refcounted* %P)
   RT_UnknownRelease,
 
+  /// void swift_fixLifetime(%swift.refcounted* %P)
+  RT_FixLifetime,
+
   /// This is not a runtime function that we support.  Maybe it is not a call,
   /// or is a call to something we don't care about.
   RT_Unknown,
@@ -76,6 +79,7 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
     .Case("objc_retain", RT_ObjCRetain)
     .Case("swift_unknownRetain", RT_UnknownRetain)
     .Case("swift_unknownRelease", RT_UnknownRelease)
+    .Case("swift_fixLifetime", RT_FixLifetime)
     .Default(RT_Unknown);
 }
 

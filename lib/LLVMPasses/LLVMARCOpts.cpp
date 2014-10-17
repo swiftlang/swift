@@ -187,6 +187,7 @@ static bool canonicalizeInputFunction(Function &F) {
     case RT_UnknownRetain:
     case RT_UnknownRelease:
     case RT_AllocObject:
+    case RT_FixLifetime:
     case RT_NoMemoryAccessed:
       break;
     case RT_RetainNoResult: {
@@ -418,9 +419,11 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       return true;
     }
 
+    case RT_FixLifetime:
     case RT_Unknown:
-      // BBI->dump();
-      // Otherwise, we get to something unknown/unhandled.  Bail out for now.
+      // Otherwise, we have reached something that we do not understand. Do not
+      // attempt to shorten the lifetime of this object beyond this point so we
+      // are conservative.
       ++BBI;
       goto OutOfLoop;
     }
@@ -476,6 +479,9 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     case RT_AllocObject:
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
+      break;
+
+    case RT_FixLifetime: // This only stops release motion. Retains can move over it.
       break;
         
     case RT_RetainNoResult:
@@ -603,6 +609,7 @@ static DtorKind analyzeDestructor(Value *P) {
       switch (classifyInstruction(I)) {
       case RT_NoMemoryAccessed:
       case RT_AllocObject:
+      case RT_FixLifetime:
         // Skip over random instructions that don't touch memory in the caller.
         continue;
           
@@ -712,23 +719,25 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // well.
       break;
 
+    case RT_NoMemoryAccessed:
       // If no memory is accessed, then something is being done with the
       // pointer: maybe it is bitcast or GEP'd. Since there are no side effects,
       // it is perfectly fine to delete this instruction if all uses of the
       // instruction are also eliminable.
-    case RT_NoMemoryAccessed:
+
       if (I->mayHaveSideEffects() || isa<TerminatorInst>(I))
         return false;
       break;
         
-      // It is perfectly fine to eliminate various retains and releases of this
-      // object: we are zapping all accesses or none.
     case RT_Release:
     case RT_RetainNoResult:
+    case RT_FixLifetime:
+      // It is perfectly fine to eliminate various retains and releases of this
+      // object: we are zapping all accesses or none.
       break;
         
-      // If this is an unknown instruction, we have more interesting things to
-      // consider.
+    // If this is an unknown instruction, we have more interesting things to
+    // consider.
     case RT_Unknown:
     case RT_ObjCRelease:
     case RT_ObjCRetain:
@@ -1074,6 +1083,12 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       Instruction &Inst = *II++;
       
       switch (classifyInstruction(Inst)) {
+      // Delete all fix lifetime instructions. After llvm-ir they have no use
+      // and show up as calls in the final binary.
+      case RT_FixLifetime:
+        Inst.eraseFromParent();
+        ++NumNoopDeleted;
+        continue;
       case RT_Retain:
         llvm_unreachable("This should be canonicalized away!");
       case RT_RetainAndReturnThree:
