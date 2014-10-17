@@ -37,7 +37,7 @@ public protocol Streamable {
 /// *output stream*, for example, by `print` and `println`.
 ///
 /// In order to generate a textual representation for an instance of any
-/// type (which might or might not conform `Printable`), use `toString`.
+/// type (which might or might not conform to `Printable`), use `toString`.
 public protocol Printable {
   /// A textual representation of `self`.
   var description: String { get }
@@ -52,7 +52,7 @@ public protocol Printable {
 /// `description` property.
 ///
 /// In order to generate a textual representation for an instance of any
-/// type (which might or might not conform `DebugPrintable`), use
+/// type (which might or might not conform to `DebugPrintable`), use
 /// `toDebugString`.
 public protocol DebugPrintable {
   /// A textual representation of `self`, suitable for debugging.
