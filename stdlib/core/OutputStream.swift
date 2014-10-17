@@ -35,6 +35,9 @@ public protocol Streamable {
 ///
 /// This textual representation is used when objects are written to an
 /// *output stream*, for example, by `print` and `println`.
+///
+/// In order to generate a textual representation for an instance of any
+/// type (which might or might not conform `Printable`), use `toString`.
 public protocol Printable {
   /// A textual representation of `self`.
   var description: String { get }
@@ -47,6 +50,10 @@ public protocol Printable {
 /// *output stream* by `debugPrint` and `debugPrintln`, and is
 /// typically more verbose than the text provided by a `Printable`\ 's
 /// `description` property.
+///
+/// In order to generate a textual representation for an instance of any
+/// type (which might or might not conform `DebugPrintable`), use
+/// `toDebugString`.
 public protocol DebugPrintable {
   /// A textual representation of `self`, suitable for debugging.
   var debugDescription: String { get }
