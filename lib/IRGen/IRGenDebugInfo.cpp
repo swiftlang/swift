@@ -1159,8 +1159,12 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
   // local static variables of SWIFT_ENTRY_POINT_FUNCTION so they
   // won't get confused with addressors.
   auto File = getOrCreateFile(L.Filename);
-  llvm::DIScope Context = IsLibrary ? MainModule : EntryPointFn;
-  DBuilder.createGlobalVariable(Context, Name, LinkageName, File, L.Line, Ty,
+  if (!IsLibrary)
+    DBuilder.createGlobalVariable(EntryPointFn, Name, LinkageName, File, L.Line,
+                                  Ty, Var->hasInternalLinkage(), Var, nullptr);
+
+  // Emit them a second time as global variables of the current module.
+  DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File, L.Line, Ty,
                                 Var->hasInternalLinkage(), Var, nullptr);
 }
 
