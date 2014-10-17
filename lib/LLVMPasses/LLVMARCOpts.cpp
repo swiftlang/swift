@@ -343,7 +343,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     switch (classifyInstruction(*BBI)) {
     case RT_Retain: // Canonicalized away, shouldn't exist.
     case RT_RetainAndReturnThree:
-      assert(0 && "these entrypoints should be canonicalized away");
+      llvm_unreachable("these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
@@ -471,7 +471,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     switch (classifyInstruction(CurInst)) {
     case RT_Retain: // Canonicalized away, shouldn't exist.
     case RT_RetainAndReturnThree:
-      assert(0 && "these entrypoints should be canonicalized away");
+      llvm_unreachable("these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
     case RT_AllocObject:
       // Skip over random instructions that don't touch memory.  They don't need
@@ -703,7 +703,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     switch (classifyInstruction(*I)) {
     case RT_Retain:
     case RT_RetainAndReturnThree:
-      assert(0 && "These should be canonicalized away");
+      llvm_unreachable("These should be canonicalized away");
 
     case RT_AllocObject:
       // If this is a different swift_allocObject than we started with, then
@@ -1074,7 +1074,8 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       Instruction &Inst = *II++;
       
       switch (classifyInstruction(Inst)) {
-      case RT_Retain: assert(0 && "This should be canonicalized away!");
+      case RT_Retain:
+        llvm_unreachable("This should be canonicalized away!");
       case RT_RetainAndReturnThree:
       case RT_RetainNoResult: {
         Value *ArgVal = cast<CallInst>(Inst).getArgOperand(0);
