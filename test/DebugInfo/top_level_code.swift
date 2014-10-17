@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -S -g -o - | FileCheck %s
+// RUN: %swift %s -S -g -o - | FileCheck %s
 var a = 1
 var b = 2
 println(a+b)
