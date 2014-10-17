@@ -1214,8 +1214,3 @@ llvm::FunctionPass *swift::createSwiftARCExpandPass() {
   initializeSwiftARCExpandPassPass(*llvm::PassRegistry::getPassRegistry());
   return new SwiftARCExpandPass();
 }
-
-llvm::ImmutablePass *swift::createSwiftAliasAnalysisPass() {
-  initializeSwiftAliasAnalysisPass(*PassRegistry::getPassRegistry());
-  return new SwiftAliasAnalysis();
-}

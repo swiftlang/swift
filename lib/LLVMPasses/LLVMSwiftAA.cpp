@@ -44,3 +44,8 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
   
   return AliasAnalysis::getModRefInfo(CS, Loc);
 }
+
+llvm::ImmutablePass *swift::createSwiftAliasAnalysisPass() {
+  initializeSwiftAliasAnalysisPass(*PassRegistry::getPassRegistry());
+  return new SwiftAliasAnalysis();
+}
