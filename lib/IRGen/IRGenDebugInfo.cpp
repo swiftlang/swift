@@ -726,6 +726,7 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
     if (!L.Filename)
       File = MainFile;
     Line = 1;
+    Name = LinkageName;
   }
 
   CanSILFunctionType FnTy = getFunctionType(SILTy);
