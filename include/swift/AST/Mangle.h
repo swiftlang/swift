@@ -127,6 +127,15 @@ public:
 
   void mangleFieldOffsetFull(ValueDecl *decl, bool isIndirect);
   void mangleTypeMetadataFull(CanType ty, bool isPattern, bool isIndirect);
+  
+  /// Mangles globalinit_token and globalinit_func, which are used to
+  /// initialize global variables.
+  /// \param decl The global variable or one of the global variables of a
+  /// pattern, e.g. var (a, b) = (1, 2)
+  /// \param counter A consecutive number inside the compiled file.
+  /// \param isInitFunc If true it's a globalinit_func, otherwise a
+  /// globalinit_token.
+  void mangleGlobalInit(VarDecl *decl, int counter, bool isInitFunc);
 
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ResilienceExpansion expansion,
