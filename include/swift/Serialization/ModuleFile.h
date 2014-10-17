@@ -64,6 +64,9 @@ class ModuleFile : public LazyMemberLoader {
   llvm::BitstreamCursor SILCursor;
   llvm::BitstreamCursor SILIndexCursor;
 
+  /// The name of the module.
+  StringRef Name;
+
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
@@ -476,6 +479,11 @@ public:
   StringRef getModuleFilename() const {
     // FIXME: This seems fragile, maybe store the filename separately ?
     return ModuleInputBuffer->getBufferIdentifier();
+  }
+
+  /// Returns the module name as stored in the serialized data.
+  StringRef getModuleName() const {
+    return Name;
   }
 
   /// AST-verify imported decls.

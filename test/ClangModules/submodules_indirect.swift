@@ -3,7 +3,7 @@
 // RUN: ls -lR %t/clang-module-cache | FileCheck %s
 // CHECK: ctypes{{.*}}.pcm
 
-// RUN: %swift %clang-importer-sdk -emit-module-path %t/submodules.swiftmodule -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules/ %s
+// RUN: %swift %clang-importer-sdk -o %t -emit-module -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules/ %s -module-name submodules
 // RUN: echo 'import submodules; println("\(x), \(y)")' | %swift %clang-importer-sdk -parse - -I %t -I %S/Inputs/custom-modules/
 // RUN: echo 'import submodules; println("\(x), \(y)")' | not %swift -parse - -I %t -I %S/Inputs/custom-modules/ 2>&1 | FileCheck -check-prefix=MISSING %s
 
