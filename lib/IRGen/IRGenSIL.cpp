@@ -1662,32 +1662,6 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   }
 }
 
-static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
-                                 Identifier builtin,
-                                 ApplyInst *i,
-                                 ArrayRef<Substitution> substitutions) {
-  CanSILFunctionType origCalleeType = i->getOrigCalleeType();
-  
-  auto argValues = i->getArgumentsWithoutIndirectResult();
-  auto params = origCalleeType->getParametersWithoutIndirectResult();
-  assert(argValues.size() == params.size());
-  
-  GenericContextScope scope(IGF.IGM,
-                            i->getOrigCalleeType()->getGenericSignature());
-  Explosion args;
-  for (auto index : indices(argValues)) {
-    emitApplyArgument(IGF, argValues[index], params[index], args);
-  }
-  
-  assert(!i->hasIndirectResult()
-         && "builtins shouldn't have indirect results");
-  Explosion result;
-  emitBuiltinCall(IGF, builtin,
-                  i->getSubstCalleeType()->getResult().getSILType(),
-                  args, result, substitutions);
-  IGF.setLoweredExplosion(SILValue(i,0), result);
-}
-
 void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
   auto argValues = i->getArguments();
   Explosion args;
