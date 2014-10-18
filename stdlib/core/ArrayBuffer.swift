@@ -77,13 +77,23 @@ class _IndirectArrayBuffer {
   
   func getNativeBufferOf<T>(_: T.Type) -> _ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
-    return _ContiguousArrayBuffer(
-      buffer != nil ? unsafeBitCast(buffer, _ContiguousArrayStorage<T>.self) : nil)
+    if buffer != nil {
+      let b: _ContiguousArrayStorageBase = unsafeDowncast(buffer!)
+      return _ContiguousArrayBuffer(b)
+    }
+    return _ContiguousArrayBuffer()
   }
 
   func getCocoa() -> _NSArrayCoreType {
     _sanityCheck(isCocoa)
-    return unsafeBitCast(buffer!, _NSArrayCoreType.self)
+    // FIXME: This cannot yet be an unsafeDowncast, since NSArray
+    // doesn't conform to _NSArrayCoreType. <rdar://problem/18694860>
+    // Nonempty protocol in runtime shim header crashes build
+    _sanityCheck(
+      !_usesNativeSwiftReferenceCounting(buffer!.dynamicType)
+      || buffer is _NSArrayCoreType
+    )
+    return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(buffer!))
   }
 }
 
@@ -227,11 +237,16 @@ extension _ArrayBuffer {
     }
     if _slowPath(indirect.needsElementTypeCheck) {
       if _fastPath(_isNative) {
-        for x in _native[subRange] {
-          _precondition(
-            unsafeBitCast(x, AnyObject.self) is T,
-            "NSArray element failed to match the Swift Array Element type")
-        }
+        _precondition(
+          withUnsafeBufferPointer {
+            (p0)->Bool in
+            // We have only dynamic knowledge that T is an object, so we
+            // can't safely convert it to AnyObject. Instead reinterpret
+            // the buffer memory as contiguous AnyObjects
+            let p1 = UnsafePointer<AnyObject>(p0.baseAddress)
+            return !contains(subRange) { !(p1[$0] is T) }
+          },
+          "NSArray element failed to match the Swift Array Element type")
       }
       else if !subRange.isEmpty {
         let ns = _nonNative!
@@ -262,7 +277,8 @@ extension _ArrayBuffer {
       location:subRange.startIndex,
       length: subRange.endIndex - subRange.startIndex)
 
-    let buffer = unsafeBitCast(target, UnsafeMutablePointer<AnyObject>.self)
+    // Non-native buffers store only objects
+    let buffer = UnsafeMutablePointer<AnyObject>(target)
     
     // Copies the references out of the NSArray without retaining them
     nonNative.getObjects(buffer, range: nsSubRange)
@@ -358,7 +374,8 @@ extension _ArrayBuffer {
       if _fastPath(_isNative) {
         return _native[i]
       }
-      return unsafeBitCast(_nonNative!.objectAtIndex(i), T.self)
+      // We have already typechecked this above, so it is known-safe.
+      return Builtin.reinterpretCast(_nonNative!.objectAtIndex(i))
     }
     
     nonmutating set {
@@ -471,11 +488,14 @@ extension _ArrayBuffer {
 
   /// Our native representation, if any.  If there's no native
   /// representation, the result is an empty buffer.
-  typealias _OptStorage = _ContiguousArrayStorage<T>?
   var _native: NativeBuffer {
     if !_isClassOrObjCExistential(T.self) {
-      return NativeBuffer(
-        unsafeBitCast(storage, _OptStorage.self))
+      if let n = storage {
+        let o: AnyObject = Builtin.castFromNativeObject(n)
+        let b: _ContiguousArrayStorageBase = unsafeDowncast(o)
+        return NativeBuffer(b)
+      }
+      return NativeBuffer()
     }
     else {
       let i = indirect
