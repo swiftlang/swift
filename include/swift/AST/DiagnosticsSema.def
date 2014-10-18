@@ -115,10 +115,6 @@ ERROR(serialization_missing_dependencies,sema,Fatal,
       "missing required modules: %0", (StringRef))
 ERROR(serialization_missing_shadowed_module,sema,Fatal,
       "cannot load underlying module for %0", (Identifier))
-ERROR(serialization_name_mismatch,sema,Fatal,
-      "cannot load module '%0' as %1", (StringRef, Identifier))
-ERROR(serialization_name_mismatch_repl,sema,none,
-      "cannot load module '%0' as %1", (StringRef, Identifier))
 
 ERROR(unknown_name_in_type,sema_nb,none,
       "use of unknown scope %0 in type reference", (Identifier))

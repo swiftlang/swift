@@ -191,7 +191,6 @@ FileUnit *SerializedModuleLoader::loadAST(
     return nullptr;
   case ModuleStatus::MissingDependency:
   case ModuleStatus::MissingShadowedModule:
-  case ModuleStatus::NameMismatch:
     llvm_unreachable("dependencies haven't been loaded yet");
   }
 
@@ -208,23 +207,11 @@ FileUnit *SerializedModuleLoader::loadAST(
 
   // We failed to bring the module file into the AST.
   M.removeFile(*fileUnit);
-  assert(loadedModuleFile->getStatus() == ModuleStatus::NameMismatch ||
-         loadedModuleFile->getStatus() == ModuleStatus::MissingDependency ||
+  assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency ||
          loadedModuleFile->getStatus() == ModuleStatus::MissingShadowedModule);
 
   if (!diagLoc)
     return nullptr;
-
-  if (loadedModuleFile->getStatus() == ModuleStatus::NameMismatch) {
-    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
-    // this as a non-fatal error.
-    auto diagKind = diag::serialization_name_mismatch;
-    if (Ctx.LangOpts.DebuggerSupport)
-      diagKind = diag::serialization_name_mismatch_repl;
-    Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadedModuleFile->getModuleName(), M.Name);
-    return nullptr;
-  }
 
   if (loadedModuleFile->getStatus() == ModuleStatus::MissingShadowedModule) {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,

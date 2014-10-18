@@ -44,10 +44,7 @@ enum class ModuleStatus {
   Malformed,
 
   /// The module documentation file is malformed in some way.
-  MalformedDocumentation,
-
-  /// The module file's name does not match the module it is being loaded into.
-  NameMismatch
+  MalformedDocumentation
 };
 
 /// \brief Imports serialized Swift modules into an ASTContext.
