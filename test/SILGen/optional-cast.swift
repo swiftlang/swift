@@ -14,8 +14,7 @@ func foo(y : A?) {
 // CHECK-NEXT: retain_value %0
 // CHECK-NEXT: store %0 to [[TMP_OPTA]]#1
 //   Check whether the temporary holds a value.
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<A>([[TMP_OPTA]]#1)
+// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OPTA]]#1
 // CHECK-NEXT: cond_br [[T1]], [[IS_PRESENT:bb.*]], [[NOT_PRESENT:bb[0-9]+]]
 //   Not sure what this block is doing here.
 // CHECK:    [[CONT:bb[0-9]+]]:
@@ -68,14 +67,12 @@ func bar(y : A????) {
 //   Materialize the argument and check for Some(...)
 // CHECK-NEXT: retain_value %0
 // CHECK-NEXT: store %0 to [[TMP_OOOOA]]#1
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<Optional<Optional<Optional<A>>>>([[TMP_OOOOA]]#1)
+// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OOOOA]]#1
 // CHECK-NEXT: cond_br [[T1]], [[P:bb.*]], [[NP:bb[0-9]+]]
 //   Not sure why this block is right here.
 //   Switch out on the value in [[OB2]].
 // CHECK:    [[SWITCH_OB2:bb[0-9]+]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<B>([[TMP_OB2]]#1)
+// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OB2]]#1
 // CHECK-NEXT: cond_br [[T1]], [[IS_B2:bb.*]], [[NOT_B2:bb[0-9]+]]
 //   If not, finish the evaluation.
 // CHECK:    [[NP]]:
@@ -91,8 +88,7 @@ func bar(y : A????) {
 // CHECK-NEXT: [[PAYLOAD_OOOA:%.*]] = unchecked_take_enum_data_addr [[TMP_OOOOA]]
 // CHECK-NEXT: [[VALUE_OOOA:%.*]] = load [[PAYLOAD_OOOA]]
 // CHECK-NEXT: store [[VALUE_OOOA]] to [[TMP_OOOA]]
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<Optional<Optional<A>>>([[TMP_OOOA]]#1)
+// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OOOA]]#1
 // CHECK-NEXT: cond_br [[T1]], [[PP:bb.*]], [[NPP:bb[0-9]+]]
 //   If not, finish the evaluation.
 // CHECK:    [[NPP]]:
@@ -108,8 +104,7 @@ func bar(y : A????) {
 // CHECK-NEXT: [[PAYLOAD_OOA:%.*]] = unchecked_take_enum_data_addr [[TMP_OOOA]]
 // CHECK-NEXT: [[VALUE_OOA:%.*]] = load [[PAYLOAD_OOA]]
 // CHECK-NEXT: store [[VALUE_OOA]] to [[TMP_OOA]]
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<Optional<A>>([[TMP_OOA]]#1)
+// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OOA]]#1
 // CHECK-NEXT: cond_br [[T1]], [[PPP:bb.*]], [[NPPP:bb[0-9]+]]
 //   If not, wrap up with Some(None).
 // CHECK:    [[NPPP]]:
@@ -125,8 +120,7 @@ func bar(y : A????) {
 // CHECK-NEXT: [[PAYLOAD_OA:%.*]] = unchecked_take_enum_data_addr [[TMP_OOA]]
 // CHECK-NEXT: [[VALUE_OA:%.*]] = load [[PAYLOAD_OA]]
 // CHECK-NEXT: store [[VALUE_OA]] to [[TMP_OA]]
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<A>([[TMP_OA]]#1)
+// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OA]]#1
 // CHECK-NEXT: cond_br [[T1]], [[PPPP:bb.*]], [[NPPPP:bb[0-9]+]]
 //   If not, wrap up with Some(Some(None)).
 // CHECK:    [[NPPPP]]:
@@ -208,8 +202,7 @@ func baz(y : AnyObject?) {
 // CHECK-NEXT: [[TMP_OPTANY:%.*]] = alloc_stack $Optional<AnyObject>
 // CHECK-NEXT: retain_value %0
 // CHECK-NEXT: store %0 to [[TMP_OPTANY]]#1
-// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<AnyObject>([[TMP_OPTANY]]#1)
+// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OPTANY]]#1
 // CHECK:      [[TMP_ANY:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTANY]]
 // CHECK-NEXT: [[VAL:%.*]] = load [[TMP_ANY]]
 // CHECK-NEXT: checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]

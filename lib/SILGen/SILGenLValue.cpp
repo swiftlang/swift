@@ -1554,17 +1554,14 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
                                                    SILValue addr) {
   SILType optType = addr.getType().getObjectType();
   OptionalTypeKind optionalKind;
-  CanType valueType = getOptionalValueType(optType, optionalKind);
+  getOptionalValueType(optType, optionalKind);
 
-  FuncDecl *fn =
-    getASTContext().getDoesOptionalHaveValueDecl(nullptr, optionalKind);
-  Substitution sub = getSimpleSubstitution(fn, valueType);
-
-  // The argument to _doesOptionalHaveValue is passed by reference.
-  return emitApplyOfLibraryIntrinsic(loc, fn, sub,
-                                     ManagedValue::forUnmanaged(addr),
-                                     SGFContext())
-    .getUnmanagedValue();
+  auto boolTy = SILType::getBuiltinIntegerType(1, getASTContext());
+  SILValue yes = B.createIntegerLiteral(loc, boolTy, 1);
+  SILValue no = B.createIntegerLiteral(loc, boolTy, 0);
+  auto someDecl = getASTContext().getOptionalSomeDecl(optionalKind);
+  return B.createSelectEnumAddr(loc, addr, boolTy, no,
+                                std::make_pair(someDecl, yes));
 }
 
 ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,

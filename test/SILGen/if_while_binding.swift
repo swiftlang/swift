@@ -13,8 +13,7 @@ func if_no_else() {
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3fooFT_GSqSS_
   // CHECK:   [[OPT_RES:%.*]] = apply [[FOO]]()
   // CHECK:   store [[OPT_RES]] to [[OPT_BUF]]#1
-  // CHECK:   [[HAS_VALUE_FN:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-  // CHECK:   [[HAS_VALUE:%.*]] = apply [transparent] [[HAS_VALUE_FN]]<String>([[OPT_BUF]]#1)
+  // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[OPT_BUF]]#1
   // CHECK:   cond_br [[HAS_VALUE]], [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YES]]:
@@ -38,8 +37,7 @@ func if_else_chain() {
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3foo
   // CHECK:   [[OPT_RES:%.*]] = apply [[FOO]]()
   // CHECK:   store [[OPT_RES]] to [[OPT_BUF]]#1
-  // CHECK:   [[HAS_VALUE_FN:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-  // CHECK:   [[HAS_VALUE:%.*]] = apply [transparent] [[HAS_VALUE_FN]]<String>([[OPT_BUF]]#1)
+  // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[OPT_BUF]]#1
   // CHECK:   cond_br [[HAS_VALUE]], [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YES]]:
@@ -79,8 +77,7 @@ func while_loop() {
   // CHECK:   [[OPT_BUF:%.*]] = alloc_stack $Optional<String>
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
-  // CHECK:   [[HAS_VALUE_FN:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-  // CHECK:   [[HAS_VALUE:%.*]] = apply [transparent] [[HAS_VALUE_FN]]<String>([[OPT_BUF]]#1)
+  // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[OPT_BUF]]#1
   // CHECK:   cond_br [[HAS_VALUE]], [[LOOP_BODY:bb[0-9]+]], [[LOOP_EXIT:bb[0-9]+]]
   while let x = foo() {
   // CHECK: [[LOOP_BODY]]:

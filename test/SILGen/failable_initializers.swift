@@ -79,8 +79,7 @@ struct LoadableStruct {
   // CHECK:         [[DELEGATEE_SELF:%.*]] = apply [[DELEGATEE_INIT]]
   // CHECK:         [[DELEGATEE_SELF_MAT:%.*]] = alloc_stack $Optional<LoadableStruct>
   // CHECK:         store [[DELEGATEE_SELF]] to [[DELEGATEE_SELF_MAT]]
-  // CHECK:         [[HAS_VALUE_FN:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-  // CHECK:         [[HAS_VALUE:%.*]] = apply [transparent] [[HAS_VALUE_FN]]<LoadableStruct>([[DELEGATEE_SELF_MAT]]#1)
+  // CHECK:         [[HAS_VALUE:%.*]] = select_enum_addr [[DELEGATEE_SELF_MAT]]#1
   // CHECK:         cond_br [[HAS_VALUE]], [[DOES_HAVE_VALUE:bb[0-9]+]], [[DOESNT_HAVE_VALUE:bb[0-9]+]]
   // -- TODO: failure
   // CHECK:       [[FAILURE:bb[0-9]+]]:
@@ -176,8 +175,7 @@ struct AddressOnlyStruct {
   // CHECK:         [[DELEGATEE_INIT:%.*]] = function_ref @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3optSb_GSqS0__
   // CHECK:         [[DELEGATEE_SELF:%.*]] = alloc_stack $Optional<AddressOnlyStruct>
   // CHECK:         apply [[DELEGATEE_INIT]]([[DELEGATEE_SELF]]
-  // CHECK:         [[HAS_VALUE_FN:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-  // CHECK:         [[HAS_VALUE:%.*]] = apply [transparent] [[HAS_VALUE_FN]]<AddressOnlyStruct>([[DELEGATEE_SELF]]#1)
+  // CHECK:         [[HAS_VALUE:%.*]] = select_enum_addr [[DELEGATEE_SELF]]
   // CHECK:         cond_br [[HAS_VALUE]], [[DOES_HAVE_VALUE:bb[0-9]+]], [[DOESNT_HAVE_VALUE:bb[0-9]+]]
   // -- TODO: failure
   // CHECK:       [[FAILURE:bb[0-9]+]]:
@@ -287,8 +285,7 @@ class RootClass {
   // CHECK:         [[NEW_SELF_OPT:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
   // CHECK:         [[NEW_SELF_OPT_MAT:%.*]] = alloc_stack $Optional<RootClass>
   // CHECK:         store [[NEW_SELF_OPT]] to [[NEW_SELF_OPT_MAT]]
-  // CHECK:         [[DOES_OPT_HAVE_VALUE:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
-  // CHECK:         [[HAS_VALUE:%.*]] = apply [transparent] [[DOES_OPT_HAVE_VALUE]]<RootClass>([[NEW_SELF_OPT_MAT]]#1)
+  // CHECK:         [[HAS_VALUE:%.*]] = select_enum_addr [[NEW_SELF_OPT_MAT]]#1
   // CHECK:         cond_br [[HAS_VALUE]], [[HAS_VALUE:bb[0-9]+]], [[NO_VALUE:bb[0-9]+]]
 
   // CHECK:       [[FAILURE:bb[0-9]+]]:
