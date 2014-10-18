@@ -50,6 +50,8 @@ public struct _StringBuffer {
   // Make this a buffer of UTF-16 code units so that it's properly
   // aligned for them if that's what we store.
   typealias _Storage = _HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
+  typealias HeapBufferStorage
+    = _HeapBufferStorage<_StringBufferIVars, UTF16.CodeUnit>
 
   init(_ storage: _Storage) {
     _storage = storage
@@ -68,7 +70,8 @@ public struct _StringBuffer {
     // Used to round capacity up to nearest multiple of 16 bits, the
     // element size of our storage.
     let divRound = 1 - elementShift
-    _storage = _Storage(_Storage.Storage.self,
+    _storage = _Storage(
+      HeapBufferStorage.self,
       _StringBufferIVars(elementWidth),
       (capacity + capacityBump + divRound) >> divRound
     )
