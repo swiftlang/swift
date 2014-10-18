@@ -19,7 +19,7 @@ sil_global @x : $Bar
 //CHECK: return
 sil @function_with_cm : $@thin () -> () {
 bb0:
-  %0 = sil_global_addr @x : $*Bar                     // users: %2, %3
+  %0 = global_addr @x : $*Bar                     // users: %2, %3
   %1 = alloc_ref $Bar                             // user: %2
   store %1 to %0 : $*Bar                          // id: %2
   %3 = load %0 : $*Bar                            // users: %6, %5, %4

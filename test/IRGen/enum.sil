@@ -2284,11 +2284,11 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 sil @force_global_variables_to_materialize : $() -> () {
 entry:
   // Force the global variables to materialize.
-  %x = sil_global_addr @x : $*AllConcreteTestEnums
+  %x = global_addr @x : $*AllConcreteTestEnums
   %y = load %x : $*AllConcreteTestEnums
-  %a = sil_global_addr @aa : $*DynamicSingleton<()>
+  %a = global_addr @aa : $*DynamicSingleton<()>
   %q = load %a : $*DynamicSingleton<()>
-  %b = sil_global_addr @bb : $*DynamicSingleton<NoPayloads>
+  %b = global_addr @bb : $*DynamicSingleton<NoPayloads>
   %r = load %b : $*DynamicSingleton<NoPayloads>
   %z = tuple ()
   return %z : $()

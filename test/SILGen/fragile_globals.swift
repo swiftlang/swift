@@ -22,12 +22,12 @@ public func sum() -> Int {
 // Check if all the addressors are inlined.
 
 // CHECK-LABEL: sil @_TF15fragile_globals3sumFT_Si
-// CHECK-DAG: sil_global_addr @_Tv15fragile_globals4myggSi
-// CHECK-DAG: sil_global_addr @_Tv7ModuleA{{.*}}gg
-// CHECK-DAG: sil_global_addr @_Tv7ModuleA{{.*}}gg
-// CHECK-DAG: sil_global_addr @globalinit_[[T1]]_token0
-// CHECK-DAG: sil_global_addr @globalinit_[[T2]]_token0
-// CHECK-DAG: sil_global_addr @globalinit_[[T3]]_token0
+// CHECK-DAG: global_addr @_Tv15fragile_globals4myggSi
+// CHECK-DAG: global_addr @_Tv7ModuleA{{.*}}gg
+// CHECK-DAG: global_addr @_Tv7ModuleA{{.*}}gg
+// CHECK-DAG: global_addr @globalinit_[[T1]]_token0
+// CHECK-DAG: global_addr @globalinit_[[T2]]_token0
+// CHECK-DAG: global_addr @globalinit_[[T3]]_token0
 // CHECK-DAG: function_ref @globalinit_[[T1]]_func0
 // CHECK-DAG: function_ref @globalinit_[[T2]]_func0
 // CHECK-DAG: function_ref @globalinit_[[T3]]_func0

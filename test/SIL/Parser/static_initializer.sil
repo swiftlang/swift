@@ -17,7 +17,7 @@ sil_global @_Tv2ch1xSi : $Int, @globalinit_func0 : $@thin () -> ()
 // CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
 sil private @globalinit_func0 : $@thin () -> () {
 bb0:
-  %0 = sil_global_addr @_Tv2ch1xSi : $*Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int
   %1 = integer_literal $Builtin.Word, 2
   %2 = struct $Int (%1 : $Builtin.Word)
   store %2 to %0 : $*Int
@@ -28,7 +28,7 @@ bb0:
 // CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
 sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
 bb0:
-  %0 = sil_global_addr @_Tv2ch1xSi : $*Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int
   %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
 }
@@ -36,7 +36,7 @@ bb0:
 // CHECK-LABEL: sil @_TF2ch1fFT_Si : $@thin () -> Int {
 sil @_TF2ch1fFT_Si : $@thin () -> Int {
 bb0:
-  %0 = sil_global_addr @_Tv2ch1xSi : $*Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int
   %1 = load %0 : $*Int
   return %1 : $Int
 }

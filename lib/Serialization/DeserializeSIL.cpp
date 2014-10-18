@@ -245,7 +245,7 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
 
   if (!Placeholders[ResultNum])
     Placeholders[ResultNum] =
-      new (SILMod) SILGlobalAddrInst(SILFileLocation(Loc), Type);
+      new (SILMod) GlobalAddrInst(SILFileLocation(Loc), Type);
   return Placeholders[ResultNum];
 }
 
@@ -952,7 +952,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                       Args);
     break;
   }
-  case ValueKind::SILGlobalAddrInst: {
+  case ValueKind::GlobalAddrInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     auto Ty = MF->getType(TyID);
     Identifier Name = MF->getIdentifier(ValID);
@@ -962,10 +962,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(g && "Can't deserialize global variable");
     assert(g->getLoweredType().getAddressType() ==
            getSILType(Ty, (SILValueCategory)TyCategory) &&
-           "Type of a global variable does not match SILGlobalAddr.");
+           "Type of a global variable does not match GlobalAddr.");
     (void)Ty;
 
-    ResultVal = Builder.createSILGlobalAddr(Loc, g);
+    ResultVal = Builder.createGlobalAddr(Loc, g);
     break;
   }
   case ValueKind::DeallocStackInst: {

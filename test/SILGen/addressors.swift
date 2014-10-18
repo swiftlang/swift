@@ -79,7 +79,7 @@ var global: Int {
     return UnsafePointer(uninitAddr)
   }
 // CHECK: sil hidden @_TF10addressorsl6globalSi : $@thin () -> UnsafePointer<Int> {
-// CHECK:   [[T0:%.*]] = sil_global_addr @_Tv10addressors10uninitAddrGVSs20UnsafeMutablePointerSi_ : $*UnsafeMutablePointer<Int>
+// CHECK:   [[T0:%.*]] = global_addr @_Tv10addressors10uninitAddrGVSs20UnsafeMutablePointerSi_ : $*UnsafeMutablePointer<Int>
 // CHECK:   [[T1:%.*]] = load [[T0]] : $*UnsafeMutablePointer<Int>
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T3:%.*]] = struct $UnsafePointer<Int> ([[T2]] : $Builtin.RawPointer)

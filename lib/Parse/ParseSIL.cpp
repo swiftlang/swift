@@ -494,7 +494,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
         HadError = true;
         P.diagnose(Name.NameLoc, diag::invalid_sil_value_name_result_number);
         // Make sure to return something of the requested type.
-        return new (SILMod) SILGlobalAddrInst(Loc, Type);
+        return new (SILMod) GlobalAddrInst(Loc, Type);
       }
     }
 
@@ -505,7 +505,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
       P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
                  EntryTy.getSwiftRValueType(), Type.getSwiftRValueType());
       // Make sure to return something of the requested type.
-      return new (SILMod) SILGlobalAddrInst(Loc, Type);
+      return new (SILMod) GlobalAddrInst(Loc, Type);
     }
 
     return SILValue(Entry, Name.isMRV() ? Name.ResultVal : 0);
@@ -516,7 +516,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
   ForwardRefLocalValues[Name.Name] = Name.NameLoc;
 
   if (!Name.isMRV()) {
-    Entry = new (SILMod) SILGlobalAddrInst(Loc, Type);
+    Entry = new (SILMod) GlobalAddrInst(Loc, Type);
     return Entry;
   }
 
@@ -527,7 +527,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
 
   if (!Placeholders[Name.ResultVal])
     Placeholders[Name.ResultVal] =
-      new (SILMod) SILGlobalAddrInst(Loc, Type);
+      new (SILMod) GlobalAddrInst(Loc, Type);
   return Placeholders[Name.ResultVal];
 }
 
@@ -1204,7 +1204,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("ref_to_unmanaged", ValueKind::RefToUnmanagedInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
     .Case("retain_value", ValueKind::RetainValueInst)
-    .Case("sil_global_addr", ValueKind::SILGlobalAddrInst)
+    .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("strong_release", ValueKind::StrongReleaseInst)
     .Case("strong_retain", ValueKind::StrongRetainInst)
     .Case("strong_retain_autoreleased", ValueKind::StrongRetainAutoreleasedInst)
@@ -2663,7 +2663,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createObjCProtocol(InstLoc, cast<ProtocolDecl>(VD), Ty);
     break;
   }
-  case ValueKind::SILGlobalAddrInst: {
+  case ValueKind::GlobalAddrInst: {
     Identifier GlobalName;
     SourceLoc IdLoc;
     SILType Ty;
@@ -2687,7 +2687,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    ResultVal = B.createSILGlobalAddr(InstLoc, global);
+    ResultVal = B.createGlobalAddr(InstLoc, global);
     break;
   }
   case ValueKind::SelectEnumInst:

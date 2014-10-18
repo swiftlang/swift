@@ -21,12 +21,12 @@ sil [fragile] @globalinit_func0 : $@thin () -> ()
 // CHECK-NOT: sil public_external @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
 sil @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
 bb0:
-  %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word
+  %1 = global_addr @globalinit_token0 : $*Builtin.Word
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@thin () -> ()
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
-  %6 = sil_global_addr @staticProp : $*Int
+  %6 = global_addr @staticProp : $*Int
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
@@ -35,8 +35,8 @@ bb0:
 // CHECK-LABEL: sil public_external [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer {
 sil [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer {
 bb0:
-  // CHECK: sil_global_addr @public_global : $*Builtin.Word
-  %1 = sil_global_addr @public_global : $*Builtin.Word
+  // CHECK: global_addr @public_global : $*Builtin.Word
+  %1 = global_addr @public_global : $*Builtin.Word
   // CHECK: unchecked_addr_cast {{%.*}} : $*Builtin.Word to $*Builtin.RawPointer
   %a = unchecked_addr_cast %1 : $*Builtin.Word to $*Builtin.RawPointer
   %2 = address_to_pointer %a : $*Builtin.RawPointer to $Builtin.RawPointer
@@ -44,7 +44,7 @@ bb0:
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
   // CHECK: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@callee_owned () -> ()) : $()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
-  %6 = sil_global_addr @staticProp : $*Int
+  %6 = global_addr @staticProp : $*Int
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
@@ -485,8 +485,8 @@ sil [fragile] @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
 // CHECK-LABEL: @global_code : $@thin () -> ()
 sil [fragile] @global_code : $@thin () -> () {
 bb0:
-  // CHECK: sil_global_addr @x : $*Int
-  %0 = sil_global_addr @x : $*Int
+  // CHECK: global_addr @x : $*Int
+  %0 = global_addr @x : $*Int
   %1 = function_ref @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
   %2 = metatype $@thin Int.Type
   %3 = integer_literal $Builtin.Int128, 0 // CHECK: integer_literal $Builtin.Int128, 0

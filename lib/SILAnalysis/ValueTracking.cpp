@@ -69,7 +69,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::LoadWeakInst:
   case ValueKind::MetatypeInst:
   case ValueKind::ObjCProtocolInst:
-  case ValueKind::SILGlobalAddrInst:
+  case ValueKind::GlobalAddrInst:
   case ValueKind::StoreInst:
   case ValueKind::StoreWeakInst:
   case ValueKind::StringLiteralInst:
@@ -380,7 +380,7 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
   //Inspect allocations and pointer literals.
   if (isa<StringLiteralInst>(Value.getDef()) ||
       isa<AllocationInst>(Value.getDef()) ||
-      isa<SILGlobalAddrInst>(Value.getDef()))
+      isa<GlobalAddrInst>(Value.getDef()))
     return IsZeroKind::NotZero;
 
   return IsZeroKind::Unknown;

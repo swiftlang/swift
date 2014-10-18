@@ -23,7 +23,7 @@ sil_global @x : $Bar
 //CHECK: return
 sil @function_with_cm_with_cast : $@thin () -> () {
 bb0:
-  %0 = sil_global_addr @x : $*Bar                     // users: %7, %8
+  %0 = global_addr @x : $*Bar                     // users: %7, %8
   %1 = alloc_ref $Foo                             // users: %5, %3, %2
   strong_retain %1 : $Foo                         // id: %2
   %3 = upcast %1 : $Foo to $Bar                   // user: %4

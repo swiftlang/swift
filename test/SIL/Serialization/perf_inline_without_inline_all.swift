@@ -7,7 +7,7 @@ import Swift
 
 // CHECK-LABEL: sil @main
 // CHECK: bb0({{.*}}):
-// CHECK-NEXT: sil_global_addr
+// CHECK-NEXT: global_addr
 // CHECK-NEXT: struct
 // CHECK-NEXT: struct
 // CHECK-NEXT: store

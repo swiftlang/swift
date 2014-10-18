@@ -240,8 +240,8 @@ namespace {
       return X->getReferencedFunction() == RHS->getReferencedFunction();
     }
 
-    bool visitSILGlobalAddrInst(const SILGlobalAddrInst *RHS) {
-      auto *X = cast<SILGlobalAddrInst>(LHS);
+    bool visitGlobalAddrInst(const GlobalAddrInst *RHS) {
+      auto *X = cast<GlobalAddrInst>(LHS);
       return X->getReferencedGlobal() == RHS->getReferencedGlobal();
     }
 
@@ -819,14 +819,14 @@ void FunctionRefInst::dropReferencedFunction() {
   Function = nullptr;
 }
 
-SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)
-  : LiteralInst(ValueKind::SILGlobalAddrInst, Loc,
+GlobalAddrInst::GlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)
+  : LiteralInst(ValueKind::GlobalAddrInst, Loc,
                 Global->getLoweredType().getAddressType()),
     Global(Global)
 {}
 
-SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILType Ty)
-  : LiteralInst(ValueKind::SILGlobalAddrInst, Loc, Ty),
+GlobalAddrInst::GlobalAddrInst(SILLocation Loc, SILType Ty)
+  : LiteralInst(ValueKind::GlobalAddrInst, Loc, Ty),
     Global(nullptr)
 {}
 

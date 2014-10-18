@@ -598,10 +598,8 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
     --SI;
     SILInstruction *Inst = &*SI;
     if (!SrcUserInsts.count(Inst)) {
-      if (!IsWorthHoisting) {
-        if (const ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
-          IsWorthHoisting = true;
-      }
+      if (!IsWorthHoisting && isa<ApplyInst>(Inst))
+        IsWorthHoisting = true;
       continue;
     }
     if (auto *CopyInst = dyn_cast<CopyAddrInst>(Inst)) {

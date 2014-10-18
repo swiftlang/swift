@@ -610,12 +610,12 @@ public:
     verifySILFunctionType(fnType);
   }
 
-  void checkSILGlobalAddrInst(SILGlobalAddrInst *GAI) {
+  void checkGlobalAddrInst(GlobalAddrInst *GAI) {
     require(GAI->getType().isAddress(),
-            "SILGlobalAddr must have an address result type");
+            "GlobalAddr must have an address result type");
     require(GAI->getType().getObjectType() ==
               GAI->getReferencedGlobal()->getLoweredType(),
-            "SILGlobalAddr must be the address type of the variable it "
+            "GlobalAddr must be the address type of the variable it "
             "references");
     if (F.isFragile()) {
       SILGlobalVariable *RefG = GAI->getReferencedGlobal();

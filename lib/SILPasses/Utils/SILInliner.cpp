@@ -213,7 +213,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
     case ValueKind::FunctionRefInst:
-    case ValueKind::SILGlobalAddrInst:
+    case ValueKind::GlobalAddrInst:
       return InlineCost::Free;
 
     // Typed GEPs are free.

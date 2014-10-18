@@ -26,7 +26,7 @@ syn keyword swiftKeyword alloc_stack alloc_ref alloc_ref_dynamic alloc_box deall
 syn keyword swiftKeyword debug_value debug_value_addr skipwhite
 syn keyword swiftKeyword load store assign  mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer to skipwhite
 syn keyword swiftKeyword strong_retain strong_retain_autoreleased strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_weak fix_lifetime skipwhite
-syn keyword swiftKeyword function_ref integer_literal float_literal string_literal sil_global_addr skipwhite
+syn keyword swiftKeyword function_ref integer_literal float_literal string_literal global_addr skipwhite
 syn keyword swiftKeyword class_method super_method witness_method dynamic_method skipwhite
 syn keyword swiftKeyword apply partial_apply builtin skipwhite
 syn keyword swiftKeyword metatype value_metatype existential_metatype skipwhite

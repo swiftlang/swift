@@ -11,7 +11,7 @@ func referenceToAvailableGlobalVariable() {
   // A definitely available global variable gets loaded as usual.
   let _ = globalAvailableOn10_9
   
-  // CHECK: [[GLOBAL_ADDR:%.*]] = sil_global_addr @_Tv22availability_optionals21globalAvailableOn10_9Si : $*Int
+  // CHECK: [[GLOBAL_ADDR:%.*]] = global_addr @_Tv22availability_optionals21globalAvailableOn10_9Si : $*Int
   // CHECK: [[LOADED_VAL:%.*]] = load [[GLOBAL_ADDR]] : $*Int
 }
 
@@ -21,7 +21,7 @@ func referenceToPotentiallyUnavailableGlobalVariable() {
   let _ = globalAvailableOn10_10
  
   // Check the required availability.
-  // CHECK: [[GLOBAL_ADDR:%.*]] = sil_global_addr @_Tv22availability_optionals22globalAvailableOn10_10Si : $*Int
+  // CHECK: [[GLOBAL_ADDR:%.*]] = global_addr @_Tv22availability_optionals22globalAvailableOn10_10Si : $*Int
   // CHECK: [[OPT_ADDR:%.*]] = alloc_stack $Optional<Int> 
   // CHECK: [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
   // CHECK: [[MINOR:%.*]] = integer_literal $Builtin.Word, 10

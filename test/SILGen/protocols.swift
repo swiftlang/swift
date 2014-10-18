@@ -21,7 +21,7 @@ func use_subscript_rvalue_get(i : Int) -> Int {
 
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_rvalue_get
 // CHECK-NEXT: bb0(%0 : $Int):
-// CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols16subscriptableGetPS_16SubscriptableGet_ : $*SubscriptableGet
+// CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols16subscriptableGetPS_16SubscriptableGet_ : $*SubscriptableGet
 // CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
@@ -33,7 +33,7 @@ func use_subscript_lvalue_get(i : Int) -> Int {
 
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_get
 // CHECK-NEXT: bb0(%0 : $Int):
-// CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
+// CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
 // CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!getter.1
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
@@ -45,7 +45,7 @@ func use_subscript_lvalue_set(i : Int) {
 
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_set
 // CHECK-NEXT: bb0(%0 : $Int):
-// CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
+// CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
 // CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!setter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>(%0, %0, [[PROJ]])
@@ -107,7 +107,7 @@ func use_property_rvalue_get() -> Int {
   return propertyGet.a
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_rvalue_get
-// CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols11propertyGetPS_18PropertyWithGetter_ : $*PropertyWithGetter
+// CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols11propertyGetPS_18PropertyWithGetter_ : $*PropertyWithGetter
 // CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[PROJ]])
@@ -116,7 +116,7 @@ func use_property_lvalue_get() -> Int {
   return propertyGetSet.b
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_get
-// CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
+// CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
 // CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetterSetter.b!getter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[PROJ]])
@@ -127,7 +127,7 @@ func use_property_lvalue_set(x : Int) {
 
 // CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_set
 // CHECK-NEXT: bb0(%0 : $Int):
-// CHECK: [[GLOB:%[0-9]+]] = sil_global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
+// CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
 // CHECK: [[PROJ:%[0-9]+]] = open_existential [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetterSetter.b!setter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])

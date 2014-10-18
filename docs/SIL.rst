@@ -656,7 +656,7 @@ to multiple-value instructions choose the value by following the ``%name`` with
 Unlike LLVM IR, SIL instructions that take value operands *only* accept
 value operands. References to literal constants, functions, global variables, or
 other entities require specialized instructions such as ``integer_literal``,
-``function_ref``, ``sil_global_addr``, etc.
+``function_ref``, ``global_addr``, etc.
 
 Functions
 ~~~~~~~~~
@@ -2036,14 +2036,14 @@ function_ref
 
 Creates a reference to a SIL function.
 
-sil_global_addr
+global_addr
 ```````````````
 
 ::
 
-  sil-instruction ::= 'sil_global_addr' sil-global-name ':' sil-type
+  sil-instruction ::= 'global_addr' sil-global-name ':' sil-type
 
-  %1 = sil_global_addr @foo : $*Builtin.Word
+  %1 = global_addr @foo : $*Builtin.Word
 
 Creates a reference to the address of a global variable.
 

@@ -53,12 +53,12 @@ sil_global @archetypeBoundToObjC: $Archetype<NSObject>
 
 sil @instantiate_globals : $() -> () {
 entry:
-  %a = sil_global_addr @swiftClass : $*SwiftClass
-  %b = sil_global_addr @objcClass : $*ObjCClass
-  %c = sil_global_addr @existential : $*Existential
-  %d = sil_global_addr @existentialntp : $*ExistentialNoTaggedPointers
-  %e = sil_global_addr @archetypeBoundToSwift : $*Archetype<C>
-  %f = sil_global_addr @archetypeBoundToObjC : $*Archetype<NSObject>
+  %a = global_addr @swiftClass : $*SwiftClass
+  %b = global_addr @objcClass : $*ObjCClass
+  %c = global_addr @existential : $*Existential
+  %d = global_addr @existentialntp : $*ExistentialNoTaggedPointers
+  %e = global_addr @archetypeBoundToSwift : $*Archetype<C>
+  %f = global_addr @archetypeBoundToObjC : $*Archetype<NSObject>
   return undef : $()
 }
 

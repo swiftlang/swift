@@ -761,14 +761,14 @@ public:
 };
   
 /// Gives the address of a SIL global variable.
-class SILGlobalAddrInst : public LiteralInst {
+class GlobalAddrInst : public LiteralInst {
   SILGlobalVariable *Global;
 
 public:
-  SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global);
+  GlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global);
 
   /// Create a placeholder instruction with an unset global reference.
-  SILGlobalAddrInst(SILLocation Loc, SILType Ty);
+  GlobalAddrInst(SILLocation Loc, SILType Ty);
 
   /// Return the referenced global variable.
   SILGlobalVariable *getReferencedGlobal() const { return Global; }
@@ -782,7 +782,7 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::SILGlobalAddrInst;
+    return V->getKind() == ValueKind::GlobalAddrInst;
   }
 };
 

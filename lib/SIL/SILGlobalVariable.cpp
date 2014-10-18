@@ -75,12 +75,12 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
     return false;
 
   SILBasicBlock *BB = &F->front();
-  SILGlobalAddrInst *SGA = nullptr;
+  GlobalAddrInst *SGA = nullptr;
   bool HasStore = false;
   for (auto &I : *BB) {
-    // Make sure we have a single SILGlobalAddrInst and a single StoreInst.
-    // And the StoreInst writes to the SILGlobalAddrInst.
-    if (auto *sga = dyn_cast<SILGlobalAddrInst>(&I)) {
+    // Make sure we have a single GlobalAddrInst and a single StoreInst.
+    // And the StoreInst writes to the GlobalAddrInst.
+    if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
       if (SGA)
         return false;
       SGA = sga;

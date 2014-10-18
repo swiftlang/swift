@@ -702,7 +702,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
   InitializationPtr Result;
   if (!vd->getDeclContext()->isLocalContext()) {
     auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
-    SILValue addr = B.createSILGlobalAddr(vd, silG);
+    SILValue addr = B.createGlobalAddr(vd, silG);
     
     VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr);
     Result = InitializationPtr(new GlobalInitialization(addr));

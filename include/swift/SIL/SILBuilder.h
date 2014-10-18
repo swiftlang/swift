@@ -227,8 +227,8 @@ public:
   FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {
     return insert(new (F.getModule()) FunctionRefInst(loc, f));
   }
-  SILGlobalAddrInst *createSILGlobalAddr(SILLocation loc, SILGlobalVariable *g){
-    return insert(new (F.getModule()) SILGlobalAddrInst(loc, g));
+  GlobalAddrInst *createGlobalAddr(SILLocation loc, SILGlobalVariable *g){
+    return insert(new (F.getModule()) GlobalAddrInst(loc, g));
   }
 
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {

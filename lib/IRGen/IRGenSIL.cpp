@@ -531,7 +531,7 @@ public:
   void visitBuiltinInst(BuiltinInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
-  void visitSILGlobalAddrInst(SILGlobalAddrInst *i);
+  void visitGlobalAddrInst(GlobalAddrInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
@@ -1407,7 +1407,7 @@ void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
                            i->getReferencedFunction()->getAbstractCC());
 }
 
-void IRGenSILFunction::visitSILGlobalAddrInst(SILGlobalAddrInst *i) {
+void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   auto &ti = getTypeInfo(i->getType());
   
   Address addr;

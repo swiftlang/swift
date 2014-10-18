@@ -639,7 +639,7 @@ sil private @private_function : $@thin () -> () {
   return %1 : $()
 }
 sil @references_private_global : $@thin () -> () {
-  %0 = sil_global_addr @private_global : $*Builtin.Word
+  %0 = global_addr @private_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
@@ -656,7 +656,7 @@ sil shared @shared_function : $@thin () -> () {
   return %1 : $()
 }
 sil @references_shared_global : $@thin () -> () {
-  %0 = sil_global_addr @shared_global : $*Builtin.Word
+  %0 = global_addr @shared_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
@@ -673,7 +673,7 @@ sil hidden @hidden_function : $@thin () -> () {
   return %1 : $()
 }
 sil @references_hidden_global : $@thin () -> () {
-  %0 = sil_global_addr @hidden_global : $*Builtin.Word
+  %0 = global_addr @hidden_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
@@ -691,7 +691,7 @@ sil @public_function : $@thin () -> () {
 }
 
 sil @references_public_global : $@thin () -> () {
-  %0 = sil_global_addr @public_global : $*Builtin.Word
+  %0 = global_addr @public_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }

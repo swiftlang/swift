@@ -11,7 +11,7 @@ sil_global @_Tv2ch1xSi : $Int
 // CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
 sil private @globalinit_func0 : $@thin () -> () {
 bb0:
-  %0 = sil_global_addr @_Tv2ch1xSi : $*Int
+  %0 = global_addr @_Tv2ch1xSi : $*Int
   %1 = integer_literal $Builtin.Word, 2
   %2 = struct $Int (%1 : $Builtin.Word)
   store %2 to %0 : $*Int
@@ -21,21 +21,21 @@ bb0:
 
 // CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
 // CHECK-NEXT: bb0:
-// CHECK-NEXT: sil_global_addr @globalinit_token0
+// CHECK-NEXT: global_addr @globalinit_token0
 // CHECK-NEXT: address_to_pointer
 // CHECK: function_ref @globalinit_func0 : $@thin () -> ()
 // CHECK-NEXT: thin_to_thick_function
-// CHECK-NEXT: sil_global_addr @_Tv2ch1xSi : $*Int
+// CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Int
 // CHECK-NEXT: address_to_pointer
 // CHECK-NEXT: return
 sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
 bb0:
-  %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word
+  %1 = global_addr @globalinit_token0 : $*Builtin.Word
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@thin () -> ()
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
-  %6 = sil_global_addr @_Tv2ch1xSi : $*Int
+  %6 = global_addr @_Tv2ch1xSi : $*Int
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }

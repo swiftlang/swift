@@ -593,10 +593,10 @@ sil_global @x    : $UInt64
 // CHECK-LABEL: @sink_refcount_to_succs
 sil @sink_refcount_to_succs : $@thin () -> () {
 bb0:
-  %0 = sil_global_addr @test : $*Test
+  %0 = global_addr @test : $*Test
   %1 = alloc_ref $Test
   store %1 to %0 : $*Test
-  %7 = sil_global_addr @x : $*UInt64
+  %7 = global_addr @x : $*UInt64
   %8 = integer_literal $Builtin.Int64, 0
   %9 = struct $UInt64 (%8 : $Builtin.Int64)
   store %9 to %7 : $*UInt64

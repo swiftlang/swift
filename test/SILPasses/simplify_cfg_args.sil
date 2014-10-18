@@ -18,7 +18,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Word):
   strong_retain %1 : $Builtin.NativeObject       // id: %6
   strong_release %1 : $Builtin.NativeObject      // id: %7
   %8 = integer_literal $Builtin.Int1, 0           // user: %23
-  %10 = sil_global_addr @globalinit_token11 : $*Builtin.Word // user: %11
+  %10 = global_addr @globalinit_token11 : $*Builtin.Word // user: %11
   %11 = address_to_pointer %10 : $*Builtin.Word to $Builtin.RawPointer // user: %14
   %12 = function_ref @globalinit_func11 : $@thin () -> () // users: %26, %13
   %13 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %14
@@ -33,7 +33,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Word):
   cond_br %8, bb1, bb2(%22 : $Builtin.Word)       // id: %23
 
 bb1:                                              // Preds: bb0
-  %24 = sil_global_addr @globalinit_token11 : $*Builtin.Word // user: %25
+  %24 = global_addr @globalinit_token11 : $*Builtin.Word // user: %25
   %25 = address_to_pointer %24 : $*Builtin.Word to $Builtin.RawPointer // user: %27
   %26 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %27
   %27 = builtin "once"(%25 : $Builtin.RawPointer, %26 : $@callee_owned () -> ()) : $()

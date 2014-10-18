@@ -665,8 +665,8 @@ public:
     OS << BI->getType();
   }
   
-  void visitSILGlobalAddrInst(SILGlobalAddrInst *GAI) {
-    OS << "sil_global_addr ";
+  void visitGlobalAddrInst(GlobalAddrInst *GAI) {
+    OS << "global_addr ";
     if (GAI->getReferencedGlobal()) {
       GAI->getReferencedGlobal()->printName(OS);
     } else {

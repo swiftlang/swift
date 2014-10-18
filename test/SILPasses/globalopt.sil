@@ -15,7 +15,7 @@ sil_global @MyConst : $Int
 // globalinit_func0
 sil private @globalinit_func0 : $@thin () -> () {
 bb0:
-  %0 = sil_global_addr @MyConst : $*Int               // user: %3
+  %0 = global_addr @MyConst : $*Int               // user: %3
   %1 = integer_literal $Builtin.Word, 0           // user: %2
   %2 = struct $Int (%1 : $Builtin.Word)           // user: %3
   store %2 to %0 : $*Int                          // id: %3
@@ -26,13 +26,13 @@ bb0:
 // ginit.MyConst.mutableAddressor : Swift.Int
 sil [global_init] @_TF5ginita7MyConstSi : $@thin () -> Builtin.RawPointer {
 bb0:
-  %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word // user: %2
+  %1 = global_addr @globalinit_token0 : $*Builtin.Word // user: %2
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer // user: %5
   // function_ref globalinit_func0
   %3 = function_ref @globalinit_func0 : $@thin () -> () // user: %4
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> () // user: %5
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
-  %6 = sil_global_addr @MyConst : $*Int               // user: %7
+  %6 = global_addr @MyConst : $*Int               // user: %7
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer // user: %8
   return %7 : $Builtin.RawPointer                 // id: %8
 }

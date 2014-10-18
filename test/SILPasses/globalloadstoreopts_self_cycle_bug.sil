@@ -33,7 +33,7 @@ bb0:
   // LICM: [[REFEnd:%[0-9]+]] = ref_element_addr %{{[0-9]+}} : $NewRangeGenerator1, #NewRangeGenerator1.end
   // LICM: [[IDStart:%[0-9]+]] = struct_element_addr [[REFStart]]
   // LICM: [[IDEnd:%[0-9]+]] = struct_element_addr [[REFEnd]]
-  %0 = sil_global_addr @total : $*Int
+  %0 = global_addr @total : $*Int
   %1 = integer_literal $Builtin.Word, 0
   %2 = struct $Int (%1 : $Builtin.Word)
   store %2 to %0 : $*Int

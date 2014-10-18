@@ -575,9 +575,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);
     break;
   }
-  case ValueKind::SILGlobalAddrInst: {
+  case ValueKind::GlobalAddrInst: {
     // Format: Name and type. Use SILOneOperandLayout.
-    const SILGlobalAddrInst *GAI = cast<SILGlobalAddrInst>(&SI);
+    const GlobalAddrInst *GAI = cast<GlobalAddrInst>(&SI);
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,

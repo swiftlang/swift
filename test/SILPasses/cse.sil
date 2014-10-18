@@ -321,13 +321,13 @@ bb0(%0 : $*Builtin.Int8):
 sil_global @global_target : $Builtin.Int64
 
 // CHECK-LABEL: globaladdr_inst
-// CHECK-NOT: sil_global_addr
-// CHECK: sil_global_addr @global_target
-// CHECK-NOT: sil_global_addr
+// CHECK-NOT: global_addr
+// CHECK: global_addr @global_target
+// CHECK-NOT: global_addr
 
 sil @globaladdr_inst : $@thin () -> (Builtin.Int64) {
-  %0 = sil_global_addr @global_target : $*Builtin.Int64
-  %1 = sil_global_addr @global_target : $*Builtin.Int64
+  %0 = global_addr @global_target : $*Builtin.Int64
+  %1 = global_addr @global_target : $*Builtin.Int64
   %2 = load %0 : $*Builtin.Int64
   %3 = load %1 : $*Builtin.Int64
   %5 = integer_literal $Builtin.Int1, 0
