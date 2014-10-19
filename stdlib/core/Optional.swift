@@ -81,6 +81,12 @@ public func map<T, U>(x: T?, f: (T)->U) -> U? {
 // Intrinsics for use by language features.
 @transparent
 public // COMPILER_INTRINSIC
+func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
+  return (v != nil).value
+}
+
+@transparent
+public // COMPILER_INTRINSIC
 func _doesOptionalHaveValueAsBool<T>(v: T?) -> Bool {
   return v != nil
 }

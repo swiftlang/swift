@@ -397,6 +397,10 @@ public:
   FuncDecl *getPreconditionOptionalHasValueDecl(LazyResolver *resolver,
                                                 OptionalTypeKind kind) const;
 
+  /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.
+  FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,
+                                         OptionalTypeKind kind) const;
+
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValueAsBool.
   FuncDecl *getDoesOptionalHaveValueAsBoolDecl(LazyResolver *resolver,
                                                OptionalTypeKind kind) const;
