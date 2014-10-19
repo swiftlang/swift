@@ -55,7 +55,7 @@ func assign_optional_lvalue_computed(inout x: S?, y: Int) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF15optional_lvalue28assign_bound_optional_lvalueFTRGSqSi_Si_T_
-// CHECK:         select_enum_addr
+// CHECK:         function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
 // CHECK:         cond_br {{%.*}}, [[SOME:bb[0-9]+]], [[NONE:bb[0-9]+]]
 // CHECK:       [[SOME]]:
 // CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr

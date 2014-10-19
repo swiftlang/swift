@@ -10,7 +10,8 @@ func foo(var f: (()->())?) {
 // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<()>
 // CHECK-NEXT: [[TEMP_RESULT:%.*]] = init_enum_data_addr [[RESULT]]
 //   Switch out on the lvalue (() -> ())!:
-// CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<() -> ()>([[F]]#1)
 // CHECK-NEXT: cond_br [[T1]], bb2, bb1
 //   If it doesn't have a value, kill all the temporaries and jump to
 //   the first nothing block.
@@ -42,7 +43,9 @@ func foo2<T>(var f: (()->T)?) {
 // CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[X]]
 //   Check whether 'f' holds a value.
-// CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<() -> T>([[F]]#1)
 // CHECK-NEXT: cond_br [[T1]], bb2, bb1
 //   If not, leave all the cleanups we needed and jump to the nothing block.
 // CHECK:    bb1:

@@ -149,7 +149,8 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-LABEL: sil hidden @_TF12dynamic_self18testOptionalResult{{.*}} : $@thin (@owned OptionalResultInheritor) -> ()
 // CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : Self -> () -> Self? , $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: apply [[T0]]([[V]])
-// CHECK:      select_enum_addr
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
+// CHECK-NEXT: apply [transparent] [[T0]]<OptionalResult>
 // CHECK:      [[T1:%.*]] = unchecked_take_enum_data_addr 
 // CHECK:      [[T2:%.*]] = load [[T1]]
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T2]] : $OptionalResult to $OptionalResultInheritor

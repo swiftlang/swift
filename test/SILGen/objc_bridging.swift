@@ -12,7 +12,8 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[OPT_BRIDGED:%.*]] = apply [[DESCRIPTION]]({{%.*}})
 // CHECK:  retain_autoreleased [[OPT_BRIDGED]]
 // CHECK:  store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
-// CHECK:  select_enum_addr [[OPT_BRIDGED_BUF]]#1
+// CHECK:  [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
+// CHECK:  apply [transparent] [[T0]]<NSString>([[OPT_BRIDGED_BUF]]#1)
 // CHECK:  [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
 // CHECK:  [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
@@ -39,7 +40,8 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]({{%.*}})
 // CHECK:   retain_autoreleased [[OPT_BRIDGED]]
 // CHECK:   store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
-// CHECK:   select_enum_addr [[OPT_BRIDGED_BUF]]#1
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
+// CHECK:   apply [transparent] [[T0]]<NSString>([[OPT_BRIDGED_BUF]]#1)
 // CHECK:   [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
 // CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
@@ -66,7 +68,7 @@ func setFoo(var f: Foo, var s: String) {
 // CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
 // CHECK:   store [[OPT_NATIVE]] to [[OPT_NATIVE_BUF:%.*]]#1
-// CHECK:   select_enum_addr
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
 // CHECK:   [[NATIVE_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
@@ -110,7 +112,8 @@ func callBar() -> String {
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[BAR]]()
 // CHECK:   retain_autoreleased [[OPT_BRIDGED]]
 // CHECK:   store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
-// CHECK:   select_enum_addr [[OPT_BRIDGED_BUF]]#1
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
+// CHECK:   apply [transparent] [[T0]]<NSString>([[OPT_BRIDGED_BUF]]#1)
 // CHECK:   [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
 // CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
@@ -137,7 +140,8 @@ func callSetBar(var s: String) {
 // CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
 // CHECK:   store [[OPT_NATIVE]] to [[OPT_NATIVE_BUF:%.*]]#1
-// CHECK:   select_enum_addr [[OPT_NATIVE_BUF]]#1
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
+// CHECK:   apply [transparent] [[T0]]<String>([[OPT_NATIVE_BUF]]#1)
 // CHECK:   [[NATIVE_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString

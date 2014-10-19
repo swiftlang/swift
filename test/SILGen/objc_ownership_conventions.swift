@@ -112,7 +112,8 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.classProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@cc(objc_method) @thin (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@cc(objc_method) @thin (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK:      store [[OPT_OBJC]] to [[OPT_OBJC_BUF:%.*]]#1
-  // CHECK:      select_enum_addr [[OPT_OBJC_BUF]]#1
+  // CHECK:      [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
+  // CHECK-NEXT: apply [transparent] [[T0]]<@objc_metatype AnyObject.Type>([[OPT_OBJC_BUF]]#1)
   // CHECK:      [[OBJC_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_OBJC_BUF]]
   // CHECK-NEXT: [[OBJC:%.*]] = load [[OBJC_BUF]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
@@ -138,7 +139,8 @@ func test11(let g: Gizmo) -> AnyClass {
   // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@cc(objc_method) @thin (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@cc(objc_method) @thin (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK:      store [[OPT_OBJC]] to [[OPT_OBJC_BUF:%.*]]#1
-  // CHECK:      select_enum_addr [[OPT_OBJC_BUF]]#1
+  // CHECK:      [[T0:%.*]] = function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
+  // CHECK-NEXT: apply [transparent] [[T0]]<@objc_metatype AnyObject.Type>([[OPT_OBJC_BUF]]#1)
   // CHECK:      [[OBJC_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_OBJC_BUF]]
   // CHECK-NEXT: [[OBJC:%.*]] = load [[OBJC_BUF]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]

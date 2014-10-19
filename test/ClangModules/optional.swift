@@ -16,7 +16,8 @@ class A {
 // CHECK-NEXT: [[TMP_OPTNSSTR:%.*]] = alloc_stack $Optional<NSString>
 // CHECK-NEXT: [[TMP_OPTSTR:%.*]] = alloc_stack $Optional<String>
 // CHECK-NEXT: store [[T1]] to [[TMP_OPTSTR]]#1
-// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OPTSTR]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
+// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<String>([[TMP_OPTSTR]]#1
 // CHECK-NEXT: cond_br [[T1]]
 //   Something branch: project value, translate, inject into result.
 // CHECK:      [[TMP_STR:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTSTR]]
@@ -41,7 +42,8 @@ class A {
 // CHECK:      [[TMP_OPTSTR:%.*]] = alloc_stack $Optional<String>
 // CHECK-NEXT: [[TMP_OPTNSSTR:%.*]] = alloc_stack $Optional<NSString>
 // CHECK-NEXT: store {{.*}} to [[TMP_OPTNSSTR]]#1
-// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OPTNSSTR]]
+// CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
+// CHECK-NEXT: [[T1:%.*]] = apply [transparent] [[T0]]<NSString>([[TMP_OPTNSSTR]]#1
 // CHECK-NEXT: cond_br [[T1]]
 //   Something branch: project value, translate, inject into result.
 // CHECK:      [[TMP_NSSTR:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTNSSTR]]
