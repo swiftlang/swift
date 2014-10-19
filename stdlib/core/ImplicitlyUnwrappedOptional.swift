@@ -80,17 +80,6 @@ extension ImplicitlyUnwrappedOptional : Printable {
 // Intrinsics for use by language features.
 @transparent
 public // COMPILER_INTRINSIC
-func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {
-  switch v {
-  case .Some:
-    return true.value
-  case .None:
-    return false.value
-  }
-}
-
-@transparent
-public // COMPILER_INTRINSIC
 func _preconditionImplicitlyUnwrappedOptionalHasValue<T>(inout v: T!) {
   switch v {
   case .Some:
