@@ -391,13 +391,12 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
               ${CONFIG_ARGS} \
               "${LLVM_SOURCE_DIR}" || exit 1)
-      set +x
+      { set +x; } 2>/dev/null
   fi
   set -x
   $DISTCC_PUMP "$CMAKE" --build "${LLVM_BUILD_DIR}" -- ${BUILD_ARGS}
-  set +x
+  { set +x; } 2>/dev/null
 fi
-set +x
 
 #
 # Now build all the Swift products
@@ -518,13 +517,13 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
                     -D${var_prefix}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
                     ${CONFIG_ARGS} \
                     "${!_PRODUCT_SOURCE_DIR}" || exit 1)
-            set +x
+            { set +x; } 2>/dev/null
         fi
 
         # Build.
         set -x
         $DISTCC_PUMP "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS}
-        set +x
+        { set +x; } 2>/dev/null
     fi
 done
 
@@ -557,7 +556,7 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
 
         set -x
         "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${test_target}"
-        set +x
+        { set +x; } 2>/dev/null
         
         if [[ "${product}" == SourceKit ]] ; then
             test_target=check-${product}
@@ -582,7 +581,7 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
         else
             set -x
             "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
-            set +x
+            { set +x; } 2>/dev/null
         fi
 
         trap - ERR
@@ -608,7 +607,7 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   else
       PERFORMANCE_TESTS_PASSED=0
   fi
-  set +x
+  { set +x; } 2>/dev/null
   
   echo "--- Submitting Swift Performance Tests ---"
   swift_source_revision="$("${LLVM_SOURCE_DIR}/utils/GetSourceVersion" "${SWIFT_SOURCE_DIR}")"
@@ -620,7 +619,7 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
         --run-order "$swift_source_revision" \
         --submit http://localhost:32169/submitRun) \
   || echo "*** Swift performance test results not submitted."
-  set +x
+  { set +x; } 2>/dev/null
   
   # If the performance tests failed, fail the build.
   if [ "$PERFORMANCE_TESTS_PASSED" -ne 1 ]; then
