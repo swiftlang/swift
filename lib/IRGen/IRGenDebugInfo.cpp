@@ -696,20 +696,6 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   else
     llvm_unreachable("function has no mangled name");
 
-  // DIBuilder adds all DIVariables to a temporary named MDNode in
-  // order to add them to the variables field in their parent
-  // DISubprogram in DIBuilder::finalize(). In the absence of an
-  // llvm::Function DIBuilder uses the human-readable name as a name
-  // for this temporary MDnode, which in the case of specialized
-  // generic functions (which are then SILinlining and thus
-  // zombiefied, making them loose their llvm::Function) is not
-  // unique, because the specialization is not encoded in the
-  // human-readable name. Until either of these problems are fixed,
-  // use the mangled name as human-readable name for IR-less functions
-  // here.
-  if (!Fn)
-    Name = LinkageName;
-
   Location L = {};
   unsigned ScopeLine = 0; /// The source line used for the function prologue.
   // Bare functions such as thunks should not have a line number. This
