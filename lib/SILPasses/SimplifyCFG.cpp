@@ -1251,7 +1251,7 @@ bool SimplifyCFG::run() {
     // Simplifying other blocks might have resulted in unreachable
     // loops.
     RU.run();
-    return true;
+    Changed = true;
   }
 
   // Split all critical edges from non cond_br terminators.
