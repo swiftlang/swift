@@ -221,6 +221,11 @@ set(SWIFT_EXTRA_FLAGS "" CACHE STRING
 set(SWIFT_DISTCC "" CACHE PATH
   "Path to distcc executable for distributed builds")
 
+# Suppress a warning that this variable is unused in case the user
+# doesn't ask for an iOS build
+if(SWIFT_DISTCC) 
+endif()
+
 # FIXME: Remove this when OS X builds as an SDK.
 set(SWIFTLIB_EXTRA_DEFAULT_COMPILE_FLAGS "" CACHE STRING
   "Extra compile flags to pass when building the default (OS X) target library")
