@@ -576,6 +576,8 @@ ERROR(tuple_type_init,pattern_parsing,none,
       "default argument not permitted in a tuple type", ())
 ERROR(protocol_method_argument_init,type_parsing,none,
       "default argument not permitted in a protocol method", ())
+ERROR(protocol_init_argument_init,type_parsing,none,
+      "default argument not permitted in a protocol initializer", ())
 
 // Protocol Types
 ERROR(expected_langle_protocol,type_parsing,PointsToFirstBadToken,

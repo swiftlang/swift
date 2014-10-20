@@ -4118,6 +4118,12 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return SignatureStatus;
   }
 
+  // Protocol initializer arguments may not have default values.
+  if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
+    diagnose(ConstructorLoc, diag::protocol_init_argument_init);
+    return nullptr;
+  }
+
   auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
