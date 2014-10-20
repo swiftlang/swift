@@ -1988,11 +1988,10 @@ SILDeserializer::~SILDeserializer() {
   }
 }
 
-// Invalidate all cached SILFunctions if the argument is null. Otherwise, only
-// invalidate the specified SILFunction.
-void SILDeserializer::invalidateEntry(SILFunction *fn) {
+// Invalidate all cached SILFunctions.
+void SILDeserializer::invalidateFunctionCache() {
   for (auto &fnEntry : Funcs)
-    if (fnEntry.isDeserialized() && (!fn || fnEntry.get() == fn)) {
+    if (fnEntry.isDeserialized()) {
       fnEntry.get()->decrementRefCount();
       fnEntry.reset();
     }

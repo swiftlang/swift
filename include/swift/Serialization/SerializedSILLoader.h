@@ -79,8 +79,8 @@ public:
   }
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
 
-  /// Invalidate the cached entry for SILFunction.
-  void invalidateEntry(SILFunction *fn);
+  /// Invalidate the cached entries for deserialized SILFunctions.
+  void invalidateCaches();
 
   /// Deserialize all SILFunctions, VTables, and WitnessTables in all
   /// SILModules.

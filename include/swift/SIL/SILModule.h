@@ -193,7 +193,7 @@ public:
   }
 
   /// Invalidate cached entries in SIL Loader.
-  void invalidateSILLoader();
+  void invalidateSILLoaderCaches();
 
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F);

@@ -689,8 +689,8 @@ void SILModule::linkAllVTables() {
   getSILLoader()->getAllVTables();
 }
 
-void SILModule::invalidateSILLoader() {
-  getSILLoader()->invalidateEntry(nullptr);
+void SILModule::invalidateSILLoaderCaches() {
+  getSILLoader()->invalidateCaches();
 }
 
 /// Erase a function from the module.
