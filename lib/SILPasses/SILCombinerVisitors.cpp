@@ -118,6 +118,28 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   return eraseInstFromFunction(*SEAI);
 }
 
+SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
+  // Promote select_enum_addr to select_enum if the enum is loadable.
+  //   = select_enum_addr %ptr : $*Optional<SomeClass>, case ...
+  //     ->
+  //   %value = load %ptr
+  //   = select_enum %value
+  SILType Ty = SEAI->getEnumOperand().getType();
+  if (!Ty.isLoadable(SEAI->getModule()))
+    return nullptr;
+
+  SmallVector<std::pair<EnumElementDecl*, SILValue>, 8> Cases;
+  for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
+    Cases.push_back(SEAI->getCase(i));
+
+  SILValue Default = SEAI->hasDefault() ? SEAI->getDefaultResult() : SILValue();
+  LoadInst *EnumVal = Builder->createLoad(SEAI->getLoc(),
+                                          SEAI->getEnumOperand());
+  return SelectEnumInst::create(SEAI->getLoc(), EnumVal, SEAI->getType(),
+                                Default, Cases,
+                                *SEAI->getParent()->getParent());
+}
+
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // init_existential instructions behave like memory allocation within
   // the allocated object. We can promote the init_existential allocation
