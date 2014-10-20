@@ -681,18 +681,11 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
     return llvm::DIDescriptor(cast<llvm::MDNode>(cached->second));
 
   StringRef Name;
-  Location L = {};
-  unsigned ScopeLine = 0; // The source line used for the function prologue.
   if (DS) {
-    if (DS->Loc.getKind() == SILLocation::SILFileKind) {
+    if (DS->Loc.getKind() == SILLocation::SILFileKind)
       Name = DS->SILFn->getName();
-    } else {
+    else
       Name = getName(DS->Loc);
-    }
-
-    auto FL = getLocation(SM, DS->Loc);
-    L = FL.Loc;
-    ScopeLine = FL.LocForLinetable.Line;
   }
 
   StringRef LinkageName;
@@ -716,6 +709,18 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   // here.
   if (!Fn)
     Name = LinkageName;
+
+  Location L = {};
+  unsigned ScopeLine = 0; /// The source line used for the function prologue.
+  // Bare functions such as thunks should not have a line number. This
+  // is especially important for shared functions like reabstraction
+  // thunk helpers, where getLocation() returns an arbitrary location
+  // of whichever use was emitted first.
+  if (DS && !(DS->SILFn && DS->SILFn->isBare())) {
+    auto FL = getLocation(SM, DS->Loc);
+    L = FL.Loc;
+    ScopeLine = FL.LocForLinetable.Line;
+  }
 
   auto File = getOrCreateFile(L.Filename);
   auto Scope = MainModule;

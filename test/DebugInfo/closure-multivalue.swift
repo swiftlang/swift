@@ -34,3 +34,6 @@ demo()
 // CHECK-O0-NOT: piece
 // CHECK-O0: [ DW_TAG_arg_variable ] [b] [line 15]
 // CHECK-O0-NOT: piece
+
+// Verify that a reabstraction thunk does not have a line number.
+// CHECK: _TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_{{.*}}; [ DW_TAG_subprogram ] [line 0]
