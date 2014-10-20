@@ -77,23 +77,13 @@ class _IndirectArrayBuffer {
   
   func getNativeBufferOf<T>(_: T.Type) -> _ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
-    if buffer != nil {
-      let b: _ContiguousArrayStorageBase = unsafeDowncast(buffer!)
-      return _ContiguousArrayBuffer(b)
-    }
-    return _ContiguousArrayBuffer()
+    return _ContiguousArrayBuffer(
+      buffer != nil ? unsafeBitCast(buffer, _ContiguousArrayStorage<T>.self) : nil)
   }
 
   func getCocoa() -> _NSArrayCoreType {
     _sanityCheck(isCocoa)
-    // FIXME: This cannot yet be an unsafeDowncast, since NSArray
-    // doesn't conform to _NSArrayCoreType. <rdar://problem/18694860>
-    // Nonempty protocol in runtime shim header crashes build
-    _sanityCheck(
-      !_usesNativeSwiftReferenceCounting(buffer!.dynamicType)
-      || buffer is _NSArrayCoreType
-    )
-    return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(buffer!))
+    return unsafeBitCast(buffer!, _NSArrayCoreType.self)
   }
 }
 
