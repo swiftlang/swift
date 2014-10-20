@@ -190,8 +190,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
   }
 
-  init(_ storage: _ContiguousArrayStorage<T>?) {
-    _base = unsafeBitCast(storage , _HeapBuffer<_ArrayBody, T>.self)
+  init(_ storage: _ContiguousArrayStorageBase?) {
+    _base = unsafeBitCast(storage, _HeapBuffer<_ArrayBody, T>.self)
   }
 
   public var hasStorage: Bool {
@@ -443,9 +443,9 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 
   //===--- private --------------------------------------------------------===//
-  typealias _OptionalStorage = _ContiguousArrayStorage<T>?
-  var _storage: _ContiguousArrayStorage<T>? {
-    return unsafeBitCast(_base.storage, _OptionalStorage.self)
+  var _storage: _ContiguousArrayStorageBase? {
+    return unsafeBitCast(
+      _base.storage, Optional<_ContiguousArrayStorageBase>.self)
   }
 
   typealias _Base = _HeapBuffer<_ArrayBody, T>
