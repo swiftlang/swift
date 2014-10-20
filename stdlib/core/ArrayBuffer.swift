@@ -237,16 +237,11 @@ extension _ArrayBuffer {
     }
     if _slowPath(indirect.needsElementTypeCheck) {
       if _fastPath(_isNative) {
-        _precondition(
-          withUnsafeBufferPointer {
-            (p0)->Bool in
-            // We have only dynamic knowledge that T is an object, so we
-            // can't safely convert it to AnyObject. Instead reinterpret
-            // the buffer memory as contiguous AnyObjects
-            let p1 = UnsafePointer<AnyObject>(p0.baseAddress)
-            return !contains(subRange) { !(p1[$0] is T) }
-          },
-          "NSArray element failed to match the Swift Array Element type")
+        for x in _native[subRange] {
+          _precondition(
+            unsafeBitCast(x, AnyObject.self) is T,
+            "NSArray element failed to match the Swift Array Element type")
+        }
       }
       else if !subRange.isEmpty {
         let ns = _nonNative!
