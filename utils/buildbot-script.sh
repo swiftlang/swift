@@ -376,6 +376,7 @@ fi
 if [ \! "$SKIP_BUILD_LLVM" ]; then
   echo "--- Building LLVM and Clang ---"
   if [[ ! -f  "${LLVM_BUILD_DIR}/CMakeCache.txt" ]] ; then
+      set -x
       mkdir -p "${LLVM_BUILD_DIR}"
       # Note: we set LLVM_IMPLICIT_PROJECT_IGNORE below because this
       # script builds swift separately, and people often have reasons
@@ -390,9 +391,13 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
               ${CONFIG_ARGS} \
               "${LLVM_SOURCE_DIR}" || exit 1)
+      set +x
   fi
+  set -x
   $DISTCC_PUMP "$CMAKE" --build "${LLVM_BUILD_DIR}" -- ${BUILD_ARGS}
+  set +x
 fi
+set +x
 
 #
 # Now build all the Swift products
@@ -499,7 +504,8 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
                 SWIFT_STDLIB*) var_prefix="SWIFT" ;;
                 *) var_prefix=${PRODUCT} ;;
             esac
-
+            
+            set -x
             (cd "${!_PRODUCT_BUILD_DIR}" &&
                 "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
                     "${!_PRODUCT_CMAKE_OPTIONS}" \
@@ -512,10 +518,13 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
                     -D${var_prefix}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
                     ${CONFIG_ARGS} \
                     "${!_PRODUCT_SOURCE_DIR}" || exit 1)
+            set +x
         fi
 
         # Build.
+        set -x
         $DISTCC_PUMP "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS}
+        set +x
     fi
 done
 
@@ -541,11 +550,15 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
         build_cmd=("$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS})
 
         if [[ "${product}" == SourceKit ]] ; then
-            "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SourceKitUnitTests
+            test_target=SourceKitUnitTests
         else
-            "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
+            test_target=SwiftUnitTests
         fi
 
+        set -x
+        "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${test_target}"
+        set +x
+        
         if [[ "${product}" == SourceKit ]] ; then
             test_target=check-${product}
             if [[ "$STRESS_TEST_SOURCEKIT" ]]; then
@@ -565,9 +578,11 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
             # executing ninja directly, have it dump the commands it would
             # run, strip Ninja's progress prefix with sed, and tell the
             # shell to execute that.
-            sh -c "$("${build_cmd[@]}" -n -v ${test_target} | sed -e 's/[^]]*] //')"
+            sh -c "set -x && $("${build_cmd[@]}" -n -v ${test_target} | sed -e 's/[^]]*] //')"
         else
+            set -x
             "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
+            set +x
         fi
 
         trap - ERR
@@ -585,6 +600,7 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   echo "--- Running Swift Performance Tests ---"
   export CLANG="$TOOLCHAIN/usr/bin/clang"
   export SWIFT="${SWIFT_BUILD_DIR}/bin/swift"
+  set -x
   if (cd "${SWIFT_BUILD_DIR}" &&
           "${LLVM_BUILD_DIR}/bin/llvm-lit" -v benchmark \
               -j1 --output benchmark/results.json); then
@@ -592,8 +608,11 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   else
       PERFORMANCE_TESTS_PASSED=0
   fi
+  set +x
+  
   echo "--- Submitting Swift Performance Tests ---"
   swift_source_revision="$("${LLVM_SOURCE_DIR}/utils/GetSourceVersion" "${SWIFT_SOURCE_DIR}")"
+  set -x
   (cd "${SWIFT_BUILD_DIR}" &&
     "${SWIFT_SOURCE_DIR}/utils/submit-benchmark-results" benchmark/results.json \
         --output benchmark/lnt_results.json \
@@ -601,7 +620,8 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
         --run-order "$swift_source_revision" \
         --submit http://localhost:32169/submitRun) \
   || echo "*** Swift performance test results not submitted."
-
+  set +x
+  
   # If the performance tests failed, fail the build.
   if [ "$PERFORMANCE_TESTS_PASSED" -ne 1 ]; then
       echo "*** ERROR: Swift Performance Tests failed ***"
