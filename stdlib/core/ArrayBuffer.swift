@@ -77,13 +77,23 @@ class _IndirectArrayBuffer {
   
   func getNativeBufferOf<T>(_: T.Type) -> _ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
-    return _ContiguousArrayBuffer(
-      buffer != nil ? unsafeBitCast(buffer, _ContiguousArrayStorage<T>.self) : nil)
+    if buffer != nil {
+      let b: _ContiguousArrayStorageBase = unsafeDowncast(buffer!)
+      return _ContiguousArrayBuffer(b)
+    }
+    return _ContiguousArrayBuffer()
   }
 
   func getCocoa() -> _NSArrayCoreType {
     _sanityCheck(isCocoa)
-    return unsafeBitCast(buffer!, _NSArrayCoreType.self)
+    // FIXME: This cannot yet be an unsafeDowncast, since NSArray
+    // doesn't conform to _NSArrayCoreType. <rdar://problem/18694860>
+    // Nonempty protocol in runtime shim header crashes build
+    _sanityCheck(
+      !_usesNativeSwiftReferenceCounting(buffer!.dynamicType)
+      || buffer is _NSArrayCoreType
+    )
+    return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(buffer!))
   }
 }
 
@@ -227,11 +237,16 @@ extension _ArrayBuffer {
     }
     if _slowPath(indirect.needsElementTypeCheck) {
       if _fastPath(_isNative) {
-        for x in _native[subRange] {
-          _precondition(
-            unsafeBitCast(x, AnyObject.self) is T,
-            "NSArray element failed to match the Swift Array Element type")
-        }
+        _precondition(
+          withUnsafeBufferPointer {
+            (p0)->Bool in
+            // We have only dynamic knowledge that T is an object, so we
+            // can't safely convert it to AnyObject. Instead reinterpret
+            // the buffer memory as contiguous AnyObjects
+            let p1 = UnsafePointer<AnyObject>(p0.baseAddress)
+            return !contains(subRange) { !(p1[$0] is T) }
+          },
+          "NSArray element failed to match the Swift Array Element type")
       }
       else if !subRange.isEmpty {
         let ns = _nonNative!
