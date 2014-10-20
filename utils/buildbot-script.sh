@@ -20,6 +20,8 @@ KNOWN_SETTINGS=(
     build-args                  ""               "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
     build-dir                   ""               "out-of-tree build directory; default is in-tree"
     build-type                  Debug            "the CMake build variant: Debug, RelWithDebInfo, Release, etc."
+    llvm-build-dir              ""               "out-of-tree build directory for llvm; default is BUILD_DIR/llvm, where BUILD_DIR is given by --build-dir"
+    llvm-build-type             "$BUILD_TYPE"    "the CMake build variant for clang and llvm: Debug, RelWithDebInfo, Release, etc.  defaults to BUILD_TYPE, where BUILD_TYPE is given by --build-type"
     cmake                       "$CMAKE_DEFAULT" "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     config-args                 ""               "User-supplied arguments to cmake when used to do configuration"
@@ -253,13 +255,16 @@ done
 # Build directories are $BUILD_DIR/$product or $PRODUCT_SOURCE_DIR/build
 for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
     PRODUCT=$(toupper "${product}")
-    eval source_dir=\${${PRODUCT}_SOURCE_DIR}
-    if [[ "${BUILD_DIR}" ]] ; then
-        product_build_dir="${BUILD_DIR}/${product}"
-    else
-        product_build_dir="${source_dir}/build"
+    product_build_dir_var="${PRODUCT}_BUILD_DIR"
+    eval "product_build_dir=\${${product_build_dir_var}}"
+    if [[ ! "${product_build_dir}" ]] ; then
+        if [[ "${BUILD_DIR}" ]] ; then
+            product_build_dir="${BUILD_DIR}/${product}"
+        else
+            product_build_dir="${source_dir}/build"
+        fi
+        eval "${PRODUCT}_BUILD_DIR=\$product_build_dir"
     fi
-    eval "${PRODUCT}_BUILD_DIR=\$product_build_dir"
 done
 
 # iOS build products use their own build directories, which are
@@ -336,7 +341,6 @@ fi
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
     "${CMAKE_COMPILER_OPTIONS[@]}"
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
     -DLLVM_ENABLE_ASSERTIONS="${ENABLE_ASSERTIONS}"
 )
 
@@ -379,6 +383,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       # LLDB
       (cd "${LLVM_BUILD_DIR}" &&
           "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
+              -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
               -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
               -DLLVM_IMPLICIT_PROJECT_IGNORE="${LLVM_SOURCE_DIR}/tools/swift" \
               -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}" \
@@ -399,17 +404,20 @@ if [[ "$(uname -s)" == "Darwin" ]] ; then
       -DMODULES_SDK="${SYSROOT}"
       -DCMAKE_C_FLAGS="-isysroot${SYSROOT} ${CMAKE_C_FLAGS}"
       -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT} ${CMAKE_CXX_FLAGS}"
-      -DSWIFT_RUN_LONG_TESTS="ON"
-      -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
   )
 else
   SWIFT_CMAKE_OPTIONS=(
       -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS}"
       -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
-      -DSWIFT_RUN_LONG_TESTS="ON"
-      -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
   )
 fi
+
+SWIFT_CMAKE_OPTIONS=(
+    "${SWIFT_CMAKE_OPTIONS[@]}"
+    -DSWIFT_RUN_LONG_TESTS="ON"
+    -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
+    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+)
 
 # set_ios_options options_var platform deployment_target internal_suffix arch
 function set_ios_options {
