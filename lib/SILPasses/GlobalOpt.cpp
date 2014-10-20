@@ -125,7 +125,7 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
     UnhandledOnceCallee = true;
     return;
   }
-  if (!Callee->getName().startswith("globalinit_func"))
+  if (!Callee->getName().startswith("globalinit_"))
     return;
 
   // We currently disable optimizing the intializer if a globalinit_func
@@ -263,7 +263,7 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF) {
   // and the globalinit_func is called by "once" from a single location,
   // continue; otherwise bail.
   auto *InitF = findInitializer(Module, AddrF, CallToOnce);
-  if (!InitF || !InitF->getName().startswith("globalinit_func") ||
+  if (!InitF || !InitF->getName().startswith("globalinit_") ||
       InitializerCount[InitF] > 1)
     return;
 
