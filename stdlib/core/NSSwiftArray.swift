@@ -48,10 +48,12 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
   }
 
-  internal var _heapBufferBridged: _HeapBufferStorage<Int, AnyObject>? {
+  internal typealias HeapBufferStorage = _HeapBufferStorage<Int, AnyObject>
+  
+  internal var _heapBufferBridged: HeapBufferStorage? {
     if let ref: AnyObject =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, _HeapBufferStorage<Int, AnyObject>.self)
+      return unsafeBitCast(ref, HeapBufferStorage.self)
     }
     return nil
   }
@@ -60,7 +62,7 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     self._nativeStorage = _nativeStorage
   }
 
-  internal func _destroyBridgedStorage(hb: _HeapBufferStorage<Int, AnyObject>?) {
+  internal func _destroyBridgedStorage(hb: HeapBufferStorage?) {
     if let bridgedStorage = hb {
       let heapBuffer = _HeapBuffer(bridgedStorage)
       let count = heapBuffer.value
@@ -98,7 +100,9 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
         if !_stdlib_atomicInitializeARCRef(
           object: _heapBufferBridgedPtr, desired: bridgedHeapBuffer.storage!) {
           // Another thread won the race.  Throw out our buffer
-          _destroyBridgedStorage(bridgedHeapBuffer.storage!)
+          let storage: HeapBufferStorage
+            = unsafeDowncast(bridgedHeapBuffer.storage!)
+          _destroyBridgedStorage(storage)
         }
         continue // try again
       }

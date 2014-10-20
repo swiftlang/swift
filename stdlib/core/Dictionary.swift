@@ -242,18 +242,19 @@ final class _NativeDictionaryStorageImpl<Key, Value> {
 
   typealias Element = _DictionaryElement<Key, Value>
   typealias DictionaryHeapBuffer = _HeapBuffer<_DictionaryBody, Element?>
+  typealias HeapBufferStorage = _HeapBufferStorage<_DictionaryBody, Element?>
 
   deinit {
     // FIXME: this cast is invalid.
     let buffer = DictionaryHeapBuffer(
-      unsafeBitCast(self, DictionaryHeapBuffer.Storage.self))
+      unsafeBitCast(self, HeapBufferStorage.self))
     let body = buffer.value
     buffer._value.destroy()
     buffer.baseAddress.destroy(body.capacity)
   }
   final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     let buffer = DictionaryHeapBuffer(
-      unsafeBitCast(self, DictionaryHeapBuffer.Storage.self))
+      unsafeBitCast(self, HeapBufferStorage.self))
     return buffer._allocatedSizeAndAlignMask()
   }
 }
@@ -826,13 +827,13 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
 
   /// The storage for bridged Dictionary elements, if present.
   var _heapBufferBridged:
-    BridgedNativeStorage.StorageImpl.DictionaryHeapBuffer.Storage? {
+    BridgedNativeStorage.StorageImpl.HeapBufferStorage? {
     if let ref: AnyObject =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
       // FIXME: this cast is invalid.
       return unsafeBitCast(
         ref,
-        BridgedNativeStorage.StorageImpl.DictionaryHeapBuffer.Storage.self)
+        BridgedNativeStorage.StorageImpl.HeapBufferStorage.self)
     }
     return nil
   }
