@@ -28,6 +28,7 @@ KNOWN_SETTINGS=(
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of cmake --help for choices"
     prefix                      "/usr"           "installation prefix"
     show-sdks                   ""               "print installed Xcode and SDK versions"
+    reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
     skip-ios                    ""               "set to skip everything iOS-related"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
@@ -375,7 +376,7 @@ fi
 # Build LLVM and Clang (x86 target only).
 if [ \! "$SKIP_BUILD_LLVM" ]; then
   echo "--- Building LLVM and Clang ---"
-  if [[ ! -f  "${LLVM_BUILD_DIR}/CMakeCache.txt" ]] ; then
+  if [[ "${RECONFIGURE}" || ! -f  "${LLVM_BUILD_DIR}/CMakeCache.txt" ]] ; then
       set -x
       mkdir -p "${LLVM_BUILD_DIR}"
       # Note: we set LLVM_IMPLICIT_PROJECT_IGNORE below because this
@@ -491,7 +492,7 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
         mkdir -p "${swift_module_cache}"
 
         # Configure if necessary.
-        if [[ ! -f  "${!_PRODUCT_BUILD_DIR}/CMakeCache.txt" ]] ; then
+        if [[  "${RECONFIGURE}" || ! -f  "${!_PRODUCT_BUILD_DIR}/CMakeCache.txt" ]] ; then
             mkdir -p "${!_PRODUCT_BUILD_DIR}"
 
             _PRODUCT_CMAKE_OPTIONS=${PRODUCT}_CMAKE_OPTIONS[@]
