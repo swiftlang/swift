@@ -86,13 +86,9 @@ internal func _isUniquelyReferenced_native(
 
 /// Management API for `_HeapBufferStorage<Value, Element>`
 internal struct _HeapBuffer<Value, Element> : Equatable {
-  /// A default type to use as a backing store
   typealias Storage = _HeapBufferStorage<Value, Element>
+  let storage: Storage?
   
-  let _storage: Builtin.NativeObject?
-  var storage: AnyObject? {
-    return _storage.map { Builtin.castFromNativeObject($0) }
-  }
   static func _valueOffset() -> Int {
     return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
   }
@@ -145,33 +141,11 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   init() {
-    self._storage = .None
-  }
-
-  init(_ storage: _HeapBufferStorage<Value,Element>) {
-    self._storage = Builtin.castToNativeObject(storage)
+    self.storage = .None
   }
   
-  init(_ storage: AnyObject) {
-    _sanityCheck(
-      _usesNativeSwiftReferenceCounting(storage.dynamicType),
-      "HeapBuffer manages only native objects"
-    )
-    self._storage = Builtin.castToNativeObject(storage)
-  }
-  
-  init<T: AnyObject>(_ storage: T?) {
-    _sanityCheck(
-      _usesNativeSwiftReferenceCounting(T.self),
-      "HeapBuffer manages only native objects"
-    )
-    self._storage = storage.map {
-      Builtin.castToNativeObject($0)
-    }
-  }
-  
-  init(nativeStorage: Builtin.NativeObject?) {
-    self._storage = nativeStorage
+  init(_ storage: Storage) {
+    self.storage = storage
   }
   
   /// Create a `_HeapBuffer` with `self.value = initializer` and
@@ -181,18 +155,13 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     _ initializer: Value, _ capacity: Int
   ) {
     _sanityCheck(capacity >= 0, "creating a _HeapBuffer with negative capacity")
-    _sanityCheck(
-      _usesNativeSwiftReferenceCounting(storageClass),
-      "HeapBuffer can only create native objects"
-    )
 
     let totalSize = _HeapBuffer._elementOffset() +
         capacity * strideof(Element.self)
     let alignMask = _HeapBuffer._requiredAlignMask()
 
-    let object: AnyObject = _swift_bufferAllocate(
-      storageClass, totalSize, alignMask)
-    self._storage = Builtin.castToNativeObject(object)
+    self.storage = unsafeBitCast(
+      _swift_bufferAllocate(storageClass, totalSize, alignMask), Storage.self)
     self._value.initialize(initializer)
   }
 
@@ -207,7 +176,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
 
   /// True if storage is non-\ `nil`
   var hasStorage: Bool {
-    return _storage != nil
+    return storage != nil
   }
 
   subscript(i: Int) -> Element {
@@ -220,17 +189,17 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   var _nativeObject: Builtin.NativeObject {
-    return _storage!
+    return unsafeBitCast(storage, Builtin.NativeObject.self)
   }
 
   static func fromNativeObject(x: Builtin.NativeObject) -> _HeapBuffer {
-    return _HeapBuffer(nativeStorage: x)
+    return _HeapBuffer(Builtin.castFromNativeObject(x) as Storage)
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(_storage)
+    let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(storage)
     let result = _swift_isUniquelyReferenced_native(o)
-    Builtin.fixLifetime(_storage)
+    Builtin.fixLifetime(storage)
     return result != 0
   }
 }
