@@ -268,11 +268,8 @@ void swift::runSILOptimizationPasses(SILModule &Module,
 
   PM.resetAndRemoveTransformations();
   AddLowLevelLoopOptPasses(PM);
+  PM.add(createDeadFunctionElimination());
   PM.runOneIteration();
-
-  // Invalidate the SILLoader and allow it to drop references to SIL functions.
-  Module.invalidateSILLoader();
-  performSILElimination(&Module);
 
   // Gather instruction counts if we are asked to do so.
   if (Options.PrintInstCounts) {
