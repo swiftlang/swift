@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
+// TEMPORARILY DISABLED BECAUSE OF rdar://problem/18709125. R_U_N: %swift -target x86_64-apple-macosx10.9 -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
 // CHECK-DAG: ![[A:.*]] = {{.*}} [ DW_TAG_arg_variable ] [a] [line 15]
 // CHECK-DAG: ![[B:.*]] = {{.*}} [ DW_TAG_arg_variable ] [b] [line 15]
 // CHECK-DAG: ![[P1:.*]] = {{.*}}; [ DW_TAG_expression ] [DW_OP_piece offset=0, size=8]
