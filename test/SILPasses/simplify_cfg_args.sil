@@ -1,5 +1,4 @@
 // RUN: %sil-opt %s -simplify-cfg | FileCheck %s
-// RUN: %sil-opt %s -codemotion -simplify-cfg | FileCheck %s --check-prefix=CHECK_WITH_CODEMOTION
 sil_stage raw
 
 import Builtin
@@ -336,7 +335,6 @@ sil @simplify_switch_to_select_enum : $@thin (X) -> Bool {
 bb0(%0 : $X):
 // CHECK: bb0
 // CHECK: [[TRUE:%.*]] = integer_literal {{.*}} -1
-// CHECK: integer_literal {{.*}} 0
 // CHECK: [[FALSE:%.*]] = integer_literal {{.*}} 0
 // CHECK: [[VAL:%[a-zA-Z0-9]+]] = select_enum %0 : $X, case #X.A!enumelt: [[TRUE]], default [[FALSE]]
   %2 = integer_literal $Builtin.Int1, 0
@@ -353,8 +351,8 @@ bb3:                                              // Preds: bb0
   br bb4(%2 : $Builtin.Int1)
 
 bb4(%20 : $Builtin.Int1):                         // Preds: bb1 bb2 bb3
-// CHECK: bb4
-// CHECK: [[RETVAL:%[a-zA-Z0-9]+]] = struct $Bool ([[VAL]] : $Builtin.Int1)
+// CHECK: bb4:
+// CHECK-NEXT: [[RETVAL:%[a-zA-Z0-9]+]] = struct $Bool ([[VAL]] : $Builtin.Int1)
 // CHECK-NEXT: return [[RETVAL]] : $Bool
   %11 = struct $Bool (%20 : $Builtin.Int1)
   return %11 : $Bool
@@ -378,7 +376,6 @@ bb1:
 bb2:
 // CHECK: unchecked_enum_data %0 : $E, #E.Yup!enumelt.1
 // CHECK-NOT: switch_enum
-// CHECK: return
   switch_enum %0 : $E, case #E.Yup!enumelt.1: bb4, case #E.Nope!enumelt: bb3
 
 bb3:
@@ -399,237 +396,3 @@ bb0(%0 : $Optional<Int>):
 bb1(%2 : $Optional<Int>):
   return %0 : $Optional<Int>
 }
-
-public enum Numbers {
-  case First, Second, Third, Fourth, Fifth
-  //var hashValue: Int { get }
-}
-    
-
-// Check that one of the switch_enum instructions can be
-// converted into select_enum instructions, even though
-// the destination block is used as a target also by 
-// another switch_enum instruction
-
-// CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumFromTwoSelectSwitches
-// CHECK_WITH_CODEMOTION: switch_enum %0 : $Numbers
-// CHECK_WITH_CODEMOTION-NOT: switch_enum
-// CHECK_WITH_CODEMOTION: select_enum
-// CHECK_WITH_CODEMOTION: return
-sil @FormSelectEnumFromTwoSelectSwitches : $@thin (Numbers) -> Int {
-bb0(%0 : $Numbers):
-  debug_value %0 : $Numbers  // let e             // id: %1
-  switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %2
-
-bb1:                                              // Preds: bb0
-  br bb2                                          // id: %3
-
-bb2:                                              // Preds: bb1
-  %4 = integer_literal $Builtin.Word, 42          // user: %5
-  %5 = struct $Int (%4 : $Builtin.Word)           // user: %6
-  br bb20(%5 : $Int)                              // id: %6
-
-bb3:                                              // Preds: bb0
-  br bb5                                          // id: %7
-
-bb4:                                              // Preds: bb0
-  br bb5                                          // id: %8
-
-bb5:                                              // Preds: bb3 bb4
-  %9 = integer_literal $Builtin.Word, 24          // user: %10
-  %10 = struct $Int (%9 : $Builtin.Word)          // user: %11
-  br bb20(%10 : $Int)                             // id: %11
-
-bb6:                                              // Preds: bb0
-  br bb7                                          // id: %12
-
-bb7:                                              // Preds: bb6
-  br bb8                                          // id: %13
-
-bb8:                                              // Preds: bb7
-  br bb9                                          // id: %14
-
-bb9:                                              // Preds: bb8
-  switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb10, case #Numbers.Second!enumelt: bb12, case #Numbers.Third!enumelt: bb13, case #Numbers.Fourth!enumelt: bb15, default bb17 // id: %15
-
-bb10:                                             // Preds: bb9
-  br bb11                                         // id: %16
-
-bb11:                                             // Preds: bb10
-  %17 = integer_literal $Builtin.Word, 42         // user: %18
-  %18 = struct $Int (%17 : $Builtin.Word)         // user: %19
-  br bb20(%18 : $Int)                             // id: %19
-
-bb12:                                             // Preds: bb9
-  br bb14                                         // id: %20
-
-bb13:                                             // Preds: bb9
-  br bb14                                         // id: %21
-
-bb14:                                             // Preds: bb12 bb13
-  %22 = integer_literal $Builtin.Word, 24         // user: %23
-  %23 = struct $Int (%22 : $Builtin.Word)         // user: %24
-  br bb20(%23 : $Int)                             // id: %24
-
-bb15:                                             // Preds: bb9
-  br bb16                                         // id: %25
-
-bb16:                                             // Preds: bb15
-  %26 = integer_literal $Builtin.Word, 100        // user: %27
-  %27 = struct $Int (%26 : $Builtin.Word)         // user: %28
-  br bb20(%27 : $Int)                             // id: %28
-
-bb17:                                             // Preds: bb9
-  br bb18                                         // id: %29
-
-bb18:                                             // Preds: bb17
-  br bb19                                         // id: %30
-
-bb19:                                             // Preds: bb18
-  %31 = integer_literal $Builtin.Word, 100        // user: %32
-  %32 = struct $Int (%31 : $Builtin.Word)         // user: %33
-  br bb20(%32 : $Int)                             // id: %33
-
-bb20(%34 : $Int):                                 // Preds: bb2 bb5 bb11 bb14 bb16 bb19
-  return %34 : $Int                               // id: %35
-}
-
-// CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumIntResult
-// CHECK_WITH_CODEMOTION-NOT: switch_enum
-// CHECK_WITH_CODEMOTION: select_enum
-// CHECK_WITH_CODEMOTION: return
-sil @FormSelectEnumIntResult : $@thin (Numbers) -> Int {
-bb0(%0 : $Numbers):
-  debug_value %0 : $Numbers  // let e             // id: %1
-  switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, case #Numbers.Fourth!enumelt: bb6, default bb8 // id: %2
-
-bb1:                                              // Preds: bb0
-  br bb2                                          // id: %3
-
-bb2:                                              // Preds: bb1
-  %4 = integer_literal $Builtin.Word, 42          // user: %5
-  %5 = struct $Int (%4 : $Builtin.Word)           // user: %6
-  br bb11(%5 : $Int)                              // id: %6
-
-bb3:                                              // Preds: bb0
-  br bb5                                          // id: %7
-
-bb4:                                              // Preds: bb0
-  br bb5                                          // id: %8
-
-bb5:                                              // Preds: bb3 bb4
-  %9 = integer_literal $Builtin.Word, 24          // user: %10
-  %10 = struct $Int (%9 : $Builtin.Word)          // user: %11
-  br bb11(%10 : $Int)                             // id: %11
-
-bb6:                                              // Preds: bb0
-  br bb7                                          // id: %12
-
-bb7:                                              // Preds: bb6
-  %13 = integer_literal $Builtin.Word, 100        // user: %14
-  %14 = struct $Int (%13 : $Builtin.Word)         // user: %15
-  br bb11(%14 : $Int)                             // id: %15
-
-bb8:                                              // Preds: bb0
-  br bb9                                          // id: %16
-
-bb9:                                              // Preds: bb8
-  br bb10                                         // id: %17
-
-bb10:                                             // Preds: bb9
-  %18 = integer_literal $Builtin.Word, 100        // user: %19
-  %19 = struct $Int (%18 : $Builtin.Word)         // user: %20
-  br bb11(%19 : $Int)                             // id: %20
-
-bb11(%21 : $Int):                                 // Preds: bb2 bb5 bb7 bb10
-  return %21 : $Int                               // id: %22
-}
-
-// CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumBoolResult
-// CHECK_WITH_CODEMOTION-NOT: switch_enum
-// CHECK_WITH_CODEMOTION: select_enum
-// CHECK_WITH_CODEMOTION: return
-sil @FormSelectEnumBoolResult : $@thin (Numbers) -> Bool {
-bb0(%0 : $Numbers):
-  debug_value %0 : $Numbers  // let e             // id: %1
-  switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %2
-
-bb1:                                              // Preds: bb0
-  br bb2                                          // id: %3
-
-bb2:                                              // Preds: bb1
-  %4 = integer_literal $Builtin.Int1, -1          // user: %5
-  %5 = struct $Bool (%4 : $Builtin.Int1)          // user: %6
-  br bb9(%5 : $Bool)                              // id: %6
-
-bb3:                                              // Preds: bb0
-  br bb5                                          // id: %7
-
-bb4:                                              // Preds: bb0
-  br bb5                                          // id: %8
-
-bb5:                                              // Preds: bb3 bb4
-  %9 = integer_literal $Builtin.Int1, 0           // user: %10
-  %10 = struct $Bool (%9 : $Builtin.Int1)         // user: %11
-  br bb9(%10 : $Bool)                             // id: %11
-
-bb6:                                              // Preds: bb0
-  br bb7                                          // id: %12
-
-bb7:                                              // Preds: bb6
-  br bb8                                          // id: %13
-
-bb8:                                              // Preds: bb7
-  %14 = integer_literal $Builtin.Int1, -1         // user: %15
-  %15 = struct $Bool (%14 : $Builtin.Int1)        // user: %16
-  br bb9(%15 : $Bool)                             // id: %16
-
-bb9(%17 : $Bool):                                 // Preds: bb2 bb5 bb8
-  return %17 : $Bool                              // id: %18
-}
-
-// CHECK_WITH_CODEMOTION-LABEL: sil @DontFormSelectEnumBoolResult
-// CHECK_WITH_CODEMOTION: switch_enum
-// CHECK_WITH_CODEMOTION-NOT: select_enum
-// CHECK_WITH_CODEMOTION: return
-sil @DontFormSelectEnumBoolResult : $@thin (Numbers, Bool) -> Bool {
-bb0(%0 : $Numbers, %1 : $Bool):
-  debug_value %0 : $Numbers  // let e             // id: %2
-  debug_value %1 : $Bool  // let b                // id: %3
-  switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %4
-
-bb1:                                              // Preds: bb0
-  br bb2                                          // id: %5
-
-bb2:                                              // Preds: bb1
-  %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = struct $Bool (%6 : $Builtin.Int1)          // user: %8
-  br bb10(%7 : $Bool)                             // id: %8
-
-bb3:                                              // Preds: bb0
-  br bb5                                          // id: %9
-
-bb4:                                              // Preds: bb0
-  br bb5                                          // id: %10
-
-bb5:                                              // Preds: bb3 bb4
-  %11 = integer_literal $Builtin.Int1, 0          // user: %12
-  %12 = struct $Bool (%11 : $Builtin.Int1)        // user: %13
-  br bb10(%12 : $Bool)                            // id: %13
-
-bb6:                                              // Preds: bb0
-  br bb7                                          // id: %14
-
-bb7:                                              // Preds: bb6
-  br bb8                                          // id: %15
-
-bb8:                                              // Preds: bb7
-  br bb9                                          // id: %16
-
-bb9:                                              // Preds: bb8
-  br bb10(%1 : $Bool)                             // id: %17
-
-bb10(%18 : $Bool):                                // Preds: bb2 bb5 bb9
-  return %18 : $Bool                              // id: %19
-}
-
