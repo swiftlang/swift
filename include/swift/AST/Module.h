@@ -696,7 +696,7 @@ public:
   };
 
 private:
-  std::unique_ptr<LookupCache> Cache;
+  LookupCache *Cache = nullptr;
   LookupCache &getCache() const;
 
   /// This is the list of modules that are imported by this module, with the
@@ -886,7 +886,7 @@ public:
   class LookupCache;
 
 private:
-  std::unique_ptr<LookupCache> Cache;
+  LookupCache *Cache = nullptr;
   LookupCache &getCache() const;
 
   friend ASTContext;

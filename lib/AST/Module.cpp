@@ -60,8 +60,10 @@ public:
 BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
   // FIXME: This leaks. Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
-  if (!Cache)
-    const_cast<BuiltinUnit *>(this)->Cache.reset(new LookupCache());
+  if (!Cache) {
+    const_cast<BuiltinUnit *>(this)->Cache = new LookupCache();
+    getASTContext().addDestructorCleanup(*Cache);
+  }
   return *Cache;
 }
 
@@ -99,28 +101,33 @@ BuiltinUnit::BuiltinUnit(Module &M)
 // Normal Module Name Lookup
 //===----------------------------------------------------------------------===//
 
-/// A lookup map for value decls. When declarations are added they are added
-/// under all variants of the name they can be found under.
-class DeclMap {
-  llvm::DenseMap<DeclName, TinyPtrVector<ValueDecl*>> Members;
-  
-public:
-  void add(ValueDecl *VD) {
-    if (!VD->hasName()) return;
-    VD->getFullName().addToLookupTable(Members, VD);
-  }
-  
-  decltype(Members)::const_iterator begin() const  { return Members.begin(); }
-  decltype(Members)::const_iterator end() const { return Members.end(); }
-  decltype(Members)::const_iterator find(DeclName Name) const {
-    return Members.find(Name);
-  }
-};
-
 class SourceFile::LookupCache {
+  /// A lookup map for value decls. When declarations are added they are added
+  /// under all variants of the name they can be found under.
+  class DeclMap {
+    llvm::DenseMap<DeclName, TinyPtrVector<ValueDecl*>> Members;
+
+  public:
+    void add(ValueDecl *VD) {
+      if (!VD->hasName()) return;
+      VD->getFullName().addToLookupTable(Members, VD);
+    }
+
+    void clear() {
+      Members.shrink_and_clear();
+    }
+
+    decltype(Members)::const_iterator begin() const  { return Members.begin(); }
+    decltype(Members)::const_iterator end() const { return Members.end(); }
+    decltype(Members)::const_iterator find(DeclName Name) const {
+      return Members.find(Name);
+    }
+  };
+
   DeclMap TopLevelValues;
   DeclMap ClassMembers;
   bool MemberCachePopulated = false;
+
   template<typename Range>
   void doPopulateCache(Range decls, bool onlyOperators);
   void addToMemberCache(DeclRange decls);
@@ -129,6 +136,9 @@ public:
   typedef Module::AccessPathTy AccessPathTy;
   
   LookupCache(const SourceFile &SF);
+
+  /// Throw away as much memory as possible.
+  void invalidate();
   
   void lookupValue(AccessPathTy AccessPath, DeclName Name,
                    NLKind LookupKind, SmallVectorImpl<ValueDecl*> &Result);
@@ -151,10 +161,10 @@ public:
 using SourceLookupCache = SourceFile::LookupCache;
 
 SourceLookupCache &SourceFile::getCache() const {
-  // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
-  // the DenseMap will leak.
-  if (!Cache)
-    const_cast<SourceFile *>(this)->Cache.reset(new SourceLookupCache(*this));
+  if (!Cache) {
+    const_cast<SourceFile *>(this)->Cache = new SourceLookupCache(*this);
+    getASTContext().addDestructorCleanup(*Cache);
+  }
   return *Cache;
 }
 
@@ -296,6 +306,16 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
   }
 
   results.append(iter->second.begin(), iter->second.end());
+}
+
+void SourceLookupCache::invalidate() {
+  TopLevelValues.clear();
+  ClassMembers.clear();
+  MemberCachePopulated = false;
+
+  // std::move AllVisibleValues into a temporary to destroy its contents.
+  using SameSizeSmallVector = decltype(AllVisibleValues);
+  (void)SameSizeSmallVector{std::move(AllVisibleValues)};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1369,7 +1389,12 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
 }
 
 void SourceFile::clearLookupCache() {
-  Cache.reset();
+  if (!Cache)
+    return;
+
+  // Abandon any current cache. We'll rebuild it on demand.
+  Cache->invalidate();
+  Cache = nullptr;
 }
 
 void
