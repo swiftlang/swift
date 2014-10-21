@@ -304,6 +304,9 @@ public:
                           Pos.PrevLoc);
   }
 
+  /// \brief Return parser position after the first character of token T
+  ParserPosition getParserPositionAfterFirstCharacter(Token T);
+
   void restoreParserPosition(ParserPosition PP) {
     L->restoreState(PP.LS);
 
@@ -485,7 +488,7 @@ public:
   /// be a complete '>' token or some kind of operator token starting with '>',
   /// e.g., '>>'.
   SourceLoc consumeStartingGreater();
-  
+
   /// \brief Consume the starting character of the current token, and split the
   /// remainder of the token into a new token (or tokens).
   SourceLoc consumeStartingCharacterOfCurrentToken();

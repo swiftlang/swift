@@ -667,12 +667,14 @@ bool Parser::isOptionalToken(const Token &T) const {
     return true;
   return false;
 }
+
 bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
-  // A postfix '!' by itself, or a '!' in SIL mode, is obviously optional.
+  // A postfix '!' by itself, or a '!' in SIL mode, is obviously implicitly
+  // unwrapped optional.
   if (T.is(tok::exclaim_postfix) || T.is(tok::sil_exclamation))
     return true;
-  // A postfix or bound infix operator token that begins with '?' can be
-  // optional too. We'll munch off the '?'.
+  // A postfix or bound infix operator token that begins with '!' can be
+  // implicitly unwrapped optional too. We'll munch off the '!'.
   if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary))
       && T.getText().startswith("!"))
     return true;
@@ -687,16 +689,7 @@ SourceLoc Parser::consumeOptionalToken() {
 SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
   assert(isImplicitlyUnwrappedOptionalToken(Tok) && "not a '!' token?!");
   // If the text of the token is just '!', grab the next token.
-  if (Tok.getLength() == 1)
-    return consumeToken();
-  
-  // Skip the '?' in the existing token. We have to reset the lexer instead of
-  // using getTokenAt, because if we split a token like '>?>', we'll end up with
-  // a shorter token '?' and lose the following '>'.
-  SourceLoc Loc = Tok.getLoc();
-  auto newState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(1));
-  L->restoreState(newState);
-  return Loc;
+  return consumeStartingCharacterOfCurrentToken();
 }
 
 /// Parse a single optional suffix, given that we are looking at the

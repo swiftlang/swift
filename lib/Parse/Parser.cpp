@@ -308,18 +308,26 @@ SourceLoc Parser::getEndOfPreviousLoc() {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
+Parser::ParserPosition Parser::getParserPositionAfterFirstCharacter(Token T) {
+  assert(T.getLength() > 1 && "Token must have more than one character");
+  auto Loc = T.getLoc();
+  auto NewState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(1));
+  return ParserPosition(NewState, Loc);
+}
+
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
-  // If the text of the token is just '?', grab the next token.
-  if (Tok.getLength() != 1) {
-    auto Loc = Tok.getLoc();
-    // Skip the '?' in the existing token. We have to reset the lexer instead of
-    // using getTokenAt, because if we split a token like '>?>', we'll end up
-    // with a shorter token '?' and lose the following '>'.
-    auto newState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(1));
-    L->restoreState(newState);
+  // Consumes one-character token (like '?', '<', '>' or '!') and returns
+  // it's location.
+
+  // Current token can be either one-character token we want to consume...
+  if (Tok.getLength() == 1) {
+    return consumeToken();
   }
-  
-  return consumeToken();
+
+  // ... or a multi-charater token with the first caracter being the one that
+  // we want to consume as a separate token.
+  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok));
+  return PreviousLoc;
 }
 
 SourceLoc Parser::consumeStartingLess() {
