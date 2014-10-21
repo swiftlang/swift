@@ -32,6 +32,8 @@ using namespace swift;
 // Temporary debugging flag until this pass is better tested.
 static llvm::cl::opt<bool> EnableCopyForwarding("enable-copyforwarding",
                                                 llvm::cl::init(false));
+static llvm::cl::opt<bool> EnableDestroyHoisting("enable-destroyhoisting",
+                                                llvm::cl::init(false));
 
 /// \return true of the given object can only be accessed via the given def
 /// (this def uniquely identifies the object).
@@ -377,6 +379,9 @@ bool CopyForwarding::collectUsers() {
 /// If the forwarded copy is not an [init], then insert a destroy of the copy's
 /// dest.
 bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
+  if (!EnableCopyForwarding)
+    return false;
+
   SILValue CopyDest = CopyInst->getDest();
   SILBasicBlock *BB = CopyInst->getParent();
 
@@ -588,6 +593,9 @@ bool CopyForwarding::backwardPropagateCopy(
 /// block was marked dead-in.
 bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
                                   SILLocation DestroyLoc) {
+  if (!EnableDestroyHoisting)
+    return false;
+
   assert(!SrcUserInsts.count(DestroyPoint) && "caller should check terminator");
   SILBasicBlock *BB = DestroyPoint->getParent();
 
@@ -794,7 +802,7 @@ static llvm::cl::opt<int> ForwardStop("copy-forward-stop",
 class CopyForwardingPass : public SILFunctionTransform
 {
   void run() override {
-    if (!EnableCopyForwarding)
+    if (!EnableCopyForwarding && !EnableDestroyHoisting)
       return;
 
     DEBUG(llvm::dbgs() << "Copy Forwarding in Func " << getFunction()->getName()
@@ -808,7 +816,7 @@ class CopyForwardingPass : public SILFunctionTransform
     for (auto &BB : *getFunction())
       for (auto II = BB.begin(), IE = BB.end(); II != IE; ++II) {
         if (auto *CopyInst = dyn_cast<CopyAddrInst>(&*II)) {
-          if (canNRVO(CopyInst)) {
+          if (EnableDestroyHoisting && canNRVO(CopyInst)) {
             NRVOCopies.push_back(CopyInst);
             continue;
           }
