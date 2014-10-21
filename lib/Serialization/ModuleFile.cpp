@@ -504,7 +504,8 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      ModuleStatus err = validateControlBlock(cursor, scratch).first;
+      ModuleStatus err;
+      std::tie(err, Name) = validateControlBlock(cursor, scratch);
       if (err != ModuleStatus::Valid) {
         error(err);
         return;
@@ -745,6 +746,11 @@ bool ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
   assert(getStatus() == ModuleStatus::Valid && "invalid module file");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
+
+  if (file->getParentModule()->Name.str() != Name) {
+    error(ModuleStatus::NameMismatch);
+    return false;
+  }
 
   ASTContext &ctx = getContext();
   bool missingDependency = false;
@@ -1091,8 +1097,7 @@ ModuleFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
   for (auto &lib : LinkLibraries)
     callback(lib);
   if (Bits.IsFramework)
-    callback(LinkLibrary(FileContext->getParentModule()->Name.str(),
-                         LibraryKind::Framework));
+    callback(LinkLibrary(Name, LibraryKind::Framework));
 }
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
