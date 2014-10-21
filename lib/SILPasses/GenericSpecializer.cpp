@@ -26,6 +26,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -35,6 +36,9 @@ STATISTIC(NumSpecialized, "Number of functions specialized");
 static bool canSpecializeFunction(SILFunction *F) {
   return !F->isExternalDeclaration();
 }
+
+llvm::cl::opt<bool> EnableSpecializer("enable-specializer",
+                                      llvm::cl::init(true));
 
 namespace {
 
@@ -370,6 +374,9 @@ public:
   SILGenericSpecializerTransform() {}
 
   void run() {
+    if (!EnableSpecializer)
+      return;
+
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
 
     // Collect a call-graph bottom-up list of functions and specialize the
