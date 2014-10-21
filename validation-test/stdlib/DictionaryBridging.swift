@@ -5,7 +5,7 @@
 //
 // RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/../../test/1_stdlib/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 //
-// RUN: cp %s %t/main.swift
+// RUN: echo '#line 1 "%s"' > "%t/main.swift" && cat "%s" >> "%t/main.swift" && chmod -w "%t/main.swift"
 // RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/../../test/1_stdlib/Inputs/SlurpFastEnumeration/ %t/main.swift %S/../../test/1_stdlib/Inputs/DictionaryKeyValueTypes.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
 // RUN: %target-run %t.out
 
@@ -46,7 +46,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: [Observation], inout _ sink: S) {
+  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
     sink.put(evaluateObservationsAllEqual(observations))
   }
 }
@@ -88,7 +88,7 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: [Observation], inout _ sink: S) {
+  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
     sink.put(evaluateObservationsAllEqual(observations))
   }
 }

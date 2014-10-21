@@ -17,36 +17,36 @@ import StdlibUnittest
 var ConcatenateTests = TestSuite("ConcatenateTests")
 
 // Help the type checker (<rdar://problem/17897413> Slow type deduction)
-typealias X = (Range<Int>, [Range<Int>])
+typealias X = (Range<Int>, ContiguousArray<Range<Int>>)
 
-let samples: [X] = [
-  (0..<8, [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8 ]),
-  (0..<8, [ 0..<5, 7..<7, 5..<7, 7..<8 ]),
-  (0..<8, [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8, 11..<11 ]),
-  (0..<8, [ 0..<5, 7..<7, 5..<7, 7..<8, 11..<11 ]),
-  (0..<0, [ 11..<11 ]),
-  (0..<0, [ 3..<3, 11..<11 ]),
-  (0..<0, []),
+let samples: ContiguousArray<X> = [
+  (0..<8, [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8 ] as ContiguousArray<Range<Int>>),
+  (0..<8, [ 0..<5, 7..<7, 5..<7, 7..<8 ] as ContiguousArray<Range<Int>>),
+  (0..<8, [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8, 11..<11 ] as ContiguousArray<Range<Int>>),
+  (0..<8, [ 0..<5, 7..<7, 5..<7, 7..<8, 11..<11 ] as ContiguousArray<Range<Int>>),
+  (0..<0, [ 11..<11 ] as ContiguousArray<Range<Int>>),
+  (0..<0, [ 3..<3, 11..<11 ] as ContiguousArray<Range<Int>>),
+  (0..<0, [] as ContiguousArray<Range<Int>>),
 ]
 
-let expected = Array(0..<8)
+let expected = ContiguousArray(0..<8)
 
 for (expected, source) in samples {
   ConcatenateTests.test("forward-\(source)") {
     checkCollection(
-      Array(expected),
+      expected,
       _lazyConcatenate(source),
       SourceLocStack().withCurrentLoc())
   }
   ConcatenateTests.test("reverse-\(source)") {
     checkCollection(
-      lazy(expected).reverse().array,
+      ContiguousArray(lazy(expected).reverse()),
       _lazyConcatenate(source).reverse(),
       SourceLocStack().withCurrentLoc())
   }
   ConcatenateTests.test("sequence-\(source)") {
     checkSequence(
-      Array(expected),
+      ContiguousArray(expected),
       _lazyConcatenate(SequenceOf(source)),
       SourceLocStack().withCurrentLoc())
   }

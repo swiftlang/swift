@@ -47,7 +47,7 @@ struct RaceTest1 : RaceTestWithPerTrialDataType {
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: [Observation], inout _ sink: S) {
+  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
     for observation in observations {
       switch observation {
       case Observation(0x1):

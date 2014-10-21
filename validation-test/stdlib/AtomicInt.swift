@@ -112,7 +112,7 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: [Observation], inout _ sink: S) {
+  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
     for observation in observations {
       switch observation {
       case Observation(1,  0,  0, 30, 40),
@@ -193,7 +193,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: [Observation], inout _ sink: S) {
+  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
     for observation in observations {
       switch observation {
       case Observation(1,  0,  0, 30, 40),
@@ -279,7 +279,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: [Observation], inout _ sink: S) {
+  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
     for observation in observations {
       switch observation {
       case Observation(1,  0,  0, 30, 40),
@@ -405,7 +405,7 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: [Observation], inout _ sink: S) {
+  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
     for observation in observations {
       switch observation {
       case Observation(1,  0,  0, 30, 40, 100, 200, 300, 400),
@@ -488,7 +488,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: [Observation], inout _ sink: S) {
+  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
     let ref = observations[0].uw2
     if contains(observations, { $0.uw2 != ref }) {
       for observation in observations {
