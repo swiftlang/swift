@@ -48,7 +48,7 @@ def cFuncSuffix(bits):
 UnaryIntrinsicFunctions = ['cos', 'sin',
                   'exp', 'exp2',
                   'log', 'log10', 'log2',
-                  'fabs',
+                  'fabs', 'sqrt',
                   'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
                   ]
 

@@ -49,7 +49,7 @@ UnaryFunctions = ['acos', 'asin', 'atan', 'tan',
                   'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh',
                   'expm1',
                   'log1p', 'logb',
-                  'cbrt', 'sqrt', 'erf', 'erfc', 'tgamma',
+                  'cbrt', 'erf', 'erfc', 'tgamma',
                   ]
 
 # These functions have a corresponding LLVM intrinsic
@@ -58,7 +58,7 @@ UnaryFunctions = ['acos', 'asin', 'atan', 'tan',
 UnaryIntrinsicFunctions = ['cos', 'sin',
                   'exp', 'exp2',
                   'log', 'log10', 'log2',
-                  'fabs',
+                  'fabs', 'sqrt',
                   'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
                   ]
 
