@@ -804,8 +804,11 @@ Serializer::encodeReferencedConformance(const ProtocolConformance *conformance,
   }
 
   bool append = !isa<NormalProtocolConformance>(conformance);
-  if (!allowReferencingCurrentModule)
-    append |= conformance->getDeclContext()->getParentModule() == M;
+  if (!append)
+    append = getDeclForContext(conformance->getDeclContext())->hasClangNode();
+  if (!append && !allowReferencingCurrentModule)
+    append = conformance->getDeclContext()->getParentModule() == M;
+
   if (append) {
     // Encode the type in typeID. Set moduleID to BUILTIN_MODULE_ID to indicate
     // that the underlying conformance will follow. This is safe because there
