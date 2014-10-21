@@ -286,7 +286,9 @@ public:
     PostOrder(PO), HasChanged(false), HasChangedCFG(false),
     HasForwardedToCopy(false) {}
 
-  void reset() {
+  void reset(SILFunction *F) {
+    if (HasChangedCFG)
+      PostOrder->invalidate(F, SILAnalysis::InvalidationKind::CFG);
     CurrentDef = SILValue();
     HasForwardedToCopy = false;
     SrcUserInsts.clear();
@@ -626,7 +628,7 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
 
 /// Perform CopyForwarding on the current Def.
 void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
-  reset();
+  reset(F);
   CurrentDef = Def;
   DEBUG(llvm::dbgs() << "Analyzing copies of Def: " << Def);
   if (!collectUsers())
