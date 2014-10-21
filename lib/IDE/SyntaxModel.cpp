@@ -363,9 +363,15 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return { false, nullptr };
       
-      if (!Clause.Body->walk(*this))
-        return { false, nullptr };
-
+      for(auto &Element : Clause.Elements) {
+        if (Expr *E = Element.dyn_cast<Expr*>()) {
+          E->walk(*this);
+        } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
+          S->walk(*this);
+        } else {
+          Element.get<Decl*>()->walk(*this);
+        }
+      }
     }
     
     if (!ConfigS->hadMissingEnd())

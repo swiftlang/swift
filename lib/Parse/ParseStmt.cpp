@@ -291,7 +291,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
         auto Brace = BraceStmt::create(Context, StartLoc,
                                        {Result}, Tok.getLoc());
-        Brace->markAsConfigBlock();
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
       } else {
@@ -300,17 +299,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
       IfConfigStmt *ICS = cast<IfConfigStmt>(Result.get<Stmt*>());
       
-      if (auto activeStmt = ICS->getActiveStmt()) {
-        // Pass on any members of the active block
-        BraceStmt *activeBlock = dyn_cast<BraceStmt>(activeStmt);
-        
-        if (activeBlock) {
-          auto activeEntries = activeBlock->getElements();
-          
-          for (auto entry : activeEntries) {
-            Entries.push_back(entry);
-          }
-        }
+      for (auto &Entry : ICS->getActiveClauseElements()) {
+        Entries.push_back(Entry);
       }
 
     } else if (Tok.is(tok::pound_line)) {
@@ -349,14 +339,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
       diagnoseDiscardedClosure(*this, Result);
       if (!Result.isNull()) {
-        auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
-        
-        if (auto *RS = Result.dyn_cast<Stmt *>()) {
-          if (auto *ifConfigStmt = dyn_cast<IfConfigStmt>(RS)) {
-              if (ifConfigStmt->getActiveStmt())
-                Brace->markAsConfigBlock();
-          }
-        }
+        // NOTE: this is a 'virtual' brace statement which does not have
+        //       explicit '{' or '}', so the start and end locations should be
+        //       the same as those of the result node
+        auto Brace = BraceStmt::create(Context, Result.getStartLoc(),
+                                       Result, Result.getEndLoc());
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
       }
@@ -547,26 +534,15 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
 }
 
-/// parseIfConfigStmtBlock - Parse the active or inactive block of an
-/// #if/#else/#endif statement.
-BraceStmt *Parser::parseIfConfigStmtBlock(bool isActive,
-                                          BraceItemListKind Kind) {
-  SourceLoc LBloc = Tok.getLoc();
-  
-  BraceItemListKind configKind =
-    isActive ? BraceItemListKind::ActiveConfigBlock :
-               BraceItemListKind::InactiveConfigBlock;
-
-  SmallVector<ASTNode, 16> Entries;
-  parseBraceItems(Entries, Kind, configKind);
-  
-  auto *Result = BraceStmt::create(Context, LBloc, Entries, Tok.getLoc());
-  
-  Result->markAsConfigBlock();
-  if (!isActive)
-    Result->markAsInactiveConfigBlock();
-  
-  return Result;
+/// \brief Parses the elements in active or inactive if config clauses.
+void Parser::parseIfConfigClauseElements(bool isActive,
+                                         BraceItemListKind Kind,
+                                         SmallVectorImpl<ASTNode> &Elements) {
+  parseBraceItems(Elements,
+                  Kind,
+                  isActive
+                    ? BraceItemListKind::ActiveConfigBlock
+                    : BraceItemListKind::InactiveConfigBlock);
 }
 
 /// parseStmtBreak
@@ -915,9 +891,11 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
     if (!Tok.isAtStartOfLine())
       diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
 
-    auto Body = parseIfConfigStmtBlock(ClauseIsActive, Kind);
+    SmallVector<ASTNode, 16> Elements;
+    parseIfConfigClauseElements(ClauseIsActive, Kind, Elements);
     
-    Clauses.push_back(IfConfigStmtClause(ClauseLoc, Condition, Body,
+    Clauses.push_back(IfConfigStmtClause(ClauseLoc, Condition,
+                                         Context.AllocateCopy(Elements),
                                          ClauseIsActive));
     
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
@@ -932,6 +910,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   bool HadMissingEnd = false;
   if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt)) {
     HadMissingEnd = true;
+    EndLoc = PreviousLoc;
     skipUntilConfigBlockClose();
   }
   else if (!Tok.isAtStartOfLine())

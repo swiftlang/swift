@@ -343,11 +343,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     checkPattern(S->getPattern());
   }
   void visitBraceStmt(BraceStmt *S) {
-    // We'll want to look inside any active config blocks, even if the ranges
-    // do not intersect.  (This is to accurately model how an active config
-    // block "shares" its enclosing scope.)
-    if (!IntersectsRange(S->getSourceRange()) &&
-        (!S->isConfigBlock() || S->isInactiveConfigBlock()))
+    if (!IntersectsRange(S->getSourceRange()))
       return;
     for (auto elem : S->getElements()) {
       if (Stmt *S = elem.dyn_cast<Stmt*>())

@@ -110,8 +110,6 @@ public:
 class BraceStmt : public Stmt {
 private:
   unsigned NumElements;
-  unsigned IsConfigBlock : 1;
-  unsigned IsInactiveConfigBlock : 1;
   
   SourceLoc LBLoc;
   SourceLoc RBLoc;
@@ -143,12 +141,6 @@ public:
     return const_cast<BraceStmt*>(this)->getElements();
   }
   
-  void markAsConfigBlock() { IsConfigBlock = true; }
-  bool isConfigBlock() { return IsConfigBlock; }
-  
-  void markAsInactiveConfigBlock() { IsInactiveConfigBlock = true; }
-  bool isInactiveConfigBlock() { return IsInactiveConfigBlock; }
-
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
 
@@ -227,15 +219,16 @@ struct IfConfigStmtClause {
   /// is a #else clause.
   Expr *Cond;
   
-  /// The body of the clause.
-  BraceStmt *Body;
+  /// Elements inside the clause
+  ArrayRef<ASTNode> Elements;
   
   /// True if this is the active clause of the #if block.  Since this is
   /// evaluated at parse time, this is always known.
   bool isActive;
   
-  IfConfigStmtClause(SourceLoc Loc, Expr *Cond, BraceStmt *Body, bool isActive)
-    : Loc(Loc), Cond(Cond), Body(Body), isActive(isActive) {
+  IfConfigStmtClause(SourceLoc Loc, Expr *Cond,
+                     ArrayRef<ASTNode> Elements, bool isActive)
+    : Loc(Loc), Cond(Cond), Elements(Elements), isActive(isActive) {
   }
 };
 
@@ -263,11 +256,11 @@ public:
   
   const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
   
-  Stmt *getActiveStmt() const {
+  ArrayRef<ASTNode> getActiveClauseElements() const {
     for (auto &Clause : Clauses)
       if (Clause.isActive)
-        return Clause.Body;
-    return nullptr;
+        return Clause.Elements;
+    return ArrayRef<ASTNode>();
   }
 
   // Implement isa/cast/dyncast/etc.

@@ -2249,7 +2249,12 @@ struct ASTNodeBase {};
       (void) Ctx.SourceMgr.findBufferContainingLoc(SR.End);
       return true;
     }
-
+    
+    template<typename T>
+    void checkSourceRangesBase(T ASTNode) {
+      checkSourceRanges(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
+    }
+    
     void checkSourceRanges(Expr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ranges", E);
 
@@ -2300,6 +2305,63 @@ struct ASTNodeBase {};
                         [&]{ S->print(Out); });
     }
 
+    void checkSourceRanges(IfConfigStmt *S) {
+      checkSourceRangesBase(S);
+
+      SourceLoc Location = S->getStartLoc();
+      for (auto &Clause : S->getClauses()) {
+        // Clause start, note that the first clause start location is the
+        // same as that of the whole statement
+        if (Location == S->getStartLoc()) {
+          if (Location != Clause.Loc) {
+            Out << "bad start location of IfConfigStmt first clause\n";
+            S->print(Out);
+            abort();
+          }
+        } else {
+          if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Clause.Loc)) {
+            Out << "bad start location of IfConfigStmt clause\n";
+            S->print(Out);
+            abort();
+          }
+        }
+        Location = Clause.Loc;
+
+        // Condition if present
+        Expr *Cond = Clause.Cond;
+        if (Cond) {
+          if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Cond->getStartLoc())) {
+            Out << "invalid IfConfigStmt clause condition start location\n";
+            S->print(Out);
+            abort();
+          }
+          Location = Cond->getEndLoc();
+        }
+        
+        // Body elements
+        auto StoredLoc = Location;
+        for (auto &Element : Clause.Elements) {
+          if (!Ctx.SourceMgr.isBeforeInBuffer(StoredLoc, Element.getStartLoc())) {
+            Out << "invalid IfConfigStmt clause element start location\n";
+            S->print(Out);
+            abort();
+          }
+          
+          auto EndLocation = Element.getEndLoc();
+          if (EndLocation.isValid() &&
+              Ctx.SourceMgr.isBeforeInBuffer(Location, EndLocation)) {
+            Location = EndLocation;
+          }
+        }
+      }
+
+      if (Ctx.SourceMgr.isBeforeInBuffer(S->getEndLoc(), Location)) {
+        Out << "invalid IfConfigStmt end location\n";
+        S->print(Out);
+        abort();
+      }
+    }
+    
     void checkSourceRanges(Pattern *P) {
       PrettyStackTracePattern debugStack(Ctx, "verifying ranges", P);
 

@@ -584,8 +584,10 @@ public:
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
-  BraceStmt *parseIfConfigStmtBlock(bool isActive, BraceItemListKind Kind);
-
+  void parseIfConfigClauseElements(bool isActive,
+                                   BraceItemListKind Kind,
+                                   SmallVectorImpl<ASTNode> &Elements);
+  
   void parseTopLevelCodeDeclDelayed();
 
   //===--------------------------------------------------------------------===//

@@ -188,11 +188,6 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
   const unsigned UnknownStmtType  = 2;
   unsigned StmtType = UnknownStmtType;
   
-  // There's nothing to do if this is a configuration block.
-  if (S->isConfigBlock()) {
-    return;
-  }
-
   for (auto &ESD : S->getElements()) {
     
     if (auto S = ESD.dyn_cast<Stmt*>()) {

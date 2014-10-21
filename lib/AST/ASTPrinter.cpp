@@ -312,7 +312,7 @@ private:
   void printEnumElement(EnumElementDecl *elt);
 
   /// \returns true if anything was printed.
-  bool printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
+  bool printASTNodes(const ArrayRef<ASTNode> &Elements, bool NeedIndent = true);
 
   void printOneParameter(Identifier ArgName,
                          const Pattern *BodyPattern,
@@ -948,7 +948,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 }
 
 void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
-  printBraceStmtElements(decl->getBody(), /*NeedIndent=*/false);
+  printASTNodes(decl->getBody()->getElements(), /*NeedIndent=*/false);
 }
 
 void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
@@ -1264,10 +1264,11 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   }
 }
 
-bool PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
+bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
+                             bool NeedIndent) {
   IndentRAII IndentMore(*this, NeedIndent);
   bool PrintedSomething = false;
-  for (auto element : stmt->getElements()) {
+  for (auto element : Elements) {
     PrintedSomething = true;
     Printer.printNewline();
     indent();
@@ -1339,7 +1340,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer << " {";
     }
     if (Options.FunctionDefinitions && decl->getBody()) {
-      if (printBraceStmtElements(decl->getBody())) {
+      if (printASTNodes(decl->getBody()->getElements())) {
         Printer.printNewline();
         indent();
       }
@@ -1562,7 +1563,7 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   Printer << "{";
-  printBraceStmtElements(stmt);
+  printASTNodes(stmt->getElements());
   Printer.printNewline();
   indent();
   Printer << "}";
@@ -1596,7 +1597,10 @@ void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
     else
       Printer << "#else";
     Printer.printNewline();
-    visit(Clause.Body);
+    if (printASTNodes(Clause.Elements)) {
+      Printer.printNewline();
+      indent();
+    }
   }
   Printer.printNewline();
   Printer << "#endif";
@@ -1682,7 +1686,7 @@ void PrintAST::visitCaseStmt(CaseStmt *CS) {
   Printer << ":";
   Printer.printNewline();
 
-  printBraceStmtElements(cast<BraceStmt>(CS->getBody()));
+  printASTNodes((cast<BraceStmt>(CS->getBody())->getElements()));
 }
 
 void PrintAST::visitFailStmt(FailStmt *stmt) {

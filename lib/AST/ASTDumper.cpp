@@ -941,8 +941,12 @@ public:
   }
   
   void visitBraceStmt(BraceStmt *S) {
-    OS.indent(Indent) << "(brace_stmt";
-    for (auto Elt : S->getElements()) {
+    printASTNodes(S->getElements(), "brace_stmt");
+  }
+
+  void printASTNodes(const ArrayRef<ASTNode> &Elements, StringRef Name) {
+    OS.indent(Indent) << "(" << Name;
+    for (auto Elt : Elements) {
       OS << '\n';
       if (Expr *SubExpr = Elt.dyn_cast<Expr*>())
         printRec(SubExpr);
@@ -984,7 +988,9 @@ public:
         printRec(Clause.Cond);
 
       OS << '\n';
-      printRec(Clause.Body);
+      Indent += 2;
+      printASTNodes(Clause.Elements, "elements");
+      Indent -= 2;
     }
     
     Indent -= 2;
