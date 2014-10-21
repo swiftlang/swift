@@ -1,8 +1,8 @@
-set(OPT ${PATH_TO_LLVM_BUILD}/bin/opt)
-
 if(CMAKE_CONFIGURATION_TYPES)
   foreach(config ${CMAKE_CONFIGURATION_TYPES})
     # Xcode support. See the CMakeLists.txt for the SwiftLLVMPasses library.
+
+    set(OPT ${PATH_TO_LLVM_BUILD}/${config}/bin/opt)
 
     string(TOUPPER ${config} config_upper)
     get_property(SWIFT_LLVM_DYLIB
@@ -20,6 +20,7 @@ if(CMAKE_CONFIGURATION_TYPES)
       @ONLY)
   endforeach()
 else()
+  set(OPT ${PATH_TO_LLVM_BUILD}/bin/opt)
   get_property(SWIFT_LLVM_DYLIB
     TARGET SwiftLLVMPasses
     PROPERTY LOCATION)
