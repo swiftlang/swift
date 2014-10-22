@@ -46,7 +46,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
+  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
     sink.put(evaluateObservationsAllEqual(observations))
   }
 }
@@ -88,7 +88,7 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
 
   func evaluateObservations<
     S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: ContiguousArray<Observation>, inout _ sink: S) {
+  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
     sink.put(evaluateObservationsAllEqual(observations))
   }
 }

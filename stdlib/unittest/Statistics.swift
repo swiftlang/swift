@@ -23,8 +23,8 @@ public func randInt() -> Int {
 #endif
 }
 
-public func randArray64(count: Int) -> ContiguousArray<UInt64> {
-  var result = ContiguousArray<UInt64>(count: count, repeatedValue: 0)
+public func randArray64(count: Int) -> _UnitTestArray<UInt64> {
+  var result = _UnitTestArray<UInt64>(count: count, repeatedValue: 0)
   for i in indices(result) {
     result[i] = rand64()
   }

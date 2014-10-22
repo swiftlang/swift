@@ -36,8 +36,8 @@ where
 /// Compute the prefix sum of `seq`.
 func scan<
   S : SequenceType, U
->(seq: S, initial: U, combine: (U, S.Generator.Element) -> U) -> ContiguousArray<U> {
-  var result = ContiguousArray<U>()
+>(seq: S, initial: U, combine: (U, S.Generator.Element) -> U) -> _UnitTestArray<U> {
+  var result = _UnitTestArray<U>()
   result.reserveCapacity(underestimateCount(seq))
   var runningResult = initial
   for element in seq {
@@ -47,7 +47,7 @@ func scan<
   return result
 }
 
-public func _stdlib_randomShuffle<T>(a: ContiguousArray<T>) -> ContiguousArray<T> {
+public func _stdlib_randomShuffle<T>(a: _UnitTestArray<T>) -> _UnitTestArray<T> {
   var result = a
   for var i = a.count - 1; i != 0; --i {
     // FIXME: 32 bits are not enough in general case!
@@ -57,8 +57,8 @@ public func _stdlib_randomShuffle<T>(a: ContiguousArray<T>) -> ContiguousArray<T
   return result
 }
 
-public func _stdlib_gather<T>(a: ContiguousArray<T>, idx: ContiguousArray<Int>) -> ContiguousArray<T> {
-  var result = ContiguousArray<T>()
+public func _stdlib_gather<T>(a: _UnitTestArray<T>, idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {
+  var result = _UnitTestArray<T>()
   result.reserveCapacity(a.count)
   for i in 0..<a.count {
     result.append(a[idx[i]])
@@ -66,7 +66,7 @@ public func _stdlib_gather<T>(a: ContiguousArray<T>, idx: ContiguousArray<Int>) 
   return result
 }
 
-public func _stdlib_scatter<T>(a: ContiguousArray<T>, idx: ContiguousArray<Int>) -> ContiguousArray<T> {
+public func _stdlib_scatter<T>(a: _UnitTestArray<T>, idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {
   var result = a
   for i in 0..<a.count {
     result[idx[i]] = a[i]
@@ -82,14 +82,14 @@ func findSubstring(string: String, substring: String) -> String.Index? {
 }
 
 func withArrayOfCStrings<R>(
-  args: ContiguousArray<String>, body: (Array<UnsafeMutablePointer<CChar>>) -> R
+  args: _UnitTestArray<String>, body: (Array<UnsafeMutablePointer<CChar>>) -> R
 ) -> R {
 
-  let argsLengths = ContiguousArray(map(args) { count($0.utf8) + 1 })
+  let argsLengths = _UnitTestArray(map(args) { count($0.utf8) + 1 })
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 
-  var argsBuffer = ContiguousArray<UInt8>()
+  var argsBuffer = _UnitTestArray<UInt8>()
   argsBuffer.reserveCapacity(argsBufferSize)
   for arg in args {
     argsBuffer.extend(arg.utf8)

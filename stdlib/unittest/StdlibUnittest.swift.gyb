@@ -32,7 +32,7 @@ public struct SourceLoc {
 }
 
 public struct SourceLocStack {
-  let locs: ContiguousArray<SourceLoc> = []
+  let locs: _UnitTestArray<SourceLoc> = []
 
   public init() {}
 
@@ -40,7 +40,7 @@ public struct SourceLocStack {
     locs = [ loc ]
   }
 
-  init(_locs: ContiguousArray<SourceLoc>) {
+  init(_locs: _UnitTestArray<SourceLoc>) {
     locs = _locs
   }
 
@@ -138,6 +138,7 @@ public func expectOptionalEqual<T : Equatable>(
 // Same for Dictionary.
 %for (Generic, EquatableType) in [
 %    ('<T : Equatable>', 'ContiguousArray<T>'),
+%    ('<T : Equatable>', '_UnitTestArray<T>'),
 %    ('<T : Equatable>', 'Slice<T>'),
 %    ('<T : Equatable>', 'Array<T>'),
 %    ('<T, U : Equatable>', 'Dictionary<T, U>'),
@@ -342,7 +343,7 @@ var _isChildProcess: Bool {
 }
 
 func _stdlib_getline() -> String? {
-  var result = ContiguousArray<UInt8>()
+  var result = _UnitTestArray<UInt8>()
   while true {
     let c = getchar()
     if c == EOF {
@@ -358,7 +359,7 @@ func _stdlib_getline() -> String? {
 struct _FDInputStream {
   let fd: CInt
   var isEOF: Bool = false
-  var _buffer = ContiguousArray<UInt8>(count: 256, repeatedValue: 0)
+  var _buffer = _UnitTestArray<UInt8>(count: 256, repeatedValue: 0)
   var _bufferUsed: Int = 0
 
   init(fd: CInt) {
@@ -415,7 +416,7 @@ func _printDebuggingAdvice() {
   println("$ \(Process.arguments[0]) --stdlib-unittest-in-process")
 }
 
-var _allTestSuites: ContiguousArray<TestSuite> = []
+var _allTestSuites: _UnitTestArray<TestSuite> = []
 var _testSuiteNameToIndex: [String : Int] = [:]
 
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
@@ -471,7 +472,7 @@ struct _ParentProcess {
   mutating func _runTestInChild(testSuiteName: String, _ testName: String)
     -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
-        crashStdout: ContiguousArray<String>, crashStderr: ContiguousArray<String>) {
+        crashStdout: _UnitTestArray<String>, crashStderr: _UnitTestArray<String>) {
     if _pid <= 0 {
       _spawnChild()
     }
@@ -489,8 +490,8 @@ struct _ParentProcess {
     var stderrSeenCrashDelimiter = false
     var stdoutEnd = false
     var stderrEnd = false
-    var capturedCrashStdout = ContiguousArray<String>()
-    var capturedCrashStderr = ContiguousArray<String>()
+    var capturedCrashStdout = _UnitTestArray<String>()
+    var capturedCrashStderr = _UnitTestArray<String>()
     var anyExpectFailedInChild = false
     while !((childStdout.isEOF && childStderr.isEOF) ||
       (stdoutEnd && stderrEnd)) {
@@ -584,9 +585,9 @@ struct _ParentProcess {
 
   mutating func run() {
     for testSuite in _allTestSuites {
-      var uxpassedTests = ContiguousArray<String>()
-      var failedTests = ContiguousArray<String>()
-      var skippedTests = ContiguousArray<String>()
+      var uxpassedTests = _UnitTestArray<String>()
+      var failedTests = _UnitTestArray<String>()
+      var skippedTests = _UnitTestArray<String>()
       for t in testSuite._tests {
         let fullTestName = "\(testSuite.name).\(t.name)"
         let activeSkips = t.getActiveSkipPredicates()
@@ -603,8 +604,8 @@ struct _ParentProcess {
 
         var expectCrash = false
         var childTerminationStatus: ProcessTerminationStatus? = nil
-        var crashStdout = ContiguousArray<String>()
-        var crashStderr = ContiguousArray<String>()
+        var crashStdout = _UnitTestArray<String>()
+        var crashStderr = _UnitTestArray<String>()
         if _runTestsInProcess {
           _anyExpectFailed = false
           testSuite._runTest(t.name)
@@ -740,16 +741,16 @@ public class TestSuite {
 
   struct _Test {
     let name: String
-    let xfail: ContiguousArray<TestRunPredicate>
-    let skip: ContiguousArray<TestRunPredicate>
+    let xfail: _UnitTestArray<TestRunPredicate>
+    let skip: _UnitTestArray<TestRunPredicate>
     let crashOutputMatches: String?
     let code: () -> ()
 
-    func getActiveXFailPredicates() -> ContiguousArray<TestRunPredicate> {
+    func getActiveXFailPredicates() -> _UnitTestArray<TestRunPredicate> {
       return xfail.filter { $0.evaluate() }
     }
 
-    func getActiveSkipPredicates() -> ContiguousArray<TestRunPredicate> {
+    func getActiveSkipPredicates() -> _UnitTestArray<TestRunPredicate> {
       return skip.filter { $0.evaluate() }
     }
   }
@@ -760,8 +761,8 @@ public class TestSuite {
     var _data: _Data = _Data()
 
     class _Data {
-      var _xfail: ContiguousArray<TestRunPredicate> = []
-      var _skip: ContiguousArray<TestRunPredicate> = []
+      var _xfail: _UnitTestArray<TestRunPredicate> = []
+      var _skip: _UnitTestArray<TestRunPredicate> = []
       var _crashOutputMatches: String?
     }
 
@@ -794,7 +795,7 @@ public class TestSuite {
   }
 
   var name: String
-  var _tests: ContiguousArray<_Test> = []
+  var _tests: _UnitTestArray<_Test> = []
 
   /// Code that is run before every test.
   var _testSetUpCode: (() -> ())?
@@ -832,8 +833,8 @@ public enum OSVersion : Printable {
   }
 }
 
-func _parseDottedVersion(s: String) -> ContiguousArray<Int> {
-  return ContiguousArray(lazy(s._split(".")).map { $0.toInt()! })
+func _parseDottedVersion(s: String) -> _UnitTestArray<Int> {
+  return _UnitTestArray(lazy(s._split(".")).map { $0.toInt()! })
 }
 
 public func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {
@@ -1158,13 +1159,13 @@ public func checkComparable<T : Comparable>(
   checkComparable(expected, lhs, rhs, SourceLocStack(SourceLoc(file, line)))
 }
 
-// Generate two overloads: one for ContiguousArray (which will get
+// Generate two overloads: one for _UnitTestArray (which will get
 // picked up when the caller passes a literal), and another that
 // accepts any appropriate Collection type.
 % for genericParam, Element, Expected in zip(
 %   ('Expected: CollectionType', 'Element'),
 %   ('Expected.Generator.Element', 'Element'),
-%   ('Expected', 'ContiguousArray<Element>')):
+%   ('Expected', '_UnitTestArray<Element>')):
 
 public func checkGenerator<
   G : GeneratorType, ${genericParam}
@@ -1175,7 +1176,7 @@ public func checkGenerator<
 ) {
   // Copying a `GeneratorType` is allowed.
   var mutableGen = generator
-  var actual: ContiguousArray<${Element}> = []
+  var actual: _UnitTestArray<${Element}> = []
   while let e = mutableGen.next() {
     actual.append(e)
   }
@@ -1219,7 +1220,7 @@ public func checkCollection<
     let startIndex = collection.startIndex
     let endIndex = collection.endIndex
 
-    var actual: ContiguousArray<${Element}> = []
+    var actual: _UnitTestArray<${Element}> = []
     var index = collection.startIndex
     while index != collection.endIndex {
       // Iteration should not change `startIndex` or `endIndex`.
@@ -1247,7 +1248,7 @@ public func checkSliceableWithBidirectionalIndex<
   // A `Sliceable` is a `CollectionType`.
   checkCollection(expected, sliceable, stackTrace.withCurrentLoc())
 
-  let expectedArray = ContiguousArray(expected)
+  let expectedArray = _UnitTestArray(expected)
   
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
@@ -1302,7 +1303,7 @@ where
 
   // First make an independent copy of the array that we can use for
   // comparison later.
-  let source = ContiguousArray<A.Generator.Element>(makeCollection())
+  let source = _UnitTestArray<A.Generator.Element>(makeCollection())
 
   for (ix, i) in enumerate(indices(source)) {
     for (jx_, j) in enumerate(i..<source.endIndex) {
@@ -1314,8 +1315,8 @@ where
 
         func reportFailure(inout a: A, message: String) {
           println("\(message) when replacing indices \(ix)...\(jx)")
-          println("  in \(ContiguousArray(source)) with \(ContiguousArray(newValues))")
-          println("  yielding \(ContiguousArray(a))")
+          println("  in \(_UnitTestArray(source)) with \(_UnitTestArray(newValues))")
+          println("  yielding \(_UnitTestArray(a))")
           println("====================================")
           expectTrue(false)
         }
@@ -1390,12 +1391,12 @@ public func expectEqualSequence<
 }
 
 public func expectEqualUnicodeScalars(
-  expected: ContiguousArray<UInt32>, actual: String,
+  expected: _UnitTestArray<UInt32>, actual: String,
   stackTrace: SourceLocStack? = nil,
   collectMoreInfo: (()->String)? = nil,
   file: String = __FILE__, line: UWord = __LINE__
 ) {
-  let actualUnicodeScalars = ContiguousArray(lazy(actual.unicodeScalars).map { $0.value })
+  let actualUnicodeScalars = _UnitTestArray(lazy(actual.unicodeScalars).map { $0.value })
   if !equal(expected, actualUnicodeScalars) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
@@ -1409,7 +1410,7 @@ public func expectEqualUnicodeScalars(
 }
 
 public func expectPrinted<T>(
-  #expectedOneOf: ContiguousArray<String>, object: T,
+  #expectedOneOf: _UnitTestArray<String>, object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   let actual = toString(object)
@@ -1430,7 +1431,7 @@ public func expectPrinted<T>(
 }
 
 public func expectDebugPrinted<T>(
-  #expectedOneOf: ContiguousArray<String>, object: T,
+  #expectedOneOf: _UnitTestArray<String>, object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   let actual = toDebugString(object)
