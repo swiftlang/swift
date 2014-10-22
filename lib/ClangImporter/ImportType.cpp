@@ -1182,10 +1182,14 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
   if (!module)
     return Type();
 
-  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module,
-                           getTypeResolver());
-  if (TypeDecl *typeDecl = lookup.getSingleTypeResult()) {
-    if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
+  // Look for the type.
+  SmallVector<ValueDecl *, 2> results;
+  module->lookupValue({ }, SwiftContext.getIdentifier(name),
+                      NLKind::UnqualifiedLookup, results);
+  if (results.size() == 1) {
+    if (auto nominalDecl = dyn_cast<NominalTypeDecl>(results.front())) {
+      if (typeResolver)
+        typeResolver->resolveDeclSignature(nominalDecl);
       if (auto params = nominalDecl->getGenericParams()) {
         if (params->size() == args.size()) {
           // When we form the bound generic type, make sure we get the

@@ -1326,17 +1326,20 @@ namespace {
       // Find the maximum-sized builtin integer type.
       
       if(!MaxIntegerTypeDecl) {
-        UnqualifiedLookup lookup(tc.Context.Id_MaxBuiltinIntegerType,
-                                 tc.getStdlibModule(dc),
-                                 &tc);
-        MaxIntegerTypeDecl =
-            dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
+        SmallVector<ValueDecl *, 1> lookupResults;
+        tc.getStdlibModule(dc)->lookupValue(/*filter=*/{},
+                                            tc.Context.Id_MaxBuiltinIntegerType,
+                                            NLKind::QualifiedLookup,
+                                            lookupResults);
+        if (lookupResults.size() == 1)
+          MaxIntegerTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
       }
       if (!MaxIntegerTypeDecl ||
           !MaxIntegerTypeDecl->getUnderlyingType()->is<BuiltinIntegerType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
         return nullptr;
       }
+      tc.validateDecl(MaxIntegerTypeDecl);
       auto maxType = MaxIntegerTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, tc.Context.Id_init,
@@ -1415,17 +1418,20 @@ namespace {
       // Find the maximum-sized builtin float type.
       // FIXME: Cache name lookup.
       if (!MaxFloatTypeDecl) {
-        UnqualifiedLookup lookup(tc.Context.Id_MaxBuiltinFloatType,
-                                 tc.getStdlibModule(dc),
-                                 &tc);
-        MaxFloatTypeDecl =
-          dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
+        SmallVector<ValueDecl *, 1> lookupResults;
+        tc.getStdlibModule(dc)->lookupValue(/*filter=*/{},
+                                            tc.Context.Id_MaxBuiltinFloatType,
+                                            NLKind::QualifiedLookup,
+                                            lookupResults);
+        if (lookupResults.size() == 1)
+          MaxFloatTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
       }
       if (!MaxFloatTypeDecl ||
           !MaxFloatTypeDecl->getUnderlyingType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;
       }
+      tc.validateDecl(MaxFloatTypeDecl);
       auto maxType = MaxFloatTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, tc.Context.Id_init,
