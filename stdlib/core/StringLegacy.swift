@@ -12,20 +12,20 @@
 
 
 extension String {
-  /// Construct an instance that is the concatenation of `sz` copies
+  /// Construct an instance that is the concatenation of `count` copies
   /// of `repeatedValue`
-  public init(count sz: Int, repeatedValue c: Character) {
+  public init(count: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_storage: _StringBuffer(
-        capacity: s._core.count * sz,
+        capacity: s._core.count * count,
         initialSize: 0,
         elementWidth: s._core.elementWidth))
-    for i in 0..<sz {
+    for i in 0..<count {
       self += s
     }
   }
 
-  /// Construct an instance that is the concatenation of `sz` copies
+  /// Construct an instance that is the concatenation of `count` copies
   /// of `Character(repeatedValue)`
   public init(count: Int, repeatedValue c: UnicodeScalar) {
     self = String._fromWellFormedCodeUnitSequence(UTF32.self,
