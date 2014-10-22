@@ -2511,6 +2511,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       if (TheDecl) {
         diagnose(Loc, diag::duplicate_property_accessor, (unsigned)Kind);
         diagnose(TheDecl->getLoc(), diag::previous_accessor, (unsigned)Kind);
+        // Forget the previous decl.
+        Decls.erase(std::find(Decls.begin(), Decls.end(), TheDecl));
         TheDecl = nullptr;  // Forget the previous decl.
       }
 
@@ -2827,6 +2829,12 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   auto ignoreInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
       flagInvalidAccessor(func);
+
+      // Forget the decl being invalidated
+      auto PositionInDecls = std::find(decls.begin(), decls.end(), func);
+      assert(PositionInDecls != decls.end());
+      decls.erase(PositionInDecls);
+
       func = nullptr;
     }
   };
