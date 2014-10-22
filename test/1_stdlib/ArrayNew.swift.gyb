@@ -13,7 +13,7 @@ import StdlibUnittest
 import Foundation
 
 %{
-all_array_types = [ 'ContiguousArray', 'Slice', 'Array' ]
+all_array_types = [ 'ContiguousArray', 'Slice', 'Array', '_UnitTestArray' ]
 }%
 
 extension Array {
@@ -34,6 +34,11 @@ extension ContiguousArray {
   }
 }
 
+extension _UnitTestArray {
+  var identity: UnsafePointer<Void> {
+    return self._buffer.identity
+  }
+}
 var ArrayTestSuite = TestSuite("Array")
 
 ArrayTestSuite.test("sizeof") {

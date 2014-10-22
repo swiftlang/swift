@@ -27,7 +27,8 @@
   arrayTypes = [
     ('ContiguousArray', 'a ContiguousArray'),
     ('Slice', 'a `Slice`'),
-    ('Array', 'an `Array`')
+    ('Array', 'an `Array`'),
+    ('_UnitTestArray', 'a `_UnitTestArray`')
   ]
 }%
 
@@ -161,6 +162,8 @@ if True:
 /// elements match or can be bridged to `T`, is deferred until the
 /// first element access."""
 # FIXME: Write about Array up/down-casting.
+    elif Self == '_UnitTestArray':
+      SelfDocComment = "\n/// Temporary"
     else:
       raise AssertionError('Unhandled case: ' + Self)
 }%
@@ -280,7 +283,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   }
 
   public
-  typealias _Buffer = _${Self}Buffer<T>
+  typealias _Buffer = _${Self.strip('_')}Buffer<T>
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.

@@ -26,7 +26,7 @@ var arg = Process.arguments[1]
   # We test for bounds-checking traps for both reading and writing
   # both single elements and slices of all three different array
   # types.
-  arrayTypes = ('Array', 'ContiguousArray', 'Slice')
+  arrayTypes = ('Array', 'ContiguousArray', 'Slice', '_UnitTestArray')
 
   def test(x = None):
     global Array

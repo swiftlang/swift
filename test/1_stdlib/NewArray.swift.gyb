@@ -173,6 +173,9 @@ println("testing...")
 test(ContiguousArray<X>.self, "ContiguousArray")
 // CHECK-NEXT: test: ContiguousArray...done
 
+test(_UnitTestArray<X>.self, "_UnitTestArray")
+// CHECK-NEXT: test: _UnitTestArray...done
+
 test(Array<X>.self, "Array")
 // CHECK-NEXT: test: Array...done
 
@@ -339,7 +342,8 @@ testSlice()
 // testing time grows roughly as the cube of this constant
 let testWidth = 11
 
-%for A in ['ContiguousArray', 'Array', 'Slice']:
+%arrayTypes = ['ContiguousArray', '_UnitTestArray', 'Array', 'Slice']
+%for A in arrayTypes:
 
 func testReplace(make: ()->${A}<X>) {
 
@@ -385,6 +389,7 @@ for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
 }
 
 // CHECK-NEXT: testing subrange replacement in ContiguousArray
+// CHECK-NEXT: testing subrange replacement in _UnitTestArray
 // CHECK-NEXT: testing subrange replacement in Array
 // CHECK-NEXT: testing subrange replacement in Slice
 // CHECK-NEXT: testing subrange replacement in trailing Sub-Slice
@@ -402,7 +407,7 @@ func testInoutViolation() {
     X(10), X(8), X(6), X(4), X(2), X(0), X(9), X(7), X(5), X(3), X(1)
   ]
 
-%for A in ['ContiguousArray', 'Array', 'Slice']:
+%for A in arrayTypes:
   if true {
     var b = ${A}(a)
     b.sort { x, y in
@@ -423,7 +428,7 @@ testInoutViolation()
 
 //===--- single-element modifiers -----------------------------------------===//
 
-%for A in ['ContiguousArray', 'Array', 'Slice']:
+%for A in arrayTypes:
 
 func testSingleElementModifiers${A}() {
   println("testing ${A} single-argument modifiers")
@@ -444,7 +449,7 @@ testSingleElementModifiers${A}()
 
 //===--- isEmpty, first, last ---------------------------------------------===//
 
-%for A in ['ContiguousArray', 'Array', 'Slice']:
+%for A in arrayTypes:
 
 func testIsEmptyFirstLast${A}() {
   println("testing ${A} isEmpty, first, and last")
