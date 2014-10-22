@@ -764,7 +764,7 @@ namespace {
       case PatternKind::Any:
         // For a pattern of unknown type, create a new type variable.
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     forFunctionParam? TVO_CanBindToLValue : 0);
+                                     /*options=*/0);
 
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
@@ -772,8 +772,7 @@ namespace {
         // For a named pattern without a type, create a new type variable
         // and use it as the type of the variable.
         Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        forFunctionParam? TVO_CanBindToLValue
-                                                        : 0);
+                                        /*options=*/0);
 
         // For weak variables, use Optional<T>.
         if (auto *OA = var->getAttrs().getAttribute<OwnershipAttr>())

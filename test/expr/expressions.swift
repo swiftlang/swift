@@ -111,8 +111,9 @@ func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({  // expected-error{{'((), Int)' is not a subtype of 'Int'}}
-     $0 + 1})
+  // FIXME: below error should be {{'((), Int)' is not a subtype of 'Int'}} <rdar://problem/18742728>
+  // expected-error@+1 {{cannot invoke '+' with an argument of type '(($T2) -> ($T2) -> $T1) -> (($T2) -> $T1) -> $T1'}}
+  testfunc2({ $0 + 1 })
 
   enum union1 {
     case bar
