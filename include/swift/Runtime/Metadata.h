@@ -1065,6 +1065,10 @@ struct NominalTypeDescriptor {
     } Enum;
   };
   
+  /// A pointer to the generic metadata pattern that is used to instantiate
+  /// instances of this type. Null if the type is not generic.
+  void *GenericMetadataPattern;
+  
   /// The generic parameter descriptor header. This describes how to find and
   /// parse the generic parameter vector in metadata records for this nominal
   /// type.

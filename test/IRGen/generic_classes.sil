@@ -22,6 +22,8 @@ import gizmo
 // CHECK:   i32 14,
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
+// --       generic metadata pattern
+// CHECK:   @_TMPdC15generic_classes11RootGeneric
 // --       generic parameter vector offset
 // CHECK:   i32 9,
 // --       generic parameter count, primary count, witness table counts
@@ -59,6 +61,8 @@ import gizmo
 // CHECK:   i32 10,
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
+// --       no generic metadata pattern
+// CHECK:   %swift.type_pattern* null,
 // --       0 = no generic parameter vector
 // CHECK:   i32 0,
 // --       number of generic params, primary params

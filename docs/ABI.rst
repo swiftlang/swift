@@ -602,20 +602,24 @@ layout is as follows:
 
     + TODO: Offsets 2-5 are always zero.
 
-- The **generic parameter descriptor** begins at **offset 6**. This describes
+- If the nominal type is generic, a pointer to the **metadata pattern** that
+  is used to form instances of the type is stored at **offset 6**. The pointer
+  is null if the type is not generic.
+
+- The **generic parameter descriptor** begins at **offset 7**. This describes
   the layout of the generic parameter vector in the metadata record:
 
-  * The **offset of the generic parameter vector** is stored at **offset 6**.
+  * The **offset of the generic parameter vector** is stored at **offset 8**.
     This is the offset in pointer-sized words of the generic parameter vector
     inside the metadata record. If the type is not generic, this is zero.
-  * The **number of type parameters** is stored at **offset 7**. This count
+  * The **number of type parameters** is stored at **offset 9**. This count
     includes associated types of type parameters with protocol constraints.
-  * The **number of type parameters** is stored at **offset 8**. This count
+  * The **number of type parameters** is stored at **offset 10**. This count
     includes only the primary formal type parameters.
   * For each type parameter **n**, the following fields are stored:
 
     + The **number of witnesses** for the type parameter is stored at
-      **offset 8+n**. This is the number of witness table pointers that are
+      **offset 11+n**. This is the number of witness table pointers that are
       stored for the type parameter in the generic parameter vector.
 
 Note that there is no nominal type descriptor for protocols or protocol types.

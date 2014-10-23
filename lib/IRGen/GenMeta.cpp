@@ -1332,6 +1332,7 @@ namespace {
       asImpl().addKind();
       asImpl().addName();
       asImpl().addKindDependentFields();
+      asImpl().addGenericMetadataPattern();
       asImpl().addGenericParams();
     }
 
@@ -1343,6 +1344,20 @@ namespace {
       NominalTypeDecl *ntd = asImpl().getTarget();
       addWord(getMangledTypeName(IGM,
                                  ntd->getDeclaredType()->getCanonicalType()));
+    }
+    
+    void addGenericMetadataPattern() {
+      NominalTypeDecl *ntd = asImpl().getTarget();
+      if (!ntd->getGenericParams()) {
+        // If there are no generic parameters, there's no pattern to link.
+        addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPatternPtrTy));
+        return;
+      }
+      
+      addWord(IGM.getAddrOfTypeMetadata(ntd->getDeclaredType()
+                                          ->getCanonicalType(),
+                                        /*indirect*/ false,
+                                        /*pattern*/ true));
     }
     
     void addGenericParams() {
