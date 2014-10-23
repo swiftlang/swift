@@ -702,7 +702,7 @@ swift::swift_dynamicCastObjCClassMetatypeUnconditional(
 const ClassMetadata *
 swift::swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
                                              const ClassMetadata *targetType) {
-  // FIXME: Actually compare CFTypeIDs, once they arae available in
+  // FIXME: Actually compare CFTypeIDs, once they are available in
   // the metadata.
   return sourceType;
 }
