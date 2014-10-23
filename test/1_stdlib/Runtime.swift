@@ -1108,7 +1108,7 @@ Reflection.test("CGPoint") {
   dump(CGPoint(x: 1.25, y: 2.75), &output)
 
   let expected =
-    "▿ (1.25,2.75)\n" +
+    "▿ (1.25, 2.75)\n" +
     "  - x: 1.25\n" +
     "  - y: 2.75\n"
 
@@ -1120,7 +1120,7 @@ Reflection.test("CGSize") {
   dump(CGSize(width: 1.25, height: 2.75), &output)
 
   let expected =
-    "▿ (1.25,2.75)\n" +
+    "▿ (1.25, 2.75)\n" +
     "  - width: 1.25\n" +
     "  - height: 2.75\n"
 
@@ -1136,11 +1136,11 @@ Reflection.test("CGRect") {
     &output)
 
   let expected =
-    "▿ (1.25,2.25,10.25,11.75)\n" +
-    "  ▿ origin: (1.25,2.25)\n" +
+    "▿ (1.25, 2.25, 10.25, 11.75)\n" +
+    "  ▿ origin: (1.25, 2.25)\n" +
     "    - x: 1.25\n" +
     "    - y: 2.25\n" +
-    "  ▿ size: (10.25,11.75)\n" +
+    "  ▿ size: (10.25, 11.75)\n" +
     "    - width: 10.25\n" +
     "    - height: 11.75\n"
 
