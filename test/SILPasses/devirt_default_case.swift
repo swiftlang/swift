@@ -6,7 +6,7 @@ public class Base1 {
   func middle() { inner() }
 // Check that call to Base1.middle cannot be devirtualized
 //
-// CHECK-LABEL: sil hidden @_TFC19devirt_default_case5Base15outerfS0_FT_T_
+// CHECK-LABEL: sil @_TFC19devirt_default_case5Base15outerfS0_FT_T_
 // CHECK: class_method 
 // CHECK: }
   func outer() { 
@@ -142,7 +142,7 @@ public class Base5 {
 // Check that call to foo() does not use class_method, because
 // it is a final method.
 //
-// CHECK-LABEL: sil hidden @_TFC19devirt_default_case5Base54testfS0_FT_T_ 
+// CHECK-LABEL: sil @_TFC19devirt_default_case5Base54testfS0_FT_T_ 
 // CHECK: function_ref @_TFC19devirt_default_case5Base53foofS0_FT_T_
 // CHECK-NOT: class_method
 // CHECK: }

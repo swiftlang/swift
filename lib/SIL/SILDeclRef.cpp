@@ -174,11 +174,12 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // FIXME: @objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
   ValueDecl *d = getDecl();
-  DeclContext *dc = d->getDeclContext();
-  while (!dc->isModuleScopeContext()) {
-    if (!isForeign && dc->isLocalContext())
-      return getLinkageForLocalContext(dc);
-    dc = dc->getParent();
+  DeclContext *context = d->getDeclContext();
+  DeclContext *moduleContext = context;
+  while (!moduleContext->isModuleScopeContext()) {
+    if (!isForeign && moduleContext->isLocalContext())
+      return getLinkageForLocalContext(moduleContext);
+    moduleContext = moduleContext->getParent();
   }
   
   // Currying and calling convention thunks have shared linkage.
@@ -189,7 +190,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // FIXME: They shouldn't.
   const SILLinkage ClangLinkage = SILLinkage::Shared;
   
-  if (isa<ClangModuleUnit>(dc)) {
+  if (isa<ClangModuleUnit>(moduleContext)) {
     if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
       return ClangLinkage;
 
@@ -206,8 +207,25 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
         return ClangLinkage;
   }
   
+  auto *classType = context->isClassOrClassExtensionContext();
+  auto accessibility = d->getAccessibility();
+  
+  // If this decleration is a function which goes into a vtable, then it must
+  // be as visible as its class. Derived classes even have to put all
+  // less visible methods of the base class into their vtables.
+  // Note: methods from extensions don't go into vtables (yet).
+  if (classType && !classType->isFinal() && !context->isExtensionContext()) {
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(d)) {
+      if (!FD->isFinal() || FD->getOverriddenDecl()) {
+        assert(accessibility <= classType->getAccessibility() &&
+               "class must be as visible as its members");
+        accessibility = classType->getAccessibility();
+      }
+    }
+  }
+
   // Otherwise, we have external linkage.
-  switch (d->getAccessibility()) {
+  switch (accessibility) {
     case Accessibility::Private:
       return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
