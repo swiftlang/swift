@@ -534,7 +534,7 @@ sil @enum_tests : $@thin () -> () {
 // CHECK: PAIR #45.
 // CHECK: (1):   %0 = alloc_box $CTest_C1
 // CHECK: (1):   %9 = alloc_box $Builtin.UnknownObject
-// CHECK: NoAlias
+// CHECK: MayAlias
 // CHECK: PAIR #47.
 // CHECK: (1):   %0 = alloc_box $CTest_C1
 // CHECK: (1):   %10 = alloc_box $Builtin.Int8
@@ -579,7 +579,7 @@ sil @enum_tests : $@thin () -> () {
 // CHECK: PAIR #94.
 // CHECK: (1):   %1 = alloc_box $CTest_C2
 // CHECK: (1):   %9 = alloc_box $Builtin.UnknownObject
-// CHECK: NoAlias
+// CHECK: MayAlias
 // CHECK: PAIR #96.
 // CHECK: (1):   %1 = alloc_box $CTest_C2
 // CHECK: (1):   %10 = alloc_box $Builtin.Int8
@@ -624,7 +624,7 @@ sil @enum_tests : $@thin () -> () {
 // CHECK: PAIR #139.
 // CHECK: (1):   %2 = alloc_box $CTest_C3
 // CHECK: (1):   %9 = alloc_box $Builtin.UnknownObject
-// CHECK: NoAlias
+// CHECK: MayAlias
 // CHECK: PAIR #141.
 // CHECK: (1):   %2 = alloc_box $CTest_C3
 // CHECK: (1):   %10 = alloc_box $Builtin.Int8
