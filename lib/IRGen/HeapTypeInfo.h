@@ -91,7 +91,8 @@ enum class ReferenceCounting : unsigned char {
   /// the reference value may contain extra bits that need to be masked.
   ///
   /// This uses maximally-compatible reference counting entry points in the
-  /// runtime, with a masking layer on top.
+  /// runtime, with a masking layer on top. A bit inside the pointer is used
+  /// to signal native Swift refcounting.
   Bridge,
 };
   
