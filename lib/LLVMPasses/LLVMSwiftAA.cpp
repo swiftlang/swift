@@ -44,7 +44,7 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
   case RT_Unknown:
     break;
   }
-  
+
   return AliasAnalysis::getModRefInfo(CS, Loc);
 }
 

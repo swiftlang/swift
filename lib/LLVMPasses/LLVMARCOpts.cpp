@@ -67,7 +67,7 @@ STATISTIC(NumReturnThreeTailCallsFormed,
 /// faster.
 static Constant *getRetain(Function &F, Type *ObjectPtrTy, Constant *&Cache) {
   if (Cache) return Cache;
-  
+
   auto AttrList = AttributeSet::get(F.getContext(),
                                     AttributeSet::FunctionIndex,
                                     Attribute::NoUnwind);
@@ -84,7 +84,7 @@ static Constant *getRetain(Function &F, Type *ObjectPtrTy, Constant *&Cache) {
 static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
                                    Constant *&Cache) {
   if (Cache) return Cache;
- 
+
   auto AttrList = AttributeSet::get(F.getContext(), 1, Attribute::NoCapture);
   AttrList = AttrList.addAttribute(F.getContext(),
                                    AttributeSet::FunctionIndex,
@@ -102,15 +102,15 @@ static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
 static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
                                          Constant *&Cache) {
   if (Cache) return Cache;
-  
+
   auto AttrList = AttributeSet::get(F.getContext(),
                                     AttributeSet::FunctionIndex,
                                     Attribute::NoUnwind);
   Module *M = F.getParent();
-  
+
   Type *Int64Ty = Type::getInt64Ty(F.getContext());
   Type *RetTy = StructType::get(Int64Ty, Int64Ty, Int64Ty, NULL);
-  
+
   return Cache = M->getOrInsertFunction("swift_retainAndReturnThree", AttrList,
                                         RetTy, ObjectPtrTy,
                                         Int64Ty, Int64Ty, Int64Ty, NULL);
@@ -122,7 +122,7 @@ static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
 
 /// updateCallValueUses - We have something like this:
 ///   %z = ptrtoint %swift.refcounted* %2 to i64
-///   %3 = call { i64, i64, i64 } 
+///   %3 = call { i64, i64, i64 }
 ///           @swift_retainAndReturnThree(..., i64 %x, i64 %1, i64 %z)
 ///   %a = extractvalue { i64, i64, i64 } %3, 0
 ///   %b = extractvalue { i64, i64, i64 } %3, 1
@@ -145,7 +145,7 @@ static void updateCallValueUses(CallInst &CI, unsigned EltNo) {
         Extract->getIndices()[0] != EltNo)
       continue;
 
-    // Both the input and result should be i64's.  
+    // Both the input and result should be i64's.
     assert(Extract->getType() == Op->getType() && "Should have i64's here");
 
     for (auto UI2 = Extract->user_begin(), E = Extract->user_end(); UI2 != E; ){
@@ -157,7 +157,7 @@ static void updateCallValueUses(CallInst &CI, unsigned EltNo) {
         ExtractUser->eraseFromParent();
       }
     }
-    
+
     // Stitch up anything other than the ptrtoint -> inttoptr.
     Extract->replaceAllUsesWith(Op);
 
@@ -176,12 +176,12 @@ static void updateCallValueUses(CallInst &CI, unsigned EltNo) {
 /// This also does some trivial peep-hole optimizations as we go.
 static bool canonicalizeInputFunction(Function &F) {
   Constant *RetainNoResultCache = 0;
-  
+
   bool Changed = false;
   for (auto &BB : F)
   for (auto I = BB.begin(); I != BB.end(); ) {
     Instruction &Inst = *I++;
-    
+
     switch (classifyInstruction(Inst)) {
     case RT_Unknown:
     case RT_UnknownRetain:
@@ -228,7 +228,7 @@ static bool canonicalizeInputFunction(Function &F) {
     }
     case RT_Release: {
       CallInst &CI = cast<CallInst>(Inst);
-      // swift_release(null) is a noop, zap it. 
+      // swift_release(null) is a noop, zap it.
       Value *ArgVal = CI.getArgOperand(0);
       if (isa<ConstantPointerNull>(ArgVal)) {
         CI.eraseFromParent();
@@ -246,14 +246,14 @@ static bool canonicalizeInputFunction(Function &F) {
       // The important case of doing this is when this function has been inlined
       // into another function.  In this case, there is no return anymore.
       CallInst &CI = cast<CallInst>(Inst);
-      
+
       IRBuilder<> B(&CI);
       Type *HeapObjectTy = CI.getArgOperand(0)->getType();
-      
+
       // Reprocess starting at the new swift_retain_noresult.
       I = B.CreateCall(getRetainNoResult(F, HeapObjectTy, RetainNoResultCache),
                        CI.getArgOperand(0));
-      
+
       // See if we can eliminate all of the extractvalue's that are hanging off
       // the swift_retainAndReturnThree.  This is important to eliminate casts
       // that will block optimizations and generally results in better IR.  Note
@@ -261,7 +261,7 @@ static bool canonicalizeInputFunction(Function &F) {
       updateCallValueUses(CI, 0);
       updateCallValueUses(CI, 1);
       updateCallValueUses(CI, 2);
-      
+
       // If our best-effort wasn't good enough, fall back to generating terrible
       // but correct code.
       if (!CI.use_empty()) {
@@ -276,11 +276,11 @@ static bool canonicalizeInputFunction(Function &F) {
       Changed = true;
       break;
     }
-        
+
     case RT_ObjCRelease: {
       CallInst &CI = cast<CallInst>(Inst);
       Value *ArgVal = CI.getArgOperand(0);
-      // objc_release(null) is a noop, zap it. 
+      // objc_release(null) is a noop, zap it.
       if (isa<ConstantPointerNull>(ArgVal)) {
         CI.eraseFromParent();
         Changed = true;
@@ -289,7 +289,7 @@ static bool canonicalizeInputFunction(Function &F) {
       }
       break;
     }
-        
+
     case RT_ObjCRetain: {
       // Canonicalize objc_retain so that nothing uses its result.
       CallInst &CI = cast<CallInst>(Inst);
@@ -298,7 +298,7 @@ static bool canonicalizeInputFunction(Function &F) {
         CI.replaceAllUsesWith(ArgVal);
         Changed = true;
       }
- 
+
       // objc_retain(null) is a noop, delete it.
       if (isa<ConstantPointerNull>(ArgVal)) {
         CI.eraseFromParent();
@@ -306,7 +306,7 @@ static bool canonicalizeInputFunction(Function &F) {
         ++NumNoopDeleted;
         continue;
       }
-      
+
       break;
     }
     }
@@ -326,14 +326,14 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
   // FIXME: Call classifier should identify the object for us.  Too bad C++
   // doesn't have nice Swift-style enums.
   Value *ReleasedObject = Release.getArgOperand(0);
-  
+
   BasicBlock::iterator BBI = &Release;
-  
+
   // Scan until we get to the top of the block.
   while (BBI != BB.begin()) {
     --BBI;
-  
-    // Don't analyze PHI nodes.  We can't move retains before them and they 
+
+    // Don't analyze PHI nodes.  We can't move retains before them and they
     // aren't "interesting".
     if (isa<PHINode>(BBI) ||
         // If we found the instruction that defines the value we're releasing,
@@ -342,7 +342,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       ++BBI;
       goto OutOfLoop;
     }
-    
+
     switch (classifyInstruction(*BBI)) {
     case RT_Retain: // Canonicalized away, shouldn't exist.
     case RT_RetainAndReturnThree:
@@ -379,7 +379,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     case RT_RetainNoResult: {  // swift_retain_noresult(obj)
       CallInst &Retain = cast<CallInst>(*BBI);
       Value *RetainedObject = Retain.getArgOperand(0);
-      
+
       // If the retain and release are to obviously pointer-equal objects, then
       // we can delete both of them.  We have proven that they do not protect
       // anything of value.
@@ -389,7 +389,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
         ++NumRetainReleasePairs;
         return true;
       }
-      
+
       // Otherwise, this is a retain of an object that is not statically known
       // to be the same object.  It may still be dynamically the same object
       // though.  In this case, we can't move the release past it.
@@ -401,7 +401,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
 
     case RT_AllocObject: {   // %obj = swift_alloc(...)
       CallInst &Allocation = cast<CallInst>(*BBI);
-        
+
       // If this is an allocation of an unrelated object, just ignore it.
       // TODO: This is not safe without proving the object being released is not
       // related to the allocated object.  Consider something silly like this:
@@ -434,7 +434,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
   }
 OutOfLoop:
 
-  
+
   // If we got to the top of the block, (and if the instruction didn't start
   // there) move the release to the top of the block.
   // TODO: This is where we'd plug in some global algorithms someday.
@@ -442,7 +442,7 @@ OutOfLoop:
     Release.moveBefore(BBI);
     return true;
   }
-  
+
   return false;
 }
 
@@ -461,17 +461,17 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
   // FIXME: Call classifier should identify the object for us.  Too bad C++
   // doesn't have nice Swift-style enums.
   Value *RetainedObject = Retain.getArgOperand(0);
-  
+
   BasicBlock::iterator BBI = &Retain, BBE = BB.getTerminator();
 
   bool isObjCRetain = Retain.getCalledFunction()->getName() == "objc_retain";
-  
+
   bool MadeProgress = false;
-  
+
   // Scan until we get to the end of the block.
   for (++BBI; BBI != BBE; ++BBI) {
     Instruction &CurInst = *BBI;
-    
+
     // Classify the instruction. This switch does a "break" when the instruction
     // can be skipped and is interesting, and a "continue" when it is a retain
     // of the same pointer.
@@ -487,20 +487,20 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
 
     case RT_FixLifetime: // This only stops release motion. Retains can move over it.
       break;
-        
+
     case RT_RetainNoResult:
     case RT_UnknownRetain:
     case RT_BridgeRetain:
     case RT_ObjCRetain: {  // swift_retain_noresult(obj)
       //CallInst &ThisRetain = cast<CallInst>(CurInst);
       //Value *ThisRetainedObject = ThisRetain.getArgOperand(0);
-      
+
       // If we see a retain of the same object, we can skip over it, but we
       // can't count it as progress.  Just pushing a retain(x) past a retain(y)
       // doesn't change the program.
       continue;
     }
-      
+
     case RT_UnknownRelease:
     case RT_BridgeRelease:
     case RT_ObjCRelease:
@@ -519,7 +519,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
         }
         return true;
       }
-      
+
       // Otherwise, if this is some other pointer, we can only ignore it if we
       // can prove that the two objects don't alias.
       // Retain.dump(); ThisRelease.dump(); BB.getParent()->dump();
@@ -532,24 +532,24 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
       if (isa<LoadInst>(CurInst) || isa<StoreInst>(CurInst) ||
           isa<MemIntrinsic>(CurInst))
         break;
-        
+
       // CurInst->dump(); BBI->dump();
       // Otherwise, we get to something unknown/unhandled.  Bail out for now.
       goto OutOfLoop;
     }
-    
+
     // If the switch did a break, we made some progress moving this retain.
     MadeProgress = true;
   }
 OutOfLoop:
-  
+
   // If we were able to move the retain down, move it now.
   // TODO: This is where we'd plug in some global algorithms someday.
   if (MadeProgress) {
     Retain.moveBefore(BBI);
     return true;
   }
-  
+
   return false;
 }
 
@@ -563,11 +563,11 @@ enum class DtorKind {
   /// NoSideEffects - The destructor does nothing, or just touches the local
   /// object in a non-observable way after it is destroyed.
   NoSideEffects,
-  
+
   /// NoEscape - The destructor potentially has some side effects, but the
   /// address of the destroyed object never escapes (in the LLVM IR sense).
   NoEscape,
-  
+
   /// Unknown - Something potentially crazy is going on here.
   Unknown
 };
@@ -581,33 +581,33 @@ static DtorKind analyzeDestructor(Value *P) {
   // useful for writing testcases.
   if (isa<ConstantPointerNull>(P->stripPointerCasts()))
     return DtorKind::NoSideEffects;
-    
+
   // We have to have a known heap metadata value, reject dynamically computed
-  // ones, or places 
+  // ones, or places
   GlobalVariable *GV = dyn_cast<GlobalVariable>(P->stripPointerCasts());
   if (GV == 0 || GV->mayBeOverridden()) return DtorKind::Unknown;
-  
+
   ConstantStruct *CS = dyn_cast_or_null<ConstantStruct>(GV->getInitializer());
   if (CS == 0 || CS->getNumOperands() == 0) return DtorKind::Unknown;
-  
+
   // FIXME: Would like to abstract the dtor slot (#0) out from this to somewhere
   // unified.
   enum { DTorSlotOfHeapMeatadata = 0 };
   Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMeatadata));
   if (DtorFn == 0 || DtorFn->mayBeOverridden() || DtorFn->hasExternalLinkage())
     return DtorKind::Unknown;
-  
+
   // Okay, we have a body, and we can trust it.  If the function is marked
   // readonly, then we know it can't have any interesting side effects, so we
   // don't need to analyze it at all.
   if (DtorFn->onlyReadsMemory())
     return DtorKind::NoSideEffects;
-  
+
   // The first argument is the object being destroyed.
   assert(DtorFn->arg_size() == 1 && !DtorFn->isVarArg() &&
          "expected a single object argument to destructors");
   Value *ThisObject = DtorFn->arg_begin();
-  
+
   // Scan the body of the function, looking for anything scary.
   for (BasicBlock &BB : *DtorFn) {
     for (Instruction &I : BB) {
@@ -618,7 +618,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_FixLifetime:
         // Skip over random instructions that don't touch memory in the caller.
         continue;
-          
+
       case RT_Retain:                // x = swift_retain(y)
       case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
       case RT_RetainAndReturnThree:  // swift_retainAndReturnThree(obj,a,b,c)
@@ -632,7 +632,7 @@ static DtorKind analyzeDestructor(Value *P) {
         // Otherwise, we may be retaining something scary.
         break;
       }
-        
+
       case RT_Release: {
         // If we get to a release that is provably to this object, then we can
         // ignore it.
@@ -644,7 +644,7 @@ static DtorKind analyzeDestructor(Value *P) {
         // Otherwise, we may be retaining something scary.
         break;
       }
-        
+
       case RT_ObjCRelease:
       case RT_ObjCRetain:
       case RT_UnknownRetain:
@@ -652,17 +652,17 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_BridgeRelease:
         // Objective-C retain and release can have arbitrary side effects.
         break;
-          
+
       case RT_Unknown:
         // Ignore all instructions with no side effects.
         if (!I.mayHaveSideEffects()) continue;
-          
+
         // store, memcpy, memmove *to* the object can be dropped.
         if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
           if (SI->getPointerOperand()->stripInBoundsOffsets() == ThisObject)
             continue;
         }
-          
+
         if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(&I)) {
           if (MI->getDest()->stripInBoundsOffsets() == ThisObject)
             continue;
@@ -671,13 +671,13 @@ static DtorKind analyzeDestructor(Value *P) {
         // Otherwise, we can't remove the deallocation completely.
         break;
       }
-      
+
       // Okay, the function has some side effects, if it doesn't capture the
       // object argument, at least that is something.
       return DtorFn->doesNotCapture(0) ? DtorKind::NoEscape : DtorKind::Unknown;
     }
   }
-  
+
   // If we didn't find any side effects, we win.
   return DtorKind::NoSideEffects;
 }
@@ -695,7 +695,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
   // We can't delete the object if its destructor has side effects.
   if (DtorInfo != DtorKind::NoSideEffects)
     return false;
-  
+
   // Do a depth first search exploring all of the uses of the object pointer,
   // following through casts, pointer adjustments etc.  If we find any loads or
   // any escape sites of the object, we give up.  If we succeed in walking the
@@ -703,17 +703,17 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
   SmallSetVector<Instruction*, 16> InvolvedInstructions;
   SmallVector<Instruction*, 16> Worklist;
   Worklist.push_back(&Allocation);
-  
+
   // Stores - Keep track of all of the store instructions we see.
   SmallVector<StoreInst*, 16> Stores;
 
   while (!Worklist.empty()) {
     Instruction *I = Worklist.pop_back_val();
-    
+
     // Insert the instruction into our InvolvedInstructions set.  If we have
     // already seen it, then don't reprocess all of the uses.
     if (!InvolvedInstructions.insert(I)) continue;
-    
+
     // Okay, this is the first time we've seen this instruction, proceed.
     switch (classifyInstruction(*I)) {
     case RT_Retain:
@@ -736,14 +736,14 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       if (I->mayHaveSideEffects() || isa<TerminatorInst>(I))
         return false;
       break;
-        
+
     case RT_Release:
     case RT_RetainNoResult:
     case RT_FixLifetime:
       // It is perfectly fine to eliminate various retains and releases of this
       // object: we are zapping all accesses or none.
       break;
-        
+
     // If this is an unknown instruction, we have more interesting things to
     // consider.
     case RT_Unknown:
@@ -757,13 +757,13 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // Otherwise, this really is some unhandled instruction.  Bail out.
       return false;
     }
-    
+
     // Okay, if we got here, the instruction can be eaten so-long as all of its
     // uses can be.  Scan through the uses and add them to the worklist for
     // recursive processing.
     for (auto UI = I->user_begin(), E = I->user_end(); UI != E; ++UI) {
       Instruction *User = cast<Instruction>(*UI);
-      
+
       // Handle stores as a special case here: we want to make sure that the
       // object is being stored *to*, not itself being stored (which would be an
       // escape point).  Since stores themselves don't have any uses, we can
@@ -786,12 +786,12 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
         // Otherwise, using the object as a source (or size) is an escape.
         return false;
       }
-      
+
       // Otherwise, normal instructions just go on the worklist for processing.
       Worklist.push_back(User);
     }
   }
-  
+
   // Ok, we succeeded!  This means we can zap all of the instructions that use
   // the object.  One thing we have to be careful of is to make sure that we
   // don't invalidate "BBI" (the iterator the outer walk of the optimization
@@ -800,14 +800,14 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
   // iterator if that would happen.
   while (InvolvedInstructions.count(BBI))
     ++BBI;
-  
+
   // Zap all of the instructions.
   for (auto I : InvolvedInstructions) {
     if (!I->use_empty())
       I->replaceAllUsesWith(UndefValue::get(I->getType()));
     I->eraseFromParent();
   }
-  
+
   ++NumStoreOnlyObjectsEliminated;
   return true;
 }
@@ -816,7 +816,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
 /// looking for interesting local optimizations that can be done.
 static bool performGeneralOptimizations(Function &F) {
   bool Changed = false;
-  
+
   // TODO: This is a really trivial local algorithm.  It could be much better.
   for (BasicBlock &BB : F) {
     for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {
@@ -891,12 +891,12 @@ void SwiftARCOpt::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
 
 bool SwiftARCOpt::runOnFunction(Function &F) {
   bool Changed = false;
-  
+
   // First thing: canonicalize swift_retain and similar calls so that nothing
   // uses their result.  This exposes the copy that the function does to the
   // optimizer.
   Changed |= canonicalizeInputFunction(F);
-  
+
   // Next, do a pass with a couple of optimizations:
   // 1) release() motion, eliminating retain/release pairs when it turns out
   //    that a pair is not protecting anything that accesses the guarded heap
@@ -905,7 +905,7 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
   //    potentially retained and released, but are only stored to and don't
   //    escape.
   Changed |= performGeneralOptimizations(F);
-  
+
   return Changed;
 }
 
@@ -922,7 +922,7 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
 static bool optimizeReturn3(ReturnInst *TheReturn) {
   // Ignore ret void.
   if (TheReturn->getNumOperands() == 0) return false;
-  
+
   // See if this is a return of three things.
   Value *RetVal = TheReturn->getOperand(0);
   StructType *RetSTy = dyn_cast<StructType>(RetVal->getType());
@@ -934,23 +934,23 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
   for (unsigned i = 0; i != 3; ++i) {
     RetVals[i] = FindInsertedValue(RetVal, i);
     if (RetVals[i] == 0) return false;
-    
+
     // If the scalar isn't int64 or pointer type, we can't transform it.
     if (!isa<PointerType>(RetVals[i]->getType()) &&
         !RetVals[i]->getType()->isIntegerTy(64))
       return false;
   }
-  
+
   // The ARC optimizer will push the retains to be immediately before the
   // return, past any insertvalues.  We tolerate other non-memory instructions
   // though, in case other optimizations have moved them around.  Collect all
   // the retain candidates.
   SmallDenseMap<Value*, CallInst*, 8> RetainedPointers;
-  
+
   for (BasicBlock::iterator BBI = TheReturn,E = TheReturn->getParent()->begin();
        BBI != E; ) {
     Instruction &I = *--BBI;
-    
+
     switch (classifyInstruction(I)) {
     case RT_Retain: {
       // Collect retained pointers.  If a pointer is multiply retained, it
@@ -966,13 +966,13 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
       // Otherwise, break out of the for loop.
       BBI = E;
       break;
-    }        
+    }
   }
 
   // If there are no retain candidates, we can't form a return3.
   if (RetainedPointers.empty())
     return false;
-  
+
   // Check to see if any of the values returned is retained.  If so, we can form
   // a return3, which makes the retain a tail call.
   CallInst *TheRetain = 0;
@@ -980,7 +980,7 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
     // If the return value is also retained, we found our retain.
     TheRetain = RetainedPointers[RetVals[i]];
     if (TheRetain) break;
-    
+
     // If we're returning the result of a known retain, then we can also handle
     // it.
     if (CallInst *CI = dyn_cast<CallInst>(RetVals[i]))
@@ -993,25 +993,25 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
   // If none of the three values was retained, we can't form a return3.
   if (TheRetain == 0)
     return false;
-  
+
   // Okay, there is, which means we can perform the transformation.  Get the
   // argument to swift_retain (the result will be zapped when we zap the call)
   // as the object to retain (of %swift.refcounted* type).
   Value *RetainedObject = TheRetain->getArgOperand(0);
-  
+
   // Insert any new instructions before the return.
   IRBuilder<> B(TheReturn);
   Type *Int64Ty = B.getInt64Ty();
 
   // The swift_retainAndReturnThree function takes the three arguments as i64.
   // Cast the arguments to i64 if needed.
-    
+
   // Update the element with a cast to i64 if needed.
   for (Value *&Elt : RetVals) {
     if (isa<PointerType>(Elt->getType()))
       Elt = B.CreatePtrToInt(Elt, Int64Ty);
   }
-    
+
   // Call swift_retainAndReturnThree with our pointer to retain and the three
   // i64's.
   Function &F = *TheReturn->getParent()->getParent();
@@ -1030,12 +1030,12 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
     if (RetVals[i]->getType() != RetSTy->getElementType(i))
       RetVals[i] = B.CreateIntToPtr(RetVals[i], RetSTy->getElementType(i));
   }
-    
+
   // Repack into an aggregate that can be returned.
   Value *RV = UndefValue::get(RetVal->getType());
   for (unsigned i = 0; i != 3; ++i)
     RV = B.CreateInsertValue(RV, RetVals[i], i);
-    
+
   // Return the right thing and zap any instruction tree of inserts that
   // existed just to feed the old return.
   TheReturn->setOperand(0, RV);
@@ -1053,7 +1053,7 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
 //                        SwiftARCExpandPass Pass
 //===----------------------------------------------------------------------===//
 
-/// performARCExpansion - This implements the very late (just before code 
+/// performARCExpansion - This implements the very late (just before code
 /// generation) lowering processes that we do to expose low level performance
 /// optimizations and take advantage of special features of the ABI.  These
 /// expansion steps can foil the general mid-level optimizer, so they are done
@@ -1071,14 +1071,14 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
 bool SwiftARCExpandPass::runOnFunction(Function &F) {
   Constant *RetainCache = nullptr;
   bool Changed = false;
-  
+
   SmallVector<ReturnInst*, 8> Returns;
-  
+
   // Since all of the calls are canonicalized, we know that we can just walk
   // through the function and collect the interesting heap object definitions by
-  // getting the argument to these functions.  
+  // getting the argument to these functions.
   DenseMap<Value*, TinyPtrVector<Instruction*>> DefsOfValue;
-  
+
   // Keep track of which order we see values in since iteration over a densemap
   // isn't in a deterministic order, and isn't efficient anyway.
   SmallVector<Value*, 16> DefOrder;
@@ -1091,7 +1091,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
     for (auto II = BB.begin(), E = BB.end(); II != E; ) {
       // Preincrement iterator to avoid iteration issues in the loop.
       Instruction &Inst = *II++;
-      
+
       switch (classifyInstruction(Inst)) {
       // Delete all fix lifetime instructions. After llvm-ir they have no use
       // and show up as calls in the final binary.
@@ -1133,7 +1133,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
           assert(GlobalEntry.back() == LocalEntry && "Local/Global mismatch?");
           GlobalEntry.pop_back();
         }
-        
+
         LocalEntry = &CI;
         GlobalEntry.push_back(&CI);
         continue;
@@ -1155,7 +1155,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
         // Just remap any uses in the value.
         break;
       }
-      
+
       // Check to see if there are any uses of a value in the LocalUpdates
       // map.  If so, remap it now to the locally defined version.
       for (unsigned i = 0, e = Inst.getNumOperands(); i != e; ++i)
@@ -1166,7 +1166,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
     }
     LocalUpdates.clear();
   }
-    
+
   // Now that we've collected all of the interesting heap object values that are
   // passed into argument-returning functions, rewrite uses of these pointers
   // with optimized lifetime-shorted versions of it.
@@ -1178,23 +1178,23 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       PtrBlock = PI->getParent();
     else
       PtrBlock = &F.getEntryBlock();
-    
+
     TinyPtrVector<Instruction*> &Defs = DefsOfValue[Ptr];
     // This is the same problem as SSA construction, so we just use LLVM's
     // SSAUpdater, with each retain as a definition of the virtual value.
     SSAUpdater Updater;
     Updater.Initialize(Ptr->getType(), Ptr->getName());
-    
+
     // Set the return value of each of these calls as a definition of the
     // virtual value.
     for (auto D : Defs)
       Updater.AddAvailableValue(D->getParent(), D);
-    
+
     // If we didn't add a definition for Ptr's block, then Ptr itself is
     // available in its block.
     if (!Updater.HasValueForBlock(PtrBlock))
       Updater.AddAvailableValue(PtrBlock, Ptr);
-      
+
 
     // Rewrite uses of Ptr to their optimized forms.
     for (auto UI = Ptr->user_begin(), E = Ptr->user_end(); UI != E; ) {
@@ -1202,29 +1202,29 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       // it.
       Use &U = UI.getUse();
       ++UI;
-      
+
       // If the use is in the same block that defines it and the User is not a
       // PHI node, then this is a local use that shouldn't be rewritten.
       Instruction *User = cast<Instruction>(U.getUser());
       if (User->getParent() == PtrBlock && !isa<PHINode>(User))
         continue;
-      
+
       // Otherwise, change it if profitable!
       Updater.RewriteUse(U);
-      
+
       if (U.get() != Ptr)
         Changed = true;
     }
   }
 
   // Scan through all the returns to see if there are any that can be optimized.
-  // FIXME: swift_retainAndReturnThree runtime call 
+  // FIXME: swift_retainAndReturnThree runtime call
   // is currently implemented only on x86_64.
   // FIXME: optimizeReturn3() implementation assumes 64-bit
   if (llvm::Triple(F.getParent()->getTargetTriple()).getArchName() == "x86_64")
     for (ReturnInst *RI : Returns)
       Changed |= optimizeReturn3(RI);
-  
+
   return Changed;
 }
 
