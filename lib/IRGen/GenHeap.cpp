@@ -182,22 +182,6 @@ namespace {
   };
 }
 
-namespace {
-  class BuiltinBridgeObjectTypeInfo
-    : public HeapTypeInfo<BuiltinBridgeObjectTypeInfo> {
-  public:
-    BuiltinBridgeObjectTypeInfo(llvm::PointerType *storage,
-                                 Size size, llvm::BitVector spareBits,
-                                 Alignment align)
-    : HeapTypeInfo(storage, size, spareBits, align) {}
-
-    /// Builtin.BridgeObject uses Swift bridge reference-counting.
-    ReferenceCounting getReferenceCounting() const {
-      return ReferenceCounting::Bridge;
-    }
-  };
-}
-
 const TypeInfo *TypeConverter::convertBuiltinNativeObject() {
   return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
                                       IGM.getPointerSize(),

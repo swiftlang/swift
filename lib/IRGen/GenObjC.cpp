@@ -230,6 +230,37 @@ namespace {
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Bridge;
     }
+    
+    // BridgeObject exposes only null as an extra inhabitant for enum layout.
+    // Other representations are reserved for future use by the stdlib.
+    
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return 1;
+    }
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                unsigned bits,
+                                                unsigned index) const override {
+      return llvm::ConstantInt::get(IGM.SizeTy, 0);
+    }
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                         SILType T) const override {
+      src = IGF.Builder.CreateBitCast(src, IGF.IGM.SizeTy->getPointerTo());
+      auto val = IGF.Builder.CreateLoad(src);
+      auto isNonzero = IGF.Builder.CreateICmpNE(val,
+                                    llvm::ConstantInt::get(IGF.IGM.SizeTy, 0));
+      // We either have extra inhabitant 0 or no extra inhabitant (-1).
+      // Conveniently, this is just a sext i1 -> i32 away.
+      return IGF.Builder.CreateSExt(isNonzero, IGF.IGM.Int32Ty);
+    }
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T) const override {
+      // There's only one extra inhabitant, 0.
+      dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.SizeTy->getPointerTo());
+      IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), dest);
+    }
   };
 }
 

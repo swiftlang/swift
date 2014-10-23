@@ -53,11 +53,12 @@ if true {
   let bo2 = bo
   let x1: C = Builtin.castReferenceFromBridgeObject(bo)
   let x2: C = Builtin.castReferenceFromBridgeObject(bo2)
-  // CHECK:      true
+  // CHECK-NEXT: true
   println(x === x1)
   // CHECK-NEXT: true
   println(x === x2)
 }
+// CHECK-NEXT: deallocated
 
 // Try with other spare bits set.
 if true {
@@ -67,11 +68,12 @@ if true {
   let bo2 = bo
   let x1: C = Builtin.castReferenceFromBridgeObject(bo)
   let x2: C = Builtin.castReferenceFromBridgeObject(bo2)
-  // CHECK:      true
+  // CHECK-NEXT: true
   println(x === x1)
   // CHECK-NEXT: true
   println(x === x2)
 }
+// CHECK-NEXT: deallocated
 
 #if os(OSX) || os(iOS)
 
@@ -85,10 +87,47 @@ if true {
   let bo2 = bo
   let x1: NSNumber = Builtin.castReferenceFromBridgeObject(bo)
   let x2: NSNumber = Builtin.castReferenceFromBridgeObject(bo2)
-  // CHECK: true
+  // CHECK-NEXT: true
   println(x === x1)
-  // CHECK: true
+  // CHECK-NEXT: true
   println(x === x2)
 }
 
 #endif
+
+func hitOptionalGenerically<T>(x: T?) {
+  switch x {
+  case .Some:
+    println("Some")
+  case .None:
+    println("None")
+  }
+}
+
+func hitOptionalSpecifically(x: Builtin.BridgeObject?) {
+  switch x {
+  case .Some:
+    println("Some")
+  case .None:
+    println("None")
+  }
+}
+
+if true {
+  // CHECK-NEXT: true
+  println(sizeof(Optional<Builtin.BridgeObject>.self)
+            == sizeof(Builtin.BridgeObject.self))
+
+  var bo: Builtin.BridgeObject? = nil
+
+  // CHECK-NEXT: None
+  hitOptionalSpecifically(bo)
+  // CHECK-NEXT: None
+  hitOptionalGenerically(bo)
+
+  bo = Builtin.castToBridgeObject(C(), 0.value)
+  // CHECK-NEXT: Some
+  hitOptionalSpecifically(bo)
+  // CHECK-NEXT: Some
+  hitOptionalGenerically(bo)
+}

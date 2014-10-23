@@ -652,7 +652,7 @@ extern "C" const ExtraInhabitantsValueWitnessTable _TWVBo; // Builtin.NativeObje
 #if SWIFT_OBJC_INTEROP
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBO; // Builtin.UnknownObject
-extern "C" const ValueWitnessTable _TWVBb; // Builtin.BridgeObject
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVBb; // Builtin.BridgeObject
 #endif
 
 // The () -> () table can be used for arbitrary function types.

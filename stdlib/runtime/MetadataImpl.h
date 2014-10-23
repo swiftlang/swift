@@ -321,7 +321,7 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
 struct BridgeObjectBox :
     RetainableBoxBase<BridgeObjectBox, void*> {
   // TODO: Enable the nil extra inhabitant.
-  static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr unsigned numExtraInhabitants = 1;
       
   static void *retain(void *obj) {
     return swift_bridgeObjectRetain(obj);
@@ -329,6 +329,14 @@ struct BridgeObjectBox :
 
   static void release(void *obj) {
     swift_bridgeObjectRelease(obj);
+  }
+      
+  static void storeExtraInhabitant(void **dest, int index) {
+    *dest = nullptr;
+  }
+
+  static int getExtraInhabitantIndex(void* const *src) {
+    return *src == nullptr ? 0 : -1;
   }
 };
   

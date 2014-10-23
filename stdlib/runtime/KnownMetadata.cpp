@@ -138,7 +138,7 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVBO =
 #endif
 
 /// The value-witness table for BridgeObject.
-const ValueWitnessTable swift::_TWVBb =
+const ExtraInhabitantsValueWitnessTable swift::_TWVBb =
   ValueWitnessTableForBox<BridgeObjectBox>::table;
 
 /*** Functions ***************************************************************/
