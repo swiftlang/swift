@@ -149,6 +149,13 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
     if (SEI->isFieldOnlyNonTrivialField())
       return SEI->getOperand();
 
+  // If we have a struct instruction with only one non-trivial stored field, the
+  // only reference count that can be modified is the non-trivial field. Return
+  // the non-trivial field.
+  if (auto *SI = dyn_cast<StructInst>(V))
+    if (SILValue NewValue = SI->getUniqueNonTrivialFieldValue())
+      return NewValue;
+
   // If we have an unchecked_enum_data, strip off the unchecked_enum_data.
   if (auto *UEDI = dyn_cast<UncheckedEnumDataInst>(V))
     return UEDI->getOperand();
@@ -158,6 +165,20 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   if (auto *EI = dyn_cast<EnumInst>(V))
     if (EI->hasOperand())
       return EI->getOperand();
+
+  // If we have a tuple_extract that is extracting the only non trivial member
+  // of a tuple, a retain_value on the tuple is equivalent to a retain_value on
+  // the extracted value.
+  if (auto *TEI = dyn_cast<TupleExtractInst>(V))
+    if (TEI->isEltOnlyNonTrivialElt())
+      return TEI->getOperand();
+
+  // If we are forming a tuple and the tuple only has one element with reference
+  // semantics, a retain_value on the tuple is equivalent to a retain value on
+  // the tuple operand.
+  if (auto *TI = dyn_cast<TupleInst>(V))
+    if (SILValue NewValue = TI->getUniqueNonTrivialElt())
+      return NewValue;
 
   return SILValue();
 }

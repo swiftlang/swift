@@ -1585,6 +1585,36 @@ public:
     return nullptr;
   }
 
+  /// Search the operands of this struct for a unique non-trivial field. If we
+  /// find it, return it. Otherwise return SILValue().
+  SILValue getUniqueNonTrivialFieldValue() {
+    SILModule &Mod = getModule();
+    ArrayRef<Operand> Ops = getAllOperands();
+
+    Optional<unsigned> Index;
+    // For each operand...
+    for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
+      // If the operand is not trivial...
+      if (!Ops[i].get().getType().isTrivial(Mod)) {
+        // And we have not found an Index yet, set index to i and continue.
+        if (!Index.hasValue()) {
+          Index = i;
+          continue;
+        }
+
+        // Otherwise, we have two values that are non-trivial. Bail.
+        return SILValue();
+      }
+    }
+
+    // If we did not find an index, return an empty SILValue.
+    if (!Index.hasValue())
+      return SILValue();
+
+    // Otherwise, return the value associated with index.
+    return Ops[Index.getValue()].get();
+  }
+
   StructDecl *getStructDecl() const {
     auto s = getType().getStructOrBoundGenericStruct();
     assert(s && "A struct should always have a StructDecl associated with it");
@@ -1679,6 +1709,36 @@ public:
 
   TupleType *getTupleType() const {
     return getType().getSwiftRValueType()->castTo<TupleType>();
+  }
+
+  /// Search the operands of this tuple for a unique non-trivial elt. If we find
+  /// it, return it. Otherwise return SILValue().
+  SILValue getUniqueNonTrivialElt() {
+    SILModule &Mod = getModule();
+    ArrayRef<Operand> Ops = getAllOperands();
+
+    Optional<unsigned> Index;
+    // For each operand...
+    for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
+      // If the operand is not trivial...
+      if (!Ops[i].get().getType().isTrivial(Mod)) {
+        // And we have not found an Index yet, set index to i and continue.
+        if (!Index.hasValue()) {
+          Index = i;
+          continue;
+        }
+
+        // Otherwise, we have two values that are non-trivial. Bail.
+        return SILValue();
+      }
+    }
+
+    // If we did not find an index, return an empty SILValue.
+    if (!Index.hasValue())
+      return SILValue();
+
+    // Otherwise, return the value associated with index.
+    return Ops[Index.getValue()].get();
   }
 };
 
@@ -1958,6 +2018,45 @@ public:
   TupleType *getTupleType() const {
     return getOperand().getType().getSwiftRValueType()->castTo<TupleType>();
   }
+
+  unsigned getNumTupleElts() const {
+    return getTupleType()->getNumElements();
+  }
+
+  bool isEltOnlyNonTrivialElt() const {
+    SILModule &Mod = getModule();
+
+    // If the elt we are extracting is trivial, we can not be a non-trivial
+    // field... return false.
+    if (getType().isTrivial(Mod))
+      return false;
+
+    // Ok, we know that the elt we are extracting is non-trivial. Make sure that
+    // we have no other non-trivial elts.
+    SILType OpTy = getOperand().getType();
+    unsigned FieldNo = getFieldNo();
+
+    // For each element index of the tuple...
+    for (unsigned i = 0, e = getNumTupleElts(); i != e; ++i) {
+      // If the element index is the one we are extracting, skip it...
+      if (i == FieldNo)
+        continue;
+
+      // Otherwise check if we have a non-trivial type. If we don't have one,
+      // continue.
+      if (OpTy.getTupleElementType(i).isTrivial(Mod))
+        continue;
+
+      // If we do have a non-trivial type, return false. We have multiple
+      // non-trivial types violating our condition.
+      return false;
+    }
+
+    // We checked every other elt of the tuple and did not find any
+    // non-trivial elt except for ourselves. Return true.
+    return true;
+  }
+
 };
 
 /// Derive the address of a numbered element from the address of a tuple.

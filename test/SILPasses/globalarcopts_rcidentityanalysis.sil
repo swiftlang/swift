@@ -387,3 +387,20 @@ bb4:
   %4 = tuple()
   return %4 : $()
 }
+
+// CHECK-LABEL: sil @strip_off_structs_tuples_tuple_extracts : $@thin (Builtin.NativeObject, (Builtin.Int32, Builtin.NativeObject, Builtin.Int32)) -> () {
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @strip_off_structs_tuples_tuple_extracts : $@thin (Builtin.NativeObject, (Builtin.Int32, Builtin.NativeObject, Builtin.Int32)) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $(Builtin.Int32, Builtin.NativeObject, Builtin.Int32)):
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $S2(%2 : $Builtin.Int32, %0 : $Builtin.NativeObject, %2 : $Builtin.Int32)
+  retain_value %3 : $S2
+  %4 = tuple(%2 : $Builtin.Int32, %0 : $Builtin.NativeObject, %2 : $Builtin.Int32)
+  release_value %4 : $(Builtin.Int32, Builtin.NativeObject, Builtin.Int32)
+  retain_value %1 : $(Builtin.Int32, Builtin.NativeObject, Builtin.Int32)
+  %5 = tuple_extract %1 : $(Builtin.Int32, Builtin.NativeObject, Builtin.Int32), 1
+  release_value %5 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
