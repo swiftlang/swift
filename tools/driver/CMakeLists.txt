@@ -25,7 +25,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     OUTPUT_VARIABLE default_toolchain_compiler)
   get_filename_component(ARCLITE_BASE ${default_toolchain_compiler} PATH)
   get_filename_component(ARCLITE_BASE ${ARCLITE_BASE} PATH)
-  set(SWIFT_REPL_ARCLITE "${ARCLITE_BASE}/lib/arc/libarclite_macosx.a")
+  set(SWIFT_REPL_ARCLITE "${ARCLITE_BASE}/lib/arc/libarclite_${SWIFT_DEPLOYMENT_OS}.a")
   if (SWIFT_REPL_ARCLITE)
     set_property(TARGET swift APPEND_STRING PROPERTY
       LINK_FLAGS " -lobjc -Wl,-force_load,\"${SWIFT_REPL_ARCLITE}\"")
