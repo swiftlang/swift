@@ -2456,21 +2456,22 @@ namespace {
     assert(args.size() == 1 && "cast should have a single argument");
     assert(substitutions.size() == 1 && "cast should have a type substitution");
     
+    // Take the reference type argument and cast it to NativeObject.
+    SILType objPointerType = SILType::getNativeObjectType(gen.F.getASTContext());
+
     // Bail if the source type is not a class reference of some kind.
     if (!substitutions[0].getReplacement()->mayHaveSuperclass() &&
         !substitutions[0].getReplacement()->isClassExistentialType()) {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
                        "castToNativeObject source must be a class");
-      // FIXME: Recovery?
-      llvm::report_fatal_error("unable to set up the ObjC bridge!");
+      SILValue undef = SILUndef::get(objPointerType, gen.SGM.M);
+      return ManagedValue::forUnmanaged(undef);
     }
     
     // Save the cleanup on the argument so we can forward it onto the cast
     // result.
     auto cleanup = args[0].getCleanup();
     
-    // Take the reference type argument and cast it to NativeObject.
-    SILType objPointerType = SILType::getNativeObjectType(gen.F.getASTContext());
     SILValue arg = args[0].getValue();
 
     // If the argument is existential, open it.
@@ -2497,12 +2498,11 @@ namespace {
            "cast should have a single substitution");
 
     // The substitution determines the destination type.
-    // FIXME: Archetype destination type?
-    SILType destType = gen.getLoweredLoadableType(
-                                             substitutions[0].getReplacement());
+    SILType destType = gen.getLoweredType(substitutions[0].getReplacement());
     
     // Bail if the source type is not a class reference of some kind.
-    if (!substitutions[0].getReplacement()->isBridgeableObjectType()) {
+    if (!substitutions[0].getReplacement()->isBridgeableObjectType()
+        || !destType.isObject()) {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
                        "castFromNativeObject dest must be an object type");
       // Recover by propagating an undef result.
@@ -2663,6 +2663,87 @@ namespace {
     SILValue out = gen.B.createUncheckedRefBitCast(loc, in,
                                                    toTL.getLoweredType());
     return ManagedValue(out, args[0].getCleanup());
+  }
+
+  /// Specialized emitter for Builtin.castToBridgeObject.
+  static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
+                                                    SILLocation loc,
+                                                    ArrayRef<Substitution> subs,
+                                                    ArrayRef<ManagedValue> args,
+                                                    SGFContext C) {
+    assert(args.size() == 2 && "cast should have two arguments");
+    assert(subs.size() == 1 && "cast should have a type substitution");
+    
+    // Take the reference type argument and cast it to BridgeObject.
+    SILType objPointerType = SILType::getBridgeObjectType(gen.F.getASTContext());
+
+    // Bail if the source type is not a class reference of some kind.
+    if (!subs[0].getReplacement()->mayHaveSuperclass() &&
+        !subs[0].getReplacement()->isClassExistentialType()) {
+      gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                       "castToNativeObject source must be a class");
+      SILValue undef = SILUndef::get(objPointerType, gen.SGM.M);
+      return ManagedValue::forUnmanaged(undef);
+    }
+    
+    // Save the cleanup on the argument so we can forward it onto the cast
+    // result.
+    auto refCleanup = args[0].getCleanup();
+    SILValue ref = args[0].getValue();
+    SILValue bits = args[1].getUnmanagedValue();
+    
+    // If the argument is existential, open it.
+    if (subs[0].getReplacement()->isClassExistentialType()) {
+      Type openedTy
+        = ArchetypeType::getOpened(subs[0].getReplacement());
+      SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
+      ref = gen.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
+    }
+    
+    SILValue result = gen.B.createRefToBridgeObject(loc, ref, bits);
+    return ManagedValue(result, refCleanup);
+  }
+  
+  /// Specialized emitter for Builtin.castReferenceFromBridgeObject.
+  static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
+                                                    SILGenFunction &gen,
+                                                    SILLocation loc,
+                                                    ArrayRef<Substitution> subs,
+                                                    ArrayRef<ManagedValue> args,
+                                                    SGFContext C) {
+    assert(args.size() == 1 && "cast should have one argument");
+    assert(subs.size() == 1 && "cast should have a type substitution");
+
+    // The substitution determines the destination type.
+    SILType destType = gen.getLoweredType(subs[0].getReplacement());
+    
+    // Bail if the source type is not a class reference of some kind.
+    if (!subs[0].getReplacement()->isBridgeableObjectType()
+        || !destType.isObject()) {
+      gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                   "castReferenceFromBridgeObject dest must be an object type");
+      // Recover by propagating an undef result.
+      SILValue result = SILUndef::get(destType, gen.SGM.M);
+      return ManagedValue::forUnmanaged(result);
+    }
+    
+    SILValue result = gen.B.createBridgeObjectToRef(loc, args[0].forward(gen),
+                                                    destType);
+    return gen.emitManagedRValueWithCleanup(result);
+  }
+  static ManagedValue emitBuiltinCastBitPatternFromBridgeObject(
+                                                    SILGenFunction &gen,
+                                                    SILLocation loc,
+                                                    ArrayRef<Substitution> subs,
+                                                    ArrayRef<ManagedValue> args,
+                                                    SGFContext C) {
+    assert(args.size() == 1 && "cast should have one argument");
+    assert(subs.empty() && "cast should not have subs");
+
+    SILType wordType = SILType::getBuiltinWordType(gen.getASTContext());
+    SILValue result = gen.B.createBridgeObjectToWord(loc, args[0].forward(gen),
+                                                     wordType);
+    return ManagedValue::forUnmanaged(result);
   }
   
   /// Specialized emitter for type traits.

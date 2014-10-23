@@ -682,6 +682,36 @@ visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::
+visitRefToBridgeObjectInst(RefToBridgeObjectInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createRefToBridgeObject(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getConverted()),
+                                         getOpValue(Inst->getBitsOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitBridgeObjectToRefInst(BridgeObjectToRefInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createBridgeObjectToRef(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getConverted()),
+                                         getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitBridgeObjectToWordInst(BridgeObjectToWordInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createBridgeObjectToWord(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getConverted()),
+                                          getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitRefToRawPointerInst(RefToRawPointerInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createRefToRawPointer(getOpLocation(Inst->getLoc()),

@@ -2143,6 +2143,7 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinNativeObject:
+  case TypeKind::BuiltinBridgeObject:
   case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinVector: {
     TypeAliasDecl *typeAlias =

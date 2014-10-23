@@ -1044,6 +1044,20 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
+// CHECK-LABEL: sil public_external [fragile] @bridge_object : $@thin (@owned Class1, Builtin.Word) -> () {
+// CHECK-NEXT:  bb0([[X:%.*]] : $Class1, [[W:%.*]] : $Builtin.Word):
+// CHECK-NEXT:    [[A:%.*]] = ref_to_bridge_object [[X]] : $Class1, [[W]] : $Builtin.Word
+// CHECK-NEXT:    [[B:%.*]] = bridge_object_to_ref [[A]] : $Builtin.BridgeObject to $Class1
+// CHECK-NEXT:    [[C:%.*]] = bridge_object_to_word [[A]] : $Builtin.BridgeObject to $Builtin.Word
+// CHECK-NEXT:    return undef : $()
+sil [fragile] @bridge_object : $@thin (@owned Class1, Builtin.Word) -> () {
+entry(%x : $Class1, %w : $Builtin.Word):
+  %a = ref_to_bridge_object %x : $Class1, %w : $Builtin.Word
+  %b = bridge_object_to_ref %a : $Builtin.BridgeObject to $Class1
+  %c = bridge_object_to_word %a : $Builtin.BridgeObject to $Builtin.Word
+  return undef : $()
+}
+
 class Foo {
   subscript (x: Int, y: Int) -> Int { get set }
   var x: Int
@@ -1241,6 +1255,7 @@ bb0:
   %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()
   %123 = function_ref @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64
   %128 = function_ref @select_enum : $@thin (@in Beth) -> ()
+  %129 = function_ref @bridge_object : $@thin (@owned Class1, Builtin.Word) -> ()
 
   %119 = tuple ()
   return %119 : $()

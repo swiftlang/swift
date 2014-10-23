@@ -661,6 +661,9 @@ public:
   void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *i);
   void visitObjCExistentialMetatypeToObjectInst(
                                         ObjCExistentialMetatypeToObjectInst *i);
+  void visitRefToBridgeObjectInst(RefToBridgeObjectInst *i);
+  void visitBridgeObjectToRefInst(BridgeObjectToRefInst *i);
+  void visitBridgeObjectToWordInst(BridgeObjectToWordInst *i);
 
   void visitIsNonnullInst(IsNonnullInst *i);
 
@@ -3079,6 +3082,104 @@ void IRGenSILFunction::visitObjCProtocolInst(ObjCProtocolInst *i) {
   Explosion ex;
   ex.add(protoRef);
   setLoweredExplosion(SILValue(i,0), ex);
+}
+
+void IRGenSILFunction::visitRefToBridgeObjectInst(
+                                              swift::RefToBridgeObjectInst *i) {
+  Explosion refEx = getLoweredExplosion(i->getConverted());
+  llvm::Value *ref = refEx.claimNext();
+  
+  Explosion bitsEx = getLoweredExplosion(i->getBitsOperand());
+  llvm::Value *bits = bitsEx.claimNext();
+  
+  // Mask the bits into the pointer representation.
+  llvm::Value *val = Builder.CreatePtrToInt(ref, IGM.SizeTy);
+  val = Builder.CreateOr(val, bits);
+  val = Builder.CreateIntToPtr(val, IGM.BridgeObjectPtrTy);
+  
+  Explosion resultEx;
+  resultEx.add(val);
+  
+  setLoweredExplosion(SILValue(i, 0), resultEx);
+}
+
+void IRGenSILFunction::visitBridgeObjectToRefInst(
+                                              swift::BridgeObjectToRefInst *i) {
+  Explosion boEx = getLoweredExplosion(i->getConverted());
+  llvm::Value *bo = boEx.claimNext();
+  Explosion resultEx;
+  
+  auto &refTI = getTypeInfo(i->getType());
+  llvm::Type *refType = refTI.getSchema()[0].getScalarType();
+  
+  // If the value is an ObjC tagged pointer, pass it through verbatim.
+  llvm::BasicBlock *taggedCont = nullptr,
+    *tagged = nullptr,
+    *notTagged = nullptr;
+  llvm::Value *taggedRef = nullptr;
+  llvm::Value *boBits = nullptr;
+  if (IGM.TargetInfo.hasObjCTaggedPointers()) {
+    boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
+    APInt maskValue
+      = getAPIntFromBitVector(IGM.TargetInfo.ObjCPointerReservedBits);
+    llvm::Value *mask = llvm::ConstantInt::get(IGM.getLLVMContext(), maskValue);
+    llvm::Value *reserved = Builder.CreateAnd(boBits, mask);
+    llvm::Value *cond = Builder.CreateICmpEQ(reserved,
+                                         llvm::ConstantInt::get(IGM.SizeTy, 0));
+    tagged = createBasicBlock("tagged-pointer"),
+    notTagged = createBasicBlock("not-tagged-pointer");
+    taggedCont = createBasicBlock("tagged-cont");
+    
+    Builder.CreateCondBr(cond, notTagged, tagged);
+    
+    Builder.emitBlock(tagged);
+    taggedRef = Builder.CreateBitCast(bo, refType);
+    Builder.CreateBr(taggedCont);
+    
+    // If it's not a tagged pointer, mask off the spare bits.
+    Builder.emitBlock(notTagged);
+  }
+  
+  // Mask off the spare bits (if they exist).
+  auto &spareBits = IGM.getHeapObjectSpareBits();
+  llvm::Value *result;
+  if (spareBits.any()) {
+    APInt maskValue = ~getAPIntFromBitVector(spareBits);
+    
+    if (!boBits)
+      boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
+    
+    llvm::Value *mask = llvm::ConstantInt::get(IGM.getLLVMContext(), maskValue);
+    llvm::Value *masked = Builder.CreateAnd(boBits, mask);
+    result = Builder.CreateIntToPtr(masked, refType);
+  } else {
+    result = Builder.CreateBitCast(bo, refType);
+  }
+  
+  if (taggedCont) {
+    Builder.CreateBr(taggedCont);
+    
+    Builder.emitBlock(taggedCont);
+    
+    auto phi = Builder.CreatePHI(refType, 2);
+    phi->addIncoming(taggedRef, tagged);
+    phi->addIncoming(result, notTagged);
+    
+    result = phi;
+  }
+  
+  resultEx.add(result);
+  setLoweredExplosion(SILValue(i,0), resultEx);
+}
+
+void IRGenSILFunction::visitBridgeObjectToWordInst(
+                                             swift::BridgeObjectToWordInst *i) {
+  Explosion boEx = getLoweredExplosion(i->getConverted());
+  llvm::Value *val = boEx.claimNext();
+  val = Builder.CreatePtrToInt(val, IGM.SizeTy);
+  Explosion wordEx;
+  wordEx.add(val);
+  setLoweredExplosion(SILValue(i, 0), wordEx);
 }
 
 void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(

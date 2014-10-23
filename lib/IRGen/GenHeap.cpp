@@ -182,6 +182,22 @@ namespace {
   };
 }
 
+namespace {
+  class BuiltinBridgeObjectTypeInfo
+    : public HeapTypeInfo<BuiltinBridgeObjectTypeInfo> {
+  public:
+    BuiltinBridgeObjectTypeInfo(llvm::PointerType *storage,
+                                 Size size, llvm::BitVector spareBits,
+                                 Alignment align)
+    : HeapTypeInfo(storage, size, spareBits, align) {}
+
+    /// Builtin.BridgeObject uses Swift bridge reference-counting.
+    ReferenceCounting getReferenceCounting() const {
+      return ReferenceCounting::Bridge;
+    }
+  };
+}
+
 const TypeInfo *TypeConverter::convertBuiltinNativeObject() {
   return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
                                       IGM.getPointerSize(),
@@ -672,6 +688,31 @@ void IRGenFunction::emitUnknownRelease(llvm::Value *value) {
     return;
   }
   emitUnaryRefCountCall(*this, IGM.getUnknownReleaseFn(), value);
+}
+
+void IRGenFunction::emitBridgeRetain(llvm::Value *value, Explosion &e) {
+  if (!IGM.ObjCInterop) {
+    emitRetain(value, e);
+    return;
+  }
+  emitUnaryRefCountCall(*this, IGM.getBridgeObjectRetainFn(), value);
+}
+
+llvm::Value *IRGenFunction::emitBridgeRetainCall(llvm::Value *value) {
+  if (!IGM.ObjCInterop) {
+    emitRetainCall(value);
+    return value;
+  }
+  emitUnaryRefCountCall(*this, IGM.getBridgeObjectRetainFn(), value);
+  return value;
+}
+
+void IRGenFunction::emitBridgeRelease(llvm::Value *value) {
+  if (!IGM.ObjCInterop) {
+    emitRelease(value);
+    return;
+  }
+  emitUnaryRefCountCall(*this, IGM.getBridgeObjectReleaseFn(), value);
 }
 
 #define DEFINE_VALUE_OP(ID)                                           \

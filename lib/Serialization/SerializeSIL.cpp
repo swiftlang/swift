@@ -899,6 +899,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedTrivialBitCastInst:
   case ValueKind::UncheckedRefBitCastInst:
+  case ValueKind::BridgeObjectToRefInst:
+  case ValueKind::BridgeObjectToWordInst:
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:
@@ -916,6 +918,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ObjCExistentialMetatypeToObjectInst:
   case ValueKind::ProjectBlockStorageInst: {
     writeConversionLikeInstruction(&SI);
+    break;
+  }
+  case ValueKind::RefToBridgeObjectInst: {
+    auto RI = cast<RefToBridgeObjectInst>(&SI);
+    SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
+           SILAbbrCodes[SILTwoOperandsLayout::Code], (unsigned)SI.getKind(),
+           /*attr*/ 0,
+           S.addTypeRef(RI->getConverted().getType().getSwiftRValueType()),
+           (unsigned)RI->getConverted().getType().getCategory(),
+           addValueRef(RI->getConverted()),
+           RI->getConverted().getResultNumber(),
+           S.addTypeRef(RI->getBitsOperand().getType().getSwiftRValueType()),
+           (unsigned)RI->getBitsOperand().getType().getCategory(),
+           addValueRef(RI->getBitsOperand()),
+           RI->getBitsOperand().getResultNumber());
     break;
   }
   // Checked Conversion instructions.

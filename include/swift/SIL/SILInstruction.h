@@ -1186,6 +1186,7 @@ public:
 
 /// ConversionInst - Abstract class representing instructions that convert
 /// values.
+///
 class ConversionInst : public SILInstruction {
 public:
   ConversionInst(ValueKind Kind, SILLocation Loc, SILType Ty)
@@ -1194,6 +1195,12 @@ public:
   /// All conversion instructions return a single result.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
+  /// All conversion instructions take the converted value, whose reference
+  /// identity is expected to be preserved through the conversion chain, as their
+  /// first operand. Some instructions may take additional operands that do not
+  /// affect the reference identity.
+  SILValue getConverted() const { return getOperand(0); }
+  
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_ConversionInst &&
       V->getKind() <= ValueKind::Last_ConversionInst;
@@ -1267,7 +1274,7 @@ public:
   UncheckedTrivialBitCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-
+  
 /// Convert a value to a layout-compatible type with equivalent
 /// "reference semantics identity", that is, a type for which retain_value and
 /// release_value have equivalent effects to retaining or releasing the original
@@ -1278,6 +1285,48 @@ class UncheckedRefBitCastInst
 {
 public:
   UncheckedRefBitCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
+/// Build a Builtin.BridgeObject from a heap object reference by bitwise-or-ing
+/// in bits from a word.
+class RefToBridgeObjectInst : public ConversionInst {
+  FixedOperandList<2> Operands;
+public:
+  RefToBridgeObjectInst(SILLocation Loc, SILValue ConvertedValue,
+                        SILValue MaskValue,
+                        SILType BridgeObjectTy)
+    : ConversionInst(ValueKind::RefToBridgeObjectInst, Loc, BridgeObjectTy),
+      Operands(this, ConvertedValue, MaskValue)
+  {}
+  
+  SILValue getBitsOperand() const { return Operands[1].get(); }
+  
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::RefToBridgeObjectInst;
+  }
+};
+
+/// Extract the heap object reference from a BridgeObject.
+class BridgeObjectToRefInst
+  : public UnaryInstructionBase<ValueKind::BridgeObjectToRefInst,
+                                ConversionInst>
+{
+public:
+  BridgeObjectToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
+/// Retrieve the bit pattern of a BridgeObject.
+class BridgeObjectToWordInst
+  : public UnaryInstructionBase<ValueKind::BridgeObjectToWordInst,
+                                ConversionInst>
+{
+public:
+  BridgeObjectToWordInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
@@ -1298,7 +1347,7 @@ public:
   RawPointerToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-
+  
 /// RefToUnownedInst - Given a value of a reference type,
 /// convert it to an unowned reference.
 ///

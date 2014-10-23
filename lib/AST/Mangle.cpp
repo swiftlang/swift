@@ -669,6 +669,7 @@ static void mangleMetatypeRepresentation(raw_ostream &Buffer,
 /// <type> ::= Bi <natural> _        # Builtin.Integer
 /// <type> ::= BO                    # Builtin.UnknownObject
 /// <type> ::= Bo                    # Builtin.NativeObject
+/// <type> ::= Bb                    # Builtin.BridgeObject
 /// <type> ::= Bp                    # Builtin.RawPointer
 /// <type> ::= Bv <natural> <type>   # Builtin.Vector
 /// <type> ::= C <decl>              # class (substitutable)
@@ -738,6 +739,9 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     return;
   case TypeKind::BuiltinNativeObject:
     Buffer << "Bo";
+    return;
+  case TypeKind::BuiltinBridgeObject:
+    Buffer << "Bb";
     return;
   case TypeKind::BuiltinUnknownObject:
     Buffer << "BO";

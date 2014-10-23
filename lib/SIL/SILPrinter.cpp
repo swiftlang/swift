@@ -866,6 +866,18 @@ public:
     OS << "objc_protocol #" << CI->getProtocol()->getName()
        << " : " << CI->getType();
   }
+  
+  void visitRefToBridgeObjectInst(RefToBridgeObjectInst *I) {
+    OS << "ref_to_bridge_object " << getIDAndType(I->getConverted())
+       << ", " << getIDAndType(I->getBitsOperand());
+  }
+  
+  void visitBridgeObjectToRefInst(BridgeObjectToRefInst *I) {
+    printUncheckedConversionInst(I, I->getOperand(), "bridge_object_to_ref");
+  }
+  void visitBridgeObjectToWordInst(BridgeObjectToWordInst *I) {
+    printUncheckedConversionInst(I, I->getOperand(), "bridge_object_to_word");
+  }
 
   void visitIsNonnullInst(IsNonnullInst *I) {
     OS << "is_nonnull " << getIDAndType(I->getOperand());

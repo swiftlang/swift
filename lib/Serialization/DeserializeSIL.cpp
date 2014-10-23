@@ -764,6 +764,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
   ONEOPERAND_ONETYPE_INST(UncheckedRefBitCast)
+  ONEOPERAND_ONETYPE_INST(BridgeObjectToRef)
+  ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)
   ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToAddress)
@@ -781,6 +783,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
+  
+  case ValueKind::RefToBridgeObjectInst: {
+    auto RefTy = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    auto Ref = getLocalValue(ValID, ValResNum, RefTy);
+    auto BitsTy = getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2);
+    auto Bits = getLocalValue(ValID2, ValResNum2, BitsTy);
+    
+    ResultVal = Builder.createRefToBridgeObject(Loc, Ref, Bits);
+    break;
+  }
 
   case ValueKind::ObjCProtocolInst: {
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);

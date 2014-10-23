@@ -137,6 +137,10 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVBO =
   ValueWitnessTableForBox<ObjCRetainableBox>::table;
 #endif
 
+/// The value-witness table for BridgeObject.
+const ValueWitnessTable swift::_TWVBb =
+  ValueWitnessTableForBox<BridgeObjectBox>::table;
+
 /*** Functions ***************************************************************/
 
 /// The basic value-witness table for function types.
@@ -164,6 +168,7 @@ OPAQUE_METADATA(Bi32_)
 OPAQUE_METADATA(Bi64_)
 OPAQUE_METADATA(Bi128_)
 OPAQUE_METADATA(Bo)
+OPAQUE_METADATA(Bb)
 #if SWIFT_OBJC_INTEROP
 OPAQUE_METADATA(BO)
 #endif

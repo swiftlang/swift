@@ -186,6 +186,8 @@ static bool canonicalizeInputFunction(Function &F) {
     case RT_Unknown:
     case RT_UnknownRetain:
     case RT_UnknownRelease:
+    case RT_BridgeRetain:
+    case RT_BridgeRelease:
     case RT_AllocObject:
     case RT_FixLifetime:
     case RT_NoMemoryAccessed:
@@ -351,6 +353,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       continue;
 
     case RT_UnknownRelease:
+    case RT_BridgeRelease:
     case RT_ObjCRelease:
     case RT_Release: {
       // If we get to a release, we can generally ignore it and scan past it.
@@ -371,6 +374,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     }
 
     case RT_UnknownRetain:
+    case RT_BridgeRetain:
     case RT_ObjCRetain:
     case RT_RetainNoResult: {  // swift_retain_noresult(obj)
       CallInst &Retain = cast<CallInst>(*BBI);
@@ -486,6 +490,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
         
     case RT_RetainNoResult:
     case RT_UnknownRetain:
+    case RT_BridgeRetain:
     case RT_ObjCRetain: {  // swift_retain_noresult(obj)
       //CallInst &ThisRetain = cast<CallInst>(CurInst);
       //Value *ThisRetainedObject = ThisRetain.getArgOperand(0);
@@ -497,6 +502,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     }
       
     case RT_UnknownRelease:
+    case RT_BridgeRelease:
     case RT_ObjCRelease:
     case RT_Release: {
       // If we get to a release that is provably to this object, then we can zap
@@ -614,6 +620,7 @@ static DtorKind analyzeDestructor(Value *P) {
         continue;
           
       case RT_Retain:                // x = swift_retain(y)
+      case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
       case RT_RetainAndReturnThree:  // swift_retainAndReturnThree(obj,a,b,c)
       case RT_RetainNoResult: {      // swift_retain_noresult(obj)
 
@@ -642,6 +649,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_ObjCRetain:
       case RT_UnknownRetain:
       case RT_UnknownRelease:
+      case RT_BridgeRelease:
         // Objective-C retain and release can have arbitrary side effects.
         break;
           
@@ -743,6 +751,8 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     case RT_ObjCRetain:
     case RT_UnknownRetain:
     case RT_UnknownRelease:
+    case RT_BridgeRetain:
+    case RT_BridgeRelease:
 
       // Otherwise, this really is some unhandled instruction.  Bail out.
       return false;
@@ -1134,6 +1144,8 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       case RT_NoMemoryAccessed:
       case RT_UnknownRelease:
       case RT_UnknownRetain:
+      case RT_BridgeRelease:
+      case RT_BridgeRetain:
       case RT_ObjCRelease:
       case RT_ObjCRetain:  // TODO: Could chain together objc_retains.
         // Remember returns in the first pass.

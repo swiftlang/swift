@@ -652,6 +652,7 @@ extern "C" const ExtraInhabitantsValueWitnessTable _TWVBo; // Builtin.NativeObje
 #if SWIFT_OBJC_INTEROP
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBO; // Builtin.UnknownObject
+extern "C" const ValueWitnessTable _TWVBb; // Builtin.BridgeObject
 #endif
 
 // The () -> () table can be used for arbitrary function types.
@@ -742,6 +743,10 @@ static const uintptr_t SwiftSpareBitsMask =
   SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK;
 static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK;
+static const uintptr_t SwiftReservedBitPatternMask =
+  SWIFT_ABI_X86_64_SWIFT_RESERVED_BIT_PATTERN_MASK;
+static const uintptr_t SwiftReservedBitPatternValue =
+  SWIFT_ABI_X86_64_SWIFT_RESERVED_BIT_PATTERN_VALUE;
 static const unsigned ObjCReservedLowBits =
   SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS;
 
@@ -760,6 +765,10 @@ static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK;
 static const unsigned ObjCReservedLowBits =
   SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS;
+static const uintptr_t SwiftReservedBitPatternMask =
+  SWIFT_ABI_ARM64_SWIFT_RESERVED_BIT_PATTERN_MASK;
+static const uintptr_t SwiftReservedBitPatternValue =
+  SWIFT_ABI_ARM64_SWIFT_RESERVED_BIT_PATTERN_VALUE;
 
 #else
 
@@ -778,6 +787,10 @@ static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
 static const unsigned ObjCReservedLowBits =
   SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
+static const uintptr_t SwiftReservedBitPatternMask =
+  SWIFT_ABI_DEFAULT_SWIFT_RESERVED_BIT_PATTERN_MASK;
+static const uintptr_t SwiftReservedBitPatternValue =
+  SWIFT_ABI_DEFAULT_SWIFT_RESERVED_BIT_PATTERN_VALUE;
 
 #endif
 
@@ -905,6 +918,7 @@ extern "C" const FullOpaqueMetadata _TMdBi32_;     // Builtin.Int32
 extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
 extern "C" const FullOpaqueMetadata _TMdBi128_;    // Builtin.Int128
 extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.NativeObject
+extern "C" const FullOpaqueMetadata _TMdBb;        // Builtin.BridgeObject
 extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.UnknownObject
 
 /// The prefix on a heap metadata.

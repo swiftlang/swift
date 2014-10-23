@@ -398,3 +398,18 @@ func reinterpretAddrOnlyLoadable<T>(a: Int, b: T) -> (T, Int) {
   // CHECK: load [[RES]]
           Builtin.reinterpretCast(b) as Int)
 }
+
+// CHECK-LABEL: sil hidden @_TF8builtins18castToBridgeObjectFTCS_1CBw_Bb
+// CHECK:         [[BO:%.*]] = ref_to_bridge_object {{%.*}} : $C, {{%.*}} : $Builtin.Word
+// CHECK:         return [[BO]]
+func castToBridgeObject(c: C, w: Builtin.Word) -> Builtin.BridgeObject {
+  return Builtin.castToBridgeObject(c, w)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins20castFromBridgeObjectFBbTCS_1CBw_
+// CHECK:         bridge_object_to_ref [[BO:%.*]] : $Builtin.BridgeObject to $C
+// CHECK:         bridge_object_to_word [[BO:%.*]] : $Builtin.BridgeObject to $Builtin.Word
+func castFromBridgeObject(bo: Builtin.BridgeObject) -> (C, Builtin.Word) {
+  return (Builtin.castReferenceFromBridgeObject(bo),
+          Builtin.castBitPatternFromBridgeObject(bo))
+}

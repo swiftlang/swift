@@ -226,6 +226,7 @@ namespace {
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinNativeObject, Reference)
+    IMPL(BuiltinBridgeObject, Reference)
     IMPL(BuiltinUnknownObject, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(Class, Reference)

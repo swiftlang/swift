@@ -418,22 +418,14 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   ClassDecl *LTyClass = LTy.getClassOrBoundGenericClass();
 
-  // If RTy is a Builtin unknown object address type...
-  if (RTy.is<BuiltinUnknownObjectType>()) {
-    // And LTy is a swift class address type, they can not alias since swift
-    // classes and objective-c classes are allocated differently.
-    if (LTyClass)
-      return false;
-
-    // Otherwise bail and assume that the two values can alias.
+  // The Builtin reference types can alias any class instance.
+  if (RTy.is<BuiltinUnknownObjectType>() && LTyClass)
     return true;
-  }
-
-  // If RTy is a Builtin Native Object Type, since Builtin Native Object is the
-  // root of the class hierarchy, it may alias any class.
   if (RTy.is<BuiltinNativeObjectType>() && LTyClass)
     return true;
-
+  if (RTy.is<BuiltinBridgeObjectType>() && LTyClass)
+    return true;
+  
   // If one type is an aggregate and it contains the other type then the record
   // reference may alias the aggregate reference.
   if (LTy.aggregateContainsRecord(RTy, Mod) ||

@@ -48,6 +48,7 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
 #undef TYPE
 
   // BuiltinNativeObject
+  // BuiltinBridgeObject
   // BuiltinUnknownObject
   // Class
   // BoundGenericClass

@@ -1468,6 +1468,9 @@ private:
       if (c == 'o')
         return NodeFactory::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.NativeObject");
+      if (c == 'b')
+        return NodeFactory::create(Node::Kind::BuiltinTypeName,
+                                     "Builtin.BridgeObject");
       if (c == 'p')
         return NodeFactory::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.RawPointer");

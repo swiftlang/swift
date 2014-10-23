@@ -1770,6 +1770,38 @@ public:
                             AI->getType().getASTContext().TheRawPointerType),
             "raw-pointer-to-ref operand must be NativeObject");
   }
+  
+  void checkRefToBridgeObjectInst(RefToBridgeObjectInst *RI) {
+    require(RI->getConverted().getType().isObject(),
+            "ref_to_bridge_object must convert from a value");
+    require(RI->getConverted().getType().getSwiftRValueType()
+              ->isBridgeableObjectType(),
+            "ref_to_bridge_object must convert from a heap object ref");
+    require(RI->getBitsOperand().getType()
+              == SILType::getBuiltinWordType(F.getASTContext()),
+            "ref_to_bridge_object must take a Builtin.Word bits operand");
+    require(RI->getType() == SILType::getBridgeObjectType(F.getASTContext()),
+            "ref_to_bridge_object must produce a BridgeObject");
+  }
+  
+  void checkBridgeObjectToRefInst(BridgeObjectToRefInst *RI) {
+    require(RI->getConverted().getType()
+               == SILType::getBridgeObjectType(F.getASTContext()),
+            "bridge_object_to_ref must take a BridgeObject");
+    require(RI->getType().isObject(),
+            "bridge_object_to_ref must produce a value");
+    require(RI->getType().getSwiftRValueType()->isBridgeableObjectType(),
+            "bridge_object_to_ref must produce a heap object reference");
+  }
+  void checkBridgeObjectToWordInst(BridgeObjectToWordInst *RI) {
+    require(RI->getConverted().getType()
+               == SILType::getBridgeObjectType(F.getASTContext()),
+            "bridge_object_to_word must take a BridgeObject");
+    require(RI->getType().isObject(),
+            "bridge_object_to_word must produce a value");
+    require(RI->getType() == SILType::getBuiltinWordType(F.getASTContext()),
+            "bridge_object_to_word must produce a Word");
+  }
 
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
     auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),

@@ -864,6 +864,18 @@ const LoadableTypeInfo &TypeConverter::getUnknownObjectTypeInfo() {
   return *UnknownObjectTI;
 }
 
+const LoadableTypeInfo &IRGenModule::getBridgeObjectTypeInfo() {
+  return Types.getBridgeObjectTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getBridgeObjectTypeInfo() {
+  if (BridgeObjectTI) return *BridgeObjectTI;
+  BridgeObjectTI = convertBuiltinBridgeObject();
+  BridgeObjectTI->NextConverted = FirstType;
+  FirstType = BridgeObjectTI;
+  return *BridgeObjectTI;
+}
+
 const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI) return *EmptyTI;
   EmptyTI = new EmptyTypeInfo(IGM.Int8Ty);
@@ -1292,6 +1304,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertBuiltinNativeObject();
   case TypeKind::BuiltinUnknownObject:
     return &getUnknownObjectTypeInfo();
+  case TypeKind::BuiltinBridgeObject:
+    return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:

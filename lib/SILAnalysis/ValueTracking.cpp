@@ -148,6 +148,9 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::UnmanagedToRefInst:
   case ValueKind::UnownedToRefInst:
   case ValueKind::UpcastInst:
+  case ValueKind::RefToBridgeObjectInst:
+  case ValueKind::BridgeObjectToRefInst:
+  case ValueKind::BridgeObjectToWordInst:
     return true;
 
   case ValueKind::AssignInst:

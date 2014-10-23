@@ -218,6 +218,14 @@ public:
   void emitUnknownUnownedRetain(llvm::Value *value);
   void emitUnknownUnownedRelease(llvm::Value *value);
   void emitUnknownRetainUnowned(llvm::Value *value);
+  /// Emit a retain of a class instance with bridge retain semantics.
+  void emitBridgeRetain(llvm::Value *value, Explosion &explosion);
+  /// Emit a retain of a class instance with bridge retain semantics, and
+  /// return the retained value.
+  llvm::Value *emitBridgeRetainCall(llvm::Value *value);
+  /// Emit a release of a class instance with bridge retain semantics.
+  void emitBridgeRelease(llvm::Value *value);
+  void emitBridgeRetainUnowned(llvm::Value *value);
   void emitUnknownWeakDestroy(Address addr);
   void emitUnknownWeakCopyInit(Address destAddr, Address srcAddr);
   void emitUnknownWeakTakeInit(Address destAddr, Address srcAddr);

@@ -413,6 +413,36 @@ void swift::swift_unknownRelease(void *object) {
   return objc_release((id) object);
 }
 
+void *swift::swift_bridgeObjectRetain(void *object) {
+  if (isObjCTaggedPointerOrNull(object))
+    return object;
+
+  // Mask out the spare bits, which may store arbitrary data.
+  uintptr_t objectRef = uintptr_t(object)
+    & ~heap_object_abi::SwiftSpareBitsMask;
+
+  // BridgeObject uses the Swift-reserved bit to tag objects with native
+  // refcounting.
+  if (uintptr_t(object) & heap_object_abi::SwiftReservedBitPatternValue)
+    return swift_retain((HeapObject*) objectRef);
+  return objc_retain((id) objectRef);
+}
+
+void swift::swift_bridgeObjectRelease(void *object) {
+  if (isObjCTaggedPointerOrNull(object))
+    return;
+
+  // Mask out the spare bits, which may store arbitrary data.
+  uintptr_t objectRef = uintptr_t(object)
+    & ~heap_object_abi::SwiftSpareBitsMask;
+
+  // BridgeObject uses the Swift-reserved bit to tag objects with native
+  // refcounting.
+  if (uintptr_t(object) & heap_object_abi::SwiftReservedBitPatternValue)
+    return swift_release((HeapObject*) objectRef);
+  return objc_release((id) objectRef);
+}
+
 void swift::swift_unknownRetainUnowned(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (usesNativeSwiftReferenceCounting_allocated(object))

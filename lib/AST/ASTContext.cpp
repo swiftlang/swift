@@ -312,6 +312,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheNativeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinNativeObjectType(*this)),
+    TheBridgeObjectType(new (*this, AllocationArena::Permanent)
+                           BuiltinBridgeObjectType(*this)),
     TheUnknownObjectType(new (*this, AllocationArena::Permanent)
                          BuiltinUnknownObjectType(*this)),
     TheRawPointerType(new (*this, AllocationArena::Permanent)

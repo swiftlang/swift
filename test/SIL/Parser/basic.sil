@@ -1110,6 +1110,20 @@ entry(%0 : $Class1):
   return %3 : $(Class2, Int)
 }
 
+// CHECK-LABEL: sil @bridge_object : $@thin (@owned Class1, Builtin.Word) -> () {
+// CHECK-NEXT:  bb0([[X:%.*]] : $Class1, [[W:%.*]] : $Builtin.Word):
+// CHECK-NEXT:    [[A:%.*]] = ref_to_bridge_object [[X]] : $Class1, [[W]] : $Builtin.Word
+// CHECK-NEXT:    [[B:%.*]] = bridge_object_to_ref [[A]] : $Builtin.BridgeObject to $Class1
+// CHECK-NEXT:    [[C:%.*]] = bridge_object_to_word [[A]] : $Builtin.BridgeObject to $Builtin.Word
+// CHECK-NEXT:    return undef : $()
+sil @bridge_object : $@thin (@owned Class1, Builtin.Word) -> () {
+entry(%x : $Class1, %w : $Builtin.Word):
+  %a = ref_to_bridge_object %x : $Class1, %w : $Builtin.Word
+  %b = bridge_object_to_ref %a : $Builtin.BridgeObject to $Class1
+  %c = bridge_object_to_word %a : $Builtin.BridgeObject to $Builtin.Word
+  return undef : $()
+}
+
 // CHECK-LABEL: sil [semantics "foo"] @test_semantics : $@thin () -> () {
 sil [semantics "foo"] @test_semantics : $@thin () -> () {
 bb0:

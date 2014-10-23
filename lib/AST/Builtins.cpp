@@ -74,6 +74,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheNativeObjectType;
   if (Name == "UnknownObject")
     return Context.TheUnknownObjectType;
+  if (Name == "BridgeObject")
+    return Context.TheBridgeObjectType;
   
   if (Name == "FPIEEE32")
     return Context.TheIEEE32Type;
@@ -629,6 +631,47 @@ static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
   TupleTypeElt ArgBodyElts[] = { ArgBody };
   return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, BodyResultTy, ParamList);
+}
+
+static ValueDecl *getCastToBridgeObjectOperation(ASTContext &C,
+                                                 Identifier Id) {
+  Type GenericTy;
+  Type ArchetypeTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(C);
+
+  Type BridgeTy = C.TheBridgeObjectType;
+  Type WordTy = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(), C);
+  TupleTypeElt ArgParamElts[] = { GenericTy, WordTy };
+  TupleTypeElt ArgBodyElts[] = { ArchetypeTy, WordTy };
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
+                                   BridgeTy, BridgeTy, ParamList);
+}
+
+static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
+                                                   Identifier Id,
+                                                   BuiltinValueKind BV) {
+  Type BridgeTy = C.TheBridgeObjectType;
+  TupleTypeElt ArgElts[] = { BridgeTy };
+  
+  switch (BV) {
+  case BuiltinValueKind::CastReferenceFromBridgeObject: {
+    Type GenericTy;
+    Type ArchetypeTy;
+    GenericParamList *ParamList;
+    std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(C);
+    return getBuiltinGenericFunction(Id, ArgElts, ArgElts,
+                                     GenericTy, ArchetypeTy, ParamList);
+  }
+
+  case BuiltinValueKind::CastBitPatternFromBridgeObject: {
+    Type WordTy = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(), C);
+    return getBuiltinFunction(Id, ArgElts, WordTy);
+  }
+      
+  default:
+    llvm_unreachable("not a cast from bridge object op");
+  }
 }
 
 static ValueDecl *getReinterpretCastOperation(ASTContext &Context,
@@ -1293,6 +1336,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::BridgeFromRawPointer:
     if (!Types.empty()) return nullptr;
     return getNativeObjectCast(Context, Id, BV);
+      
+  case BuiltinValueKind::CastToBridgeObject:
+    if (!Types.empty()) return nullptr;
+    return getCastToBridgeObjectOperation(Context, Id);
+  case BuiltinValueKind::CastReferenceFromBridgeObject:
+  case BuiltinValueKind::CastBitPatternFromBridgeObject:
+    if (!Types.empty()) return nullptr;
+    return getCastFromBridgeObjectOperation(Context, Id, BV);
       
   case BuiltinValueKind::ReinterpretCast:
     if (!Types.empty()) return nullptr;

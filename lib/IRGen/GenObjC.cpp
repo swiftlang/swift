@@ -217,6 +217,29 @@ const LoadableTypeInfo *TypeConverter::convertBuiltinUnknownObject() {
                           IGM.getPointerAlignment());
 }
 
+namespace {
+  /// A type info implementation for BridgeObject
+  class BridgeObjectTypeInfo : public HeapTypeInfo<BridgeObjectTypeInfo> {
+  public:
+    BridgeObjectTypeInfo(llvm::PointerType *storageType, Size size,
+                 llvm::BitVector spareBits, Alignment align)
+      : HeapTypeInfo(storageType, size, spareBits, align) {
+    }
+
+    /// Builtin.BridgeObject uses its own specialized refcounting implementation.
+    ReferenceCounting getReferenceCounting() const {
+      return ReferenceCounting::Bridge;
+    }
+  };
+}
+
+
+const LoadableTypeInfo *TypeConverter::convertBuiltinBridgeObject() {
+  return new BridgeObjectTypeInfo(IGM.BridgeObjectPtrTy, IGM.getPointerSize(),
+                                  /*spare bits*/ {},
+                                  IGM.getPointerAlignment());
+}
+
 const TypeInfo &IRGenModule::getObjCClassPtrTypeInfo() {
   return Types.getObjCClassPtrTypeInfo();
 }

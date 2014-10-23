@@ -213,6 +213,8 @@ IRGenModule::IRGenModule(ASTContext &Context,
 
   ObjCPtrTy = llvm::StructType::create(getLLVMContext(), "objc_object")
                 ->getPointerTo(DefaultAS);
+  BridgeObjectPtrTy = llvm::StructType::create(getLLVMContext(), "swift.bridge")
+                ->getPointerTo(DefaultAS);
 
   ObjCClassStructTy = llvm::StructType::create(LLVMContext, "objc_class");
   ObjCClassPtrTy = ObjCClassStructTy->getPointerTo(DefaultAS);

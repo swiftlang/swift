@@ -180,6 +180,32 @@ BUILTIN_SIL_OPERATION(CastToNativeObject, "castToNativeObject", Special)
 /// CastFromNativeObject has type (Builtin.NativeObject) -> T
 BUILTIN_SIL_OPERATION(CastFromNativeObject, "castFromNativeObject", Special)
 
+/// CastToBridgeObject has type (T, Builtin.Word) -> Builtin.BridgeObject.
+/// It sets the BridgeObject to the bitwise OR of its operands.
+/// It is assumed that
+///
+///   castReferenceFromBridgeObject(castToBridgeObject(ref, x)) === ref
+///
+/// regardless of what x is.
+/// x thus must not have any bits set that would change the heap
+/// object pointer value, nor may it have the native/ObjC discriminator bit set,
+/// nor may it have any bits set if the first operand is an ObjC tagged pointer,
+/// or else undefined behavior will ensue.
+BUILTIN_SIL_OPERATION(CastToBridgeObject, "castToBridgeObject", Special)
+
+/// CastReferenceFromBridgeObject has type (Builtin.BridgeObject) -> T.
+/// It recovers the heap object reference by masking spare bits from the
+/// BridgeObject.
+BUILTIN_SIL_OPERATION(CastReferenceFromBridgeObject,
+                      "castReferenceFromBridgeObject",
+                      Special)
+
+/// CastBitPatternFromBridgeObject has type (Builtin.BridgeObject) -> Builtin.Word.
+/// It presents the raw bit pattern of the BridgeObject as
+BUILTIN_SIL_OPERATION(CastBitPatternFromBridgeObject,
+                      "castBitPatternFromBridgeObject",
+                      Special)
+
 /// BridgeToRawPointer has type (T) -> Builtin.RawPointer
 BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 

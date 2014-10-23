@@ -317,6 +317,21 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
   }
 };
 
+/// A box implementation class for BridgeObject.
+struct BridgeObjectBox :
+    RetainableBoxBase<BridgeObjectBox, void*> {
+  // TODO: Enable the nil extra inhabitant.
+  static constexpr unsigned numExtraInhabitants = 0;
+      
+  static void *retain(void *obj) {
+    return swift_bridgeObjectRetain(obj);
+  }
+
+  static void release(void *obj) {
+    swift_bridgeObjectRelease(obj);
+  }
+};
+  
 /// A box implementation class for unmanaged, pointer-aligned pointers.
 /// Metatype values have this layout.
 struct PointerPointerBox : NativeBox<void**> {

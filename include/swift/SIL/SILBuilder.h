@@ -360,6 +360,31 @@ public:
                                                      SILType Ty) {
     return insert(new (F.getModule()) UncheckedRefBitCastInst(Loc, Op, Ty));
   }
+  
+  RefToBridgeObjectInst *createRefToBridgeObject(SILLocation Loc,
+                                                 SILValue Ref,
+                                                 SILValue Bits) {
+    auto Ty = SILType::getBridgeObjectType(getASTContext());
+    return insert(new (F.getModule()) RefToBridgeObjectInst(Loc, Ref, Bits, Ty));
+  }
+  
+  BridgeObjectToRefInst *createBridgeObjectToRef(SILLocation Loc,
+                                                 SILValue Op,
+                                                 SILType Ty) {
+    return insert(new (F.getModule()) BridgeObjectToRefInst(Loc, Op, Ty));
+  }
+
+  BridgeObjectToWordInst *createBridgeObjectToWord(SILLocation Loc,
+                                                   SILValue Op) {
+    auto Ty = SILType::getBuiltinWordType(getASTContext());
+    return createBridgeObjectToWord(Loc, Op, Ty);
+  }
+  
+  BridgeObjectToWordInst *createBridgeObjectToWord(SILLocation Loc,
+                                                   SILValue Op,
+                                                   SILType Ty) {
+    return insert(new (F.getModule()) BridgeObjectToWordInst(Loc, Op, Ty));
+  }
 
   RefToRawPointerInst *createRefToRawPointer(SILLocation Loc, SILValue Op,
                                              SILType Ty) {

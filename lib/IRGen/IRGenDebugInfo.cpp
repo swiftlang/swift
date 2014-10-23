@@ -1453,6 +1453,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createObjectPointerType(PTy);
   }
 
+  case TypeKind::BuiltinBridgeObject: {
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
+    auto PTy = DBuilder.createPointerType(llvm::DIType(), PtrSize, PtrAlign,
+                                          MangledName);
+    return DBuilder.createObjectPointerType(PTy);
+  }
+
   case TypeKind::BuiltinRawPointer: {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
     unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);

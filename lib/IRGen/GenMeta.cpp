@@ -515,6 +515,10 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
+    llvm::Value *visitBuiltinBridgeObjectType(CanBuiltinBridgeObjectType type) {
+      return emitDirectMetadataRef(type);
+    }
+
     llvm::Value *visitBuiltinUnknownObjectType(CanBuiltinUnknownObjectType type) {
       return emitDirectMetadataRef(type);
     }

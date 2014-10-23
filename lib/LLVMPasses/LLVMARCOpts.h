@@ -52,6 +52,12 @@ enum RT_Kind {
   /// void swift_fixLifetime(%swift.refcounted* %P)
   RT_FixLifetime,
 
+  /// void swift_bridgeRetain(%swift.refcounted* %P)
+  RT_BridgeRetain,
+
+  /// void swift_bridgeRelease(%swift.refcounted* %P)
+  RT_BridgeRelease,
+
   /// This is not a runtime function that we support.  Maybe it is not a call,
   /// or is a call to something we don't care about.
   RT_Unknown,
@@ -77,6 +83,8 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
     .Case("swift_retainAndReturnThree", RT_RetainAndReturnThree)
     .Case("objc_release", RT_ObjCRelease)
     .Case("objc_retain", RT_ObjCRetain)
+    .Case("swift_bridgeRetain", RT_BridgeRetain)
+    .Case("swift_bridgeRelease", RT_BridgeRelease)
     .Case("swift_unknownRetain", RT_UnknownRetain)
     .Case("swift_unknownRelease", RT_UnknownRelease)
     .Case("swift_fixLifetime", RT_FixLifetime)

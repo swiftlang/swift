@@ -86,6 +86,13 @@ enum class ReferenceCounting : unsigned char {
   /// FIXME: Those entry points are currently objc_retain/objc_release, which
   /// are not compatible with non-class heap objects.
   Unknown,
+
+  /// The object has an unknown reference counting implementation and
+  /// the reference value may contain extra bits that need to be masked.
+  ///
+  /// This uses maximally-compatible reference counting entry points in the
+  /// runtime, with a masking layer on top.
+  Bridge,
 };
   
 /// The kind of 'isa' encoding a heap object uses to reference its heap
@@ -126,6 +133,7 @@ public:
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
     case ReferenceCounting::Unknown:
+    case ReferenceCounting::Bridge:
       return false;
     }
   }
@@ -160,6 +168,8 @@ public:
       return IGF.emitBlockRelease(value);
     case ReferenceCounting::Unknown:
       return IGF.emitUnknownRelease(value);
+    case ReferenceCounting::Bridge:
+      return IGF.emitBridgeRelease(value);
     }
   }
 
@@ -171,6 +181,9 @@ public:
     switch (asDerived().getReferenceCounting()) {
     case ReferenceCounting::Native:
       IGF.emitRetainCall(value);
+      return;
+    case ReferenceCounting::Bridge:
+      IGF.emitBridgeRetainCall(value);
       return;
     case ReferenceCounting::ObjC:
       IGF.emitObjCRetainCall(value);
@@ -192,6 +205,8 @@ public:
     case ReferenceCounting::Block:
     case ReferenceCounting::Unknown:
       return IGF.emitUnknownRetainUnowned(value);
+    case ReferenceCounting::Bridge:
+      llvm_unreachable("not supported!");
     }
   }
 
@@ -203,6 +218,8 @@ public:
     case ReferenceCounting::Block:
     case ReferenceCounting::Unknown:
       return IGF.emitUnknownUnownedRelease(value);
+    case ReferenceCounting::Bridge:
+      llvm_unreachable("not supported!");
     }
   }
 
@@ -214,6 +231,8 @@ public:
     case ReferenceCounting::Block:
     case ReferenceCounting::Unknown:
       return IGF.emitUnknownUnownedRetain(value);
+    case ReferenceCounting::Bridge:
+      llvm_unreachable("not supported!");
     }
   }
 
@@ -248,6 +267,7 @@ public:
       return TC.createSwiftWeakStorageType(this->getStorageType());
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
+    case ReferenceCounting::Bridge:
     case ReferenceCounting::Unknown:
       return TC.createUnknownWeakStorageType(this->getStorageType());
     }
@@ -259,6 +279,7 @@ public:
       return TC.createSwiftUnownedStorageType(this->getStorageType());
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
+    case ReferenceCounting::Bridge:
     case ReferenceCounting::Unknown:
       return TC.createUnknownUnownedStorageType(this->getStorageType());
     }

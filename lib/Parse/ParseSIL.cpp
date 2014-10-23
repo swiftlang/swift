@@ -1149,6 +1149,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("autorelease_value", ValueKind::AutoreleaseValueInst)
     .Case("br", ValueKind::BranchInst)
     .Case("builtin", ValueKind::BuiltinInst)
+    .Case("bridge_object_to_ref", ValueKind::BridgeObjectToRefInst)
+    .Case("bridge_object_to_word", ValueKind::BridgeObjectToWordInst)
     .Case("checked_cast_br", ValueKind::CheckedCastBranchInst)
     .Case("checked_cast_addr_br", ValueKind::CheckedCastAddrBranchInst)
     .Case("class_method", ValueKind::ClassMethodInst)
@@ -1200,6 +1202,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
+    .Case("ref_to_bridge_object", ValueKind::RefToBridgeObjectInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
     .Case("ref_to_unmanaged", ValueKind::RefToUnmanagedInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
@@ -1835,6 +1838,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:
+  case ValueKind::BridgeObjectToRefInst:
+  case ValueKind::BridgeObjectToWordInst:
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
@@ -1887,6 +1892,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     case ValueKind::PointerToAddressInst:
       ResultVal = B.createPointerToAddress(InstLoc, Val, Ty);
       break;
+    case ValueKind::BridgeObjectToRefInst:
+      ResultVal = B.createBridgeObjectToRef(InstLoc, Val, Ty);
+      break;
+    case ValueKind::BridgeObjectToWordInst:
+      ResultVal = B.createBridgeObjectToWord(InstLoc, Val);
+      break;
     case ValueKind::RefToRawPointerInst:
       ResultVal = B.createRefToRawPointer(InstLoc, Val, Ty);
       break;
@@ -1923,6 +1934,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     break;
   }
+      
+  case ValueKind::RefToBridgeObjectInst: {
+    SILValue BitsVal;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(BitsVal))
+      return true;
+    ResultVal = B.createRefToBridgeObject(InstLoc, Val, BitsVal);
+    break;
+  }
+      
   // Indirect checked conversion instructions.
   case ValueKind::UnconditionalCheckedCastAddrInst:
   case ValueKind::CheckedCastAddrBranchInst: {

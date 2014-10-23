@@ -22,6 +22,10 @@ SILType SILType::getNativeObjectType(const ASTContext &C) {
   return SILType(CanType(C.TheNativeObjectType), SILValueCategory::Object);
 }
 
+SILType SILType::getBridgeObjectType(const ASTContext &C) {
+  return SILType(CanType(C.TheBridgeObjectType), SILValueCategory::Object);
+}
+
 SILType SILType::getUnknownObjectType(const ASTContext &C) {
   return getPrimitiveObjectType(CanType(C.TheUnknownObjectType));
 }
@@ -132,6 +136,8 @@ bool SILType::isHeapObjectReferenceType() const {
   if (getSwiftRValueType()->isBridgeableObjectType())
     return true;
   if (getSwiftRValueType()->isEqual(C.TheNativeObjectType))
+    return true;
+  if (getSwiftRValueType()->isEqual(C.TheBridgeObjectType))
     return true;
   if (getSwiftRValueType()->isEqual(C.TheUnknownObjectType))
     return true;

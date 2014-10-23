@@ -1981,6 +1981,10 @@ public:
     Printer << "Builtin.UnknownObject";
   }
 
+  void visitBuiltinBridgeObjectType(BuiltinBridgeObjectType *T) {
+    Printer << "Builtin.BridgeObject";
+  }
+  
   void visitBuiltinVectorType(BuiltinVectorType *T) {
     llvm::SmallString<32> UnderlyingStrVec;
     StringRef UnderlyingStr;

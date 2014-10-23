@@ -757,6 +757,20 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinNativeObjectType, BuiltinType);
 
+/// A type that contains an owning reference to a heap object packed with
+/// additional bits. The type uses a bit to discriminate native Swift objects
+/// from Objective-C object pointers or tagged pointers.
+class BuiltinBridgeObjectType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinBridgeObjectType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinBridgeObject, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinBridgeObject;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBridgeObjectType, BuiltinType);
+
 /// BuiltinUnknownObjectType - The builtin opaque Objective-C pointer type.
 /// Useful for pushing an Objective-C type through swift.
 class BuiltinUnknownObjectType : public BuiltinType {

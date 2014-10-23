@@ -246,9 +246,19 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ThinToThickFunctionInst:
     case ValueKind::ConvertFunctionInst:
 
+    case ValueKind::BridgeObjectToWordInst:
+      return InlineCost::Free;
+
+    // TODO: These are free if the metatype is for a Swift class.
     case ValueKind::ThickToObjCMetatypeInst:
     case ValueKind::ObjCToThickMetatypeInst:
-      return InlineCost::Free;
+      return InlineCost::Expensive;
+      
+    // TODO: Bridge object conversions imply a masking operation that should be
+    // "hella cheap" but not really expensive
+    case ValueKind::BridgeObjectToRefInst:
+    case ValueKind::RefToBridgeObjectInst:
+      return InlineCost::Expensive;
 
     case ValueKind::MetatypeInst:
       // Thin metatypes are always free.

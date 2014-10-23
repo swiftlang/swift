@@ -57,6 +57,7 @@ public:
     case TypeKind::BuiltinFloat:
     case TypeKind::BuiltinInteger:
     case TypeKind::BuiltinNativeObject:
+    case TypeKind::BuiltinBridgeObject:
     case TypeKind::BuiltinUnknownObject:
     case TypeKind::BuiltinRawPointer:
     case TypeKind::BuiltinVector:

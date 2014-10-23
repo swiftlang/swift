@@ -313,6 +313,8 @@ extern "C" void swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
 /// \param src - never null, but can refer to a null object
 extern "C" void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 
+extern "C" void *swift_bridgeObjectRetain(void *value);
+
 #if SWIFT_OBJC_INTEROP
 
 /// Increment the strong retain count of an object which might not be a native
@@ -326,6 +328,8 @@ static inline void swift_unknownRetain(void *value) {
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
+
+extern "C" void swift_bridgeObjectRelease(void *value);
 
 #if SWIFT_OBJC_INTEROP
 

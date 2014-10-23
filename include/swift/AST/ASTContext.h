@@ -491,6 +491,7 @@ public:
   const CanType TheErrorType;       /// TheErrorType - This is the error singleton.
   const CanType TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
   const CanType TheNativeObjectType; /// Builtin.NativeObject
+  const CanType TheBridgeObjectType; /// Builtin.BridgeObject
   const CanType TheUnknownObjectType; /// Builtin.UnknownObject
   const CanType TheRawPointerType;  /// Builtin.RawPointer
   

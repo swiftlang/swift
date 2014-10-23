@@ -85,6 +85,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   // These types are always class references.
   case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinNativeObject:
+  case TypeKind::BuiltinBridgeObject:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
     return true;
@@ -360,6 +361,7 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinNativeObject:
+  case TypeKind::BuiltinBridgeObject:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinVector:
   case TypeKind::Module:
