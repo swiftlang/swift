@@ -4514,9 +4514,9 @@ classifyEnum(const clang::EnumDecl *decl) {
   auto loc = decl->getLocStart();
   if (loc.isMacroID()) {
     StringRef MacroName = getClangPreprocessor().getImmediateMacroName(loc);
-    if (MacroName == "CF_ENUM")
+    if (MacroName == "CF_ENUM" || MacroName == "OBJC_ENUM")
       return EnumKind::Enum;
-    if (MacroName == "CF_OPTIONS")
+    if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS")
       return EnumKind::Options;
   }
   

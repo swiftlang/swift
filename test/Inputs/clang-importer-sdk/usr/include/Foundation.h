@@ -1,8 +1,10 @@
 #if __has_feature(modules)
 @import ObjectiveC;
+@import CoreFoundation;
 @import CoreGraphics;
 #else
 #import <objc/NSObject.h>
+#import <CoreFoundation.h>
 #import <CoreGraphics.h>
 #endif
 
@@ -153,8 +155,6 @@ typedef CGRect NSRect;
 // Enums.
 //===---
 
-#define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
-#define CF_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
 #define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
 #define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
 

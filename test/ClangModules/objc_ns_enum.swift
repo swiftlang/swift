@@ -50,3 +50,5 @@ URLOrUTI = .CFUTIKind
 
 let magnitude: Magnitude = .k2
 let magnitude2: MagnitudeWords = .Two
+
+let objcABI: objc_abi = .v2

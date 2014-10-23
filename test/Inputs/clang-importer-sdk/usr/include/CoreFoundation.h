@@ -5,3 +5,6 @@ typedef struct __CFTree *CFTreeRef;
 
 typedef signed long CFIndex;
 extern CFIndex CFIndex_test;
+
+#define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define CF_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
