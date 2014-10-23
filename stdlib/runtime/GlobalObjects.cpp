@@ -16,7 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "../shims/GlobalObjects.h"
-#include "swift/Runtime/FastEntryPoints.h"
 #include "swift/Runtime/Metadata.h"
 
 namespace swift {
@@ -28,8 +27,6 @@ extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
   // HeapObject header;
   {
     &_TMdCSs18_EmptyArrayStorage, // is-a pointer
-    RC_INTERVAL,                  // refcount
-    WRC_INTERVAL                  // weak refcount
   },
   
   // _SwiftArrayBodyStorage body;

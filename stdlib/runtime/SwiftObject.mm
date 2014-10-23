@@ -73,8 +73,8 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 #endif
 
 struct SwiftObject_s {
-  void *isa;
-  long refCount;
+  void *isa  __attribute__((unavailable));
+  long refCount  __attribute__((unavailable));
 };
 
 #if __has_attribute(objc_root_class)
@@ -751,7 +751,8 @@ unsigned char swift::_swift_isUniquelyReferenced_nonNull_native(
   const HeapObject* object
 ) {
   assert(object != nullptr);
-  return object->refCount < 2 * RC_INTERVAL;
+  assert(!object->refCount.isDeallocating());
+  return object->refCount.getCount() == 1;
 }
 
 // Given a non-@objc object reference, return true iff the
@@ -804,7 +805,7 @@ unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
   // lifetime, or lifetime managed outside the Swift object system.
   // In these cases we have to assume the data is shared among
   // multiple references, and needs to be copied before modification.
-  return object != nullptr && object->refCount < 2 * RC_INTERVAL;
+  return _swift_isUniquelyReferenced_native(object);
 }
 
 /// Returns class_getInstanceSize(c)

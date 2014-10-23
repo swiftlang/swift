@@ -49,9 +49,10 @@ _swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
   assert(isAlignmentMask(requiredAlignmentMask));
   auto object = reinterpret_cast<HeapObject *>(
                   swift_slowAlloc(requiredSize, requiredAlignmentMask));
+  // FIXME: this should be a placement new but that adds a null check
   object->metadata = metadata;
-  object->refCount = RC_INTERVAL;
-  object->weakRefCount = WRC_INTERVAL;
+  object->refCount.init();
+  object->weakRefCount.init();
   return object;
 }
 auto swift::_swift_allocObject = _swift_allocObject_;
@@ -252,7 +253,7 @@ void swift::swift_deallocPOD(HeapObject *obj) {
 
 // Forward-declare this, but define it after swift_release.
 extern "C" LLVM_LIBRARY_VISIBILITY
-void _swift_release_slow(HeapObject *object)
+void _swift_release_dealloc(HeapObject *object)
   __attribute__((noinline,used));
 
 void
@@ -260,9 +261,6 @@ swift::swift_retain_noresult(HeapObject *object) {
   swift_retain(object);
 }
 
-
-// These are implemented in FastEntryPoints.s on some platforms.
-#ifndef SWIFT_HAVE_FAST_ENTRY_POINTS
 
 HeapObject *swift::swift_retain(HeapObject *object) {
   return _swift_retain(object);
@@ -276,35 +274,26 @@ void swift::swift_release(HeapObject *object) {
   return _swift_release(object);
 }
 static void _swift_release_(HeapObject *object) {
-  if (object && (__sync_sub_and_fetch(&object->refCount, RC_INTERVAL) == 0)) {
-    if (__sync_bool_compare_and_swap(&object->refCount,
-                                     0, RC_DEALLOCATING_BIT)) {
-      _swift_release_slow(object);
-    }
+  if (object  &&  object->refCount.decrementShouldDeallocate()) {
+    _swift_release_dealloc(object);
   }
 }
 auto swift::_swift_release = _swift_release_;
 
 size_t swift::swift_retainCount(HeapObject *object) {
-  return object->refCount >> RC_INTERVAL_SHIFT;
+  return object->refCount.getCount();
 }
 
 void swift::swift_weakRetain(HeapObject *object) {
   if (!object) return;
 
-  // FIXME: should check carry bit
-  if (__sync_add_and_fetch(&object->weakRefCount, WRC_INTERVAL) < WRC_INTERVAL){
-    assert(0 && "weak retain count overflow");
-  }
+  object->weakRefCount.increment();
 }
 
 void swift::swift_weakRelease(HeapObject *object) {
   if (!object) return;
 
-  uint32_t newCount = __sync_sub_and_fetch(&object->weakRefCount, WRC_INTERVAL);
-  assert(newCount < (0U - uint32_t(WRC_INTERVAL)) &&
-         "weak retain count underflow");
-  if (newCount == 0) {
+  if (object->weakRefCount.decrementShouldDeallocate()) {
     // Only class objects can be weak-retained and weak-released.
     auto metadata = object->metadata;
     assert(metadata->isClassObject());
@@ -321,30 +310,23 @@ HeapObject *swift::swift_tryRetain(HeapObject *object) {
 static HeapObject *_swift_tryRetain_(HeapObject *object) {
   if (!object) return nullptr;
 
-  uint32_t newCount = __sync_add_and_fetch(&object->refCount, RC_INTERVAL);
-  assert(newCount >= RC_INTERVAL  &&  "retain count overflow");
-  if (newCount & RC_DEALLOCATING_BIT) {
-    __sync_fetch_and_sub(&object->refCount, RC_INTERVAL);
-    return nullptr;
-  }
-  return object;
+  if (object->refCount.tryIncrement()) return object;
+  else return nullptr;
 }
 auto swift::_swift_tryRetain = _swift_tryRetain_;
 
-#endif
 
 void swift::swift_retainUnowned(HeapObject *object) {
   if (!object) return;
-  assert((object->weakRefCount & WRC_MASK) &&
+  assert(object->weakRefCount.getCount() &&
          "object is not currently weakly retained");
 
-  uint32_t curCount = __sync_fetch_and_add(&object->refCount, RC_INTERVAL);
-  if (curCount & RC_DEALLOCATING_BIT)
+  if (! object->refCount.tryIncrement())
     _swift_abortRetainUnowned(object);
 }
 
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
-void _swift_release_slow(HeapObject *object) {
+void _swift_release_dealloc(HeapObject *object) {
   asFullMetadata(object->metadata)->destroy(object);
 }
 
@@ -361,7 +343,7 @@ void swift::_swift_deallocClassInstance(HeapObject *self) {
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                 size_t allocatedAlignMask) {
   assert(isAlignmentMask(allocatedAlignMask));
-  assert(object->refCount == RC_DEALLOCATING_BIT);
+  assert(object->refCount.isDeallocating());
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
                   "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
@@ -434,7 +416,7 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
   // atomic decrement (and has the ability to reconstruct
   // allocatedSize and allocatedAlignMask).
 
-  if (object->weakRefCount == WRC_INTERVAL) {
+  if (object->weakRefCount.getCount() == 1) {
     swift_slowDealloc(object, allocatedSize, allocatedAlignMask);
   } else {
     swift_weakRelease(object);
@@ -461,7 +443,7 @@ void swift::swift_weakAssign(WeakReference *ref, HeapObject *newValue) {
 HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
   auto object = ref->Value;
   if (object == nullptr) return nullptr;
-  if (object->refCount & RC_DEALLOCATING_BIT) {
+  if (object->refCount.isDeallocating()) {
     swift_weakRelease(object);
     ref->Value = nullptr;
     return nullptr;
@@ -485,7 +467,7 @@ void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
   auto object = src->Value;
   if (object == nullptr) {
     dest->Value = nullptr;
-  } else if (object->refCount & RC_DEALLOCATING_BIT) {
+  } else if (object->refCount.isDeallocating()) {
     src->Value = nullptr;
     dest->Value = nullptr;
     swift_weakRelease(object);
@@ -498,7 +480,7 @@ void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
 void swift::swift_weakTakeInit(WeakReference *dest, WeakReference *src) {
   auto object = src->Value;
   dest->Value = object;
-  if (object != nullptr && object->refCount & RC_DEALLOCATING_BIT) {
+  if (object != nullptr && object->refCount.isDeallocating()) {
     dest->Value = nullptr;
     swift_weakRelease(object);
   }

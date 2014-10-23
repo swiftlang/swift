@@ -18,7 +18,6 @@
 #define SWIFT_RUNTIME_PRIVATE_H
 
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/FastEntryPoints.h"
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/Compiler.h"
 

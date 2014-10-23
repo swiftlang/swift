@@ -20,7 +20,6 @@
 #include <cstddef>
 #include <cstdint>
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/FastEntryPoints.h"
 
 // Bring in the definition of HeapObject 
 #include "../../../stdlib/shims/HeapObject.h"
@@ -153,7 +152,7 @@ extern "C" void swift_retain_noresult(HeapObject *object);
 
 static inline HeapObject *_swift_retain_inlined(HeapObject *object) {
   if (object) {
-    __sync_fetch_and_add(&object->refCount, RC_INTERVAL);
+    object->refCount.increment();
   }
   return object;
 }

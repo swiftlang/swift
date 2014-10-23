@@ -12,7 +12,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_HEAPOBJECT_H
 #define SWIFT_STDLIB_SHIMS_HEAPOBJECT_H
 
-#include <stdint.h>
+#include "RefCount.h"
 
 #ifdef __cplusplus
 namespace swift {
@@ -23,8 +23,8 @@ struct HeapMetadata;
 // The members of the HeapObject header that are not shared by a
 // standard Objective-C instance
 #define SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS       \
-  uint32_t refCount;                            \
-  uint32_t weakRefCount
+  StrongRefCount refCount;                      \
+  WeakRefCount weakRefCount
 
 /// The Swift heap-object header.
 struct HeapObject {
@@ -33,6 +33,15 @@ struct HeapObject {
 
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
   // FIXME: allocate two words of metadata on 32-bit platforms
+
+#ifdef __cplusplus
+  // Initialize a HeapObject header as appropriate for a newly-allocated object.
+  constexpr HeapObject(HeapMetadata const *newMetadata) 
+    : metadata(newMetadata)
+    , refCount()
+    , weakRefCount() 
+  { }
+#endif
 };
 
 #ifdef __cplusplus
