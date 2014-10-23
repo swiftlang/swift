@@ -61,81 +61,6 @@ static bool dominatesArgument(DominanceInfo *DI, SILArgument *A,
   return DI->dominates(OtherBB, A->getParent());
 }
 
-/// Return the underlying SILValue after stripping off SILArguments that can not
-/// affect RC identity if our BB has only one predecessor.
-SILValue
-RCIdentityAnalysis::
-stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
-  auto *A = dyn_cast<SILArgument>(V);
-  if (!A) {
-    return SILValue();
-  }
-
-  // If we already visited this BB, don't reprocess it since we have a cycle.
-  if (!VisitedArgs.insert(A).second) {
-    return SILValue();
-  }
-
-  // Ok, this is the first time that we have visited this BB. Get the
-  // SILArgument's incoming values. If we don't have an incoming value for each
-  // one of our predecessors, just return SILValue().
-  llvm::SmallVector<SILValue, 8> IncomingValues;
-  if (!A->getIncomingValues(IncomingValues) || IncomingValues.empty()) {
-    return SILValue();
-  }
-
-  unsigned IVListSize = IncomingValues.size();
-
-  // If we only have one incoming value, just return the identity root of that
-  // incoming value. There can be no loop problems.
-  if (IVListSize == 1) {
-    return getRCIdentityRootInner(IncomingValues[0], RecursionDepth+1);
-  }
-
-  // Ok, we have multiple predecessors. First find the first non-payloaded enum.
-  unsigned i = 0;
-  for (; i < IVListSize && isNoPayloadEnum(IncomingValues[i]); ++i) {}
-
-  // If we did not find any non-payloaded enum, there is no RC associated with
-  // this Phi node. Just return SILValue().
-  if (i == IVListSize)
-    return SILValue();
-
-  // Then make sure that this incoming value is from a BB which is different
-  // from our BB and dominates our BB. Otherwise, just return SILValue() there
-  // is nothing we can do hter.
-  DominanceInfo *DI = DA->getDomInfo(A->getFunction());
-  if (!dominatesArgument(DI, A, IncomingValues[i]))
-    return SILValue();
-
-  // Ok, it is safe to continue stripping from this argument. Perform the
-  // recursive stripping.
-  SILValue FirstIV = getRCIdentityRootInner(IncomingValues[i],
-                                            RecursionDepth+1);
-  while (i < IVListSize) {
-    SILValue IV = IncomingValues[i++];
-
-    // If IV is a no payload enum, we don't care about it. Skip it.
-    if (isNoPayloadEnum(IV))
-      continue;
-
-    // Then make sure that this incoming value is from a BB which is different
-    // from our BB and dominates our BB. Otherwise, just return SILValue() there
-    // is nothing we can do hter.
-    if (!dominatesArgument(DI, A, IV))
-      return SILValue();
-
-    // Ok, it is safe to continue stripping incoming values. Perform the
-    // stripping and check if the stripped value equals FirstIV. If it is not
-    // so, then bail. We found a conflicting value in our merging.
-    if (getRCIdentityRootInner(IV, RecursionDepth+1) != FirstIV)
-      return SILValue();
-  }
-
-  // Ok all our values match! Return FirstIV.
-  return FirstIV;
-}
-
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
   if (isRCIdentityPreservingCast(V->getKind()))
@@ -181,6 +106,90 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
       return NewValue;
 
   return SILValue();
+}
+
+/// Return the underlying SILValue after stripping off SILArguments that can not
+/// affect RC identity if our BB has only one predecessor.
+SILValue
+RCIdentityAnalysis::
+stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
+  auto *A = dyn_cast<SILArgument>(V);
+  if (!A) {
+    return SILValue();
+  }
+
+  // If we already visited this BB, don't reprocess it since we have a cycle.
+  if (!VisitedArgs.insert(A).second) {
+    return SILValue();
+  }
+
+  // Ok, this is the first time that we have visited this BB. Get the
+  // SILArgument's incoming values. If we don't have an incoming value for each
+  // one of our predecessors, just return SILValue().
+  llvm::SmallVector<SILValue, 8> IncomingValues;
+  if (!A->getIncomingValues(IncomingValues) || IncomingValues.empty()) {
+    return SILValue();
+  }
+
+  unsigned IVListSize = IncomingValues.size();
+
+  // If we only have one incoming value, just return the identity root of that
+  // incoming value. There can be no loop problems.
+  if (IVListSize == 1) {
+    return getRCIdentityRootInner(IncomingValues[0], RecursionDepth+1);
+  }
+
+  // Ok, we have multiple predecessors. First find the first non-payloaded enum.
+  unsigned i = 0;
+  for (; i < IVListSize && isNoPayloadEnum(IncomingValues[i]); ++i) {}
+
+  // If we did not find any non-payloaded enum, there is no RC associated with
+  // this Phi node. Just return SILValue().
+  if (i == IVListSize)
+    return SILValue();
+
+  SILValue FirstIV = IncomingValues[i];
+
+  // Strip off any non-argument instructions from IV. We know that 
+  while (SILValue NewIV = stripRCIdentityPreservingInsts(FirstIV))
+    FirstIV = NewIV;
+
+  // Then make sure that this incoming value is from a BB which is different
+  // from our BB and dominates our BB. Otherwise, just return SILValue() there
+  // is nothing we can do hter.
+  DominanceInfo *DI = DA->getDomInfo(A->getFunction());
+  if (!dominatesArgument(DI, A, FirstIV))
+    return SILValue();
+
+  // Ok, it is safe to continue stripping from this argument. Perform the
+  // recursive stripping.
+  FirstIV = getRCIdentityRootInner(FirstIV, RecursionDepth+1);
+  while (i < IVListSize) {
+    SILValue IV = IncomingValues[i++];
+
+    // If IV is a no payload enum, we don't care about it. Skip it.
+    if (isNoPayloadEnum(IV))
+      continue;
+
+    // Strip off any non-argument instructions from IV. We know that 
+    while (SILValue NewIV = stripRCIdentityPreservingInsts(IV))
+      IV = NewIV;
+
+    // Then make sure that this incoming value is from a BB which is different
+    // from our BB and dominates our BB. Otherwise, just return SILValue() there
+    // is nothing we can do hter.
+    if (!dominatesArgument(DI, A, IV))
+      return SILValue();
+
+    // Ok, it is safe to continue stripping incoming values. Perform the
+    // stripping and check if the stripped value equals FirstIV. If it is not
+    // so, then bail. We found a conflicting value in our merging.
+    if (getRCIdentityRootInner(IV, RecursionDepth+1) != FirstIV)
+      return SILValue();
+  }
+
+  // Ok all our values match! Return FirstIV.
+  return FirstIV;
 }
 
 SILValue
