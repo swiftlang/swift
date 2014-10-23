@@ -237,3 +237,153 @@ bb0(%0 : $FakeOptional<Builtin.NativeObject>):
   %6 = tuple()
   return %6 : $()
 }
+
+// CHECK-LABEL: sil @dont_strip_phi_nodes_over_backedges_1bb : $@thin () -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @dont_strip_phi_nodes_over_backedges_1bb : $@thin () -> () {
+bb0:
+  %0 = enum $FakeOptional<Cls>, #FakeOptional.None!enumelt
+  br bb1(%0 : $FakeOptional<Cls>)
+
+bb1(%1 : $FakeOptional<Cls>):
+  %2 = alloc_ref $Cls
+  retain_value %2 : $Cls
+  release_value %1 : $FakeOptional<Cls>
+  %3 = enum $FakeOptional<Cls>, #FakeOptional.Some!enumelt.1, %2 : $Cls
+  cond_br undef, bb1(%3 : $FakeOptional<Cls>), bb2
+
+bb2:
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @dont_strip_phi_nodes_over_backedges_multibb1 : $@thin () -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @dont_strip_phi_nodes_over_backedges_multibb1 : $@thin () -> () {
+bb0:
+  %0 = enum $FakeOptional<Cls>, #FakeOptional.None!enumelt
+  br bb1(%0 : $FakeOptional<Cls>)
+
+bb1(%1 : $FakeOptional<Cls>):
+  %2 = alloc_ref $Cls
+  retain_value %2 : $Cls
+  br bb2
+
+bb2:
+  release_value %1 : $FakeOptional<Cls>
+  %3 = enum $FakeOptional<Cls>, #FakeOptional.Some!enumelt.1, %2 : $Cls
+  br bb3
+
+bb3:
+  cond_br undef, bb1(%3 : $FakeOptional<Cls>), bb4
+
+bb4:
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @dont_strip_phi_nodes_over_backedges_multibb2 : $@thin () -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @dont_strip_phi_nodes_over_backedges_multibb2 : $@thin () -> () {
+bb0:
+  %0 = enum $FakeOptional<Cls>, #FakeOptional.None!enumelt
+  br bb1(%0 : $FakeOptional<Cls>)
+
+bb1(%1 : $FakeOptional<Cls>):
+  br bb2
+
+bb2:
+  %2 = alloc_ref $Cls
+  retain_value %2 : $Cls
+  release_value %1 : $FakeOptional<Cls>
+  %3 = enum $FakeOptional<Cls>, #FakeOptional.Some!enumelt.1, %2 : $Cls
+  br bb3
+
+bb3:
+  cond_br undef, bb1(%3 : $FakeOptional<Cls>), bb4
+
+bb4:
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @dont_strip_phi_nodes_over_backedges_multibb3 : $@thin () -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @dont_strip_phi_nodes_over_backedges_multibb3 : $@thin () -> () {
+bb0:
+  %0 = enum $FakeOptional<Cls>, #FakeOptional.None!enumelt
+  br bb1(%0 : $FakeOptional<Cls>)
+
+bb1(%1 : $FakeOptional<Cls>):
+  br bb2
+
+bb2:
+  %2 = alloc_ref $Cls
+  retain_value %2 : $Cls
+  br bb3
+
+bb3:
+  release_value %1 : $FakeOptional<Cls>
+  %3 = enum $FakeOptional<Cls>, #FakeOptional.Some!enumelt.1, %2 : $Cls
+  cond_br undef, bb1(%3 : $FakeOptional<Cls>), bb4
+
+bb4:
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @dont_strip_phi_nodes_over_backedges_multibb4 : $@thin () -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @dont_strip_phi_nodes_over_backedges_multibb4 : $@thin () -> () {
+bb0:
+  %0 = enum $FakeOptional<Cls>, #FakeOptional.None!enumelt
+  br bb1(%0 : $FakeOptional<Cls>)
+
+bb1(%1 : $FakeOptional<Cls>):
+  br bb2
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = alloc_ref $Cls
+  retain_value %2 : $Cls
+  release_value %1 : $FakeOptional<Cls>
+  %3 = enum $FakeOptional<Cls>, #FakeOptional.Some!enumelt.1, %2 : $Cls
+  cond_br undef, bb1(%3 : $FakeOptional<Cls>), bb4
+
+bb4:
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @dont_strip_phi_nodes_over_backedges_multibb5 : $@thin () -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @dont_strip_phi_nodes_over_backedges_multibb5 : $@thin () -> () {
+bb0:
+  %0 = enum $FakeOptional<Cls>, #FakeOptional.None!enumelt
+  br bb1(%0 : $FakeOptional<Cls>)
+
+bb1(%1 : $FakeOptional<Cls>):
+  %2 = alloc_ref $Cls
+  retain_value %2 : $Cls
+  br bb2
+
+bb2:
+  br bb3
+
+bb3:
+  release_value %1 : $FakeOptional<Cls>
+  %3 = enum $FakeOptional<Cls>, #FakeOptional.Some!enumelt.1, %2 : $Cls
+  cond_br undef, bb1(%3 : $FakeOptional<Cls>), bb4
+
+bb4:
+  %4 = tuple()
+  return %4 : $()
+}
