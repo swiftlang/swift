@@ -28,7 +28,7 @@ import Builtin
 // CHECK: @_TMPdV15generic_structs13SingleDynamic = global {{[{].*\* [}]}} {
 // -- template header
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[SINGLE_DYNAMIC_CREATE_METADATA:@create_generic_metadata[0-9]*]],
-// CHECK:   i32 240, i16 1, i16 8, [8 x i8*] zeroinitializer,
+// CHECK:   i32 240, i16 1, i16 8, [{{[0-9]+}} x i8*] zeroinitializer,
 // -- placeholder for vwtable pointer
 // CHECK:   i8* null,
 // -- address point

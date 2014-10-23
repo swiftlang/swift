@@ -1991,7 +1991,7 @@ namespace {
     SmallVector<FillOp, 8> FillOps;
 
     enum { TemplateHeaderFieldCount = 5 };
-    enum { NumPrivateDataWords = 8 };
+    enum { NumPrivateDataWords = swift::NumGenericMetadataPrivateDataWords };
     Size TemplateHeaderSize;
 
   protected:
@@ -2199,13 +2199,13 @@ namespace {
     /// Produce the initializer for the private-data field of the
     /// template header.
     llvm::Constant *getPrivateDataInit() {
-      // Spec'ed to be 8 pointers wide.  An arbitrary choice; should
-      // work out an ideal size with the runtime folks.
       auto null = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
       
-      llvm::Constant *privateData[NumPrivateDataWords] = {
-        null, null, null, null, null, null, null, null
-      };
+      llvm::Constant *privateData[NumPrivateDataWords];
+      
+      for (auto &element : privateData)
+        element = null;
+
       return makeArray(IGM.Int8PtrTy, privateData);
     }
   };

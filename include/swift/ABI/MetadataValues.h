@@ -136,6 +136,11 @@ inline ClassFlags &operator|=(ClassFlags &a, ClassFlags b) {
   return a = (a | b);
 }
 
+enum : unsigned {
+  /// Number of words reserved in generic metadata patterns.
+  NumGenericMetadataPrivateDataWords = 16,
+};
+  
 }
 
 #endif

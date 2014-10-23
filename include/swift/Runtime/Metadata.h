@@ -1775,7 +1775,7 @@ struct GenericMetadata {
 
   /// Data that the runtime can use for its own purposes.  It is guaranteed
   /// to be zero-filled by the compiler.
-  void *PrivateData[8];
+  void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
 
   // Here there is a variably-sized field:
   // char alignas(void*) MetadataTemplate[MetadataSize];
