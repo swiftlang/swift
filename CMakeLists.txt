@@ -232,11 +232,14 @@ set(SWIFTLIB_EXTRA_DEFAULT_COMPILE_FLAGS "" CACHE STRING
 set(SWIFTLIB_EXTRA_DEFAULT_LINK_FLAGS "" CACHE STRING
   "Extra link flags to pass when building the default (OS X) target library")
 
-# Find the 'clang' executable.
-if ( PATH_TO_CLANG_BUILD STREQUAL "" )
-   set(CLANG_EXEC "swift")
-else()
-   set(CLANG_EXEC "${PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/bin/clang")
+# Find the 'clang' executable for compiling API notes.
+set (CLANG_APINOTES "" CACHE FILEPATH "Path to Clang executable to be used for compling API notes")
+if ( CLANG_APINOTES STREQUAL "" )
+  if ( PATH_TO_CLANG_BUILD STREQUAL "" )
+     set(CLANG_APINOTES "clang")
+  else()
+     set(CLANG_APINOTES "${PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/bin/clang")
+  endif()
 endif()
 
 set(PATH_TO_SWIFT_BUILD "" CACHE FILEPATH "Path to existing Swift build")
@@ -534,7 +537,7 @@ function(compile_swift_files)
       endif()
         
       list(APPEND create_apinotes
-        COMMAND ${CLANG_EXEC} -cc1apinotes -yaml-to-binary -o ${apinote_file} ${apinote_target} ${apinote_input_file}
+        COMMAND ${CLANG_APINOTES} -cc1apinotes -yaml-to-binary -o ${apinote_file} ${apinote_target} ${apinote_input_file}
         DEPENDS ${apinote_input_file})
 
       list(APPEND apinote_files ${apinote_file})
