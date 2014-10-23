@@ -1367,10 +1367,11 @@ endmacro(add_swift_library)
 #                                     # the ALL_BUILD target
 #     [OPT_FLAGS]                     # Optimization flags (overrides SWIFT_OPTIMIZE)
 #     [DONT_STRIP_NON_MAIN_SYMBOLS]   # Should we not strip non main symbols. 
+#     [DISABLE_ASLR]                  # Should we compile with -Wl,-no_pie so ASLR is disabled?
 #     source1 [source2 source3 ...])  # Sources to add into this library
 macro(add_swift_executable name)
   # Parse the arguments we were given.
-  parse_arguments(SWIFTEXE  "DEPENDS;COMPONENT_DEPENDS;OPT_FLAGS" "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS"
+  parse_arguments(SWIFTEXE  "DEPENDS;COMPONENT_DEPENDS;OPT_FLAGS" "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
     ${ARGN})
   set(SWIFTEXE)
   
@@ -1406,6 +1407,11 @@ macro(add_swift_executable name)
   target_link_libraries( ${name} ${SWIFTEXE_DEPENDS} )
   llvm_config( ${name} ${SWIFTEXE_COMPONENT_DEPENDS} )
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
+
+  if (SWIFTEXE_DISABLE_ASLR)
+    set_property(TARGET ${name} APPEND_STRING PROPERTY
+      LINK_FLAGS    " -Wl,-no_pie ")
+  endif()
 
   if (SWIFT_SDKS)
     set_property(TARGET ${name} APPEND_STRING PROPERTY
