@@ -694,7 +694,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
 /// `_NativeDictionaryStorageOwner`.
 @objc
 class _NativeDictionaryStorageOwnerBase
-    : _NSSwiftDictionary, _SwiftNSDictionaryRequiredOverridesType {
+    : _NSSwiftDictionary, _NSDictionaryCoreType {
 
   override init() {}
 
@@ -971,7 +971,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
 }
 
 struct _CocoaDictionaryStorage : _DictionaryStorageType {
-  var cocoaDictionary: _SwiftNSDictionaryType
+  var cocoaDictionary: _NSDictionaryType
 
   typealias Index = _CocoaDictionaryIndex
 
@@ -1570,7 +1570,7 @@ struct _CocoaDictionaryIndex : BidirectionalIndexType, Comparable {
   // order every time.
 
   /// A reference to the NSDictionary, which owns keys in `allKeys`.
-  let cocoaDictionary: _SwiftNSDictionaryType
+  let cocoaDictionary: _NSDictionaryType
 
   /// An unowned array of keys.
   var allKeys: _HeapBuffer<Int, AnyObject>
@@ -1578,19 +1578,19 @@ struct _CocoaDictionaryIndex : BidirectionalIndexType, Comparable {
   /// Index into `allKeys`.
   var currentKeyIndex: Int
 
-  init(_ cocoaDictionary: _SwiftNSDictionaryType, startIndex: ()) {
+  init(_ cocoaDictionary: _NSDictionaryType, startIndex: ()) {
     self.cocoaDictionary = cocoaDictionary
     self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
     self.currentKeyIndex = 0
   }
 
-  init(_ cocoaDictionary: _SwiftNSDictionaryType, endIndex: ()) {
+  init(_ cocoaDictionary: _NSDictionaryType, endIndex: ()) {
     self.cocoaDictionary = cocoaDictionary
     self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
     self.currentKeyIndex = allKeys.value
   }
 
-  init(_ cocoaDictionary: _SwiftNSDictionaryType,
+  init(_ cocoaDictionary: _NSDictionaryType,
        _ allKeys: _HeapBuffer<Int, AnyObject>,
        _ currentKeyIndex: Int) {
     self.cocoaDictionary = cocoaDictionary
@@ -1822,7 +1822,7 @@ class _CocoaDictionaryGenerator : GeneratorType {
   // guarantee that the fast enumeration struct is pinned to a certain memory
   // location.
 
-  let cocoaDictionary: _SwiftNSDictionaryType
+  let cocoaDictionary: _NSDictionaryType
   var fastEnumerationState = _makeSwiftNSFastEnumerationState()
   var fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
 
@@ -1833,7 +1833,7 @@ class _CocoaDictionaryGenerator : GeneratorType {
   var itemIndex: Int = 0
   var itemCount: Int = 0
 
-  init(_ cocoaDictionary: _SwiftNSDictionaryType) {
+  init(_ cocoaDictionary: _NSDictionaryType) {
     self.cocoaDictionary = cocoaDictionary
   }
 
@@ -1990,7 +1990,7 @@ public struct Dictionary<
   /// * it is statically known that the given `NSDictionary` is immutable;
   /// * `Key` and `Value` are bridged verbatim to Objective-C (i.e.,
   ///   are reference types).
-  public init(_immutableCocoaDictionary: _SwiftNSDictionaryType) {
+  public init(_immutableCocoaDictionary: _NSDictionaryType) {
     _sanityCheck(
         _isBridgedVerbatimToObjectiveC(Key.self) &&
         _isBridgedVerbatimToObjectiveC(Value.self),
@@ -2464,7 +2464,7 @@ public protocol _NSArrayCoreType :
 }
 
 @objc
-public protocol _SwiftNSDictionaryRequiredOverridesType :
+public protocol _NSDictionaryCoreType :
     _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
 
   // The following methods should be overridden when implementing an
@@ -2490,8 +2490,7 @@ public protocol _SwiftNSDictionaryRequiredOverridesType :
 }
 
 @unsafe_no_objc_tagged_pointer @objc
-public protocol _SwiftNSDictionaryType :
-    _SwiftNSDictionaryRequiredOverridesType {
+public protocol _NSDictionaryType : _NSDictionaryCoreType {
   func getObjects(objects: UnsafeMutablePointer<AnyObject>,
       andKeys keys: UnsafeMutablePointer<AnyObject>)
 }
@@ -2505,7 +2504,7 @@ func _stdlib_NSObject_isEqual(lhs: AnyObject, rhs: AnyObject) -> Bool
 
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
-func _stdlib_NSDictionary_allKeys(nsd: _SwiftNSDictionaryType)
+func _stdlib_NSDictionary_allKeys(nsd: _NSDictionaryType)
     -> _HeapBuffer<Int, AnyObject> {
   let count = nsd.count
   var buffer = _HeapBuffer<Int, AnyObject>(
@@ -2518,7 +2517,7 @@ func _stdlib_NSDictionary_allKeys(nsd: _SwiftNSDictionaryType)
 
 extension Dictionary {
   public func _bridgeToObjectiveCImpl()
-      -> _SwiftNSDictionaryRequiredOverridesType {
+      -> _NSDictionaryCoreType {
     switch _variantStorage {
     case .Native(let nativeOwner):
       _precondition(_isBridgedToObjectiveC(Key.self),
@@ -2660,12 +2659,12 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
     // Dictionary will not mutate storage with reference count greater than 1.
     return Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(nativeOwner, _SwiftNSDictionaryType.self))
+        unsafeBitCast(nativeOwner, _NSDictionaryType.self))
 
   case .Cocoa(let cocoaStorage):
     return Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(cocoaStorage, _SwiftNSDictionaryType.self))
+        unsafeBitCast(cocoaStorage, _NSDictionaryType.self))
   }
 }
 

@@ -726,12 +726,12 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaDictionary: _SwiftNSDictionaryType) {
+  public init(_cocoaDictionary: _NSDictionaryType) {
     let cfValue = unsafeBitCast(_cocoaDictionary, CFDictionary.self)
     let copy = CFDictionaryCreateCopy(nil, cfValue)
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(copy, _SwiftNSDictionaryType.self))
+        unsafeBitCast(copy, _NSDictionaryType.self))
   }
 }
 
@@ -800,7 +800,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d, _SwiftNSDictionaryType.self))
+        _cocoaDictionary: unsafeBitCast(d, _NSDictionaryType.self))
       return
     }
 

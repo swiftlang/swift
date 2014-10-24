@@ -349,7 +349,7 @@ extension String : Hashable {
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
     let cocoaString =
-      unsafeBitCast(self._bridgeToObjectiveCImpl(), _SwiftNSStringType.self)
+      unsafeBitCast(self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
     return hashOffset ^ _stdlib_NSStringNFDHashValue(cocoaString)
   }
 }

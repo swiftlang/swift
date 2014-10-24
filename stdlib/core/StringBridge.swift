@@ -87,7 +87,7 @@ import SwiftShims
 public class _NSSwiftString {}
 
 @objc
-public protocol _SwiftNSStringRequiredOverridesType :
+public protocol _NSStringCoreType :
     _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
 
   // The following methods should be overridden when implementing an
@@ -98,11 +98,6 @@ public protocol _SwiftNSStringRequiredOverridesType :
   func characterAtIndex(index: Int) -> UInt16
 
   // We also override the following methods for efficiency.
-}
-
-@objc
-public protocol _SwiftNSStringType :
-    _SwiftNSStringRequiredOverridesType {
 }
 
 /// An NSString built around a slice of contiguous Swift String storage
