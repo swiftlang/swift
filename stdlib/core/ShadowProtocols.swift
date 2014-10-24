@@ -27,7 +27,7 @@ public protocol _ShadowProtocol {}
 
 /// A shadow for the `NSFastEnumeration` protocol
 @objc
-public protocol _SwiftNSFastEnumerationType : _ShadowProtocol {
+public protocol _NSFastEnumerationType : _ShadowProtocol {
   func countByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
@@ -36,7 +36,7 @@ public protocol _SwiftNSFastEnumerationType : _ShadowProtocol {
 
 /// A shadow for the `NSEnumerator` class
 @objc
-public protocol _SwiftNSEnumeratorType : _ShadowProtocol {
+public protocol _NSEnumeratorType : _ShadowProtocol {
   init()
   func nextObject() -> AnyObject?
 }
@@ -46,7 +46,7 @@ public typealias _SwiftNSZone = COpaquePointer
 
 /// A shadow for the `NSCopying` protocol
 @objc
-public protocol _SwiftNSCopyingType : _ShadowProtocol {
+public protocol _NSCopyingType : _ShadowProtocol {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 }
 
@@ -56,7 +56,7 @@ public protocol _SwiftNSCopyingType : _ShadowProtocol {
 /// be a useful `NSArray` subclass.
 @unsafe_no_objc_tagged_pointer @objc
 public protocol _NSArrayCoreType :
-    _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
+    _NSCopyingType, _NSFastEnumerationType {
 
   func objectAtIndex(index: Int) -> AnyObject
 
@@ -78,7 +78,7 @@ public protocol _NSArrayCoreType :
 /// be a useful `NSDictionary` subclass.
 @objc
 public protocol _NSDictionaryCoreType :
-    _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
+    _NSCopyingType, _NSFastEnumerationType {
 
   // The following methods should be overridden when implementing an
   // NSDictionary subclass.
@@ -90,7 +90,7 @@ public protocol _NSDictionaryCoreType :
 
   var count: Int { get }
   func objectForKey(aKey: AnyObject?) -> AnyObject?
-  func keyEnumerator() -> _SwiftNSEnumeratorType?
+  func keyEnumerator() -> _NSEnumeratorType?
 
   // We also override the following methods for efficiency.
 

@@ -88,7 +88,7 @@ public class _NSSwiftString {}
 
 @objc
 public protocol _NSStringCoreType :
-    _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
+    _NSCopyingType, _NSFastEnumerationType {
 
   // The following methods should be overridden when implementing an
   // NSString subclass.

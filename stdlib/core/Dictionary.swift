@@ -578,7 +578,7 @@ struct _BridgedNativeDictionaryStorage {
 /// `_NativeDictionaryStorageKeyNSEnumerator`.
 @objc
 class _NativeDictionaryStorageKeyNSEnumeratorBase
-    : _NSSwiftEnumerator, _SwiftNSEnumeratorType {
+    : _NSSwiftEnumerator, _NSEnumeratorType {
 
   init(dummy: (Int, ())) {}
 
@@ -715,7 +715,7 @@ class _NativeDictionaryStorageOwnerBase
 
   // Empty tuple is a workaround for
   // <rdar://problem/16824792> Overriding functions and properties in a generic
-  func bridgingKeyEnumerator(dummy: ()) -> _SwiftNSEnumeratorType {
+  func bridgingKeyEnumerator(dummy: ()) -> _NSEnumeratorType {
     _sanityCheckFailure("'bridgingKeyEnumerator' should be overridden")
   }
 
@@ -756,7 +756,7 @@ class _NativeDictionaryStorageOwnerBase
   }
 
   @objc
-  func keyEnumerator() -> _SwiftNSEnumeratorType? {
+  func keyEnumerator() -> _NSEnumeratorType? {
     return bridgingKeyEnumerator(())
   }
 
@@ -936,7 +936,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     return nil
   }
 
-  override func bridgingKeyEnumerator(dummy: ()) -> _SwiftNSEnumeratorType {
+  override func bridgingKeyEnumerator(dummy: ()) -> _NSEnumeratorType {
     return _NativeDictionaryStorageKeyNSEnumerator<Key, Value>(self)
   }
 
