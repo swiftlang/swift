@@ -106,7 +106,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
-      out << "\t" << cast<OperatorDecl>(D)->getName() << "\n";
+      out << "- \"" << cast<OperatorDecl>(D)->getName() << "\"\n";
       break;
 
     case DeclKind::TypeAlias:
@@ -121,7 +121,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           VD->getAccessibility() == Accessibility::Private) {
         break;
       }
-      out << "\t" << cast<ValueDecl>(D)->getName() << "\n";
+      out << "- \"" << cast<ValueDecl>(D)->getName() << "\"\n";
       break;
     }
 
@@ -148,7 +148,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   // FIXME: Sort these?
   out << "top-level:\n";
   for (Identifier name : tracker->getTopLevelNames()) {
-    out << "\t" << name << "\n";
+    out << "- \"" << name << "\"\n";
   }
 
   // FIXME: Sort these?
@@ -159,9 +159,9 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       continue;
 
     Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
-    out << "\t";
+    out << "- \"";
     mangler.mangleContext(usedNominal, Mangle::Mangler::BindGenerics::None);
-    out << "\n";
+    out << "\"\n";
   }
 
   return false;
