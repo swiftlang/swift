@@ -61,7 +61,6 @@ set(SWIFTLIB_ESSENTIAL
   Map.swift.gyb
   Mirrors.swift.gyb
   Misc.swift
-  NSSwiftArray.swift
   Optional.swift
   OutputStream.swift
   Pointer.swift
@@ -90,6 +89,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF8.swift
   StringUTFViewsMirrors.swift.gyb
   StringUnicodeScalarView.swift
+  SwiftNativeNSArray.swift
   Unicode.swift
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb

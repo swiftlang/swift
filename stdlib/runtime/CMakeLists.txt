@@ -29,7 +29,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(SWIFT_RUNTIME_OBJC_SOURCES
     Availability.mm
     SwiftObject.mm
-    NSSwiftXXXBase.mm.gyb
+    SwiftNativeNSXXXBase.mm.gyb
     Reflection.mm)
 
   set(FRAMEWORKS Foundation)

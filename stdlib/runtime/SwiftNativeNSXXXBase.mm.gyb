@@ -1,4 +1,4 @@
-//===--- NSSwiftXXXBase.mm.gyb - Cocoa container buffer bases -*- swift -*-===//
+//===--- SwiftNativeNSXXXBase.mm.gyb - Cocoa classes with fast refcounts --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines:
+// Classes derived from ObjC bases but that use native swift reference
+// counting, layout, and allocation.
 //
-//    _SwiftNativeNSArrayBase, _SwiftNativeNSDictionaryBase, _SwiftNativeNSStringBase
+// These classes declare a native Swift object header and override the
+// NSObject methods that do reference counting to use it accordingly.
+// We can only do this trick with objc classes that are known not to
+// use the storage where Swift places its native object header.  This
+// takes care of how the classes are handled from Objective-C code.
 //
-// To optimize bridging between Swift containers and their Cocoa
-// counterparts, we derive Swift containers' buffers from the
-// corresponding Cocoa classes; that way we can just hand a buffer off
-// to Cocoa when it holds bridged types.  
+// To trick Swift into using its fast refcounting and allocation
+// directly (rather than going through objc_msgSend to arrive at the
+// implementations defined here), we define subclasses on the Swift
+// side but hide the inheritance relationship from the Swift compiler
+// and only establish it dynamically, in the '+ load' method of each
+// class defined here.
 //
 //===----------------------------------------------------------------------===//
 
