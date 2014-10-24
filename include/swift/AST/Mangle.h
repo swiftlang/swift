@@ -40,10 +40,10 @@ class Mangler {
   };
 
   raw_ostream &Buffer;
-  llvm::DenseMap<void*, unsigned> Substitutions;
-  llvm::DenseMap<ArchetypeType*, ArchetypeInfo> Archetypes;
+  llvm::DenseMap<const void *, unsigned> Substitutions;
+  llvm::DenseMap<const ArchetypeType *, ArchetypeInfo> Archetypes;
   unsigned ArchetypesDepth = 0;
-  DeclContext *DeclCtx = nullptr;
+  const DeclContext *DeclCtx = nullptr;
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
   /// If enabled, non-ASCII names are encoded in modified Punycode.
@@ -88,44 +88,47 @@ public:
   Mangler(raw_ostream &buffer, bool DWARFMangling = false, 
           bool usePunycode = true)
     : Buffer(buffer), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
-  void mangleContextOf(ValueDecl *decl, BindGenerics shouldBind);
-  void mangleContext(DeclContext *ctx, BindGenerics shouldBind);
-  void mangleModule(Module *module);
-  void mangleDeclName(ValueDecl *decl);
-  void mangleDeclType(ValueDecl *decl, ResilienceExpansion expansion,
+  void mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind);
+  void mangleContext(const DeclContext *ctx, BindGenerics shouldBind);
+  void mangleModule(const Module *module);
+  void mangleDeclName(const ValueDecl *decl);
+  void mangleDeclType(const ValueDecl *decl, ResilienceExpansion expansion,
                       unsigned uncurryingLevel);
-  void mangleEntity(ValueDecl *decl, ResilienceExpansion expansion,
+  void mangleEntity(const ValueDecl *decl, ResilienceExpansion expansion,
                     unsigned uncurryingLevel);
-  void mangleConstructorEntity(ConstructorDecl *ctor, bool isAllocating,
-                               ResilienceExpansion kind, unsigned uncurryingLevel);
-  void mangleDestructorEntity(DestructorDecl *decl, bool isDeallocating);
-  void mangleIVarInitDestroyEntity(ClassDecl *decl, bool isDestroyer);
-  void mangleAccessorEntity(AccessorKind kind, AbstractStorageDecl *decl,
+  void mangleConstructorEntity(const ConstructorDecl *ctor, bool isAllocating,
+                               ResilienceExpansion kind,
+                               unsigned uncurryingLevel);
+  void mangleDestructorEntity(const DestructorDecl *decl, bool isDeallocating);
+  void mangleIVarInitDestroyEntity(const ClassDecl *decl, bool isDestroyer);
+  void mangleAccessorEntity(AccessorKind kind, const AbstractStorageDecl *decl,
                             ResilienceExpansion expansion);
-  void mangleAddressorEntity(ValueDecl *decl);
-  void mangleDefaultArgumentEntity(DeclContext *ctx, unsigned index);
-  void mangleInitializerEntity(VarDecl *var);
-  void mangleClosureEntity(AbstractClosureExpr *closure,
-                           ResilienceExpansion explosion, unsigned uncurryingLevel);
-  void mangleNominalType(NominalTypeDecl *decl, ResilienceExpansion expansion,
+  void mangleAddressorEntity(const ValueDecl *decl);
+  void mangleDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
+  void mangleInitializerEntity(const VarDecl *var);
+  void mangleClosureEntity(const AbstractClosureExpr *closure,
+                           ResilienceExpansion explosion,
+                           unsigned uncurryingLevel);
+  void mangleNominalType(const NominalTypeDecl *decl,
+                         ResilienceExpansion expansion,
                          BindGenerics shouldBind,
-                         GenericParamList *extGenericParams = nullptr);
-  void mangleProtocolDecl(ProtocolDecl *protocol);
+                         const GenericParamList *extGenericParams = nullptr);
+  void mangleProtocolDecl(const ProtocolDecl *protocol);
   void mangleType(CanType type, ResilienceExpansion expansion,
                   unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
-  void mangleProtocolName(ProtocolDecl *protocol);
-  void mangleProtocolConformance(ProtocolConformance *conformance);
+  void mangleProtocolName(const ProtocolDecl *protocol);
+  void mangleProtocolConformance(const ProtocolConformance *conformance);
   void bindGenericParameters(const GenericParamList *genericParams,
                              bool mangleParameters);
-  void addSubstitution(void *ptr);
+  void addSubstitution(const void *ptr);
 
-  void mangleDeclTypeForDebugger(ValueDecl *decl);
-  void mangleTypeForDebugger(Type decl, DeclContext *DC);
-  void mangleGenericSignature(GenericSignature *sig,
+  void mangleDeclTypeForDebugger(const ValueDecl *decl);
+  void mangleTypeForDebugger(Type decl, const DeclContext *DC);
+  void mangleGenericSignature(const GenericSignature *sig,
                               ResilienceExpansion expansion);
 
-  void mangleFieldOffsetFull(ValueDecl *decl, bool isIndirect);
+  void mangleFieldOffsetFull(const ValueDecl *decl, bool isIndirect);
   void mangleTypeMetadataFull(CanType ty, bool isPattern, bool isIndirect);
   
   /// Mangles globalinit_token and globalinit_func, which are used to
@@ -135,7 +138,7 @@ public:
   /// \param counter A consecutive number inside the compiled file.
   /// \param isInitFunc If true it's a globalinit_func, otherwise a
   /// globalinit_token.
-  void mangleGlobalInit(VarDecl *decl, int counter, bool isInitFunc);
+  void mangleGlobalInit(const VarDecl *decl, int counter, bool isInitFunc);
 
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ResilienceExpansion expansion,
@@ -145,10 +148,11 @@ private:
   void mangleIdentifier(Identifier ident,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
   void manglePolymorphicType(const GenericParamList *genericParams, CanType T,
-                             ResilienceExpansion expansion, unsigned uncurryLevel,
+                             ResilienceExpansion expansion,
+                             unsigned uncurryLevel,
                              bool mangleAsFunction);
-  bool tryMangleStandardSubstitution(NominalTypeDecl *type);
-  bool tryMangleSubstitution(void *ptr);
+  bool tryMangleStandardSubstitution(const NominalTypeDecl *type);
+  bool tryMangleSubstitution(const void *ptr);
 };
   
 } // end namespace Mangle

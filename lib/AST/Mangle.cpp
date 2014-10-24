@@ -139,7 +139,7 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   }
 }
 
-bool Mangler::tryMangleSubstitution(void *ptr) {
+bool Mangler::tryMangleSubstitution(const void *ptr) {
   auto ir = Substitutions.find(ptr);
   if (ir == Substitutions.end()) return false;
 
@@ -152,13 +152,13 @@ bool Mangler::tryMangleSubstitution(void *ptr) {
   return true;
 }
 
-void Mangler::addSubstitution(void *ptr) {
+void Mangler::addSubstitution(const void *ptr) {
   Substitutions.insert(std::make_pair(ptr, Substitutions.size()));
 }
 
 /// Mangle the context of the given declaration as a <context.
 /// This is the top-level entrypoint for mangling <context>.
-void Mangler::mangleContextOf(ValueDecl *decl, BindGenerics shouldBind) {
+void Mangler::mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind) {
   auto clangDecl = decl->getClangDecl();
 
   // Classes and protocols implemented in Objective-C have a special context
@@ -240,7 +240,7 @@ static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
   return var;
 }
 
-void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
+void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module:
     return mangleModule(cast<Module>(ctx));
@@ -322,7 +322,7 @@ void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
   llvm_unreachable("bad decl context");
 }
 
-void Mangler::mangleModule(Module *module) {
+void Mangler::mangleModule(const Module *module) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
   // Try the special 'swift' substitution.
@@ -405,7 +405,7 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
     mangleType(T, explosion, uncurryLevel);
 }
         
-static OperatorFixity getDeclFixity(ValueDecl *decl) {
+static OperatorFixity getDeclFixity(const ValueDecl *decl) {
   if (!decl->getName().isOperator())
     return OperatorFixity::NotOperator;
 
@@ -417,7 +417,7 @@ static OperatorFixity getDeclFixity(ValueDecl *decl) {
   llvm_unreachable("bad UnaryOperatorKind");
 }
 
-void Mangler::mangleDeclName(ValueDecl *decl) {
+void Mangler::mangleDeclName(const ValueDecl *decl) {
   if (decl->getDeclContext()->isLocalContext()) {
     // Mangle local declarations with a numeric discriminator.
     // decl-name ::= 'L' index identifier
@@ -477,7 +477,7 @@ static void bindAllGenericParameters(Mangler &mangler,
   mangler.bindGenericParameters(generics, /*mangle*/ false);
 }
 
-void Mangler::mangleTypeForDebugger(Type Ty, DeclContext *DC) {
+void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   assert(DWARFMangling);
 
   if (auto NameAliasTy = dyn_cast<NameAliasType>(Ty.getPointer())) {
@@ -517,7 +517,7 @@ void Mangler::mangleTypeForDebugger(Type Ty, DeclContext *DC) {
   mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal, /*uncurry*/ 0);
 }
 
-void Mangler::mangleDeclTypeForDebugger(ValueDecl *decl) {
+void Mangler::mangleDeclTypeForDebugger(const ValueDecl *decl) {
   assert(DWARFMangling);
   Buffer << "_Tt";
 
@@ -571,7 +571,7 @@ void Mangler::mangleDeclTypeForDebugger(ValueDecl *decl) {
     }
   };
 
-  auto result = ClassifyDecl().visit(decl);
+  auto result = ClassifyDecl().visit(const_cast<ValueDecl *>(decl));
   if (!result.first) return;
 
   // Find the innermost generic context and stash it in DeclCtx.
@@ -598,14 +598,15 @@ void Mangler::mangleDeclTypeForDebugger(ValueDecl *decl) {
   mangleDeclType(decl, ResilienceExpansion::Minimal, /*uncurry*/ 0);
 }
 
-void Mangler::mangleDeclType(ValueDecl *decl, ResilienceExpansion explosion,
+void Mangler::mangleDeclType(const ValueDecl *decl,
+                             ResilienceExpansion explosion,
                              unsigned uncurryLevel) {
   Type type = decl->hasType() ? decl->getType()
                               : ErrorType::get(decl->getASTContext());
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
 }
 
-void Mangler::mangleGenericSignature(GenericSignature *sig,
+void Mangler::mangleGenericSignature(const GenericSignature *sig,
                                      ResilienceExpansion expansion) {
   // Mangle the number of parameters.
   unsigned depth = 0;
@@ -1008,7 +1009,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     // Mangle generic parameter archetypes.
 
     // Find the archetype information.
-    DeclContext *DC = DeclCtx;
+    const DeclContext *DC = DeclCtx;
     auto it = Archetypes.find(archetype);
     while (it == Archetypes.end()) {
       // This should be treated like an error, but we don't want
@@ -1040,7 +1041,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
       // they appear at the top level of a type (_Tt).
       // Clone a new, non-DWARF Mangler for the DeclContext.
       Mangler ContextMangler(Buffer, /*DWARFMangling=*/false);
-      SmallVector<void *, 4> SortedSubsts(Substitutions.size());
+      SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
       for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
       for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
       for (; relativeDepth > 0; --relativeDepth)
@@ -1131,7 +1132,7 @@ void Mangler::mangleProtocolList(ArrayRef<ProtocolDecl*> protocols) {
 }
 
 /// Mangle the name of a protocol as a substitution candidate.
-void Mangler::mangleProtocolName(ProtocolDecl *protocol) {
+void Mangler::mangleProtocolName(const ProtocolDecl *protocol) {
   //  <protocol-name> ::= <decl>      # substitutable
   // The <decl> in a protocol-name is the same substitution
   // candidate as a protocol <type>, but it is mangled without
@@ -1145,7 +1146,7 @@ void Mangler::mangleProtocolName(ProtocolDecl *protocol) {
   addSubstitution(type);
 }
 
-static char getSpecifierForNominalType(NominalTypeDecl *decl) {
+static char getSpecifierForNominalType(const NominalTypeDecl *decl) {
   switch (decl->getKind()) {
 #define NOMINAL_TYPE_DECL(id, parent)
 #define DECL(id, parent) \
@@ -1161,14 +1162,14 @@ static char getSpecifierForNominalType(NominalTypeDecl *decl) {
   llvm_unreachable("bad decl kind");
 }
 
-void Mangler::mangleNominalType(NominalTypeDecl *decl,
+void Mangler::mangleNominalType(const NominalTypeDecl *decl,
                                 ResilienceExpansion explosion,
                                 BindGenerics shouldBind,
-                                GenericParamList *extGenericParams) {
+                                const GenericParamList *extGenericParams) {
   auto bindGenericsIfDesired = [&] {
     if (shouldBind == BindGenerics::All) {
-      GenericParamList *generics = extGenericParams ? extGenericParams
-                                                    : decl->getGenericParams();
+      const GenericParamList *generics =
+          extGenericParams ? extGenericParams : decl->getGenericParams();
       if (generics)
         bindGenericParameters(generics, /*mangle*/ false);
     }
@@ -1198,7 +1199,7 @@ void Mangler::mangleNominalType(NominalTypeDecl *decl,
   addSubstitution(key);
 }
 
-void Mangler::mangleProtocolDecl(ProtocolDecl *protocol) {
+void Mangler::mangleProtocolDecl(const ProtocolDecl *protocol) {
   Buffer << 'P';
   ContextStack context(*this);
   mangleContextOf(protocol, BindGenerics::None);
@@ -1206,7 +1207,7 @@ void Mangler::mangleProtocolDecl(ProtocolDecl *protocol) {
   Buffer << '_';
 }
 
-bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
+bool Mangler::tryMangleStandardSubstitution(const NominalTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
   DeclContext *dc = decl->getDeclContext();
   if (!dc->isModuleScopeContext() || !dc->getParentModule()->isStdlibModule())
@@ -1269,7 +1270,7 @@ void Mangler::mangleFunctionType(CanAnyFunctionType fn,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
 }
 
-void Mangler::mangleClosureEntity(AbstractClosureExpr *closure,
+void Mangler::mangleClosureEntity(const AbstractClosureExpr *closure,
                                   ResilienceExpansion explosion,
                                   unsigned uncurryLevel) {
   // entity-name ::= 'U' index type         // explicit anonymous closure
@@ -1291,7 +1292,7 @@ void Mangler::mangleClosureEntity(AbstractClosureExpr *closure,
   mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal, /*uncurry*/ 0);
 }
 
-void Mangler::mangleConstructorEntity(ConstructorDecl *ctor,
+void Mangler::mangleConstructorEntity(const ConstructorDecl *ctor,
                                       bool isAllocating,
                                       ResilienceExpansion explosion,
                                       unsigned uncurryLevel) {
@@ -1301,14 +1302,15 @@ void Mangler::mangleConstructorEntity(ConstructorDecl *ctor,
   mangleDeclType(ctor, explosion, uncurryLevel);
 }
 
-void Mangler::mangleDestructorEntity(DestructorDecl *dtor,
+void Mangler::mangleDestructorEntity(const DestructorDecl *dtor,
                                      bool isDeallocating) {
   Buffer << 'F';
   mangleContextOf(dtor, BindGenerics::Enclosing);
   Buffer << (isDeallocating ? 'D' : 'd');
 }
 
-void Mangler::mangleIVarInitDestroyEntity(ClassDecl *decl, bool isDestroyer) {
+void Mangler::mangleIVarInitDestroyEntity(const ClassDecl *decl,
+                                          bool isDestroyer) {
   Buffer << 'F';
   mangleContext(decl, BindGenerics::Enclosing);
   Buffer << (isDestroyer ? 'E' : 'e');
@@ -1328,7 +1330,8 @@ static char getCodeForAccessorKind(AccessorKind kind) {
   llvm_unreachable("bad accessor kind");
 }
 
-void Mangler::mangleAccessorEntity(AccessorKind kind, AbstractStorageDecl *decl,
+void Mangler::mangleAccessorEntity(AccessorKind kind,
+                                   const AbstractStorageDecl *decl,
                                    ResilienceExpansion explosion) {
   assert(kind != AccessorKind::NotAccessor);
   Buffer << 'F';
@@ -1338,7 +1341,7 @@ void Mangler::mangleAccessorEntity(AccessorKind kind, AbstractStorageDecl *decl,
   mangleDeclType(decl, explosion, 0);
 }
 
-void Mangler::mangleAddressorEntity(ValueDecl *decl) {
+void Mangler::mangleAddressorEntity(const ValueDecl *decl) {
   Buffer << 'F';
   mangleContextOf(decl, BindGenerics::All);
   Buffer << 'a';
@@ -1346,20 +1349,22 @@ void Mangler::mangleAddressorEntity(ValueDecl *decl) {
   mangleDeclType(decl, ResilienceExpansion::Minimal, 0);
 }
 
-void Mangler::mangleDefaultArgumentEntity(DeclContext *func, unsigned index) {
+void Mangler::mangleDefaultArgumentEntity(const DeclContext *func,
+                                          unsigned index) {
   Buffer << 'I';
   mangleContext(func, BindGenerics::All);
   Buffer << 'A' << Index(index);
 }
 
-void Mangler::mangleInitializerEntity(VarDecl *var) {
+void Mangler::mangleInitializerEntity(const VarDecl *var) {
   // The initializer is its own entity whose context is the variable.
   Buffer << 'I';
   mangleEntity(var, ResilienceExpansion::Minimal, /*uncurry*/ 0);
   Buffer << 'i';
 }
 
-void Mangler::mangleEntity(ValueDecl *decl, ResilienceExpansion explosion,
+void Mangler::mangleEntity(const ValueDecl *decl,
+                           ResilienceExpansion explosion,
                            unsigned uncurryLevel) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
@@ -1401,7 +1406,7 @@ void Mangler::mangleDirectness(bool isIndirect) {
   Buffer << (isIndirect ? 'i': 'd');
 }
 
-void Mangler::mangleProtocolConformance(ProtocolConformance *conformance) {
+void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
   // protocol-conformance ::= type protocol
   // FIXME: Should include the generic parameters and module, but this
   // complicates our hack for swift_conformsToProtocol.
@@ -1433,7 +1438,7 @@ void Mangler::mangleProtocolConformance(ProtocolConformance *conformance) {
 #endif
 }
 
-void Mangler::mangleFieldOffsetFull(ValueDecl *decl, bool isIndirect) {
+void Mangler::mangleFieldOffsetFull(const ValueDecl *decl, bool isIndirect) {
   Buffer << "_TWv";
   mangleDirectness(isIndirect);
   mangleEntity(decl, ResilienceExpansion::Minimal, 0);
@@ -1448,7 +1453,8 @@ void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern,
   mangleType(ty, ResilienceExpansion::Minimal, 0);
 }
 
-void Mangler::mangleGlobalInit(VarDecl *decl, int counter, bool isInitFunc) {
+void Mangler::mangleGlobalInit(const VarDecl *decl, int counter,
+                               bool isInitFunc) {
   auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
   auto fileUnit = cast<FileUnit>(topLevelContext);
   Identifier discriminator = fileUnit->getDiscriminatorForPrivateValue(decl);
