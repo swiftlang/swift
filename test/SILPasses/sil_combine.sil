@@ -1704,3 +1704,22 @@ bb0(%0 : $XX):
   return %8 : $()                                 // id: %9
 }
 
+// CHECK-LABEL: sil @unowned_round_trips : $@thin (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) -> (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) {
+// CHECK: bb0(
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @unowned_round_trips : $@thin (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) -> (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) {
+bb0(%0 : $B, %1 : $@sil_unowned B, %2 : $AnyObject, %3: $@sil_unmanaged AnyObject):
+  %4 = ref_to_unowned %0 : $B to $@sil_unowned B
+  %5 = unowned_to_ref %4 : $@sil_unowned B to $B
+  %6 = unowned_to_ref %1 : $@sil_unowned B to $B
+  %7 = ref_to_unowned %6 : $B to $@sil_unowned B
+
+  %8 = ref_to_unmanaged %2 : $AnyObject to $@sil_unmanaged AnyObject
+  %9 = unmanaged_to_ref %8 : $@sil_unmanaged AnyObject to $AnyObject
+  %10 = unmanaged_to_ref %3 : $@sil_unmanaged AnyObject to $AnyObject
+  %11 = ref_to_unmanaged %10 : $AnyObject to $@sil_unmanaged AnyObject
+
+  %9999 = tuple(%5 : $B, %7 : $@sil_unowned B, %9 : $AnyObject, %11 : $@sil_unmanaged AnyObject)
+  return %9999 : $(B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject)
+}

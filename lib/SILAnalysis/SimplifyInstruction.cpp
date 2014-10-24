@@ -46,6 +46,10 @@ namespace {
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitBuiltinInst(BuiltinInst *AI);
     SILValue visitUpcastInst(UpcastInst *UI);
+    SILValue visitRefToUnownedInst(RefToUnownedInst *RUI);
+    SILValue visitUnownedToRefInst(UnownedToRefInst *URI);
+    SILValue visitRefToUnmanagedInst(RefToUnmanagedInst *RUI);
+    SILValue visitUnmanagedToRefInst(UnmanagedToRefInst *URI);
     SILValue visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
@@ -85,7 +89,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
 
     return Ex0->getOperand();
   }
-  
+
   return SILValue();
 }
 
@@ -142,7 +146,7 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
   // struct_extract(struct(x, y), x) -> x
   if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
     return Struct->getFieldValue(SEI->getField());
-  
+
   return SILValue();
 }
 
@@ -304,6 +308,42 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(UI->getOperand()))
     if (URCI->getOperand().getType() == UI->getType())
       return URCI->getOperand();
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::visitRefToUnownedInst(RefToUnownedInst *RUI) {
+  if (auto *URI = dyn_cast<UnownedToRefInst>(RUI->getOperand()))
+    if (URI->getOperand().getType() == RUI->getType())
+      return URI->getOperand();
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::visitUnownedToRefInst(UnownedToRefInst *URI) {
+  if (auto *RUI = dyn_cast<RefToUnownedInst>(URI->getOperand()))
+    if (RUI->getOperand().getType() == URI->getType())
+      return RUI->getOperand();
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::visitRefToUnmanagedInst(RefToUnmanagedInst *RUI) {
+  if (auto *URI = dyn_cast<UnmanagedToRefInst>(RUI->getOperand()))
+    if (URI->getOperand().getType() == RUI->getType())
+      return URI->getOperand();
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::visitUnmanagedToRefInst(UnmanagedToRefInst *URI) {
+  if (auto *RUI = dyn_cast<RefToUnmanagedInst>(URI->getOperand()))
+    if (RUI->getOperand().getType() == URI->getType())
+      return RUI->getOperand();
 
   return SILValue();
 }
