@@ -6,8 +6,9 @@
 // CHECK-NEXT: "IntWrapper"
 // CHECK-NEXT: "=="
 // CHECK-NEXT: "<"
-// CHECK-NEXT: "Subclass"
+// CHECK-NEXT: "***"
 // CHECK-NEXT: "^^^"
+// CHECK-NEXT: "Subclass"
 // CHECK-NEXT: "MyArray"
 // CHECK-NEXT: "someGlobal"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
@@ -42,10 +43,16 @@ func <(lhs: IntWrapper, rhs: IntWrapper) -> Bool {
   return lhs.value < rhs.value
 }
 
+// Test operator lookup without a use of the same operator.
+// This is declared in the other file.
+// CHECK-DAG: "***"
+prefix func ***(lhs: IntWrapper) {}
+
+// This is provided as an operator but not implemented here.
+prefix operator ^^^ {}
+
 // CHECK-DAG: "ClassFromOtherFile"
 class Subclass : ClassFromOtherFile {}
-
-prefix operator ^^^ {}
 
 // CHECK-DAG: "Array"
 typealias MyArray = Array<Bool>

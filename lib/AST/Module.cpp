@@ -14,20 +14,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Module.h"
+#include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/SourceManager.h"
-#include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -1107,8 +1106,6 @@ static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
-  // FIXME: Operator lookup is a kind of top-level lookup too. We should be
-  // tracking this in a SourceFile's ReferencedNameTracker.
   OP_DECL *result = nullptr;
   for (const FileUnit *File : M->getFiles()) {
     auto next = lookupOperatorDeclForName(*File, Loc, Name, false, OP_MAP);
@@ -1135,9 +1132,12 @@ Kind##OperatorDecl * \
 SourceFile::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(*this, loc, name, true, \
                                           &SourceFile::Kind##Operators); \
-  if (result.hasValue() && !result.getValue()) \
+  if (result.hasValue() && !result.getValue()) { \
+    if (ReferencedNames) \
+      ReferencedNames->addTopLevelName(name); \
     result = lookupOperatorDeclForName(getParentModule(), loc, name, \
                                        &SourceFile::Kind##Operators); \
+  } \
   return result ? *result : nullptr; \
 }
 

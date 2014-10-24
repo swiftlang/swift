@@ -19,3 +19,5 @@ struct OtherFileSecretTypeWrapper {
 
 typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
 
+prefix operator *** {}
+
