@@ -13,12 +13,21 @@
 // CHECK-NEXT: "lookUpManyTopLevelNames"
 // CHECK-NEXT: "eof"
 
+// CHECK-LABEL: {{^nominals:$}}
+// CHECK-NEXT: "V4main10IntWrapper"
+// CHECK-NEXT: "VV4main10IntWrapper16InnerForNoReason"
+// CHECK-NEXT: "C4main8Subclass"
+// CHECK-NEXT: "Si"
+// CHECK-NEXT: "VE4mainSi10InnerToInt"
+
 // CHECK-LABEL: {{^top-level:$}}
 
 // CHECK-DAG: "Comparable"
 struct IntWrapper: Comparable {
   // CHECK-DAG: "Int"
   var value: Int
+
+  struct InnerForNoReason {}
 }
 
 // CHECK-DAG: "IntWrapper"
@@ -43,6 +52,10 @@ typealias MyArray = Array<Bool>
 
 // CHECK-DAG: "IntegerLiteralType"
 let someGlobal = 42
+
+extension Int {
+  struct InnerToInt {}
+}
 
 func lookUpManyTopLevelNames() {
   // CHECK-DAG: "Dictionary"

@@ -75,6 +75,17 @@ static bool emitMakeDependencies(DiagnosticEngine &Diags,
   return false;
 }
 
+static void findNominals(SmallVectorImpl<const NominalTypeDecl *> &list,
+                         DeclRange members) {
+  for (const Decl *D : members) {
+    auto nominal = dyn_cast<NominalTypeDecl>(D);
+    if (!nominal)
+      continue;
+    list.push_back(nominal);
+    findNominals(list, nominal->getMembers(/*forceDelayed=*/false));
+  }
+}
+
 /// Emits a Swift-style dependencies file.
 static bool emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *SF,
@@ -92,6 +103,8 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
 
   out << "### Swift dependencies file v0 ###\n";
 
+  SmallVector<const NominalTypeDecl *, 16> extendedNominals;
+
   out << "provides:\n";
   for (const Decl *D : SF->Decls) {
     switch (D->getKind()) {
@@ -99,9 +112,17 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       // FIXME: Handle re-exported decls.
       break;
 
-    case DeclKind::Extension:
-      // FIXME: Handle extensions.
+    case DeclKind::Extension: {
+      auto *ED = cast<ExtensionDecl>(D);
+      auto *NTD = ED->getExtendedType()->getAnyNominal();
+      if (NTD->hasAccessibility() &&
+          NTD->getAccessibility() == Accessibility::Private) {
+        break;
+      }
+      extendedNominals.push_back(NTD);
+      findNominals(extendedNominals, ED->getMembers());
       break;
+    }
 
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
@@ -109,11 +130,22 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       out << "- \"" << cast<OperatorDecl>(D)->getName() << "\"\n";
       break;
 
-    case DeclKind::TypeAlias:
     case DeclKind::Enum:
     case DeclKind::Struct:
     case DeclKind::Class:
-    case DeclKind::Protocol:
+    case DeclKind::Protocol: {
+      auto *NTD = cast<NominalTypeDecl>(D);
+      if (NTD->hasAccessibility() &&
+          NTD->getAccessibility() == Accessibility::Private) {
+        break;
+      }
+      out << "- \"" << NTD->getName() << "\"\n";
+      extendedNominals.push_back(NTD);
+      findNominals(extendedNominals, NTD->getMembers());
+      break;
+    }
+
+    case DeclKind::TypeAlias:
     case DeclKind::Var:
     case DeclKind::Func: {
       auto *VD = cast<ValueDecl>(D);
@@ -121,7 +153,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           VD->getAccessibility() == Accessibility::Private) {
         break;
       }
-      out << "- \"" << cast<ValueDecl>(D)->getName() << "\"\n";
+      out << "- \"" << VD->getName() << "\"\n";
       break;
     }
 
@@ -141,6 +173,14 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::EnumElement:
       llvm_unreachable("cannot appear at the top level of a file");
     }
+  }
+
+  out << "nominals:\n";
+  for (auto nominal : extendedNominals) {
+    Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
+    out << "- \"";
+    mangler.mangleContext(nominal, Mangle::Mangler::BindGenerics::None);
+    out << "\"\n";
   }
 
   ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
