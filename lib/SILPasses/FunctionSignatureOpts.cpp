@@ -63,7 +63,11 @@ struct ArgDescriptor {
 static SILInstruction *searchForCalleeRelease(SILFunction *F,
                                               SILArgument *Arg,
                                               RCIdentityAnalysis *RCIA) {
-  auto ReturnBB = F->findReturnBB();
+  auto ReturnBB = std::find_if(F->begin(), F->end(),
+                               [](const SILBasicBlock &BB) -> bool {
+                                 const TermInst *TI = BB.getTerminator();
+                                 return isa<ReturnInst>(TI);
+                               });
   if (ReturnBB == F->end())
     return nullptr;
 
