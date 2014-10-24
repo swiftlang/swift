@@ -26,10 +26,9 @@ using namespace swift;
 STATISTIC(NumInstFolded, "Number of constant folded instructions");
 
 template<typename...T, typename...U>
-static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
-                     U &&...args) {
-  Context.Diags.diagnose(loc,
-                         diag, std::forward<U>(args)...);
+static InFlightDiagnostic
+diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
+  return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
 /// \brief Construct (int, overflow) result tuple.
@@ -115,13 +114,19 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
     Type OpType;
     SILLocation Loc = BI->getLoc();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+    SourceRange LHSRange, RHSRange;
     if (CE) {
       const TupleExpr *Args = dyn_cast_or_null<TupleExpr>(CE->getArg());
       if (Args && Args->getNumElements() == 2) {
-        CanType LHSTy = Args->getElement(0)->getType()->getCanonicalType();
-        CanType RHSTy = Args->getElement(0)->getType()->getCanonicalType();
+        // Look through inout types in order to handle += well.
+        CanType LHSTy = Args->getElement(0)->getType()->getInOutObjectType()->
+                         getCanonicalType();
+        CanType RHSTy = Args->getElement(1)->getType()->getCanonicalType();
         if (LHSTy == RHSTy)
           OpType = Args->getElement(1)->getType();
+        
+        LHSRange = Args->getElement(0)->getSourceRange();
+        RHSRange = Args->getElement(1)->getSourceRange();
       }
     }
 
@@ -132,7 +137,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
                LHSInt.toString(/*Radix*/ 10, Signed),
                Operator,
                RHSInt.toString(/*Radix*/ 10, Signed),
-               OpType);
+               OpType).highlight(LHSRange).highlight(RHSRange);
     } else {
       // If we cannot get the type info in an expected way, describe the type.
       diagnose(BI->getModule().getASTContext(),
@@ -142,7 +147,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
                Operator,
                RHSInt.toString(/*Radix*/ 10, Signed),
                Signed,
-               LHSInt.getBitWidth());
+               LHSInt.getBitWidth()).highlight(LHSRange).highlight(RHSRange);
     }
     ResultsInError = Optional<bool>(true);
   }
@@ -245,8 +250,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
       return nullptr;
 
     // Otherwise emit a diagnosis error and set ResultsInError to true.
-    diagnose(M.getASTContext(),
-             BI->getLoc().getSourceLoc(),
+    diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
              diag::division_by_zero);
     ResultsInError = Optional<bool>(true);
     return nullptr;
