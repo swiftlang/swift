@@ -578,7 +578,7 @@ struct _BridgedNativeDictionaryStorage {
 /// `_NativeDictionaryStorageKeyNSEnumerator`.
 @objc
 class _NativeDictionaryStorageKeyNSEnumeratorBase
-    : _NSSwiftEnumerator, _NSEnumeratorType {
+    : _SwiftNativeNSEnumerator, _NSEnumeratorType {
 
   init(dummy: (Int, ())) {}
 
@@ -696,7 +696,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
 /// `_NativeDictionaryStorageOwner`.
 @objc
 class _NativeDictionaryStorageOwnerBase
-    : _NSSwiftDictionary, _NSDictionaryCoreType {
+    : _SwiftNativeNSDictionary, _NSDictionaryCoreType {
 
   override init() {}
 

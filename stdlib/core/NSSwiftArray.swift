@@ -34,7 +34,7 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
 }
 
 /// `Swift.Array` bridges to this class, which is a subclass of `NSArray`.
-@objc internal final class _NSSwiftArray : _NSArrayCoreType {
+@objc internal final class _SwiftNativeNSArray : _NSArrayCoreType {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it.

@@ -78,13 +78,13 @@ func _cocoaStringSubscriptNotInitialized(
 
 import SwiftShims
 
-/// This class is derived from `_NSSwiftStringBase` (through runtime magic),
+/// This class is derived from `_SwiftNativeNSStringBase` (through runtime magic),
 /// which is derived from `NSString`.
 ///
 /// This allows us to subclass an Objective-C class and use the fast Swift
 /// memory allocator.
 @objc
-public class _NSSwiftString {}
+public class _SwiftNativeNSString {}
 
 @objc
 public protocol _NSStringCoreType :
@@ -101,7 +101,7 @@ public protocol _NSStringCoreType :
 }
 
 /// An NSString built around a slice of contiguous Swift String storage
-public final class _NSContiguousString : _NSSwiftString {
+public final class _NSContiguousString : _SwiftNativeNSString {
   public init(_ _core: _StringCore) {
     _sanityCheck(
       _core.hasContiguousStorage,

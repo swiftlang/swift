@@ -83,7 +83,7 @@ for x: AnyObject in s_m {
   println(x.description!)
 }
 
-// Enumeration over an _NSSwiftArray
+// Enumeration over a _SwiftNativeNSArray
 // CHECK: hello
 // CHECK: bridged
 // CHECK: array

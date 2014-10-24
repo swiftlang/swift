@@ -12,7 +12,7 @@
 //
 // This file defines:
 //
-//    _NSSwiftArrayBase, _NSSwiftDictionaryBase, _NSSwiftStringBase
+//    _SwiftNativeNSArrayBase, _SwiftNativeNSDictionaryBase, _SwiftNativeNSStringBase
 //
 // To optimize bridging between Swift containers and their Cocoa
 // counterparts, we derive Swift containers' buffers from the
@@ -42,16 +42,16 @@ extern "C" id _objc_rootAutorelease(id);
 using namespace swift;
 
 % for Class in ('Array', 'Dictionary', 'String', 'Enumerator'):
-@interface _NSSwift${Class}Base : NS${Class}
+@interface _SwiftNativeNS${Class}Base : NS${Class}
 {
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 }
 @end
 
-@implementation _NSSwift${Class}Base
+@implementation _SwiftNativeNS${Class}Base
 + (void)load {
-  // Poke this class into the superclass chain for _NSSwift${Class}
-  auto subclassName = "_NSSwift${Class}";
+  // Poke this class into the superclass chain for _SwiftNativeNS${Class}
+  auto subclassName = "_SwiftNativeNS${Class}";
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -63,7 +63,7 @@ using namespace swift;
     (int)strlen(subclassName), subclassName);
 
   auto subclass = objc_getClass(subclassMangledName);
-  auto selfClass = [_NSSwift${Class}Base class];
+  auto selfClass = [_SwiftNativeNS${Class}Base class];
   class_setSuperclass(subclass, selfClass);
 #pragma clang diagnostic pop
 }
