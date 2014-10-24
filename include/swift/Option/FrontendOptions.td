@@ -162,7 +162,10 @@ def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 
 def playground : Flag<["-"], "playground">,
-  HelpText<"Apply the playground transformation">;
+  HelpText<"Apply the playground semantics and transformation">;
+
+def disable_playground_transform : Flag<["-"], "disable-playground-transform">,
+  HelpText<"Disable playground transformation">;
 
 def use_jit : Flag<["-"], "use-jit">,
   HelpText<"Register Objective-C classes as if the JIT were in use">;

@@ -150,6 +150,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
 
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
+  if (Args.hasArg(OPT_disable_playground_transform))
+    Opts.PlaygroundTransform = false;
 
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
