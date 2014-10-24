@@ -233,7 +233,7 @@ set(SWIFTLIB_EXTRA_DEFAULT_LINK_FLAGS "" CACHE STRING
   "Extra link flags to pass when building the default (OS X) target library")
 
 # Find the 'clang' executable for compiling API notes.
-set (CLANG_APINOTES "" CACHE FILEPATH "Path to Clang executable to be used for compling API notes")
+set (CLANG_APINOTES "" CACHE FILEPATH "Path to Clang executable to be used for compiling API notes")
 if ( CLANG_APINOTES STREQUAL "" )
   if ( PATH_TO_CLANG_BUILD STREQUAL "" )
      set(CLANG_APINOTES "clang")
