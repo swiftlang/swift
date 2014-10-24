@@ -524,6 +524,10 @@ public:
         if (Member.hasValue() && E.getMethodWitness().Requirement != *Member)
           continue;
 
+        // The witness could be removed by dead function elimination.
+        if (!E.getMethodWitness().Witness)
+          continue;
+        
         // Otherwise if it is the requirement we are looking for or we just want
         // to deserialize everything, add the function to the list of functions
         // to deserialize.

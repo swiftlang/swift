@@ -47,6 +47,7 @@ public:
     /// The method required.
     SILDeclRef Requirement;
     /// The witness for the method.
+    /// This can be null in case dead function elimination has removed the method.
     SILFunction *Witness;
   };
   

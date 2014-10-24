@@ -1477,10 +1477,14 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     SmallVector<ValueID, 4> ListOfValues;
     handleSILDeclRef(S, methodWitness.Requirement, ListOfValues);
     FuncsToDeclare.insert(methodWitness.Witness);
+    IdentifierID witnessID = 0;
+    if (SILFunction *witness = methodWitness.Witness) {
+      witnessID = S.addIdentifierRef(Ctx.getIdentifier(witness->getName()));
+    }
     WitnessMethodEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[WitnessMethodEntryLayout::Code],
         // SILFunction name
-        S.addIdentifierRef(Ctx.getIdentifier(methodWitness.Witness->getName())),
+        witnessID,
         ListOfValues);
   }
 }

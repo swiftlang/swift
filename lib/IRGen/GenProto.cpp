@@ -3096,10 +3096,14 @@ namespace {
       assert(entry.getMethodWitness().Requirement.getDecl() == iface
              && "sil witness table does not match protocol");
       
-      llvm::Constant *witness
-        = IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
-                                   NotForDefinition);
-      witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
+      SILFunction *Func = entry.getMethodWitness().Witness;
+      llvm::Constant *witness = nullptr;
+      if (Func) {
+        witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
+        witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
+      } else {
+        witness = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      }
       Table.push_back(witness);
       return;
     }

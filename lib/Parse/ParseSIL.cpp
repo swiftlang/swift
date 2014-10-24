@@ -3880,15 +3880,23 @@ bool Parser::parseSILWitnessTable() {
       Identifier FuncName;
       SourceLoc FuncLoc;
       if (WitnessState.parseSILDeclRef(Ref) ||
-          parseToken(tok::colon, diag::expected_sil_witness_colon) ||
-          parseToken(tok::at_sign, diag::expected_sil_function_name) ||
-          WitnessState.parseSILIdentifier(FuncName, FuncLoc,
-                                          diag::expected_sil_value_name))
+          parseToken(tok::colon, diag::expected_sil_witness_colon))
         return true;
-      SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
-      if (!Func) {
-        diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
-        return true;
+      
+      SILFunction *Func = nullptr;
+      if (Tok.is(tok::kw_nil)) {
+        consumeToken();
+      } else {
+        if (parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+            WitnessState.parseSILIdentifier(FuncName, FuncLoc,
+                                        diag::expected_sil_value_name))
+          return true;
+
+        Func = SIL->M->lookUpFunction(FuncName.str());
+        if (!Func) {
+          diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
+          return true;
+        }
       }
       witnessEntries.push_back(SILWitnessTable::MethodWitness{
         Ref, Func

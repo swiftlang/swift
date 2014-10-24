@@ -1936,8 +1936,11 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       ArrayRef<uint64_t> ListOfValues;
       DeclID NameID;
       WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
-      SILFunction *Func = getFuncForReference(MF->getIdentifier(NameID).str());
-      if (Func) {
+      SILFunction *Func = nullptr;
+      if (NameID != 0) {
+        Func = getFuncForReference(MF->getIdentifier(NameID).str());
+      }
+      if (Func || NameID == 0) {
         unsigned NextValueIndex = 0;
         witnessEntries.push_back(SILWitnessTable::MethodWitness{
           getSILDeclRef(MF, ListOfValues, NextValueIndex), Func

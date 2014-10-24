@@ -79,3 +79,20 @@ sil_witness_table public_external InheritedConformance2: InheritedProtocol1 modu
 // CHECK-LABEL: sil_witness_table public InheritedConformance2: AnyProtocol module witness_tables
 // CHECK-NOT: }
 sil_witness_table public InheritedConformance2: AnyProtocol module witness_tables
+
+
+protocol Proto {
+	func abc()
+}
+
+class DeadMethodClass : Proto {
+	func abc()
+}
+
+// CHECK-LABEL: sil_witness_table DeadMethodClass: Proto module witness_tables
+// CHECK: method #Proto.abc!1: nil
+// CHECK: }
+sil_witness_table DeadMethodClass: Proto module witness_tables {
+  method #Proto.abc!1: nil
+}
+
