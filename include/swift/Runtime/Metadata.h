@@ -1786,6 +1786,207 @@ struct GenericMetadata {
   }
 };
 
+/// Kinds of protocol conformance record.
+enum class ProtocolConformanceTypeKind : unsigned {
+  /// The conformance is universal and might apply to any type.
+  /// getDirectType() is nil.
+  Universal,
+
+  /// The conformance is for a nongeneric native struct or enum type.
+  /// getDirectType() points to the canonical metadata for the type.
+  UniqueDirectType,
+  
+  /// The conformance is for a nongeneric foreign struct or enum type.
+  /// getDirectType() points to a nonunique metadata record for the type, which
+  /// needs to be uniqued by the runtime.
+  NonuniqueDirectType,
+  
+  /// The conformance is for a nongeneric class type.
+  /// getIndirectClass() points to a variable that contains the pointer to the
+  /// class object, which may be ObjC and thus require a runtime call to get
+  /// metadata.
+  ///
+  /// On platforms without ObjC interop, this indirection isn't necessary,
+  /// and classes could be emitted as NativeDirectType.
+  UniqueIndirectClass,
+  
+  /// The conformance is for a generic type.
+  /// getGenericPattern() points to the generic metadata pattern used to
+  /// form instances of the type.
+  UniqueGenericPattern,
+};
+  
+/// Kinds of reference to protocol conformance.
+enum class ProtocolConformanceKind : unsigned {
+  /// A direct reference to a protocol witness table.
+  WitnessTable,
+  /// A function pointer that can be called to access the protocol witness
+  /// table.
+  WitnessTableAccessor,
+};
+  
+struct ProtocolConformanceFlags {
+private:
+  using int_type = unsigned;
+  int_type Data;
+  
+  enum : int_type {
+    TypeKindMask = 0x0000000FU,
+    TypeKindShift = 0,
+    ConformanceKindMask = 0x00000010U,
+    ConformanceKindShift = 4,
+  };
+  
+public:
+  constexpr ProtocolConformanceFlags() : Data(0) {}
+  constexpr ProtocolConformanceFlags(int_type Data) : Data(Data) {}
+  
+  constexpr ProtocolConformanceTypeKind getTypeKind() const {
+    return ProtocolConformanceTypeKind((Data >> TypeKindShift) & TypeKindMask);
+  }
+  constexpr ProtocolConformanceFlags withTypeKind(
+                                        ProtocolConformanceTypeKind ptk) const {
+    return ProtocolConformanceFlags(
+                     (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
+  }
+  
+  constexpr ProtocolConformanceKind getConformanceKind() const {
+    return ProtocolConformanceKind((Data >> ConformanceKindShift)
+                                     & ConformanceKindMask);
+  }
+  constexpr ProtocolConformanceFlags withConformanceKind(
+                                            ProtocolConformanceKind pck) const {
+    return ProtocolConformanceFlags(
+       (Data & ~ConformanceKindMask) | (int_type(pck) << ConformanceKindShift));
+  }
+};
+  
+/// The structure of a protocol conformance record.
+///
+/// This contains enough static information to recover the witness table for a
+/// type's conformance to a protocol.
+struct ProtocolConformanceRecord {
+private:
+  /// The protocol being conformed to.
+  const ProtocolDescriptor *Protocol;
+  
+  // Some description of the type that conforms to the protocol.
+  union {
+    /// A direct reference to the metadata.
+    ///
+    /// Depending on the conformance kind, this may not be usable
+    /// metadata without being first processed by the runtime.
+    const Metadata *DirectType;
+    
+    /// An indirect reference to the metadata.
+    const ClassMetadata * const *IndirectClass;
+    
+    /// The generic metadata pattern for a generic type which has instances that
+    /// conform to the protocol.
+    const GenericMetadata *GenericPattern;
+  };
+  
+  using WitnessTableAccessor_t = const void *(*)(const Metadata*);
+  
+  // The conformance, or a generator function for the conformance.
+  union {
+    /// A direct reference to the witness table for the conformance.
+    const void *WitnessTable;
+    
+    /// A function that produces the witness table given an instance of the
+    /// type. The function may return null if a specific instance does not
+    /// conform to the protocol.
+    WitnessTableAccessor_t WitnessTableAccessor;
+  };
+  
+  /// Flags describing the protocol conformance.
+  ProtocolConformanceFlags Flags;
+  
+public:
+  const ProtocolDescriptor *getProtocol() const {
+    return Protocol;
+  }
+  
+  ProtocolConformanceFlags getFlags() const {
+    return Flags;
+  }
+  
+  ProtocolConformanceTypeKind getTypeKind() const {
+    return Flags.getTypeKind();
+  }
+  ProtocolConformanceKind getConformanceKind() const {
+    return Flags.getConformanceKind();
+  }
+  
+  const Metadata *getDirectType() const {
+    switch (Flags.getTypeKind()) {
+    case ProtocolConformanceTypeKind::Universal: // will be null in this case
+    case ProtocolConformanceTypeKind::UniqueDirectType:
+    case ProtocolConformanceTypeKind::NonuniqueDirectType:
+      break;
+        
+    case ProtocolConformanceTypeKind::UniqueIndirectClass:
+    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+      assert(false && "not direct type metadata");
+    }
+
+    return DirectType;
+  }
+  
+  const ClassMetadata * const *getIndirectClass() const {
+    switch (Flags.getTypeKind()) {
+    case ProtocolConformanceTypeKind::Universal: // will be null in this case
+    case ProtocolConformanceTypeKind::UniqueIndirectClass:
+      break;
+        
+    case ProtocolConformanceTypeKind::UniqueDirectType:
+    case ProtocolConformanceTypeKind::NonuniqueDirectType:
+    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+      assert(false && "not indirect class object");
+    }
+    
+    return IndirectClass;
+  }
+  
+  const GenericMetadata *getGenericPattern() const {
+    switch (Flags.getTypeKind()) {
+    case ProtocolConformanceTypeKind::Universal: // will be null in this case
+    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+      break;
+        
+    case ProtocolConformanceTypeKind::UniqueIndirectClass:
+    case ProtocolConformanceTypeKind::UniqueDirectType:
+    case ProtocolConformanceTypeKind::NonuniqueDirectType:
+      assert(false && "not generic metadata pattern");
+    }
+    
+    return GenericPattern;
+  }
+  
+  const void *getWitnessTable() const {
+    switch (Flags.getConformanceKind()) {
+    case ProtocolConformanceKind::WitnessTable:
+      break;
+        
+    case ProtocolConformanceKind::WitnessTableAccessor:
+      assert(false && "not witness table");
+    }
+    return WitnessTable;
+  }
+  
+   WitnessTableAccessor_t getWitnessTableAccessor() const {
+    switch (Flags.getConformanceKind()) {
+    case ProtocolConformanceKind::WitnessTableAccessor:
+      break;
+        
+    case ProtocolConformanceKind::WitnessTable:
+      assert(false && "not witness table accessor");
+    }
+    return WitnessTableAccessor;
+    
+  }
+};
+
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 ///
 /// The basic algorithm for fetching a metadata object is:
