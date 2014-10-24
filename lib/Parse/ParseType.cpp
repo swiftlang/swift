@@ -151,7 +151,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
 
   // Parse Generic Parameters. Generic Parameters are visible in the function
   // body.
-  GenericParamList *generics = maybeParseGenericParams();
+  GenericParamList *generics = nullptr;
+  if (isInSILMode()) {
+    generics = maybeParseGenericParams();
+  }
 
   ParserResult<TypeRepr> ty = parseTypeSimple(MessageID);
   if (ty.hasCodeCompletion())

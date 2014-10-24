@@ -27,3 +27,9 @@ switch state { // expected-error {{use of unresolved identifier 'state'}}
   let duration : Int = 0 // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} \
                          // expected-error {{expected expression}}
 }
+
+// rdar://problem/18507467
+func d(b: String -> <T>() -> T) {} // expected-error {{expected type for function result}} \
+                                   // expected-error 2 {{expected ',' separator}} \
+                                   // expected-error {{expected parameter type following ':'}} \
+                                   // expected-error {{type annotation missing in pattern}}
