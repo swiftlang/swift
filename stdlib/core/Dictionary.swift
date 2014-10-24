@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 // General Mutable, Value-Type Collections
 // =================================================
 //
@@ -2413,86 +2415,6 @@ public struct _DictionaryBuilder<Key : Hashable, Value> {
     _actualCount = -1
     return _result
   }
-}
-
-//===--- Mocks of Cocoa types that we use ---------------------------------===//
-
-import SwiftShims
-
-@objc
-public protocol _SwiftNSFastEnumerationType {
-  func countByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
-  ) -> Int
-}
-
-@objc
-public protocol _SwiftNSEnumeratorType {
-  init()
-  func nextObject() -> AnyObject?
-}
-
-public typealias _SwiftNSZone = COpaquePointer
-
-@objc
-public protocol _SwiftNSCopyingType {
-  func copyWithZone(zone: _SwiftNSZone) -> AnyObject
-}
-
-/// The "core operations" of NSArray
-///
-/// We use layout-compatible type substitutions in these signatures
-/// where necessary to prevent a dependency on Foundation in the core
-/// stdlib.
-@unsafe_no_objc_tagged_pointer @objc
-public protocol _NSArrayCoreType :
-    _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
-
-  func objectAtIndex(index: Int) -> AnyObject
-
-  func getObjects(UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
-
-  func countByEnumeratingWithState(
-         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafeMutablePointer<AnyObject>, count: Int
-  ) -> Int
-
-  func copyWithZone(zone: _SwiftNSZone) -> AnyObject
-
-  var count: Int { get }
-}
-
-@objc
-public protocol _NSDictionaryCoreType :
-    _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
-
-  // The following methods should be overridden when implementing an
-  // NSDictionary subclass.
-
-  // The designated initializer of `NSDictionary`.
-  init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys: UnsafePointer<Void>, count: Int)
-
-  var count: Int { get }
-  func objectForKey(aKey: AnyObject?) -> AnyObject?
-  func keyEnumerator() -> _SwiftNSEnumeratorType?
-
-  // We also override the following methods for efficiency.
-
-  func copyWithZone(zone: _SwiftNSZone) -> AnyObject
-
-  func countByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
-  ) -> Int
-}
-
-@unsafe_no_objc_tagged_pointer @objc
-public protocol _NSDictionaryType : _NSDictionaryCoreType {
-  func getObjects(objects: UnsafeMutablePointer<AnyObject>,
-      andKeys keys: UnsafeMutablePointer<AnyObject>)
 }
 
 /// Call `[lhs isEqual: rhs]`.

@@ -75,6 +75,7 @@ set(SWIFTLIB_ESSENTIAL
   Reverse.swift.gyb
   Runtime.swift.gyb
   Sort.swift.gyb
+  ShadowProtocols.swift
   Shims.swift
   StaticString.swift
   Stride.swift
