@@ -177,6 +177,7 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
+    BCFixed<1>,          // IsFragile.
     DeclIDField,         // ID of protocol decl
     ModuleIDField        // module containing conformance
     // Witness table entries will be serialized after.

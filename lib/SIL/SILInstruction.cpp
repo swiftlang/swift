@@ -1500,12 +1500,17 @@ TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance 
   if (isa<ClangModuleUnit>(typeUnit)
       && C->getDeclContext()->getParentModule() == typeUnit->getParentModule())
     return SILLinkage::Shared;
-  
-  // TODO Access control
-  if (definition)
-    return SILLinkage::Public;
-  else
-    return SILLinkage::PublicExternal;
+
+  switch (C->getProtocol()->getAccessibility()) {
+    case Accessibility::Private:
+      return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+      
+    case Accessibility::Internal:
+      return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
+      
+    default:
+      return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
+  }
 }
 
 static void declareWitnessTable(SILModule &Mod,

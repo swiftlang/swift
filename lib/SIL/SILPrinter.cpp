@@ -1611,6 +1611,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions Options = PrintOptions::printSIL();
   OS << "sil_witness_table ";
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
+  if (isFragile())
+    OS << "[fragile] ";
+
   getConformance()->printName(OS, Options);
 
   if (isDeclaration()) {

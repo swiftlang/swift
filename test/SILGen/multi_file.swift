@@ -44,4 +44,4 @@ class HasComputedProperty: ProtocolWithProperty {
   }
 }
 // CHECK-LABEL: sil hidden [transparent] @_TFC10multi_file19HasComputedPropertym3fooSi : $@cc(method) @thin (Builtin.RawPointer, @owned HasComputedProperty) -> (Builtin.RawPointer, Builtin.Int1) {
-// CHECK-LABEL: sil @_TTWC10multi_file19HasComputedPropertyS_20ProtocolWithPropertyFS1_m3fooSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout HasComputedProperty) -> (Builtin.RawPointer, Builtin.Int1) {
+// CHECK-LABEL: sil hidden @_TTWC10multi_file19HasComputedPropertyS_20ProtocolWithPropertyFS1_m3fooSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout HasComputedProperty) -> (Builtin.RawPointer, Builtin.Int1) {

@@ -21,6 +21,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -29,6 +30,7 @@
 #include "llvm/IR/GlobalValue.h"
 #include "DebugTypeInfo.h"
 #include "IRGen.h"
+#include "IRGenModule.h"
 #include "ValueWitness.h"
 
 namespace llvm {
@@ -41,9 +43,6 @@ namespace swift {
 namespace irgen {
 class TypeInfo;
 class IRGenModule;
-  
-SILLinkage getProtocolConformanceLinkage(IRGenModule &IGM,
-                                         ProtocolConformance *C);
   
 /// A link entity is some sort of named declaration, combined with all
 /// the information necessary to distinguish specific implementations
@@ -76,6 +75,7 @@ class LinkEntity {
     
     // This field appears in ProtocolConformance kinds.
     ConformanceLinkageShift = 8, ConformanceLinkageMask = 0x0700,
+    ConformanceFragilityShift = 11, ConformanceFragilityMask = 0x0800
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -210,10 +210,18 @@ class LinkEntity {
                                  ProtocolConformance *c,
                                  IRGenModule &IGM) {
     assert(isProtocolConformanceKind(kind));
+
+    SILLinkage linkage = SILLinkage::PublicExternal;
+    unsigned isFragile = 0;
+    auto wt = IGM.SILMod->lookUpWitnessTable(c);
+    if (wt.first) {
+      linkage = wt.first->getLinkage();
+      isFragile = wt.first->isFragile() ? 1 : 0;
+    }
     Pointer = c;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
-         | LINKENTITY_SET_FIELD(ConformanceLinkage,
-                       unsigned(irgen::getProtocolConformanceLinkage(IGM, c)));
+         | LINKENTITY_SET_FIELD(ConformanceLinkage, unsigned(linkage))
+         | LINKENTITY_SET_FIELD(ConformanceFragility, isFragile);
   }
 
   void setForType(Kind kind, CanType type) {
@@ -387,6 +395,12 @@ public:
     assert(isProtocolConformanceKind(getKind()));
     
     return SILLinkage(LINKENTITY_GET_FIELD(Data, ConformanceLinkage));
+  }
+  
+  bool isProtocolConformanceFragile() const {
+    assert(isProtocolConformanceKind(getKind()));
+    
+    return LINKENTITY_GET_FIELD(Data, ConformanceFragility) != 0;
   }
   
   ResilienceExpansion getResilienceExpansion() const {

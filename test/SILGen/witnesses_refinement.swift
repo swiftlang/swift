@@ -16,4 +16,4 @@ extension Int: Saturable {
 
 // FIXME-NOT CHECK: sil_witness_table Int: Equatable module witnesses_refinement { 
 // FIXME-NOT CHECK: sil_witness_table Int: Comparable module witnesses_refinement { 
-// CHECK: sil_witness_table Int: Saturable module witnesses_refinement { 
+// CHECK: sil_witness_table hidden Int: Saturable module witnesses_refinement { 

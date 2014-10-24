@@ -6,7 +6,7 @@ protocol A {
 }
 
 struct X<Y> : A {
-  // CHECK-LABEL: define void @_TTWV23dependent_reabstraction1XS_1AFS1_1bUS1__U__fRQPS1_FQS2_1BT_(%swift.type** noalias, %V23dependent_reabstraction1X* noalias, %swift.type* %Self)
+  // CHECK-LABEL: define hidden void @_TTWV23dependent_reabstraction1XS_1AFS1_1bUS1__U__fRQPS1_FQS2_1BT_(%swift.type** noalias, %V23dependent_reabstraction1X* noalias, %swift.type* %Self)
   func b(b: X.Type) {
     let x: Any = b
     println(b as X.Type)

@@ -1829,10 +1829,11 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   DeclID ConformanceTyID;
   unsigned RawLinkage;
   unsigned IsDeclaration;
+  unsigned IsFragile;
   DeclID ProtoID;
   ModuleID OwningModuleID;
   WitnessTableLayout::readRecord(scratch, ConformanceTyID, RawLinkage,
-                                 IsDeclaration, ProtoID, OwningModuleID);
+                          IsDeclaration, IsFragile, ProtoID, OwningModuleID);
   if (ConformanceTyID == 0) {
     DEBUG(llvm::dbgs() << "WitnessTable conforming typeID is 0.\n");
     MF->error();
@@ -1953,7 +1954,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
 
-  wT->convertToDefinition(witnessEntries);
+  wT->convertToDefinition(witnessEntries, IsFragile != 0);
   wTableOrOffset.set(wT, /*fully deserialized*/ true);
   if (Callback)
     Callback->didDeserializeWitnessTableEntries(MF->getAssociatedModule(), wT);

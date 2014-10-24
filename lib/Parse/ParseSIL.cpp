@@ -3738,6 +3738,11 @@ bool Parser::parseSILWitnessTable() {
   Optional<SILLinkage> Linkage;
   parseSILLinkage(Linkage, *this);
   
+  bool isFragile = false;
+  if (parseDeclSILOptional(nullptr, &isFragile, nullptr,
+                           nullptr, nullptr, nullptr, *this))
+    return true;
+
   Scope S(this, ScopeKind::TopLevel);
   // We should use WitnessTableBody. This ensures that the generic params
   // are visible.
@@ -3901,7 +3906,7 @@ bool Parser::parseSILWitnessTable() {
 
   if (!wt)
     wt = SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
-  wt->convertToDefinition(witnessEntries);
+  wt->convertToDefinition(witnessEntries, isFragile);
   BodyScope.reset();
   return false;
 }

@@ -41,5 +41,6 @@ extension NSRuncingOptions: Bub {}
 
 // CHECK-DAG: sil shared @_TTWOSC16NSRuncingOptionsSs16RawRepresentableFS0_CUS0__U__fMQPS0_FT8rawValueQS1_8RawValue_GSqS1__
 
-// Extension conformances get public linkage as normal.
-// CHECK-DAG: sil_witness_table NSRuncingOptions: Bub module objc_enum
+// Extension conformances get linkage occording to the protocol's accessibility, as normal.
+// CHECK-DAG: sil_witness_table hidden NSRuncingOptions: Bub module objc_enum
+

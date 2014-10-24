@@ -8,7 +8,7 @@ import objc_protocols_Bas
 
 // -- Protocol "Frungible" inherits only objc protocols and should have no
 //    out-of-line inherited witnesses in its witness table.
-// CHECK: [[ZIM_FRUNGIBLE_WITNESS:@_TWPC14objc_protocols3ZimS_9Frungible]] = constant [1 x i8*] [
+// CHECK: [[ZIM_FRUNGIBLE_WITNESS:@_TWPC14objc_protocols3ZimS_9Frungible]] = hidden constant [1 x i8*] [
 // CHECK:    i8* bitcast (void (%C14objc_protocols3Zim*, %swift.type*)* @_TTWC14objc_protocols3ZimS_9FrungibleFS1_6frungeUS1___fQPS1_FT_T_ to i8*)
 // CHECK: ]
 

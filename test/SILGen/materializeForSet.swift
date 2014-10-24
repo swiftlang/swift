@@ -101,13 +101,13 @@ struct Bill : Totalled {
 // CHECK:   return [[T3]] : $(Builtin.RawPointer, Builtin.Int1)
 // CHECK: }
 
-// CHECK:  sil @_TTWV17materializeForSet4BillS_8TotalledFS1_m5totalSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Bill) -> (Builtin.RawPointer, Builtin.Int1) {
+// CHECK:  sil hidden @_TTWV17materializeForSet4BillS_8TotalledFS1_m5totalSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Bill) -> (Builtin.RawPointer, Builtin.Int1) {
 // CHECK:  bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[SELF:%.*]] : $*Bill):
 // CHECK:    [[T0:%.*]] = function_ref @_TFV17materializeForSet4Billm5totalSi
 // CHECK:    [[T1:%.*]] = apply [[T0]]([[BUFFER]], [[SELF]])
 // CHECK:    return [[T1]] :
 
-// CHECK: sil_witness_table Bill: Totalled module materializeForSet {
+// CHECK: sil_witness_table hidden Bill: Totalled module materializeForSet {
 // CHECK:   method #Totalled.total!getter.1: @_TTWV17materializeForSet4BillS_8TotalledFS1_g5totalSi
 // CHECK:   method #Totalled.total!setter.1: @_TTWV17materializeForSet4BillS_8TotalledFS1_s5totalSi
 // CHECK:   method #Totalled.total!materializeForSet.1: @_TTWV17materializeForSet4BillS_8TotalledFS1_m5totalSi

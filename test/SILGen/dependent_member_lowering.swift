@@ -9,13 +9,13 @@ struct Foo<T>: P {
   typealias A = T.Type
 
   func f(t: T.Type) {}
-  // CHECK-LABEL: sil @_TTWV25dependent_member_lowering3FooS_1PFS1_1fUS1__U__fRQPS1_FQS2_1AT_ : $@cc(witness_method) @thin <T> (@in Foo<T>.A, @inout Foo<T>) -> ()
+  // CHECK-LABEL: sil hidden @_TTWV25dependent_member_lowering3FooS_1PFS1_1fUS1__U__fRQPS1_FQS2_1AT_ : $@cc(witness_method) @thin <T> (@in Foo<T>.A, @inout Foo<T>) -> ()
   // CHECK:       bb0(%0 : $*@thick T.Type, %1 : $*Foo<T>):
 }
 struct Bar<T>: P {
   typealias A = Int -> T
 
   func f(t: Int -> T) {}
-  // CHECK-LABEL: sil @_TTWV25dependent_member_lowering3BarS_1PFS1_1fUS1__U__fRQPS1_FQS2_1AT_ : $@cc(witness_method) @thin <T> (@in Bar<T>.A, @inout Bar<T>) -> ()
+  // CHECK-LABEL: sil hidden @_TTWV25dependent_member_lowering3BarS_1PFS1_1fUS1__U__fRQPS1_FQS2_1AT_ : $@cc(witness_method) @thin <T> (@in Bar<T>.A, @inout Bar<T>) -> ()
   // CHECK:       bb0(%0 : $*@callee_owned (@out T, @in Int) -> (), %1 : $*Bar<T>):
 }

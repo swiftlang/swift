@@ -1418,6 +1418,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
                            conformanceTypeID,
                            toStableSILLinkage(wt.getLinkage()),
                            unsigned(wt.isDeclaration()),
+                           unsigned(wt.isFragile()),
                            S.addDeclRef(conformance->getProtocol()),
                            owningModuleID);
 

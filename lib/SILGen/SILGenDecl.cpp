@@ -2094,7 +2094,7 @@ public:
 
       // If we have a declaration, convert the witness table to a definition.
       if (wt->isDeclaration()) {
-        wt->convertToDefinition(Entries);
+        wt->convertToDefinition(Entries, SGM.makeModuleFragile);
 
         // Since we had a declaration before, its linkage should be external,
         // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
@@ -2111,7 +2111,7 @@ public:
     }
 
     // Otherwise if we have no witness table yet, create it.
-    return SILWitnessTable::create(SGM.M, Linkage,
+    return SILWitnessTable::create(SGM.M, Linkage, SGM.makeModuleFragile,
                                  Conformance, Entries);
   }
   

@@ -578,16 +578,6 @@ void IRGenModule::emitLazyDefinitions() {
   }
 }
 
-/// As a kludge, try to find the linkage of a SILWitnessTable in the current
-/// SIL module, falling back to public_external if there is none.
-SILLinkage irgen::getProtocolConformanceLinkage(IRGenModule &IGM,
-                                                ProtocolConformance *C) {
-  auto wt = IGM.SILMod->lookUpWitnessTable(C);
-  if (!wt.first)
-    return SILLinkage::PublicExternal;
-  return wt.first->getLinkage();
-}
-
 /// Get SIL-linkage for something that's not required to be visible
 /// and doesn't actually need to be uniqued.
 static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
@@ -676,6 +666,11 @@ bool LinkEntity::isFragile() const {
       
     case Kind::SILGlobalVariable:
       return getSILGlobalVariable()->isFragile();
+      
+    case Kind::DirectProtocolWitnessTable:
+    case Kind::LazyProtocolWitnessTableAccessor:
+    case Kind::DependentProtocolWitnessTableGenerator:
+      return isProtocolConformanceFragile();
       
     default:
       break;

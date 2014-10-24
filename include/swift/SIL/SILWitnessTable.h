@@ -24,6 +24,7 @@
 
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 #include <string>
@@ -178,9 +179,14 @@ private:
   /// whether or not entries is empty since you can have an empty witness table
   /// that is not a declaration.
   bool IsDeclaration;
+ 
+  /// Whether or not this witness table is fragile. Fragile means that the
+  /// table may be serialized and "inlined" into another module.
+  bool IsFragile;
 
   /// Private constructor for making SILWitnessTable definitions.
-  SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
+  SILWitnessTable(SILModule &M, SILLinkage Linkage,
+                  bool IsFragile, StringRef Name,
                   NormalProtocolConformance *Conformance,
                   ArrayRef<Entry> entries);
 
@@ -191,6 +197,7 @@ private:
 public:
   /// Create a new SILWitnessTable definition with the given entries.
   static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
+                                 bool IsFragile,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries);
 
@@ -216,6 +223,9 @@ public:
 
   /// Returns true if this witness table is a definition.
   bool isDefinition() const { return !isDeclaration(); }
+ 
+  /// Returns true if this witness table is fragile.
+  bool isFragile() const { return IsFragile; }
 
   /// Return all of the witness table entries.
   ArrayRef<Entry> getEntries() const { return Entries; }
@@ -230,7 +240,7 @@ public:
   void setLinkage(SILLinkage l) { Linkage = l; }
 
   /// Change a SILWitnessTable declaration into a SILWitnessTable definition.
-  void convertToDefinition(ArrayRef<Entry> newEntries);
+  void convertToDefinition(ArrayRef<Entry> newEntries, bool isFragile);
 
   /// Print the witness table.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;

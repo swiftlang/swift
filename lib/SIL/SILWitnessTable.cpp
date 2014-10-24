@@ -39,7 +39,7 @@ static void mangleConstant(NormalProtocolConformance *C,
 }
 
 SILWitnessTable *
-SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
+SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
                         NormalProtocolConformance *Conformance,
                         ArrayRef<SILWitnessTable::Entry> entries) {
   assert(Conformance && "Can not create a witness table for a null "
@@ -53,8 +53,8 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
-  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Name.str(),
-                                                    Conformance, entries);
+  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, IsFragile,
+                                           Name.str(), Conformance, entries);
 
   // Make sure we have not seen this witness table yet.
   assert(M.WitnessTableLookupCache.find(Conformance) ==
@@ -95,18 +95,19 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
   return wt;
 }
 
-SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
+SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage,
+                                 bool IsFragile, StringRef N,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries)
   : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
     IsDeclaration(true) {
-  convertToDefinition(entries);
+  convertToDefinition(entries, IsFragile);
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
                                  NormalProtocolConformance *Conformance)
   : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-    IsDeclaration(true)
+    IsDeclaration(true), IsFragile(false)
 {}
 
 SILWitnessTable::~SILWitnessTable() {
@@ -129,9 +130,11 @@ SILWitnessTable::~SILWitnessTable() {
   }
 }
 
-void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries) {
+void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries,
+                                          bool isFragile) {
   assert(isDeclaration() && "Definitions should never call this method.");
   IsDeclaration = false;
+  IsFragile = isFragile;
 
   void *buf = Mod.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
   memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
