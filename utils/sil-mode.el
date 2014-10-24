@@ -66,6 +66,7 @@
    `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased"
                     "strong_release" "strong_retain_unowned" "ref_to_unowned"
                     "unowned_to_ref" "unowned_retain" "unowned_release"
+                    "ref_to_unmanaged" "unmanaged_to_ref"
                     "load_weak" "store_weak" "fix_lifetime")
 		  'words) . font-lock-keyword-face)
    ;; Literals
