@@ -2,6 +2,17 @@
 // RUN: FileCheck %s < %t.swiftdeps
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
+// CHECK-LABEL: {{^provides:$}}
+// CHECK-NEXT: IntWrapper{{$}}
+// CHECK-NEXT: =={{$}}
+// CHECK-NEXT: <{{$}}
+// CHECK-NEXT: Subclass{{$}}
+// CHECK-NEXT: ^^^{{$}}
+// CHECK-NEXT: MyArray{{$}}
+// CHECK-NEXT: someGlobal{{$}}
+// CHECK-NEXT: lookUpManyTopLevelNames{{$}}
+// CHECK-NEXT: eof{{$}}
+
 // CHECK-LABEL: {{^top-level:$}}
 
 // CHECK-DAG: Comparable{{$}}
@@ -13,10 +24,12 @@ struct IntWrapper: Comparable {
 // CHECK-DAG: IntWrapper{{$}}
 // CHECK-DAG: Bool{{$}}
 func ==(lhs: IntWrapper, rhs: IntWrapper) -> Bool {
+  // CHECK-DAG: =={{$}}
   return lhs.value == rhs.value
 }
 
 func <(lhs: IntWrapper, rhs: IntWrapper) -> Bool {
+  // CHECK-DAG: <{{$}}
   return lhs.value < rhs.value
 }
 
@@ -50,6 +63,7 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: StringLiteralType{{$}}
   // NEGATIVE-NOT: ForwardIndex{{$}}
   let ForwardIndex = "abc"
+  // CHECK-DAG: println{{$}}
   println(ForwardIndex)
 }
 

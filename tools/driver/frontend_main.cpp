@@ -22,6 +22,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/DependencyFileGenerator.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
@@ -76,7 +77,7 @@ static bool emitMakeDependencies(DiagnosticEngine &Diags,
 
 /// Emits a Swift-style dependencies file.
 static bool emitReferenceDependencies(DiagnosticEngine &diags,
-                                      ReferencedNameTracker &nameTracker,
+                                      SourceFile *SF,
                                       const FrontendOptions &opts) {
   std::error_code EC;
   llvm::raw_fd_ostream out(opts.ReferenceDependenciesFilePath, EC,
@@ -90,10 +91,58 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   }
 
   out << "### Swift dependencies file v0 ###\n";
+
+  out << "provides:\n";
+  for (const Decl *D : SF->Decls) {
+    switch (D->getKind()) {
+    case DeclKind::Import:
+      // FIXME: Handle re-exported decls.
+      break;
+
+    case DeclKind::Extension:
+      // FIXME: Handle extensions.
+      break;
+
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
+      out << "\t" << cast<OperatorDecl>(D)->getName() << "\n";
+      break;
+
+    case DeclKind::TypeAlias:
+    case DeclKind::Enum:
+    case DeclKind::Struct:
+    case DeclKind::Class:
+    case DeclKind::Protocol:
+    case DeclKind::Var:
+    case DeclKind::Func:
+      out << "\t" << cast<ValueDecl>(D)->getName() << "\n";
+      break;
+
+    case DeclKind::PatternBinding:
+    case DeclKind::TopLevelCode:
+    case DeclKind::IfConfig:
+      // No action necessary.
+      break;
+
+    case DeclKind::EnumCase:
+    case DeclKind::GenericTypeParam:
+    case DeclKind::AssociatedType:
+    case DeclKind::Param:
+    case DeclKind::Subscript:
+    case DeclKind::Constructor:
+    case DeclKind::Destructor:
+    case DeclKind::EnumElement:
+      llvm_unreachable("cannot appear at the top level of a file");
+    }
+  }
+
+  // FIXME: Sort these?
   out << "top-level:\n";
-  for (Identifier name : nameTracker.getTopLevelNames()) {
+  for (Identifier name : SF->getReferencedNameTracker()->getTopLevelNames()) {
     out << "\t" << name << "\n";
   }
+
   return false;
 }
 
@@ -196,7 +245,8 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (shouldTrackReferences)
-    emitReferenceDependencies(Context.Diags, nameTracker, opts);
+    emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
+                              opts);
 
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse) {
