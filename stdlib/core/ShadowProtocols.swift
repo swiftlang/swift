@@ -67,8 +67,6 @@ public protocol _NSArrayCoreType :
          objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 
-  func copyWithZone(zone: _SwiftNSZone) -> AnyObject
-
   var count: Int { get }
 }
 
