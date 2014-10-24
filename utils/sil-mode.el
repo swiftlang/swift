@@ -91,7 +91,8 @@
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
    ;; swift declaration as well handled at the top.
    `(,(regexp-opt '("init_enum_data_addr" "unchecked_enum_data"
-                    "unchecked_take_enum_data_addr" "inject_enum_addr")
+                    "unchecked_take_enum_data_addr" "inject_enum_addr"
+                    "select_enum")
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential" "deinit_existential"
