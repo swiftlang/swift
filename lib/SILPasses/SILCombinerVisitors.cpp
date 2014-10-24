@@ -105,12 +105,12 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   SILType Ty = SEAI->getOperand().getType();
   if (!Ty.isLoadable(SEAI->getModule()))
     return nullptr;
-  
+
   SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
   for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
     Cases.push_back(SEAI->getCase(i));
 
-  
+
   SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
   LoadInst *EnumVal = Builder->createLoad(SEAI->getLoc(),
                                           SEAI->getOperand());
@@ -916,7 +916,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
 
   if (I->getBuiltinInfo().ID == BuiltinValueKind::ICMP_NE)
     return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ true);
-  
+
   // Optimize sub(x - x) -> 0.
   if (I->getNumOperands() == 2 &&
       match(I, m_ApplyInst(BuiltinValueKind::Sub, m_ValueBase())) &&
@@ -931,10 +931,11 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   IndexRawPointerInst *Indexraw;
   if (I->getNumOperands() == 2 &&
       match(I, m_BuiltinInst(BuiltinValueKind::Sub,
-                            m_BuiltinInst(BuiltinValueKind::PtrToInt,
-                                        m_IndexRawPointerInst(Indexraw)),
-                            m_BuiltinInst(Bytes2)))) {
-    if (match(Bytes2, m_BuiltinInst(BuiltinValueKind::PtrToInt, m_ValueBase()))) {
+                             m_BuiltinInst(BuiltinValueKind::PtrToInt,
+                                           m_IndexRawPointerInst(Indexraw)),
+                             m_BuiltinInst(Bytes2)))) {
+    if (match(Bytes2,
+              m_BuiltinInst(BuiltinValueKind::PtrToInt, m_ValueBase()))) {
       if (Indexraw->getOperand(0) == Bytes2->getOperand(0) &&
           Indexraw->getOperand(1).getType() == I->getType()) {
         replaceInstUsesWith(*I, Indexraw->getOperand(1).getDef());
@@ -947,7 +948,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   // always the second argument.
   if (I->getNumOperands() != 3)
     return nullptr;
-  
+
   if (match(I, m_ApplyInst(BuiltinValueKind::SMulOver,
                             m_ApplyInst(BuiltinValueKind::Strideof),
                             m_ValueBase(), m_IntegerLiteralInst())) ||
@@ -1216,7 +1217,8 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   MetatypeInst *Metatype;
   if (match(PTAI->getOperand(),
             m_IndexRawPointerInst(m_ValueBase(),
-                                  m_TupleExtractInst(m_BuiltinInst(Bytes), 0)))) {
+                                  m_TupleExtractInst(m_BuiltinInst(Bytes),
+                                                     0)))) {
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),
@@ -1350,8 +1352,9 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitUnconditionalCheckedCastInst(
-                               UnconditionalCheckedCastInst *UCCI) {
+SILInstruction *
+SILCombiner::
+visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
   if (RemoveCondFails) {
     SILModule &Mod = UCCI->getModule();
@@ -1516,7 +1519,7 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *EIT) {
   auto *EI = dyn_cast<EnumInst>(EIT->getEnumOperand());
   if (!EI)
     return nullptr;
-  
+
   SILValue selected;
   for (unsigned i = 0, e = EIT->getNumCases(); i < e; ++i) {
     auto casePair = EIT->getCase(i);
@@ -1532,7 +1535,7 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *EIT) {
     return IntegerLiteralInst::create(inst->getLoc(), inst->getType(),
                                       inst->getValue(), *EIT->getFunction());
   }
-  
+
   return nullptr;
 }
 
