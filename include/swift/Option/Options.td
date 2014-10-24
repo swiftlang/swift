@@ -144,7 +144,7 @@ def save_temps : Flag<["-"], "save-temps">, Flags<[NoInteractiveOption]>,
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption]>,
-  HelpText<"Emit Make-compatible dependencies files">;
+  HelpText<"Emit basic Make-compatible dependencies files">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption]>,

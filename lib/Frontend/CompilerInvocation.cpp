@@ -478,6 +478,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_dependencies,
                           OPT_emit_dependencies_path,
                           "d", false);
+  determineOutputFilename(Opts.ReferenceDependenciesFilePath,
+                          OPT_emit_reference_dependencies,
+                          OPT_emit_reference_dependencies_path,
+                          "swiftdeps", false);
   determineOutputFilename(Opts.SerializedDiagnosticsPath,
                           OPT_serialize_diagnostics,
                           OPT_serialize_diagnostics_path,

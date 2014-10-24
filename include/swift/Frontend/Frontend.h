@@ -269,7 +269,9 @@ class CompilerInstance {
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
+
   DependencyTracker *DepTracker = nullptr;
+  ReferencedNameTracker *NameTracker = nullptr;
 
   Module *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -293,6 +295,7 @@ class CompilerInstance {
   SourceFile *PrimarySourceFile = nullptr;
 
   void createSILModule();
+  void setPrimarySourceFile(SourceFile *SF);
 
 public:
   SourceManager &getSourceMgr() { return SourceMgr; }
@@ -314,6 +317,14 @@ public:
   }
   DependencyTracker *getDependencyTracker() {
     return DepTracker;
+  }
+
+  void setReferencedNameTracker(ReferencedNameTracker *tracker) {
+    assert(!PrimarySourceFile && "must be called before performSema()");
+    NameTracker = tracker;
+  }
+  ReferencedNameTracker *getReferencedNameTracker() {
+    return NameTracker;
   }
 
   /// Set the SIL module for this compilation instance.

@@ -37,7 +37,14 @@ def emit_module_doc_path
 
 def emit_dependencies_path
   : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
-    HelpText<"Output dependencies file to <path>">;
+    HelpText<"Output basic Make-compatible dependencies file to <path>">;
+
+// FIXME: Move the no-argument version to Options.td once it's ready.
+def emit_reference_dependencies : Flag<["-"], "emit-reference-dependencies">,
+  HelpText<"Emit Swift-style dependencies files">;
+def emit_reference_dependencies_path
+  : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
+    HelpText<"Output Swift-style dependencies file to <path>">;
 
 def serialize_diagnostics_path
   : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,

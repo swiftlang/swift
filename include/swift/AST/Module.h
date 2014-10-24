@@ -60,6 +60,7 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolDecl;
   struct PrintOptions;
+  class ReferencedNameTracker;
   class TupleType;
   class Type;
   class TypeRefinementContext;
@@ -717,6 +718,9 @@ private:
 
   /// The root TypeRefinementContext for this SourceFile.
   TypeRefinementContext *TRC = nullptr;
+
+  /// If non-null, used to track name lookups that happen within this file.
+  ReferencedNameTracker *ReferencedNames = nullptr;
   
   friend ASTContext;
   ~SourceFile();
@@ -814,6 +818,14 @@ public:
   PostfixOperatorDecl *lookupPostfixOperator(Identifier name,
                                              SourceLoc diagLoc = {});
   /// @}
+
+  ReferencedNameTracker *getReferencedNameTracker() {
+    return ReferencedNames;
+  }
+  void setReferencedNameTracker(ReferencedNameTracker *Tracker) {
+    assert(!ReferencedNames && "This file already has a name tracker.");
+    ReferencedNames = Tracker;
+  }
 
   /// \brief The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.

@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/DependencyFileGenerator.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
@@ -52,9 +53,10 @@ static std::string displayName(StringRef MainExecutablePath) {
   return Name;
 }
 
-static bool emitDependencies(DiagnosticEngine &Diags,
-                             DependencyFileGenerator &DFG,
-                             const FrontendOptions &opts) {
+/// Emits a Make-style dependencies file.
+static bool emitMakeDependencies(DiagnosticEngine &Diags,
+                                 DependencyFileGenerator &DFG,
+                                 const FrontendOptions &opts) {
   opts.forAllOutputPaths([&DFG](StringRef target) { DFG.addTarget(target); });
 
   std::error_code EC;
@@ -69,6 +71,29 @@ static bool emitDependencies(DiagnosticEngine &Diags,
   }
 
   DFG.writeToStream(out);
+  return false;
+}
+
+/// Emits a Swift-style dependencies file.
+static bool emitReferenceDependencies(DiagnosticEngine &diags,
+                                      ReferencedNameTracker &nameTracker,
+                                      const FrontendOptions &opts) {
+  std::error_code EC;
+  llvm::raw_fd_ostream out(opts.ReferenceDependenciesFilePath, EC,
+                           llvm::sys::fs::F_None);
+
+  if (out.has_error() || EC) {
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   opts.ReferenceDependenciesFilePath, EC.message());
+    out.clear_error();
+    return true;
+  }
+
+  out << "### Swift dependencies file v0 ###\n";
+  out << "top-level:\n";
+  for (Identifier name : nameTracker.getTopLevelNames()) {
+    out << "\t" << name << "\n";
+  }
   return false;
 }
 
@@ -110,6 +135,12 @@ static bool performCompile(CompilerInstance &Instance,
                            ArrayRef<const char *> Args) {
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
+
+  ReferencedNameTracker nameTracker;
+  bool shouldTrackReferences =
+    !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty();
+  if (shouldTrackReferences)
+    Instance.setReferencedNameTracker(&nameTracker);
 
   if (Action == FrontendOptions::DumpParse)
     Instance.performParseOnly();
@@ -161,9 +192,12 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (DependencyTracker *DT = Instance.getDependencyTracker()) {
     auto &DFG = *static_cast<DependencyFileGenerator*>(DT);
-    (void)emitDependencies(Context.Diags, DFG, opts);
+    (void)emitMakeDependencies(Context.Diags, DFG, opts);
   }
-  
+
+  if (shouldTrackReferences)
+    emitReferenceDependencies(Context.Diags, nameTracker, opts);
+
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse) {
     if (!opts.ObjCHeaderOutputPath.empty())

@@ -97,6 +97,9 @@ public:
   /// The path to which we should output a Make-style dependencies file.
   std::string DependenciesFilePath;
 
+  /// The path to which we should output a Swift reference dependencies file.
+  std::string ReferenceDependenciesFilePath;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 

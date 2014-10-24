@@ -35,8 +35,18 @@
 using namespace swift;
 
 void CompilerInstance::createSILModule() {
-  assert(getMainModule());
+  assert(MainModule && "main module not created yet");
   TheSILModule = SILModule::createEmptyModule(getMainModule());
+}
+
+void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
+  assert(SF);
+  assert(MainModule && "main module not created yet");
+  assert(!PrimarySourceFile && "already has a primary source file");
+  assert(PrimaryBufferID == NO_SUCH_BUFFER || !SF->getBufferID().hasValue() ||
+         SF->getBufferID().getValue() == PrimaryBufferID);
+  PrimarySourceFile = SF;
+  PrimarySourceFile->setReferencedNameTracker(NameTracker);
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -318,7 +328,7 @@ void CompilerInstance::performSema() {
     addAdditionalInitialImports(MainFile);
 
     if (MainBufferID == PrimaryBufferID)
-      PrimarySourceFile = MainFile;
+      setPrimarySourceFile(MainFile);
   }
 
   bool hadLoadError = false;
@@ -344,7 +354,7 @@ void CompilerInstance::performSema() {
     addAdditionalInitialImports(NextInput);
 
     if (BufferID == PrimaryBufferID)
-      PrimarySourceFile = NextInput;
+      setPrimarySourceFile(NextInput);
 
     bool Done;
     parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
@@ -430,7 +440,7 @@ void CompilerInstance::performParseOnly() {
                                           BufferIDs[0],
                                     SourceFile::ImplicitModuleImportKind::None);
   MainModule->addFile(*Input);
-  PrimarySourceFile = Input;
+  setPrimarySourceFile(Input);
 
   PersistentParserState PersistentState;
   bool Done;

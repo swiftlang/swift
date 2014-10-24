@@ -1107,6 +1107,8 @@ static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
 {
+  // FIXME: Operator lookup is a kind of top-level lookup too. We should be
+  // tracking this in a SourceFile's ReferencedNameTracker.
   OP_DECL *result = nullptr;
   for (const FileUnit *File : M->getFiles()) {
     auto next = lookupOperatorDeclForName(*File, Loc, Name, false, OP_MAP);

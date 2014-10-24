@@ -15,10 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/LazyResolver.h"
-#include "swift/AST/DebuggerClient.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/DebuggerClient.h"
+#include "swift/AST/LazyResolver.h"
+#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
@@ -421,6 +422,17 @@ static void filterForDiscriminator(SmallVectorImpl<Result> &results,
   results.push_back(lastMatch);
 }
 
+static void recordLookupOfTopLevelName(DeclContext *topLevelContext,
+                                       DeclName name) {
+  auto SF = dyn_cast<SourceFile>(topLevelContext);
+  if (!SF)
+    return;
+  auto *nameTracker = SF->getReferencedNameTracker();
+  if (!nameTracker)
+    return;
+  nameTracker->addTopLevelName(name.getBaseName());
+}
+
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      SourceLoc Loc, bool IsTypeLookup) {
@@ -626,16 +638,18 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     }
   }
 
-  // Add private imports to the extra search list.
-  SmallVector<Module::ImportedModule, 8> extraImports;
-  if (auto FU = dyn_cast<FileUnit>(DC))
-    FU->getImportedModules(extraImports, Module::ImportFilter::Private);
-
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName()
       && DebugClient && DebugClient->lookupOverrides(Name.getBaseName(), DC,
                                                    Loc, IsTypeLookup, Results))
     return;
+
+  recordLookupOfTopLevelName(DC, Name);
+
+  // Add private imports to the extra search list.
+  SmallVector<Module::ImportedModule, 8> extraImports;
+  if (auto FU = dyn_cast<FileUnit>(DC))
+    FU->getImportedModules(extraImports, Module::ImportFilter::Private);
 
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
@@ -691,10 +705,9 @@ UnqualifiedLookup::forModuleAndName(ASTContext &C,
 }
 
 TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
-  if (Results.size() != 1 || !Results.back().hasValueDecl() ||
-      !isa<TypeDecl>(Results.back().getValueDecl()))
+  if (Results.size() != 1 || !Results.back().hasValueDecl())
     return nullptr;
-  return cast<TypeDecl>(Results.back().getValueDecl());
+  return dyn_cast<TypeDecl>(Results.back().getValueDecl());
 }
 
 #pragma mark Member lookup table
@@ -1078,10 +1091,16 @@ bool DeclContext::lookupQualified(Type type,
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
+      recordLookupOfTopLevelName(topLevelScope, member);
       lookupInModule(module, /*accessPath=*/{}, member, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                      typeResolver, topLevelScope);
     } else {
+      // Note: This is a lookup into another module. Unless we're compiling
+      // multiple modules at once, or if the other module re-exports this one,
+      // it shouldn't be possible to have a dependency from that module on
+      // anything in this one.
+
       // Perform the lookup in all imports of this module.
       forAllVisibleModules(this,
                            [&](const Module::ImportedModule &import) -> bool {
