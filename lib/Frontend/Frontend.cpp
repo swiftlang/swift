@@ -390,7 +390,7 @@ void CompilerInstance::performSema() {
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
     
-    if (mainIsPrimary && Invocation.getLangOptions().Playground)
+    if (mainIsPrimary && Invocation.getFrontendOptions().PlaygroundTransform)
       performPlaygroundTransform(MainFile);
     if (!mainIsPrimary)
       performNameBinding(MainFile);

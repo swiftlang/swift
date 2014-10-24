@@ -149,6 +149,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
 
+  Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
+
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
       Opts.PrintHelp = true;

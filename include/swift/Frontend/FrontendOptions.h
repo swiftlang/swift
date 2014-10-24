@@ -164,7 +164,7 @@ public:
   bool PrintClangStats = false;
 
   /// Indicates whether the playground transformation should be applied.
-  bool Playground = false;
+  bool PlaygroundTransform = false;
 
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
