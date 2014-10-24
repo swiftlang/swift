@@ -20,21 +20,27 @@
 
 import SwiftShims
 
-/// Return whether the given `index` is valid, i.e. `0 ≤ index ≤ count`
+/// Return true iff the given `index` is valid as a position, i.e. `0
+/// ≤ index ≤ count`
 @transparent
 internal func _isValidArrayIndex(index: Int, count: Int) -> Bool {
   return (index >= 0) & (index <= count)
 }
 
-/// Return whether the given `index` is valid for subscripting, i.e.
+/// Return true iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`
 @transparent
 internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   return (index >= 0) & (index < count)
 }
 
-/// `Swift.Array` bridges to this class, which is a subclass of `NSArray`.
-@objc internal final class _SwiftNativeNSArray : _NSArrayCoreType {
+/// An `NSArray` whose contiguous storage is created and filled, upon
+/// first access, by bridging the elements of a Swift `Array`.
+///
+/// Ideally instances of this class would be allocated in-line in the
+/// buffers used for Array storage.
+@objc internal final class _SwiftDeferredNSArray
+  : _SwiftNativeNSArray, _NSArrayCoreType {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it.
@@ -42,6 +48,8 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   // Do not access this property directly.
   internal var _heapBufferBridged_DoNotUse: AnyObject? = nil
 
+  // When this class is allocated inline, this property can become a
+  // computed one.
   internal let _nativeStorage: _ContiguousArrayStorageBase
 
   internal var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {

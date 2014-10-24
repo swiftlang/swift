@@ -83,11 +83,11 @@ for x: AnyObject in s_m {
   println(x.description!)
 }
 
-// Enumeration over a _SwiftNativeNSArray
-// CHECK: hello
-// CHECK: bridged
-// CHECK: array
-var a2 = ["hello", "bridged", "array"]
+// Enumeration over a _SwiftDeferredNSArray
+// CHECK: 3
+// CHECK: 2
+// CHECK: 1
+var a2 = [3, 2, 1]
 var nsa2 = (a2._asCocoaArray() as AnyObject) as NSArray
 for x: AnyObject in nsa2 {
   println(x.description!)

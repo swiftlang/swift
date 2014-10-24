@@ -388,10 +388,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
         _isBridgedToObjectiveC(T.self),
         "Array element type is not bridged to ObjectiveC")
     if count == 0 {
-      return _SwiftNativeNSArray(
+      return _SwiftDeferredNSArray(
         _nativeStorage: _emptyArrayStorage)
     }
-    return _SwiftNativeNSArray(_nativeStorage: _storage!)
+    return _SwiftDeferredNSArray(_nativeStorage: _storage!)
   }
 
   /// An object that keeps the elements stored in this buffer alive

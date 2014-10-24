@@ -401,7 +401,7 @@ func _rawPointerToString(value: Builtin.RawPointer) -> String {
 //
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
-extension _SwiftNativeNSArray {} // See NSSwiftArray.swift
+@objc class _SwiftNativeNSArray {}
 @objc class _SwiftNativeNSDictionary {}
 @objc class _SwiftNativeNSEnumerator {}
 
