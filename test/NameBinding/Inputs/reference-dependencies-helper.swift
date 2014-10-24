@@ -4,3 +4,18 @@ class ClassFromOtherFile {}
 typealias AliasFromOtherFile = Int16
 
 func funcFromOtherFile() {}
+
+struct OtherFileOuterType {
+  struct InnerType {
+    static let sharedConstant = 42
+  }
+}
+
+struct OtherFileSecretTypeWrapper {
+  struct SecretType {
+    static let constant = 42
+  }
+}
+
+typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
+

@@ -59,17 +59,43 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: funcFromOtherFile{{$}}
   funcFromOtherFile()
 
-  // "ForwardIndex" is not used as a top-level name here.
+  // "CInt" is not used as a top-level name here.
   // CHECK-DAG: StringLiteralType{{$}}
-  // NEGATIVE-NOT: ForwardIndex{{$}}
-  let ForwardIndex = "abc"
+  // NEGATIVE-NOT: CInt{{$}}
+  let CInt = "abc"
   // CHECK-DAG: println{{$}}
-  println(ForwardIndex)
+  println(CInt)
+
+  // NEGATIVE-NOT: max{{$}}
+  println(Int.max)
+
+  // NEGATIVE-NOT: Stride{{$}}
+  let _: Int.Stride = 0
+
+  // CHECK-DAG: OtherFileOuterType{{$}}
+  _ = OtherFileOuterType.InnerType.sharedConstant
+
+  // CHECK-DAG: OtherFileAliasForSecret{{$}}
+  _ = OtherFileAliasForSecret.constant
 }
 
-// String is not used anywhere in this file.
+// CHECK-LABEL: {{^member-access:$}}
+// CHECK-DAG: V4main10IntWrapper{{$}}
+// CHECK-DAG: C4main18ClassFromOtherFile{{$}}
+// CHECK-DAG: C4main8Subclass{{$}}
+// CHECK-DAG: Si{{$}}
+// CHECK-DAG: PSs10Strideable{{$}}
+// CHECK-DAG: V4main18OtherFileOuterType{{$}}
+// CHECK-DAG: VV4main18OtherFileOuterType9InnerType{{$}}
+// CHECK-DAG: VV4main26OtherFileSecretTypeWrapper10SecretType{{$}}
+
+// String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: String{{$}}
 // Int16 is used by the other file in this module, but not by this one.
 // NEGATIVE-NOT: Int16{{$}}
+
+// OtherFileSecretTypeWrapper is never used directly in this file.
+// NEGATIVE-NOT: OtherFileSecretTypeWrapper{{$}}
+// NEGATIVE-NOT: V4main26OtherFileSecretTypeWrapper{{$}}
 
 let eof: () = ()

@@ -1222,12 +1222,18 @@ bool DeclContext::lookupQualified(Type type,
     return true;
   };
 
+  ReferencedNameTracker *tracker = nullptr;
+  if (auto containingSourceFile = dyn_cast<SourceFile>(getModuleScopeContext()))
+    tracker = containingSourceFile->getReferencedNameTracker();
+
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> knownConformances;
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
+    if (tracker)
+      tracker->addUsedNominal(current);
 
     // Make sure we've resolved implicit constructors, if we need them.
     if (member.getBaseName() == ctx.Id_init && typeResolver)

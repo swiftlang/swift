@@ -21,6 +21,7 @@ namespace swift {
 
 class ReferencedNameTracker {
   SmallPtrSet<Identifier, 1> TopLevelNames;
+  SmallPtrSet<const NominalTypeDecl *, 1> UsedNominals;
 public:
   void addTopLevelName(Identifier name) {
     TopLevelNames.insert(name);
@@ -28,6 +29,14 @@ public:
 
   const SmallPtrSetImpl<Identifier> &getTopLevelNames() const {
     return TopLevelNames;
+  }
+
+  void addUsedNominal(const NominalTypeDecl *nominal) {
+    UsedNominals.insert(nominal);
+  }
+
+  const SmallPtrSetImpl<const NominalTypeDecl *> &getUsedNominals() const {
+    return UsedNominals;
   }
 };
 

@@ -137,10 +137,25 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     }
   }
 
+  ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
+
   // FIXME: Sort these?
   out << "top-level:\n";
-  for (Identifier name : SF->getReferencedNameTracker()->getTopLevelNames()) {
+  for (Identifier name : tracker->getTopLevelNames()) {
     out << "\t" << name << "\n";
+  }
+
+  // FIXME: Sort these?
+  out << "member-access:\n";
+  for (auto usedNominal : tracker->getUsedNominals()) {
+    if (usedNominal->hasAccessibility() &&
+        usedNominal->getAccessibility() == Accessibility::Private)
+      continue;
+
+    Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
+    out << "\t";
+    mangler.mangleContext(usedNominal, Mangle::Mangler::BindGenerics::None);
+    out << "\n";
   }
 
   return false;
