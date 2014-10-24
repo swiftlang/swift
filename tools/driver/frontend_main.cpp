@@ -115,9 +115,15 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::Class:
     case DeclKind::Protocol:
     case DeclKind::Var:
-    case DeclKind::Func:
+    case DeclKind::Func: {
+      auto *VD = cast<ValueDecl>(D);
+      if (VD->hasAccessibility() &&
+          VD->getAccessibility() == Accessibility::Private) {
+        break;
+      }
       out << "\t" << cast<ValueDecl>(D)->getName() << "\n";
       break;
+    }
 
     case DeclKind::PatternBinding:
     case DeclKind::TopLevelCode:

@@ -79,6 +79,9 @@ func lookUpManyTopLevelNames() {
   _ = OtherFileAliasForSecret.constant
 }
 
+// NEGATIVE-NOT: privateFunc{{$}}
+private func privateFunc() {}
+
 // CHECK-LABEL: {{^member-access:$}}
 // CHECK-DAG: V4main10IntWrapper{{$}}
 // CHECK-DAG: C4main18ClassFromOtherFile{{$}}
