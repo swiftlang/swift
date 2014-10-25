@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
@@ -53,13 +54,68 @@ extern "C" const void *swift_dynamicCastObjCProtocolConditional(
                          size_t numProtocols,
                          const ProtocolDescriptor * const *protocols);
 
-/// Report a dynamic cast failure.
-LLVM_ATTRIBUTE_NORETURN
-LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
-static void _dynamicCastFailure(const Metadata *sourceType,
-                                const Metadata *targetType) {
-  swift::crash("Swift dynamic cast failure");
+// Return a user-comprehensible name for the given type.
+// FIXME: this only works well for Class/Struct/Enum types. rdar://16392852
+static std::string nameForMetadata(const Metadata *type) {
+  auto descriptor = type->getNominalTypeDescriptor();
+  if (descriptor && descriptor->Name) {
+    auto mangled = std::string("_Tt") + descriptor->Name;
+    return Demangle::demangleSymbolAsString(mangled);
+  }
+
+  switch (type->getKind()) {
+  case MetadataKind::Class: 
+    return "<unknown class type>";
+  case MetadataKind::ObjCClassWrapper: 
+    return "<unknown Objective-C class type>";
+  case MetadataKind::ForeignClass:
+    return "<unknown foreign class type>";
+  case MetadataKind::Existential:
+    return "<unknown existential type>";
+  case MetadataKind::ExistentialMetatype:
+    return "<unknown existential metatype>";
+  case MetadataKind::Function:
+    return "<unknown function type>";
+  case MetadataKind::Block:
+    return "<unknown Objective-C block object type>";
+  case MetadataKind::HeapLocalVariable:
+    return "<unknown type>";
+  case MetadataKind::Metatype:
+    return "<unknown metatype>";
+  case MetadataKind::Enum:
+    return "<unknown enum type>";
+  case MetadataKind::Opaque:
+    return "<unknown type>";
+  case MetadataKind::PolyFunction:
+    return "<unknown polymorphic function type>";
+  case MetadataKind::Struct:
+    return "<unknown struct type>";
+  case MetadataKind::Tuple:
+    return "<unknown tuple type>";
+  }
+  return "<unknown type>";
 }
+
+/// Report a dynamic cast failure.
+// This is noinline with asm("") to preserve this frame in stack traces.
+// We want "dynamicCastFailure" to appear in crash logs even we crash 
+// during the diagnostic because some Metadata is invalid.
+LLVM_ATTRIBUTE_NORETURN
+LLVM_ATTRIBUTE_NOINLINE
+static void swift_dynamicCastFailure(const Metadata *sourceType,
+                                     const Metadata *targetType, 
+                                     const char *message = nullptr) {
+  asm("");
+
+  std::string sourceName = nameForMetadata(sourceType);
+  std::string targetName = nameForMetadata(targetType);
+
+  swift::fatalError("Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
+                    sourceName.c_str(), (void *)sourceType, 
+                    targetName.c_str(), (void *)targetType, 
+                    message ? ": " : ".", message ?: "");
+}
+
 
 /// Report a corrupted type object.
 LLVM_ATTRIBUTE_NORETURN
@@ -103,7 +159,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 static bool _fail(OpaqueValue *srcValue, const Metadata *srcType,
                   const Metadata *targetType, DynamicCastFlags flags) {
   if (flags & DynamicCastFlags::Unconditional)
-    _dynamicCastFailure(srcType, targetType);
+    swift_dynamicCastFailure(srcType, targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
     srcType->vw_destroy(srcValue);
   return false;
@@ -132,7 +188,7 @@ swift::swift_dynamicCastClass(const void *object,
 
   // Swift native classes never have a tagged-pointer representation.
   if (isObjCTaggedPointerOrNull(object)) {
-    return NULL;
+    return nullptr;
   }
 #endif
 
@@ -145,7 +201,7 @@ swift::swift_dynamicCastClass(const void *object,
     isa = _swift_getSuperclass(isa);
   } while (isa);
 
-  return NULL;
+  return nullptr;
 }
 
 /// Dynamically cast a class object to a Swift class type.
@@ -153,10 +209,9 @@ const void *
 swift::swift_dynamicCastClassUnconditional(const void *object,
                                            const ClassMetadata *targetType) {
   auto value = swift_dynamicCastClass(object, targetType);
-  if (value == nullptr) {
-    swift::crash("Swift dynamic cast failed");
-  }
-  return value;
+  if (value) return value;
+
+  swift_dynamicCastFailure(_swift_getClass(object), targetType);
 }
 
 static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
@@ -548,9 +603,9 @@ swift::swift_dynamicCastUnknownClass(const void *object,
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
-    swift::crash("Swift dynamic cast failed");
+    swift_dynamicCastFailure(_swift_getClass(object), targetType);
   }
-  swift::crash("bad metadata kind!");
+  _failCorruptType(targetType);
 }
 
 /// Perform a dynamic class of some sort of class instance to some
@@ -586,9 +641,9 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
-    swift::crash("Swift dynamic cast failed");
+    swift_dynamicCastFailure(_swift_getClass(object), targetType);
   }
-  swift::crash("bad metadata kind!");
+  _failCorruptType(targetType);
 }
 
 const Metadata *
@@ -740,7 +795,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
-      _dynamicCastFailure(sourceType, targetType);
+      swift_dynamicCastFailure(sourceType, targetType);
     }
     break;
     
@@ -771,7 +826,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
-      _dynamicCastFailure(sourceType, targetType);
+      swift_dynamicCastFailure(sourceType, targetType);
     }
     break;
   case MetadataKind::Existential:
@@ -788,7 +843,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     // The cast succeeds only if the metadata pointers are statically
     // equivalent.
     if (sourceType != targetType)
-      _dynamicCastFailure(sourceType, targetType);
+      swift_dynamicCastFailure(sourceType, targetType);
     return origSourceType;
   }
 }
@@ -924,13 +979,13 @@ static const Metadata *_getUnknownClassAsMetatype(void *object) {
 /// Perform a dynamic cast of a class value to a metatype type.
 static bool _dynamicCastUnknownClassToMetatype(OpaqueValue *dest,
                                                void *object,
-                                               const MetatypeMetadata *targetType,
+                                             const MetatypeMetadata *targetType,
                                                DynamicCastFlags flags) {
   if (auto metatype = _getUnknownClassAsMetatype(object))
     return _dynamicCastMetatypeToMetatype(dest, metatype, targetType, flags);
 
   if (flags & DynamicCastFlags::Unconditional)
-    _dynamicCastFailure(swift_getObjectType((HeapObject*) object), targetType);
+    swift_dynamicCastFailure(_swift_getClass(object), targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
     swift_release((HeapObject*) object);
   return false;
@@ -1015,7 +1070,7 @@ static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
       const ProtocolDescriptor *protocol = protocols[i];
       if (!_conformsToProtocol(nullptr, srcMetatype, protocol, nullptr)) {
         if (flags & DynamicCastFlags::Unconditional)
-          _dynamicCastFailure(srcMetatype, targetType);
+          swift_dynamicCastFailure(srcMetatype, targetType);
         return false;
       }
     }
@@ -1033,7 +1088,7 @@ static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
   auto srcMetatypeMetatype = dyn_cast<MetatypeMetadata>(srcMetatype);
   if (!srcMetatypeMetatype) {
     if (flags & DynamicCastFlags::Unconditional)
-      _dynamicCastFailure(srcMetatype, targetType);
+      swift_dynamicCastFailure(srcMetatype, targetType);
     return false;
   }
 
@@ -1068,7 +1123,7 @@ static bool _dynamicCastUnknownClassToExistentialMetatype(OpaqueValue *dest,
   
   // Class values are currently never metatypes (?).
   if (flags & DynamicCastFlags::Unconditional)
-    _dynamicCastFailure(swift_getObjectType((HeapObject*) object), targetType);
+    swift_dynamicCastFailure(_swift_getClass(object), targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
     swift_release((HeapObject*) object);
   return false;
@@ -1126,7 +1181,7 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     if (flags & DynamicCastFlags::Unconditional) {
-      _dynamicCastFailure(srcType, targetType);
+      swift_dynamicCastFailure(srcType, targetType);
     }
     return false;
   }
@@ -1353,7 +1408,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
-      swift::crash("Swift dynamic cast failed");
+      swift_dynamicCastFailure(sourceType, targetType);
     }
     break;
 
@@ -1361,7 +1416,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     auto r = _dynamicCastToExistential(value, sourceType,
                                    (const ExistentialTypeMetadata*)targetType);
     if (!r)
-      swift::crash("Swift dynamic cast failed");
+      swift_dynamicCastFailure(sourceType, targetType);
     return r;
   }
     
@@ -1378,7 +1433,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     // The cast succeeds only if the metadata pointers are statically
     // equivalent.
     if (sourceType != targetType)
-      swift::crash("Swift dynamic cast failed");
+      swift_dynamicCastFailure(sourceType, targetType);
     break;
   }
   
