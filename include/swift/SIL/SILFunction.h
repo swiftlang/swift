@@ -378,6 +378,26 @@ public:
     getBlocks().splice(begin(), F->getBlocks());
   }
 
+  /// Return the unique basic block containing a return inst if it
+  /// exists. Otherwise, returns end.
+  iterator findReturnBB() {
+    return std::find_if(begin(), end(),
+      [](const SILBasicBlock &BB) -> bool {
+        const TermInst *TI = BB.getTerminator();
+        return isa<ReturnInst>(TI);
+    });
+  }
+
+  /// Return the unique basic block containing a return inst if it
+  /// exists. Otherwise, returns end.
+  const_iterator findReturnBB() const {
+    return std::find_if(begin(), end(),
+      [](const SILBasicBlock &BB) -> bool {
+        const TermInst *TI = BB.getTerminator();
+        return isa<ReturnInst>(TI);
+    });
+  }
+
   //===--------------------------------------------------------------------===//
   // Miscellaneous
   //===--------------------------------------------------------------------===//
