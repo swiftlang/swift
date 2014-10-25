@@ -34,13 +34,92 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   return (index >= 0) & (index < count)
 }
 
+/// An `NSArray` with Swift-native reference counting and contiguous
+/// storage.
+class _SwiftNativeNSArrayWithContiguousStorage
+  : _SwiftNativeNSArray { // provides NSArray inheritance and native refcounting
+
+  // Operate on our contiguous storage
+  internal func withUnsafeBufferOfObjects<R>(
+    body: (UnsafeBufferPointer<AnyObject>)->R
+  ) -> R {
+    _sanityCheckFailure(
+      "Must override withUnsafeBufferOfObjects in derived classes")
+  }
+}
+
+// Implement the APIs required by NSArray 
+extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
+  @objc internal var count: Int {
+    return withUnsafeBufferOfObjects { $0.count }
+  }
+
+  @objc internal final func objectAtIndex(index: Int) -> AnyObject {
+    return withUnsafeBufferOfObjects {
+      objects in
+      _precondition(
+        _isValidArraySubscript(index, objects.count),
+        "Array index out of range")
+      return objects[index]
+    }
+  }
+
+  @objc internal func getObjects(
+    aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
+  ) {
+    return withUnsafeBufferOfObjects {
+      objects in
+      _precondition(
+        _isValidArrayIndex(range.location, objects.count),
+        "Array index out of range")
+
+      _precondition(
+        _isValidArrayIndex(
+          range.location + range.length, objects.count),
+        "Array index out of range")
+
+      // These objects are "returned" at +0, so treat them as values to
+      // avoid retains.
+      UnsafeMutablePointer<Word>(aBuffer).initializeFrom(
+        UnsafeMutablePointer(objects.baseAddress + range.location),
+        count: range.length)
+    }
+  }
+
+  @objc internal func countByEnumeratingWithState(
+    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  ) -> Int {
+    var enumerationState = state.memory
+
+    if enumerationState.state != 0 {
+      return 0
+    }
+
+    return withUnsafeBufferOfObjects {
+      objects in
+      enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+      enumerationState.itemsPtr = unsafeBitCast(
+        objects.baseAddress,
+        AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
+      enumerationState.state = 1
+      state.memory = enumerationState
+      return objects.count
+    }
+  }
+
+  @objc internal func copyWithZone(_: _SwiftNSZone) -> AnyObject {
+    return self
+  }
+}
+
 /// An `NSArray` whose contiguous storage is created and filled, upon
 /// first access, by bridging the elements of a Swift `Array`.
 ///
 /// Ideally instances of this class would be allocated in-line in the
 /// buffers used for Array storage.
 @objc internal final class _SwiftDeferredNSArray
-  : _SwiftNativeNSArray, _NSArrayCoreType {
+  : _SwiftNativeNSArrayWithContiguousStorage {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it.
@@ -82,7 +161,7 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     _destroyBridgedStorage(_heapBufferBridged)
   }
 
-  internal func _withBridgedUnsafeBuffer<R>(
+  internal override func withUnsafeBufferOfObjects<R>(
     body: (UnsafeBufferPointer<AnyObject>)->R
   ) -> R {
     do {
@@ -97,23 +176,26 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
 
       // If elements are bridged verbatim, the native buffer is all we
       // need, so return that.
-      else if let buf = _nativeStorage._withVerbatimBridgedUnsafeBuffer({ $0 }) {
+      else if let buf = _nativeStorage._withVerbatimBridgedUnsafeBuffer(
+        { $0 }
+      ) {
         buffer = buf
       }
       else {
         // Create buffer of bridged objects.
-        let bridgedHeapBuffer = _nativeStorage._getNonVerbatimBridgedHeapBuffer()
+        let objects = _nativeStorage._getNonVerbatimBridgedHeapBuffer()
         
         // Atomically store a reference to that buffer in self.
         if !_stdlib_atomicInitializeARCRef(
-          object: _heapBufferBridgedPtr, desired: bridgedHeapBuffer.storage!) {
+          object: _heapBufferBridgedPtr, desired: objects.storage!) {
+
           // Another thread won the race.  Throw out our buffer
-          let storage: HeapBufferStorage
-            = unsafeDowncast(bridgedHeapBuffer.storage!)
+          let storage: HeapBufferStorage = unsafeDowncast(objects.storage!)
           _destroyBridgedStorage(storage)
         }
         continue // try again
       }
+      
       let result = body(buffer)
       _fixLifetime(self)
       return result
@@ -121,15 +203,12 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     while true
   }
 
-  //
-  // NSArray implementation.
-  //
-  // Do not call any of these methods from the standard library!
-  //
-
-  @objc internal var count: Int {
-    // Note: calling this function should not trigger bridging of array
-    // elements, there is no need in that.
+  /// Return the number of elements in the array
+  ///
+  /// This override allows the count can be read without triggering
+  /// bridging of array elements
+  @objc
+  internal override var count: Int {
     if let bridgedStorage = _heapBufferBridged {
       return _HeapBuffer(bridgedStorage).value
     }
@@ -138,70 +217,22 @@ internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
     return _nativeStorage._withVerbatimBridgedUnsafeBuffer { $0.count }
       ?? _nativeStorage._getNonVerbatimBridgedCount()
   }
-
-  @objc internal func objectAtIndex(index: Int) -> AnyObject {
-    return _withBridgedUnsafeBuffer {
-      objects in
-      _precondition(
-        _isValidArraySubscript(index, objects.count),
-        "Array index out of range")
-      return objects[index]
-    }
-  }
-
-  @objc internal func getObjects(
-    aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
-  ) {
-    return _withBridgedUnsafeBuffer {
-      objects in
-      _precondition(
-        _isValidArrayIndex(range.location, objects.count),
-        "Array index out of range")
-
-      _precondition(
-        _isValidArrayIndex(
-          range.location + range.length, objects.count),
-        "Array index out of range")
-
-      // These objects are "returned" at +0, so treat them as values to
-      // avoid retains.
-      UnsafeMutablePointer<Word>(aBuffer).initializeFrom(
-        UnsafeMutablePointer(objects.baseAddress + range.location),
-        count: range.length)
-    }
-  }
-
-  @objc internal func countByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
-  ) -> Int {
-    var enumerationState = state.memory
-
-    if enumerationState.state != 0 {
-      return 0
-    }
-
-    return _withBridgedUnsafeBuffer {
-      objects in
-      enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      enumerationState.itemsPtr = unsafeBitCast(
-        objects.baseAddress,
-        AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
-      enumerationState.state = 1
-      state.memory = enumerationState
-      return objects.count
-    }
-  }
-
-  @objc internal func copyWithZone(_: _SwiftNSZone) -> AnyObject {
-    return self
-  }
 }
 
-/// Base class of the heap buffer backing arrays.  The only reason
-/// this is not a class protocol instead, is that instances of class
-/// protocols are fatter than plain object references.
-class _ContiguousArrayStorageBase {
+/// Base class of the heap buffer backing arrays.  
+internal class _ContiguousArrayStorageBase
+  : _SwiftNativeNSArrayWithContiguousStorage {
+
+  internal override func withUnsafeBufferOfObjects<R>(
+    body: (UnsafeBufferPointer<AnyObject>)->R
+  ) -> R {
+    if let result = _withVerbatimBridgedUnsafeBuffer(body) {
+      return result
+    }
+    _sanityCheckFailure(
+      "Can't use a buffer of non-verbatim-bridged elements as an NSArray")
+  }
+
   /// If the stored type is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
@@ -234,4 +265,3 @@ class _ContiguousArrayStorageBase {
       "Concrete subclasses must implement staticElementType")
   }
 }
-
