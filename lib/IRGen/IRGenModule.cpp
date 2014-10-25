@@ -207,6 +207,16 @@ IRGenModule::IRGenModule(ASTContext &Context,
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
 
+  ProtocolConformanceRecordTy
+    = createStructType(*this, "swift.protocol_conformance", {
+      ProtocolDescriptorPtrTy,
+      OpaquePtrTy,
+      OpaquePtrTy,
+      Int32Ty
+    });
+  ProtocolConformanceRecordPtrTy
+    = ProtocolConformanceRecordTy->getPointerTo(DefaultAS);
+
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)
     ValueWitnessTys[i] = nullptr;

@@ -393,12 +393,19 @@ void IRGenModule::addObjCClass(llvm::Constant *classPtr) {
   ObjCClasses.push_back(classPtr);
 }
 
+/// Add the given protocol conformance record to the protocol conformances list.
+void IRGenModule::addProtocolConformanceRecord(llvm::Constant *conformanceRec) {
+  ProtocolConformanceRecords.push_back(conformanceRec);
+}
+
 /// Emit a global list, i.e. a global constant array holding all of a
 /// list of values.  Generally these lists are for various LLVM
 /// metadata or runtime purposes.
 static void emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
                            StringRef name, StringRef section,
-                           llvm::GlobalValue::LinkageTypes linkage) {
+                           llvm::GlobalValue::LinkageTypes linkage,
+                           llvm::Type *eltTy,
+                           bool isConstant) {
   // Do nothing if the list is empty.
   if (handles.empty()) return;
 
@@ -406,20 +413,20 @@ static void emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
   // ones like @llvm.used), it's important to set an explicit alignment
   // so that the linker doesn't accidentally put padding in the list.
   Alignment alignment = IGM.getPointerAlignment();
-  auto eltTy = IGM.Int8PtrTy;
 
   // We have an array of value handles, but we need an array of constants.
   SmallVector<llvm::Constant*, 8> elts;
   elts.reserve(handles.size());
   for (auto &handle : handles) {
     auto elt = cast<llvm::Constant>(&*handle);
-    elt = llvm::ConstantExpr::getBitCast(elt, eltTy);
+    if (elt->getType() != eltTy)
+      elt = llvm::ConstantExpr::getBitCast(elt, eltTy);
     elts.push_back(elt);
   }
 
   auto varTy = llvm::ArrayType::get(eltTy, elts.size());
   auto init = llvm::ConstantArray::get(varTy, elts);
-  auto var = new llvm::GlobalVariable(IGM.Module, varTy, false, linkage,
+  auto var = new llvm::GlobalVariable(IGM.Module, varTy, isConstant, linkage,
                                       init, name);
   var->setSection(section);
   var->setAlignment(alignment.getValue());
@@ -435,19 +442,31 @@ void IRGenModule::emitGlobalLists() {
   // name but a magic section.
   emitGlobalList(*this, ObjCClasses, "objc_classes",
                  "__DATA, __objc_classlist, regular, no_dead_strip",
-                 llvm::GlobalValue::InternalLinkage);
+                 llvm::GlobalValue::InternalLinkage,
+                 Int8PtrTy,
+                 false);
   // So do categories.
   emitGlobalList(*this, ObjCCategories, "objc_categories",
                  "__DATA, __objc_catlist, regular, no_dead_strip",
-                 llvm::GlobalValue::InternalLinkage);
+                 llvm::GlobalValue::InternalLinkage,
+                 Int8PtrTy,
+                 false);
 
   // FIXME: We also emit the class references in a second magic section to make
   // sure they are "realized" by the Objective-C runtime before any instances
   // are allocated.
   emitGlobalList(*this, ObjCClasses, "objc_non_lazy_classes",
                  "__DATA, __objc_nlclslist, regular, no_dead_strip",
-                 llvm::GlobalValue::InternalLinkage);
+                 llvm::GlobalValue::InternalLinkage,
+                 Int8PtrTy,
+                 false);
 
+  emitGlobalList(*this, ProtocolConformanceRecords, "protocol_conformances",
+               "__DATA, __swift1_proto, regular, no_dead_strip",
+               llvm::GlobalValue::InternalLinkage,
+               ProtocolConformanceRecordTy,
+               true);
+  
   // @llvm.used
   assert(std::all_of(LLVMUsed.begin(), LLVMUsed.end(),
                      [](const llvm::WeakVH &global) {
@@ -455,7 +474,9 @@ void IRGenModule::emitGlobalLists() {
            !cast<llvm::GlobalValue>(global)->isDeclaration();
   }) && "all globals in the 'used' list must be definitions");
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
-                 llvm::GlobalValue::AppendingLinkage);
+                 llvm::GlobalValue::AppendingLinkage,
+                 Int8PtrTy,
+                 false);
 }
 
 /// Prepare for the emission of a program.

@@ -185,6 +185,8 @@ public:
   llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::StructType *ObjCBlockStructTy; /// %objc_block
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
+  llvm::StructType *ProtocolConformanceRecordTy;
+  llvm::PointerType *ProtocolConformanceRecordPtrTy;
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
   /// Get the bit width of an integer type for the target platform.
@@ -299,6 +301,7 @@ public:
                                            ForDefinition_t forDefinition);
   void addUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr);
+  void addProtocolConformanceRecord(llvm::Constant *record);
 
 private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
@@ -325,6 +328,8 @@ private:
   SmallVector<llvm::WeakVH, 4> ObjCClasses;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakVH, 4> ObjCCategories;
+  /// List of protocol conformance records.
+  SmallVector<llvm::WeakVH, 4> ProtocolConformanceRecords;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;

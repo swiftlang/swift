@@ -19,6 +19,7 @@
 #ifndef SWIFT_ABI_METADATAVALUES_H
 #define SWIFT_ABI_METADATAVALUES_H
 
+#include <stdlib.h>
 #include <stdint.h>
 
 namespace swift {
@@ -139,6 +140,83 @@ inline ClassFlags &operator|=(ClassFlags &a, ClassFlags b) {
 enum : unsigned {
   /// Number of words reserved in generic metadata patterns.
   NumGenericMetadataPrivateDataWords = 16,
+};
+  
+/// Kinds of protocol conformance record.
+enum class ProtocolConformanceTypeKind : unsigned {
+  /// The conformance is universal and might apply to any type.
+  /// getDirectType() is nil.
+  Universal,
+
+  /// The conformance is for a nongeneric native struct or enum type.
+  /// getDirectType() points to the canonical metadata for the type.
+  UniqueDirectType,
+  
+  /// The conformance is for a nongeneric foreign struct or enum type.
+  /// getDirectType() points to a nonunique metadata record for the type, which
+  /// needs to be uniqued by the runtime.
+  NonuniqueDirectType,
+  
+  /// The conformance is for a nongeneric class type.
+  /// getIndirectClass() points to a variable that contains the pointer to the
+  /// class object, which may be ObjC and thus require a runtime call to get
+  /// metadata.
+  ///
+  /// On platforms without ObjC interop, this indirection isn't necessary,
+  /// and classes could be emitted as NativeDirectType.
+  UniqueIndirectClass,
+  
+  /// The conformance is for a generic type.
+  /// getGenericPattern() points to the generic metadata pattern used to
+  /// form instances of the type.
+  UniqueGenericPattern,
+};
+  
+/// Kinds of reference to protocol conformance.
+enum class ProtocolConformanceReferenceKind : unsigned {
+  /// A direct reference to a protocol witness table.
+  WitnessTable,
+  /// A function pointer that can be called to access the protocol witness
+  /// table.
+  WitnessTableAccessor,
+};
+  
+struct ProtocolConformanceFlags {
+private:
+  using int_type = unsigned;
+  int_type Data;
+  
+  enum : int_type {
+    TypeKindMask = 0x0000000FU,
+    TypeKindShift = 0,
+    ConformanceKindMask = 0x00000010U,
+    ConformanceKindShift = 4,
+  };
+  
+public:
+  constexpr ProtocolConformanceFlags() : Data(0) {}
+  constexpr ProtocolConformanceFlags(int_type Data) : Data(Data) {}
+  
+  constexpr ProtocolConformanceTypeKind getTypeKind() const {
+    return ProtocolConformanceTypeKind((Data >> TypeKindShift) & TypeKindMask);
+  }
+  constexpr ProtocolConformanceFlags withTypeKind(
+                                        ProtocolConformanceTypeKind ptk) const {
+    return ProtocolConformanceFlags(
+                     (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
+  }
+  
+  constexpr ProtocolConformanceReferenceKind getConformanceKind() const {
+    return ProtocolConformanceReferenceKind((Data >> ConformanceKindShift)
+                                     & ConformanceKindMask);
+  }
+  constexpr ProtocolConformanceFlags withConformanceKind(
+                                  ProtocolConformanceReferenceKind pck) const {
+    return ProtocolConformanceFlags(
+       (Data & ~ConformanceKindMask) | (int_type(pck) << ConformanceKindShift));
+  }
+  
+  int_type getValue() const { return Data; }
 };
   
 }
