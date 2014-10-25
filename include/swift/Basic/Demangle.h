@@ -181,8 +181,7 @@ demangleSymbolAsString(const char *MangledName, size_t MangledNameLength,
 inline std::string
 demangleSymbolAsString(std::string MangledName,
                        const DemangleOptions &Options = DemangleOptions()) {
-  return demangleSymbolAsString(MangledName.c_str(), 
-                                strlen(MangledName.c_str()));
+  return demangleSymbolAsString(MangledName.data(), MangledName.size());
 }
 
 } // end namespace Demangle
