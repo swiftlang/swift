@@ -269,9 +269,6 @@ createEmptyFunctionWithOptimizedSig(SILFunction *OldF,
                                     SmallVectorImpl<unsigned> &DeadArgs) {
   SILModule &M = OldF->getModule();
 
-  // TODO: Change this to always be shared perhaps.
-  SILLinkage OptimizedLinkage = getSpecializedLinkage(OldF->getLinkage());
-
   // Create the new optimized function type.
   CanSILFunctionType OldFTy = OldF->getLoweredFunctionType();
   const ASTContext &Ctx = M.getASTContext();
@@ -291,7 +288,7 @@ createEmptyFunctionWithOptimizedSig(SILFunction *OldF,
   // Create the new function.
   auto *NewDebugScope = new (M) SILDebugScope(*OldF->getDebugScope());
   SILFunction *NewF = SILFunction::create(
-      M, OptimizedLinkage, NewFName, NewFTy, nullptr, OldF->getLocation(),
+      M, OldF->getLinkage(), NewFName, NewFTy, nullptr, OldF->getLocation(),
       OldF->isBare(), OldF->isTransparent(), OldF->isFragile(),
       OldF->getInlineStrategy(), OldF->getEffectsInfo(), 0,
       NewDebugScope, OldF->getDeclContext());
@@ -497,11 +494,6 @@ static bool canSpecializeFunction(SILFunction &F) {
 
   // For now ignore generic functions to keep things simple...
   if (F.getLoweredFunctionType()->isPolymorphic())
-    return false;
-
-  // Only specialize fragile functions for now since I keep running into
-  // bugs other places in the compiler with non-fragile functions.
-  if (!F.isFragile())
     return false;
 
   // Make sure F has a linkage that we can optimize.
