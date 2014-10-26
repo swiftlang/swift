@@ -2,10 +2,26 @@
 
 protocol Fooable: class {
   func foo()
+  class func bar()
+  init()
 }
 
 class Foo: Fooable {
+  
   func foo() { }
+  // CHECK-LABEL: sil hidden @_TTWC15witnesses_class3FooS_7FooableFS1_3fooUS1___fQPS1_FT_T_
+  // CHECK-NOT:     function_ref
+  // CHECK:         class_method
+
+  class func bar() {}
+  // CHECK-LABEL: sil hidden @_TTWC15witnesses_class3FooS_7FooableFS1_3barUS1___fMQPS1_FT_T_
+  // CHECK-NOT:     function_ref
+  // CHECK:         class_method
+
+  required init() {}
+  // CHECK-LABEL: sil hidden @_TTWC15witnesses_class3FooS_7FooableFS1_CUS1___fMQPS1_FT_S2_
+  // CHECK-NOT:     function_ref
+  // CHECK:         class_method
 }
 
 // CHECK-LABEL: sil hidden @_TF15witnesses_class3genUS_7Fooable__FQ_T_

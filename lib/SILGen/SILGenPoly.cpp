@@ -1497,7 +1497,9 @@ static AbstractionPattern stripInputTupleLabels(AbstractionPattern p) {
   return AbstractionPattern(stripInputTupleLabels(p.getAsType()));
 }
 
-static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
+static SILValue getWitnessFunctionRef(SILGenFunction &gen,
+                                      ProtocolConformance *conformance,
+                                      SILDeclRef witness,
                                       bool isFree,
                                       SmallVectorImpl<ManagedValue> &origParams,
                                       SILType witnessSILTy, SILLocation loc) {
@@ -1508,22 +1510,19 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
     return gen.emitGlobalFunctionRef(loc, witness);
 
   ManagedValue &selfParam = origParams.back();
-  CanType selfInstanceType = selfParam.getType().getSwiftRValueType();
 
   // If we have a non-class, non-objc method or a class, objc method that is
   // final, we do not dynamic dispatch.
-  ClassDecl *C = selfInstanceType.getClassOrBoundGenericClass();
+  ClassDecl *C = conformance->getType()->getClassOrBoundGenericClass();
   if (!C)
     return gen.emitGlobalFunctionRef(loc, witness);
 
   bool isFinal = C->isFinal();
   bool isExtension = false;
 
-  if (FuncDecl *fd = witness.getFuncDecl()) {
-    isFinal |= fd->isFinal();
-    if (DeclContext *dc = fd->getDeclContext())
-      isExtension = isa<ExtensionDecl>(dc);
-  }
+  isFinal |= witness.getDecl()->isFinal();
+  if (DeclContext *dc = witness.getDecl()->getDeclContext())
+    isExtension = isa<ExtensionDecl>(dc);
 
   // If the witness is dynamic, go through dynamic dispatch.
   if (witness.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
@@ -1535,7 +1534,10 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
   // A natively ObjC method witness referenced this way will end up going
   // through its native thunk, which will redispatch the method after doing
   // bridging just like we want.
-  if (isFinal || isExtension || witness.isForeignThunk())
+  if (isFinal || isExtension || witness.isForeignThunk()
+      // Hack--We emit a static thunk for ObjC allocating constructors.
+      || (witness.getDecl()->hasClangNode()
+          && witness.kind == SILDeclRef::Kind::Allocator))
     return gen.emitGlobalFunctionRef(loc, witness);
 
   // Otherwise emit a class method.
@@ -1702,7 +1704,8 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // Invoke the witness function calling a class method if we have a class and
   // calling the static function otherwise.
   // TODO: Collect forwarding substitutions from outer context of method.
-  SILValue witnessFnRef = getWitnessFunctionRef(*this, witness, isFree,
+  SILValue witnessFnRef = getWitnessFunctionRef(*this, conformance,
+                                                witness, isFree,
                                                 origParams, witnessSILTy, loc);
   SILValue witnessResultValue = B.createApply(
       loc, witnessFnRef, witnessSILTy,
