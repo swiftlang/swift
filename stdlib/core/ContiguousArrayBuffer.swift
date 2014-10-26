@@ -179,14 +179,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
         _ArrayBody(),
         realMinimumCapacity)
 
-      var bridged = false
-      if _canBeClass(T.self) != 0 {
-        bridged = _isBridgedVerbatimToObjectiveC(T.self)
-      }
-
+      let verbatim = _isBridgedVerbatimToObjectiveC(T.self)
+      
       _base.value = _ArrayBody(
         count: count, capacity: _base._capacity(),
-        elementTypeIsBridgedVerbatim: bridged)
+        elementTypeIsBridgedVerbatim: verbatim)
     }
   }
 
