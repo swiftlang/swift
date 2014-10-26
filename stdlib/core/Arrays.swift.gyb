@@ -73,7 +73,7 @@ if True:
 ///    object leakage.  To prevent this effect, use `Slice` only for
 ///    transient computation."""
     elif Self == 'Array':
-      SelfDocComment = """\
+      SelfDocComment = '''\
 /// Conceptually_, `Array` is an efficient, tail-growable random-access
 /// collection of arbitrary elements.
 ///
@@ -160,7 +160,7 @@ if True:
 /// `NSArray`, to ensure it won't be modified, and stores the result
 /// in the `Array`.  Type-checking, to ensure the `NSArray`\ 's
 /// elements match or can be bridged to `T`, is deferred until the
-/// first element access."""
+/// first element access.'''
 # FIXME: Write about Array up/down-casting.
     elif Self == '_UnitTestArray':
       SelfDocComment = "\n/// Temporary"
