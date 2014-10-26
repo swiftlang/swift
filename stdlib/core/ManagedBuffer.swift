@@ -202,6 +202,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
             ManagedBufferPointer(unsafeBufferObject: $0).allocatedElementCount
           }))
     }
+    // FIXME: workaround for <rdar://problem/18619176>.  If we don't
+    // access value somewhere, its addressor gets linked away
+    let x = value 
   }
 
   /// Manage the given `buffer`.
@@ -216,18 +219,12 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// The stored `Value` instance.
   public var value: Value {    
-    /*
     address {
       return withUnsafeMutablePointerToValue { UnsafePointer($0) }
     }
     mutableAddress {
       return withUnsafeMutablePointerToValue { $0 }
     }
-    */
-    // FIXME: <rdar://problem/18619176> replace get/set with
-    // addressors => link error
-    get { return withUnsafeMutablePointerToValue { $0.memory } }
-    nonmutating set { withUnsafeMutablePointerToValue { $0.memory = newValue } }
   }
 
   /// Return the object instance being used for storage.
