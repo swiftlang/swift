@@ -43,6 +43,8 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
@@ -239,6 +241,37 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
   return success;
 }
 
+static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
+                                    void *Context) {
+  // This assert self documents our precondition that Context is always
+  // nullptr. It seems that parts of LLVM are using the flexibility of having a
+  // context. We don't really care about this.
+  assert(Context == nullptr && "We assume Context is always a nullptr");
+
+  if (DI.getSeverity() != llvm::DS_Error)
+    return;
+
+  std::string MsgStorage;
+  {
+    llvm::raw_string_ostream Stream(MsgStorage);
+    llvm::DiagnosticPrinterRawOStream DP(Stream);
+    DI.print(DP);
+  }
+  llvm::errs() << "Error linking swift modules\n";
+  llvm::errs() << MsgStorage << "\n";
+}
+
+static bool linkLLVMModules(llvm::Module *Module, llvm::Module *SubModule,
+                            llvm::Linker::LinkerMode LinkerMode) {
+  llvm::LLVMContext &Ctx = SubModule->getContext();
+  auto OldHandler = Ctx.getDiagnosticHandler();
+  void *OldDiagnosticContext = Ctx.getDiagnosticContext();
+  Ctx.setDiagnosticHandler(linkerDiagnosticHandler, nullptr);
+  bool Failed = llvm::Linker::LinkModules(Module, SubModule, LinkerMode);
+  Ctx.setDiagnosticHandler(OldHandler, OldDiagnosticContext);
+  return !Failed;
+}
+
 static bool IRGenImportedModules(CompilerInstance &CI,
                                  llvm::Module &Module,
                                  llvm::SmallPtrSet<swift::Module *, 8>
@@ -305,12 +338,8 @@ static bool IRGenImportedModules(CompilerInstance &CI,
       break;
     }
 
-    std::string ErrorMessage;
-    if (llvm::Linker::LinkModules(&Module, SubModule.get(),
-                                  llvm::Linker::DestroySource,
-                                  &ErrorMessage)) {
-      llvm::errs() << "Error linking swift modules\n";
-      llvm::errs() << ErrorMessage << "\n";
+    if (!linkLLVMModules(&Module, SubModule.get(),
+                         llvm::Linker::DestroySource)) {
       hadError = true;
       break;
     }
@@ -1056,12 +1085,8 @@ private:
     if (CI.getASTContext().hadError())
       return false;
     
-    std::string ErrorMessage;
-    if (llvm::Linker::LinkModules(Module, LineModule.get(),
-                                  llvm::Linker::PreserveSource,
-                                  &ErrorMessage)) {
-      llvm::errs() << "Error linking swift modules\n";
-      llvm::errs() << ErrorMessage << "\n";
+    if (!linkLLVMModules(Module, LineModule.get(),
+                         llvm::Linker::PreserveSource)) {
       return false;
     }
 
@@ -1071,11 +1096,8 @@ private:
 
     stripPreviouslyGenerated(*NewModule);
 
-    if (llvm::Linker::LinkModules(&DumpModule, LineModule.get(),
-                                  llvm::Linker::DestroySource,
-                                  &ErrorMessage)) {
-      llvm::errs() << "Error linking swift modules\n";
-      llvm::errs() << ErrorMessage << "\n";
+    if (!linkLLVMModules(&DumpModule, LineModule.get(),
+                         llvm::Linker::DestroySource)) {
       return false;
     }
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
