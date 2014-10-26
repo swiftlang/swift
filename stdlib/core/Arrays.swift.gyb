@@ -729,64 +729,66 @@ func _arrayNonSliceInPlaceReplace<
 
   let growth = insertCount - eraseCount
   target.count = oldCount + growth
-  
-  let elements = target.baseAddress
-  _sanityCheck(elements != nil)
-  
-  let oldTailIndex = subRange.endIndex
-  let oldTailStart = elements + oldTailIndex
-  let newTailIndex = oldTailIndex + growth
-  let newTailStart = oldTailStart + growth
-  let tailCount = oldCount - subRange.endIndex
 
-  if growth > 0 {
-    // Slide the tail part of the buffer forwards, in reverse order
-    // so as not to self-clobber.
-    newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
+  let _:() = target.withUnsafeMutableBufferPointer {
+    let elements = $0.baseAddress
+    _sanityCheck(elements != nil)
+    
+    let oldTailIndex = subRange.endIndex
+    let oldTailStart = elements + oldTailIndex
+    let newTailIndex = oldTailIndex + growth
+    let newTailStart = oldTailStart + growth
+    let tailCount = oldCount - subRange.endIndex
 
-    // Assign over the original subRange
-    var i = newValues.startIndex
-    for j in subRange {
-      elements[j] = newValues[i++]
+    if growth > 0 {
+      // Slide the tail part of the buffer forwards, in reverse order
+      // so as not to self-clobber.
+      newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
+
+      // Assign over the original subRange
+      var i = newValues.startIndex
+      for j in subRange {
+        elements[j] = newValues[i++]
+      }
+      // Initialize the hole left by sliding the tail forward
+      for j in oldTailIndex..<newTailIndex {
+        (elements + j).initialize(newValues[i++])
+      }
+      _expectEnd(i, newValues)
     }
-    // Initialize the hole left by sliding the tail forward
-    for j in oldTailIndex..<newTailIndex {
-      (elements + j).initialize(newValues[i++])
-    }
-    _expectEnd(i, newValues)
-  }
-  else { // We're not growing the buffer
-    // Assign all the new elements into the start of the subRange
-    var i = subRange.startIndex
-    var j = newValues.startIndex
-    for _ in 0..<insertCount {
-      elements[i++] = newValues[j++]
-    }
-    _expectEnd(j, newValues)
+    else { // We're not growing the buffer
+      // Assign all the new elements into the start of the subRange
+      var i = subRange.startIndex
+      var j = newValues.startIndex
+      for _ in 0..<insertCount {
+        elements[i++] = newValues[j++]
+      }
+      _expectEnd(j, newValues)
 
-    // If the size didn't change, we're done.
-    if growth == 0 {
-      return
-    }
+      // If the size didn't change, we're done.
+      if growth == 0 {
+        return
+      }
 
-    // Move the tail backward to cover the shrinkage.  
-    let shrinkage = -growth
-    if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
+      // Move the tail backward to cover the shrinkage.  
+      let shrinkage = -growth
+      if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
 
-      // Assign over the rest of the replaced range with the first
-      // part of the tail.
-      newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
-      
-      //  slide the rest of the tail back
-      oldTailStart.moveInitializeFrom(
-        oldTailStart + shrinkage, count: tailCount - shrinkage)
-    }
-    else {                      // tail fits within erased elements
-      // Assign over the start of the replaced range with the tail
-      newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
+        // Assign over the rest of the replaced range with the first
+        // part of the tail.
+        newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
+        
+        //  slide the rest of the tail back
+        oldTailStart.moveInitializeFrom(
+          oldTailStart + shrinkage, count: tailCount - shrinkage)
+      }
+      else {                      // tail fits within erased elements
+        // Assign over the start of the replaced range with the tail
+        newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
-      // destroy elements remaining after the tail in subRange
-      (newTailStart + tailCount).destroy(shrinkage - tailCount)
+        // destroy elements remaining after the tail in subRange
+        (newTailStart + tailCount).destroy(shrinkage - tailCount)
+      }
     }
   }
 }
@@ -970,32 +972,34 @@ func _arrayOutOfPlaceUpdate<
   
   // Check to see if we have storage we can move from
   if let backing = source.requestUniqueMutableBackingBuffer(sourceCount) {
-    let sourceStart = source.baseAddress
-    let oldStart = sourceStart + headCount
-    
-    // Destroy any items that may be lurking in a _SliceBuffer before
-    // its real first element
-    let backingStart = backing.baseAddress
-    let sourceOffset = sourceStart - backingStart
-    backingStart.destroy(sourceOffset)
+    let _:() = source.withUnsafeMutableBufferPointer {
+      let sourceStart = $0.baseAddress
+      let oldStart = sourceStart + headCount
 
-    // Move the head items
-    destStart.moveInitializeFrom(sourceStart, count: headCount)
+      // Destroy any items that may be lurking in a _SliceBuffer before
+      // its real first element
+      let backingStart = backing.baseAddress
+      let sourceOffset = sourceStart - backingStart
+      backingStart.destroy(sourceOffset)
 
-    // Destroy unused source items
-    oldStart.destroy(oldCount)
+      // Move the head items
+      destStart.moveInitializeFrom(sourceStart, count: headCount)
 
-    initializeNewElements.call(newStart, count: newCount)
+      // Destroy unused source items
+      oldStart.destroy(oldCount)
 
-    // Move the tail items
-    newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
-    
-    // Destroy any items that may be lurking in a _SliceBuffer after
-    // its real last element
-    let backingEnd = backingStart + backing.count
-    let sourceEnd = sourceStart + sourceCount
-    sourceEnd.destroy(backingEnd - sourceEnd)
-    backing.count = 0
+      initializeNewElements.call(newStart, count: newCount)
+
+      // Move the tail items
+      newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
+
+      // Destroy any items that may be lurking in a _SliceBuffer after
+      // its real last element
+      let backingEnd = backingStart + backing.count
+      let sourceEnd = sourceStart + sourceCount
+      sourceEnd.destroy(backingEnd - sourceEnd)
+      backing.count = 0
+    }
   }
   else {
     let newStart = source._uninitializedCopy(0..<headCount, target: destStart)
@@ -1027,7 +1031,9 @@ func _arrayAppend<_Buffer: _ArrayBufferType>(
   let oldCount = buffer.count
   var newBuffer = _createUniqueMutableBuffer(&buffer, oldCount + 1)
   if _fastPath(newBuffer == nil) {
-    (buffer.baseAddress + oldCount).initialize(newValue)
+    let _:() = buffer.withUnsafeMutableBufferPointer {
+      ($0.baseAddress + oldCount).initialize(newValue)
+    }
   }
   else {
     _arrayOutOfPlaceUpdate(
@@ -1085,11 +1091,13 @@ func _arrayAppendSequence<
   nextItem = stream.next()
   while nextItem != nil {
     let capacity = buffer.capacity
-    let base = buffer.baseAddress
-    
-    while (nextItem != nil) && count < capacity {
-      (base + count++).initialize(nextItem!)
-      nextItem = stream.next()
+    let _:() = buffer.withUnsafeMutableBufferPointer {
+      let base = $0.baseAddress
+      
+      while (nextItem != nil) && count < capacity {
+        (base + count++).initialize(nextItem!)
+        nextItem = stream.next()
+      }
     }
     buffer.count = count
     if nextItem != nil {
