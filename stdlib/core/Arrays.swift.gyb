@@ -316,12 +316,6 @@ extension ${Self} : ArrayLiteralConvertible {
 %end
 }
 
-extension ${Self} {
-  public func _asCocoaArray() -> _NSArrayCoreType {
-    return _buffer._asCocoaArray()
-  }
-}
-
 // Referenced by the compiler to allocate array literals.
 @semantics("array.uninitialized")
 public func _allocateUninitialized${Self}<T>(count: Builtin.Word)

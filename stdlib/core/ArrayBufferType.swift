@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The underlying buffer for an ArrayType conforms to _ArrayBufferType
+/// The underlying buffer for an ArrayType conforms to
+/// _ArrayBufferType.  This buffer does not provide value semantics.
 public protocol _ArrayBufferType : MutableCollectionType {
   /// The type of elements stored in the buffer
   typealias Element
@@ -27,11 +28,6 @@ public protocol _ArrayBufferType : MutableCollectionType {
   func _uninitializedCopy(
     subRange: Range<Int>, target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
-
-  /// Convert to an NSArray.
-  /// Precondition: _isBridgedToObjectiveC(Element.self)
-  /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  func _asCocoaArray() -> _NSArrayCoreType
 
   /// Get/set the index'th element
   subscript(index: Int) -> Element { get nonmutating set}

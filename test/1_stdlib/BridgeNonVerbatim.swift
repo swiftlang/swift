@@ -100,7 +100,7 @@ println("testing...")
 
 func testScope() {
   let a = [X(1), X(2), X(3)]
-  let nsx = a._asCocoaArray()
+  let nsx = a._buffer._asCocoaArray()
 
   // construction of these tracked objects is lazy
   // CHECK-NEXT: trackedCount = 0 .

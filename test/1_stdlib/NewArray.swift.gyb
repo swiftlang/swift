@@ -312,7 +312,7 @@ func testSlice() {
 
   // Now a bridged slice
   var a = Array<NSString>(
-    _ArrayBuffer(nsArrayOfStrings()._asCocoaArray()))
+    _ArrayBuffer(nsArrayOfStrings()._buffer._asCocoaArray()))
   
   printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
   

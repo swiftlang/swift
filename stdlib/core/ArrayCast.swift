@@ -56,7 +56,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
       }
     }
     // This result has deferred element typechecking
-    return Array(_fromCocoaArray: source._asCocoaArray())
+    return Array(_fromCocoaArray: source._buffer._asCocoaArray())
     
   case (.Reference, .Explicit):
     let result: [TargetElement]? = _arrayConditionalBridgeElements(source)
