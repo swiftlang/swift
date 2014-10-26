@@ -357,7 +357,7 @@ struct FailableModel: FailableRequirement, IUOFailableRequirement {
 
   // CHECK-LABEL: sil hidden @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   // CHECK: bb0([[SELF:%[0-9]+]] : $*ImplicitlyUnwrappedOptional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
-  // CHECK: apply [transparent] [[CHECK_OPTIONAL_FN:%[0-9]+]]<FailableModel>([[RESULT_ADDR:%[0-9]+]]#1) : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+  // CHECK: select_enum_addr [[RESULT_ADDR:%[0-9]+]]#1
   // CHECK: [[RESULT:%[0-9]+]] = init_enum_data_addr [[IUO_TEMP:%[0-9]+]]#1
   // CHECK: cond_br
   // CHECK: inject_enum_addr [[IUO_TEMP]]
@@ -407,7 +407,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
   // CHECK-LABEL: sil hidden @_TTWC9witnesses18FailableClassModelS_24FailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
 
   // CHECK-LABEL: sil hidden @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
-  // CHECK: function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
+  // CHECK: select_enum_addr
   // CHECK: unchecked_take_enum_data_addr
   // CHECK: inject_enum_addr {{.*}}Some
   // CHECK: inject_enum_addr {{.*}}None
@@ -417,7 +417,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil hidden @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementFS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
-  // CHECK: function_ref @_TFSs41_doesImplicitlyUnwrappedOptionalHaveValueU__FRGSQQ__Bi1_
+  // CHECK: select_enum_addr
   // CHECK: unchecked_take_enum_data_addr
   // CHECK: inject_enum_addr {{.*}}Some
   // CHECK: inject_enum_addr {{.*}}None
