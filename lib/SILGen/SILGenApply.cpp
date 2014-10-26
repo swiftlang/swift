@@ -643,13 +643,18 @@ public:
       break;
     }
     case Kind::WitnessMethod: {
-      assert(level >= 1
-             && "currying 'self' of generic method dispatch not yet supported");
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
-
       auto constant = method.methodName.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(constant);
+
+      // If the call is curried, emit a direct call to the curry thunk.
+      if (level < method.methodName.uncurryLevel) {
+        SILValue ref = gen.emitGlobalFunctionRef(Loc, constant, constantInfo);
+        mv = ManagedValue::forUnmanaged(ref);
+        transparent = false;
+        break;
+      }
 
       // Look up the witness for the archetype.
       auto selfType = getProtocolSelfType(gen.SGM);
@@ -841,6 +846,7 @@ public:
     for (auto callSite : callSites) {
       addSite(callSite, false);
     }
+    // The self application might be a MemberRefExpr if "self" is an archetype.
     if (auto selfApply = dyn_cast_or_null<ApplyExpr>(SelfApplyExpr)) {
       addSite(selfApply, otherCtorRefUsesAllocating);
     }
@@ -1197,9 +1203,19 @@ public:
     
     assert(!baseTy->getRValueInstanceType()->isExistentialType()
            && "did not open existential type?!");
+    
+    // Gross. We won't have any call sites if this is a curried generic method
+    // application, because it doesn't look like a call site in the AST, but a
+    // member ref.
+    CanFunctionType substFnType;
+    if (!callSites.empty() || dyn_cast_or_null<ApplyExpr>(SelfApplyExpr))
+      substFnType = getSubstFnType();
+    else
+      substFnType = cast<FunctionType>(e->getType()->getCanonicalType());
+    
     setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
                                    SILDeclRef(fd, kind).asForeign(isObjC),
-                                   getSubstFnType(), e));
+                                   substFnType, e));
 
     // If there are substitutions, add them now.
     if (!subs.empty()) {
@@ -2862,7 +2878,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   return emission;
 }
 
-RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
+RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
   return RValue(*this, e, prepareApplyExpr(*this, e).apply(c));
 }
 

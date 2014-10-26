@@ -2364,6 +2364,13 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
       SGF.B.createMetatype(E, SGF.getLoweredLoadableType(E->getType()));
     return RValue(SGF, E, ManagedValue::forUnmanaged(MT));
   }
+  
+  if (isa<AbstractFunctionDecl>(E->getMember().getDecl())) {
+    // Method references into generics are represented as member refs instead
+    // of apply exprs for some reason. Send this down the correct path to be
+    // treated as a curried method application.
+    return SGF.emitApplyExpr(E, C);
+  }
 
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
 
@@ -4391,22 +4398,42 @@ static void forwardCaptureArgs(SILGenFunction &gen,
 static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        SILLocation loc,
                                        SILDeclRef next,
-                                       ArrayRef<SILValue> curriedArgs) {
+                                       ArrayRef<SILValue> curriedArgs,
+                                       ArrayRef<Substitution> curriedSubs) {
   // For a foreign function, reference the native thunk.
   if (next.isForeign)
     return gen.emitGlobalFunctionRef(loc, next.asForeign(false));
   
   // If the fully-uncurried reference is to a native dynamic class method, emit
   // the dynamic dispatch.
-  if (!next.isCurried && !next.isForeign &&
-      next.kind == SILDeclRef::Kind::Func &&
-      next.hasDecl() &&
+  auto fullyAppliedMethod = !next.isCurried && !next.isForeign &&
+    next.kind == SILDeclRef::Kind::Func &&
+    next.hasDecl();
+  
+  auto constantInfo = gen.SGM.Types.getConstantInfo(next);
+  SILValue thisArg;
+  if (!curriedArgs.empty())
+      thisArg = curriedArgs.back();
+  
+  if (fullyAppliedMethod &&
       gen.getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
         == MethodDispatch::Class) {
     SILValue thisArg = curriedArgs.back();
     
     return gen.B.createClassMethod(loc, thisArg, next,
-                                   gen.SGM.getConstantType(next));
+                                   constantInfo.getSILType());
+  }
+  
+  // If the fully-uncurried reference is to a generic method, look up the
+  // witness.
+  if (fullyAppliedMethod &&
+      constantInfo.SILFnType->getAbstractCC() == AbstractCC::WitnessMethod) {
+    auto thisType = curriedSubs[0].getReplacement()->getCanonicalType();
+    assert(isa<ArchetypeType>(thisType) && "no archetype for witness?!");
+    return gen.B.createWitnessMethod(loc,
+                                     thisType,
+                                     nullptr,
+                                     next, constantInfo.getSILType());
   }
 
   // Otherwise, emit a direct call.
@@ -4438,7 +4465,13 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
       forwardCaptureArgs(*this, curriedArgs, capture);
   }
 
-  SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);
+  // Forward substitutions.
+  ArrayRef<Substitution> subs;
+  if (auto gp = getConstantInfo(to).ContextGenericParams) {
+    subs = buildForwardingSubstitutions(gp);
+  }
+  
+  SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs, subs);
   SILType resultTy
     = SGM.getConstantType(from).castTo<SILFunctionType>()
          ->getResult().getSILType();
@@ -4446,10 +4479,8 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   auto toTy = toFn.getType();
   
   // Forward archetypes and specialize if the function is generic.
-  ArrayRef<Substitution> subs;
-  if (auto gp = getConstantInfo(to).ContextGenericParams) {
+  if (!subs.empty()) {
     auto toFnTy = toFn.getType().castTo<SILFunctionType>();
-    subs = buildForwardingSubstitutions(gp);
     toTy = getLoweredLoadableType(
               toFnTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
   }

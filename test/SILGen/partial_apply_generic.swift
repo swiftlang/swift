@@ -1,0 +1,15 @@
+// RUN: %swift -emit-silgen %s | FileCheck %s
+
+protocol Foo {
+  class func foo()
+}
+
+func getFoo<T: Foo>(t: T.Type) -> () -> () {
+  return t.foo
+}
+
+// CHECK-LABEL: sil hidden @_TF21partial_apply_generic6getFooUS_3Foo__FMQ_FT_T_
+// CHECK:         function_ref @_TFP21partial_apply_generic3Foo3fooUS0___FMQPS0_FT_T_ 
+
+// CHECK-LABEL: sil shared @_TFP21partial_apply_generic3Foo3fooUS0___FMQPS0_FT_T_
+// CHECK:         witness_method $Self, #Foo.foo!1
