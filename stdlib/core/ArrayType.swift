@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _ArrayType : _CollectionType {
+public protocol __ArrayType : _CollectionType {
   var count: Int {get}
 
   typealias _Buffer : _ArrayBufferType
@@ -20,7 +20,7 @@ public protocol _ArrayType : _CollectionType {
 }
 
 public func ~> <
-  A: protocol<_ArrayType, _Sequence_Type>
+  A: protocol<__ArrayType, _Sequence_Type>
   where A._Element == A.Generator.Element
 >(
   source: A, _: (_CopyToNativeArrayBuffer,())
@@ -28,8 +28,9 @@ public func ~> <
   return source._doCopyToNativeArrayBuffer()
 }
 
-internal protocol ArrayType
-  : _ArrayType,
+public // @testable
+protocol _ArrayType
+  : __ArrayType,
     RangeReplaceableCollectionType,
     MutableSliceable,
     ArrayLiteralConvertible
@@ -128,7 +129,7 @@ internal protocol ArrayType
   init(_ buffer: _Buffer)
 }
 
-internal struct _ArrayTypeMirror<T : ArrayType> : MirrorType {
+internal struct _ArrayTypeMirror<T : _ArrayType> : MirrorType {
   let _value : T
   
   init(_ v : T) { _value = v }

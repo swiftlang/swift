@@ -87,7 +87,7 @@ struct MrMcRange : CollectionType {
 // treated as an arbitrary CollectionType when converting to a
 // _ContiguousArrayBuffer, it is first asked for its underlying
 // _ContiguousArrayBuffer.
-struct MrMcArray<T> : CollectionType, _ArrayType {
+struct MrMcArray<T> : CollectionType, __ArrayType {
   typealias _Buffer = _ContiguousArrayBuffer<T>
 
   init(_ buffer: _Buffer) {

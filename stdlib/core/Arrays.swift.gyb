@@ -295,7 +295,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   public var _buffer: _Buffer
 }
 
-extension ${Self} : _ArrayType {
+extension ${Self} : __ArrayType {
   public func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<T> {
     return _extractOrCopyToNativeArrayBuffer(self._buffer)
   }
@@ -324,7 +324,7 @@ public func _allocateUninitialized${Self}<T>(count: Builtin.Word)
   return (array, ptr._rawValue)
 }
 
-extension ${Self} : ArrayType {
+extension ${Self} : _ArrayType {
   /// Construct an empty ${Self}
   @semantics("array.init")
   public init() {
