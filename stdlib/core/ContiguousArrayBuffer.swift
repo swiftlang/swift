@@ -441,8 +441,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   //===--- private --------------------------------------------------------===//
   var _storage: _ContiguousArrayStorageBase? {
-    return unsafeBitCast(
-      _base.storage, Optional<_ContiguousArrayStorageBase>.self)
+    return _base.storage.map { unsafeDowncast($0) }
   }
 
   typealias _Base = _HeapBuffer<_ArrayBody, T>
