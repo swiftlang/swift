@@ -210,7 +210,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   public subscript(subRange: Range<Int>) -> _SliceBuffer<T>
   {
     return _SliceBuffer(
-      owner: _base.storage,
+      owner: _base.storage ?? _emptyArrayStorage,
       start: baseAddress + subRange.startIndex,
       count: subRange.endIndex - subRange.startIndex,
       hasNativeBuffer: true)
@@ -245,8 +245,8 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   }
 
   /// An object that keeps the elements stored in this buffer alive
-  public var owner: AnyObject? {
-    return _storage
+  public var owner: AnyObject {
+    return _storage ?? _emptyArrayStorage
   }
 
   /// A value that identifies the storage used by the buffer.  Two

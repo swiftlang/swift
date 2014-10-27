@@ -139,8 +139,7 @@ extension _ArrayBuffer {
   public
   init(_ source: NativeBuffer) {
     if !_isClassOrObjCExistential(T.self) {
-      self.storage
-        = (source._storage != nil) ? Builtin.castToNativeObject(source._storage!) : nil
+      self.storage = Builtin.castToNativeObject(source._storage)
     }
     else {
       self.storage = Builtin.castToNativeObject(
@@ -286,12 +285,12 @@ extension _ArrayBuffer {
       return _native[subRange]
     }
 
-    let nonNative = self._nonNative
+    let nonNative = self._nonNative!
 
     let subRangeCount = Swift.count(subRange)
     
     // Look for contiguous storage in the NSArray
-    let cocoa = _CocoaArrayWrapper(nonNative!)
+    let cocoa = _CocoaArrayWrapper(nonNative)
     let start = cocoa.contiguousStorage(subRange)
     if start != nil {
       return _SliceBuffer(owner: nonNative, start: UnsafeMutablePointer(start),
@@ -408,7 +407,7 @@ extension _ArrayBuffer {
   
   /// An object that keeps the elements stored in this buffer alive
   public
-  var owner: AnyObject? {
+  var owner: AnyObject {
     return _fastPath(_isNative) ? _native._storage : _nonNative!
   }
   

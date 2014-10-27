@@ -359,7 +359,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   public subscript(subRange: Range<Int>) -> _SliceBuffer<T>
   {
     return _SliceBuffer(
-      owner: _base.storage,
+      owner: __bufferPointer.buffer,
       start: baseAddress + subRange.startIndex,
       count: subRange.endIndex - subRange.startIndex,
       hasNativeBuffer: true)
@@ -390,11 +390,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       return _SwiftDeferredNSArray(
         _nativeStorage: _emptyArrayStorage)
     }
-    return _SwiftDeferredNSArray(_nativeStorage: _storage!)
+    return _SwiftDeferredNSArray(_nativeStorage: _storage)
   }
 
   /// An object that keeps the elements stored in this buffer alive
-  public var owner: AnyObject? {
+  public var owner: AnyObject {
     return _storage
   }
 
@@ -408,10 +408,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Return true iff we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
-    if let s = _storage {
-      return s.canStoreElementsOfDynamicType(proposedElementType)
-    }
-    return false
+    return _storage.canStoreElementsOfDynamicType(proposedElementType)
   }
 
   /// Return true if the buffer stores only elements of type `U`.
@@ -442,8 +439,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 
   //===--- private --------------------------------------------------------===//
-  var _storage: _ContiguousArrayStorageBase? {
-    return _base.storage.map { unsafeDowncast($0) }
+  var _storage: _ContiguousArrayStorageBase {
+    return Builtin.castFromNativeObject(__bufferPointer._nativeBuffer)
   }
 
   typealias _Base = _HeapBuffer<_ArrayBody, T>
