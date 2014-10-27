@@ -75,6 +75,11 @@ public:
   /// argument SILArguments.
   bool isSelf() const;
 
+  /// Returns true if this SILArgument is passed via the given convention.
+  bool hasConvention(ParameterConvention P) const {
+    return getParameterInfo().getConvention() == P;
+  }
+
 private:
   // A special constructor, only intended for use in SILBasicBlock::replaceBBArg.
   explicit SILArgument(SILType Ty, const ValueDecl *D =nullptr) :
