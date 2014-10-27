@@ -18,7 +18,6 @@
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Range.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILArgument.h"
@@ -64,9 +63,6 @@ struct ArgumentDescriptor {
   }
 };
 
-template <typename T1, typename T2>
-inline T1 getFirstPairElt(const std::pair<T1, T2> &P) { return P.first; }
-
 /// A class that contains all analysis information we gather about our
 /// function. Also provides utility methods for creating the new empty function.
 class FunctionAnalyzer {
@@ -88,18 +84,12 @@ class FunctionAnalyzer {
   /// information that we learn early on but need later deep in the analysis
   llvm::SmallVector<unsigned, 8> DeadArgIndices;
 
-  using ArgIndexInstMapTy =
-    llvm::MapVector<unsigned, SILInstruction *,
-                    llvm::SmallDenseMap<unsigned, unsigned, 8>,
-                    llvm::SmallVector<std::pair<unsigned,
-                                                SILInstruction *>, 8>>;
-  /// A map from consumed SILArguments to the release associated with the
-  /// argument.
+  // This is a set that we use to ensure that when we are searching for @owned
+  // parameters, we ignore retains releases that we know that we are already
+  // going to move.
   ///
-  /// We purposefully use a map vector here since we want to ensure that we can
-  /// reoutput the instructions in the same order in the callers which we see
-  /// them in the callee. This is the key property preserved by the map vector.
-  ArgIndexInstMapTy ConsumedArgumentIndexToReleaseMap;
+  /// This is going to be removed when searchForCalleeRelease is removed.
+  llvm::SmallPtrSet<SILInstruction *, 4> DecrementsToMove;
 
 public:
   FunctionAnalyzer() = delete;
@@ -125,70 +115,50 @@ public:
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
   ArrayRef<unsigned> getDeadArgIndices() const { return DeadArgIndices; }
 
-  Range<ArgIndexInstMapTy::reverse_iterator>
-  getConsumedArgumentIndexReleasePairs() {
-    return reversed(ConsumedArgumentIndexToReleaseMap);
-  }
-
 private:
+  /// Returns the callee release for Arg. This will be removed soon.
+  SILInstruction *searchForCalleeRelease(SILArgument *Arg);
+
   /// Compute the interface params of the optimized function.
   void
   computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &OutArray);
 
   /// Compute the CanSILFunctionType for the optimized function.
   CanSILFunctionType createOptimizedSILFunctionType();
-
-  /// Populate ConsumedArgumentReleases with all releases associated with a
-  /// consumed function argument.
-  void findConsumedArgumentReleases();
 };
 
 } // end anonymous namespace
 
-void
-FunctionAnalyzer::findConsumedArgumentReleases() {
-  // Find the return BB of F. If we fail, then bail.
+/// See if we can find a release on Arg in the exiting BB of F without any side
+/// effects in between the release and the return statement.
+///
+/// We only do this in the last basic block for now since if the ARC optimizer
+/// had meaningfully reduced the lifetime of an object, we don't want to extend
+/// the life if for instance we had moved releases over loops.
+///
+/// TODO: This is going to be ripped out. This analysis needs to be more
+/// robust. But while I am refactoring I am going to leave it in.
+SILInstruction *
+FunctionAnalyzer::searchForCalleeRelease(SILArgument *Arg) {
   auto ReturnBB = F->findReturnBB();
   if (ReturnBB == F->end())
-    return;
+    return nullptr;
 
   for (auto II = std::next(ReturnBB->rbegin()), IE = ReturnBB->rend();
        II != IE; ++II) {
-    // If we do not have a release_value or strong_release...
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
-      // And the object can not use values in a manner that will keep the object
-      // alive, continue. We may be able to find additional releases.
-      if (arc::canNeverUseValues(&*II))
-        continue;
-
-      // Otherwise, we need to stop computing since we do not want to reduce the
-      // lifetime of objects.
-      return;
+      if (!arc::canNeverUseValues(&*II)) {
+        return nullptr;
+      }
+      continue;
     }
 
-    // Ok, we have a release_value or strong_release. Grab Target and find the
-    // RC identity root of its operand.
     SILInstruction *Target = &*II;
     SILValue Op = RCIA->getRCIdentityRoot(Target->getOperand(0));
-
-    // If Op is not a consumed argument, we must break since this is not an Op
-    // that is a part of a return sequence. We are being conservative here since
-    // we could make this more general by allowing for intervening non-arg
-    // releases in the sense that we do not allow for race conditions in between
-    // destructors.
-    auto *Arg = dyn_cast<SILArgument>(Op);
-    if (!Arg || !Arg->isFunctionArg() ||
-        !Arg->hasConvention(ParameterConvention::Direct_Owned))
-      return;
-
-    // Ok, we have a release on a SILArgument that is direct owned. Attempt to
-    // put it into our arc opts map. If we already have it, we have exited the
-    // return value sequence so break. Otherwise, continue looking for more arc
-    // operations.
-    if (!ConsumedArgumentIndexToReleaseMap.insert({Arg->getIndex(),
-                                                   Target}).second)
-      return;
+    return Op == SILValue(Arg) ? Target : nullptr;
   }
+
+  return nullptr;
 }
 
 /// This function goes through the arguments of F and sees if we have anything
@@ -199,12 +169,6 @@ FunctionAnalyzer::analyze() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResult())
     return false;
-
-  // Search for all ARC sequence ops. This initializes the small map vector we
-  // are using to store instructions. We are using this data structure on
-  // purpose since it will allow us to easily recreate our arc opts in the same
-  // order in caller functions.
-  findConsumedArgumentReleases();
 
   ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
@@ -219,11 +183,8 @@ FunctionAnalyzer::analyze() {
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     if (A.hasConvention(ParameterConvention::Direct_Owned)) {
-      auto P = ConsumedArgumentIndexToReleaseMap.find(i);
-      if (P != ConsumedArgumentIndexToReleaseMap.end()) {
-        assert(A.Arg->getIndex() == i &&
-               "Make sure our argument index matches the current arg index.");
-        A.CalleeRelease = P->second;
+      if ((A.CalleeRelease = searchForCalleeRelease(A.Arg))) {
+        DecrementsToMove.insert(A.CalleeRelease);
         ShouldOptimize = true;
         ++NumOwnedConvertedToGuaranteed;
       }
@@ -410,12 +371,11 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
 
     // If we have any arguments that were consumed but are now guaranteed,
     // insert a fix lifetime instruction and a release_value.
-    //
-    // We iterate over the consumed argument index to release map backwards
-    // since we inserted the instructions in reverse order.
-    for (auto P : Analyzer.getConsumedArgumentIndexReleasePairs()) {
-      Builder.createFixLifetime(AI->getLoc(), AI->getArgument(P.first));
-      Builder.createReleaseValue(AI->getLoc(), AI->getArgument(P.first));
+    for (unsigned i = 0, e = ArgDescList.size(); i != e; ++i) {
+      if (ArgDescList[i].CalleeRelease) {
+        Builder.createFixLifetime(AI->getLoc(), AI->getArgument(i));
+        Builder.createReleaseValue(AI->getLoc(), AI->getArgument(i));
+      }
     }
 
     // Erase the old apply.
@@ -435,13 +395,19 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 
   // Create the args for the thunk's apply, ignoring any dead arguments.
   llvm::SmallVector<SILValue, 8> ThunkArgs;
+  llvm::SmallVector<SILValue, 4> OwnedToGuaranteedArgs;
 
+  ArrayRef<ArgumentDescriptor> ArgDescList = Analyzer.getArgDescList();
   ArrayRef<unsigned> DeadArgs = Analyzer.getDeadArgIndices();
   unsigned deadarg_i = 0, deadarg_e = DeadArgs.size();
   for (unsigned i = 0, e = BB->getNumBBArg(); i < e; ++i) {
     if (deadarg_i < deadarg_e && DeadArgs[deadarg_i] == i) {
       deadarg_i++;
       continue;
+    }
+
+    if (ArgDescList[i].CalleeRelease) {
+      OwnedToGuaranteedArgs.push_back(BB->getBBArg(i));
     }
 
     ThunkArgs.push_back(BB->getBBArg(i));
@@ -457,10 +423,9 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 
   // If we have any arguments that were consumed but are now guaranteed,
   // insert a fix lifetime instruction and a release_value.
-  for (auto P : Analyzer.getConsumedArgumentIndexReleasePairs()) {
-    SILValue Arg = BB->getBBArg(P.first);
-    Builder.createFixLifetime(Loc, Arg);
-    Builder.createReleaseValue(Loc, Arg);
+  for (SILValue V : OwnedToGuaranteedArgs) {
+    Builder.createFixLifetime(Loc, V);
+    Builder.createReleaseValue(Loc, V);
   }
 
   Builder.createReturn(Loc, ReturnValue);
