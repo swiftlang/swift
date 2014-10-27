@@ -448,7 +448,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   typealias _Base = _HeapBuffer<_ArrayBody, T>
   var _base: _Base {
-    return _HeapBuffer(__bufferPointer.buffer)
+    return _Base(nativeStorage: __bufferPointer._nativeBuffer)
   }
 
   var __bufferPointer: ManagedBufferPointer<_ArrayBody, T>
