@@ -358,59 +358,56 @@ public struct _MagicMirrorData {
   }
 }
 
-public // protocol conformance used in Reflection.mm
 struct _OpaqueMirror: MirrorType {
   let data: _MagicMirrorData
 
-  public var value: Any { return data.value }
-  public var valueType: Any.Type { return data.valueType }
-  public var objectIdentifier: ObjectIdentifier? { return nil }
-  public var count: Int { return 0 }
-  public subscript(i: Int) -> (String, MirrorType) { 
+  var value: Any { return data.value }
+  var valueType: Any.Type { return data.valueType }
+  var objectIdentifier: ObjectIdentifier? { return nil }
+  var count: Int { return 0 }
+  subscript(i: Int) -> (String, MirrorType) { 
     _preconditionFailure("no children")
   }
-  public var summary: String { return data.summary }
-  public var quickLookObject: QuickLookObject? { return nil }
-  public var disposition: MirrorDisposition { return .Aggregate }
+  var summary: String { return data.summary }
+  var quickLookObject: QuickLookObject? { return nil }
+  var disposition: MirrorDisposition { return .Aggregate }
 }
 
-public // protocol conformance used in Reflection.mm
-struct _TupleMirror: MirrorType {
+internal struct _TupleMirror: MirrorType {
   let data: _MagicMirrorData
 
-  public var value: Any { return data.value }
-  public var valueType: Any.Type { return data.valueType }
-  public var objectIdentifier: ObjectIdentifier? { return nil }
-  public var count: Int {
+  var value: Any { return data.value }
+  var valueType: Any.Type { return data.valueType }
+  var objectIdentifier: ObjectIdentifier? { return nil }
+  var count: Int {
     @asmname("swift_TupleMirror_count")get
   }
-  public subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, MirrorType) {
     @asmname("swift_TupleMirror_subscript")get
   }
-  public var summary: String { return "(\(count) elements)" }
-  public var quickLookObject: QuickLookObject? { return nil }
-  public var disposition: MirrorDisposition { return .Tuple }
+  var summary: String { return "(\(count) elements)" }
+  var quickLookObject: QuickLookObject? { return nil }
+  var disposition: MirrorDisposition { return .Tuple }
 }
 
-public // protocol conformance used in Reflection.mm
 struct _StructMirror: MirrorType {
   let data: _MagicMirrorData
 
-  public var value: Any { return data.value }
-  public var valueType: Any.Type { return data.valueType }
-  public var objectIdentifier: ObjectIdentifier? { return nil }
-  public var count: Int {
+  var value: Any { return data.value }
+  var valueType: Any.Type { return data.valueType }
+  var objectIdentifier: ObjectIdentifier? { return nil }
+  var count: Int {
     @asmname("swift_StructMirror_count")get
   }
-  public subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, MirrorType) {
     @asmname("swift_StructMirror_subscript")get
   }
 
-  public var summary: String {
+  var summary: String {
     return _stdlib_getDemangledTypeName(value)
   }
-  public var quickLookObject: QuickLookObject? { return nil }
-  public var disposition: MirrorDisposition { return .Struct }
+  var quickLookObject: QuickLookObject? { return nil }
+  var disposition: MirrorDisposition { return .Struct }
 }
 
 @asmname("swift_ClassMirror_count")
@@ -421,51 +418,49 @@ func _getClassChild(Int, _MagicMirrorData) -> (String, MirrorType)
 @asmname("swift_ClassMirror_quickLookObject")public
 func _getClassQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
 
-public // protocol conformance used in Reflection.mm
 struct _ClassMirror: MirrorType {
   let data: _MagicMirrorData
   
-  public var value: Any { return data.value }
-  public var valueType: Any.Type { return data.valueType }
-  public var objectIdentifier: ObjectIdentifier? {
+  var value: Any { return data.value }
+  var valueType: Any.Type { return data.valueType }
+  var objectIdentifier: ObjectIdentifier? {
     return data._loadValue() as ObjectIdentifier
   }
-  public var count: Int {
+  var count: Int {
     return _getClassCount(data)
   }
-  public subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, MirrorType) {
     return _getClassChild(i, data)
   }
-  public var summary: String {
+  var summary: String {
     return _stdlib_getDemangledTypeName(value)
   }
-  public var quickLookObject: QuickLookObject? {
+  var quickLookObject: QuickLookObject? {
     return _getClassQuickLookObject(data)
   }
-  public var disposition: MirrorDisposition { return .Class }
+  var disposition: MirrorDisposition { return .Class }
 }
 
-public // protocol conformance used in Reflection.mm
 struct _ClassSuperMirror: MirrorType {
   let data: _MagicMirrorData
   
-  public var value: Any { return data.value }
-  public var valueType: Any.Type { return data.valueType }
+  var value: Any { return data.value }
+  var valueType: Any.Type { return data.valueType }
   
   // Suppress the value identifier for super mirrors.
-  public var objectIdentifier: ObjectIdentifier? {
+  var objectIdentifier: ObjectIdentifier? {
     return nil
   }
-  public var count: Int {
+  var count: Int {
     return _getClassCount(data)
   }
-  public subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, MirrorType) {
     return _getClassChild(i, data)
   }
-  public var summary: String {
+  var summary: String {
     return _stdlib_getDemangledTypeName(value)
   }
-  public var quickLookObject: QuickLookObject? { return nil }
-  public var disposition: MirrorDisposition { return .Class }
+  var quickLookObject: QuickLookObject? { return nil }
+  var disposition: MirrorDisposition { return .Class }
 }
 
