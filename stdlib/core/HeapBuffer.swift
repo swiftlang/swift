@@ -161,13 +161,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
   
   init<T: AnyObject>(_ storage: T?) {
-    _sanityCheck(
-      _usesNativeSwiftReferenceCounting(T.self),
-      "HeapBuffer manages only native objects"
-    )
-    self._storage = storage.map {
-      Builtin.castToNativeObject($0)
-    }
+    self = storage.map { _HeapBuffer($0) } ?? _HeapBuffer()
   }
   
   init(nativeStorage: Builtin.NativeObject?) {
