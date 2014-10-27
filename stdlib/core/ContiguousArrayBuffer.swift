@@ -462,7 +462,7 @@ public func += <
     (lhs.baseAddress + oldCount).initializeFrom(rhs)
   }
   else {
-    let newLHS = _ContiguousArrayBuffer<T>(
+    var newLHS = _ContiguousArrayBuffer<T>(
       count: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
 
@@ -470,7 +470,7 @@ public func += <
       newLHS.baseAddress.moveInitializeFrom(lhs.baseAddress, count: oldCount)
       lhs._base.value.count = 0
     }
-    lhs._base = newLHS._base
+    swap(&lhs, &newLHS)
     (lhs._base.baseAddress + oldCount).initializeFrom(rhs)
   }
 }
