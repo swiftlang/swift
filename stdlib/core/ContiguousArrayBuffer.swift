@@ -174,21 +174,22 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       self = _ContiguousArrayBuffer<T>()
     }
     else {
-      _base = _HeapBuffer(
-        _ContiguousArrayStorage<T>.self,
-        _ArrayBody(),
-        realMinimumCapacity)
-
+      __bufferPointer = ManagedBufferPointer(
+        bufferClass: _ContiguousArrayStorage<T>.self,
+        minimumCapacity: realMinimumCapacity
+      ) {_,_ in _ArrayBody() }
+      
       let verbatim = _isBridgedVerbatimToObjectiveC(T.self)
       
-      _base.value = _ArrayBody(
+      __bufferPointer.value = _ArrayBody(
         count: count, capacity: _base._capacity(),
         elementTypeIsBridgedVerbatim: verbatim)
     }
   }
 
   init(_ storage: _ContiguousArrayStorageBase?) {
-    _base = unsafeBitCast(storage, _HeapBuffer<_ArrayBody, T>.self)
+    __bufferPointer = ManagedBufferPointer(
+      unsafeBufferObject: storage ?? _emptyArrayStorage)
   }
 
   public var hasStorage: Bool {
@@ -234,7 +235,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// create an empty buffer
   public init() {
-    _base = unsafeBitCast(_emptyArrayStorage, _HeapBuffer<_ArrayBody, T>.self)
+    __bufferPointer = ManagedBufferPointer(
+      unsafeBufferObject: _emptyArrayStorage)
   }
 
   /// Adopt the storage of x
@@ -368,7 +370,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// may need to be considered, such as whether the buffer could be
   /// some immutable Cocoa container.
   public mutating func isUniquelyReferenced() -> Bool {
-    return _base.isUniquelyReferenced()
+    return __bufferPointer.holdsUniqueReference()
   }
 
   /// Returns true iff this buffer is mutable. NOTE: a true result
@@ -445,7 +447,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 
   typealias _Base = _HeapBuffer<_ArrayBody, T>
-  var _base: _Base
+  var _base: _Base {
+    return _HeapBuffer(__bufferPointer.buffer)
+  }
+
+  var __bufferPointer: ManagedBufferPointer<_ArrayBody, T>
 }
 
 /// Append the elements of rhs to lhs
