@@ -28,6 +28,20 @@
 #include "llvm/ADT/StringExtras.h"
 #include "Debug.h"
 
+#if defined(__APPLE__)
+#include <malloc/malloc.h>
+extern "C" size_t swift_malloc_size(const void *ptr) {
+  return malloc_size(ptr);
+}
+#elif defined(__GNU_LIBRARY__)
+#include <malloc.h>
+extern "C" size_t swift_malloc_size(const void *ptr) {
+  return malloc_usable_size(const_cast<void*>(ptr));
+}
+#else
+# error No malloc_size analog known for this platform/libc.
+#endif
+
 static uint64_t uint64ToStringImpl(char *Buffer, uint64_t Value,
                                    int64_t Radix, bool Uppercase,
                                    bool Negative) {

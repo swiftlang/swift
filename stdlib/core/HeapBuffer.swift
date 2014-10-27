@@ -127,7 +127,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   func _allocatedSize() -> Int {
-    return Int(bitPattern: malloc_size(UnsafeMutablePointer(_address)))
+    return Int(bitPattern: swift_malloc_size(UnsafeMutablePointer(_address)))
   }
 
   func _allocatedAlignMask() -> Int {

@@ -20,7 +20,7 @@
 
 #include <stddef.h> // for size_t
 
-size_t malloc_size(const void *ptr);
+size_t swift_malloc_size(const void *ptr);
 size_t strlen(const char *s);
 char *strcpy(char *restrict dst, const char *restrict src);
 int strcmp(const char *s1, const char *s2);
