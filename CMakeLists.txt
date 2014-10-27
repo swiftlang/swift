@@ -1657,7 +1657,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   endif()
 else()
   # Default to the host triple llvm uses for all other platforms
-  set(SWIFT_HOST_TRIPLE "${LLVM_DEFAULT_TARGET_TRIPLE}" CACHE STRING "triple")
+  set(SWIFT_HOST_TRIPLE "${TARGET_TRIPLE}" CACHE STRING "triple")
 endif()
 
 # We'll need this once we have generated headers
