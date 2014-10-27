@@ -18,6 +18,7 @@
 #define SWIFT_RUNTIME_ONCE_H
 
 #include "swift/Runtime/HeapObject.h"
+#include <mutex>
 
 namespace swift {
 
@@ -28,8 +29,8 @@ typedef long swift_once_t;
 
 #else
 
-// On other platforms swift_once_t is pointer-sized.
-typedef void *swift_once_t;
+// On other platforms swift_once_t is std::once_flag
+typedef std::once_flag swift_once_t;
 
 #endif
 

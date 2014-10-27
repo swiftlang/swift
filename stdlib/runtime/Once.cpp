@@ -27,6 +27,7 @@ using namespace swift;
 #include <dispatch/dispatch.h>
 static_assert(std::is_same<swift_once_t, dispatch_once_t>::value,
               "swift_once_t and dispatch_once_t must stay in sync");
+#endif
 
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must point to a global or static variable of static
@@ -34,23 +35,25 @@ static_assert(std::is_same<swift_once_t, dispatch_once_t>::value,
 void swift::swift_once(swift_once_t *predicate, void (*fn)(HeapObject *ctx),
                        HeapObject *ctx) {
   // Swift convention passes ctx +1, but 'fn' may or may not be called.
+#if __APPLE__
   __block HeapObject *ctx2 = ctx;
   dispatch_once(predicate, ^{
     fn(ctx);
     ctx2 = nullptr;
   });
+#else
+  // FIXME: We're relying here on the coincidence that libstdc++ uses pthread's
+  // pthread_once, and that on glibc pthread_once follows a compatible init
+  // process (the token is a word that is atomically incremented from 0 to
+  // 1 to 2 during initialization) to work. We should implement our own version
+  // that we can rely on to continue to work that way.
+  // For more information, see rdar://problem/18499385
+  HeapObject *ctx2 = ctx;
+  std::call_once(*predicate, [fn,ctx,&ctx2]() {
+    fn(ctx);
+    ctx2 = nullptr;
+  });
+#endif
   if (ctx2)
     swift_release(ctx);
 }
-
-#else
-
-void swift::swift_once(swift_once_t *predicate, void (*fn)(HeapObject *ctx),
-                       HeapObject *ctx) {
-  // FIXME: can not use pthread_once because there is no way to pass context.
-  // Either re-implement pthread_once, or change 'fn' to be a thin closure.
-  swift::crash("swift_once not implemented");
-}
-
-#endif
-
