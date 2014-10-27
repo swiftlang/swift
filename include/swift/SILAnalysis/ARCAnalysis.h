@@ -43,6 +43,13 @@ bool canCheckRefCount(SILInstruction *User);
 /// that requires \p Ptr to be alive before Inst.
 bool canUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
 
+/// \returns True if \p User can never use a value in a way that requires the
+/// value to be alive.
+///
+/// This is purposefully a negative query to contrast with canUseValue which is
+/// about a specific value while this is about general values.
+bool canNeverUseValues(SILInstruction *User);
+
 /// If \p Op has arc uses in the instruction range [Start, End), return the
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.

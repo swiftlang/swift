@@ -203,7 +203,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
 }
 
 /// Returns true if Inst is a function that we know never uses ref count values.
-static bool canInstUseRefCountValues(SILInstruction *Inst) {
+bool swift::arc::canNeverUseValues(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   // These instructions do not use other values.
   case ValueKind::FunctionRefInst:
@@ -302,7 +302,7 @@ bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
                              AliasAnalysis *AA) {
   // If Inst is an instruction that we know can never use values with reference
   // semantics, return true.
-  if (canInstUseRefCountValues(User))
+  if (canNeverUseValues(User))
     return false;
 
   // If the user is a load or a store and we can prove that it does not access
