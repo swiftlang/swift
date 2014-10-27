@@ -303,12 +303,10 @@ extension _ArrayBuffer {
         count: subRangeCount, minimumCapacity: 0)
 
     // Tell Cocoa to copy the objects into our storage
-    let _:() = result.withUnsafeMutableBufferPointer {
-      cocoa.buffer.getObjects(
-        UnsafeMutablePointer($0.baseAddress),
-        range: _SwiftNSRange(location: subRange.startIndex, length: subRangeCount)
-      )
-    }
+    cocoa.buffer.getObjects(
+      UnsafeMutablePointer(result.baseAddress),
+      range: _SwiftNSRange(location: subRange.startIndex, length: subRangeCount)
+    )
 
     return _SliceBuffer(result)
   }
@@ -318,9 +316,7 @@ extension _ArrayBuffer {
   public
   var baseAddress: UnsafeMutablePointer<T> {
     if (_fastPath(_isNative)) {
-      return _native.withUnsafeBufferPointer {
-        UnsafeMutablePointer($0.baseAddress)
-      }
+      return _native.baseAddress
     }
     return nil
   }
@@ -388,7 +384,9 @@ extension _ArrayBuffer {
         indirect.replaceStorage(_copyCollectionToNativeArrayBuffer(self))
       }
     }
-    return _native.withUnsafeBufferPointer(body)
+    let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
+    _fixLifetime(self)
+    return ret
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -399,7 +397,7 @@ extension _ArrayBuffer {
     body: (UnsafeMutableBufferPointer<T>)->R
   ) -> R {
     _sanityCheck(
-      _nonNative == nil,
+      baseAddress != nil || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
     let ret = body(

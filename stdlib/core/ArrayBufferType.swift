@@ -93,6 +93,10 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject? {get}
   
+  /// If the elements are stored contiguously, a pointer to the first
+  /// element. Otherwise, nil.
+  var baseAddress: UnsafeMutablePointer<Element> {get}
+
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
