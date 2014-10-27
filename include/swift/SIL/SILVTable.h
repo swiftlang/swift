@@ -23,8 +23,10 @@
 
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
+#include <algorithm>
 
 namespace swift {
 
@@ -34,6 +36,7 @@ class SILModule;
 
 /// A mapping from each dynamically-dispatchable method of a class to the
 /// SILFunction that implements the method for that class.
+/// Note that dead methods are completely removed from the vtable.
 class SILVTable : public llvm::ilist_node<SILVTable>,
                   public SILAllocated<SILVTable> {
 public:
@@ -76,6 +79,20 @@ public:
   /// Look up the implementation function for the given method.
   SILFunction *getImplementation(SILModule &M, SILDeclRef method) const;
 
+  /// Removes entries from the vtable.
+  /// \p predicate Returns true if the passed entry should be removed.
+  template <typename Predicate> void removeEntries_if(Predicate predicate) {
+    Pair *end = std::remove_if(Entries, Entries + NumEntries,
+                               [&](Pair &entry) -> bool {
+      if (predicate(entry)) {
+        entry.second->decrementRefCount();
+        return true;
+      }
+      return false;
+    });
+    NumEntries = end - Entries;
+  }
+                    
   /// Verify that the vtable is well-formed for the given class.
   void verify(const SILModule &M) const;
 

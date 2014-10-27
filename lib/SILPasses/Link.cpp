@@ -46,8 +46,6 @@ class SILLinker : public SILModuleTransform {
     for (auto &Fn : M)
       Changed |= M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll);
 
-    M.invalidateSILLoaderCaches();
-    
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }

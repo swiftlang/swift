@@ -140,7 +140,7 @@ void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries,
 
   void *buf = Mod.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
   memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
-  Entries = ArrayRef<Entry>(static_cast<Entry*>(buf), entries.size());
+  Entries = MutableArrayRef<Entry>(static_cast<Entry*>(buf), entries.size());
 
   // Bump the reference count of witness functions referenced by this table.
   for (auto entry : getEntries()) {

@@ -209,6 +209,10 @@ struct SILDeclRef {
   bool isConstructor() const {
     return kind == Kind::Allocator || kind == Kind::Initializer;
   }
+  /// True if the SILDeclRef references a destructor entry point.
+  bool isDestructor() const {
+    return kind == Kind::Destroyer || kind == Kind::Deallocator;
+  }
   /// True if the SILDeclRef references an enum entry point.
   bool isEnumElement() const {
     return kind == Kind::EnumElement;

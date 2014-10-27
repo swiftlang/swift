@@ -156,6 +156,14 @@ public:
       assert(Kind == WitnessKind::MissingOptional);
       return MissingOptional;
     }
+
+    void removeWitnessMethod() {
+      assert(Kind == WitnessKind::Method);
+      if (Method.Witness) {
+        Method.Witness->decrementRefCount();
+      }
+      Method.Witness = nullptr;
+    }
   };
   
 private:
@@ -174,7 +182,7 @@ private:
 
   /// The various witnesses containing in this witness table. Is empty if the
   /// table has no witness entires or if it is a declaration.
-  ArrayRef<Entry> Entries;
+  MutableArrayRef<Entry> Entries;
 
   /// Whether or not this witness table is a declaration. This is separate from
   /// whether or not entries is empty since you can have an empty witness table
@@ -231,6 +239,19 @@ public:
   /// Return all of the witness table entries.
   ArrayRef<Entry> getEntries() const { return Entries; }
 
+  /// Clears methods in MethodWitness entries.
+  /// \p predicate Returns true if the passed entry should be set to null.
+  template <typename Predicate> void clearMethods_if(Predicate predicate) {
+    for (Entry &entry : Entries) {
+      if (entry.getKind() == WitnessKind::Method) {
+        const MethodWitness &MW = entry.getMethodWitness();
+        if (predicate(MW)) {
+          entry.removeWitnessMethod();
+        }
+      }
+    }
+  }
+  
   /// Verify that the witness table is well-formed.
   void verify(const SILModule &M) const;
   

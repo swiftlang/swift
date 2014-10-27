@@ -1,4 +1,4 @@
-// RUN: %swift -O  -module-name devirt_default_case -emit-sil  %s | FileCheck %s
+// RUN: %swift -O  -module-name devirt_default_case -emit-sil %s | FileCheck %s
 
 // public class
 public class Base1 {
@@ -61,12 +61,12 @@ class Base3 {
   @inline(never) func middle() { inner() }
 // Check that call to Base3.middle can be devirtualized
 // 
-// CHECK-LABEL: sil hidden @_TFC19devirt_default_case5Base35outerfS0_FT_T_
-// CHECK: function_ref @_TFC19devirt_default_caseP33_77424841540E67CC820F5E5F7940DCB08Derived36middlefS0_FT_T_
+// CHECK-LABEL: sil hidden [noinline] @_TFC19devirt_default_case5Base35outerfS0_FT_T_
+// CHECK: function_ref @_TFC19devirt_default_caseP{{.*}}8Derived36middlefS0_FT_T_
 // CHECK: function_ref @_TFC19devirt_default_case5Base36middlefS0_FT_T_
 // CHECK-NOT: class_method
 // CHECK: }
-  func outer() {
+  @inline(never) func outer() {
     middle()
   }
 }
@@ -75,6 +75,8 @@ class Base3 {
 private class Derived3 : Base3 {
   override func inner() { println("Derived1") }
   @inline(never) final override func middle() { inner() }
+  override func outer() {
+  }
 }
 
 class A2 { @inline(never) func f() -> Int { return 0 } }
@@ -119,10 +121,11 @@ func foo(a: A3) -> Int {
 println("foo(E()) = \(foo(E3()))")
 
 class Base4 {
+  @inline(never)
   func test() { 
 // Check that call to foo() can be devirtualized
 //
-// CHECK-LABEL: sil hidden @_TFC19devirt_default_case5Base44testfS0_FT_T_ 
+// CHECK-LABEL: sil hidden [noinline] @_TFC19devirt_default_case5Base44testfS0_FT_T_ 
 // CHECK: function_ref @_TFC19devirt_default_case8Derived43foofS0_FT_T_ 
 // CHECK: function_ref @_TFC19devirt_default_case5Base43foofS0_FT_T_
 // CHECK-NOT: class_method
@@ -138,11 +141,12 @@ class Derived4 : Base4 {
 }
 
 public class Base5 {
+  @inline(never)
   func test() { 
 // Check that call to foo() does not use class_method, because
 // it is a final method.
 //
-// CHECK-LABEL: sil @_TFC19devirt_default_case5Base54testfS0_FT_T_ 
+// CHECK-LABEL: sil [noinline] @_TFC19devirt_default_case5Base54testfS0_FT_T_ 
 // CHECK: function_ref @_TFC19devirt_default_case5Base53foofS0_FT_T_
 // CHECK-NOT: class_method
 // CHECK: }
@@ -202,3 +206,15 @@ func check_call_on_downcasted_instance(a: A7) -> Bool {
 }
 
 println(check_call_on_downcasted_instance(B7()))
+
+@inline(never)
+func callIt(b3: Base3, b4: Base4, b5: Base5) {
+  b3.outer()
+  b4.test()
+  b5.test()
+}
+
+public func externalEntryPoint() {
+  callIt(Base3(), Base4(), Base5())
+}
+
