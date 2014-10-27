@@ -14,6 +14,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/LLVM.h"
@@ -40,18 +41,92 @@ STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct ArgDescriptor {
+
+/// A structure that maintains all of the information about a specific
+/// SILArgument that we are tracking.
+///
+/// TODO: Remove IsDead and CalleeRelease and make them properties of
+/// ArgumentDescriptor based off of Arg.
+struct ArgumentDescriptor {
   SILArgument *Arg;
   SILParameterInfo ParameterInfo;
   bool IsDead;
   SILInstruction *CalleeRelease;
 
-  ArgDescriptor() = default;
-  ArgDescriptor(SILArgument *A)
+  ArgumentDescriptor() = default;
+  ArgumentDescriptor(SILArgument *A)
     : Arg(A), ParameterInfo(A->getParameterInfo()), IsDead(A->use_empty()),
       CalleeRelease() {}
 
+  bool hasConvention(ParameterConvention P) const {
+    return Arg->hasConvention(P);
+  }
 };
+
+/// A class that contains all analysis information we gather about our
+/// function. Also provides utility methods for creating the new empty function.
+class FunctionAnalyzer {
+  /// The function that we are analyzing.
+  SILFunction *F;
+
+  /// The rc identity analysis we are using to find rc identity roots of arc
+  /// values.
+  RCIdentityAnalysis *RCIA;
+
+  /// Did we ascertain that we can optimize this function?
+  bool ShouldOptimize;
+
+  /// A list of structures which present a "view" of precompiled information on
+  /// an argument that we will use during our optimization.
+  llvm::SmallVector<ArgumentDescriptor, 8> ArgDescList;
+
+  /// A list containing all dead argument indices. This is useful precompiled
+  /// information that we learn early on but need later deep in the analysis
+  llvm::SmallVector<unsigned, 8> DeadArgIndices;
+
+  // This is a set that we use to ensure that when we are searching for @owned
+  // parameters, we ignore retains releases that we know that we are already
+  // going to move.
+  ///
+  /// This is going to be removed when searchForCalleeRelease is removed.
+  llvm::SmallPtrSet<SILInstruction *, 4> DecrementsToMove;
+
+public:
+  FunctionAnalyzer() = delete;
+  FunctionAnalyzer(const FunctionAnalyzer &) = delete;
+  FunctionAnalyzer(FunctionAnalyzer &&) = delete;
+
+  FunctionAnalyzer(SILFunction *F, RCIdentityAnalysis *RCIA)
+    : F(F), RCIA(RCIA), ShouldOptimize(false) {}
+
+  /// Analyze the given function.
+  bool analyze();
+
+  /// Returns the managled name of the function that should be generated from
+  /// this function analyzer.
+  llvm::SmallString<64> getOptimizedName();
+
+  /// Create a new empty function with the optimized signature found by this
+  /// analysis.
+  ///
+  /// *NOTE* This occurs in the same module as F.
+  SILFunction *createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &Name);
+
+  ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
+  ArrayRef<unsigned> getDeadArgIndices() const { return DeadArgIndices; }
+
+private:
+  /// Returns the callee release for Arg. This will be removed soon.
+  SILInstruction *searchForCalleeRelease(SILArgument *Arg);
+
+  /// Compute the interface params of the optimized function.
+  void
+  computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &OutArray);
+
+  /// Compute the CanSILFunctionType for the optimized function.
+  CanSILFunctionType createOptimizedSILFunctionType();
+};
+
 } // end anonymous namespace
 
 /// See if we can find a release on Arg in the exiting BB of F without any side
@@ -60,25 +135,25 @@ struct ArgDescriptor {
 /// We only do this in the last basic block for now since if the ARC optimizer
 /// had meaningfully reduced the lifetime of an object, we don't want to extend
 /// the life if for instance we had moved releases over loops.
-static SILInstruction *searchForCalleeRelease(SILFunction *F,
-                                              SILArgument *Arg,
-                                              RCIdentityAnalysis *RCIA) {
+///
+/// TODO: This is going to be ripped out. This analysis needs to be more
+/// robust. But while I am refactoring I am going to leave it in.
+SILInstruction *
+FunctionAnalyzer::searchForCalleeRelease(SILArgument *Arg) {
   auto ReturnBB = F->findReturnBB();
   if (ReturnBB == F->end())
     return nullptr;
 
-  for (auto II = ReturnBB->rbegin(), IE = ReturnBB->rend(); II != IE; ++II) {
-    // TODO: Use ARC infrastructure here.
-    SILInstruction *Target = nullptr;
-    if (isa<ReleaseValueInst>(*II) || isa<StrongReleaseInst>(*II))
-      Target = &*II;
-
-    if (!Target) {
-      if (II->mayHaveSideEffects())
+  for (auto II = std::next(ReturnBB->rbegin()), IE = ReturnBB->rend();
+       II != IE; ++II) {
+    if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
+      if (!arc::canNeverUseValues(&*II)) {
         return nullptr;
+      }
       continue;
     }
 
+    SILInstruction *Target = &*II;
     SILValue Op = RCIA->getRCIdentityRoot(Target->getOperand(0));
     return Op == SILValue(Arg) ? Target : nullptr;
   }
@@ -89,27 +164,27 @@ static SILInstruction *searchForCalleeRelease(SILFunction *F,
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
 /// it returns false.
-static bool
-analyzeArguments(SILFunction *F, SmallVectorImpl<ArgDescriptor> &ArgDescList,
-                 RCIdentityAnalysis *RCIA) {
+bool
+FunctionAnalyzer::analyze() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResult())
     return false;
 
-  bool ShouldOptimize = false;
-
-  for (SILArgument *Arg : F->begin()->getBBArgs()) {
-    ArgDescriptor A{Arg};
+  ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+    ArgumentDescriptor A{Args[i]};
 
     if (A.IsDead) {
       ShouldOptimize = true;
+      DeadArgIndices.push_back(i);
       ++NumDeadArgsEliminated;
     }
 
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
-    if (A.ParameterInfo.isConsumed()) {
-      if ((A.CalleeRelease = searchForCalleeRelease(F, Arg, RCIA))) {
+    if (A.hasConvention(ParameterConvention::Direct_Owned)) {
+      if ((A.CalleeRelease = searchForCalleeRelease(A.Arg))) {
+        DecrementsToMove.insert(A.CalleeRelease);
         ShouldOptimize = true;
         ++NumOwnedConvertedToGuaranteed;
       }
@@ -122,6 +197,79 @@ analyzeArguments(SILFunction *F, SmallVectorImpl<ArgDescriptor> &ArgDescList,
 }
 
 //===----------------------------------------------------------------------===//
+//                         Creating the New Function
+//===----------------------------------------------------------------------===//
+
+void
+FunctionAnalyzer::
+computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &OutArray) {
+  CanSILFunctionType OldFTy = F->getLoweredFunctionType();
+  ArrayRef<SILParameterInfo> ParameterInfo = OldFTy->getParameters();
+  for (unsigned i = 0, e = ParameterInfo.size(); i != e; ++i) {
+    // If we have a dead argument, skip it.
+    if (ArgDescList[i].IsDead) {
+      continue;
+    }
+
+    // If we found a release in the callee in the last BB on an @owned
+    // parameter, change the parameter to @guaranteed and continue...
+    if (ArgDescList[i].CalleeRelease) {
+      const SILParameterInfo &OldInfo = ParameterInfo[i];
+      assert(OldInfo.getConvention() == ParameterConvention::Direct_Owned &&
+             "Can only transform @owned => @guaranteed in this code path");
+      SILParameterInfo NewInfo(OldInfo.getType(),
+                               ParameterConvention::Direct_Guaranteed);
+      OutArray.push_back(NewInfo);
+      continue;
+    }
+
+    // Otherwise just propagate through the parameter info.
+    OutArray.push_back(ParameterInfo[i]);
+  }
+}
+
+CanSILFunctionType
+FunctionAnalyzer::createOptimizedSILFunctionType() {
+  const ASTContext &Ctx = F->getModule().getASTContext();
+  CanSILFunctionType FTy = F->getLoweredFunctionType();
+
+  // The only way that we modify the arity of function parameters is here for
+  // dead arguments. Doing anything else is unsafe since by definition non-dead
+  // arguments will have SSA uses in the function. We would need to be smarter
+  // in our moving to handle such cases.
+  llvm::SmallVector<SILParameterInfo, 8> InterfaceParams;
+  computeOptimizedInterfaceParams(InterfaceParams);
+
+  SILResultInfo InterfaceResult = FTy->getResult();
+
+  return SILFunctionType::get(FTy->getGenericSignature(),
+                              FTy->getExtInfo(),
+                              FTy->getCalleeConvention(),
+                              InterfaceParams, InterfaceResult, Ctx);
+}
+
+SILFunction *
+FunctionAnalyzer::
+createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
+  SILModule &M = F->getModule();
+
+  // Create the new optimized function type.
+  CanSILFunctionType NewFTy = createOptimizedSILFunctionType();
+
+  // Create the new function.
+  auto *NewDebugScope = new (M) SILDebugScope(*F->getDebugScope());
+  SILFunction *NewF = SILFunction::create(
+      M, F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(),
+      F->isBare(), F->isTransparent(), F->isFragile(),
+      F->getInlineStrategy(), F->getEffectsInfo(), 0,
+      NewDebugScope, F->getDeclContext());
+  NewF->setSemanticsAttr(F->getSemanticsAttr());
+  NewDebugScope->SILFn = NewF;
+
+  return NewF;
+}
+
+//===----------------------------------------------------------------------===//
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
@@ -129,55 +277,60 @@ static bool isSpecializedFunction(SILFunction &F) {
   return F.getName().startswith("_TTOS");
 }
 
-static void createNewName(SILFunction &OldF, ArrayRef<ArgDescriptor> Args,
-                          llvm::SmallString<64> &Name) {
-  llvm::raw_svector_ostream buffer(Name);
+llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
+  llvm::SmallString<64> Name;
 
-  // OS for optimized signature.
-  buffer << "_TTOS_";
+  {
+    llvm::raw_svector_ostream buffer(Name);
+    // OS for optimized signature.
+    buffer << "_TTOS_";
 
-  // For every argument, put in what we are going to do to that arg in the
-  // signature. The key is:
-  //
-  // 'n'   => We did nothing to the argument.
-  // 'd'   => The argument was dead and will be removed.
-  // 'a2v' => Was a loadable address and we promoted it to a value.
-  // 'o2g' => Was an @owned argument, but we changed it to be a guaranteed
-  //          parameter.
-  // 's'   => Was a loadable value that we exploded into multiple arguments.
-  //
-  // Currently we only use 'n' and 'd' since we do not perform the other
-  // optimizations.
-  //
-  // *NOTE* The guaranteed optimization requires knowledge to be taught to the
-  // ARC optimizer among other passes in order to guarantee safety. That or you
-  // need to insert a fix_lifetime call to make sure we do not eliminate the
-  // retain, release surrounding the call site in the caller.
-  //
-  // Additionally we use a packed signature since at this point we don't need
-  // any '_'. The fact that we can run this optimization multiple times makes me
-  // worried about long symbol names so I am trying to keep the symbol names as
-  // short as possible especially in light of this being applied to specialized
-  // functions.
-  for (const ArgDescriptor &Arg : Args) {
-    // If this arg is dead, add 'd' to the packed signature and continue.
-    if (Arg.IsDead) {
-      buffer << 'd';
-      continue;
+    // For every argument, put in what we are going to do to that arg in the
+    // signature. The key is:
+    //
+    // 'n'   => We did nothing to the argument.
+    // 'd'   => The argument was dead and will be removed.
+    // 'a2v' => Was a loadable address and we promoted it to a value.
+    // 'o2g' => Was an @owned argument, but we changed it to be a guaranteed
+    //          parameter.
+    // 's'   => Was a loadable value that we exploded into multiple arguments.
+    //
+    // Currently we only use 'n' and 'd' since we do not perform the other
+    // optimizations.
+    //
+    // *NOTE* The guaranteed optimization requires knowledge to be taught to the
+    // ARC optimizer among other passes in order to guarantee safety. That or
+    // you need to insert a fix_lifetime call to make sure we do not eliminate
+    // the retain, release surrounding the call site in the caller.
+    //
+    // Additionally we use a packed signature since at this point we don't need
+    // any '_'. The fact that we can run this optimization multiple times makes
+    // me worried about long symbol names so I am trying to keep the symbol
+    // names as short as possible especially in light of this being applied to
+    // specialized functions.
+
+    for (const ArgumentDescriptor &Arg : ArgDescList) {
+      // If this arg is dead, add 'd' to the packed signature and continue.
+      if (Arg.IsDead) {
+        buffer << 'd';
+        continue;
+      }
+
+      // If we have an @owned argument and found a callee release for it,
+      // convert the argument to guaranteed.
+      if (Arg.CalleeRelease) {
+        buffer << "o2g";
+        continue;
+      }
+
+      // Otherwise we are doing nothing so add 'n' to the packed signature.
+      buffer << 'n';
     }
 
-    // If we have an @owned argument and found a callee release for it, convert
-    // the argument to guaranteed.
-    if (Arg.CalleeRelease) {
-      buffer << "o2g";
-      continue;
-    }
-
-    // Otherwise we are doing nothing so add 'n' to the packed signature.
-    buffer << 'n';
+    buffer << '_' << F->getName();
   }
 
-  buffer << '_' << OldF.getName();
+  return Name;
 }
 
 //===----------------------------------------------------------------------===//
@@ -187,8 +340,7 @@ static void createNewName(SILFunction &OldF, ArrayRef<ArgDescriptor> Args,
 /// This function takes in OldF and all callsites of OldF and rewrites the
 /// callsites to call the new function.
 static void
-rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
-                                  ArrayRef<ArgDescriptor> ArgDescs,
+rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
                                   CallGraphNode::CallerCallSiteList CallSites) {
   for (ApplyInst *AI : CallSites) {
     SILBuilder Builder(AI);
@@ -197,8 +349,9 @@ rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
 
     // Create the args for the new apply, ignoring any dead arguments.
     llvm::SmallVector<SILValue, 8> NewArgs;
-    for (unsigned i = 0, e = ArgDescs.size(); i != e; ++i) {
-      if (ArgDescs[i].IsDead)
+    ArrayRef<ArgumentDescriptor> ArgDescList = Analyzer.getArgDescList();
+    for (unsigned i = 0, e = ArgDescList.size(); i != e; ++i) {
+      if (ArgDescList[i].IsDead)
         continue;
       NewArgs.push_back(AI->getArgument(i));
     }
@@ -218,8 +371,8 @@ rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
 
     // If we have any arguments that were consumed but are now guaranteed,
     // insert a fix lifetime instruction and a release_value.
-    for (unsigned i = 0, e = ArgDescs.size(); i != e; ++i) {
-      if (ArgDescs[i].CalleeRelease) {
+    for (unsigned i = 0, e = ArgDescList.size(); i != e; ++i) {
+      if (ArgDescList[i].CalleeRelease) {
         Builder.createFixLifetime(AI->getLoc(), AI->getArgument(i));
         Builder.createReleaseValue(AI->getLoc(), AI->getArgument(i));
       }
@@ -232,75 +385,8 @@ rewriteApplyInstToCallNewFunction(SILFunction *OldF, SILFunction *NewF,
   }
 }
 
-static void
-computeOptimizedInterfaceParams(CanSILFunctionType OldFTy,
-                                ArrayRef<ArgDescriptor> Args,
-                                SmallVectorImpl<unsigned> &DeadArgs,
-                                SmallVectorImpl<SILParameterInfo> &OutArray) {
-  ArrayRef<SILParameterInfo> ParameterInfo = OldFTy->getParameters();
-  for (unsigned i = 0, e = ParameterInfo.size(); i != e; ++i) {
-    // If we have a dead argument, skip it.
-    if (Args[i].IsDead) {
-      DeadArgs.push_back(i);
-      continue;
-    }
-
-    // If we found a release in the callee in the last BB on an @owned
-    // parameter, change the parameter to @guaranteed and continue...
-    if (Args[i].CalleeRelease) {
-      const SILParameterInfo &OldInfo = ParameterInfo[i];
-      assert(OldInfo.getConvention() == ParameterConvention::Direct_Owned &&
-             "Can only transform @owned => @guaranteed in this code path");
-      SILParameterInfo NewInfo(OldInfo.getType(),
-                               ParameterConvention::Direct_Guaranteed);
-      OutArray.push_back(NewInfo);
-      continue;
-    }
-
-    // Otherwise just propagate through the parameter info.
-    OutArray.push_back(ParameterInfo[i]);
-  }
-}
-
-static SILFunction *
-createEmptyFunctionWithOptimizedSig(SILFunction *OldF,
-                                    llvm::SmallString<64> &NewFName,
-                                    ArrayRef<ArgDescriptor> Args,
-                                    SmallVectorImpl<unsigned> &DeadArgs) {
-  SILModule &M = OldF->getModule();
-
-  // Create the new optimized function type.
-  CanSILFunctionType OldFTy = OldF->getLoweredFunctionType();
-  const ASTContext &Ctx = M.getASTContext();
-
-  // The only way that we modify the arity of function parameters is here for
-  // dead arguments. Doing anything else is unsafe since by definition non-dead
-  // arguments will have SSA uses in the function. We would need to be smarter
-  // in our moving to handle such cases.
-  SmallVector<SILParameterInfo, 4> InterfaceParams;
-  computeOptimizedInterfaceParams(OldFTy, Args, DeadArgs, InterfaceParams);
-
-  SILResultInfo InterfaceResult = OldFTy->getResult();
-  CanSILFunctionType NewFTy = SILFunctionType::get(
-      OldFTy->getGenericSignature(), OldFTy->getExtInfo(),
-      OldFTy->getCalleeConvention(), InterfaceParams, InterfaceResult, Ctx);
-
-  // Create the new function.
-  auto *NewDebugScope = new (M) SILDebugScope(*OldF->getDebugScope());
-  SILFunction *NewF = SILFunction::create(
-      M, OldF->getLinkage(), NewFName, NewFTy, nullptr, OldF->getLocation(),
-      OldF->isBare(), OldF->isTransparent(), OldF->isFragile(),
-      OldF->getInlineStrategy(), OldF->getEffectsInfo(), 0,
-      NewDebugScope, OldF->getDeclContext());
-  NewF->setSemanticsAttr(OldF->getSemanticsAttr());
-  NewDebugScope->SILFn = NewF;
-
-  return NewF;
-}
-
 static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
-                            ArrayRef<ArgDescriptor> Args,
-                            ArrayRef<unsigned> DeadArgs) {
+                            FunctionAnalyzer &Analyzer) {
   // TODO: What is the proper location to use here?
   SILLocation Loc = BB->getParent()->getLocation();
   SILBuilder Builder(BB);
@@ -311,6 +397,8 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   llvm::SmallVector<SILValue, 8> ThunkArgs;
   llvm::SmallVector<SILValue, 4> OwnedToGuaranteedArgs;
 
+  ArrayRef<ArgumentDescriptor> ArgDescList = Analyzer.getArgDescList();
+  ArrayRef<unsigned> DeadArgs = Analyzer.getDeadArgIndices();
   unsigned deadarg_i = 0, deadarg_e = DeadArgs.size();
   for (unsigned i = 0, e = BB->getNumBBArg(); i < e; ++i) {
     if (deadarg_i < deadarg_e && DeadArgs[deadarg_i] == i) {
@@ -318,7 +406,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
       continue;
     }
 
-    if (Args[i].CalleeRelease) {
+    if (ArgDescList[i].CalleeRelease) {
       OwnedToGuaranteedArgs.push_back(BB->getBBArg(i));
     }
 
@@ -346,18 +434,14 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 static SILFunction *
 moveFunctionBodyToNewFunctionWithName(SILFunction *F,
                                       llvm::SmallString<64> &NewFName,
-                                      ArrayRef<ArgDescriptor> Args) {
-  // A list of the indices of our dead args.
-  llvm::SmallVector<unsigned, 4> DeadArgs;
-
+                                      FunctionAnalyzer &Analyzer) {
   // First we create an empty function (i.e. no BB) whose function signature has
   // had its arity modified.
   //
   // We only do this to remove dead arguments. All other function signature
   // optimization is done later by modifying the function signature elements
   // themselves.
-  SILFunction *NewF = createEmptyFunctionWithOptimizedSig(F, NewFName, Args,
-                                                          DeadArgs);
+  SILFunction *NewF = Analyzer.createEmptyFunctionWithOptimizedSig(NewFName);
 
   // Then we transfer the body of F to NewF. At this point, the arguments of the
   // first BB will not match.
@@ -374,14 +458,14 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // Then erase the dead arguments from NewF using DeadArgs. We go backwards so
   // we remove arg elements by decreasing index so we don't invalidate our
   // indices.
-  for (unsigned i : reversed(DeadArgs)) {
+  for (unsigned i : reversed(Analyzer.getDeadArgIndices())) {
     NewFEntryBB->eraseArgument(i);
   }
 
   // Intrusively optimize the function signature of NewF.
 
   // Then we create a new body for ThunkBody that calls NewF.
-  createThunkBody(ThunkBody, NewF, Args, DeadArgs);
+  createThunkBody(ThunkBody, NewF, Analyzer);
 
   return NewF;
 }
@@ -399,12 +483,13 @@ optimizeFunctionSignature(SILFunction *F,
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
 
-  // An array containing our ArgDescriptor objects that contain information
+  // An array containing our ArgumentDescriptor objects that contain information
   // from our analysis.
-  llvm::SmallVector<ArgDescriptor, 8> Arguments;
+  llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  if (!analyzeArguments(F, Arguments, RCIA)) {
+  FunctionAnalyzer Analyzer(F, RCIA);
+  if (!Analyzer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
     return false;
@@ -419,8 +504,7 @@ optimizeFunctionSignature(SILFunction *F,
     llvm::dbgs()  << "        CALLSITE: " << *AI;
   });
 
-  llvm::SmallString<64> NewFName;
-  createNewName(*F, Arguments, NewFName);
+  llvm::SmallString<64> NewFName = Analyzer.getOptimizedName();
 
   // If we already have a specialized version of this function, do not
   // respecialize. For now just bail.
@@ -433,14 +517,14 @@ optimizeFunctionSignature(SILFunction *F,
     return false;
 
   // Otherwise, move F over to NewF.
-  SILFunction *NewF = moveFunctionBodyToNewFunctionWithName(F, NewFName,
-                                                            Arguments);
+  SILFunction *NewF =
+    moveFunctionBodyToNewFunctionWithName(F, NewFName, Analyzer);
 
   // And remove all Callee releases that we found and made redundent via owned
   // to guaranteed conversion.
   //
   // TODO: If more stuff needs to be placed here, refactor into its own method.
-  for (auto &A : Arguments) {
+  for (auto &A : Analyzer.getArgDescList()) {
     if (A.CalleeRelease) {
       A.CalleeRelease->eraseFromParent();
     }
@@ -448,7 +532,7 @@ optimizeFunctionSignature(SILFunction *F,
 
   // Rewrite all apply insts calling F to call NewF. Update each call site as
   // appropriate given the form of function signature optimization performed.
-  rewriteApplyInstToCallNewFunction(F, NewF, Arguments, CallSites);
+  rewriteApplyInstToCallNewFunction(Analyzer, NewF, CallSites);
 
   return true;
 }
@@ -469,6 +553,8 @@ static bool isSpecializableCC(AbstractCC CC) {
   }
 }
 
+/// Returns true if F is a function which the pass know show to specialize
+/// function signatures for.
 static bool canSpecializeFunction(SILFunction &F) {
   // Do not specialize the signature of SILFunctions that are external
   // declarations since there is no body to optimize.
