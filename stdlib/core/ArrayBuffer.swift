@@ -160,7 +160,7 @@ extension _ArrayBuffer {
       _isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
 
-    return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative!
+    return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative
   }
 
   var _hasMutableBuffer: Bool {
@@ -232,7 +232,7 @@ extension _ArrayBuffer {
         }
       }
       else if !subRange.isEmpty {
-        let ns = _nonNative!
+        let ns = _nonNative
         // Could be sped up, e.g. by using
         // enumerateObjectsAtIndexes:options:usingBlock:
         for i in subRange {
@@ -254,7 +254,7 @@ extension _ArrayBuffer {
       return _native._uninitializedCopy(subRange, target: target)
     }
 
-    let nonNative = _nonNative!
+    let nonNative = _nonNative
 
     let nsSubRange = SwiftShims._SwiftNSRange(
       location:subRange.startIndex,
@@ -284,7 +284,7 @@ extension _ArrayBuffer {
       return _native[subRange]
     }
 
-    let nonNative = self._nonNative!
+    let nonNative = self._nonNative
 
     let subRangeCount = Swift.count(subRange)
     
@@ -323,7 +323,7 @@ extension _ArrayBuffer {
   public
   var count: Int {
     get {
-      return _fastPath(_isNative) ? _native.count : _nonNative!.count
+      return _fastPath(_isNative) ? _native.count : _nonNative.count
     }
     set {
       _sanityCheck(_isNative, "attempting to update count of Cocoa array")
@@ -345,7 +345,7 @@ extension _ArrayBuffer {
   /// How many elements the buffer can store without reallocation
   public
   var capacity: Int {
-    return _fastPath(_isNative) ? _native.capacity : _nonNative!.count
+    return _fastPath(_isNative) ? _native.capacity : _nonNative.count
   }
 
   /// Get/set the value of the ith element
@@ -356,7 +356,7 @@ extension _ArrayBuffer {
       if _fastPath(_isNative) {
         return _native[i]
       }
-      return unsafeBitCast(_nonNative!.objectAtIndex(i), T.self)
+      return unsafeBitCast(_nonNative.objectAtIndex(i), T.self)
     }
     
     nonmutating set {
@@ -378,7 +378,7 @@ extension _ArrayBuffer {
     body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
     if _isClassOrObjCExistential(T.self) {
-      if _nonNative != nil {
+      if !_isNative {
         indirect.replaceStorage(_copyCollectionToNativeArrayBuffer(self))
       }
     }
@@ -407,7 +407,7 @@ extension _ArrayBuffer {
   /// An object that keeps the elements stored in this buffer alive
   public
   var owner: AnyObject {
-    return _fastPath(_isNative) ? _native._storage : _nonNative!
+    return _fastPath(_isNative) ? _native._storage : _nonNative
   }
   
   /// A value that identifies the storage used by the buffer.  Two
@@ -417,11 +417,8 @@ extension _ArrayBuffer {
     if _isNative {
       return _native.identity
     }
-    else if let cocoa = _nonNative {
-      return unsafeAddressOf(cocoa)
-    }
     else {
-      return nil
+      return unsafeAddressOf(_nonNative)
     }
   }
   
@@ -469,7 +466,6 @@ extension _ArrayBuffer {
 
   /// Our native representation, if any.  If there's no native
   /// representation, the result is an empty buffer.
-  typealias _OptStorage = _ContiguousArrayStorage<T>?
   var _native: NativeBuffer {
     if !_isClassOrObjCExistential(T.self) {
       let s: _ContiguousArrayStorageBase = Builtin.castFromNativeObject(storage)
@@ -483,14 +479,11 @@ extension _ArrayBuffer {
     }
   }
 
-  var _nonNative: _NSArrayCoreType? {
-    if !_isClassOrObjCExistential(T.self) {
-      return nil
-    }
-    else {
-      let i = indirect
-      return _fastPath(!i.isCocoa) ? nil : i.getCocoa()
-    }
+  var _nonNative: _NSArrayCoreType {
+    _sanityCheck(_isClassOrObjCExistential(T.self))
+    let i = indirect
+    _sanityCheck(i.isCocoa)
+    return i.getCocoa()
   }
 }
 
