@@ -960,10 +960,7 @@ clang::DeclarationName
 ClangImporter::Implementation::importName(Identifier name) {
   // FIXME: When we start dealing with C++, we can map over some operator
   // names.
-  if (name.isOperator())
-    return clang::DeclarationName();
-
-  if (isSwiftReservedName(name.str()))
+  if (name.empty() || name.isOperator())
     return clang::DeclarationName();
 
   // Map the identifier. If it's some kind of keyword, it can't be mapped.

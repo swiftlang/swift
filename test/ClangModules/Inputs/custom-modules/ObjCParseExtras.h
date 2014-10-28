@@ -84,3 +84,7 @@ __weak id globalWeakVar;
 - (id)getObject;
 - (id)getObjectFromVarArgs:(id)first, ...;
 @end
+
+@interface ExtraSelectors
+- (void)foo:(int)a bar:(int)b :(int)c;
+@end

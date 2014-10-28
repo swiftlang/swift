@@ -439,3 +439,8 @@ class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-e
   func getObject() -> AnyObject { return self }
 }
 
+func testNullarySelectorPieces(obj: AnyObject) {
+  obj.foo(1, bar: 2, 3) // no-warning
+  obj.foo(1, 2, bar: 3) // expected-error{{'AnyObject' does not have a member named 'foo(_:_:bar:)'}}
+}
+
