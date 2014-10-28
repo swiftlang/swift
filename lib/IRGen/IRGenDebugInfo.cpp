@@ -447,7 +447,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
       DS->Loc.isASTNode<AbstractClosureExpr>() ||
       DS->Loc.isASTNode<EnumElementDecl>()) {
 
-    auto FnScope = DS->SILFn->getDebugScope();
+    auto *FnScope = DS->SILFn->getDebugScope();
     // FIXME: This is a bug in the SIL deserialization.
     if (!FnScope)
       DS->SILFn->setDebugScope(DS);
@@ -615,7 +615,7 @@ llvm::DIScope IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     }
 
     // Create a Forward-declared type.
-    auto TyDecl = cast<NominalTypeDecl>(DC);
+    auto *TyDecl = cast<NominalTypeDecl>(DC);
     auto Loc = getLoc(SM, TyDecl);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
@@ -848,7 +848,7 @@ llvm::DIModule IRGenDebugInfo::getOrCreateModule(llvm::DIScope Parent,
 
 llvm::DIDescriptor IRGenDebugInfo::emitFunction(SILFunction &SILFn,
                                                 llvm::Function *Fn) {
-  auto DS = SILFn.getDebugScope();
+  auto *DS = SILFn.getDebugScope();
   if (DS && !DS->SILFn)
     DS->SILFn = &SILFn;
 
@@ -1048,13 +1048,13 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   // Create inlined variables.
   if (DS && DS->InlinedCallSite) {
-    auto InlinedAt = createInlinedAt(DS);
+    auto *InlinedAt = createInlinedAt(DS);
     Var = createInlinedVariable(Var, InlinedAt, M.getContext());
   }
 
   // Insert a debug intrinsic into the current block.
   unsigned OffsetInBytes = 0;
-  auto BB = Builder.GetInsertBlock();
+  auto *BB = Builder.GetInsertBlock();
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   ElementSizes EltSizes(DITy, DIRefMap);
@@ -1106,7 +1106,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.size() == 0) {
-    auto undef = llvm::UndefValue::get(DbgTy.StorageType);
+    auto *undef = llvm::UndefValue::get(DbgTy.StorageType);
     emitDbgIntrinsic(BB, undef, Var, Expr, Line, Loc.Col, Scope, DS);
   }
 }
@@ -1117,7 +1117,7 @@ emitDbgIntrinsic(llvm::BasicBlock *BB,
                  llvm::DIExpression Expr,
                  unsigned Line, unsigned Col, llvm::DIDescriptor Scope,
                  SILDebugScope *DS) {
-  auto Call = (isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage))
+  auto *Call = (isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage))
     ? DBuilder.insertDeclare(Storage, Var, Expr, BB)
     : DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, BB);
 
@@ -1264,7 +1264,7 @@ llvm::DIArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
                                               llvm::DIFile File,
                                               unsigned Flags) {
   SmallVector<llvm::Value *, 16> Elements;
-  for (auto ElemDecl : D->getAllElements()) {
+  for (auto *ElemDecl : D->getAllElements()) {
     // FIXME <rdar://problem/14845818> Support enums.
     // Swift Enums can be both like DWARF enums and DWARF unions.
     // They should probably be emitted as DW_TAG_variant_type.
@@ -1427,7 +1427,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::BuiltinFloat: {
-    auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
+    auto *FloatTy = BaseTy->castTo<BuiltinFloatType>();
     // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
     SizeInBits = FloatTy->getBitWidth();
     Encoding = llvm::dwarf::DW_ATE_float;
@@ -1472,7 +1472,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Self. We don't have a way to represent instancetype in DWARF,
     // so we emit the static type instead. This is similar to what we
     // do with instancetype in Objective-C.
-    auto DynamicSelfTy = BaseTy->castTo<DynamicSelfType>();
+    auto *DynamicSelfTy = BaseTy->castTo<DynamicSelfType>();
     auto SelfTy = getOrCreateDesugaredType(DynamicSelfTy->getSelfType(), DbgTy);
     return DBuilder.createTypedef(SelfTy, MangledName, File, 0, File);
 
@@ -1480,8 +1480,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   // Even builtin swift types usually come boxed in a struct.
   case TypeKind::Struct: {
-    auto StructTy = BaseTy->castTo<StructType>();
-    auto Decl = StructTy->getDecl();
+    auto *StructTy = BaseTy->castTo<StructType>();
+    auto *Decl = StructTy->getDecl();
     Location L = getLoc(SM, Decl);
     return createStructType(DbgTy, Decl, StructTy, Scope,
                             getOrCreateFile(L.Filename), L.Line, SizeInBits,
@@ -1494,7 +1494,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Classes are represented as DW_TAG_structure_type. This way the
     // DW_AT_APPLE_runtime_class( DW_LANG_Swift ) attribute can be
     // used to differentiate them from C++ and ObjC classes.
-    auto ClassTy = BaseTy->castTo<ClassType>();
+    auto *ClassTy = BaseTy->castTo<ClassType>();
     auto *Decl = ClassTy->getDecl();
     Location L = getLoc(SM, Decl);
     // TODO: We may want to peek at Decl->isObjC() and set this
@@ -1526,8 +1526,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Protocol: {
-    auto ProtocolTy = BaseTy->castTo<ProtocolType>();
-    auto Decl = ProtocolTy->getDecl();
+    auto *ProtocolTy = BaseTy->castTo<ProtocolType>();
+    auto *Decl = ProtocolTy->getDecl();
     // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
     Location L = getLoc(SM, Decl);
     auto File = getOrCreateFile(L.Filename);
@@ -1537,7 +1537,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::ProtocolComposition: {
-    auto Decl = DbgTy.getDecl();
+    auto *Decl = DbgTy.getDecl();
     Location L = getLoc(SM, Decl);
     auto File = getOrCreateFile(L.Filename);
 
@@ -1549,8 +1549,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::UnboundGeneric: {
-    auto UnboundTy = BaseTy->castTo<UnboundGenericType>();
-    auto Decl = UnboundTy->getDecl();
+    auto *UnboundTy = BaseTy->castTo<UnboundGenericType>();
+    auto *Decl = UnboundTy->getDecl();
     Location L = getLoc(SM, Decl);
     return createPointerSizedStruct(Scope,
                                     Decl ? Decl->getNameStr() : MangledName,
@@ -1558,8 +1558,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::BoundGenericStruct: {
-    auto StructTy = BaseTy->castTo<BoundGenericStructType>();
-    auto Decl = StructTy->getDecl();
+    auto *StructTy = BaseTy->castTo<BoundGenericStructType>();
+    auto *Decl = StructTy->getDecl();
     Location L = getLoc(SM, Decl);
     return createPointerSizedStruct(Scope,
                                     Decl ? Decl->getNameStr() : MangledName,
@@ -1567,8 +1567,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::BoundGenericClass: {
-    auto ClassTy = BaseTy->castTo<BoundGenericClassType>();
-    auto Decl = ClassTy->getDecl();
+    auto *ClassTy = BaseTy->castTo<BoundGenericClassType>();
+    auto *Decl = ClassTy->getDecl();
     Location L = getLoc(SM, Decl);
     // TODO: We may want to peek at Decl->isObjC() and set this
     // attribute accordingly.
@@ -1578,7 +1578,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Tuple: {
-    auto TupleTy = BaseTy->castTo<TupleType>();
+    auto *TupleTy = BaseTy->castTo<TupleType>();
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     // Tuples are also represented as structs.
@@ -1595,7 +1595,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // This is an inout type. Naturally we would be emitting them as
     // DW_TAG_reference_type types, but LLDB can deal better with pointer-sized
     // struct that has the appropriate mangled name.
-    auto Decl = DbgTy.getDecl();
+    auto *Decl = DbgTy.getDecl();
     Location L = getLoc(SM, Decl);
     auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
     auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
@@ -1605,7 +1605,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Archetype: {
-    auto Archetype = BaseTy->castTo<ArchetypeType>();
+    auto *Archetype = BaseTy->castTo<ArchetypeType>();
     Location L = getLoc(SM, Archetype->getAssocType());
     auto Superclass = Archetype->getSuperclass();
     auto DerivedFrom = Superclass.isNull()
@@ -1620,7 +1620,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         llvm::DIType(), MangledName);
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Value *, 4> Protocols;
-    for (auto ProtocolDecl : Archetype->getConformsTo()) {
+    for (auto *ProtocolDecl : Archetype->getConformsTo()) {
       auto PTy = IGM.SILMod->Types.getLoweredType(ProtocolDecl->getType())
                      .getSwiftRValueType();
       auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
@@ -1648,15 +1648,15 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction: {
     CanSILFunctionType FunctionTy;
-    if (auto SILFnTy = dyn_cast<SILFunctionType>(BaseTy))
+    if (auto *SILFnTy = dyn_cast<SILFunctionType>(BaseTy))
       FunctionTy = CanSILFunctionType(SILFnTy);
     // FIXME: Handling of generic parameters in SIL type lowering is in flux.
     // DebugInfo doesn't appear to care about the generic context, so just
     // throw it away before lowering.
     else if (isa<GenericFunctionType>(BaseTy) ||
              isa<PolymorphicFunctionType>(BaseTy)) {
-      auto fTy = cast<AnyFunctionType>(BaseTy);
-      auto nongenericTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
+      auto *fTy = cast<AnyFunctionType>(BaseTy);
+      auto *nongenericTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
                                             fTy->getExtInfo());
 
       FunctionTy = IGM.SILMod->Types.getLoweredType(nongenericTy)
@@ -1675,16 +1675,16 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Enum: {
-    auto EnumTy = BaseTy->castTo<EnumType>();
-    auto Decl = EnumTy->getDecl();
+    auto *EnumTy = BaseTy->castTo<EnumType>();
+    auto *Decl = EnumTy->getDecl();
     Location L = getLoc(SM, Decl);
     return createEnumType(DbgTy, Decl, MangledName, Scope,
                           getOrCreateFile(L.Filename), L.Line, Flags);
   }
 
   case TypeKind::BoundGenericEnum: {
-    auto EnumTy = BaseTy->castTo<BoundGenericEnumType>();
-    auto Decl = EnumTy->getDecl();
+    auto *EnumTy = BaseTy->castTo<BoundGenericEnumType>();
+    auto *Decl = EnumTy->getDecl();
     Location L = getLoc(SM, Decl);
     return createEnumType(DbgTy, Decl, MangledName, Scope,
                           getOrCreateFile(L.Filename), L.Line, Flags);
@@ -1692,7 +1692,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::BuiltinVector: {
     (void)MangledName; // FIXME emit the name somewhere.
-    auto BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
+    auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
     DebugTypeInfo ElemDbgTy(BuiltinVectorTy->getElementType(),
                             DbgTy.StorageType,
                             DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
@@ -1706,7 +1706,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::UnownedStorage:
   case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage: {
-    auto ReferenceTy = cast<ReferenceStorageType>(BaseTy);
+    auto *ReferenceTy = cast<ReferenceStorageType>(BaseTy);
     auto CanTy = ReferenceTy->getReferentType();
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
@@ -1718,8 +1718,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::NameAlias: {
 
-    auto NameAliasTy = cast<NameAliasType>(BaseTy);
-    auto Decl = NameAliasTy->getDecl();
+    auto *NameAliasTy = cast<NameAliasType>(BaseTy);
+    auto *Decl = NameAliasTy->getDecl();
     Location L = getLoc(SM, Decl);
     auto AliasedTy = Decl->getUnderlyingType();
     auto File = getOrCreateFile(L.Filename);
@@ -1732,7 +1732,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Substituted: {
-    auto SubstitutedTy = cast<SubstitutedType>(BaseTy);
+    auto *SubstitutedTy = cast<SubstitutedType>(BaseTy);
     auto OrigTy = SubstitutedTy->getReplacementType();
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
@@ -1741,7 +1741,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Paren: {
-    auto ParenTy = cast<ParenType>(BaseTy);
+    auto *ParenTy = cast<ParenType>(BaseTy);
     auto Ty = ParenTy->getUnderlyingType();
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
@@ -1753,24 +1753,24 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::ArraySlice:
   case TypeKind::Optional:
   case TypeKind::ImplicitlyUnwrappedOptional: {
-    auto SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
-    auto CanTy = SyntaxSugarTy->getDesugaredType();
+    auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
+    auto *CanTy = SyntaxSugarTy->getDesugaredType();
     return getOrCreateDesugaredType(CanTy, DbgTy);
   }
 
   case TypeKind::Dictionary: {
-    auto DictionaryTy = cast<DictionaryType>(BaseTy);
-    auto CanTy = DictionaryTy->getDesugaredType();
+    auto *DictionaryTy = cast<DictionaryType>(BaseTy);
+    auto *CanTy = DictionaryTy->getDesugaredType();
     return getOrCreateDesugaredType(CanTy, DbgTy);
   }
     
   case TypeKind::GenericTypeParam: {
-    auto ParamTy = cast<GenericTypeParamType>(BaseTy);
+    auto *ParamTy = cast<GenericTypeParamType>(BaseTy);
     // FIXME: Provide a more meaningful debug type.
     return DBuilder.createUnspecifiedType(ParamTy->getName().str());
   }
   case TypeKind::DependentMember: {
-    auto MemberTy = cast<DependentMemberType>(BaseTy);
+    auto *MemberTy = cast<DependentMemberType>(BaseTy);
     // FIXME: Provide a more meaningful debug type.
     return DBuilder.createUnspecifiedType(MemberTy->getName().str());
   }
