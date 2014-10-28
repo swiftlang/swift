@@ -35,6 +35,17 @@ NON_CF(CGPDFObjectRef)
 NON_CF(CGPDFStreamRef)
 NON_CF(CGPDFStringRef)
 
+// CoreMIDI
+NON_CF(MIDIClientRef)
+NON_CF(MIDIDeviceRef)
+NON_CF(MIDIDeviceListRef)
+NON_CF(MIDIEntityRef)
+NON_CF(MIDIEndpointRef)
+NON_CF(MIDIObjectRef)
+NON_CF(MIDIPortRef)
+NON_CF(MIDISetupRef)
+NON_CF(MIDIThruConnectionRef)
+
 // CoreServices
 NON_CF(FSEventStreamRef)
 NON_CF(ConstFSEventStreamRef)
