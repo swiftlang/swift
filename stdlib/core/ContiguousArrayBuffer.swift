@@ -473,18 +473,6 @@ public func += <T> (inout lhs: _ContiguousArrayBuffer<T>, rhs: T) {
   lhs += CollectionOfOne(rhs)
 }
 
-func === <T>(
-  lhs: _ContiguousArrayBuffer<T>, rhs: _ContiguousArrayBuffer<T>
-) -> Bool {
-  return lhs._base == rhs._base
-}
-
-func !== <T>(
-  lhs: _ContiguousArrayBuffer<T>, rhs: _ContiguousArrayBuffer<T>
-) -> Bool {
-  return lhs._base != rhs._base
-}
-
 extension _ContiguousArrayBuffer : CollectionType {
   /// The position of the first element in a non-empty collection.
   ///
