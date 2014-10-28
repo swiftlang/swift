@@ -92,7 +92,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
 
   /// Adopt the storage of x
   public init(_ buffer: _ContiguousArrayBuffer<Element>) {
-    self._base = buffer._base
+    _base = _HeapBuffer(buffer.owner)
   }
 
   public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
