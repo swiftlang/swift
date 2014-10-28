@@ -192,20 +192,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       unsafeBufferObject: storage ?? _emptyArrayStorage)
   }
 
-  public var hasStorage: Bool {
-    return _base.hasStorage
-  }
-
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public var baseAddress: UnsafeMutablePointer<T> {
-    return _base.hasStorage ? _base.baseAddress : nil
-  }
-
-  /// A pointer to the first element, assuming that the elements are stored
-  /// contiguously.
-  var _unsafeElementStorage: UnsafeMutablePointer<T> {
-    return _base.baseAddress
+    return __bufferPointer.withUnsafeMutablePointerToElements { $0 }
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
@@ -282,7 +272,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     get {
       _sanityCheck(_isValidSubscript(i), "Array index out of range")
       // If the index is in bounds, we can assume we have storage.
-      return _unsafeElementStorage[i]
+      return baseAddress[i]
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
@@ -290,18 +280,18 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
       // FIXME: Manually swap because it makes the ARC optimizer happy.  See
       // <rdar://problem/16831852> check retain/release order
-      // _unsafeElementStorage[i] = newValue
+      // baseAddress[i] = newValue
       var nv = newValue
       let tmp = nv
-      nv = _unsafeElementStorage[i]
-      _unsafeElementStorage[i] = tmp
+      nv = baseAddress[i]
+      baseAddress[i] = tmp
     }
   }
 
   /// How many elements the buffer stores
   public var count: Int {
     get {
-      return _base.hasStorage ? _base.value.count : 0
+      return __bufferPointer.value.count
     }
     nonmutating set {
       _sanityCheck(newValue >= 0)
