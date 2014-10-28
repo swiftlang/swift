@@ -89,7 +89,6 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 
 // The class that implements the storage for a ContiguousArray<T>
 final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
-  typealias Buffer = _ContiguousArrayBuffer<T>
 
   deinit {
     __manager.withUnsafeMutablePointers {
