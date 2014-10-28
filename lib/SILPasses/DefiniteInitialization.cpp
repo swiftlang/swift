@@ -1053,7 +1053,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
     unsigned FirstElement = InstInfo.FirstElement;
     unsigned NumElements = InstInfo.NumElements;
 
-    SmallVector<SILInstruction*, 8> InsertedInsts;
+    SmallVector<SILInstruction*, 4> InsertedInsts;
     SILBuilder B(Inst, &InsertedInsts);
 
     LowerAssignInstruction(B, AI, InitKind);
@@ -1061,6 +1061,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
     // If lowering of the assign introduced any new loads or stores, keep track
     // of them.
     for (auto I : InsertedInsts) {
+      I->setDebugScope(AI->getDebugScope());
       if (isa<StoreInst>(I)) {
         NonLoadUses[I] = Uses.size();
         Uses.push_back(DIMemoryUse(I, Kind, FirstElement, NumElements));
@@ -1119,7 +1120,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
     // free the memory.  If this is a derived class, we may have to do a load of
     // the 'self' box to get the class reference.
     if (TheMemory.isClassInitSelf()) {
-      SILBuilder B(Release);
+      SILBuilderWithScope<4> B(Release);
       SILValue Pointer = Release->getOperand(0);
 
       // If we see an alloc_box as the pointer, then we're deallocating a 'box'
@@ -1139,7 +1140,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
                                      Release->getOperand(0));
         Releases.push_back(DB);
       }
-      
+
       Releases[ReleaseID] = Dealloc;
       Release->eraseFromParent();
       return;
@@ -1198,7 +1199,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
   // Create the control variable as the first instruction in the function (so
   // that it is easy to destroy the stack location.
-  SILBuilder B(TheMemory.getFunctionEntryPoint());
+  SILBuilderWithScope<16> B(TheMemory.getFunctionEntryPoint(),
+                            TheMemory.getFunction().getDebugScope());
   SILType IVType =
     SILType::getBuiltinIntegerType(NumMemoryElements, Module.getASTContext());
   auto Alloc = B.createAllocStack(Loc, IVType);
@@ -1333,7 +1335,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // emit a mask update as appropriate.
     --i;
   }
-  
+
   return AllocAddr;
 }
 
@@ -1343,7 +1345,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 /// to emit branching logic when an element may or may not be initialized.
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
-  SILBuilder B(TheMemory.MemoryInst);
+  SILBuilderWithScope<16> B(TheMemory.MemoryInst);
   Identifier ShiftRightFn, TruncateFn;
 
   unsigned NumMemoryElements = TheMemory.getNumMemoryElements();
@@ -1786,7 +1788,7 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
       
       // Unprocessed assigns just lower into assignments, not initializations.
       if (auto *AI = dyn_cast<AssignInst>(Inst)) {
-        SILBuilder B(AI);
+        SILBuilderWithScope<4> B(AI);
         LowerAssignInstruction(B, AI, IsNotInitialization);
         // Assign lowering may split the block. If it did,
         // reset our iteration range to the block after the insertion.

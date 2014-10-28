@@ -68,6 +68,11 @@ public:
   void setParent(SILDebugScope *P) { Parent = P; }
 };
 
+#ifndef NDEBUG
+/// Determine whether an instruction may not have a SILDebugScope.
+bool maybeScopeless(SILInstruction &I);
+#endif
+
 }
 
 #endif

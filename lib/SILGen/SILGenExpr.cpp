@@ -432,6 +432,7 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
   // VarLocs.
   auto &entryBB = gen.getFunction().getBlocks().front();
   SILBuilder B(&entryBB, entryBB.begin());
+  B.setTrackingList(gen.getBuilder().getTrackingList());
 
   auto *silG = gen.SGM.getSILGlobalVariable(var, NotForDefinition);
   SILValue addr = B.createGlobalAddr(var, silG);
@@ -3311,8 +3312,10 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel, bool AutoGen) {
   if (!returnValue)
     returnValue = emitEmptyTuple(CleanupLocation::getCleanupLocation(TopLevel));
 
-  B.createReturn(returnLoc, returnValue)
-    ->setDebugScope(MainScope);
+  B.createReturn(returnLoc, returnValue);
+  if (!MainScope)
+    MainScope = F.getDebugScope();
+  setDebugScopeForInsertedInstrs(MainScope);
 }
 
 void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
@@ -4650,6 +4653,9 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
 
   addr = B.createAddressToPointer(global, addr, rawPointerSILTy);
   B.createReturn(global, addr);
+  if (!MainScope)
+    MainScope = F.getDebugScope();
+  setDebugScopeForInsertedInstrs(MainScope);
 }
 
 RValue RValueEmitter::
@@ -5817,6 +5823,7 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
         failureBB->eraseFromParent();
       } else {
         SILBuilder failureBuilder(failureBB);
+        failureBuilder.setTrackingList(SGF.getBuilder().getTrackingList());
         auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
         auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
         failureBuilder.createCondFail(loc, trueV);

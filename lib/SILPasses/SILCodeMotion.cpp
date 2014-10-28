@@ -60,7 +60,7 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
   SILType ArgType = EnumVal.getType().getEnumElementType(EnumDecl, Mod);
 
   auto *UEDI =
-      Builder.createUncheckedEnumData(I->getLoc(), EnumVal, EnumDecl, ArgType);
+    Builder.createUncheckedEnumData(I->getLoc(), EnumVal, EnumDecl, ArgType);
 
   SILType UEDITy = UEDI->getType();
 
@@ -466,7 +466,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
     return false;
 
   // Ok, we have a ref count instruction, sink it!
-  SILBuilder Builder(Switch);
+  SILBuilderWithScope<> Builder(Switch, RV->getDebugScope());
   for (unsigned i = 0, e = Switch->getNumCases(); i != e; ++i) {
     auto Case = Switch->getCase(i);
     EnumElementDecl *Enum = Case.first;
@@ -551,7 +551,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
 
   Elts[1] = OtherElt;
 
-  SILBuilder Builder(SEI);
+  SILBuilderWithScope<> Builder(SEI, I->getDebugScope());
 
   // Ok, we have a ref count instruction, sink it!
   for (unsigned i = 0; i != 2; ++i) {
@@ -615,7 +615,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   // copy of this instruction in each one of our successors unless they are
   // ignoreable trap blocks.
   DEBUG(llvm::dbgs() << "    Sinking " << *I);
-  SILBuilder Builder(T);
+  SILBuilderWithScope<> Builder(T, I->getDebugScope());
   for (auto &Succ : T->getParent()->getSuccs()) {
     SILBasicBlock *SuccBB = Succ.getBB();
 
@@ -1075,7 +1075,7 @@ bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
   DEBUG(llvm::dbgs() << "    Found RetainValue: " << *RVI);
   DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << FindResult->first);
 
-  SILBuilder Builder(RVI);
+  SILBuilderWithScope<> Builder(RVI, RVI->getDebugScope());
   createRefCountOpForPayload(Builder, RVI, FindResult->second);
   RVI->eraseFromParent();
   return true;
@@ -1095,7 +1095,7 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
   DEBUG(llvm::dbgs() << "    Found ReleaseValue: " << *RVI);
   DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << FindResult->first);
 
-  SILBuilder Builder(RVI);
+  SILBuilderWithScope<> Builder(RVI , RVI->getDebugScope());
   createRefCountOpForPayload(Builder, RVI, FindResult->second);
   RVI->eraseFromParent();
   return true;
@@ -1185,7 +1185,8 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
       // predecessor.
       assert(P.first->getSingleSuccessor() &&
              "Can not hoist release into BB that has multiple successors");
-      SILBuilder Builder(P.first->getTerminator());
+      SILBuilderWithScope<> Builder(P.first->getTerminator(),
+                                    RVI->getDebugScope());
       createRefCountOpForPayload(Builder, RVI, P.second);
     }
 

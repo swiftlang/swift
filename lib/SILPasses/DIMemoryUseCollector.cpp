@@ -312,7 +312,7 @@ static void getScalarizedElements(SILValue V,
 /// can return the newly generated sub-element loads.
 static SILValue scalarizeLoad(LoadInst *LI,
                               SmallVectorImpl<SILValue> &ElementAddrs) {
-  SILBuilder B(LI);
+  SILBuilderWithScope<16> B(LI);
   SmallVector<SILValue, 4> ElementTmps;
   
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
@@ -689,7 +689,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   if (!UsesToScalarize.empty()) {
     SILInstruction *PointerInst = cast<SILInstruction>(Pointer);
     SmallVector<SILValue, 4> ElementAddrs;
-    SILBuilder AddrBuilder(++SILBasicBlock::iterator(PointerInst));
+    SILBuilderWithScope<16> AddrBuilder(++SILBasicBlock::iterator(PointerInst),
+                                        PointerInst->getDebugScope());
     getScalarizedElementAddresses(Pointer, AddrBuilder, PointerInst->getLoc(),
                                   ElementAddrs);
     
@@ -707,10 +708,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         continue;
       }
 
-      SILBuilder B(User);
-
       // Scalarize AssignInst
       if (auto *AI = dyn_cast<AssignInst>(User)) {
+        SILBuilderWithScope<> B(User, AI->getDebugScope());
         getScalarizedElements(AI->getOperand(0), ElementTmps, AI->getLoc(), B);
 
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
@@ -721,6 +721,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       
       // Scalarize StoreInst
       if (auto *SI = dyn_cast<StoreInst>(User)) {
+        SILBuilderWithScope<> B(User, SI->getDebugScope());
         getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
         
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
@@ -731,6 +732,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       
       // Scalarize CopyAddrInst.
       auto *CAI = cast<CopyAddrInst>(User);
+      SILBuilderWithScope<> B(User, CAI->getDebugScope());
 
       // Determine if this is a copy *from* or *to* "Pointer".
       if (CAI->getSrc() == Pointer) {
@@ -738,15 +740,15 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         getScalarizedElementAddresses(CAI->getDest(), B, CAI->getLoc(),
                                       ElementTmps);
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-        B.createCopyAddr(CAI->getLoc(), ElementAddrs[i], ElementTmps[i],
-                         CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
+          B.createCopyAddr(CAI->getLoc(), ElementAddrs[i], ElementTmps[i],
+                           CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
         
       } else {
         getScalarizedElementAddresses(CAI->getSrc(), B, CAI->getLoc(),
                                       ElementTmps);
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-        B.createCopyAddr(CAI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                         CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
+          B.createCopyAddr(CAI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                           CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
       }
       CAI->eraseFromParent();
     }

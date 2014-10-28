@@ -48,6 +48,7 @@ static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
 
   // TODO: What is the correct SILLocation to use here? If the InsertPt is a
   // terminator, then we will have the wrong location type and hit an assertion.
+  // Also: what scope?
   auto Loc = SILFileLocation(SourceLoc());
 
   // If Ptr has reference semantics itself, create the strong_retain and
@@ -68,6 +69,7 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
 
   // TODO: What is the correct SILLocation to use here? If the InsertPt is a
   // terminator, then we will have the wrong location type and hit an assertion.
+  // Also: what scope?
   auto Loc = SILFileLocation(SourceLoc());
 
   // If Ptr has reference semantics itself, create a strong_release.

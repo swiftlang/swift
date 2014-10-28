@@ -154,17 +154,15 @@ protected:
     // the newly specialized function.
     SILValue CalleeVal = Inst->getCallee();
     FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
-    SILBuilder &Builder = getBuilder();
+    SILBuilderWithPostProcess<TypeSubstCloner, 4> Builder(this, Inst);
     if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
       FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                       &Builder.getFunction());
-      PartialApplyInst *NPAI =
-        Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
-                                   getOpType(Inst->getSubstCalleeSILType()),
-                                   ArrayRef<Substitution>(),
-                                   Args,
-                                   getOpType(Inst->getType()));
-      doPostProcess(Inst, NPAI);
+      Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
+                                 getOpType(Inst->getSubstCalleeSILType()),
+                                 ArrayRef<Substitution>(),
+                                 Args,
+                                 getOpType(Inst->getType()));
       return;
     }
 
@@ -173,11 +171,10 @@ protected:
       TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
     }
     
-    PartialApplyInst *N = Builder.createPartialApply(
+    Builder.createPartialApply(
       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
         getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,
         getOpType(Inst->getType()));
-    doPostProcess(Inst, N);
   }
 
   void visitWitnessMethodInst(WitnessMethodInst *Inst) {
@@ -236,7 +233,7 @@ protected:
     SILType sourceType = getOpType(inst->getOperand().getType());
     SILType targetType = getOpType(inst->getType());
     SILLocation loc = getOpLocation(inst->getLoc());
-    SILBuilder &B = getBuilder();
+    SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
 
     // The non-addr CheckedCastInsts can currently only be used for
     // types that don't have abstraction differences, so this is okay.
@@ -279,7 +276,7 @@ protected:
     SILLocation loc = getOpLocation(inst->getLoc());
     SILValue src = getOpValue(inst->getSrc());
     SILValue dest = getOpValue(inst->getDest());
-    SILBuilder &B = getBuilder();
+    SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
 
     CanType sourceType = getOpASTType(inst->getSourceType());
     CanType targetType = getOpASTType(inst->getTargetType());
@@ -295,11 +292,9 @@ protected:
 
     case DynamicCastFeasibility::MaySucceed: {
       // TODO: simplify?
-      auto newInst =
-        B.createUnconditionalCheckedCastAddr(loc, inst->getConsumptionKind(),
-                                             src, sourceType,
-                                             dest, targetType);
-      doPostProcess(inst, newInst);
+      B.createUnconditionalCheckedCastAddr(loc, inst->getConsumptionKind(),
+                                           src, sourceType,
+                                           dest, targetType);
       return;
     }
 
@@ -307,8 +302,7 @@ protected:
     // runtime as the spec for the instruction requires and propagate
     // undef to all uses.
     case DynamicCastFeasibility::WillFail: {
-      auto newInst = B.createBuiltinTrap(loc);
-      doPostProcess(inst, newInst);
+      B.createBuiltinTrap(loc);
 
       // mem2reg's invariants get unhappy if we don't try to
       // initialize a loadable result.
@@ -335,15 +329,14 @@ protected:
     SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());
     SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
 
-    SILBuilder &B = getBuilder();
+    SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
     switch (classifyDynamicCast(SwiftMod, sourceType, targetType)) {
     case DynamicCastFeasibility::WillSucceed: {
       emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
                                               inst->getConsumptionKind(),
                                               src, sourceType,
                                               dest, targetType);
-      auto br = B.createBranch(loc, succBB);
-      doPostProcess(inst, br);
+      B.createBranch(loc, succBB);
       return;
     }
 
@@ -360,11 +353,10 @@ protected:
       }
 
       // Otherwise, use the indirect cast.
-      auto br = B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
-                                              src, sourceType,
-                                              dest, targetType,
-                                              succBB, failBB);
-      doPostProcess(inst, br);
+      B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
+                                    src, sourceType,
+                                    dest, targetType,
+                                    succBB, failBB);
       return;
     }
 
@@ -373,7 +365,7 @@ protected:
         auto &srcTL = B.getModule().getTypeLowering(src.getType());
         srcTL.emitDestroyAddress(B, loc, src);
       }
-      doPostProcess(inst, B.createBranch(loc, failBB));
+      B.createBranch(loc, failBB);
       return;
     }    
   }
@@ -391,7 +383,7 @@ protected:
     SILLocation loc = getOpLocation(inst->getLoc());
     SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());
     SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
-    SILBuilder &B = getBuilder();
+    SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
 
     SILValue operand = getOpValue(inst->getOperand());
 
@@ -406,8 +398,7 @@ protected:
       // we're still using checked_cast_branch for address-only stuff.
       if (loweredTargetType.isAddress()) {
         if (sourceType == targetType) {
-          auto br = B.createBranch(loc, succBB, operand);
-          doPostProcess(inst, br);
+          B.createBranch(loc, succBB, operand);
           return;
         }
         goto maySucceed;
@@ -418,21 +409,19 @@ protected:
                                               loweredTargetType, sourceType,
                                               targetType);
 
-      auto br = B.createBranch(loc, succBB, result);
-      doPostProcess(inst, br);
+      B.createBranch(loc, succBB, result);
       return;
     }
 
     maySucceed:
     case DynamicCastFeasibility::MaySucceed: {
-      auto br = B.createCheckedCastBranch(loc, /*exact*/ false, operand,
-                                          loweredTargetType, succBB, failBB);
-      doPostProcess(inst, br);
+      B.createCheckedCastBranch(loc, /*exact*/ false, operand,
+                                loweredTargetType, succBB, failBB);
       return;
     }
 
     case DynamicCastFeasibility::WillFail:
-      doPostProcess(inst, B.createBranch(loc, failBB));
+      B.createBranch(loc, failBB);
       return;
     }
   }

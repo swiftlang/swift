@@ -622,14 +622,16 @@ struct InductionInfo {
       return;
 
     auto Loc = Inc->getLoc();
+    auto Scope = Inc->getDebugScope();
     auto FName = getCmpFunction(Loc, "cmp_sge", Start.getType(), Builder);
 
     SmallVector<SILValue, 4> Args(1, Start);
     Args.push_back(End);
     auto CmpSGE = Builder.createBuiltin(Loc, FName,
                     SILType::getBuiltinIntegerType(1, Builder.getASTContext()),
-                    {}, Args);    
-    Builder.createCondFail(Loc, CmpSGE);
+                    {}, Args);
+    CmpSGE->setDebugScope(Scope);
+    Builder.createCondFail(Loc, CmpSGE)->setDebugScope(Scope);
     IsOverflowCheckInserted = true;
 
     // We can now remove the cond fail on the increment the above comparison
@@ -796,9 +798,10 @@ public:
   void hoistCheckToPreheader(ArraySemanticsCall CheckToHoist,
                              SILBasicBlock *Preheader,
                              DominanceInfo *DT) {
-    SILBuilder Builder(Preheader->getTerminator());
     ApplyInst *AI = CheckToHoist;
     SILLocation Loc = AI->getLoc();
+    SILBuilderWithScope<> Builder(Preheader->getTerminator(),
+                                  AI->getDebugScope());
 
     // Get the first induction value.
     auto FirstVal = Ind->getFirstValue();
@@ -988,7 +991,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   if (IVarsFound)
     for (auto *Arg: Header->getBBArgs())
       if (auto *IV = IndVars[Arg]) {
-        SILBuilder B(Preheader->getTerminator());
+        SILBuilderWithScope<> B(Preheader->getTerminator());
         IV->checkOverflow(B);
       }
 

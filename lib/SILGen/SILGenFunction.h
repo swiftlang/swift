@@ -123,8 +123,9 @@ public:
   SmallVector<SILInstruction*, 32> InsertedInstrs;
   size_t LastInsnWithoutScope;
   
-  /// B - The SILBuilder used to construct the SILFunction.  It is what maintains
-  /// the notion of the current block being emitted into.
+  /// B - The SILBuilder used to construct the SILFunction.  It is
+  /// what maintains the notion of the current block being emitted
+  /// into.
   SILBuilder B;
     
   /// IndirectReturnAddress - For a function with an indirect return, holds a

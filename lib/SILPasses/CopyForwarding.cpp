@@ -398,7 +398,8 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
     DEBUG(llvm::dbgs() << "  Forwarding Copy:" << *CopyInst);
     if (!CopyInst->isInitializationOfDest()) {
       SILBuilder(CopyInst).createDestroyAddr(CopyInst->getLoc(),
-                                             CopyInst->getDest());
+                                             CopyInst->getDest())
+        ->setDebugScope(CopyInst->getDebugScope());
     }
     CopyInst->eraseFromParent();
     HasChanged = true;
@@ -500,7 +501,8 @@ bool CopyForwarding::forwardPropagateCopy(
       assert(!Copy->isInitializationOfDest() && "expected a deinit");
 
       DestroyAddrInst *Destroy =
-        SILBuilder(SI).createDestroyAddr(Copy->getLoc(), CopyDest);
+        SILBuilderWithScope<1>(SI, Copy->getDebugScope())
+          .createDestroyAddr(Copy->getLoc(), CopyDest);
       Copy->setIsInitializationOfDest(IsInitialization);
 
       assert(ValueUses.back()->getUser() == Copy && "bad value use");
@@ -563,7 +565,8 @@ bool CopyForwarding::backwardPropagateCopy(
   // initialization.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopySrc && !Copy->isInitializationOfDest()) {
-      SILBuilder(SI).createDestroyAddr(Copy->getLoc(), CopySrc);
+      SILBuilder(SI).createDestroyAddr(Copy->getLoc(), CopySrc)
+        ->setDebugScope(Copy->getDebugScope());
       Copy->setIsInitializationOfDest(IsInitialization);
     }
   }
@@ -626,7 +629,8 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
       return false;
 
     DEBUG(llvm::dbgs() << "  Hoisting to Use:" << *Inst);
-    SILBuilder(std::next(SI)).createDestroyAddr(DestroyLoc, CurrentDef);
+    SILBuilder(std::next(SI)).createDestroyAddr(DestroyLoc, CurrentDef)
+      ->setDebugScope(Inst->getDebugScope());
     HasChanged = true;
     return true;
   }
@@ -702,7 +706,8 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 
       // We make no attempt to use the best DebugLoc, because in all known
       // cases, we only have one.
-      SILBuilder(SuccBB->begin()).createDestroyAddr(DestroyLoc, CurrentDef);
+      SILBuilder(SuccBB->begin()).createDestroyAddr(DestroyLoc, CurrentDef)
+        ->setDebugScope(HoistedDestroy->getDebugScope());
       HasChanged = true;
     }
   }

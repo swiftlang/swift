@@ -52,6 +52,7 @@ public:
     return getBuilder().getTrackingList();
   }
 
+  SILBuilder &getBuilder() { return Builder; }
 
 protected:
 #define VALUE(CLASS, PARENT) \
@@ -63,8 +64,6 @@ protected:
 #include "swift/SIL/SILNodes.def"
 
   void visitSILBasicBlock(SILBasicBlock* BB);
-
-  SILBuilder &getBuilder() { return Builder; }
 
   // Derived classes of SILCloner using the CRTP can implement the following
   // functions to customize behavior; the remap functions are called before
@@ -224,9 +223,15 @@ protected:
   SILBasicBlock *getOpBasicBlock(SILBasicBlock *BB) {
     return asImpl().remapBasicBlock(BB);
   }
+
+public:
   void doPostProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     asImpl().postProcess(Orig, Cloned);
+    assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
+           "cloned instruction dropped debug scope");
   }
+
+protected:
 
   SILBuilder Builder;
   SILBasicBlock *InsertBeforeBB;
@@ -235,6 +240,31 @@ protected:
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
   TypeSubstitutionMap OpenedExistentialSubs;
 };
+
+/// \brief A SILBuilder that automatically invokes postprocess on each
+/// inserted instruction.
+template<class SomeSILCloner, unsigned N = 4>
+class SILBuilderWithPostProcess : public SILBuilder {
+  SomeSILCloner &SC;
+  SILInstruction *Orig;
+  SmallVector<SILInstruction*, N> InsertedInstrs;
+
+public:
+  SILBuilderWithPostProcess(SomeSILCloner *sc, SILInstruction *Orig)
+    : SILBuilder(sc->getBuilder().getInsertionBB(), &InsertedInstrs),
+      SC(*sc), Orig(Orig)
+    {
+      setInsertionPoint(SC.getBuilder().getInsertionBB(),
+                        SC.getBuilder().getInsertionPoint());
+    }
+
+  ~SILBuilderWithPostProcess() {
+    for (auto *I : InsertedInstrs) {
+      SC.doPostProcess(Orig, I);
+    }
+  }
+};
+
 
 /// SILClonerWithScopes - a SILCloner that automatically clones
 /// SILDebugScopes. In contrast to inline scopes, this generates a

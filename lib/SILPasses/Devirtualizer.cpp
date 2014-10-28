@@ -145,7 +145,7 @@ static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
   // method inst.
   SILType FuncSelfTy = paramTypes[paramTypes.size() - 1];
   SILType OriginTy = ClassInstance.getType();
-  SILBuilder B(AI);
+  SILBuilderWithScope<16> B(AI);
 
   // Then compare the two types and if they are unequal...
   if (FuncSelfTy != OriginTy) {
@@ -339,7 +339,7 @@ bool WitnessMethodDevirtualizer::devirtualize() {
 bool WitnessMethodDevirtualizer::processNormalProtocolConformance(
                                    bool PartOfSpecialized) {
   // Ok, we found the member we are looking for. Devirtualize away!
-  SILBuilder Builder(AI);
+  SILBuilderWithScope<2> Builder(AI);
   SILLocation Loc = AI->getLoc();
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
@@ -404,7 +404,7 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
 
   assert(SILTy.isSuperclassOf(SelfTy) &&
          "Should only create upcasts for sub class devirtualization.");
-  Self = SILBuilder(AI).createUpcast(AI->getLoc(), *Self, SILTy);
+  Self = SILBuilderWithScope<1>(AI).createUpcast(AI->getLoc(), *Self, SILTy);
 
   SmallVector<Substitution, 16> SelfDerivedSubstitutions;
   for (auto &origSub : AI->getSubstitutions())
@@ -620,11 +620,13 @@ static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
   for (unsigned i = 0, e = Args.size(); i != e; ++i)
     Ret[i] = Args[i];
 
-  return Builder.createApply(AI->getLoc(), AI->getCallee(),
-                             AI->getSubstCalleeSILType(),
-                             AI->getType(),
-                             AI->getSubstitutions(),
-                             Ret, AI->isTransparent());
+  auto NAI = Builder.createApply(AI->getLoc(), AI->getCallee(),
+                                 AI->getSubstCalleeSILType(),
+                                 AI->getType(),
+                                 AI->getSubstitutions(),
+                                 Ret, AI->isTransparent());
+  NAI->setDebugScope(AI->getDebugScope());
+  return NAI;
 }
 
 /// Insert monomorphic inline caches for a specific class type \p SubClassTy.
@@ -662,7 +664,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
 
   SILBasicBlock *Continue = Entry->splitBasicBlock(It);
 
-  SILBuilder Builder(Entry);
+  SILBuilderWithScope<> Builder(Entry, AI->getDebugScope());
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
   assert(SubClassTy.getClassOrBoundGenericClass() &&
@@ -683,8 +685,10 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
     if (!SRI && It != Entry->begin())
       SRI = dyn_cast<StrongRetainInst>(--It);
     if (SRI && SRI->getOperand() == ClassInstance) {
-      VirtBuilder.createStrongRetain(SRI->getLoc(), ClassInstance);
-      IdenBuilder.createStrongRetain(SRI->getLoc(), DownCastedClassInstance);
+      VirtBuilder.createStrongRetain(SRI->getLoc(), ClassInstance)
+        ->setDebugScope(SRI->getDebugScope());
+      IdenBuilder.createStrongRetain(SRI->getLoc(), DownCastedClassInstance)
+        ->setDebugScope(SRI->getDebugScope());
       SRI->eraseFromParent();
     }
   }
@@ -696,8 +700,10 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   // Create a PHInode for returning the return value from both apply
   // instructions.
   SILArgument *Arg = Continue->createArgument(AI->getType());
-  IdenBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(IdenAI));
-  VirtBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(VirtAI));
+  IdenBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(IdenAI))
+    ->setDebugScope(AI->getDebugScope());
+  VirtBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(VirtAI))
+    ->setDebugScope(AI->getDebugScope());
 
   // Remove the old Apply instruction.
   AI->replaceAllUsesWith(Arg);

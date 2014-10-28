@@ -96,7 +96,8 @@ private:
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless
     // of the input location.
-    return Loc.hasValue() ? Loc.getValue() : SILLocation((Decl*)nullptr);
+    return Loc.hasValue() ? Loc.getValue() :
+      MandatoryInlinedLocation::getMandatoryInlinedLocation((Decl*)nullptr);
   }
 
   InlineKind IKind;

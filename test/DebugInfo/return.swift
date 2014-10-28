@@ -13,8 +13,7 @@ func ifelseexpr() -> Int {
   } else {
     x.x--;
   }
-  // CHECK:  @swift_release {{.*}}1X{{.*}}, !dbg ![[CLEANUP:.*]]
-  // CHECK:  ret{{.*}}, !dbg ![[RET:.*]]
-  // CHECK: ![[CLEANUP]] = metadata !{i32 [[@LINE+1]],
+  // CHECK:  @swift_release {{.*}}1X{{.*}}, !dbg ![[RET:.*]]
+  // CHECK:  ret{{.*}}, !dbg ![[RET]]
   return x.x; // CHECK: ![[RET]] = metadata !{i32 [[@LINE]],
 }

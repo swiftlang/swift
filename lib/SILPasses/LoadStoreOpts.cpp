@@ -54,7 +54,7 @@ findExtractPathFromAddressValueToLoad(SILValue Address, SILValue StoredValue,
   // Ok, at this point we know that we can construct our aggregate projections
   // from our list of address projections.
   SILValue LastExtract = StoredValue;
-  SILBuilder Builder(Inst);
+  SILBuilderWithScope<16> Builder(Inst);
   while (!ProjectionPath.empty()) {
     auto P = ProjectionPath.pop_back_val();
     if (ValueDecl *D = P.getDecl()) {
@@ -404,7 +404,7 @@ forwardAddressValueToUncheckedAddrToLoad(SILValue Address,
   SILType OutputTy = UADCI->getType();
   bool OutputIsTrivial = OutputTy.isTrivial(Mod);
 
-  SILBuilder B(LI);
+  SILBuilderWithScope<1> B(LI);
   SILValue CastValue;
 
   // If the output is trivial, we have a trivial bit cast.

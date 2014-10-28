@@ -28,7 +28,7 @@ using namespace swift;
 /// The argument is appended at the end of the argument tuple.
 TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
                                          SILValue Val) {
-  SILBuilder Builder(Branch);
+  SILBuilderWithScope<2> Builder(Branch);
   TermInst *NewBr = nullptr;
 
   if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
@@ -88,7 +88,7 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
 /// specified index.
 TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
                                  size_t Idx, SILValue Val) {
-  SILBuilder Builder(Branch);
+  SILBuilderWithScope<2> Builder(Branch);
 
   if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
     SmallVector<SILValue, 8> TrueArgs;
@@ -187,7 +187,7 @@ SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
 
 static void changeBranchTargetAndStripArgs(TermInst *T, unsigned EdgeIdx,
                                            SILBasicBlock *NewDest) {
-  SILBuilder B(T);
+  SILBuilderWithScope<8> B(T);
 
   if (auto Br = dyn_cast<BranchInst>(T)) {
     B.createBranch(T->getLoc(), NewDest);

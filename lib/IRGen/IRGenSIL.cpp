@@ -1285,6 +1285,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   }
 }
 
+
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
@@ -1352,8 +1353,12 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
       // Until SILDebugScopes are properly serialized, bare functions
       // are allowed to not have a scope.
-      if (!DS && CurSILFn->isBare())
-        DS = CurSILFn->getDebugScope();
+      if (!DS) {
+        if (CurSILFn->isBare())
+          DS = CurSILFn->getDebugScope();
+        else
+          assert(maybeScopeless(I) && "instruction has location, but no scope");
+      }
 
       // Ignore scope-less instructions and have IRBuilder reuse the
       // previous location and scope.

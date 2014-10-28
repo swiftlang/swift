@@ -428,13 +428,13 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
       if (isa<DeallocBoxInst>(LastRelease))
         continue;
 
-      SILBuilder BuildDestroy(LastRelease);
+      SILBuilderWithScope<1> BuildDestroy(LastRelease);
       BuildDestroy.emitDestroyAddr(Loc, PointerResult);
     }
   }
 
   for (auto Return : Returns) {
-    SILBuilder BuildDealloc(Return);
+    SILBuilderWithScope<1> BuildDealloc(Return);
     BuildDealloc.createDeallocStack(Loc, ASI->getContainerResult());
   }
 
@@ -632,7 +632,7 @@ static PartialApplyInst *specializePartialApply(PartialApplyInst *PartialApply,
   }
 
   // Build the function_ref and partial_apply.
-  SILBuilder Builder(PartialApply);
+  SILBuilderWithScope<2> Builder(PartialApply);
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    Cloner.getCloned());
   CanSILFunctionType CanFnTy = Cloner.getCloned()->getLoweredFunctionType();

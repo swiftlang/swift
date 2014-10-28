@@ -77,7 +77,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
   if (SrcType.isAddressOnly(M))
     return false;
 
-  SILBuilder Builder(CA);
+  SILBuilderWithScope<16> Builder(CA);
 
   // %new = load %0 : $*T
   LoadInst *New = Builder.createLoad(CA->getLoc(), Source);
@@ -129,7 +129,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
 
 static bool expandDestroyAddr(DestroyAddrInst *DA) {
   SILModule &Module = DA->getModule();
-  SILBuilder Builder(DA);
+  SILBuilderWithScope<16> Builder(DA);
 
   // Strength reduce destroy_addr inst into release/store if
   // we have a non-address only type.
@@ -155,7 +155,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 
 static bool expandReleaseValue(ReleaseValueInst *DV) {
   SILModule &Module = DV->getModule();
-  SILBuilder Builder(DV);
+  SILBuilderWithScope<16>  Builder(DV);
 
   // Strength reduce destroy_addr inst into release/store if
   // we have a non-address only type.
@@ -178,7 +178,7 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
 
 static bool expandRetainValue(RetainValueInst *CV) {
   SILModule &Module = CV->getModule();
-  SILBuilder Builder(CV);
+  SILBuilderWithScope<16> Builder(CV);
 
   // Strength reduce destroy_addr inst into release/store if
   // we have a non-address only type.

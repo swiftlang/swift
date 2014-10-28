@@ -112,9 +112,10 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
 
 
   SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
-  LoadInst *EnumVal = Builder->createLoad(SEAI->getLoc(),
-                                          SEAI->getOperand());
-  Builder->createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
+  LoadInst *EnumVal = Builder->createLoad(SEAI->getLoc(), SEAI->getOperand());
+  EnumVal->setDebugScope(SEAI->getDebugScope());
+  Builder->createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases)
+    ->setDebugScope(SEAI->getDebugScope());
   return eraseInstFromFunction(*SEAI);
 }
 
@@ -135,9 +136,12 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   SILValue Default = SEAI->hasDefault() ? SEAI->getDefaultResult() : SILValue();
   LoadInst *EnumVal = Builder->createLoad(SEAI->getLoc(),
                                           SEAI->getEnumOperand());
-  return SelectEnumInst::create(SEAI->getLoc(), EnumVal, SEAI->getType(),
-                                Default, Cases,
-                                *SEAI->getParent()->getParent());
+  EnumVal->setDebugScope(SEAI->getDebugScope());
+  auto *I = SelectEnumInst::create(SEAI->getLoc(), EnumVal, SEAI->getType(),
+                                   Default, Cases,
+                                   *SEAI->getParent()->getParent());
+  I->setDebugScope(SEAI->getDebugScope());
+  return I;
 }
 
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
@@ -187,6 +191,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (LegalUsers && IEI) {
     auto *ConcAlloc = Builder->createAllocStack(AS->getLoc(),
                                                 IEI->getLoweredConcreteType());
+    ConcAlloc->setDebugScope(AS->getDebugScope());
     SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
     eraseInstFromFunction(*IEI);
 
@@ -194,13 +199,15 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     for (Operand *Op: AS->getUses()) {
       if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
         Builder->setInsertionPoint(DA);
-        Builder->createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1));
+        Builder->createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1))
+          ->setDebugScope(DA->getDebugScope());
         eraseInstFromFunction(*DA);
 
       }
       if (auto *DS = dyn_cast<DeallocStackInst>(Op->getUser())) {
         Builder->setInsertionPoint(DS);
-        Builder->createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0));
+        Builder->createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0))
+          ->setDebugScope(DS->getDebugScope());
         eraseInstFromFunction(*DS);
       }
     }
@@ -216,7 +223,8 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
   if (auto *UI = dyn_cast<UpcastInst>(LI->getOperand())) {
-    SILValue NewLI = Builder->createLoad(LI->getLoc(), UI->getOperand());
+    auto NewLI = Builder->createLoad(LI->getLoc(), UI->getOperand());
+    NewLI->setDebugScope(LI->getDebugScope());
     return new (UI->getModule()) UpcastInst(LI->getLoc(), NewLI,
                                             LI->getType());
   }
@@ -274,7 +282,9 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
         Builder->createStructElementAddr(LI->getLoc(), LI->getOperand(),
                                          cast<VarDecl>(V),
                                          Inst->getType(0).getAddressType());
+      SEA->setDebugScope(LI->getDebugScope());
       LastNewLoad = Builder->createLoad(LI->getLoc(), SEA);
+      LastNewLoad->setDebugScope(LI->getDebugScope());
       replaceInstUsesWith(*Inst, LastNewLoad, 0);
       eraseInstFromFunction(*Inst);
       continue;
@@ -289,7 +299,9 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
       Builder->createTupleElementAddr(LI->getLoc(), LI->getOperand(),
                                       Proj.getIndex(),
                                       Inst->getType(0).getAddressType());
+    TEA->setDebugScope(LI->getDebugScope());
     LastNewLoad = Builder->createLoad(LI->getLoc(), TEA);
+    LastNewLoad->setDebugScope(LI->getDebugScope());
     replaceInstUsesWith(*Inst, LastNewLoad, 0);
     eraseInstFromFunction(*Inst);
   }
@@ -435,7 +447,8 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
 
       if (!Param.isIndirect() && Param.isConsumed())
         if (!Arg.getType().isAddress())
-          Builder->createReleaseValue(Loc, Arg);
+          Builder->createReleaseValue(Loc, Arg)
+            ->setDebugScope(PAI->getDebugScope());
     }
 
     Builder->setInsertionPoint(OrigInsertPoint);
@@ -494,10 +507,12 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
 
   ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy,
                                         Subs, Args, AI->isTransparent());
+  NAI->setDebugScope(AI->getDebugScope());
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
-  Builder->createStrongRelease(AI->getLoc(), PAI);
+  Builder->createStrongRelease(AI->getLoc(), PAI)
+    ->setDebugScope(AI->getDebugScope());
 
   replaceInstUsesWith(*AI, NAI);
   return eraseInstFromFunction(*AI);
@@ -582,13 +597,15 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
     // other types alone.
     if (OldOpType.isAddress()) {
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
-      Args.push_back(Builder->createUncheckedAddrCast(AI->getLoc(),
-                                                      Op, NewOpType));
+      auto UAC = Builder->createUncheckedAddrCast(AI->getLoc(), Op, NewOpType);
+      UAC->setDebugScope(AI->getDebugScope());
+      Args.push_back(UAC);
     } else if (OldOpType.isHeapObjectReferenceType()) {
       assert(NewOpType.isHeapObjectReferenceType() &&
              "refs should map to refs.");
-      Args.push_back(Builder->createUncheckedRefCast(AI->getLoc(),
-                                                     Op, NewOpType));
+      auto URC = Builder->createUncheckedRefCast(AI->getLoc(), Op, NewOpType);
+      URC->setDebugScope(AI->getDebugScope());
+      Args.push_back(URC);
     } else {
       Args.push_back(Op);
     }
@@ -596,10 +613,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
 
   SILType CCSILTy = SILType::getPrimitiveObjectType(ConvertCalleeTy);
   // Create the new apply inst.
-  return ApplyInst::create(AI->getLoc(), FRI, CCSILTy,
-                           ConvertCalleeTy->getSILResult(),
-                           ArrayRef<Substitution>(), Args, false,
-                           *FRI->getReferencedFunction());
+  auto NAI = ApplyInst::create(AI->getLoc(), FRI, CCSILTy,
+                               ConvertCalleeTy->getSILResult(),
+                               ArrayRef<Substitution>(), Args, false,
+                               *FRI->getReferencedFunction());
+  NAI->setDebugScope(AI->getDebugScope());
+  return NAI;
 }
 
 typedef SmallVector<SILInstruction*, 4> UserListTy;
@@ -765,6 +784,7 @@ void StringConcatenationOptimizer::adjustEncodings() {
     // Convert UTF8 representation into UTF16.
     SLILeft = Builder->createStringLiteral(AI->getLoc(), SLILeft->getValue(),
                                            StringLiteralInst::Encoding::UTF16);
+    SLILeft->setDebugScope(AI->getDebugScope());
   }
 
   if (SLIRight->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
@@ -775,6 +795,7 @@ void StringConcatenationOptimizer::adjustEncodings() {
     // Convert UTF8 representation into UTF16.
     SLIRight = Builder->createStringLiteral(AI->getLoc(), SLIRight->getValue(),
                                             StringLiteralInst::Encoding::UTF16);
+    SLIRight->setDebugScope(AI->getDebugScope());
   }
 
   // It should be impossible to have two operands with different
@@ -838,12 +859,14 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   auto *NewSLI = Builder->createStringLiteral(AI->getLoc(),
                                               LV + Twine(RV),
                                               Encoding);
+  NewSLI->setDebugScope(AI->getDebugScope());
   Arguments.push_back(NewSLI);
 
   // Length of the concatenated literal according to its encoding.
   auto *Len = Builder->createIntegerLiteral(AI->getLoc(),
                                             AILeft->getOperand(2).getType(),
                                             getConcatenatedLength());
+  Len->setDebugScope(AI->getDebugScope());
   Arguments.push_back(Len);
 
   // isAscii flag for UTF8-encoded string literals.
@@ -853,6 +876,7 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
     auto *Ascii = Builder->createIntegerLiteral(AI->getLoc(),
                                                 ILType,
                                                 intmax_t(IsAscii));
+    Ascii->setDebugScope(AI->getDebugScope());
     Arguments.push_back(Ascii);
   }
 
@@ -1140,7 +1164,9 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     EnumInst *E =
       Builder->createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
                           IEAI->getOperand().getType().getObjectType());
-    Builder->createStore(IEAI->getLoc(), E, IEAI->getOperand());
+    E->setDebugScope(IEAI->getDebugScope());
+    Builder->createStore(IEAI->getLoc(), E, IEAI->getOperand())
+      ->setDebugScope(IEAI->getDebugScope());
     return eraseInstFromFunction(*IEAI);
   }
 
@@ -1167,8 +1193,9 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   EnumInst *E =
       Builder->createEnum(IEDAI->getLoc(), SI->getSrc(), IEDAI->getElement(),
                           IEDAI->getOperand().getType().getObjectType());
-  Builder->createStore(IEDAI->getLoc(), E, IEDAI->getOperand());
-
+  E->setDebugScope(IEDAI->getDebugScope());
+  Builder->createStore(IEDAI->getLoc(), E, IEDAI->getOperand())
+    ->setDebugScope(IEDAI->getDebugScope());
   // Cleanup.
   eraseInstFromFunction(*SI);
   eraseInstFromFunction(*IEDAI);
@@ -1240,6 +1267,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       SILValue Distance = Bytes->getArguments()[0];
       auto *NewPTAI =
           Builder->createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType());
+      NewPTAI->setDebugScope(PTAI->getDebugScope());
       return new (PTAI->getModule())
           IndexAddrInst(PTAI->getLoc(), NewPTAI, Distance);
     }
@@ -1303,6 +1331,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
   SILValue Op = UADCI->getOperand();
   SILLocation Loc = UADCI->getLoc();
+  SILDebugScope *Scope = UADCI->getDebugScope();
 
   // Ok, we have all loads. Lets simplify this. Go back through the loads a
   // second time, rewriting them into a load + bitcast from our source.
@@ -1312,6 +1341,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
     // Insert a new load from our source and bitcast that as appropriate.
     LoadInst *NewLoad = Builder->createLoad(Loc, Op);
+    NewLoad->setDebugScope(Scope);
     SILInstruction *BitCast = nullptr;
     if (OutputIsTrivial)
       BitCast = Builder->createUncheckedTrivialBitCast(Loc, NewLoad,
@@ -1319,6 +1349,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     else
       BitCast = Builder->createUncheckedRefBitCast(Loc, NewLoad,
                                                    OutputTy.getObjectType());
+    BitCast->setDebugScope(Scope);
 
     // Replace all uses of the old load with the new bitcasted result and erase
     // the old load.
@@ -1416,6 +1447,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
 
   // Grab the EnumAddr.
   SILLocation Loc = TEDAI->getLoc();
+  SILDebugScope *Scope = TEDAI->getDebugScope();
   SILValue EnumAddr = TEDAI->getOperand();
   EnumElementDecl *EnumElt = TEDAI->getElement();
   SILType PayloadType = TEDAI->getType().getObjectType();
@@ -1427,8 +1459,11 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
     LoadInst *L = cast<LoadInst>(U->getUser());
 
     // Insert a new Load of the enum and extract the data from that.
+    auto *Load = Builder->createLoad(Loc, EnumAddr);
+    Load->setDebugScope(Scope);
     auto *D = Builder->createUncheckedEnumData(
-        Loc, Builder->createLoad(Loc, EnumAddr), EnumElt, PayloadType);
+        Loc, Load, EnumElt, PayloadType);
+    D->setDebugScope(Scope);
 
     // Replace all uses of the old load with the data and erase the old load.
     replaceInstUsesWith(*L, D, 0);

@@ -70,6 +70,7 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
       SILDebugScope(AI->getLoc(), F, AIScope);
     CallSiteScope->InlinedCallSite = AIScope->InlinedCallSite;
   }
+  assert(CallSiteScope && "call site has no scope");
 
   // Increment the ref count for the inlined function, so it doesn't
   // get deleted before we can emit abstract debug info for it.
@@ -147,7 +148,8 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
     // trying to clone the ReturnInst.
     if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
       getBuilder().createBranch(Loc.getValue(), ReturnToBB,
-                                remapValue(RI->getOperand()));
+                                remapValue(RI->getOperand()))
+        ->setDebugScope(AIScope);
       continue;
     }
 

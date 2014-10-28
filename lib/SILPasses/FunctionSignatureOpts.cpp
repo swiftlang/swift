@@ -382,7 +382,7 @@ static void
 rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
                                   CallGraphNode::CallerCallSiteList CallSites) {
   for (ApplyInst *AI : CallSites) {
-    SILBuilder Builder(AI);
+    SILBuilderWithScope<16> Builder(AI);
 
     FunctionRefInst *FRI = Builder.createFunctionRef(AI->getLoc(), NewF);
 
@@ -429,7 +429,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
                             FunctionAnalyzer &Analyzer) {
   // TODO: What is the proper location to use here?
   SILLocation Loc = BB->getParent()->getLocation();
-  SILBuilder Builder(BB);
+  SILBuilderWithScope<16> Builder(BB, NewF->getDebugScope());
 
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 

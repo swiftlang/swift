@@ -208,7 +208,7 @@ void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
     Arguments.push_back(Op.get());
   }
 
-  SILBuilder Builder(AI);
+  SILBuilderWithScope<2> Builder(AI);
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 
   ApplyInst *NAI =
@@ -262,7 +262,7 @@ void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
 /// instruction.
 TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
                                      TermInst *Branch) {
-  SILBuilder Builder(Branch);
+  SILBuilderWithScope<2> Builder(Branch);
 
   if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
     SmallVector<SILValue, 8> TrueArgs;
@@ -474,7 +474,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     auto Self = getSelf();
     // We are going to have a retain, emit a matching release.
     if (!LeaveOriginal)
-      SILBuilder(SemanticsCall)
+      SILBuilderWithScope<1>(SemanticsCall)
           .createReleaseValue(SemanticsCall->getLoc(), Self);
 
     // Hoist the array load, if neccessary.
@@ -482,7 +482,8 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     auto NewArrayStructValue = copyArrayLoad(Self, InsertBefore, DT);
 
     // Retain the array.
-    B.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue);
+    B.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue)
+      ->setDebugScope(SemanticsCall->getDebugScope());
     auto Call = hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
     Call->setSelfArgument(NewArrayStructValue);
     return Call;
@@ -504,7 +505,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
 void swift::ArraySemanticsCall::replaceByRetainValue() {
   assert(getKind() < ArrayCallKind::kMakeMutable &&
          "Must be a semantics call that passes the array by value");
-  SILBuilder(SemanticsCall)
+  SILBuilderWithScope<1>(SemanticsCall)
       .createReleaseValue(SemanticsCall->getLoc(), getSelf());
   SemanticsCall->eraseFromParent();
 }

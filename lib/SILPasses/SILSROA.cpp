@@ -76,8 +76,8 @@ private:
 
 SILInstruction *
 SROAMemoryUseAnalyzer::createAgg(SILBuilder &B, SILLocation Loc,
-                                       SILType Ty,
-                                       ArrayRef<SILValue> Elements) {
+                                 SILType Ty,
+                                 ArrayRef<SILValue> Elements) {
   if (TT)
     return B.createTuple(Loc, Ty, Elements);
 
@@ -195,7 +195,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
 void
 SROAMemoryUseAnalyzer::
 createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
-  SILBuilder B(AI);
+  SILBuilderWithScope<16> B(AI);
   SILType Type = AI->getType(1).getObjectType();
 
   if (TT) {
@@ -226,7 +226,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Change any aggregate loads into field loads + aggregate structure.
   for (auto *LI : Loads) {
-    SILBuilder B(LI);
+    SILBuilderWithScope<16> B(LI);
     llvm::SmallVector<SILValue, 4> Elements;
     for (auto *NewAI : NewAllocations)
       Elements.push_back(B.createLoad(LI->getLoc(), SILValue(NewAI, 1)));
@@ -238,7 +238,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Change any aggregate stores into extracts + field stores.
   for (auto *SI : Stores) {
-    SILBuilder B(SI);
+    SILBuilderWithScope<16> B(SI);
     for (unsigned EltNo : indices(NewAllocations))
       B.createStore(SI->getLoc(),
                     createAggProjection(B, SI->getLoc(), SI->getSrc(), EltNo),
@@ -265,7 +265,8 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
       DEBUG(llvm::dbgs() << "        Found DeallocStackInst!\n");
       // Create the allocations in reverse order.
       for (auto *NewAI : swift::reversed(NewAllocations))
-        B.createDeallocStack(DSI->getLoc(), SILValue(NewAI));
+        B.createDeallocStack(DSI->getLoc(), SILValue(NewAI))
+          ->setDebugScope(DSI->getDebugScope());
       DSI->eraseFromParent();
     }
   }

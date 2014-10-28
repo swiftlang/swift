@@ -235,7 +235,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
 
 void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
                                              SILFunction *SpecialF) {
-  SILBuilder Builder(OrigPAI);
+  SILBuilderWithScope<2> Builder(OrigPAI);
   auto FuncRef = Builder.createFunctionRef(OrigPAI->getLoc(), SpecialF);
   auto NewPAI = Builder.createPartialApply(OrigPAI->getLoc(),
                                            FuncRef,

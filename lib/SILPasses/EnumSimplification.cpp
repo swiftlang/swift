@@ -418,7 +418,7 @@ bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
   DEBUG(llvm::dbgs() << "    Found RetainValue: " << *RVI);
   DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << FindResult->first);
 
-  SILBuilder Builder(RVI);
+  SILBuilderWithScope<8> Builder(RVI);
   createRefCountOpForPayload(Builder, RVI, FindResult->second);
   RVI->eraseFromParent();
   return true;
@@ -438,7 +438,7 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
   DEBUG(llvm::dbgs() << "    Found ReleaseValue: " << *RVI);
   DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << FindResult->first);
 
-  SILBuilder Builder(RVI);
+  SILBuilderWithScope<8> Builder(RVI);
   createRefCountOpForPayload(Builder, RVI, FindResult->second);
   RVI->eraseFromParent();
   return true;
@@ -528,7 +528,8 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered(AliasAnalysis *AA) {
       // predecessor.
       assert(P.first->getSingleSuccessor() &&
              "Can not hoist release into BB that has multiple successors");
-      SILBuilder Builder(P.first->getTerminator());
+      SILBuilderWithScope<8> Builder(P.first->getTerminator(),
+                                     RVI->getDebugScope());
       createRefCountOpForPayload(Builder, RVI, P.second);
     }
 

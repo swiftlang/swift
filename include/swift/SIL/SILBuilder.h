@@ -15,6 +15,7 @@
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILDebugScope.h"
 
 namespace swift {
 
@@ -1054,6 +1055,37 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->getInstList().insert(InsertPt, TheInst);
+  }
+};
+
+
+/// An RAII version of SILBuilder that automatically sets up identical
+/// SILDebugScopes for all instructions.  This is useful for
+/// situations where a single SIL instruction is lowered into a
+/// sequence of SIL instructions.
+template<unsigned N = 4> class SILBuilderWithScope : public SILBuilder {
+  SmallVector<SILInstruction*, N> InsertedInstrs;
+  SILDebugScope *DebugScope;
+
+public:
+  explicit SILBuilderWithScope(SILInstruction *I)
+    : SILBuilder(I, &InsertedInstrs), DebugScope(I->getDebugScope()) {
+    assert((DebugScope || maybeScopeless(*I)) && "no debug scope");
+  }
+
+  explicit SILBuilderWithScope(SILInstruction *I, SILDebugScope *DS)
+    : SILBuilder(I, &InsertedInstrs), DebugScope(DS) {
+  }
+
+  explicit SILBuilderWithScope(SILBasicBlock *BB, SILDebugScope *DS)
+    : SILBuilder(BB, &InsertedInstrs), DebugScope(DS) {
+  }
+
+  ~SILBuilderWithScope() {
+    for (auto *I : InsertedInstrs) {
+      assert(!I->getDebugScope() && "instruction was already assigned a scope");
+      I->setDebugScope(DebugScope);
+    }
   }
 };
 

@@ -391,7 +391,8 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
       // object type argument.
       SILFunction &F = getBuilder().getFunction();
       auto &typeLowering = F.getModule().getTypeLowering(I->second.getType());
-      typeLowering.emitReleaseValue(getBuilder(), Inst->getLoc(), I->second);
+      SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
+      typeLowering.emitReleaseValue(B, Inst->getLoc(), I->second);
       return;
     }
   }
@@ -438,9 +439,10 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
       if (I != AddrArgumentMap.end()) {
         // Loads of a struct_element_addr of an argument get replaced with
         // struct_extract of the new object type argument.
-        SILValue V = getBuilder().emitStructExtract(Inst->getLoc(), I->second,
-                                                    SEAI->getField(),
-                                                    Inst->getType());
+        SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
+        SILValue V = B.emitStructExtract(Inst->getLoc(), I->second,
+                                         SEAI->getField(),
+                                         Inst->getType());
         ValueMap.insert(std::make_pair(Inst, V));
         return;
       }
@@ -683,7 +685,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
-  SILBuilder B(PAI);
+  SILBuilderWithScope<8> B(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
   SILType FnTy = FnVal.getType();
 

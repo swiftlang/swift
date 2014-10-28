@@ -223,7 +223,7 @@ struct ArgDescriptor {
 
 /// Update the callsite to pass in the correct arguments.
 static void rewriteApplyInst(ArgDescriptor &AD, SILFunction *NewF) {
-  SILBuilder Builder(AD.AI);
+  SILBuilderWithScope<2> Builder(AD.AI);
   FunctionRefInst *FRI = Builder.createFunctionRef(AD.AI->getLoc(), NewF);
 
   // Create the args for the new apply by removing the closure argument and
