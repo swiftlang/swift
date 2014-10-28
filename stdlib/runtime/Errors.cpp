@@ -167,3 +167,9 @@ extern "C" void swift_reportUnimplementedInitializer(const char *className,
   free(log);
 }
 
+// Report a call to a removed method.
+LLVM_ATTRIBUTE_NORETURN
+extern "C" void
+swift_reportMissingMethod() {
+  swift::fatalError("fatal error: call of removed method\n");
+}

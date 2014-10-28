@@ -3103,12 +3103,15 @@ namespace {
         witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
         witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
       } else {
-        witness = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+        // The method is removed by dead method elimination.
+        // It should be never called. We add a pointer to an error function.
+        witness = llvm::ConstantExpr::getBitCast(IGM.getDeadMethodErrorFn(),
+                                                 IGM.Int8PtrTy);
       }
       Table.push_back(witness);
       return;
     }
-    
+
     void addStaticMethod(FuncDecl *iface) {
       return addMethodFromSILWitnessTable(iface);
     }

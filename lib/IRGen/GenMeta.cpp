@@ -2478,11 +2478,10 @@ namespace {
       if (func) {
         addWord(IGM.getAddrOfSILFunction(func, NotForDefinition));
       } else {
-        // Just add a null pointer in case the optimizer has removed the
-        // function because it is dead. This is some kind of a hack which is
-        // only required because the vtable generation in SIL is different than
-        // the algorithm here.
-        addWord(llvm::ConstantPointerNull::get(IGM.FunctionPtrTy));
+        // The method is removed by dead method elimination.
+        // It should be never called. We add a pointer to an error function.
+        addWord(llvm::ConstantExpr::getBitCast(IGM.getDeadMethodErrorFn(),
+                                               IGM.FunctionPtrTy));
       }
     }
 
