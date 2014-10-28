@@ -96,3 +96,14 @@
 // DEBUG-LINK-ONLY: 4: merge-module, {0, 1, 2, 3}, swiftmodule
 // DEBUG-LINK-ONLY: 5: link, {0, 1, 2, 3, 4}, image
 // DEBUG-LINK-ONLY: 6: generate-dSYM, {5}, dSYM
+
+
+// RUN: %swiftc_driver -driver-print-actions %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions -force-single-frontend-invocation 2>&1 | FileCheck %s -check-prefix=WHOLE-MODULE
+// WHOLE-MODULE: 0: input, "{{.*}}Inputs/main.swift", swift
+// WHOLE-MODULE: 1: input, "{{.*}}Inputs/empty.swift", swift
+// WHOLE-MODULE: 2: input, "{{.*}}actions.swift", swift
+// WHOLE-MODULE: 3: compile, {0, 1, 2}, object
+// WHOLE-MODULE: 4: link, {3}, image
+
+// RUN: %swiftc_driver -driver-print-actions -g %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions -force-single-frontend-invocation 2>&1 | FileCheck %s -check-prefix=WHOLE-MODULE -check-prefix=WHOLE-MODULE-DEBUG
+// WHOLE-MODULE-DEBUG: 5: generate-dSYM, {4}, dSYM
