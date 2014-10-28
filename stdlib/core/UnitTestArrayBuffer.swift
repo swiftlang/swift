@@ -112,7 +112,8 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
   public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
-    return _ContiguousArrayBuffer(_base.storage as _ContiguousArrayStorageBase?)
+    return _ContiguousArrayBuffer(
+      (_base.storage as? _ContiguousArrayStorageBase) ?? _emptyArrayStorage)
   }
 
   /// Replace the given subRange with the first newCount elements of

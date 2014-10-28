@@ -190,9 +190,9 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
   }
 
-  init(_ storage: _ContiguousArrayStorageBase?) {
+  init(_ storage: _ContiguousArrayStorageBase) {
     __bufferPointer = ManagedBufferPointer(
-      unsafeBufferObject: storage ?? _emptyArrayStorage)
+      unsafeBufferObject: storage)
   }
 
   /// If the elements are stored contiguously, a pointer to the first
@@ -410,13 +410,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     
     // Start with the base class so that optimizations based on
     // 'final' don't bypass dynamic type check.
-    let s: _ContiguousArrayStorageBase? = _storage
+    let s: _ContiguousArrayStorageBase = _storage
     
-    if _fastPath(s != nil){
-      if _fastPath(s!.staticElementType is U.Type) {
-        // Done in O(1)
-        return true
-      }
+    if _fastPath(s.staticElementType is U.Type) {
+      // Done in O(1)
+      return true
     }
 
     // Check the elements
