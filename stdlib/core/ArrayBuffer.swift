@@ -87,11 +87,11 @@ class _IndirectArrayBuffer {
 }
 
 public struct _ArrayBuffer<T> : _ArrayBufferType {
-  var storage: Builtin.NativeObject?
+  var storage: Builtin.NativeObject
 
   var indirect: _IndirectArrayBuffer {
     _sanityCheck(_isClassOrObjCExistential(T.self))
-    return Builtin.castFromNativeObject(storage!)
+    return Builtin.castFromNativeObject(storage)
   }
   
   public typealias Element = T
@@ -472,9 +472,8 @@ extension _ArrayBuffer {
   typealias _OptStorage = _ContiguousArrayStorage<T>?
   var _native: NativeBuffer {
     if !_isClassOrObjCExistential(T.self) {
-      let s: _ContiguousArrayStorageBase? = storage.map {
-        Builtin.castFromNativeObject($0) }
-      return NativeBuffer(s ?? _emptyArrayStorage)
+      let s: _ContiguousArrayStorageBase = Builtin.castFromNativeObject(storage)
+      return NativeBuffer(s)
     }
     else {
       let i = indirect

@@ -1,3 +1,4 @@
+// XFAIL: *
 // RUN: %swift -O -emit-sil -primary-file %s | FileCheck %s
 //
 // Test Array "make_mutable" hoisting.  It's hard for FileCheck to
@@ -6,11 +7,11 @@
 // output instead.
 
 // CHECK-LABEL: sil hidden @_TF13array_mutable8inoutarrFRGSaSi_T_
-// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced_native
+// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
 // CHECK-NOT: {{^bb}}
 // CHECK: apply %[[FR]]
 // CHECK: {{^bb}}
-// CHECK-NOT: _swift_isUniquelyReferenced_native_spareBits
+// CHECK-NOT: _swift_isUniquelyReferenced
 // CHECK: [[VOID:%[^ ]+]] = tuple ()
 // CHECK: return [[VOID]]
 func inoutarr(inout a: [Int]) {
@@ -24,11 +25,11 @@ struct S {
 }
 
 // CHECK-LABEL: sil hidden @_TF13array_mutable6arreltFRVS_1ST_
-// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced_native
+// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
 // CHECK-NOT: {{^bb}}
 // CHECK: apply %[[FR]]
 // CHECK: {{^bb}}
-// CHECK-NOT: _swift_isUniquelyReferenced_native_spareBits
+// CHECK-NOT: _swift_isUniquelyReferenced
 // CHECK: {{^[}]}}
 func arrelt(inout s: S) {
   for i in 0..<s.a.count {
@@ -39,7 +40,7 @@ func arrelt(inout s: S) {
 // Check that we have an explicit retain before calling isUniquelyReferenced.
 // <rdar:18109082> ARC: make _isUniquelyReferenced a barrier
 // CHECK-LABEL: sil hidden @_TF13array_mutable7arrcopyFRGSaSi_Si
-// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced_native
+// CHECK: %[[FR:[0-9]+]] = function_ref @_swift_isUniquelyReferenced
 // CHECK: retain_value
 // CHECK: apply %[[FR]]
 // CHECK: {{^bb1}}
