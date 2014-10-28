@@ -1314,12 +1314,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
   for (auto InsnIter = BB->begin(); InsnIter != BB->end(); ++InsnIter) {
     auto &I = *InsnIter;
-    // Functions with external linkage only exist so they can be
-    // inlined at the SIL level. They are dead code at the IR level
-    // and below, so there is no point in emitting debug info for
-    // them.  Since they do get emitted to IR, LLVM will perform
-    // inling and gets confused if the instructions have wrong scope
-    // information on them.
     if (IGM.DebugInfo) {
       // Set the debug info location for I, if applicable.
       SILLocation ILoc = I.getLoc();
