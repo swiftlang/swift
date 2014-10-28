@@ -70,20 +70,19 @@ class _IndirectArrayBuffer {
     self.needsElementTypeCheck = false
   }
 
-  var buffer: AnyObject?
+  var buffer: AnyObject
   var isMutable: Bool
   var isCocoa: Bool
   var needsElementTypeCheck: Bool
   
   func getNativeBufferOf<T>(_: T.Type) -> _ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
-    let s: _ContiguousArrayStorageBase? = buffer.map { unsafeDowncast($0) }
-    return _ContiguousArrayBuffer(s ?? _emptyArrayStorage)
+    return _ContiguousArrayBuffer(unsafeDowncast(buffer))
   }
 
   func getCocoa() -> _NSArrayCoreType {
     _sanityCheck(isCocoa)
-    return unsafeBitCast(buffer!, _NSArrayCoreType.self)
+    return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(buffer))
   }
 }
 
