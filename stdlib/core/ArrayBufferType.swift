@@ -91,7 +91,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   var capacity: Int {get}
 
   /// An object that keeps the elements stored in this buffer alive
-  var owner: AnyObject {get}
+  var owner: AnyObject? {get}
   
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.

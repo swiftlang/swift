@@ -126,12 +126,13 @@ ArrayTestSuite.test("${array_type}/emptyAllocation") {
   // Empty arrays all use the same buffer
   expectEqual(arr0._buffer.identity, arr1._buffer.identity)
   
+  // Only non-literal empty Slices have nil buffers
   let hasNilBuffer = arr1.identity == nil
-  expectFalse(hasNilBuffer)
+  expect${array_type == 'Slice'}(hasNilBuffer)
 
   let arr2: ${array_type}<TestValueTy> = []
   let emptyLiteralsShareBuffer = arr0._buffer.identity == arr2._buffer.identity
-  expectTrue(emptyLiteralsShareBuffer)
+  expect${array_type != 'Slice'}(emptyLiteralsShareBuffer)
 }
 
 % end

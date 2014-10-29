@@ -16,11 +16,10 @@
 
 import SwiftShims
 
-internal func _makeSwiftNSFastEnumerationState()
-   -> _SwiftNSFastEnumerationState {
-  return _SwiftNSFastEnumerationState(
-    state: 0, itemsPtr: nil, mutationsPtr: nil,
-    extra: (0, 0, 0, 0, 0))
+internal
+func _makeSwiftNSFastEnumerationState() -> _SwiftNSFastEnumerationState {
+  return _SwiftNSFastEnumerationState(state: 0, itemsPtr: nil, mutationsPtr: nil,
+      extra: (0, 0, 0, 0, 0))
 }
 
 /// A dummy value that is be used as the target for `mutationsPtr` in fast
@@ -33,14 +32,5 @@ public // @testable
 var _fastEnumerationStorageMutationsPtr: UnsafeMutablePointer<CUnsignedLong> {
   return UnsafeMutablePointer(
       Builtin.addressof(&_fastEnumerationStorageMutationsTarget))
-}
-
-internal func _isUniquelyReferenced_native(
-  inout x: Builtin.NativeObject
-) -> Bool {
-  let p = UnsafePointer<_HeapObject>(Builtin.bridgeToRawPointer(x))
-  let result = _swift_isUniquelyReferenced_nonNull_native(p) != 0
-  Builtin.fixLifetime(x)
-  return result
 }
 

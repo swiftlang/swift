@@ -89,13 +89,16 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 
 // The class that implements the storage for a ContiguousArray<T>
 final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
+  typealias Buffer = _ContiguousArrayBuffer<T>
 
   deinit {
-    __manager.withUnsafeMutablePointers {
-      (pointerToValue, pointerToElements)->Void in
-      pointerToElements.destroy(pointerToValue.memory.count)
-      pointerToValue.destroy()
-    }
+    let b = Buffer(self)
+    b.baseAddress.destroy(b.count)
+    b._base._value.destroy()
+  }
+
+  final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+    return Buffer(self)._base._allocatedSizeAndAlignMask()
   }
 
   /// If `T` is bridged verbatim, invoke `body` on an
@@ -104,10 +107,12 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
     body: (UnsafeBufferPointer<AnyObject>)->Void
   ) {
     if _isBridgedVerbatimToObjectiveC(T.self) {
-      let count = __manager.value.count
-      __manager.withUnsafeMutablePointerToElements {
-        body(UnsafeBufferPointer(start: UnsafePointer($0), count: count))
-      }
+      let nativeBuffer = Buffer(self)
+      body(
+        UnsafeBufferPointer(
+          start: UnsafePointer(nativeBuffer.baseAddress),
+          count: nativeBuffer.count))
+      _fixLifetime(self)
     }
   }
 
@@ -118,7 +123,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
       "Verbatim bridging should be handled separately")
-    return __manager.value.count
+    return Buffer(self).count
   }
 
   /// Bridge array elements and return a new buffer that owns them.
@@ -129,14 +134,14 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
       "Verbatim bridging should be handled separately")
-    let count = __manager.value.count
+    let nativeBuffer = Buffer(self)
+    let count = nativeBuffer.count
     let result = _HeapBuffer<Int, AnyObject>(
       _HeapBufferStorage<Int, AnyObject>.self, count, count)
     let resultPtr = result.baseAddress
-    let _:() = __manager.withUnsafeMutablePointerToElements {
-      for i in 0..<count {
-        (resultPtr + i).initialize(_bridgeToObjectiveCUnconditional($0[i]))
-      }
+    for i in 0..<count {
+      (resultPtr + i).initialize(
+        _bridgeToObjectiveCUnconditional(nativeBuffer[i]))
     }
     return result
   }
@@ -155,14 +160,6 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
   override var staticElementType: Any.Type {
     return T.self
   }
-
-  internal // private
-  typealias Manager = ManagedBufferPointer<_ArrayBody, T>
-
-  internal // private
-  var __manager : Manager {
-    return Manager(unsafeBufferObject: self)
-  }
 }
 
 public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
@@ -177,28 +174,37 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       self = _ContiguousArrayBuffer<T>()
     }
     else {
-      __bufferPointer = ManagedBufferPointer(
-        bufferClass: _ContiguousArrayStorage<T>.self,
-        minimumCapacity: realMinimumCapacity
-      ) {
-        buffer, elementCount
-        in _ArrayBody(
-          count: count,
-          capacity: elementCount(buffer),
-          elementTypeIsBridgedVerbatim: _isBridgedVerbatimToObjectiveC(T.self))
-      }
+      _base = _HeapBuffer(
+        _ContiguousArrayStorage<T>.self,
+        _ArrayBody(),
+        realMinimumCapacity)
+
+      let verbatim = _isBridgedVerbatimToObjectiveC(T.self)
+      
+      _base.value = _ArrayBody(
+        count: count, capacity: _base._capacity(),
+        elementTypeIsBridgedVerbatim: verbatim)
     }
   }
 
-  init(_ storage: _ContiguousArrayStorageBase) {
-    __bufferPointer = ManagedBufferPointer(
-      unsafeBufferObject: storage)
+  init(_ storage: _ContiguousArrayStorageBase?) {
+    _base = unsafeBitCast(storage, _HeapBuffer<_ArrayBody, T>.self)
+  }
+
+  public var hasStorage: Bool {
+    return _base.hasStorage
   }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public var baseAddress: UnsafeMutablePointer<T> {
-    return __bufferPointer.withUnsafeMutablePointerToElements { $0 }
+    return _base.hasStorage ? _base.baseAddress : nil
+  }
+
+  /// A pointer to the first element, assuming that the elements are stored
+  /// contiguously.
+  var _unsafeElementStorage: UnsafeMutablePointer<T> {
+    return _base.baseAddress
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
@@ -228,8 +234,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// create an empty buffer
   public init() {
-    __bufferPointer = ManagedBufferPointer(
-      unsafeBufferObject: _emptyArrayStorage)
+    _base = unsafeBitCast(_emptyArrayStorage, _HeapBuffer<_ArrayBody, T>.self)
   }
 
   /// Adopt the storage of x
@@ -275,7 +280,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     get {
       _sanityCheck(_isValidSubscript(i), "Array index out of range")
       // If the index is in bounds, we can assume we have storage.
-      return baseAddress[i]
+      return _unsafeElementStorage[i]
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
@@ -283,18 +288,18 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
       // FIXME: Manually swap because it makes the ARC optimizer happy.  See
       // <rdar://problem/16831852> check retain/release order
-      // baseAddress[i] = newValue
+      // _unsafeElementStorage[i] = newValue
       var nv = newValue
       let tmp = nv
-      nv = baseAddress[i]
-      baseAddress[i] = tmp
+      nv = _unsafeElementStorage[i]
+      _unsafeElementStorage[i] = tmp
     }
   }
 
   /// How many elements the buffer stores
   public var count: Int {
     get {
-      return __bufferPointer.value.count
+      return _base.hasStorage ? _base.value.count : 0
     }
     nonmutating set {
       _sanityCheck(newValue >= 0)
@@ -303,8 +308,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
-      __bufferPointer.withUnsafeMutablePointerToValue {
-        $0.memory.count = newValue
+      _sanityCheck(_base.hasStorage || newValue == 0)
+
+      if _base.hasStorage {
+        _base.value.count = newValue
       }
     }
   }
@@ -317,12 +324,13 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     /// Note that this is better than folding hasStorage in to
     /// the return from this function, as this implementation generates
     /// no shortcircuiting blocks.
-    return (index >= 0) & (index < __bufferPointer.value.count)
+    _precondition(_base.hasStorage, "Cannot index empty buffer")
+    return (index >= 0) & (index < _base.value.count)
   }
 
   /// How many elements the buffer can store without reallocation
   public var capacity: Int {
-    return __bufferPointer.value.capacity
+    return _base.hasStorage ? _base.value.capacity : 0
   }
 
   /// Copy the given subRange of this buffer into uninitialized memory
@@ -349,7 +357,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   public subscript(subRange: Range<Int>) -> _SliceBuffer<T>
   {
     return _SliceBuffer(
-      owner: __bufferPointer.buffer,
+      owner: _base.storage,
       start: baseAddress + subRange.startIndex,
       count: subRange.endIndex - subRange.startIndex,
       hasNativeBuffer: true)
@@ -360,7 +368,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// may need to be considered, such as whether the buffer could be
   /// some immutable Cocoa container.
   public mutating func isUniquelyReferenced() -> Bool {
-    return __bufferPointer.holdsUniqueReference()
+    return _base.isUniquelyReferenced()
   }
 
   /// Returns true iff this buffer is mutable. NOTE: a true result
@@ -380,11 +388,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       return _SwiftDeferredNSArray(
         _nativeStorage: _emptyArrayStorage)
     }
-    return _SwiftDeferredNSArray(_nativeStorage: _storage)
+    return _SwiftDeferredNSArray(_nativeStorage: _storage!)
   }
 
   /// An object that keeps the elements stored in this buffer alive
-  public var owner: AnyObject {
+  public var owner: AnyObject? {
     return _storage
   }
 
@@ -398,7 +406,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Return true iff we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
-    return _storage.canStoreElementsOfDynamicType(proposedElementType)
+    if let s = _storage {
+      return s.canStoreElementsOfDynamicType(proposedElementType)
+    }
+    return false
   }
 
   /// Return true if the buffer stores only elements of type `U`.
@@ -410,11 +421,13 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     
     // Start with the base class so that optimizations based on
     // 'final' don't bypass dynamic type check.
-    let s: _ContiguousArrayStorageBase = _storage
+    let s: _ContiguousArrayStorageBase? = _storage
     
-    if _fastPath(s.staticElementType is U.Type) {
-      // Done in O(1)
-      return true
+    if _fastPath(s != nil){
+      if _fastPath(s!.staticElementType is U.Type) {
+        // Done in O(1)
+        return true
+      }
     }
 
     // Check the elements
@@ -426,17 +439,21 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return true
   }
 
-  internal var _storage: _ContiguousArrayStorageBase {
-    return Builtin.castFromNativeObject(__bufferPointer._nativeBuffer)
+  //===--- private --------------------------------------------------------===//
+  var _storage: _ContiguousArrayStorageBase? {
+    return _base.storage.map { unsafeDowncast($0) }
   }
 
-  var __bufferPointer: ManagedBufferPointer<_ArrayBody, T>
+  typealias _Base = _HeapBuffer<_ArrayBody, T>
+  var _base: _Base
 }
 
 /// Append the elements of rhs to lhs
 public func += <
   T, C: CollectionType where C._Element == T
-> (inout lhs: _ContiguousArrayBuffer<T>, rhs: C) {
+> (
+  inout lhs: _ContiguousArrayBuffer<T>, rhs: C
+) {
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(count(rhs))
 
@@ -449,10 +466,12 @@ public func += <
       count: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
 
-    newLHS.baseAddress.moveInitializeFrom(lhs.baseAddress, count: oldCount)
-    lhs.count = 0
+    if lhs._base.hasStorage {
+      newLHS.baseAddress.moveInitializeFrom(lhs.baseAddress, count: oldCount)
+      lhs._base.value.count = 0
+    }
     swap(&lhs, &newLHS)
-    (lhs.baseAddress + oldCount).initializeFrom(rhs)
+    (lhs._base.baseAddress + oldCount).initializeFrom(rhs)
   }
 }
 

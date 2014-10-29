@@ -143,7 +143,7 @@ internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
   var buf = _ContiguousArrayBuffer<TargetElement>(
     count: source.count, minimumCapacity: 0)
   
-  var p = buf.baseAddress
+  var p = buf._unsafeElementStorage
   
 ElementwiseBridging:
   do {
@@ -160,7 +160,7 @@ ElementwiseBridging:
   while false
   
   // Don't destroy anything we never created.
-  buf.count = p - buf.baseAddress
+  buf.count = p - buf._unsafeElementStorage
   
   // Report failure
   return nil

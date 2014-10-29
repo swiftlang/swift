@@ -54,8 +54,7 @@ internal class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
   }
 }
 
-// Return true if x is non-nil, and the only (strong) reference to the
-// given object.
+// Return true if x is the only (strong) reference to the given RawBuffer
 // 
 // This is an inout function for two reasons:
 // 
@@ -66,6 +65,16 @@ internal class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
 // 2. When it is not an inout function, self is passed by
 //    value... thus bumping the reference count and disturbing the
 //    result we are trying to observe, Dr. Heisenberg!
+//
+// NOTE: this is not as safe as it could be; class types that come
+// from Cocoa don't have a reference count stored inline where we're
+// checking for it.  However, we have no way to restrict T to being a
+// native Swift class, and in fact we have no reasonable way of
+// getting a class pointer out of some other types, such as an enum
+// whose first case is a native Swift object and is statically known
+// to be in that case, without affecting its reference count.  Instead
+// we accept everything; unsafeBitCast will at least catch
+// inappropriately-sized things at runtime.
 internal func _isUniquelyReferenced_native(
   inout x: Builtin.NativeObject?
 ) -> Bool {
