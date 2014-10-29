@@ -376,14 +376,18 @@ public func lexicographicalCompare<
 }
 
 /// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
-/// ordering, using `less` as the comparison between elements.
+/// ordering, using `isOrderedBefore` as the comparison between elements.
+///
+/// Requires: isOrderedBefore` is a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements of `a1` and `a2`.
 public func lexicographicalCompare<
     S1 : SequenceType, S2 : SequenceType
   where 
     S1.Generator.Element == S2.Generator.Element
 >(
   a1: S1, a2: S2,
-  less: (S1.Generator.Element,S1.Generator.Element)->Bool
+  isOrderedBefore less: (S1.Generator.Element,S1.Generator.Element)->Bool
 ) -> Bool {
   var g1 = a1.generate()
   var g2 = a2.generate()
