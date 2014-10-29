@@ -2697,6 +2697,11 @@ public:
   /// in the protocol list, then sorting them in some stable order.
   static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
+  /// Compare two protocols to provide them with a stable ordering for
+  /// use in sorting.
+  static int compareProtocols(ProtocolDecl * const* PP1,
+                              ProtocolDecl * const* PP2);
+
 private:
   friend class NominalTypeDecl;
   ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx);

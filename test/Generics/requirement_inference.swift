@@ -79,26 +79,26 @@ struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
 
 // CHECK-LABEL: .inferSameType1@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   U witness marker
-// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:26]
-// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [inferred @ {{.*}}26]
 // CHECK-NEXT:   T witness marker
 // CHECK-NEXT:   T : P3 [inferred @ {{.*}}:26]
+// CHECK-NEXT:   U witness marker
+// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:26]
 // CHECK-NEXT:   T[.P3].P3Assoc witness marker
-// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:26]
 // CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}:26]
+// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:26]
+// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [inferred @ {{.*}}26]
 func inferSameType1<T, U>(x: Model_P3_P4_Eq<T, U>) { }
 
 // CHECK-LABEL: .inferSameType2()@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   U witness marker
-// CHECK-NEXT:   U : P4 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:29]
-// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
 // CHECK-NEXT:   T witness marker
 // CHECK-NEXT:   T : P3 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:21]
+// CHECK-NEXT:   U witness marker
+// CHECK-NEXT:   U : P4 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:29]
 // CHECK-NEXT:   T[.P3].P3Assoc witness marker
-// CHECK-NEXT:   T[.P3].P3Assoc : P2 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:54]
 // CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:21]
+// CHECK-NEXT:   T[.P3].P3Assoc : P2 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:54]
+// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
 func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>() { }
 
 // CHECK-LABEL: .inferSameType3()
@@ -106,8 +106,8 @@ func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>
 // CHECK-NEXT:   T witness marker
 // CHECK-NEXT:   T : PCommonAssoc1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:21]
 // CHECK-NEXT:   T : PCommonAssoc2 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:69]
-// CHECK-NEXT:   T[.PCommonAssoc2].CommonAssoc == T[.PCommonAssoc1].CommonAssoc [inferred @ {{.*}}requirement_inference.swift:{{.*}}:69]
 // CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc witness marker
 // CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:61]
+// CHECK-NEXT:   T[.PCommonAssoc2].CommonAssoc == T[.PCommonAssoc1].CommonAssoc [inferred @ {{.*}}requirement_inference.swift:{{.*}}:69]
 // CHECK-NEXT: Generic signature
 func inferSameType3<T : PCommonAssoc1 where T.CommonAssoc : P1, T : PCommonAssoc2>() { }

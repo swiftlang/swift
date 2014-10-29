@@ -28,6 +28,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
@@ -1293,12 +1294,39 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
       }
     }
   }
+}
 
+namespace {
+  /// \brief Function object that orders potential archetypes by name.
+  struct OrderPotentialArchetypeByName {
+    using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
+
+    bool operator()(std::pair<Identifier, PotentialArchetype *> X,
+                    std::pair<Identifier, PotentialArchetype *> Y) const {
+      return X.first.str() < Y.second->getName().str();
+    }
+
+    bool operator()(std::pair<Identifier, PotentialArchetype *> X,
+                    Identifier Y) const {
+      return X.first.str() < Y.str();
+    }
+
+    bool operator()(Identifier X,
+                    std::pair<Identifier, PotentialArchetype *> Y) const {
+      return X.str() < Y.first.str();
+    }
+
+    bool operator()(Identifier X, Identifier Y) const {
+      return X.str() < Y.str();
+    }
+  };
 }
 
 template<typename F>
 void ArchetypeBuilder::enumerateRequirements(F f) {
-  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+  // Local function to visit a potential archetype, enumerating its
+  // requirements.
+  auto visitPA = [&](PotentialArchetype *archetype) {
     // Invalid archetypes are never representatives in well-formed or corrected
     // signature, so we don't need to visit them.
     if (archetype->isInvalid())
@@ -1332,12 +1360,72 @@ void ArchetypeBuilder::enumerateRequirements(F f) {
     }
 
     // Enumerate conformance requirements.
+    SmallVector<ProtocolDecl *, 4> protocols;
+    DenseMap<ProtocolDecl *, RequirementSource> protocolSources;
     for (const auto &conforms : archetype->getConformsTo()) {
-      f(RequirementKind::Conformance, archetype, 
-        conforms.first->getDeclaredInterfaceType(),
-        conforms.second);
+      protocols.push_back(conforms.first);
+      assert(protocolSources.count(conforms.first) == 0 && 
+             "redundant protocol requirement?");
+      protocolSources.insert({conforms.first, conforms.second});
     }
-  });
+
+    // Sort the protocols in canonical order.
+    llvm::array_pod_sort(protocols.begin(), protocols.end(), 
+                         ProtocolType::compareProtocols);
+
+    // Enumerate the conformance requirements.
+    for (auto proto : protocols) {
+      assert(protocolSources.count(proto) == 1 && "Missing conformance?");
+      f(RequirementKind::Conformance, archetype, 
+        proto->getDeclaredInterfaceType(), 
+        protocolSources.find(proto)->second);
+    }
+  };
+
+  // Local function to visit the nested potential archetypes of the
+  // given potential archetype.
+  std::function<void(PotentialArchetype *archetype)> visitNested 
+    = [&](PotentialArchetype *archetype) {
+    // Collect the nested types, sorted by name.
+    SmallVector<std::pair<Identifier, PotentialArchetype*>, 16> nestedTypes;
+    for (const auto &nested : archetype->getNestedTypes()) {
+      for (auto nestedPA : nested.second)
+        nestedTypes.push_back(std::make_pair(nested.first, nestedPA));
+    }
+    std::stable_sort(nestedTypes.begin(), nestedTypes.end(),
+                     OrderPotentialArchetypeByName());
+    
+    // Add requirements for the nested types.
+    for (const auto &nested : nestedTypes) {
+      visitPA(nested.second);
+      visitNested(nested.second);
+    }
+  };
+
+  auto primaryIter = Impl->PotentialArchetypes.begin(), 
+    primaryIterEnd = Impl->PotentialArchetypes.end();
+  while (primaryIter != primaryIterEnd) {
+    unsigned depth = primaryIter->first.Depth;
+
+    // For each of the primary potential archetypes, add the requirements.
+    // Stop when we hit a parameter at a different depth.
+    // FIXME: This algorithm falls out from the way the "all archetypes" lists
+    // are structured. Once those lists no longer exist or are no longer
+    // "the truth", we can simplify this algorithm considerably.
+    auto nextPrimaryIter = primaryIter;
+    for (/*none*/; 
+         (nextPrimaryIter != primaryIterEnd && 
+          nextPrimaryIter->first.Depth == depth);
+         ++nextPrimaryIter) {
+      visitPA(nextPrimaryIter->second);
+    }
+
+    // For each of the primary potential archetypes, add the nested
+    // requirements.
+    for (; primaryIter != nextPrimaryIter; ++primaryIter) {
+      visitNested(primaryIter->second);
+    }
+  }
 }
 
 void ArchetypeBuilder::dump() {
