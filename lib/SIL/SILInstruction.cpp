@@ -1420,7 +1420,7 @@ SwitchEnumInstBase::createSwitchEnum(SILLocation Loc, SILValue Operand,
   return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs);
 }
 
-EnumElementDecl *SwitchEnumInstBase::getUnqiueCaseForDefault() {
+EnumElementDecl *SwitchEnumInstBase::getUniqueCaseForDefault() {
   assert(hasDefault() && "doesn't have a default");
   SILValue value = getOperand();
   SILType enumType = value.getType();
@@ -1463,7 +1463,7 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
     }
   }
   if (!D && hasDefault() && getDefaultBB() == BB) {
-    return getUnqiueCaseForDefault();
+    return getUniqueCaseForDefault();
   }
   return D;
 }

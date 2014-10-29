@@ -1243,7 +1243,7 @@ void SimplifyCFG::canonicalizeSwitchEnums() {
     if (!SWI->hasDefault())
       continue;
     
-    EnumElementDecl *elementDecl = SWI->getUnqiueCaseForDefault();
+    EnumElementDecl *elementDecl = SWI->getUniqueCaseForDefault();
     if (!elementDecl)
       continue;
     
