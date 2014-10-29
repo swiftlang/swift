@@ -492,7 +492,7 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
 /// set is necessary.
 bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
                                            SILValue ArrayVal) {
-  if (isa<RetainValueInst>(UseInst) &&
+  if ((isa<RetainValueInst>(UseInst) || isa<StrongRetainInst>(UseInst)) &&
       isRetainReleasedBeforeMutate(UseInst, ArrayVal))
     return true;
 
