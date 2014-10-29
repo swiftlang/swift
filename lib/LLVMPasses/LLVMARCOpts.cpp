@@ -58,7 +58,7 @@ STATISTIC(NumReturnThreeTailCallsFormed,
           "Number of swift_retainAndReturnThree tail calls formed");
 
 llvm::cl::opt<bool>
-DisableARCOpts("disable-arc-opts", llvm::cl::init(false));
+DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 //                            Utility Functions
