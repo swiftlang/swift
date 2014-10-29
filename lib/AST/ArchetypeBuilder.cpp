@@ -1307,8 +1307,7 @@ void ArchetypeBuilder::enumerateRequirements(F f) {
     // If this is not the representative, produce a same-type
     // constraint to the representative.
     if (archetype->getRepresentative() != archetype) {
-      f(RequirementKind::SameType, archetype, 
-        archetype->getRepresentative()->getDependentType(*this),
+      f(RequirementKind::SameType, archetype, archetype->getRepresentative(),
         archetype->getSameTypeSource());
       return;
     }
@@ -1345,19 +1344,25 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
   enumerateRequirements([&](RequirementKind kind, 
                             PotentialArchetype *archetype,
-                            Type type,
+                            llvm::PointerUnion<Type, PotentialArchetype *> type,
                             RequirementSource source) {
     out << "\n  ";
     switch (kind) {
     case RequirementKind::Conformance:
       out << archetype->getDebugName() << " : " 
-          << type.getString() << " [";
+          << type.get<Type>().getString() << " [";
       source.dump(out, &Context.SourceMgr);
       out << "]";
       break;
 
     case RequirementKind::SameType:
-      out << archetype->getDebugName() << " == " << type.getString() << " [";
+      out << archetype->getDebugName() << " == " ;
+      if (auto secondType = type.dyn_cast<Type>()) {
+        out << secondType.getString();
+      } else {
+        out << type.get<PotentialArchetype *>()->getDebugName();
+      }
+      out << " [";
       source.dump(out, &Context.SourceMgr);
       out << "]";
       break;
