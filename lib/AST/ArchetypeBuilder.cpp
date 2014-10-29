@@ -1320,6 +1320,10 @@ void ArchetypeBuilder::enumerateRequirements(F f) {
       return;
     }
 
+    // Add the witness marker.
+    f(RequirementKind::WitnessMarker, archetype, Type(),
+      RequirementSource(RequirementSource::Protocol, SourceLoc()));
+
     // If we have a superclass, produce a superclass requirement
     // (FIXME: Currently described as a conformance requirement)
     if (Type superclass = archetype->getSuperclass()) {
@@ -1346,9 +1350,9 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
                             PotentialArchetype *archetype,
                             llvm::PointerUnion<Type, PotentialArchetype *> type,
                             RequirementSource source) {
-    out << "\n  ";
     switch (kind) {
     case RequirementKind::Conformance:
+      out << "\n  ";
       out << archetype->getDebugName() << " : " 
           << type.get<Type>().getString() << " [";
       source.dump(out, &Context.SourceMgr);
@@ -1356,6 +1360,7 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
       break;
 
     case RequirementKind::SameType:
+      out << "\n  ";
       out << archetype->getDebugName() << " == " ;
       if (auto secondType = type.dyn_cast<Type>()) {
         out << secondType.getString();
@@ -1368,6 +1373,7 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
       break;
 
     case RequirementKind::WitnessMarker:
+      out << "\n  " << archetype->getDebugName() << " witness marker";
       break;
     }
   });
