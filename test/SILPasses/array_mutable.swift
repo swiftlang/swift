@@ -1,4 +1,3 @@
-// XFAIL: *
 // RUN: %swift -O -emit-sil -primary-file %s | FileCheck %s
 //
 // Test Array "make_mutable" hoisting.  It's hard for FileCheck to
