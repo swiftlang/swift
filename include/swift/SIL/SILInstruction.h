@@ -3133,6 +3133,10 @@ public:
     return getDefaultBB();
   }
 
+  /// \brief If the default refers to exactly one case decl, return it.
+  /// return it.
+  EnumElementDecl *getUnqiueCaseForDefault();
+
   /// \brief If the given block only has one enum element decl matched to it,
   /// return it.
   EnumElementDecl *getUniqueCaseForDestination(SILBasicBlock *BB);

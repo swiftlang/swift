@@ -99,6 +99,7 @@ namespace {
     }
 
     bool simplifyBlocks();
+    void canonicalizeSwitchEnums();
     bool dominatorBasedSimplify(DominanceInfo *DT);
 
     /// \brief Remove the basic block if it has no predecessors. Returns true
@@ -1229,6 +1230,44 @@ bool SimplifyCFG::simplifyBlocks() {
   return Changed;
 }
 
+/// Canonicalize all switch_enum and switch_enum_addr instructions.
+/// If possible, replace the default with the corresponding unique case.
+void SimplifyCFG::canonicalizeSwitchEnums() {
+  for (auto &BB : Fn) {
+    TermInst *TI = BB.getTerminator();
+  
+    SwitchEnumInstBase *SWI = dyn_cast<SwitchEnumInstBase>(TI);
+    if (!SWI)
+      continue;
+    
+    if (!SWI->hasDefault())
+      continue;
+    
+    EnumElementDecl *elementDecl = SWI->getUnqiueCaseForDefault();
+    if (!elementDecl)
+      continue;
+    
+    // Construct a new instruction by copying all the case entries.
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> CaseBBs;
+    for (int idx = 0, numIdcs = SWI->getNumCases(); idx < numIdcs; idx++) {
+      CaseBBs.push_back(SWI->getCase(idx));
+    }
+    // Add the default-entry of the original instruction as case-entry.
+    CaseBBs.push_back(std::make_pair(elementDecl, SWI->getDefaultBB()));
+    
+    if (SWI->getKind() == ValueKind::SwitchEnumInst) {
+      SILBuilderWithScope<1>(SWI).createSwitchEnum(SWI->getLoc(),
+                                  SWI->getOperand(), nullptr, CaseBBs);
+    } else {
+      assert(SWI->getKind() == ValueKind::SwitchEnumAddrInst &&
+             "unknown switch_enum instruction");
+      SILBuilderWithScope<1>(SWI).createSwitchEnumAddr(SWI->getLoc(),
+                                  SWI->getOperand(), nullptr, CaseBBs);
+    }
+    SWI->eraseFromParent();
+  }
+}
+
 bool SimplifyCFG::run() {
   RemoveUnreachable RU(Fn);
 
@@ -1261,6 +1300,8 @@ bool SimplifyCFG::run() {
   // Split all critical edges from non cond_br terminators.
   Changed |= splitAllCriticalEdges(Fn, true, nullptr, nullptr);
 
+  canonicalizeSwitchEnums();
+  
   return Changed;
 }
 

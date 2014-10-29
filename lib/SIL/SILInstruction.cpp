@@ -1420,10 +1420,14 @@ SwitchEnumInstBase::createSwitchEnum(SILLocation Loc, SILValue Operand,
   return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs);
 }
 
-EnumElementDecl *
-SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
+EnumElementDecl *SwitchEnumInstBase::getUnqiueCaseForDefault() {
+  assert(hasDefault() && "doesn't have a default");
   SILValue value = getOperand();
   SILType enumType = value.getType();
+
+  if (enumType.isResilient(getParent()->getParent()->getModule()))
+    return nullptr;
+
   EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
   assert(decl && "switch_enum operand is not an enum");
 
@@ -1431,20 +1435,35 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
   for (auto elt : decl->getAllElements())
     unswitchedElts.insert(elt);
 
-  EnumElementDecl *D = nullptr;
   for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
     auto Entry = getCase(i);
     unswitchedElts.erase(Entry.first);
+  }
+
+  if (unswitchedElts.size() == 1)
+    return *unswitchedElts.begin();
+
+  return nullptr;
+}
+
+EnumElementDecl *
+SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
+  SILValue value = getOperand();
+  SILType enumType = value.getType();
+  EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+  assert(decl && "switch_enum operand is not an enum");
+
+  EnumElementDecl *D = nullptr;
+  for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
+    auto Entry = getCase(i);
     if (Entry.second == BB) {
       if (D != nullptr)
         return nullptr;
       D = Entry.first;
     }
   }
-  if (!D && hasDefault() && unswitchedElts.size() == 1 &&
-      !enumType.isResilient(BB->getParent()->getModule()) &&
-      getDefaultBB() == BB) {
-    return *unswitchedElts.begin();
+  if (!D && hasDefault() && getDefaultBB() == BB) {
+    return getUnqiueCaseForDefault();
   }
   return D;
 }

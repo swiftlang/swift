@@ -1,0 +1,89 @@
+// RUN: %sil-opt %s  -simplify-cfg -verify | FileCheck %s
+
+import Builtin
+import Swift
+import SwiftShims
+
+enum E {
+	case A
+	case B
+	case C
+}
+
+enum GenE<T> {
+	case A
+	case B
+	case C(T)
+}
+
+// CHECK-LABEL: sil @test_switch_enum
+sil @test_switch_enum : $@thin (E) -> Int {
+bb0(%0 : $E):
+  // CHECK: switch_enum %0 : $E, case #E.A!enumelt: bb1, case #E.B!enumelt: bb2, case #E.C!enumelt: bb3
+  switch_enum %0 : $E, case #E.A!enumelt: bb1, case #E.B!enumelt: bb2, default bb3
+
+bb1:
+  %2 = integer_literal $Builtin.Word, 10
+  br bb4(%2 : $Builtin.Word)
+
+bb2:
+  %4 = integer_literal $Builtin.Word, 20
+  br bb4(%4 : $Builtin.Word)
+
+bb3:
+  %6 = integer_literal $Builtin.Word, 30
+  br bb4(%6 : $Builtin.Word)
+
+bb4(%8 : $Builtin.Word):
+  %9 = struct $Int (%8 : $Builtin.Word)
+  return %9 : $Int
+}
+
+// CHECK-LABEL: sil @test_switch_enum_addr
+sil @test_switch_enum_addr : $@thin <T> (@in GenE<T>) -> Int {
+bb0(%0 : $*GenE<T>):
+  %1 = alloc_stack $GenE<T>
+  copy_addr %0 to [initialization] %1#1 : $*GenE<T>
+  // CHECK: switch_enum_addr %1#1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, case #GenE.C!enumelt.1: bb3
+  switch_enum_addr %1#1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, default bb3
+
+bb1:
+  %4 = integer_literal $Builtin.Word, 10
+  br bb4(%4 : $Builtin.Word)
+
+bb2:
+  %6 = integer_literal $Builtin.Word, 20
+  br bb4(%6 : $Builtin.Word)
+
+bb3:
+  destroy_addr %1#1 : $*GenE<T>
+  %9 = integer_literal $Builtin.Word, 30
+  br bb4(%9 : $Builtin.Word)
+
+bb4(%11 : $Builtin.Word):
+  %12 = struct $Int (%11 : $Builtin.Word)
+  dealloc_stack %1#0 : $*@local_storage GenE<T>
+  destroy_addr %0 : $*GenE<T>
+  return %12 : $Int
+}
+
+// CHECK-LABEL: sil @test_no_replace
+sil @test_no_replace : $@thin (@inout E) -> Int {
+bb0(%0 : $*E):
+  %1 = load %0 : $*E
+  // CHECK: switch_enum %1 : $E, case #E.A!enumelt: bb1, default bb2
+  switch_enum %1 : $E, case #E.A!enumelt: bb1, default bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Word, 10
+  br bb3(%3 : $Builtin.Word)
+
+bb2:
+  %5 = integer_literal $Builtin.Word, 30
+  br bb3(%5 : $Builtin.Word)
+
+bb3(%7 : $Builtin.Word):
+  %8 = struct $Int (%7 : $Builtin.Word)
+  return %8 : $Int
+}
+
