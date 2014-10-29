@@ -57,6 +57,9 @@ STATISTIC(NumStoreOnlyObjectsEliminated,
 STATISTIC(NumReturnThreeTailCallsFormed,
           "Number of swift_retainAndReturnThree tail calls formed");
 
+llvm::cl::opt<bool>
+DisableARCOpts("disable-arc-opts", llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 //                            Utility Functions
 //===----------------------------------------------------------------------===//
@@ -890,6 +893,9 @@ void SwiftARCOpt::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
 }
 
 bool SwiftARCOpt::runOnFunction(Function &F) {
+  if (DisableARCOpts)
+    return false;
+
   bool Changed = false;
 
   // First thing: canonicalize swift_retain and similar calls so that nothing
