@@ -261,19 +261,13 @@ static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
   llvm::errs() << MsgStorage << "\n";
 }
 
-static bool linkLLVMModules(llvm::Module *Module, llvm::Module *SubModule
-                            // TODO: reactivate the linker mode if it is
-                            // supported in llvm again. Otherwise remove the
-                            // commented code completely.
-                            /*, llvm::Linker::LinkerMode LinkerMode */) {
+static bool linkLLVMModules(llvm::Module *Module, llvm::Module *SubModule,
+                            llvm::Linker::LinkerMode LinkerMode) {
   llvm::LLVMContext &Ctx = SubModule->getContext();
   auto OldHandler = Ctx.getDiagnosticHandler();
   void *OldDiagnosticContext = Ctx.getDiagnosticContext();
   Ctx.setDiagnosticHandler(linkerDiagnosticHandler, nullptr);
-                              // TODO: reactivate the linker mode if it is
-                              // supported in llvm again. Otherwise remove the
-                              // commented code completely.
-  bool Failed = llvm::Linker::LinkModules(Module, SubModule /*, LinkerMode*/);
+  bool Failed = llvm::Linker::LinkModules(Module, SubModule, LinkerMode);
   Ctx.setDiagnosticHandler(OldHandler, OldDiagnosticContext);
   return !Failed;
 }
@@ -344,11 +338,8 @@ static bool IRGenImportedModules(CompilerInstance &CI,
       break;
     }
 
-    if (!linkLLVMModules(&Module, SubModule.get()
-                         // TODO: reactivate the linker mode if it is
-                         // supported in llvm again. Otherwise remove the
-                         // commented code completely.
-                         /*, llvm::Linker::DestroySource */)) {
+    if (!linkLLVMModules(&Module, SubModule.get(),
+                         llvm::Linker::DestroySource)) {
       hadError = true;
       break;
     }
@@ -1094,11 +1085,8 @@ private:
     if (CI.getASTContext().hadError())
       return false;
     
-    if (!linkLLVMModules(Module, LineModule.get()
-                         // TODO: reactivate the linker mode if it is
-                         // supported in llvm again. Otherwise remove the
-                         // commented code completely.
-                         /*, llvm::Linker::PreserveSource */)) {
+    if (!linkLLVMModules(Module, LineModule.get(),
+                         llvm::Linker::PreserveSource)) {
       return false;
     }
 
@@ -1108,11 +1096,8 @@ private:
 
     stripPreviouslyGenerated(*NewModule);
 
-    if (!linkLLVMModules(&DumpModule, LineModule.get()
-                         // TODO: reactivate the linker mode if it is
-                         // supported in llvm again. Otherwise remove the
-                         // commented code completely.
-                         /*, llvm::Linker::DestroySource */)) {
+    if (!linkLLVMModules(&DumpModule, LineModule.get(),
+                         llvm::Linker::DestroySource)) {
       return false;
     }
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
