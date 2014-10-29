@@ -2448,6 +2448,12 @@ public:
              NumGenericParams };
   }
 
+  /// Retrieve the innermost generic parameters.
+  ///
+  /// Given a generic signature for a nested generic type, produce an
+  /// array of the generic parameters for the innermost generic type.
+  ArrayRef<GenericTypeParamType *> getInnermostGenericParams() const;
+
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     const void *genericParams = getGenericParams().end();

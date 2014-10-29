@@ -933,27 +933,6 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                    cs.getConstraintLocator(locator));
 }
 
-/// Collect all of the generic parameters and requirements from the
-/// given context and its outer contexts.
-static void collectContextParamsAndRequirements(
-              DeclContext *dc, 
-              SmallVectorImpl<GenericTypeParamType *> &genericParams, 
-              SmallVectorImpl<Requirement> &genericRequirements) {
-  if (!dc->isTypeContext())
-    return;
-
-  // Recurse to outer context.
-  collectContextParamsAndRequirements(dc->getParent(), genericParams,
-                                      genericRequirements);
-
-  // Add our generic parameters and requirements.
-  auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
-  genericParams.append(nominal->getGenericParamTypes().begin(),
-                       nominal->getGenericParamTypes().end());
-  genericRequirements.append(nominal->getGenericRequirements().begin(),
-                             nominal->getGenericRequirements().end());
-}
-
 /// Rebuilds the given 'self' type using the given object type as the
 /// replacement for the object type of self.
 static Type rebuildSelfTypeWithObjectType(Type selfTy, Type objectTy) {
@@ -1027,11 +1006,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // Figure out the declaration context to use when opening this type.
-  DeclContext *dc;
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    dc = func;
-  else
-    dc = value->getDeclContext();
+  DeclContext *dc = value->getPotentialGenericDeclContext();
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;
@@ -1043,15 +1018,10 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                                /*wantInterfaceType=*/true);
 
     Type selfTy;
-    if (dc->isGenericContext()) {
+    if (auto sig = dc->getGenericSignatureOfContext()) {
       // Open up the generic parameter list for the container.
-      auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
       llvm::DenseMap<CanType, TypeVariableType *> replacements;
-      SmallVector<GenericTypeParamType *, 4> genericParams;
-      SmallVector<Requirement, 4> genericRequirements;
-      collectContextParamsAndRequirements(dc, genericParams,
-                                          genericRequirements);
-      openGeneric(dc, genericParams, genericRequirements,
+      openGeneric(dc, sig->getGenericParams(), sig->getRequirements(),
                   /*skipProtocolSelfConstraint=*/true,
                   opener, locator, replacements);
 
@@ -1060,6 +1030,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                             opener);
 
       // Determine the object type of 'self'.
+      auto nominal = value->getDeclContext()->getDeclaredTypeOfContext()
+                       ->getAnyNominal();
       if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
         // Retrieve the type variable for 'Self'.
         selfTy = replacements[protocol->getSelf()->getDeclaredType()

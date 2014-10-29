@@ -1525,8 +1525,13 @@ mapArchetypeToInterfaceType(const PrimaryArchetypeMap &primaryArchetypes,
 CanType
 TypeConverter::getInterfaceTypeOutOfContext(CanType contextTy,
                                          DeclContext *context) const {
-  return getInterfaceTypeOutOfContext(contextTy,
-                                   context->getGenericParamsOfContext());
+  GenericParamList *genericParams;
+  do {
+    genericParams = context->getGenericParamsOfContext();
+    context = context->getParent();
+  } while (!genericParams && context);
+    
+  return getInterfaceTypeOutOfContext(contextTy, genericParams);
 }
 
 CanType

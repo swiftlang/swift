@@ -138,7 +138,12 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     if (auto GP = AFD->getGenericParams())
       return GP;
 
-    return AFD->getDeclContext()->getGenericParamsOfContext();
+    // If we're within a type context, pick up the generic signature
+    // of that context.
+    if (AFD->getDeclContext()->isTypeContext())
+      return AFD->getDeclContext()->getGenericParamsOfContext();
+
+    return nullptr;
   }
 
   case DeclContextKind::NominalTypeDecl: {
@@ -146,7 +151,10 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     if (auto gp = nominal->getGenericParams())
       return gp;
 
-    return nominal->getDeclContext()->getGenericParamsOfContext();
+    if (nominal->getDeclContext()->isTypeContext())
+      return nominal->getDeclContext()->getGenericParamsOfContext();
+
+    return nullptr;
   }
 
   case DeclContextKind::ExtensionDecl:
@@ -168,14 +176,26 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
     auto *AFD = cast<AbstractFunctionDecl>(this);
     if (auto GFT = AFD->getInterfaceType()->getAs<GenericFunctionType>())
       return GFT->getGenericSignature();
-    return AFD->getDeclContext()->getGenericSignatureOfContext();
+      
+    // If we're within a type context, pick up the generic signature
+    // of that context.
+    if (AFD->getDeclContext()->isTypeContext())
+      return AFD->getDeclContext()->getGenericSignatureOfContext();
+      
+    return nullptr;
   }
 
   case DeclContextKind::NominalTypeDecl: {
     auto nominal = cast<NominalTypeDecl>(this);
     if (auto genericSig = nominal->getGenericSignature())
       return genericSig;
-    return nominal->getDeclContext()->getGenericSignatureOfContext();
+      
+    // If we're within a type context, pick up the generic signature
+    // of that context.
+    if (nominal->getDeclContext()->isTypeContext())
+      return nominal->getDeclContext()->getGenericSignatureOfContext();
+      
+    return nullptr;
   }
 
   case DeclContextKind::ExtensionDecl:

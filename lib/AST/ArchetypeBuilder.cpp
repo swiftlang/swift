@@ -1020,7 +1020,7 @@ public:
       return Action::Continue; 
 
     auto genericSig = boundGeneric->getDecl()->getGenericSignature();
-    auto params = genericSig->getGenericParams();
+    auto params = genericSig->getInnermostGenericParams();
     auto args = boundGeneric->getGenericArgs();
 
     // Produce substitutions from the generic parameters to the actual

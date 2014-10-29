@@ -1395,7 +1395,11 @@ DeclContext *ValueDecl::getPotentialGenericDeclContext() {
   if (auto NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD;
 
-  return getDeclContext();
+  auto parentDC = getDeclContext();
+  if (parentDC->isTypeContext())
+    return parentDC;
+
+  return nullptr;
 }
 
 Type ValueDecl::getInterfaceType() const {
@@ -1517,6 +1521,22 @@ GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
   
   if (isCanonical)
     CanonicalSignatureOrASTContext = (ASTContext *)nullptr;
+}
+
+ArrayRef<GenericTypeParamType *> 
+GenericSignature::getInnermostGenericParams() const {
+  auto params = getGenericParams();
+
+  // Find the point at which the depth changes.
+  unsigned depth = params.back()->getDepth();
+  for (unsigned n = params.size(); n > 0; --n) {
+    if (params[n-1]->getDepth() != depth) {
+      return params.slice(n);
+    }
+  }
+
+  // All parameters are at the same depth.
+  return params;
 }
 
 void NominalTypeDecl::setGenericSignature(GenericSignature *sig) {
