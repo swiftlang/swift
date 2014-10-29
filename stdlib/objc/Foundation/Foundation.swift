@@ -757,6 +757,8 @@ public func _convertNSDictionaryToDictionary<
   return result!
 }
 
+// FIXME: right now the following is O(n), not O(1).
+
 /// The entry point for bridging `Dictionary` to `NSDictionary` in bridge
 /// thunks.  Used, for example, to expose ::
 ///
@@ -765,13 +767,13 @@ public func _convertNSDictionaryToDictionary<
 /// to Objective-C code as a method that returns an `NSDictionary`.
 ///
 /// This is a forced downcast.  This operation should have O(1) complexity.
-/// FIXME: right now it is O(n).
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
 public func _convertDictionaryToNSDictionary<Key, Value>(
     d: [Key : Value]
 ) -> NSDictionary {
+  
   // Note: there should be *a good justification* for doing something else
   // than just dispatching to `_bridgeToObjectiveC`.
   return d._bridgeToObjectiveC()

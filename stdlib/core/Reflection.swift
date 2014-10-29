@@ -80,24 +80,24 @@ public enum QuickLookObject {
   /// A floating-point numeric value.
   case Float(Double)
 
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// An image.
-  /// FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   case Image(Any)
 
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A sound.
-  /// FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   case Sound(Any)
 
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A color.
-  /// FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   case Color(Any)
 
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A bezier path.
-  /// FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   case BezierPath(Any)
   
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// An attributed string.
-  /// FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   case AttributedString(Any)
   
   /// A rectangle
