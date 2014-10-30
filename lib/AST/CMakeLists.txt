@@ -37,7 +37,7 @@ add_swift_library(swiftAST
   DEPENDS swiftBasic swiftReST
   clangIndex
   clangFormat
-  clangTooling
+  clangToolingCore
   LLVMCore
   )
 
