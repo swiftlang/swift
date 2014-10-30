@@ -1,4 +1,4 @@
-// RUN: %swift -O  -module-name devirt_default_case -emit-sil %s | FileCheck %s
+// RUN: %swift -O  -module-name devirt_default_case -disable-func-sig-opts -emit-sil %s | FileCheck %s
 
 // public class
 public class Base1 {

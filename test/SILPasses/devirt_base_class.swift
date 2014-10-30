@@ -1,4 +1,4 @@
-// RUN: %swift -O   -emit-sil  %s | FileCheck %s
+// RUN: %swift -O -emit-sil -disable-func-sig-opts  %s | FileCheck %s
 public class Base1 { @inline(never) func f() -> Int { return 0 } }
 
 public class Base2: Base1 {

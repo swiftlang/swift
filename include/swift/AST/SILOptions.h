@@ -87,7 +87,7 @@ public:
   bool PrintInstCounts = false;
 
   /// Should we optimize function signatures. Disabled by default.
-  bool EnableFuncSigOpts = false;
+  bool EnableFuncSigOpts = true;
 };
 
 } // end namespace swift

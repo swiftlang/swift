@@ -858,7 +858,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.TimeTransforms |= Args.hasArg(OPT_sil_time_transforms);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
-  Opts.EnableFuncSigOpts |= Args.hasArg(OPT_enable_func_sig_opts);
+  Opts.EnableFuncSigOpts &= !Args.hasArg(OPT_disable_func_sig_opts);
 
   return false;
 }
