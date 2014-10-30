@@ -7755,7 +7755,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
     }
 
     if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->hasStorage() && !var->isStatic())
+      if (var->hasStorage() && !var->isStatic() && !var->isInvalid())
         FoundInstanceVar = true;
       continue;
     }
@@ -7898,30 +7898,6 @@ ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // memberwise one.
   if (decl->hasClangNode())
     return nullptr;
-
-  // Verify that all of the instance variables of this type have default
-  // constructors.
-  for (auto member : decl->getMembers()) {
-    // We only care about pattern bindings, and if the pattern has an
-    // initializer, it can get a default initializer.
-    auto patternBind = dyn_cast<PatternBindingDecl>(member);
-    if (!patternBind || patternBind->getInit())
-      continue;
-
-    bool CantBuildInitializer = false;
-
-    // Find the variables in the pattern. They'll each need to be
-    // default-initialized.
-    patternBind->getPattern()->forEachVariable([&](VarDecl *VD) {
-      if (!VD->isStatic() && VD->hasStorage() && !VD->isInvalid())
-        CantBuildInitializer = true;
-    });
-
-    // If there is a stored ivar without an initializer, we can't generate a
-    // default initializer for this.
-    if (CantBuildInitializer)
-      return nullptr;
-  }
 
   // For a class, check whether the superclass (if it exists) is
   // default-initializable.

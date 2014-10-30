@@ -11,8 +11,7 @@ struct CanDefaultInit {
 }
 
 func testCanDefaultInit() {
-// FIXME: rdar://16921173 This should be accepted.
-  CanDefaultInit()  // expected-error {{missing argument for parameter 'opt1' in call}}
+  _ = CanDefaultInit()
 }
 
 
