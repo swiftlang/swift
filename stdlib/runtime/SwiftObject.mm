@@ -421,11 +421,15 @@ void *swift::swift_bridgeObjectRetain(void *object) {
   uintptr_t objectRef = uintptr_t(object)
     & ~heap_object_abi::SwiftSpareBitsMask;
 
+#if SWIFT_OBJC_INTEROP
   // BridgeObject uses the Swift-reserved bit to tag objects with native
   // refcounting.
   if (uintptr_t(object) & heap_object_abi::SwiftReservedBitPatternValue)
     return swift_retain((HeapObject*) objectRef);
   return objc_retain((id) objectRef);
+#else
+  return swift_retain((HeapOject*) objectRef);
+#endif
 }
 
 void swift::swift_bridgeObjectRelease(void *object) {
@@ -436,11 +440,15 @@ void swift::swift_bridgeObjectRelease(void *object) {
   uintptr_t objectRef = uintptr_t(object)
     & ~heap_object_abi::SwiftSpareBitsMask;
 
+#if SWIFT_OBJC_INTEROP
   // BridgeObject uses the Swift-reserved bit to tag objects with native
   // refcounting.
   if (uintptr_t(object) & heap_object_abi::SwiftReservedBitPatternValue)
     return swift_release((HeapObject*) objectRef);
   return objc_release((id) objectRef);
+#else
+  swift_release((HeapObject*) objectRef);
+#endif
 }
 
 void swift::swift_unknownRetainUnowned(void *object) {

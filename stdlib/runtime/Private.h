@@ -83,6 +83,10 @@ namespace swift {
   LLVM_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);
 #else
+  static inline bool isObjCTaggedPointerOrNull(const void *object) {
+    return object == nullptr;
+  }
+
   static inline const ClassMetadata *_swift_getClass(const void *object) {
     return _swift_getClassOfAllocated(object);
   }  
