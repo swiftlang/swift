@@ -31,3 +31,11 @@ func testAnonEnumSmall() {
 // CHECK-LABEL: define linkonce_odr hidden i64 @_TFSCg15AnonConstSmall2Si
 // CHECK-NOT: ret i64
 // CHECK: ret i64 17
+
+func testStructWithFlexibleArray(s : StructWithFlexibleArray)
+{
+  var a = s.a
+}
+
+// Make sure flexible array struct member isn't represented in IR function signature as i0 (or at all). rdar://problem/18510461
+// CHECK-LABEL: define hidden void @_TF9ctypes_ir27testStructWithFlexibleArrayFVSC23StructWithFlexibleArrayT_(i32)

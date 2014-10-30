@@ -37,6 +37,11 @@ struct StructWithBitfields {
   unsigned Third : 5;
 };
 
+typedef struct {
+  unsigned a;
+  unsigned b[];
+} StructWithFlexibleArray;
+
 //===---
 // Tag decls and typedefs.
 //===---

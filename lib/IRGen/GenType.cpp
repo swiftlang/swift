@@ -1196,6 +1196,7 @@ IRGenModule::getOpaqueStorageTypeInfo(Size size) {
 
 const LoadableTypeInfo &
 TypeConverter::getOpaqueStorageTypeInfo(Size size) {
+  assert(!size.isZero());
   auto index = size.getValue();
   if (index < OpaqueStorageTypes.size())
     if (auto type = OpaqueStorageTypes[index])

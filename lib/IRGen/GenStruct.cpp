@@ -656,6 +656,10 @@ private:
 
   /// Add opaque storage at the given offset.
   void addOpaqueField(Size offset, Size fieldSize) {
+    // No need to add storage for zero-size fields (e.g. incomplete array
+    // decls).
+    if (fieldSize.isZero()) return;
+
     auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(fieldSize);
     addField(nullptr, offset, opaqueTI);
   }
