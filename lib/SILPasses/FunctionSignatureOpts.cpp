@@ -429,7 +429,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
                             FunctionAnalyzer &Analyzer) {
   // TODO: What is the proper location to use here?
   SILLocation Loc = BB->getParent()->getLocation();
-  SILBuilderWithScope<16> Builder(BB, NewF->getDebugScope());
+  SILBuilderWithScope<16> Builder(BB, BB->getParent()->getDebugScope());
 
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 
