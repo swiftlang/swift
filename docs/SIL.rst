@@ -1285,7 +1285,7 @@ does not take ownership of the referenced memory. The referenced memory must
 be initialized upon function entry and exit. If the ``@inout`` argument
 refers to a fragile physical variable, then the argument is the address of that
 variable. If the ``@inout`` argument refers to a logical property, then the
-argument is the address of a caller-owner writeback buffer. It is the caller's
+argument is the address of a caller-owned writeback buffer. It is the caller's
 responsibility to initialize the buffer by storing the result of the property
 getter prior to calling the function and to write back to the property
 on return by loading from the buffer and invoking the setter with the final
@@ -1323,7 +1323,13 @@ Witness Method Calling Convention @cc(witness_method)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The witness method calling convention is used by protocol witness methods in
-`witness tables`_.
+`witness tables`_. It is identical to the ``method`` calling convention
+except that its handling of generic type parameters. For non-witness methods,
+the machine-level convention for passing type parameter metadata may be
+arbitrarily dependent on static aspects of the function signature, but because
+witnesses must be polymorphically dispatchable on their ``Self`` type,
+the ``Self``-related metadata for a witness must be passed in a maximally
+abstracted manner.
 
 C Calling Convention @cc(cdecl)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
