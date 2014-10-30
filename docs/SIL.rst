@@ -3247,6 +3247,60 @@ Checks whether a reference type value is null, returning 1 if
 the value is not null, or 0 if it is null.  If the value is a function
 type, it checks the function pointer (not the data pointer) for null.
 
+ref_to_bridge_object
+````````````````````
+::
+
+  sil-instruction ::= 'ref_to_bridge_object' sil-operand, sil-operand
+
+  %2 = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
+  // %1 must be of reference type $C
+  // %2 will be of type Builtin.BridgeObject
+
+Creates a ``Builtin.BridgeObject`` that references ``%0``, with spare bits
+in the pointer representation populated by bitwise-OR-ing in the value of
+``%1``. It is undefined behavior if this bitwise OR operation affects the
+reference identity of ``%0``; in other words, after the following instruction
+sequence::
+
+  %b = ref_to_bridge_object %r : $C, %w : $Builtin.Word
+  %r2 = bridge_object_to_ref %b : $Builtin.BridgeObject to $C
+
+``%r`` and ``%r2`` must be equivalent. In particular, it is assumed that
+retaining or releasing the ``BridgeObject`` is equivalent to retaining or
+releasing the original reference, and that the above ``ref_to_bridge_object``
+/ ``bridge_object_to_ref`` round-trip can be folded away to a no-op.
+
+On platforms with ObjC interop, there is additionally a platform-specific
+bit in the pointer representation of a ``BridgeObject`` that is reserved to
+indicate whether the referenced object has native Swift refcounting. It is
+undefined behavior to set this bit when the first operand references an
+Objective-C object.
+
+bridge_object_to_ref
+````````````````````
+::
+
+  sil-instruction ::= 'bridge_object_to_ref' sil-operand 'to' sil-type
+
+  %1 = bridge_object_to_ref %0 : $Builtin.BridgeObject to $C
+  // $C must be a reference type
+  // %1 will be of type $C
+
+Extracts the object reference from a ``Builtin.BridgeObject``, masking out any
+spare bits.
+
+bridge_object_to_word
+`````````````````````
+::
+
+  sil-instruction ::= 'bridge_object_to_word' sil-operand 'to' sil-type
+
+  %1 = bridge_object_to_word %0 : $Builtin.BridgeObject to $Builtin.Word
+  // %1 will be of type $Builtin.Word
+
+Provides the bit pattern of a ``Builtin.BridgeObject`` as an integer.
+
 Checked Conversions
 ~~~~~~~~~~~~~~~~~~~
 
