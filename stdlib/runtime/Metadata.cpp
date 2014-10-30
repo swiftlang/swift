@@ -700,7 +700,9 @@ namespace {
 /// The uniquing structure for function type metadata.
 namespace {
   MetadataCache<FunctionCacheEntry> FunctionTypes;
+#if SWIFT_OBJC_INTEROP
   MetadataCache<FunctionCacheEntry> BlockTypes;
+#endif
   
   const FunctionTypeMetadata *
   _getFunctionTypeMetadata(const Metadata *argMetadata,
