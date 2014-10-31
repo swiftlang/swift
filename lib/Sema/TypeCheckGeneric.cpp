@@ -658,10 +658,6 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
                            func->getDeclContext(),
                            allGenericParams);
 
-  // Collect the requirements placed on the generic parameter types.
-  SmallVector<Requirement, 4> requirements;
-  collectRequirements(builder, allGenericParams, requirements);
-
   // Compute the function type.
   Type funcTy;
   Type initFuncTy;
@@ -707,7 +703,11 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     patterns = storedPatterns;
   }
 
-  auto sig = GenericSignature::get(allGenericParams, requirements);
+  SmallVector<Requirement, 4> requirements;
+  collectRequirements(builder, allGenericParams, requirements);
+
+  auto prevSig = GenericSignature::get(allGenericParams, requirements);
+  auto sig = builder.getGenericSignature(allGenericParams);
 
   // Debugging of the archetype builder and generic signature generation.
   if (Context.LangOpts.DebugGenericSignatures) {
@@ -717,9 +717,15 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     llvm::errs() << "Generic signature: ";
     sig->print(llvm::errs());
     llvm::errs() << "\n";
+    llvm::errs() << "Prior generic signature: ";
+    prevSig->print(llvm::errs());
+    llvm::errs() << "\n";
     llvm::errs() << "Canonical generic signature: ";
     sig->getCanonicalSignature()->print(llvm::errs());
-    llvm::errs() << "\n";    
+    llvm::errs() << "\n";
+    llvm::errs() << "Prior canonical generic signature: ";
+    prevSig->getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";
   }
 
   bool hasSelf = func->getDeclContext()->isTypeContext();
@@ -834,7 +840,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
   collectRequirements(builder, allGenericParams, requirements);
 
   // Record the generic type parameter types and the requirements.
-  auto sig = GenericSignature::get(allGenericParams, requirements);
+  auto prevSig = GenericSignature::get(allGenericParams, requirements);
+  auto sig = builder.getGenericSignature(allGenericParams);
 
   // Debugging of the archetype builder and generic signature generation.
   if (Context.LangOpts.DebugGenericSignatures) {
@@ -844,8 +851,14 @@ GenericSignature *TypeChecker::validateGenericSignature(
     llvm::errs() << "Generic signature: ";
     sig->print(llvm::errs());
     llvm::errs() << "\n";
+    llvm::errs() << "Prior generic signature: ";
+    prevSig->print(llvm::errs());
+    llvm::errs() << "\n";
     llvm::errs() << "Canonical generic signature: ";
     sig->getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Prior canonical generic signature: ";
+    prevSig->getCanonicalSignature()->print(llvm::errs());
     llvm::errs() << "\n";
   }
 
