@@ -27,6 +27,12 @@
 #include "Private.h"
 #include "stddef.h"
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <mach-o/getsect.h>
+#include <dispatch/dispatch.h>
+#endif
+
 #include <dlfcn.h>
 
 #include <cstring>
@@ -1449,12 +1455,146 @@ static std::string typeNameForObjCClass(const ClassMetadata *cls)
     return ostream.str();
 }
 
+#ifndef NDEBUG
+void ProtocolConformanceRecord::dump() const {
+  auto symbolName = [&](const void *addr) -> const char * {
+    Dl_info info;
+    int ok = dladdr(addr, &info);
+    if (!ok)
+      return "<unknown addr>";
+    return info.dli_sname;
+  };
+
+  switch (auto kind = getTypeKind()) {
+    case ProtocolConformanceTypeKind::Universal:
+      printf("universal");
+      break;
+    case ProtocolConformanceTypeKind::UniqueDirectType:
+    case ProtocolConformanceTypeKind::NonuniqueDirectType:
+      printf("%s direct type ",
+             kind == ProtocolConformanceTypeKind::UniqueDirectType
+             ? "unique" : "nonunique");
+      if (auto ntd = getDirectType()->getNominalTypeDescriptor()) {
+        printf("%s", ntd->Name);
+      } else {
+        printf("<structural type>");
+      }
+      break;
+    case ProtocolConformanceTypeKind::UniqueIndirectClass:
+      printf("unique indirect class %s",
+             class_getName(*getIndirectClass()));
+      break;
+      
+    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+      printf("unique generic type %s", symbolName(getGenericPattern()));
+      break;
+  }
+  
+  printf(" => ");
+  
+  switch (getConformanceKind()) {
+    case ProtocolConformanceReferenceKind::WitnessTable:
+      printf("witness table %s\n", symbolName(getWitnessTable()));
+      break;
+    case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+      printf("witness table accessor %s\n",
+             symbolName(getWitnessTable()));
+      break;
+  }
+}
+#endif
+
+// TODO: Implement protocol conformance lookup for non-Apple environments
+#ifdef __APPLE__
+
+#define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift1_proto"
+
+// dispatch_once token to install the dyld callback to enqueue images for
+// protocol conformance lookup.
+static dispatch_once_t InstallProtocolConformanceAddImageCallbackOnce = 0;
+
+// Monotonic generation number that is increased when we load an image with
+// new protocol conformances.
+static std::atomic<unsigned> ProtocolConformanceGeneration
+  = ATOMIC_VAR_INIT(0);
+
+static void _addImageProtocolConformances(const mach_header *mh,
+                                          intptr_t vmaddr_slide) {
+#ifdef __LP64__
+  using mach_header_platform = mach_header_64;
+  assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
+#else
+  using mach_header_platform = mach_header;
+#endif
+  
+  // Look for a __swift1_proto section.
+  unsigned long conformancesSize;
+  const uint8_t *conformances =
+    getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
+                   SEG_DATA, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
+                   &conformancesSize);
+  
+  if (!conformances)
+    return;
+  
+  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0
+         && "weird-sized conformances section?!");
+  
+  // If we have a section, enqueue the conformances for lookup.
+
+  // Increase the generation to invalidate cached negative lookups.
+  ++ProtocolConformanceGeneration;
+  
+  // TODO: Just dump records for now. We should enqueue this list for lazy
+  // consumption.
+  auto record
+    = reinterpret_cast<const ProtocolConformanceRecord*>(conformances);
+  auto recordsEnd
+    = reinterpret_cast<const ProtocolConformanceRecord*>
+                                              (conformances + conformancesSize);
+  
+  
+  for (; record < recordsEnd; ++record)
+    record->dump();
+}
+
+const void *swift::swift_conformsToProtocol2(const Metadata *type,
+                                            const ProtocolDescriptor *protocol){
+  // Install our dyld callback if we haven't already.
+  // Dyld will invoke this on our behalf for all images that have already been
+  // loaded.
+  dispatch_once(&InstallProtocolConformanceAddImageCallbackOnce, ^(void){
+    _dyld_register_func_for_add_image(_addImageProtocolConformances);
+  });
+  
+  return nullptr;
+  
+  // See if we have a cached conformance.
+  
+  // If we got a cached negative response, check the generation number.
+  
+  // If we didn't have a cache entry, or it's a stale negative response, go to
+  // the conformance records.
+}
+
+#else // if !__APPLE__
+
+const void *swift::swift_conformsToProtocol2(const Metadata *type,
+                                            const ProtocolDescriptor *protocol){
+  // Not implemented for non-Apple platforms.
+  return nullptr;
+}
+
+#endif // __APPLE__
+
 /// A cache used for swift_conformsToProtocol.
 static llvm::DenseMap<std::pair<const Metadata*, const ProtocolDescriptor*>,
                       const void *> FoundProtocolConformances;
 /// Read-write lock used to guard FoundProtocolConformances during lookup
 static pthread_rwlock_t FoundProtocolConformancesLock
   = PTHREAD_RWLOCK_INITIALIZER;
+
+
 
 /// \brief Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.

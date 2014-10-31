@@ -1900,7 +1900,7 @@ public:
     return WitnessTable;
   }
   
-   WitnessTableAccessor_t getWitnessTableAccessor() const {
+  WitnessTableAccessor_t getWitnessTableAccessor() const {
     switch (Flags.getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
       break;
@@ -1911,6 +1911,10 @@ public:
     return WitnessTableAccessor;
     
   }
+  
+#ifndef NDEBUG
+  void dump() const;
+#endif
 };
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
@@ -2292,6 +2296,9 @@ extern "C"
 const void *swift_conformsToProtocol(const Metadata *type,
                                      const ProtocolDescriptor *protocol,
                                      const char *module);
+extern "C"
+const void *swift_conformsToProtocol2(const Metadata *type,
+                                      const ProtocolDescriptor *protocol);
   
 /// Return the number of extra inhabitants in a heap object pointer.
 extern "C"
