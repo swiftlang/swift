@@ -20,6 +20,10 @@ declare void @swift_fixLifetime(%swift.refcounted* ) nounwind
 
 declare void @user(%swift.refcounted *) nounwind
 
+; CHECK-LABEL: @trivial_retain_release(
+; CHECK-NEXT: entry:
+; CHECK-NEXT: ret void
+
 define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O) {
 entry:
   tail call void @swift_retain_noresult(%swift.refcounted* %P)
@@ -31,14 +35,18 @@ entry:
   ret void
 }
 
-; CHECK: @trivial_retain_release(
-; CHECK-NEXT: entry:
-; CHECK-NEXT: ret void
-
-
 ; retain3_test2 - This shows a case where something else (eg inlining an already
 ; optimized function) has given us a swift_retainAndReturnThree that we need to
 ; destructure and reassemble.
+
+
+; CHECK-LABEL: @retain3_test2
+; CHECK: insertvalue
+; CHECK-NEXT: insertvalue
+; CHECK-NEXT: insertvalue
+; CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* %2)
+; CHECK-NEXT: ret
+
 define { i8*, i64, %swift.refcounted* } @retain3_test2(i8*, i64, %swift.refcounted*) nounwind {
 entry:
   %x = ptrtoint i8* %0 to i64
@@ -56,16 +64,15 @@ entry:
   ret { i8*, i64, %swift.refcounted* } %6
 }
 
-; CHECK: @retain3_test2
-; CHECK: insertvalue
-; CHECK-NEXT: insertvalue
-; CHECK-NEXT: insertvalue
-; CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* %2)
-; CHECK-NEXT: ret
-
-
 ; retain_motion1 - This shows motion of a retain across operations that can't
 ; release an object.  Release motion can't zap this.
+
+; CHECK-LABEL: @retain_motion1(
+; CHECK-NEXT: bitcast
+; CHECK-NEXT: store i32
+; CHECK-NEXT: ret void
+
+
 define void @retain_motion1(%swift.refcounted* %A) {
   tail call void @swift_retain_noresult(%swift.refcounted* %A)
   %B = bitcast %swift.refcounted* %A to i32*
@@ -74,14 +81,12 @@ define void @retain_motion1(%swift.refcounted* %A) {
   ret void
 }
 
-; CHECK: @retain_motion1(
-; CHECK-NEXT: bitcast
-; CHECK-NEXT: store i32
+; rdar://11583269 - Optimize out objc_retain/release(null)
+
+; CHECK-LABEL: @objc_retain_release_null(
+; CHECK-NEXT: entry:
 ; CHECK-NEXT: ret void
 
-
-
-; rdar://11583269 - Optimize out objc_retain/release(null)
 define void @objc_retain_release_null() {
 entry:
   tail call void @objc_release(%objc_object* null) nounwind
@@ -89,21 +94,18 @@ entry:
   ret void
 }
 
-; CHECK: @objc_retain_release_null(
-; CHECK-NEXT: entry:
+; rdar://11583269 - Useless objc_retain/release optimization.
+
+; CHECK-LABEL: @objc_retain_release_opt(
+; CHECK-NEXT: store i32 42
 ; CHECK-NEXT: ret void
 
-; rdar://11583269 - Useless objc_retain/release optimization.
 define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
   tail call %objc_object* @objc_retain(%objc_object* %P) nounwind
   store i32 42, i32* %IP
   tail call void @objc_release(%objc_object* %P) nounwind
   ret void
 }
-
-; CHECK-LABEL: @objc_retain_release_opt(
-; CHECK-NEXT: store i32 42
-; CHECK-NEXT: ret void
 
 ; CHECK-LABEL: define void @swift_fixLifetimeTest
 ; CHECK: swift_retain_noresult
