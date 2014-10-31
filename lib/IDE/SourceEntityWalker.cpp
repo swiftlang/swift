@@ -162,7 +162,12 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
       if (VD->getAttrs().hasAttribute<LazyAttr>()) {
         if (auto *Get = VD->getGetter()) {
           assert(Get->isImplicit() && "lazy var not implicitly computed");
-          Get->getBody()->walk(*this);
+
+          // Note that an implicit getter may not have the body synthesized
+          // in case the owning PatternBindingDecl is invalid
+          if(auto *Body = Get->getBody()) {
+            Body->walk(*this);
+          }
         }
       }
     }
