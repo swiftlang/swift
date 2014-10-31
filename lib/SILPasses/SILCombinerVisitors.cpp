@@ -1127,6 +1127,12 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
     return ROPI->use_empty() ? eraseInstFromFunction(*ROPI) : nullptr;
   }
 
+  // (ref_to_raw_pointer (open_existential_ref (init_existential_ref x))) ->
+  // (ref_to_raw_pointer x)
+  if (auto *OER = dyn_cast<OpenExistentialRefInst>(RRPI->getOperand()))
+    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
+      return new (RRPI->getModule()) RefToRawPointerInst(
+          RRPI->getLoc(), IER->getOperand(), RRPI->getType());
   return nullptr;
 }
 
@@ -1379,6 +1385,13 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
       URCI->getType().isSuperclassOf(URCI->getOperand().getType()))
     return new (URCI->getModule())
         UpcastInst(URCI->getLoc(), URCI->getOperand(), URCI->getType());
+
+  // (unchecked_ref_cast (open_existential_ref (init_existential_ref X))) ->
+  // (unchecked_ref_cast X)
+  if (auto *OER = dyn_cast<OpenExistentialRefInst>(URCI->getOperand()))
+    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
+      return new (URCI->getModule()) UncheckedRefCastInst(
+          URCI->getLoc(), IER->getOperand(), URCI->getType());
 
   return nullptr;
 }

@@ -1723,3 +1723,37 @@ bb0(%0 : $B, %1 : $@sil_unowned B, %2 : $AnyObject, %3: $@sil_unmanaged AnyObjec
   %9999 = tuple(%5 : $B, %7 : $@sil_unowned B, %9 : $AnyObject, %11 : $@sil_unmanaged AnyObject)
   return %9999 : $(B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject)
 }
+
+// CHECK-LABEL: sil @collapse_existential_pack_unpack_unchecked_ref_cast
+// CHECK:       bb0([[Ref:%.*]]: $MyClass):
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
+// CHECK:         unchecked_ref_cast [[Ref]]
+
+sil @collapse_existential_pack_unpack_unchecked_ref_cast : $@thin (MyClass) -> () {
+bb0(%0: $MyClass):
+  %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  strong_retain %3: $Builtin.NativeObject
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil @collapse_existential_pack_unpack_ref_to_raw_pointer
+// CHECK:       bb0([[Ref:%.*]]: $MyClass):
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
+// CHECK:         ref_to_raw_pointer [[Ref]]
+
+sil @collapse_existential_pack_unpack_ref_to_raw_pointer : $@thin (MyClass) -> () {
+bb0(%0: $MyClass):
+  %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = ref_to_raw_pointer %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Builtin.Word
+  %5 = integer_literal $Builtin.Word, 5
+  store %5 to %4: $*Builtin.Word
+  %6 = tuple ()
+  return %6 : $()
+}
