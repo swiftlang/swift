@@ -1,8 +1,9 @@
-// RUN: %swift -disable-func-sig-opts -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
-// RUN: %swift -disable-func-sig-opts -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
-// RUN: %swift -disable-func-sig-opts -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
+// RUN: %swift -module-name OptimizationOptions -disable-func-sig-opts -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
+// RUN: %swift -module-name OptimizationOptions -disable-func-sig-opts -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
+// RUN: %swift -module-name OptimizationOptions -disable-func-sig-opts -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
 
 // REQUIRES: optimized_stdlib
+// REQUIRES: swift_stdlib_no_asserts
 
 func test_assert() (x: Int, y: Int) -> Int {
   assert(x >= y , "x smaller than y")

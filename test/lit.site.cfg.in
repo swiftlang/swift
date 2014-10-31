@@ -33,6 +33,8 @@ if "@SWIFT_ASAN_BUILD@" != "OFF" and "@SWIFT_ASAN_BUILD@" != "NO":
 
 if "@SWIFT_STDLIB_INTERNAL_CHECKS@" != "OFF" and "@SWIFT_STDLIB_INTERNAL_CHECKS@" != "NO":
   config.available_features.add('swift_stdlib_asserts')
+else:
+  config.available_features.add('swift_stdlib_no_asserts')
 
 if "@SWIFT_OPTIMIZED@" == "ON" or "@SWIFT_OPTIMIZED@" == "YES":
   config.available_features.add("optimized_stdlib")
