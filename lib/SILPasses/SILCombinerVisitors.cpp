@@ -1655,3 +1655,16 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
                                         APInt(1, 0), *TEI->getFunction());
   return nullptr;
 }
+
+SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
+  // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
+  if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
+    if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
+      auto Load = Builder->createLoad(FLI->getLoc(), SILValue(AI, 1));
+      Load->setDebugScope(FLI->getDebugScope());
+      return new (FLI->getModule())
+          FixLifetimeInst(FLI->getLoc(), SILValue(Load, 0));
+    }
+  }
+  return nullptr;
+}
