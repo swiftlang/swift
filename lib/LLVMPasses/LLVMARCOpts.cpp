@@ -187,15 +187,14 @@ static bool canonicalizeInputFunction(Function &F) {
 
     switch (classifyInstruction(Inst)) {
     case RT_Unknown:
-    case RT_UnknownRetain:
-    case RT_UnknownRelease:
     case RT_BridgeRetain:
     case RT_BridgeRelease:
     case RT_AllocObject:
     case RT_FixLifetime:
     case RT_NoMemoryAccessed:
       break;
-    case RT_RetainNoResult: {
+    case RT_RetainNoResult:
+    case RT_UnknownRetain: {
       CallInst &CI = cast<CallInst>(Inst);
       Value *ArgVal = CI.getArgOperand(0);
       // retain_noresult(null) is a no-op.
@@ -229,7 +228,8 @@ static bool canonicalizeInputFunction(Function &F) {
       Changed = true;
       break;
     }
-    case RT_Release: {
+    case RT_Release:
+    case RT_UnknownRelease: {
       CallInst &CI = cast<CallInst>(Inst);
       // swift_release(null) is a noop, zap it.
       Value *ArgVal = CI.getArgOperand(0);

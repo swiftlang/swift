@@ -94,6 +94,17 @@ entry:
   ret void
 }
 
+; CHECK-LABEL: @swiftunknown_retain_release_null(
+; CHECK-NEXT: entry:
+; CHECK-NEXT: ret void
+
+define void @swiftunknown_retain_release_null() {
+entry:
+  tail call void @swift_unknownRelease(%swift.refcounted* null)
+  tail call void @swift_unknownRetain(%swift.refcounted* null) nounwind
+  ret void
+}
+
 ; rdar://11583269 - Useless objc_retain/release optimization.
 
 ; CHECK-LABEL: @objc_retain_release_opt(
