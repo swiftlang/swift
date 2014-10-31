@@ -144,6 +144,9 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   return I;
 }
 
+SILInstruction *SILCombiner::visitSelectValueInst(SelectValueInst *SVI) {
+  return nullptr;
+}
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // init_existential instructions behave like memory allocation within
   // the allocated object. We can promote the init_existential allocation

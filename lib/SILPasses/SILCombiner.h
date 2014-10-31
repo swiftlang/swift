@@ -209,6 +209,7 @@ public:
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
   SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
   SILInstruction *visitFixLifetimeInst(FixLifetimeInst *FLI);
+  SILInstruction *visitSelectValueInst(SelectValueInst *SVI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);

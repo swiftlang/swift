@@ -423,6 +423,25 @@ namespace {
       return visitSelectEnumInstBase(RHS);
     }
 
+    bool visitSelectValueInst(const SelectValueInst *RHS) {
+      // Check that the instructions match cases in the same order.
+      auto *X = cast<SelectValueInst>(LHS);
+
+      if (X->getNumCases() != RHS->getNumCases())
+        return false;
+      if (X->hasDefault() != RHS->hasDefault())
+        return false;
+
+      for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
+        if (X->getCase(i).first != RHS->getCase(i).first)
+          return false;
+        if (X->getCase(i).second != RHS->getCase(i).second)
+          return false;
+      }
+
+      return true;
+    }
+
     // Conversion instructions.
     // All of these just return true as they have already had their
     // operands and types checked
@@ -1276,6 +1295,60 @@ SwitchIntInst *SwitchIntInst::create(SILLocation Loc, SILValue Operand,
   return ::new (buf) SwitchIntInst(Loc, Operand, DefaultBB, CaseBBs);
 }
 
+SelectValueInst::SelectValueInst(SILLocation Loc, SILValue Operand, SILType Type,
+                                 SILValue DefaultResult,
+                                 ArrayRef<SILValue> CaseValuesAndResults)
+    : SelectInstBase(ValueKind::SelectValueInst,
+                     Loc,
+                     Type,
+                     CaseValuesAndResults.size() / 2,
+                     bool(DefaultResult),
+                     CaseValuesAndResults, Operand) {
+
+  unsigned OperandBitWidth = 0;
+
+  if (auto OperandTy = Operand.getType().getAs<BuiltinIntegerType>()) {
+    OperandBitWidth = OperandTy->getGreatestWidth();
+  }
+
+  for (unsigned i = 0, size = CaseValuesAndResults.size(); i < size; i += 2) {
+    auto *IL = dyn_cast<IntegerLiteralInst>(CaseValuesAndResults[i]);
+    assert(IL && "select_value case value should be of an integer type");
+    assert(IL->getValue().getBitWidth() == OperandBitWidth &&
+           "select_value case value is not same bit width as operand");
+  }
+
+  if (HasDefault)
+    getCaseBuf()[NumCases * 2] = DefaultResult;
+}
+
+SelectValueInst::~SelectValueInst() {
+}
+
+SelectValueInst *
+SelectValueInst::create(SILLocation Loc, SILValue Operand, SILType Type,
+                        SILValue DefaultResult,
+                        ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
+                        SILFunction &F) {
+  // Allocate enough room for the instruction with tail-allocated data for all
+  // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
+  // SILValuues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
+  SmallVector<SILValue, 8> CaseValuesAndResults;
+  for (auto pair : CaseValues) {
+    CaseValuesAndResults.push_back(pair.first);
+    CaseValuesAndResults.push_back(pair.second);
+  }
+
+  if ((bool)DefaultResult)
+    CaseValuesAndResults.push_back(DefaultResult);
+
+  size_t bufSize = sizeof(SelectValueInst) + decltype(Operands)::getExtraSize(
+                                               CaseValuesAndResults.size());
+  void *buf = F.getModule().allocate(bufSize, alignof(SelectValueInst));
+  return ::new (buf)
+      SelectValueInst(Loc, Operand, Type, DefaultResult, CaseValuesAndResults);
+}
+
 static SmallVector<SILValue, 4>
 getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
                 SILValue DefaultValue) {
@@ -1290,15 +1363,11 @@ getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
 }
 
 SelectEnumInstBase::SelectEnumInstBase(
-                ValueKind Kind,
-                SILLocation Loc, SILValue Operand, SILType Ty,
-                SILValue DefaultValue,
-                ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues)
-  : SILInstruction(Kind, Loc, Ty),
-    NumCases(CaseValues.size()),
-    HasDefault(bool(DefaultValue)),
-    Operands(this, getCaseOperands(CaseValues, DefaultValue), Operand)
-{
+    ValueKind Kind, SILLocation Loc, SILValue Operand, SILType Ty,
+    SILValue DefaultValue,
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues)
+    : SelectInstBase(Kind, Loc, Ty, CaseValues.size(), bool(DefaultValue),
+                     getCaseOperands(CaseValues, DefaultValue), Operand) {
   // Initialize the case and successor arrays.
   auto *cases = getCaseBuf();
   for (unsigned i = 0, size = CaseValues.size(); i < size; ++i) {

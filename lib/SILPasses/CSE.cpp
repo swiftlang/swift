@@ -106,6 +106,7 @@ struct SimpleValue {
     case ValueKind::ObjCMetatypeToObjectInst:
     case ValueKind::ObjCExistentialMetatypeToObjectInst:
     case ValueKind::SelectEnumInst:
+    case ValueKind::SelectValueInst:
         return true;
     default:
         return false;
@@ -344,6 +345,23 @@ public:
 
   hash_code visitSelectEnumAddrInst(SelectEnumAddrInst *X) {
     return visitSelectEnumInstBase(X);
+  }
+
+  hash_code visitSelectValueInst(SelectValueInst *X) {
+    auto hash = llvm::hash_combine(X->getKind(),
+                                   X->getOperand(),
+                                   X->getType(),
+                                   X->hasDefault());
+
+    for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
+      hash = llvm::hash_combine(hash, X->getCase(i).first,
+                                X->getCase(i).second);
+    }
+
+    if (X->hasDefault())
+      hash = llvm::hash_combine(hash, X->getDefaultResult());
+
+    return hash;
   }
 
   hash_code visitIsNonnullInst(IsNonnullInst *X) {

@@ -1193,10 +1193,10 @@ public:
     }
     if (SEI->hasDefault())
       OS << ", default " << getID(SEI->getDefaultResult());
-    
+
     OS << " : " << SEI->getType();
   }
-  
+
   void visitSelectEnumInst(SelectEnumInst *SEI) {
     OS << "select_enum ";
     printSelectEnumInst(SEI);
@@ -1204,6 +1204,23 @@ public:
   void visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
     OS << "select_enum_addr ";
     printSelectEnumInst(SEI);
+  }
+
+  void visitSelectValueInst(SelectValueInst *SVI) {
+    OS << "select_value ";
+    OS << getIDAndType(SVI->getOperand());
+
+    for (unsigned i = 0, e = SVI->getNumCases(); i < e; ++i) {
+      SILValue casevalue;
+      SILValue result;
+      std::tie(casevalue, result) = SVI->getCase(i);
+      OS << ", case " << getID(casevalue)
+         << ": " << getID(result);
+    }
+    if (SVI->hasDefault())
+      OS << ", default " << getID(SVI->getDefaultResult());
+
+    OS << " : " << SVI->getType();
   }
   
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {

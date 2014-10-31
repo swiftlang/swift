@@ -593,6 +593,7 @@ public:
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *i);
   void visitSelectEnumInst(SelectEnumInst *i);
   void visitSelectEnumAddrInst(SelectEnumAddrInst *i);
+  void visitSelectValueInst(SelectValueInst *i);
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *i);
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
@@ -1986,6 +1987,84 @@ void IRGenSILFunction::visitSwitchIntInst(SwitchIntInst *i) {
   llvm_unreachable("not implemented");
 }
 
+static llvm::ConstantInt *
+getSwitchCaseValue(IRGenFunction &IGF, SILValue val) {
+  if (auto *IL = dyn_cast<IntegerLiteralInst>(val)) {
+    return dyn_cast<llvm::ConstantInt>(getConstantInt(IGF.IGM, IL));
+  }
+  else {
+    assert(false && "Switch value cases should be integers");
+  }
+}
+
+static void
+emitSwitchValueDispatch(IRGenSILFunction &IGF,
+                        SILType ty,
+                        Explosion &value,
+                        ArrayRef<std::pair<SILValue, llvm::BasicBlock*>> dests,
+                        llvm::BasicBlock *defaultDest) {
+  // Create an unreachable block for the default if the original SIL
+  // instruction had none.
+  bool unreachableDefault = false;
+  if (!defaultDest) {
+    unreachableDefault = true;
+    defaultDest = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+  }
+
+  if (ty.getAs<BuiltinIntegerType>()) {
+    auto *discriminator = value.claimNext();
+    auto *i = IGF.Builder.CreateSwitch(discriminator, defaultDest,
+                                     dests.size());
+    for (auto &dest : dests)
+      i->addCase(getSwitchCaseValue(IGF, dest.first), dest.second);
+  } else {
+    // Get the value we're testing, which is a function.
+    llvm::Value *val;
+    llvm::BasicBlock *nextTest = nullptr;
+    if (ty.getSwiftType()->is<SILFunctionType>()) {
+      val = value.claimNext();   // Function pointer.
+      //values.claimNext();         // Ignore the data pointer.
+    } else {
+      llvm_unreachable("switch_value operand has an unknown type");
+    }
+
+    for (int i = 0, e = dests.size(); i < e; ++i) {
+      auto casePair = dests[i];
+      llvm::Value *caseval;
+      auto casevalue = IGF.getLoweredExplosion(casePair.first);
+      if (casePair.first.getType().getSwiftType()->is<SILFunctionType>()) {
+        caseval = casevalue.claimNext();   // Function pointer.
+        //values.claimNext();         // Ignore the data pointer.
+      } else {
+        llvm_unreachable("switch_value operand has an unknown type");
+      }
+
+      // Compare operand with a case tag value.
+      llvm::Value *cond = IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_EQ,
+                                                 val, caseval);
+
+      if (i == e -1 && !unreachableDefault) {
+        nextTest = nullptr;
+        IGF.Builder.CreateCondBr(cond, casePair.second, defaultDest);
+      } else {
+        nextTest = IGF.createBasicBlock("next-test");
+        IGF.Builder.CreateCondBr(cond, casePair.second, nextTest);
+        IGF.Builder.emitBlock(nextTest);
+        IGF.Builder.SetInsertPoint(nextTest);
+      }
+    }
+
+    if (nextTest) {
+      IGF.Builder.CreateBr(defaultDest);
+    }
+  }
+
+  if (unreachableDefault) {
+    IGF.Builder.emitBlock(defaultDest);
+    IGF.Builder.CreateUnreachable();
+  }
+}
+
 // Bind an incoming explosion value to an explosion of LLVM phi node(s).
 static void addIncomingExplosionToPHINodes(IRGenSILFunction &IGF,
                                            ArrayRef<llvm::Value*> phis,
@@ -2120,18 +2199,19 @@ IRGenSILFunction::visitSwitchEnumAddrInst(SwitchEnumAddrInst *inst) {
 
 // FIXME: We could lower select_enum directly to LLVM select in a lot of cases.
 // For now, just emit a switch and phi nodes, like a chump.
+template<class T>
 static llvm::BasicBlock *
-emitBBMapForSelectEnum(IRGenSILFunction &IGF,
+emitBBMapForSelect(IRGenSILFunction &IGF,
            Explosion &resultPHI,
-           SmallVectorImpl<std::pair<EnumElementDecl*, llvm::BasicBlock*>> &BBs,
+           SmallVectorImpl<std::pair<T, llvm::BasicBlock*>> &BBs,
            llvm::BasicBlock *&defaultBB,
-           SelectEnumInstBase *inst) {
+           SelectInstBase<T> *inst) {
   auto origBB = IGF.Builder.GetInsertBlock();
-  
+
   // Set up a continuation BB and phi nodes to receive the result value.
   llvm::BasicBlock *contBB = IGF.createBasicBlock("select_enum");
   IGF.Builder.SetInsertPoint(contBB);
-  
+
   // Emit an explosion of phi node(s) to receive the value.
   auto &ti = IGF.getTypeInfo(inst->getType());
   SmallVector<llvm::Value*, 4> phis;
@@ -2182,13 +2262,14 @@ emitBBMapForSelectEnum(IRGenSILFunction &IGF,
   return contBB;
 }
 
+template <class T>
 static LoweredValue
-getLoweredValueForSelectEnum(IRGenSILFunction &IGF,
-                             Explosion &result, SelectEnumInstBase *inst) {
+getLoweredValueForSelect(IRGenSILFunction &IGF,
+                         Explosion &result, SelectInstBase<T> *inst) {
   if (inst->getType().isAddress())
     // FIXME: Loses potentially better alignment info we might have.
     return LoweredValue(Address(result.claimNext(),
-                    IGF.getTypeInfo(inst->getType()).getBestKnownAlignment()));
+                IGF.getTypeInfo(inst->getType()).getBestKnownAlignment()));
   return LoweredValue(result);
 }
 
@@ -2200,18 +2281,18 @@ void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
   llvm::BasicBlock *defaultDest;
   Explosion result;
   llvm::BasicBlock *contBB
-    = emitBBMapForSelectEnum(*this, result, dests, defaultDest, inst);
+    = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
   
   // Emit the dispatch.
   emitSwitchLoadableEnumDispatch(*this, inst->getEnumOperand().getType(),
                                   value, dests, defaultDest);
-  
+
   // emitBBMapForSelectEnum set up a continuation block and phi nodes to
   // receive the result.
   Builder.SetInsertPoint(contBB);
 
   setLoweredValue(SILValue(inst, 0),
-                  getLoweredValueForSelectEnum(*this, result, inst));
+                  getLoweredValueForSelect(*this, result, inst));
 }
 
 void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
@@ -2225,7 +2306,7 @@ void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
   llvm::BasicBlock *defaultDest;
   Explosion result;
   llvm::BasicBlock *contBB
-    = emitBBMapForSelectEnum(*this, result, dests, defaultDest, inst);
+    = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
   
   // Emit the dispatch.
   emitSwitchAddressOnlyEnumDispatch(*this, inst->getEnumOperand().getType(),
@@ -2235,7 +2316,28 @@ void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
   Builder.SetInsertPoint(contBB);
 
   setLoweredValue(SILValue(inst, 0),
-                  getLoweredValueForSelectEnum(*this, result, inst));
+                  getLoweredValueForSelect(*this, result, inst));
+}
+
+void IRGenSILFunction::visitSelectValueInst(SelectValueInst *inst) {
+  Explosion value = getLoweredExplosion(inst->getOperand());
+
+  // Map the SIL dest bbs to their LLVM bbs.
+  SmallVector<std::pair<SILValue, llvm::BasicBlock*>, 4> dests;
+  llvm::BasicBlock *defaultDest;
+  Explosion result;
+  auto *contBB = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
+
+  // Emit the dispatch.
+  emitSwitchValueDispatch(*this, inst->getOperand().getType(), value, dests,
+                          defaultDest);
+
+  // emitBBMapForSelectEnum set up a continuation block and phi nodes to
+  // receive the result.
+  Builder.SetInsertPoint(contBB);
+
+  setLoweredValue(SILValue(inst, 0),
+                  getLoweredValueForSelect(*this, result, inst));
 }
 
 void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){

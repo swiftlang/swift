@@ -1370,6 +1370,38 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createSwitchInt(Loc, Cond, DefaultBB, CaseBBs);
     break;
   }
+  case ValueKind::SelectValueInst: {
+    // Format: condition, a list of cases (ValueID + Value ID),
+    // default value ID. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list has value for condition, result type,
+    // hasDefault, default,
+    // basic block ID, a list of (Value ID, Value ID).
+    SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
+                                  getSILType(MF->getType(TyID),
+                                             (SILValueCategory)TyCategory));
+
+    Type ResultLoweredTy = MF->getType(ListOfValues[2]);
+    SILValueCategory ResultCategory = (SILValueCategory)ListOfValues[3];
+    SILType ResultTy = getSILType(ResultLoweredTy, ResultCategory);
+
+    SILValue DefaultVal = nullptr;
+    if (ListOfValues[4])
+      DefaultVal = getLocalValue(ListOfValues[5], ListOfValues[6],
+                                 ResultTy);
+
+    SmallVector<std::pair<SILValue, SILValue>, 4> CaseValuesAndResults;
+    for (unsigned I = 7, E = ListOfValues.size(); I < E; I += 4) {
+      auto CaseValue = getLocalValue(ListOfValues[I], ListOfValues[I+1],
+                                     Cond.getType());
+      auto Result = getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
+                                  ResultTy);
+      CaseValuesAndResults.push_back({CaseValue, Result});
+    }
+
+    ResultVal = Builder.createSelectValue(Loc, Cond, ResultTy,
+                                          DefaultVal, CaseValuesAndResults);
+    break;
+  }  
   case ValueKind::EnumInst: {
     // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
     // (DeclID + hasOperand), and an operand.

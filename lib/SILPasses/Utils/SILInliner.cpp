@@ -363,6 +363,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::InitBlockStorageHeaderInst:
     case ValueKind::SelectEnumAddrInst:
     case ValueKind::SelectEnumInst:
+    case ValueKind::SelectValueInst:
       return InlineCost::Expensive;
 
     case ValueKind::SILArgument:

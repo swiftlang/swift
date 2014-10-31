@@ -155,6 +155,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(InjectEnumAddrInst, SILInstruction, MayWrite)
   INST(SelectEnumInst, SILInstruction, None)
   INST(SelectEnumAddrInst, SILInstruction, MayRead)
+  INST(SelectValueInst, SILInstruction, None)
 
   // Protocol and Protocol Composition Types
   INST(InitExistentialInst, SILInstruction, MayWrite)

@@ -1474,6 +1474,24 @@ SILCloner<ImplClass>::visitSelectEnumAddrInst(SelectEnumAddrInst *Inst) {
                                       getOpType(Inst->getType()),
                                       DefaultResult, CaseResults));
 }
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitSelectValueInst(SelectValueInst *Inst) {
+  SILValue DefaultResult;
+  if (Inst->hasDefault())
+    DefaultResult = getOpValue(Inst->getDefaultResult());
+  SmallVector<std::pair<SILValue, SILValue>, 8> CaseResults;
+  for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i)
+    CaseResults.push_back(std::make_pair(Inst->getCase(i).first,
+                                         getOpValue(Inst->getCase(i).second)));
+
+  doPostProcess(Inst,
+    getBuilder().createSelectValue(getOpLocation(Inst->getLoc()),
+                                   getOpValue(Inst->getOperand()),
+                                   getOpType(Inst->getType()),
+                                   DefaultResult, CaseResults));
+}
   
 template<typename ImplClass>
 void

@@ -739,6 +739,43 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+  case ValueKind::SelectValueInst: {
+    // Format: condition, a list of cases (Value ID + Value ID),
+    // default value ID. Use SILOneTypeValuesLayout: the type is
+    // for condition, the list has value for condition, result type,
+    // hasDefault, default
+    // basic block ID, a list of (Value ID, Value ID).
+    const SelectValueInst *SVI = cast<SelectValueInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    ListOfValues.push_back(addValueRef(SVI->getOperand()));
+    ListOfValues.push_back(SVI->getOperand().getResultNumber());
+    ListOfValues.push_back(S.addTypeRef(SVI->getType().getSwiftRValueType()));
+    ListOfValues.push_back((unsigned)SVI->getType().getCategory());
+    ListOfValues.push_back((unsigned)SVI->hasDefault());
+    if (SVI->hasDefault()) {
+      ListOfValues.push_back(addValueRef(SVI->getDefaultResult()));
+      ListOfValues.push_back(SVI->getDefaultResult().getResultNumber());
+    } else {
+      ListOfValues.push_back(0);
+      ListOfValues.push_back(0);
+    }
+    for (unsigned i = 0, e = SVI->getNumCases(); i < e; ++i) {
+      SILValue casevalue;
+      SILValue result;
+      std::tie(casevalue, result) = SVI->getCase(i);
+      ListOfValues.push_back(addValueRef(casevalue));
+      ListOfValues.push_back(casevalue.getResultNumber());
+      ListOfValues.push_back(addValueRef(result));
+      ListOfValues.push_back(result.getResultNumber());
+    }
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(SVI->getOperand().getType().getSwiftRValueType()),
+        (unsigned)SVI->getOperand().getType().getCategory(),
+        ListOfValues);
+    break;
+  }
   case ValueKind::CondFailInst:
   case ValueKind::RetainValueInst:
   case ValueKind::ReleaseValueInst:

@@ -1215,6 +1215,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("return", ValueKind::ReturnInst)
     .Case("select_enum", ValueKind::SelectEnumInst)
     .Case("select_enum_addr", ValueKind::SelectEnumAddrInst)
+    .Case("select_value", ValueKind::SelectValueInst)
     .Case("store", ValueKind::StoreInst)
     .Case("store_weak", ValueKind::StoreWeakInst)
     .Case("string_literal", ValueKind::StringLiteralInst)
@@ -2861,6 +2862,66 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     ResultVal = B.createSwitchInt(InstLoc, Val, DefaultBB, CaseBBs);
+    break;
+  }
+  case ValueKind::SelectValueInst: {
+    if (parseTypedValueRef(Val))
+      return true;
+
+    SmallVector<std::pair<UnresolvedValueName, UnresolvedValueName>, 4>
+      CaseValueAndResultNames;
+    Optional<UnresolvedValueName> DefaultResultName;
+    while (P.consumeIf(tok::comma)) {
+      Identifier BBName;
+      SourceLoc BBLoc;
+      // Parse 'default' sil-value.
+      UnresolvedValueName tmp;
+      if (P.consumeIf(tok::kw_default)) {
+        if (parseValueName(tmp))
+          return true;
+        DefaultResultName = tmp;
+        break;
+      }
+
+      // Parse 'case' sil-decl-ref ':' sil-value.
+      if (P.consumeIf(tok::kw_case)) {
+        UnresolvedValueName casevalue;
+        parseValueName(casevalue);
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");
+        parseValueName(tmp);
+        CaseValueAndResultNames.push_back(std::make_pair(
+                                          casevalue,
+                                          tmp));
+        continue;
+      }
+
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
+      return true;
+    }
+
+    if (!DefaultResultName) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "default");
+      return true;
+    }
+
+    // Parse the type of the result operands.
+    SILType ResultType;
+    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(ResultType))
+      return true;
+
+    // Resolve the results.
+    SmallVector<std::pair<SILValue, SILValue>, 4> CaseValues;
+    SILValue DefaultValue;
+    if (DefaultResultName)
+      DefaultValue = getLocalValue(*DefaultResultName, ResultType, InstLoc);
+    for (auto &caseName : CaseValueAndResultNames)
+      CaseValues.push_back(std::make_pair(
+                           getLocalValue(caseName.first, ResultType, InstLoc),
+                           getLocalValue(caseName.second, ResultType, InstLoc)));
+
+    ResultVal = B.createSelectValue(InstLoc, Val, ResultType,
+                                    DefaultValue, CaseValues);
     break;
   }
   case ValueKind::DeinitExistentialInst: {

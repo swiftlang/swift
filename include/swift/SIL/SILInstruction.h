@@ -1839,15 +1839,48 @@ public:
   EnumElementDecl *getElement() const { return Element; }
 };
 
-/// Common base class for the select_enum and select_enum_addr instructions,
-/// which select one of a set of possible values based on the case of an enum.
-class SelectEnumInstBase : public SILInstruction {
+// Base class of all select instructions like select_enum, select_value, etc.
+// The template parameter represents a type of case values to be compared
+// with the operand of a select instruction.
+template <class T> class SelectInstBase : public SILInstruction {
+protected:
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
 
-  // The first operand is the enumeration; the rest are the values to select.
+  // The first operand is the operand of select_xxx instruction;
+  // the rest are the case values and results of a select instruction.
   TailAllocatedOperandList<1> Operands;
 
+public:
+  SelectInstBase(ValueKind kind, SILLocation loc, SILType type,
+                 unsigned numCases, bool hasDefault, ArrayRef<SILValue> operands,
+                 SILValue operand)
+      : SILInstruction(kind, loc, type),
+        NumCases(numCases),
+        HasDefault(hasDefault),
+        Operands(this, operands, operand) {
+  }
+
+  SILValue getOperand() const { return Operands[0].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  virtual std::pair<T, SILValue> getCase(unsigned i) const = 0;
+
+  unsigned getNumCases() const { return NumCases; }
+
+  bool hasDefault() const { return HasDefault; }
+
+  virtual SILValue getDefaultResult() const = 0;
+
+  // getType() is OK because there's only one result.
+  SILType getType() const { return SILInstruction::getType(0); }
+};
+
+/// Common base class for the select_enum and select_enum_addr instructions,
+/// which select one of a set of possible results based on the case of an enum.
+class SelectEnumInstBase : public SelectInstBase<EnumElementDecl*> {
   // Tail-allocated after the operands is an array of `NumCases`
   // EnumElementDecl* pointers, referencing the case discriminators for each
   // operand.
@@ -1874,12 +1907,7 @@ protected:
                    SILFunction &F);
 
 public:
-  SILValue getEnumOperand() const { return Operands[0].get(); }
-  
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-
-  unsigned getNumCases() const { return NumCases; }
+  SILValue getEnumOperand() const { return getOperand(); }
   
   std::pair<EnumElementDecl*, SILValue>
   getCase(unsigned i) const {
@@ -1899,15 +1927,11 @@ public:
     return getDefaultResult();
   }
   
-  bool hasDefault() const { return HasDefault; }
   SILValue getDefaultResult() const {
     assert(HasDefault && "doesn't have a default");
     return Operands[NumCases + 1].get();
   }
-  
-  // getType() is OK because there's only one result.
-  SILType getType() const { return SILInstruction::getType(0); }
-  
+
   // If there is a single case that returns a literal "true" value (an
   // "integer_literal $Builtin.Int1, 1" value), return it.
   //
@@ -2968,6 +2992,42 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CondBranchInst;
+  }
+};
+
+/// Select on a value of a builtin integer type.
+class SelectValueInst : public SelectInstBase<SILValue> {
+  SelectValueInst(SILLocation Loc, SILValue Operand,
+                  SILType Type,
+                  SILValue DefaultResult,
+                  ArrayRef<SILValue> CaseValuesAndResults);
+
+  OperandValueArrayRef getCaseBuf() const {
+    return Operands.getDynamicValuesAsArray();
+  }
+
+public:
+  ~SelectValueInst();
+
+  static SelectValueInst *
+  create(SILLocation Loc, SILValue Operand, SILType Type,
+         SILValue DefaultValue,
+         ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
+         SILFunction &F);
+
+  std::pair<SILValue, SILValue>
+  getCase(unsigned i) const {
+    assert(i < NumCases && "case out of bounds");
+    return {getCaseBuf()[i*2], getCaseBuf()[i*2+1]};
+  }
+
+  SILValue getDefaultResult() const {
+    assert(HasDefault && "doesn't have a default");
+    return getCaseBuf()[NumCases*2];
+  }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::SelectValueInst;
   }
 };
 
