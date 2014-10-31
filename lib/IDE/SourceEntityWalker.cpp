@@ -165,7 +165,7 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
 
           // Note that an implicit getter may not have the body synthesized
           // in case the owning PatternBindingDecl is invalid.
-          if (auto *Body = Get->getBody()) {
+          if (auto *Body = Get->getBody()) {
             Body->walk(*this);
           }
         }
