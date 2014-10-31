@@ -299,10 +299,12 @@ b2:
 // CHECK:   return
 }
 
-sil @constant_fold_switch_int : $@thin (Int) -> Int {
+sil @constant_fold_switch_value : $@thin (Int) -> Int {
 bb0(%0 : $Int):
   %1 = integer_literal $Builtin.Word, 2
-  switch_int %1 : $Builtin.Word, case 1: bb1, case 2: bb2
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 2
+  switch_value %1 : $Builtin.Word, case %2: bb1, case %3: bb2
 bb1:
   br bb3
 
@@ -311,10 +313,10 @@ bb2:
 
 bb3:
   return %0 : $Int
-// CHECK-LABEL: sil @constant_fold_switch_int
+// CHECK-LABEL: sil @constant_fold_switch_value
 // CHECK: bb0(%0 : $Int):
 // CHECK-NEXT: br bb1
-// CHECK-NOT: switch_int
+// CHECK-NOT: switch_value
 // CHECK: }
 }
 

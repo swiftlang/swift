@@ -708,12 +708,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
-  case ValueKind::SwitchIntInst: {
-    // Format: condition, a list of cases (APInt + Basic Block ID),
+  case ValueKind::SwitchValueInst: {
+    // Format: condition, a list of cases (Value ID + Basic Block ID),
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
     // for condition, the list contains value for condition, hasDefault, default
-    // basic block ID, a list of (APInt(Identifier ID), BasicBlock ID).
-    const SwitchIntInst *SII = cast<SwitchIntInst>(&SI);
+    // basic block ID, a list of (Value ID, BasicBlock ID).
+    const SwitchValueInst *SII = cast<SwitchValueInst>(&SI);
     SmallVector<ValueID, 4> ListOfValues;
     ListOfValues.push_back(addValueRef(SII->getOperand()));
     ListOfValues.push_back(SII->getOperand().getResultNumber());
@@ -724,11 +724,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(0);
 
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
-      APInt value;
+      SILValue value;
       SILBasicBlock *dest;
       std::tie(value, dest) = SII->getCase(i);
-      StringRef Str = value.toString(10, true);
-      ListOfValues.push_back(S.addIdentifierRef(Ctx.getIdentifier(Str)));
+      ListOfValues.push_back(addValueRef(value));
+      ListOfValues.push_back(value.getResultNumber());
       ListOfValues.push_back(BasicBlockMap[dest]);
     }
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,

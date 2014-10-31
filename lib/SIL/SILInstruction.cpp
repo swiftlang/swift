@@ -1236,35 +1236,47 @@ void CondBranchInst::swapSuccessors() {
   std::swap(NumTrueArgs, NumFalseArgs);
 }
 
-SwitchIntInst::SwitchIntInst(SILLocation Loc, SILValue Operand,
-                             SILBasicBlock *DefaultBB,
-                             ArrayRef<std::pair<APInt, SILBasicBlock*>> CaseBBs)
-  : TermInst(ValueKind::SwitchIntInst, Loc),
-    Operands(this, Operand),
-    NumCases(CaseBBs.size()),
+SwitchValueInst::SwitchValueInst(SILLocation Loc, SILValue Operand,
+                                 SILBasicBlock *DefaultBB,
+                                 ArrayRef<SILValue> Cases,
+                                 ArrayRef<SILBasicBlock*> BBs)
+  : TermInst(ValueKind::SwitchValueInst, Loc),
+    NumCases(Cases.size()),
     HasDefault(bool(DefaultBB)),
-    BitWidthForCase(Operand.getType().castTo<BuiltinIntegerType>()
-                                                           ->getGreatestWidth())
+    Operands(this, Cases, Operand)
 {
-  // Initialize the case and successor arrays.
-  auto *cases = getCaseBuf();
+
+  // Initialize the successor array.
   auto *succs = getSuccessorBuf();
+  unsigned OperandBitWidth = 0;
 
-  unsigned words = getNumWordsForCase();
+  if (auto OperandTy = Operand.getType().getAs<BuiltinIntegerType>()) {
+    OperandBitWidth = OperandTy->getGreatestWidth();
+  }
 
-  for (unsigned i = 0, size = CaseBBs.size(); i < size; ++i) {
-    assert(CaseBBs[i].first.getBitWidth() == getBitWidthForCase() &&
-           "switch_int case value is not same bit width as operand");
-    memcpy(cases + i*words, CaseBBs[i].first.getRawData(),
-           words * sizeof(llvm::integerPart));
-    ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
+  for (unsigned i = 0, size = Cases.size(); i < size; ++i) {
+    if (OperandBitWidth) {
+      auto *IL = dyn_cast<IntegerLiteralInst>(Cases[i]);
+      assert(IL && "switch_value case value should be of an integer type");
+      assert(IL->getValue().getBitWidth() == OperandBitWidth &&
+             "switch_value case value is not same bit width as operand");
+    } else {
+      auto *FR = dyn_cast<FunctionRefInst>(Cases[i]);
+      if (!FR) {
+        if (auto *CF = dyn_cast<ConvertFunctionInst>(Cases[i])) {
+          FR = dyn_cast<FunctionRefInst>(CF->getOperand());
+        }
+      }
+      assert(FR && "switch_value case value should be a function reference");
+    }
+    ::new (succs + i) SILSuccessor(this, BBs[i]);
   }
 
   if (HasDefault)
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
 }
 
-SwitchIntInst::~SwitchIntInst() {
+SwitchValueInst::~SwitchValueInst() {
   // Destroy the successor records to keep the CFG up to date.
   auto *succs = getSuccessorBuf();
   for (unsigned i = 0, end = NumCases + HasDefault; i < end; ++i) {
@@ -1272,27 +1284,25 @@ SwitchIntInst::~SwitchIntInst() {
   }
 }
 
-SwitchIntInst *SwitchIntInst::create(SILLocation Loc, SILValue Operand,
-                           SILBasicBlock *DefaultBB,
-                           ArrayRef<std::pair<APInt, SILBasicBlock *>> CaseBBs,
-                           SILFunction &F) {
+SwitchValueInst *SwitchValueInst::create(
+    SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
+    ArrayRef<std::pair<SILValue, SILBasicBlock *>> CaseBBs, SILFunction &F) {
   // Allocate enough room for the instruction with tail-allocated data for all
-  // the APInt values and the SILSuccessor arrays. There are `CaseBBs.size()`
-  // APInts (each needing `getNumWords()` `llvm::integerPart`s of storage) and
-  // `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
+  // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
+  // SILValues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
+  SmallVector<SILValue, 8> Cases;
+  SmallVector<SILBasicBlock *, 8> BBs;
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
-
-  unsigned bits = Operand.getType().castTo<BuiltinIntegerType>()
-    ->getGreatestWidth();
-  unsigned words = (bits + llvm::integerPartWidth - 1) / llvm::integerPartWidth;
-
-  void *buf = F.getModule().allocate(sizeof(SwitchIntInst)
-                                      + sizeof(llvm::integerPart) * numCases
-                                                                  * words
-                                      + sizeof(SILSuccessor) * numSuccessors,
-                                     alignof(SwitchIntInst));
-  return ::new (buf) SwitchIntInst(Loc, Operand, DefaultBB, CaseBBs);
+  for(auto pair: CaseBBs) {
+    Cases.push_back(pair.first);
+    BBs.push_back(pair.second);
+  }
+  size_t bufSize = sizeof(SwitchValueInst) +
+                   decltype(Operands)::getExtraSize(Cases.size()) +
+                   sizeof(SILSuccessor) * numSuccessors;
+  void *buf = F.getModule().allocate(bufSize, alignof(SwitchValueInst));
+  return ::new (buf) SwitchValueInst(Loc, Operand, DefaultBB, Cases, BBs);
 }
 
 SelectValueInst::SelectValueInst(SILLocation Loc, SILValue Operand, SILType Type,

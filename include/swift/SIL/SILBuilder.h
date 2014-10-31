@@ -900,11 +900,11 @@ public:
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
                            OperandValueArrayRef Args);
 
-  SwitchIntInst *createSwitchInt(SILLocation Loc, SILValue Operand,
+  SwitchValueInst *createSwitchValue(SILLocation Loc, SILValue Operand,
          SILBasicBlock *DefaultBB,
-         ArrayRef<std::pair<APInt, SILBasicBlock*>> CaseBBs) {
-    return insertTerminator(SwitchIntInst::create(Loc, Operand, DefaultBB,
-                                                  CaseBBs, F));
+         ArrayRef<std::pair<SILValue, SILBasicBlock*>> CaseBBs) {
+    return insertTerminator(SwitchValueInst::create(Loc, Operand, DefaultBB,
+                                                    CaseBBs, F));
   }
 
   SwitchEnumInst *createSwitchEnum(SILLocation Loc, SILValue Operand,

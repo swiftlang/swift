@@ -1916,29 +1916,39 @@ public:
     
     checkSelectEnumCases(SEI);
   }
-  
-  void checkSwitchIntInst(SwitchIntInst *SII) {
-    requireObjectType(BuiltinIntegerType, SII->getOperand(),
-                      "switch_int operand");
 
-    auto ult = [](const APInt &a, const APInt &b) { return a.ult(b); };
-    std::set<APInt, decltype(ult)> cases(ult);
+  void checkSwitchValueInst(SwitchValueInst *SVI) {
+    // TODO: Type should be either integer or function
+    auto Ty = SVI->getOperand().getType();
+    require(Ty.getAs<BuiltinIntegerType>() || Ty.getAs<SILFunctionType>(),
+            "switch_value operand should be either of an integer "
+            "or function type");
 
-    for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
-      APInt value;
+    auto ult = [](const SILValue &a, const SILValue &b) { 
+      return a == b || a < b; 
+    };
+
+    std::set<SILValue, decltype(ult)> cases(ult);
+
+    for (unsigned i = 0, e = SVI->getNumCases(); i < e; ++i) {
+      SILValue value;
       SILBasicBlock *dest;
-      std::tie(value, dest) = SII->getCase(i);
+      std::tie(value, dest) = SVI->getCase(i);
+
+      require(value.getType() == Ty,
+             "switch_value case value should have the same type as its operand");
 
       require(!cases.count(value),
-              "multiple switch_int cases for same value");
+              "multiple switch_value cases for same value");
       cases.insert(value);
 
       require(dest->bbarg_empty(),
-              "switch_int case destination cannot take arguments");
+              "switch_value case destination cannot take arguments");
     }
-    if (SII->hasDefault())
-      require(SII->getDefaultBB()->bbarg_empty(),
-              "switch_int default destination cannot take arguments");
+
+    if (SVI->hasDefault())
+      require(SVI->getDefaultBB()->bbarg_empty(),
+              "switch_value default destination cannot take arguments");
   }
 
   void checkSelectValueCases(SelectValueInst *I) {

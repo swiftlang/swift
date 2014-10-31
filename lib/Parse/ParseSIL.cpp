@@ -1226,7 +1226,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("switch_enum", ValueKind::SwitchEnumInst)
     .Case("switch_enum_addr",
           ValueKind::SwitchEnumAddrInst)
-    .Case("switch_int", ValueKind::SwitchIntInst)
+    .Case("switch_value", ValueKind::SwitchValueInst)
     .Case("unchecked_enum_data", ValueKind::UncheckedEnumDataInst)
     .Case("unchecked_addr_cast", ValueKind::UncheckedAddrCastInst)
     .Case("unchecked_trivial_bit_cast", ValueKind::UncheckedTrivialBitCastInst)
@@ -2814,15 +2814,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       ResultVal = B.createSwitchEnumAddr(InstLoc, Val, DefaultBB, CaseBBs);
     break;
   }
-  case ValueKind::SwitchIntInst: {
+  case ValueKind::SwitchValueInst: {
     if (parseTypedValueRef(Val))
       return true;
 
-    SmallVector<std::pair<APInt, SILBasicBlock*>, 4> CaseBBs;
+    SmallVector<std::pair<SILValue, SILBasicBlock *>, 4> CaseBBs;
     SILBasicBlock *DefaultBB = nullptr;
     while (P.consumeIf(tok::comma)) {
       Identifier BBName;
       SourceLoc BBLoc;
+      SILValue CaseVal;
       // Parse 'default' sil-identifier.
       if (P.consumeIf(tok::kw_default)) {
         parseSILIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
@@ -2830,38 +2831,62 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         break;
       }
 
-      // Parse 'case' int-literal ':' sil-identifier.
+      // Parse 'case' value-ref ':' sil-identifier.
       if (P.consumeIf(tok::kw_case)) {
-        // Parse int-literal.
-        if (P.Tok.getKind() != tok::integer_literal) {
-          P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+        if (parseValueRef(CaseVal, Val.getType(),
+                          SILFileLocation(P.Tok.getLoc()))) {
+          // TODO: Issue a proper error message here
+          P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "reference to a value");
           return true;
         }
         auto intTy = Val.getType().getAs<BuiltinIntegerType>();
-        if (!intTy) {
+        auto functionTy = Val.getType().getAs<SILFunctionType>();
+        if (!intTy && !functionTy) {
           P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
           return true;
         }
 
-        APInt value(intTy->getGreatestWidth(), 0);
-        bool error = P.Tok.getText().getAsInteger(0, value);
-        assert(!error && "integer_literal token did not parse as APInt?!");
-        (void)error;
+        if (intTy) {
+          // If it is a switch on an integer type, check that all case values
+          // are integer literals.
+          auto *IL = dyn_cast<IntegerLiteralInst>(CaseVal);
+          if (!IL) {
+            P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
+            return true;
+          }
+          APInt CaseValue = IL->getValue();
 
-        if (value.getBitWidth() != intTy->getGreatestWidth())
-          value = value.zextOrTrunc(intTy->getGreatestWidth());
-        P.consumeToken(tok::integer_literal);
+          if (CaseValue.getBitWidth() != intTy->getGreatestWidth())
+            CaseVal = B.createIntegerLiteral(
+                IL->getLoc(), Val.getType(),
+                CaseValue.zextOrTrunc(intTy->getGreatestWidth()));
+        }
+
+        if (functionTy) {
+          // If it is a switch on a function type, check that all case values
+          // are function references.
+          auto *FR = dyn_cast<FunctionRefInst>(CaseVal);
+          if (!FR) {
+            if (auto *CF = dyn_cast<ConvertFunctionInst>(CaseVal)) {
+              FR = dyn_cast<FunctionRefInst>(CF->getOperand());
+            }
+          }
+          if (!FR) {
+            P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
+            return true;
+          }
+        }
 
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":");
         parseSILIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
-        CaseBBs.push_back( {value, getBBForReference(BBName, BBLoc)} );
+        CaseBBs.push_back({CaseVal, getBBForReference(BBName, BBLoc)});
         continue;
       }
 
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
       return true;
     }
-    ResultVal = B.createSwitchInt(InstLoc, Val, DefaultBB, CaseBBs);
+    ResultVal = B.createSwitchValue(InstLoc, Val, DefaultBB, CaseBBs);
     break;
   }
   case ValueKind::SelectValueInst: {

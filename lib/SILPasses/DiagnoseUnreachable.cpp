@@ -324,18 +324,21 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
 
   // Constant fold switch int.
   //   %1 = integer_literal $Builtin.Int64, 2
-  //   switch_int %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
+  //   switch_value %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
   // =>
   //   br bb2
-  if (SwitchIntInst *SUI = dyn_cast<SwitchIntInst>(TI)) {
+  if (SwitchValueInst *SUI = dyn_cast<SwitchValueInst>(TI)) {
     if (IntegerLiteralInst *SwitchVal =
           dyn_cast<IntegerLiteralInst>(SUI->getOperand())) {
       SILBasicBlock *TheSuccessorBlock = 0;
       for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
-        APInt EI;
+        APInt AI;
+        SILValue EI;
         SILBasicBlock *BI;
         std::tie(EI, BI) = SUI->getCase(Idx);
-        if (EI == SwitchVal->getValue())
+        // TODO: Check that EI is really an IntegerLiteralInst
+        AI = dyn_cast<IntegerLiteralInst>(EI)->getValue();
+        if (AI == SwitchVal->getValue())
           TheSuccessorBlock = BI;
       }
 

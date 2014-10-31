@@ -216,10 +216,10 @@ static void changeBranchTargetAndStripArgs(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  if (auto SII = dyn_cast<SwitchIntInst>(T)) {
-    SmallVector<std::pair<APInt, SILBasicBlock *>, 8> Cases;
+  if (auto SII = dyn_cast<SwitchValueInst>(T)) {
+    SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SII, Cases, EdgeIdx, NewDest);
-    B.createSwitchInt(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
+    B.createSwitchValue(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
     SII->eraseFromParent();
     return;
   }
@@ -298,7 +298,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     return;
   }
 
-  if (auto SEI = dyn_cast<SwitchIntInst>(T)) {
+  if (auto SEI = dyn_cast<SwitchValueInst>(T)) {
     auto *SuccBB = getNthEdgeBlock(SEI, EdgeIdx);
     assert(SuccBB->getNumBBArg() == 0 && "Can't take an argument");
     return;

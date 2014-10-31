@@ -136,7 +136,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::SuperMethodInst:
   case ValueKind::SwitchEnumAddrInst:
   case ValueKind::SwitchEnumInst:
-  case ValueKind::SwitchIntInst:
+  case ValueKind::SwitchValueInst:
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::ThickToObjCMetatypeInst:

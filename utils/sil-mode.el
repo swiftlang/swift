@@ -93,7 +93,7 @@
    ;; swift declaration as well handled at the top.
    `(,(regexp-opt '("init_enum_data_addr" "unchecked_enum_data"
                     "unchecked_take_enum_data_addr" "inject_enum_addr"
-                    "select_enum")
+                    "select_enum" "select_value")
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential" "deinit_existential"
@@ -120,7 +120,7 @@
 		  'words) . font-lock-keyword-face)
    ;; Terminators
    `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
-                    "cond_br" "switch_int" "switch_enum"
+                    "cond_br" "switch_value" "switch_enum"
                     "switch_enum_addr" "dynamic_method_br"
                     "checked_cast_br")
                   'words) . font-lock-keyword-face)

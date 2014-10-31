@@ -349,15 +349,15 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
       return (Succ == CBI->getTrueBB()) ? "T" : "F";
 
     // Label source of switch edges with the associated value.
-    if (auto *SI = dyn_cast<SwitchIntInst>(Term)) {
+    if (auto *SI = dyn_cast<SwitchValueInst>(Term)) {
       if (SI->hasDefault() && SI->getDefaultBB() == Succ)
         return "def";
 
       std::string Str;
       raw_string_ostream OS(Str);
 
-      APInt I = getCaseValueForBB<SwitchIntInst, APInt>(SI, Succ);
-      OS << I;
+      SILValue I = getCaseValueForBB<SwitchValueInst, SILValue>(SI, Succ);
+      OS << I; // TODO: or should we output the literal value of I?
       return OS.str();
     }
 

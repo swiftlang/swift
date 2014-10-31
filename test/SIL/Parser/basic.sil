@@ -803,11 +803,13 @@ bb3:
   return %t : $()
 }
 
-// CHECK-LABEL: sil @test_switch_int : $@thin (Builtin.Word) -> ()
-sil @test_switch_int : $@thin (Builtin.Word) -> () {
+// CHECK-LABEL: sil @test_switch_value : $@thin (Builtin.Word) -> ()
+sil @test_switch_value : $@thin (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
-  // CHECK: switch_int %{{.*}} : $Builtin.Word, case 1: bb1, case 2: bb2
-  switch_int %0 : $Builtin.Word, case 1: bb1, case 2: bb2
+  // CHECK: switch_value %{{.*}} : $Builtin.Word, case %1: bb1, case %2: bb2
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 2
+  switch_value %0 : $Builtin.Word, case %1: bb1, case %2: bb2
 
 bb1:
   %7 = function_ref @_T6switch1aFT_T_ : $@thin () -> () // CHECK: function_ref
@@ -820,8 +822,30 @@ bb2:
   br bb3
 
 bb3:
+  // CHECK: [[FUNC1:%.*]] = function_ref @_T6switch1aFT_T_
+  // CHECK: [[FUNC2:%.*]] = function_ref @_T6switch1bFT_T_
+  // CHECK: switch_value %{{.*}} : $@thin () -> (), case [[FUNC1]]: bb4, case [[FUNC2]]: bb5
+  %20 = function_ref @_T6switch1bFT_T_ : $@thin () -> ()
+  %21 = function_ref @_T6switch1aFT_T_ : $@thin () -> ()
+  %22 = function_ref @_T6switch1bFT_T_ : $@thin () -> ()
+  switch_value %20 : $@thin () -> (), case %21: bb4, case %22: bb5
+
+bb4:
+  // CHECK: function_ref
+  %37 = function_ref @_T6switch1aFT_T_ : $@thin () -> () 
+  %38 = apply %37() : $@thin () -> ()
+  br bb6
+
+bb5:
+  // CHECK: function_ref
+  %42 = function_ref @_T6switch1bFT_T_ : $@thin () -> ()
+  %43 = apply %42() : $@thin () -> ()
+  br bb6
+
+bb6:
   %18 = tuple ()
-  return %18 : $()                                        // CHECK: return
+  // CHECK: return
+  return %18 : $()
 }
 
 // CHECK-LABEL: sil @test_select_value : $@thin (Builtin.Word) -> Builtin.Word

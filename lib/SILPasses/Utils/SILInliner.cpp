@@ -351,7 +351,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::SuperMethodInst:
     case ValueKind::SwitchEnumAddrInst:
     case ValueKind::SwitchEnumInst:
-    case ValueKind::SwitchIntInst:
+    case ValueKind::SwitchValueInst:
     case ValueKind::UncheckedEnumDataInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:

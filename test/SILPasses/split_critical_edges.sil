@@ -51,14 +51,15 @@ end:
   return %v : $()
 }
 
-// CHECK-LABEL: sil @check_switch_int
+// CHECK-LABEL: sil @check_switch_value
 // CHECK: bb0
 // CHECK:   cond_br %1, bb1, bb2
 // CHECK: bb1:
 // CHECK:   integer_literal $Builtin.Int64, 1
 // CHECK:   br bb4
 // CHECK: bb2:
-// CHECK:   switch_int %0 : $Builtin.Int32, case 1: bb3, default bb5
+// CHECK:   [[VAL:%[0-9]+]] = integer_literal $Builtin.Int32, 1
+// CHECK:   switch_value %0 : $Builtin.Int32, case [[VAL]]: bb3, default bb5
 // CHECK: bb3:
 // CHECK:   br bb4
 // CHECK: bb4:
@@ -68,7 +69,7 @@ end:
 // CHECK: bb6:
 // CHECK:   return
 
-sil @check_switch_int : $(Builtin.Int32, Builtin.Int1) -> () {
+sil @check_switch_value : $(Builtin.Int32, Builtin.Int1) -> () {
 entry(%0 : $Builtin.Int32, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 
@@ -76,7 +77,8 @@ bb1:
   %2 = integer_literal $Builtin.Int64, 1
   br x_dest
 bb2:
-  switch_int %0 : $Builtin.Int32, case 1: x_dest, default y_dest
+  %3 = integer_literal $Builtin.Int32, 1
+  switch_value %0 : $Builtin.Int32, case %3: x_dest, default y_dest
 
 x_dest:
   br end

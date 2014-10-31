@@ -134,7 +134,7 @@ namespace {
 static bool isConditional(TermInst *I) {
   switch (I->getKind()) {
   case ValueKind::CondBranchInst:
-  case ValueKind::SwitchIntInst:
+  case ValueKind::SwitchValueInst:
   case ValueKind::SwitchEnumInst:
   case ValueKind::SwitchEnumAddrInst:
   case ValueKind::CheckedCastBranchInst:
@@ -337,7 +337,7 @@ static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
       simplifyCondBranchInst(CBI, BranchTaken);
       return true;
     }
-    case ValueKind::SwitchIntInst:
+    case ValueKind::SwitchValueInst:
     case ValueKind::SwitchEnumAddrInst:
       // FIXME: Handle these.
       return false;
@@ -1210,7 +1210,7 @@ bool SimplifyCFG::simplifyBlocks() {
     case ValueKind::CondBranchInst:
       Changed |= simplifyCondBrBlock(cast<CondBranchInst>(TI));
       break;
-    case ValueKind::SwitchIntInst:
+    case ValueKind::SwitchValueInst:
       // FIXME: Optimize for known switch values.
       break;
     case ValueKind::SwitchEnumInst:

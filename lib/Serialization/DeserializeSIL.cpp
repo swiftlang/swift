@@ -1346,11 +1346,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                DefaultVal, CaseVals);
     break;
   }
-  case ValueKind::SwitchIntInst: {
-    // Format: condition, a list of cases (APInt + Basic Block ID),
+  case ValueKind::SwitchValueInst: {
+    // Format: condition, a list of cases (Value ID + Basic Block ID),
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
     // for condition, the list contains value for condition, hasDefault, default
-    // basic block ID, a list of (APInt(Identifier ID), BasicBlock ID).
+    // basic block ID, a list of (Value ID, BasicBlock ID).
+    SILType ResultTy = getSILType(MF->getType(TyID),
+                                             (SILValueCategory)TyCategory);
     SILValue Cond = getLocalValue(ListOfValues[0], ListOfValues[1],
                                   getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory));
@@ -1359,15 +1361,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     if (ListOfValues[2])
       DefaultBB = getBBForReference(Fn, ListOfValues[3]);
 
-    SmallVector<std::pair<APInt, SILBasicBlock*>, 4> CaseBBs;
-    for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 2) {
-      auto intTy = Cond.getType().getAs<BuiltinIntegerType>();
-      // Build APInt from string.
-      Identifier StringVal = MF->getIdentifier(ListOfValues[I]);
-      APInt value(intTy->getGreatestWidth(), StringVal.str(), 10);
-      CaseBBs.push_back( {value, getBBForReference(Fn, ListOfValues[I+1])} );
+    SmallVector<std::pair<SILValue, SILBasicBlock*>, 4> CaseBBs;
+    for (unsigned I = 4, E = ListOfValues.size(); I < E; I += 3) {
+      auto value = getLocalValue(ListOfValues[I], ListOfValues[I+1],
+                                 ResultTy);
+      CaseBBs.push_back( {value, getBBForReference(Fn, ListOfValues[I+2])} );
     }
-    ResultVal = Builder.createSwitchInt(Loc, Cond, DefaultBB, CaseBBs);
+    ResultVal = Builder.createSwitchValue(Loc, Cond, DefaultBB, CaseBBs);
     break;
   }
   case ValueKind::SelectValueInst: {

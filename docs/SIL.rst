@@ -3432,20 +3432,20 @@ Conditionally branches to ``true_label`` if ``%0`` is equal to ``1`` or to
 ``false_label`` if ``%0`` is equal to ``0``, binding the corresponding set of
 values to the the arguments of the chosen destination block.
 
-switch_int
+switch_value
 ``````````
 ::
 
-  sil-terminator ::= 'switch_int' sil-operand
-                       (',' sil-switch-int-case)*
+  sil-terminator ::= 'switch_value' sil-operand
+                       (',' sil-switch-value-case)*
                        (',' sil-switch-default)?
-  sil-switch-int-case ::= 'case' int-literal ':' sil-identifier
+  sil-switch-value-case ::= 'case' sil-value ':' sil-identifier
   sil-switch-default ::= 'default' sil-identifier
 
-  switch_int %0 : $Builtin.Int<n>, case 1: label1, \
-                                   case 2: label2, \
-                                   ...,            \
-                                   default labelN
+  switch_value %0 : $Builtin.Int<n>, case %1: label1, \
+                                     case %2: label2, \
+                                     ...,            \
+                                     default labelN
 
   // %0 must be a value of builtin integer type $Builtin.Int<n>
   // `label1` through `labelN` must refer to block labels within the current
@@ -3453,7 +3453,7 @@ switch_int
   // FIXME: All destination labels currently must take no arguments
 
 Conditionally branches to one of several destination basic blocks based on a
-value of builtin integer type. If the operand value matches one of the ``case``
+value of builtin integer or function type. If the operand value matches one of the ``case``
 values of the instruction, control is transferred to the corresponding basic
 block. If there is a ``default`` basic block, control is transferred to it if
 the value does not match any of the ``case`` values. It is undefined behavior

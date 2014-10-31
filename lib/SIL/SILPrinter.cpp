@@ -1147,13 +1147,13 @@ public:
     OS << "autorelease_return " << getIDAndType(RI->getOperand());
   }
   
-  void visitSwitchIntInst(SwitchIntInst *SII) {
-    OS << "switch_int " << getIDAndType(SII->getOperand());
+  void visitSwitchValueInst(SwitchValueInst *SII) {
+    OS << "switch_value " << getIDAndType(SII->getOperand());
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
-      APInt value;
+      SILValue value;
       SILBasicBlock *dest;
       std::tie(value, dest) = SII->getCase(i);
-      OS << ", case " << value << ": " << getID(dest);
+      OS << ", case " << getID(value) << ": " << getID(dest);
     }
     if (SII->hasDefault())
       OS << ", default " << getID(SII->getDefaultBB());

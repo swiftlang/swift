@@ -3031,62 +3031,45 @@ public:
   }
 };
 
-/// A switch on a builtin integer value.
-class SwitchIntInst : public TermInst {
-  FixedOperandList<1> Operands;
+/// A switch on a value of a builtin type.
+class SwitchValueInst : public TermInst {
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
-  /// \brief The number of APInt bits required to represent a case value.
-  unsigned BitWidthForCase;
+  TailAllocatedOperandList<1> Operands;
 
-  SwitchIntInst(SILLocation Loc, SILValue Operand,
-                SILBasicBlock *DefaultBB,
-                ArrayRef<std::pair<APInt, SILBasicBlock*>> CaseBBs);
+  SwitchValueInst(SILLocation Loc, SILValue Operand,
+                  SILBasicBlock *DefaultBB,
+                  ArrayRef<SILValue> Cases,
+                  ArrayRef<SILBasicBlock*> BBs);
 
-  // Tail-allocated after the SwitchIntInst record are:
-  // - `NumCases * getNumWordsForCase()` llvm::integerPart values, containing
-  //   the bitwise representations of the APInt value for each case
+  // Tail-allocated after the SwitchValueInst record are:
+  // - `NumCases` SILValue values, containing
+  //   the SILValue references for each case
   // - `NumCases + HasDefault` SILSuccessor records, referencing the
   //   destinations for each case, ending with the default destination if
   //   present.
 
-  /// Returns the number of APInt bits required to represent a case value, all
-  /// of which are of the operand's type.
-  unsigned getBitWidthForCase() const {
-    return BitWidthForCase;
-  }
 
-  /// Returns the number of APInt words required to represent a case value, all
-  /// of which are of the operand's type.
-  unsigned getNumWordsForCase() const {
-    return (getBitWidthForCase() + llvm::integerPartWidth - 1)
-             / llvm::integerPartWidth;
-  }
-
-  llvm::integerPart *getCaseBuf() {
-    return reinterpret_cast<llvm::integerPart*>(this + 1);
-  }
-  const llvm::integerPart *getCaseBuf() const {
-    return reinterpret_cast<const llvm::integerPart *>(this + 1);
+  OperandValueArrayRef getCaseBuf() const {
+    return Operands.getDynamicValuesAsArray();
   }
 
   SILSuccessor *getSuccessorBuf() {
-    return reinterpret_cast<SILSuccessor*>(
-                             getCaseBuf() + (NumCases * getNumWordsForCase()));
+    return reinterpret_cast<SILSuccessor*>(Operands.asArray().end());
   }
   const SILSuccessor *getSuccessorBuf() const {
-    return reinterpret_cast<const SILSuccessor *>(
-                             getCaseBuf() + (NumCases * getNumWordsForCase()));
+    return reinterpret_cast<const SILSuccessor *>(Operands.asArray().end());
   }
 
 public:
   /// Clean up tail-allocated successor records for the switch cases.
-  ~SwitchIntInst();
+  ~SwitchValueInst();
 
-  static SwitchIntInst *create(SILLocation Loc, SILValue Operand,
-                           SILBasicBlock *DefaultBB,
-                           ArrayRef<std::pair<APInt, SILBasicBlock*>> CaseBBs,
-                           SILFunction &F);
+  static SwitchValueInst *
+  create(SILLocation Loc, SILValue Operand,
+         SILBasicBlock *DefaultBB,
+         ArrayRef<std::pair<SILValue, SILBasicBlock*>> CaseBBs,
+         SILFunction &F);
 
   SILValue getOperand() const { return Operands[0].get(); }
 
@@ -3099,12 +3082,10 @@ public:
   }
 
   unsigned getNumCases() const { return NumCases; }
-  std::pair<APInt, SILBasicBlock*>
+  std::pair<SILValue, SILBasicBlock*>
   getCase(unsigned i) const {
     assert(i < NumCases && "case out of bounds");
-    unsigned words = getNumWordsForCase();
-    ArrayRef<llvm::integerPart> parts{getCaseBuf() + i * words, words};
-    return {APInt(getBitWidthForCase(), parts), getSuccessorBuf()[i]};
+    return {getCaseBuf()[i], getSuccessorBuf()[i]};
   }
 
   bool hasDefault() const { return HasDefault; }
@@ -3114,7 +3095,7 @@ public:
   }
 
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::SwitchIntInst;
+    return V->getKind() == ValueKind::SwitchValueInst;
   }
 };
 

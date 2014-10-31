@@ -190,7 +190,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
     llvm_unreachable("Unexpected terminator kind!");
 
   case ValueKind::UnreachableInst:
-  case ValueKind::SwitchIntInst:
+  case ValueKind::SwitchValueInst:
     llvm_unreachable("Unexpected argument for terminator kind!");
     break;
 
@@ -262,12 +262,16 @@ void DCE::propagateLiveness(SILInstruction *I) {
   case ValueKind::ReturnInst:
   case ValueKind::AutoreleaseReturnInst:
   case ValueKind::CondBranchInst:
-  case ValueKind::SwitchIntInst:
   case ValueKind::SwitchEnumInst:
   case ValueKind::SwitchEnumAddrInst:
   case ValueKind::DynamicMethodBranchInst:
   case ValueKind::CheckedCastBranchInst:
     markValueLive(I->getOperand(0).getDef());
+    return;
+
+  case ValueKind::SwitchValueInst:
+    for (auto &O : I->getAllOperands())
+      markValueLive(O.get().getDef());
     return;
 
   case ValueKind::CheckedCastAddrBranchInst:
@@ -293,7 +297,7 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
   assert(Block && "Expected a destination block!");
 
   assert((isa<CondBranchInst>(Inst) ||
-          isa<SwitchIntInst>(Inst) ||
+          isa<SwitchValueInst>(Inst) ||
           isa<SwitchEnumInst>(Inst) ||
           isa<SwitchEnumAddrInst>(Inst) ||
           isa<DynamicMethodBranchInst>(Inst) ||

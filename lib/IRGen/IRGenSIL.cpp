@@ -676,7 +676,7 @@ public:
   void visitCondBranchInst(CondBranchInst *i);
   void visitReturnInst(ReturnInst *i);
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
-  void visitSwitchIntInst(SwitchIntInst *i);
+  void visitSwitchValueInst(SwitchValueInst *i);
   void visitSwitchEnumInst(SwitchEnumInst *i);
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *i);
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
@@ -1983,8 +1983,19 @@ void IRGenSILFunction::visitAutoreleaseReturnInst(AutoreleaseReturnInst *i) {
   emitReturnInst(*this, i->getOperand().getType(), temp);
 }
 
-void IRGenSILFunction::visitSwitchIntInst(SwitchIntInst *i) {
-  llvm_unreachable("not implemented");
+static llvm::BasicBlock *emitBBMapForSwitchValue(
+        IRGenSILFunction &IGF,
+        SmallVectorImpl<std::pair<SILValue, llvm::BasicBlock*>> &dests,
+        SwitchValueInst *inst) {
+  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
+    auto casePair = inst->getCase(i);
+    dests.push_back({casePair.first, IGF.getLoweredBB(casePair.second).bb});
+  }
+
+  llvm::BasicBlock *defaultDest = nullptr;
+  if (inst->hasDefault())
+    defaultDest = IGF.getLoweredBB(inst->getDefaultBB()).bb;
+  return defaultDest;
 }
 
 static llvm::ConstantInt *
@@ -2063,6 +2074,17 @@ emitSwitchValueDispatch(IRGenSILFunction &IGF,
     IGF.Builder.emitBlock(defaultDest);
     IGF.Builder.CreateUnreachable();
   }
+}
+
+void IRGenSILFunction::visitSwitchValueInst(SwitchValueInst *inst) {
+  Explosion value = getLoweredExplosion(inst->getOperand());
+
+  // Map the SIL dest bbs to their LLVM bbs.
+  SmallVector<std::pair<SILValue, llvm::BasicBlock*>, 4> dests;
+  auto *defaultDest = emitBBMapForSwitchValue(*this, dests, inst);
+
+  emitSwitchValueDispatch(*this, inst->getOperand().getType(),
+                                  value, dests, defaultDest);
 }
 
 // Bind an incoming explosion value to an explosion of LLVM phi node(s).

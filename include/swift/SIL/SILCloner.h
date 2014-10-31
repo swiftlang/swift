@@ -1390,18 +1390,18 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitSwitchIntInst(SwitchIntInst *Inst) {
+SILCloner<ImplClass>::visitSwitchValueInst(SwitchValueInst *Inst) {
   SILBasicBlock *DefaultBB = nullptr;
   if (Inst->hasDefault())
     DefaultBB = getOpBasicBlock(Inst->getDefaultBB());
-  SmallVector<std::pair<APInt, SILBasicBlock*>, 8> CaseBBs;
+  SmallVector<std::pair<SILValue, SILBasicBlock*>, 8> CaseBBs;
   for(int i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseBBs.push_back(std::make_pair(Inst->getCase(i).first,
                                      getOpBasicBlock(Inst->getCase(i).second)));
   doPostProcess(Inst,
-    getBuilder().createSwitchInt(getOpLocation(Inst->getLoc()),
-                                 getOpValue(Inst->getOperand()),
-                                 DefaultBB, CaseBBs));
+    getBuilder().createSwitchValue(getOpLocation(Inst->getLoc()),
+                                   getOpValue(Inst->getOperand()),
+                                   DefaultBB, CaseBBs));
 }
 
 template<typename ImplClass>
