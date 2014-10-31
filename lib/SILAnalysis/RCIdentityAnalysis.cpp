@@ -41,6 +41,8 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UnconditionalCheckedCastInst:
   case ValueKind::UncheckedRefBitCastInst:
+  case ValueKind::InitExistentialRefInst:
+  case ValueKind::OpenExistentialRefInst:
     return true;
   default:
     return false;
