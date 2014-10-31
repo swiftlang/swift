@@ -1545,6 +1545,7 @@ static void _addImageProtocolConformances(const mach_header *mh,
   // Increase the generation to invalidate cached negative lookups.
   ++ProtocolConformanceGeneration;
   
+#ifndef NDEBUG
   // TODO: Just dump records for now. We should enqueue this list for lazy
   // consumption.
   auto record
@@ -1556,6 +1557,7 @@ static void _addImageProtocolConformances(const mach_header *mh,
   
   for (; record < recordsEnd; ++record)
     record->dump();
+#endif
 }
 
 const void *swift::swift_conformsToProtocol2(const Metadata *type,
