@@ -7,7 +7,7 @@ target triple = "x86_64-apple-macosx10.9"
 %swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
 %objc_object = type opaque
 
-declare void @swift_unknownRetain(%swift.refcounted*)
+declare %swift.refcounted* @swift_unknownRetain(%swift.refcounted*)
 declare void @swift_unknownRelease(%swift.refcounted*)
 declare %objc_object* @objc_retain(%objc_object*)
 declare void @objc_release(%objc_object*)
@@ -22,16 +22,18 @@ declare void @user(%swift.refcounted *) nounwind
 
 ; CHECK-LABEL: @trivial_retain_release(
 ; CHECK-NEXT: entry:
+; CHECK-NEXT: call void @user
 ; CHECK-NEXT: ret void
 
 define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O) {
 entry:
   tail call void @swift_retain_noresult(%swift.refcounted* %P)
   tail call void @swift_release(%swift.refcounted* %P) nounwind
-  tail call void @swift_unknownRetain(%swift.refcounted* %P)
+  %0 = tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %P)
   tail call void @swift_unknownRelease(%swift.refcounted* %P)
   tail call %objc_object* @objc_retain(%objc_object* %O)
   tail call void @objc_release(%objc_object* %O)
+  call void @user(%swift.refcounted* %0) nounwind
   ret void
 }
 
@@ -101,7 +103,7 @@ entry:
 define void @swiftunknown_retain_release_null() {
 entry:
   tail call void @swift_unknownRelease(%swift.refcounted* null)
-  tail call void @swift_unknownRetain(%swift.refcounted* null) nounwind
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* null) nounwind
   ret void
 }
 
@@ -137,7 +139,7 @@ define void @swift_fixLifetimeTest(%swift.refcounted* %A) {
 ; CHECK: ret
 define void @move_retain_across_unknown_retain(%swift.refcounted* %A, %swift.refcounted* %B) {
   tail call void @swift_retain_noresult(%swift.refcounted* %A)
-  tail call void @swift_unknownRetain(%swift.refcounted* %B)
+  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %B)
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret void
 }

@@ -193,8 +193,7 @@ static bool canonicalizeInputFunction(Function &F) {
     case RT_FixLifetime:
     case RT_NoMemoryAccessed:
       break;
-    case RT_RetainNoResult:
-    case RT_UnknownRetain: {
+    case RT_RetainNoResult: {
       CallInst &CI = cast<CallInst>(Inst);
       Value *ArgVal = CI.getArgOperand(0);
       // retain_noresult(null) is a no-op.
@@ -293,8 +292,11 @@ static bool canonicalizeInputFunction(Function &F) {
       break;
     }
 
+    // These retain instructions return their argument so must be processed
+    // specially.
+    case RT_UnknownRetain:
     case RT_ObjCRetain: {
-      // Canonicalize objc_retain so that nothing uses its result.
+      // Canonicalize the retain so that nothing uses its result.
       CallInst &CI = cast<CallInst>(Inst);
       Value *ArgVal = CI.getArgOperand(0);
       if (!CI.use_empty()) {
@@ -302,7 +304,7 @@ static bool canonicalizeInputFunction(Function &F) {
         Changed = true;
       }
 
-      // objc_retain(null) is a noop, delete it.
+      // {objc_retain,swift_unknownRetain}(null) is a noop, delete it.
       if (isa<ConstantPointerNull>(ArgVal)) {
         CI.eraseFromParent();
         Changed = true;
@@ -382,6 +384,12 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     case RT_RetainNoResult: {  // swift_retain_noresult(obj)
       CallInst &Retain = cast<CallInst>(*BBI);
       Value *RetainedObject = Retain.getArgOperand(0);
+
+      // Since we canonicalized earlier, we know that if our retain has any
+      // uses, they were replaced already. This assertion documents this
+      // assumption.
+      assert(Retain.use_empty() && "Retain should have been canonicalized to "
+             "have no uses.");
 
       // If the retain and release are to obviously pointer-equal objects, then
       // we can delete both of them.  We have proven that they do not protect
