@@ -107,7 +107,7 @@ static bool isLSForwardingInertInstruction(SILInstruction *Inst) {
 
 namespace {
 
-enum ForwardingKind {
+enum class ForwardingKind {
   Normal,
   UncheckedAddress
 };
@@ -366,7 +366,7 @@ canForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
     return false;
   }
 
-  Result.Kind = UncheckedAddress;
+  Result.Kind = ForwardingKind::UncheckedAddress;
   Result.UADCI = UADCI;
   // Attempt to find the projection path from UADCI -> Load->getOperand().
   // If we failed to find the path, return false.
@@ -383,7 +383,7 @@ static bool canForwardAddressValueToLoad(SILValue Address, LoadInst *LI,
     return canForwardAddressValueToUncheckedAddrToLoad(Address, LI, UADCI,
                                                        Result);
 
-  Result.Kind = Normal;
+  Result.Kind = ForwardingKind::Normal;
   // Attempt to find the projection path from Address -> Load->getOperand().
   // If we failed to find the path, return an empty value early.
   return findAddressProjectionPathBetweenValues(Address, LI->getOperand(),
@@ -444,12 +444,13 @@ static SILValue forwardAddressValueToLoad(SILValue Address,
                                           ForwardingFeasibility &CheckResult) {
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
-  if (CheckResult.Kind == UncheckedAddress)
+  if (CheckResult.Kind == ForwardingKind::UncheckedAddress)
     return forwardAddressValueToUncheckedAddrToLoad(Address, StoredValue,
                                                     LI, CheckResult.UADCI,
                                                     CheckResult.ProjectionPath);
 
-  assert(CheckResult.Kind == Normal && "The default kind is Normal.");
+  assert(CheckResult.Kind == ForwardingKind::Normal &&
+         "The default kind is Normal.");
   // Next, try to promote partial loads from stores. If this fails, it will
   // return SILValue(), which is also our failure condition.
   return findExtractPathFromAddressValueToLoad(Address, StoredValue, LI,
