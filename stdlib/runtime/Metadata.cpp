@@ -646,12 +646,12 @@ static MetadataCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
-#if SWIFT_OBJC_INTEROP
   // If the class pointer is valid as metadata, no translation is required.
   if (theClass->isTypeMetadata()) {
     return theClass;
   }
 
+#if SWIFT_OBJC_INTEROP
   // Search the cache.
 
   const size_t numGenericArgs = 1;

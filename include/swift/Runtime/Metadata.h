@@ -1792,6 +1792,9 @@ struct GenericMetadata {
 /// This contains enough static information to recover the witness table for a
 /// type's conformance to a protocol.
 struct ProtocolConformanceRecord {
+public:
+  using WitnessTableAccessor_t = const void *(*)(const Metadata*);
+
 private:
   /// The protocol being conformed to.
   const ProtocolDescriptor *Protocol;
@@ -1812,7 +1815,6 @@ private:
     const GenericMetadata *GenericPattern;
   };
   
-  using WitnessTableAccessor_t = const void *(*)(const Metadata*);
   
   // The conformance, or a generator function for the conformance.
   union {
@@ -1889,7 +1891,8 @@ public:
     return GenericPattern;
   }
   
-  const void *getWitnessTable() const {
+  /// Get the directly-referenced static witness table.
+  const void *getStaticWitnessTable() const {
     switch (Flags.getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTable:
       break;
@@ -1909,8 +1912,16 @@ public:
       assert(false && "not witness table accessor");
     }
     return WitnessTableAccessor;
-    
   }
+  
+  /// Get the canonical metadata for the type referenced by this record, or
+  /// return null if the record references a generic or universal type.
+  const Metadata *getCanonicalTypeMetadata() const;
+  
+  /// Get the witness table for the specified type, realizing it if
+  /// necessary, or return null if the conformance does not apply to the
+  /// type.
+  const void *getWitnessTable(const Metadata *type) const;
   
 #ifndef NDEBUG
   void dump() const;

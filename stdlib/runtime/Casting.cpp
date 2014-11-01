@@ -36,6 +36,7 @@
 #include <dlfcn.h>
 
 #include <cstring>
+#include <deque>
 #include <mutex>
 #include <sstream>
 #include <type_traits>
@@ -1494,15 +1495,51 @@ void ProtocolConformanceRecord::dump() const {
   
   switch (getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTable:
-      printf("witness table %s\n", symbolName(getWitnessTable()));
+      printf("witness table %s\n", symbolName(getStaticWitnessTable()));
       break;
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
       printf("witness table accessor %s\n",
-             symbolName(getWitnessTable()));
+             symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
       break;
   }
 }
 #endif
+
+/// Take the type reference inside a protocol conformance record and fetch the
+/// canonical metadata pointer for the type it refers to.
+/// Returns nil for universal or generic type references.
+const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata()
+const {
+  switch (getTypeKind()) {
+  case ProtocolConformanceTypeKind::UniqueDirectType:
+    // Already unique.
+    return getDirectType();
+  case ProtocolConformanceTypeKind::NonuniqueDirectType:
+    // Ask the runtime for the unique metadata record we're using.
+    // TODO: We don't unique these yet.
+    return getDirectType();
+  case ProtocolConformanceTypeKind::UniqueIndirectClass:
+    // The class may be ObjC, in which case we need to instantiate its Swift
+    // metadata.
+    return swift_getObjCClassMetadata(*getIndirectClass());
+      
+  case ProtocolConformanceTypeKind::UniqueGenericPattern:
+  case ProtocolConformanceTypeKind::Universal:
+    // The record does not apply to a single type.
+    return nullptr;
+  }
+}
+
+const void *ProtocolConformanceRecord::getWitnessTable(const Metadata *type)
+const {
+  switch (getConformanceKind()) {
+  case ProtocolConformanceReferenceKind::WitnessTable:
+    return getStaticWitnessTable();
+
+  case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+    return getWitnessTableAccessor()(type);
+  }
+}
 
 // TODO: Implement protocol conformance lookup for non-Apple environments
 #ifdef __APPLE__
@@ -1515,8 +1552,85 @@ static dispatch_once_t InstallProtocolConformanceAddImageCallbackOnce = 0;
 
 // Monotonic generation number that is increased when we load an image with
 // new protocol conformances.
+//
+// Although this is atomically readable, writes or cached stores of the value
+// must be guarded by the SectionsToScanLock in order to ensure the generation
+// number agrees with the state of the queue at the time of caching.
 static std::atomic<unsigned> ProtocolConformanceGeneration
   = ATOMIC_VAR_INIT(0);
+
+namespace {
+  struct ConformanceSection {
+    const ProtocolConformanceRecord *Begin, *End;
+    const ProtocolConformanceRecord *begin() const {
+      return Begin;
+    }
+    const ProtocolConformanceRecord *end() const {
+      return End;
+    }
+  };
+  
+  struct ConformanceCacheEntry {
+  private:
+    uintptr_t Data;
+    // All Darwin 64-bit platforms reserve the low 2^32 of address space, which
+    // is more than enough invalid pointer values for any realistic generation
+    // number. It's a little easier to overflow on 32-bit, so we need an extra
+    // bit there.
+  #if !__LP64__
+    bool Success;
+  #endif
+    
+    ConformanceCacheEntry(uintptr_t Data, bool Success)
+      : Data(Data)
+    #if !__LP64__
+        , Success(Success)
+    #endif
+    {}
+    
+  public:
+    ConformanceCacheEntry() = default;
+    
+    /// Cache entry for a successful lookup.
+    static ConformanceCacheEntry success(const void *value) {
+      return ConformanceCacheEntry((uintptr_t)value, true);
+    }
+    /// Cache entry for a failed lookup.
+    static ConformanceCacheEntry failure(unsigned generation) {
+      return ConformanceCacheEntry((uintptr_t)generation, false);
+    }
+    
+    bool isSuccessful() const {
+    #if __LP64__
+      return Data > 0xFFFFFFFFU;
+    #else
+      return Success;
+    #endif
+    }
+    
+    /// Get the cached witness table, if successful.
+    const void *getWitnessTable() const {
+      assert(isSuccessful());
+      return (const void *)Data;
+    }
+    
+    /// Get the generation number under which this lookup failed.
+    unsigned getFailureGeneration() const {
+      assert(!isSuccessful());
+      return Data;
+    }
+  };
+}
+
+// Found conformances.
+static pthread_rwlock_t ConformanceCacheLock = PTHREAD_RWLOCK_INITIALIZER;
+static llvm::DenseMap<std::pair<const Metadata *, const ProtocolDescriptor*>,
+                      ConformanceCacheEntry> ConformanceCache;
+
+// Conformance sections pending a scan.
+// TODO: This could easily be a lock-free FIFO.
+static pthread_mutex_t SectionsToScanLock = PTHREAD_MUTEX_INITIALIZER;
+static std::deque<ConformanceSection> SectionsToScan;
 
 static void _addImageProtocolConformances(const mach_header *mh,
                                           intptr_t vmaddr_slide) {
@@ -1542,26 +1656,25 @@ static void _addImageProtocolConformances(const mach_header *mh,
   
   // If we have a section, enqueue the conformances for lookup.
 
-  // Increase the generation to invalidate cached negative lookups.
-  ++ProtocolConformanceGeneration;
   
-#ifndef NDEBUG
-  // TODO: Just dump records for now. We should enqueue this list for lazy
-  // consumption.
-  auto record
+  auto recordsBegin
     = reinterpret_cast<const ProtocolConformanceRecord*>(conformances);
   auto recordsEnd
     = reinterpret_cast<const ProtocolConformanceRecord*>
                                               (conformances + conformancesSize);
   
-  
-  for (; record < recordsEnd; ++record)
-    record->dump();
-#endif
+  pthread_mutex_lock(&SectionsToScanLock);
+  // Increase the generation to invalidate cached negative lookups.
+  ++ProtocolConformanceGeneration;
+
+  SectionsToScan.push_back(ConformanceSection{recordsBegin, recordsEnd});
+  pthread_mutex_unlock(&SectionsToScanLock);
 }
 
 const void *swift::swift_conformsToProtocol2(const Metadata *type,
                                             const ProtocolDescriptor *protocol){
+  // TODO: Generic types, subclasses, foreign classes
+
   // Install our dyld callback if we haven't already.
   // Dyld will invoke this on our behalf for all images that have already been
   // loaded.
@@ -1569,14 +1682,64 @@ const void *swift::swift_conformsToProtocol2(const Metadata *type,
     _dyld_register_func_for_add_image(_addImageProtocolConformances);
   });
   
-  return nullptr;
-  
+recur:
   // See if we have a cached conformance.
+  pthread_rwlock_rdlock(&ConformanceCacheLock);
+  auto found = ConformanceCache.find({type, protocol});
+  if (found != ConformanceCache.end()) {
+    auto entry = found->second;
+    pthread_rwlock_unlock(&ConformanceCacheLock);
+    
+    if (entry.isSuccessful())
+      return entry.getWitnessTable();
+    
+    // If we got a cached negative response, check the generation number.
+    if (entry.getFailureGeneration() == ProtocolConformanceGeneration)
+      return nullptr;
+  } else {
+    pthread_rwlock_unlock(&ConformanceCacheLock);
+  }
   
-  // If we got a cached negative response, check the generation number.
+  // If we didn't have an up-to-date cache entry, scan the conformance records.
+  pthread_mutex_lock(&SectionsToScanLock);
+  pthread_rwlock_wrlock(&ConformanceCacheLock);
   
-  // If we didn't have a cache entry, or it's a stale negative response, go to
-  // the conformance records.
+  // If we have no new information to pull in, we're done.
+  if (SectionsToScan.empty()) {
+    // Cache the negative result.
+    ConformanceCache.insert({{type, protocol},
+      ConformanceCacheEntry::failure(ProtocolConformanceGeneration)});
+    pthread_rwlock_unlock(&ConformanceCacheLock);
+    pthread_mutex_unlock(&SectionsToScanLock);
+    return nullptr;
+  }
+  
+  while (!SectionsToScan.empty()) {
+    auto section = SectionsToScan.front();
+    SectionsToScan.pop_front();
+    
+    // Eagerly pull records for nongeneric, nonuniversal classes into our cache.
+    for (const auto &record : section) {
+      auto metadata = record.getCanonicalTypeMetadata();
+      if (!metadata)
+        continue;
+      
+      auto witness = record.getWitnessTable(metadata);
+      ConformanceCacheEntry cacheEntry;
+      if (witness)
+        cacheEntry = ConformanceCacheEntry::success(witness);
+      else
+        cacheEntry
+          = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
+      
+      ConformanceCache.insert({{metadata, record.getProtocol()}, cacheEntry});
+    }
+  }
+  
+  pthread_rwlock_unlock(&ConformanceCacheLock);
+  pthread_mutex_unlock(&SectionsToScanLock);
+  // Try again with our newly-populated cache.
+  goto recur;
 }
 
 #else // if !__APPLE__
@@ -1589,13 +1752,54 @@ const void *swift::swift_conformsToProtocol2(const Metadata *type,
 
 #endif // __APPLE__
 
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C" OpaqueExistentialContainer
+_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
+                                            const Metadata *T);
+
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C" OpaqueExistentialContainer
+_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
+
+
+// Test harness for using swift_conformsToProtocol2 from Swift source.
+//
+// func _stdlib_dynamicCastToExistential1_2<SourceType, DestType>(
+//     value: SourceType,
+//     _: DestType.Type
+// ) -> DestType?
+//
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C"
+OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1_2(
+    OpaqueValue *sourceValue, const Metadata *_destType,
+    const Metadata *sourceType, const Metadata *destType) {
+  assert(destType->getKind() == MetadataKind::Existential);
+  auto destExistential
+    = static_cast<const ExistentialTypeMetadata*>(destType);
+  assert(destExistential->Protocols.NumProtocols == 1);
+  auto protocol = destExistential->Protocols[0];
+  auto witness = swift_conformsToProtocol2(sourceType, protocol);
+  if (!witness)
+    return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
+  
+  OpaqueExistentialBox<1>::Container outValue;
+  outValue.Header.Type = sourceType;
+  outValue.WitnessTables[0] = witness;
+  sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
+  return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
+                         reinterpret_cast<OpaqueValue *>(&outValue), destType);
+}
+
 /// A cache used for swift_conformsToProtocol.
 static llvm::DenseMap<std::pair<const Metadata*, const ProtocolDescriptor*>,
                       const void *> FoundProtocolConformances;
-/// Read-write lock used to guard FoundProtocolConformances during lookup
+/// Read-write lock used to guard FoundProtocolConformances during lookup.
 static pthread_rwlock_t FoundProtocolConformancesLock
   = PTHREAD_RWLOCK_INITIALIZER;
-
 
 
 /// \brief Check whether a type conforms to a given native Swift protocol,
@@ -1863,17 +2067,6 @@ swift_stdlib_dynamicCastToExistential1Unconditional(
 }
 
 #pragma clang diagnostic pop
-
-// The return type is incorrect.  It is only important that it is
-// passed using 'sret'.
-extern "C" OpaqueExistentialContainer
-_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
-                                            const Metadata *T);
-
-// The return type is incorrect.  It is only important that it is
-// passed using 'sret'.
-extern "C" OpaqueExistentialContainer
-_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
 
 // func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
 //     value: SourceType,
