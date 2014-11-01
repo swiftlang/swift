@@ -1,6 +1,9 @@
 // RUN: %swift -gnone -O -target x86_64-apple-macosx10.9 -emit-assembly %s -o - | FileCheck -check-prefix x86_64 %s
 // RUN: %swift -gnone -O -target armv7-apple-ios7 -emit-assembly %s -o - | FileCheck -check-prefix armv7 %s
 // RUN: %swift -gnone -O -target arm64-apple-ios7 -emit-assembly %s -o - | FileCheck -check-prefix arm64 %s
+// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=armv7
+// REQUIRES: CPU=arm64
 
 // rdar://17999904
 
