@@ -57,7 +57,7 @@ var g = foo(1.0);
 
 // Tuple types.
 var tuple: (Int, Bool) = (1, true)
-// CHECK-DAG: _Tv{{9variables|4main}}5tupleTSiSb_{{[^,]+}},{{[^,]+}}, {{[^,]+}}, metadata ![[TUPTY:[^,]+]], {{.*}}} ; [ DW_TAG_variable ] [tuple] [line [[@LINE-1]]] [def]
+// CHECK-DAG: _Tv{{9variables|4main}}5tupleTSiSb_{{[^,]+}},{{[^,]+}}, {{[^,]+}}, metadata ![[TUPTY:[^,]+]], {{.*}}} ; [ DW_TAG_variable ] [tuple] [line [[@LINE-1]]]
 // CHECK-DAG: metadata ![[ELEMS:[0-9]+]], null, null, metadata ![[TUPTY]]}
 // CHECK-DAG: ![[ELEMS]] = metadata !{metadata ![[MI64:[0-9]+]], metadata ![[MB:[0-9]+]]}
 // CHECK-DAG: ![[MI64]] = {{.*}}[ DW_TAG_member ]{{.*}}[from _TtSi]
@@ -72,7 +72,7 @@ println(tuple)
 
 // Arrays are represented as an instantiation of Array.
 // CHECK-DAG: null, null, metadata ![[Array:.*]]} ; [ DW_TAG_structure_type ] [Array]
-// CHECK-DAG: metadata ![[Array]], {{.*}} ; [ DW_TAG_variable ] [array_of_tuples] [line [[@LINE+1]]] [def]
+// CHECK-DAG: metadata ![[Array]], {{.*}} ; [ DW_TAG_variable ] [array_of_tuples] [line [[@LINE+1]]]
 var array_of_tuples : [(a : Int, b : Int)] = [(1,2)]
 var twod : [[Int]] = [[1]]
 
@@ -80,7 +80,7 @@ func bar( x: [(a : Int, b : Int)], y: [[Int]] ) {
 }
 
 
-// CHECK-DAG: \001", {{[^,]+}}, {{[^,]+}}, metadata ![[PTY:[0-9]+]], {{.*}}} ; [ DW_TAG_variable ] [P] [line [[@LINE+4]]] [def]
+// CHECK-DAG: \001", {{[^,]+}}, {{[^,]+}}, metadata ![[PTY:[0-9]+]], {{.*}}} ; [ DW_TAG_variable ] [P] [line [[@LINE+4]]]
 // CHECK-DAG: metadata ![[PTUP:[^,]+]]} ; [ DW_TAG_structure_type ] [_TtT1xSd1ySd1zSd_]
 // CHECK-DAG: ![[PTY]] = {{.*}}metadata ![[PTUP]]} ; [ DW_TAG_typedef ] [_Tta{{9variables|4main}}5Point] [line [[@LINE+1]], size 0, align 0, offset 0] [from _TtT1xSd1ySd1zSd_]
 typealias Point = (x: Double, y: Double, z: Double)
@@ -90,7 +90,7 @@ func println(p: (x: Double, y: Double, z: Double)) {
 }
 println(P)
 
-// CHECK-DAG: \001", {{[^,]+}}, {{[^,]+}}, metadata ![[APTY:[0-9]+]], {{.*}}} ; [ DW_TAG_variable ] [P2] [line [[@LINE+3]]] [def]
+// CHECK-DAG: \001", {{[^,]+}}, {{[^,]+}}, metadata ![[APTY:[0-9]+]], {{.*}}} ; [ DW_TAG_variable ] [P2] [line [[@LINE+3]]]
 // CHECK-DAG: ![[APTY]] = {{.*}}metadata ![[PTY:[0-9]+]]} ; [ DW_TAG_typedef ] [_Tta{{9variables|4main}}13AliasForPoint] [line [[@LINE+1]], size 0, align 0, offset 0] [from _Tta{{9variables|4main}}5Point]
 typealias AliasForPoint = Point
 var P2:AliasForPoint = (4, 5, 6)
@@ -102,7 +102,7 @@ enum TriValue {
   case true_
   case top
 }
-// CHECK-DAG: \001", {{[^,]+}}, {{[^,]+}}, metadata ![[UNIONTYPE:[^,]+]], {{.*}}} ; [ DW_TAG_variable ] [unknown] [line [[@LINE+2]]] [def]
+// CHECK-DAG: \001", {{[^,]+}}, {{[^,]+}}, metadata ![[UNIONTYPE:[^,]+]], {{.*}}} ; [ DW_TAG_variable ] [unknown] [line [[@LINE+2]]]
 // CHECK-DAG: ![[UNIONTYPE]] ={{.*}}[ DW_TAG_union_type ] [_TtO{{9variables|4main}}8TriValue]
 var unknown = TriValue.top
 func println(value: TriValue) {
