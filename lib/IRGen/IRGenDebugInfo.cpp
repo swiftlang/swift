@@ -1148,11 +1148,11 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
 
   // Global variables in the top level compilation unit are emitted as
   // local static variables of SWIFT_ENTRY_POINT_FUNCTION so they
-  // won't get confused with addressors.
+  // show up as frame variables, too.
   auto File = getOrCreateFile(L.Filename);
   if (!IsLibrary)
     DBuilder.createGlobalVariable(EntryPointFn, Name, LinkageName, File, L.Line,
-                                  Ty, Var->hasInternalLinkage(), Var, nullptr);
+                                  Ty, true, Var, nullptr);
 
   // Emit them a second time as global variables of the current module.
   DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File, L.Line, Ty,

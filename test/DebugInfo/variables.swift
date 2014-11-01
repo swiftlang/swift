@@ -12,21 +12,21 @@
 
 // Global variables.
 var glob_i8:   Int8 = 8;
-// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[I8:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_i8] [line [[@LINE-1]]] [def]
+// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[I8:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_i8] [line [[@LINE-1]]]
 var glob_i16:  Int16 = 16;
-// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[I16:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_i16] [line [[@LINE-1]]] [def]
+// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[I16:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_i16] [line [[@LINE-1]]]
 var glob_i32:  Int32 = 32;
-// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[I32:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_i32] [line [[@LINE-1]]] [def]
+// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[I32:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_i32] [line [[@LINE-1]]]
 var glob_i64:  Int64 = 64;
-// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[I64:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_i64] [line [[@LINE-1]]] [def]
+// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[I64:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_i64] [line [[@LINE-1]]]
 var glob_f:    Float = 2.89;
-// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[F:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_f] [line [[@LINE-1]]] [def]
+// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[F:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_f] [line [[@LINE-1]]]
 var glob_d:    Double = 3.14;
-// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[D:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_d] [line [[@LINE-1]]] [def]
+// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[D:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_d] [line [[@LINE-1]]]
 var glob_b:    Bool = true
-// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[B:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_b] [line [[@LINE-1]]] [def]
+// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[B:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_b] [line [[@LINE-1]]]
 var glob_s:    String = "😄"
-// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[S:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_s] [line [[@LINE-1]]] [def]
+// CHECK-DAG: metadata ![[TLC]], {{[^,]+}}, metadata ![[S:[^,]+]]{{.*}}} ; [ DW_TAG_variable ] [glob_s] [line [[@LINE-1]]]
 // FIXME: Dreadful type-checker performance prevents this from being this single
 // print expression:
 //   print("\(glob_v), \(glob_i8), \(glob_i16), \(glob_i32), \(glob_i64), \(glob_f), \(glob_d), \(glob_b), \(glob_s)")
