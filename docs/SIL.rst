@@ -3433,7 +3433,7 @@ Conditionally branches to ``true_label`` if ``%0`` is equal to ``1`` or to
 values to the the arguments of the chosen destination block.
 
 switch_value
-``````````
+````````````
 ::
 
   sil-terminator ::= 'switch_value' sil-operand
@@ -3460,7 +3460,7 @@ the value does not match any of the ``case`` values. It is undefined behavior
 if the value does not match any cases and no ``default`` branch is provided.
 
 select_value
-```````````
+````````````
 ::
 
   sil-instruction ::= 'select_value' sil-operand sil-select-value-case*
