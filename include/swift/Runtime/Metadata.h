@@ -2310,6 +2310,11 @@ const void *swift_conformsToProtocol(const Metadata *type,
 extern "C"
 const void *swift_conformsToProtocol2(const Metadata *type,
                                       const ProtocolDescriptor *protocol);
+
+/// Register a block of protocol conformance records for dynamic lookup.
+extern "C"
+void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
+                                        const ProtocolConformanceRecord *end);
   
 /// Return the number of extra inhabitants in a heap object pointer.
 extern "C"

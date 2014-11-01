@@ -496,7 +496,7 @@ public:
 //--- Global context emission --------------------------------------------------
 public:
   void emitGlobalTopLevel();
-  void emitObjCRegistration();
+  void emitRuntimeRegistration();
   void emitLazyDefinitions();
 private:
   void emitGlobalDecl(Decl *D);

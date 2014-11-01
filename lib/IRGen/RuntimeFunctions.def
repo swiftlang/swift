@@ -596,6 +596,14 @@ FUNCTION(Once, swift_once, RuntimeCC,
          ARGS(OnceTy->getPointerTo(), Int8PtrTy, RefCountedPtrTy),
          ATTRS())
 
+// void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
+//                                         const ProtocolConformanceRecord *end)
+FUNCTION(RegisterProtocolConformances,
+         swift_registerProtocolConformances, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolConformanceRecordPtrTy, ProtocolConformanceRecordPtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy),

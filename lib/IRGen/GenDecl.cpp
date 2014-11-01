@@ -340,74 +340,17 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   }
 }
 
-void IRGenModule::emitObjCRegistration() {
-  SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-  
-  // If we're debugging, we probably don't have a main. Find a
-  // function marked with the LLDBDebuggerFunction attribute instead.
-  if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
-    for (SILFunction &SF : *SILMod) {
-      if (SF.hasLocation()) {
-        if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
-          if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-            if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
-              EntryPoint = &SF;
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  if (!EntryPoint)
-    return;
-    
-  llvm::Function *DebuggerFunction = Module.getFunction(EntryPoint->getName());
-  if (!DebuggerFunction)
-    return;
-  
-  llvm::BasicBlock *EntryBB = &DebuggerFunction->getEntryBlock();
-  llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-  IRBuilder Builder(getLLVMContext());
-  Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
-  
-  for (llvm::WeakVH &ObjCClass : ObjCClasses) {
-    Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
-  }
-    
-  for (ExtensionDecl *ext : ObjCCategoryDecls) {
-    CategoryInitializerVisitor(*this, Builder, ext).visitMembers(ext);
-  }
-}
-
-/// Add the given global value to @llvm.used.
-///
-/// This value must have a definition by the time the module is finalized.
-void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
-  LLVMUsed.push_back(global);
-}
-
-/// Add the given global value to the Objective-C class list.
-void IRGenModule::addObjCClass(llvm::Constant *classPtr) {
-  ObjCClasses.push_back(classPtr);
-}
-
-/// Add the given protocol conformance record to the protocol conformances list.
-void IRGenModule::addProtocolConformanceRecord(llvm::Constant *conformanceRec) {
-  ProtocolConformanceRecords.push_back(conformanceRec);
-}
-
 /// Emit a global list, i.e. a global constant array holding all of a
 /// list of values.  Generally these lists are for various LLVM
 /// metadata or runtime purposes.
-static void emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
+static llvm::GlobalVariable *
+emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
                            StringRef name, StringRef section,
                            llvm::GlobalValue::LinkageTypes linkage,
                            llvm::Type *eltTy,
                            bool isConstant) {
   // Do nothing if the list is empty.
-  if (handles.empty()) return;
+  if (handles.empty()) return nullptr;
 
   // For global lists that actually get linked (as opposed to notional
   // ones like @llvm.used), it's important to set an explicit alignment
@@ -435,6 +378,99 @@ static void emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
   // (Note that we'd specifically like to not put @llvm.used in itself.)
   if (llvm::GlobalValue::isLocalLinkage(linkage))
     IGM.addUsedGlobal(var);
+  return var;
+}
+
+void IRGenModule::emitRuntimeRegistration() {
+  // Duck out early if we have nothing to register.
+  if (ProtocolConformanceRecords.empty()
+      && (!ObjCInterop || (ObjCClasses.empty() && ObjCCategoryDecls.empty())))
+    return;
+  
+  // Find the entry point.
+  SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+  
+  // If we're debugging, we probably don't have a main. Find a
+  // function marked with the LLDBDebuggerFunction attribute instead.
+  if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
+    for (SILFunction &SF : *SILMod) {
+      if (SF.hasLocation()) {
+        if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
+          if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+            if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
+              EntryPoint = &SF;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  if (!EntryPoint)
+    return;
+    
+  llvm::Function *EntryFunction = Module.getFunction(EntryPoint->getName());
+  if (!EntryFunction)
+    return;
+  
+  llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
+  llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
+  IRBuilder Builder(getLLVMContext());
+  Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+  
+  // Register protocol conformances if we added any.
+  if (!ProtocolConformanceRecords.empty()) {
+    llvm::Constant *conformances
+      = emitGlobalList(*this, ProtocolConformanceRecords,
+                       "protocol_conformances",
+                       "__DATA, __swift1_proto, regular, no_dead_strip",
+                       llvm::GlobalValue::InternalLinkage,
+                       ProtocolConformanceRecordTy,
+                       true);
+    llvm::Constant *beginIndices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, 0),
+    };
+    auto begin = llvm::ConstantExpr::getGetElementPtr(conformances,
+                                                      beginIndices);
+    llvm::Constant *endIndices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, ProtocolConformanceRecords.size()),
+    };
+    auto end = llvm::ConstantExpr::getGetElementPtr(conformances, endIndices);
+    
+    Builder.CreateCall2(getRegisterProtocolConformancesFn(), begin, end);
+  }
+  
+  // Register ObjC classes and extensions we added.
+  if (ObjCInterop)
+    return;
+  
+  for (llvm::WeakVH &ObjCClass : ObjCClasses) {
+    Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
+  }
+    
+  for (ExtensionDecl *ext : ObjCCategoryDecls) {
+    CategoryInitializerVisitor(*this, Builder, ext).visitMembers(ext);
+  }
+}
+
+/// Add the given global value to @llvm.used.
+///
+/// This value must have a definition by the time the module is finalized.
+void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
+  LLVMUsed.push_back(global);
+}
+
+/// Add the given global value to the Objective-C class list.
+void IRGenModule::addObjCClass(llvm::Constant *classPtr) {
+  ObjCClasses.push_back(classPtr);
+}
+
+/// Add the given protocol conformance record to the protocol conformances list.
+void IRGenModule::addProtocolConformanceRecord(llvm::Constant *conformanceRec) {
+  ProtocolConformanceRecords.push_back(conformanceRec);
 }
 
 void IRGenModule::emitGlobalLists() {
@@ -461,11 +497,14 @@ void IRGenModule::emitGlobalLists() {
                  Int8PtrTy,
                  false);
 
-  emitGlobalList(*this, ProtocolConformanceRecords, "protocol_conformances",
-               "__DATA, __swift1_proto, regular, no_dead_strip",
-               llvm::GlobalValue::InternalLinkage,
-               ProtocolConformanceRecordTy,
-               true);
+  // Emit protocol conformances into a section we can recognize at runtime.
+  // In JIT mode we need to manually register these conformances later.
+  if (!Opts.UseJIT)
+    emitGlobalList(*this, ProtocolConformanceRecords, "protocol_conformances",
+                 "__DATA, __swift1_proto, regular, no_dead_strip",
+                 llvm::GlobalValue::InternalLinkage,
+                 ProtocolConformanceRecordTy,
+                 true);
   
   // @llvm.used
   assert(std::all_of(LLVMUsed.begin(), LLVMUsed.end(),

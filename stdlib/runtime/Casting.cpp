@@ -1632,6 +1632,17 @@ static llvm::DenseMap<std::pair<const Metadata *, const ProtocolDescriptor*>,
 static pthread_mutex_t SectionsToScanLock = PTHREAD_MUTEX_INITIALIZER;
 static std::deque<ConformanceSection> SectionsToScan;
 
+void
+swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
+                                          const ProtocolConformanceRecord *end){
+  pthread_mutex_lock(&SectionsToScanLock);
+  // Increase the generation to invalidate cached negative lookups.
+  ++ProtocolConformanceGeneration;
+  
+  SectionsToScan.push_back(ConformanceSection{begin, end});
+  pthread_mutex_unlock(&SectionsToScanLock);
+}
+
 static void _addImageProtocolConformances(const mach_header *mh,
                                           intptr_t vmaddr_slide) {
 #ifdef __LP64__
@@ -1662,13 +1673,7 @@ static void _addImageProtocolConformances(const mach_header *mh,
   auto recordsEnd
     = reinterpret_cast<const ProtocolConformanceRecord*>
                                               (conformances + conformancesSize);
-  
-  pthread_mutex_lock(&SectionsToScanLock);
-  // Increase the generation to invalidate cached negative lookups.
-  ++ProtocolConformanceGeneration;
-
-  SectionsToScan.push_back(ConformanceSection{recordsBegin, recordsEnd});
-  pthread_mutex_unlock(&SectionsToScanLock);
+  swift_registerProtocolConformances(recordsBegin, recordsEnd);
 }
 
 const void *swift::swift_conformsToProtocol2(const Metadata *type,
@@ -1694,8 +1699,9 @@ recur:
       return entry.getWitnessTable();
     
     // If we got a cached negative response, check the generation number.
-    if (entry.getFailureGeneration() == ProtocolConformanceGeneration)
+    if (entry.getFailureGeneration() == ProtocolConformanceGeneration) {
       return nullptr;
+    }
   } else {
     pthread_rwlock_unlock(&ConformanceCacheLock);
   }
@@ -1707,8 +1713,8 @@ recur:
   // If we have no new information to pull in, we're done.
   if (SectionsToScan.empty()) {
     // Cache the negative result.
-    ConformanceCache.insert({{type, protocol},
-      ConformanceCacheEntry::failure(ProtocolConformanceGeneration)});
+    ConformanceCache[{type, protocol}]
+      = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
     pthread_rwlock_unlock(&ConformanceCacheLock);
     pthread_mutex_unlock(&SectionsToScanLock);
     return nullptr;
@@ -1732,7 +1738,7 @@ recur:
         cacheEntry
           = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
       
-      ConformanceCache.insert({{metadata, record.getProtocol()}, cacheEntry});
+      ConformanceCache[{metadata, record.getProtocol()}] = cacheEntry;
     }
   }
   

@@ -166,9 +166,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Okay, emit any definitions that we suddenly need.
   IGM.emitLazyDefinitions();
 
-  // Emit intializers for Objective-C classes if needed.
-  if (IGM.ObjCInterop && Opts.UseJIT)
-    IGM.emitObjCRegistration();
+  // Register our info with the runtime if needed.
+  if (Opts.UseJIT)
+    IGM.emitRuntimeRegistration();
 
   std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
                 [&](LinkLibrary linkLib) {
