@@ -9,6 +9,7 @@ add_subdirectory(Foundation)
 add_subdirectory(ObjectiveC)
 add_subdirectory(Security)
 add_subdirectory(SpriteKit)
+add_subdirectory(XCTest)
 
 if (SWIFT_SDKS)
   add_subdirectory(AppKit)
@@ -27,8 +28,3 @@ else()
   endif()
 endif()
 
-# FIXME: Temporarily allow one to disable building this overlay module.
-option(SWIFT_BUILD_XCTEST "Build XCTest overlay" YES)
-if (SWIFT_BUILD_XCTEST)
-  add_subdirectory(XCTest)
-endif()
