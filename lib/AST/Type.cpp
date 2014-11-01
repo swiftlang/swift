@@ -870,10 +870,6 @@ CanGenericSignature GenericSignature::getCanonicalSignature() {
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 CanType TypeBase::getCanonicalType() {
-  assert(this != 0 &&
-         "Cannot call getCanonicalType before name binding is complete "
-         "or on a null pointer");
-
   // If the type is itself canonical, return it.
   if (isCanonical())
     return CanType(this);
