@@ -2221,13 +2221,13 @@ IRGenSILFunction::visitSwitchEnumAddrInst(SwitchEnumAddrInst *inst) {
 
 // FIXME: We could lower select_enum directly to LLVM select in a lot of cases.
 // For now, just emit a switch and phi nodes, like a chump.
-template<class T>
+template<class C, class T>
 static llvm::BasicBlock *
 emitBBMapForSelect(IRGenSILFunction &IGF,
            Explosion &resultPHI,
            SmallVectorImpl<std::pair<T, llvm::BasicBlock*>> &BBs,
            llvm::BasicBlock *&defaultBB,
-           SelectInstBase<T> *inst) {
+           SelectInstBase<C, T> *inst) {
   auto origBB = IGF.Builder.GetInsertBlock();
 
   // Set up a continuation BB and phi nodes to receive the result value.
@@ -2284,10 +2284,10 @@ emitBBMapForSelect(IRGenSILFunction &IGF,
   return contBB;
 }
 
-template <class T>
+template <class C, class T>
 static LoweredValue
 getLoweredValueForSelect(IRGenSILFunction &IGF,
-                         Explosion &result, SelectInstBase<T> *inst) {
+                         Explosion &result, SelectInstBase<C, T> *inst) {
   if (inst->getType().isAddress())
     // FIXME: Loses potentially better alignment info we might have.
     return LoweredValue(Address(result.claimNext(),

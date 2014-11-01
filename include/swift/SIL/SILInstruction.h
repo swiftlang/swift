@@ -1842,7 +1842,8 @@ public:
 // Base class of all select instructions like select_enum, select_value, etc.
 // The template parameter represents a type of case values to be compared
 // with the operand of a select instruction.
-template <class T> class SelectInstBase : public SILInstruction {
+template <class Derived, class T>
+class SelectInstBase : public SILInstruction {
 protected:
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
@@ -1866,13 +1867,17 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
-  virtual std::pair<T, SILValue> getCase(unsigned i) const = 0;
+  std::pair<T, SILValue> getCase(unsigned i) {
+    return static_cast<const Derived *>(this)->getCase(i);
+  }
 
   unsigned getNumCases() const { return NumCases; }
 
   bool hasDefault() const { return HasDefault; }
 
-  virtual SILValue getDefaultResult() const = 0;
+  SILValue getDefaultResult() const {
+    return static_cast<const Derived *>(this)->getDefaultResult();
+  }
 
   // getType() is OK because there's only one result.
   SILType getType() const { return SILInstruction::getType(0); }
@@ -1880,7 +1885,8 @@ public:
 
 /// Common base class for the select_enum and select_enum_addr instructions,
 /// which select one of a set of possible results based on the case of an enum.
-class SelectEnumInstBase : public SelectInstBase<EnumElementDecl*> {
+class SelectEnumInstBase
+    : public SelectInstBase<SelectEnumInstBase, EnumElementDecl *> {
   // Tail-allocated after the operands is an array of `NumCases`
   // EnumElementDecl* pointers, referencing the case discriminators for each
   // operand.
@@ -2996,7 +3002,7 @@ public:
 };
 
 /// Select on a value of a builtin integer type.
-class SelectValueInst : public SelectInstBase<SILValue> {
+class SelectValueInst : public SelectInstBase<SelectValueInst, SILValue> {
   SelectValueInst(SILLocation Loc, SILValue Operand,
                   SILType Type,
                   SILValue DefaultResult,
