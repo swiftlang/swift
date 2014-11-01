@@ -31,7 +31,7 @@ add_custom_command(TARGET copy_shim_headers POST_BUILD
     "${SWIFTLIB_DIR}/clang"
   COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Symlink in arclite from the XcodeDefault toolchain.
   execute_process(COMMAND xcrun --toolchain XcodeDefault -find clang 
     OUTPUT_VARIABLE toolchain_dir 

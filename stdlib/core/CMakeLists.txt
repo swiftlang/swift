@@ -114,7 +114,7 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   )
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")
   set(RUNTIME_DEPENDENCY swiftRuntime)
 else()

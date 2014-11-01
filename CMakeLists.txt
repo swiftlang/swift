@@ -193,7 +193,7 @@ option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 
 # Disable stdlib internal checks in Release builds. Internal checks
 # are intentionally enabled in RelWithDebInfo builds.
-if(CMAKE_BUILD_TYPE MATCHES "Release")
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
   set(SWIFT_STDLIB_INTERNAL_CHECKS_default NO)
 else()
   set(SWIFT_STDLIB_INTERNAL_CHECKS_default YES)
@@ -307,7 +307,7 @@ if ( XCODE )
 else ()
   # Compile with C++11, without RTTI, exceptions
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
-  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # Use libc++.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++")
@@ -979,7 +979,7 @@ macro(add_swift_library_single target name)
     endif()
   endif()
 
-  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(${target}
       PROPERTIES
       INSTALL_NAME_DIR "@rpath"
@@ -1436,12 +1436,12 @@ macro(add_swift_executable name)
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 
-  if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_property(TARGET ${name} APPEND_STRING PROPERTY
       LINK_FLAGS " -Xlinker -rpath -Xlinker @executable_path/../lib/swift/${SWIFTLIB_SUBDIR}")
   endif()
  
-  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # ASan does not play well with exported_symbol option. This should be fixed soon.
     if(NOT SWIFT_ASAN_BUILD)
       if (NOT SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS)
@@ -1561,7 +1561,7 @@ endmacro(configure_sdk)
 
 # Configure the various SDKs.
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Choose an SDK if none was set.
   set(MODULES_SDK "" CACHE PATH
       "Path to the modules-enabled SDK to use")

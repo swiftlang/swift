@@ -9,7 +9,7 @@ find_path(UUID_INCLUDE_DIR uuid/uuid.h
 set(UUID_INCLUDE_DIRS ${UUID_INCLUDE_DIR})
 
 # On OSX we don't need the library
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(UUID_REQUIRED UUID_INCLUDE_DIR)
 else()
   find_library(UUID_LIBRARY NAMES uuid
