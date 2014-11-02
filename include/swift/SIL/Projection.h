@@ -1,4 +1,4 @@
-//===--- Projection.h - Defines the Projection class ------------*- C++ -*-===//
+//===--- Projection.h - Utilities for working with  Projections -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the class Projection, a representation of type projections
-// that is nominal, tuple agnostic. This is useful for working with aggregate
-// type trees at a high level.
+// This file defines the class Projection and related utilities. A projection is
+// a representation of type projections that is nominal, tuple agnostic. These
+// utilities are useful for working with aggregate type trees at a high level.
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,6 +22,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/Optional.h"
 
 namespace swift {
 
@@ -98,14 +99,14 @@ public:
   unsigned getIndex() const { return Index; }
   NominalType getNominalType() const { return NominalType(Decl.getInt()); }
 
-  bool operator==(Projection &Other) const {
+  bool operator==(const Projection &Other) const {
     if (auto *D = getDecl())
       return D == Other.getDecl();
     else
       return !Other.getDecl() && Index == Other.getIndex();
   }
 
-  bool operator!=(Projection &Other) const {
+  bool operator!=(const Projection &Other) const {
     return !(*this == Other);
   }
 
@@ -134,6 +135,46 @@ public:
       return false;
     }
   }
+};
+
+class ProjectionPath {
+  llvm::SmallVector<Projection, 8> Path;
+
+  /// This is private since in all cases where we construct a projection path we
+  /// can fail. That implies that we only want to allow ProjectionPaths to be
+  /// created from static factory methods that can return an rvalue of a
+  /// projection path.
+  ProjectionPath() : Path() {}
+
+public:
+  ~ProjectionPath() = default;
+
+  /// Do not allow copy construction. The only way to get one of these is from
+  /// getAddressProjectionPathBetweenValues which involves the move constructor.
+  ProjectionPath(const ProjectionPath &Other) = delete;
+
+  /// We only allow for moves of ProjectionPath since we only want them to be
+  /// able to be constructed by calling our factory method.
+  ProjectionPath(ProjectionPath &&Other) : Path(Other.Path) {}
+
+  /// Create a new address projection path in between Start and End. Returns
+  /// Nothing::None if there is no such path.
+  static Optional<ProjectionPath>
+  getAddressProjectionPathBetweenValues(SILValue Start, SILValue End,
+                                        bool IgnoreCasts=false);
+
+  /// Returns true if LHS and RHS have all the same projections in the same
+  /// order.
+  bool operator==(const ProjectionPath &RHS) const;
+
+  /// Returns true if the two paths have a non-empty symmetric difference.
+  ///
+  /// This means that the two objects have the same base but access different
+  /// fields of the base object.
+  bool hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const;
+
+  bool empty() const { return Path.empty(); }
+  unsigned size() const { return Path.size(); }
 };
 
 bool
