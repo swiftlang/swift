@@ -798,7 +798,8 @@ static const uintptr_t SwiftReservedBitPatternValue =
 }
   
 struct NominalTypeDescriptor;
-  
+struct GenericMetadata;
+
 /// The common structure of all type metadata.
 struct Metadata {
   constexpr Metadata() : Kind(MetadataKind::Class) {}
@@ -890,6 +891,10 @@ public:
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
   const NominalTypeDescriptor *getNominalTypeDescriptor() const;
+  
+  /// Get the generic metadata pattern from which this generic type instance was
+  /// instantiated, or null if the type is not generic.
+  const GenericMetadata *getGenericPattern() const;
   
 protected:
   friend struct OpaqueMetadata;
@@ -1068,7 +1073,7 @@ struct NominalTypeDescriptor {
   
   /// A pointer to the generic metadata pattern that is used to instantiate
   /// instances of this type. Null if the type is not generic.
-  void *GenericMetadataPattern;
+  GenericMetadata *GenericMetadataPattern;
   
   /// The generic parameter descriptor header. This describes how to find and
   /// parse the generic parameter vector in metadata records for this nominal

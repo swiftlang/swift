@@ -1570,6 +1570,38 @@ namespace {
     }
   };
   
+  struct ConformanceCacheKey {
+  private:
+    // The type or generic pattern that the cached witness table applies to.
+    const void *Type;
+    // The protocol the witness table witnesses.
+    const ProtocolDescriptor *Protocol;
+    
+    friend struct llvm::DenseMapInfo<ConformanceCacheKey>;
+  public:
+    ConformanceCacheKey() = default;
+    
+    // Create a conformance cache key for a witness table that applies to a
+    // specific type.
+    ConformanceCacheKey(const Metadata *type, const ProtocolDescriptor *proto)
+      : Type(type), Protocol(proto)
+    {}
+    
+    // Create a conformance cache key for a witness table that can apply to any
+    // instance of a generic type.
+    ConformanceCacheKey(const GenericMetadata *generic,
+                        const ProtocolDescriptor *proto)
+      : Type(generic), Protocol(proto)
+    {}
+    
+    bool operator==(ConformanceCacheKey other) {
+      return Type == other.Type && Protocol == other.Protocol;
+    }
+    bool operator!=(ConformanceCacheKey other) {
+      return Type != other.Type || Protocol != other.Protocol;
+    }
+  };
+  
   struct ConformanceCacheEntry {
   private:
     uintptr_t Data;
@@ -1622,9 +1654,29 @@ namespace {
   };
 }
 
+namespace llvm {
+  template<>
+  struct DenseMapInfo<ConformanceCacheKey> {
+    static ConformanceCacheKey getEmptyKey() {
+      return {(Metadata*)nullptr, nullptr};
+    }
+    static ConformanceCacheKey getTombstoneKey() {
+      return {(Metadata*)1, nullptr};
+    }
+    static unsigned getHashValue(ConformanceCacheKey value) {
+      return llvm::combineHashValue(
+                            DenseMapInfo<void*>::getHashValue(value.Type),
+                            DenseMapInfo<void*>::getHashValue(value.Protocol));
+    }
+    static bool isEqual(ConformanceCacheKey a, ConformanceCacheKey b) {
+      return a == b;
+    }
+  };
+}
+
 // Found conformances.
 static pthread_rwlock_t ConformanceCacheLock = PTHREAD_RWLOCK_INITIALIZER;
-static llvm::DenseMap<std::pair<const Metadata *, const ProtocolDescriptor*>,
+static llvm::DenseMap<ConformanceCacheKey,
                       ConformanceCacheEntry> ConformanceCache;
 
 // Conformance sections pending a scan.
@@ -1666,8 +1718,6 @@ static void _addImageProtocolConformances(const mach_header *mh,
          && "weird-sized conformances section?!");
   
   // If we have a section, enqueue the conformances for lookup.
-
-  
   auto recordsBegin
     = reinterpret_cast<const ProtocolConformanceRecord*>(conformances);
   auto recordsEnd
@@ -1689,22 +1739,39 @@ const void *swift::swift_conformsToProtocol2(const Metadata *type,
   
 recur:
   // See if we have a cached conformance.
+  // Try the specific type first.
   pthread_rwlock_rdlock(&ConformanceCacheLock);
   auto found = ConformanceCache.find({type, protocol});
   if (found != ConformanceCache.end()) {
     auto entry = found->second;
-    pthread_rwlock_unlock(&ConformanceCacheLock);
     
-    if (entry.isSuccessful())
+    if (entry.isSuccessful()) {
+      pthread_rwlock_unlock(&ConformanceCacheLock);
       return entry.getWitnessTable();
+    }
     
     // If we got a cached negative response, check the generation number.
     if (entry.getFailureGeneration() == ProtocolConformanceGeneration) {
+      pthread_rwlock_unlock(&ConformanceCacheLock);
       return nullptr;
     }
-  } else {
-    pthread_rwlock_unlock(&ConformanceCacheLock);
   }
+  
+  // If the type is generic, see if there's a shared nondependent witness table
+  // for its instances.
+  if (auto generic = type->getGenericPattern()) {
+    found = ConformanceCache.find({generic, protocol});
+    if (found != ConformanceCache.end()) {
+      auto entry = found->second;
+      if (entry.isSuccessful()) {
+        pthread_rwlock_unlock(&ConformanceCacheLock);
+        return entry.getWitnessTable();
+      }
+      // We don't try to cache negative responses for generic
+      // patterns.
+    }
+  }
+  pthread_rwlock_unlock(&ConformanceCacheLock);
   
   // If we didn't have an up-to-date cache entry, scan the conformance records.
   pthread_mutex_lock(&SectionsToScanLock);
@@ -1724,21 +1791,31 @@ recur:
     auto section = SectionsToScan.front();
     SectionsToScan.pop_front();
     
-    // Eagerly pull records for nongeneric, nonuniversal classes into our cache.
+    // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
-      auto metadata = record.getCanonicalTypeMetadata();
-      if (!metadata)
-        continue;
-      
-      auto witness = record.getWitnessTable(metadata);
-      ConformanceCacheEntry cacheEntry;
-      if (witness)
-        cacheEntry = ConformanceCacheEntry::success(witness);
-      else
-        cacheEntry
-          = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
-      
-      ConformanceCache[{metadata, record.getProtocol()}] = cacheEntry;
+      // If the record applies to a specific type, cache it.
+      if (auto metadata = record.getCanonicalTypeMetadata()) {
+        auto witness = record.getWitnessTable(metadata);
+        ConformanceCacheEntry cacheEntry;
+        if (witness)
+          cacheEntry = ConformanceCacheEntry::success(witness);
+        else
+          cacheEntry
+            = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
+        
+        ConformanceCache[{metadata, record.getProtocol()}] = cacheEntry;
+      // If the record provides a nondependent witness table for all instances
+      // of a generic type, cache it for the generic pattern.
+      // TODO: "Nondependent witness table" probably deserves its own flag.
+      // An accessor function might still be necessary even if the witness table
+      // can be shared.
+      } else if (record.getTypeKind()
+                   == ProtocolConformanceTypeKind::UniqueGenericPattern
+                 && record.getConformanceKind()
+                   == ProtocolConformanceReferenceKind::WitnessTable) {
+        ConformanceCache[{record.getGenericPattern(), record.getProtocol()}]
+          = ConformanceCacheEntry::success(record.getStaticWitnessTable());
+      }
     }
   }
   

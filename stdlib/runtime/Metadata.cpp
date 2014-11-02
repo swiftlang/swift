@@ -2071,6 +2071,14 @@ Metadata::getNominalTypeDescriptor() const {
   }
 }
 
+const GenericMetadata *
+Metadata::getGenericPattern() const {
+  auto ntd = getNominalTypeDescriptor();
+  if (!ntd)
+    return nullptr;
+  return ntd->GenericMetadataPattern;
+}
+
 /// Scan and return a single run-length encoded identifier.
 /// Returns a malloc-allocated string, or nullptr on failure.
 /// mangled is advanced past the end of the scanned token.

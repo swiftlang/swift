@@ -37,6 +37,12 @@ func fooify<T>(x: T) {
   }
 }
 
+struct G<T>: Fooable {
+  func foo() { println("G") }
+}
+
+struct H<T> {}
+
 fooify(1)   // CHECK:      Int
 fooify(2)   // CHECK-NEXT: Int
 fooify(S()) // CHECK-NEXT: S
@@ -48,8 +54,14 @@ fooify(D()) // TODO CHECK-NEXT: not fooable
 fooify(D()) // TODO CHECK-NEXT: not fooable
 fooify(X()) // CHECK-NEXT: not fooable
 fooify(X()) // CHECK-NEXT: not fooable
+fooify(G<Int>()) // CHECK-NEXT: G
+fooify(G<Float>()) // CHECK-NEXT: G
+fooify(G<Int>()) // CHECK-NEXT: G
+fooify(H<Int>()) // CHECK-NEXT: not fooable
+fooify(H<Float>()) // CHECK-NEXT: not fooable
+fooify(H<Int>()) // CHECK-NEXT: not fooable
 
-// TODO: generics
+// TODO: generics w/ dependent witness tables
 // TODO: imported value types
 // TODO: subclasses
 // TODO: objc classes
