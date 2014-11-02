@@ -35,6 +35,7 @@ public:
                     ///  other.
     MayAlias,       ///< The two values can not be proven to alias or
                     ///  not alias. Anything could happen.
+    PartialAlias,   ///< The two values overlap in a partial manner.
     MustAlias,      ///< The two values are equal.
   };
 
@@ -60,6 +61,12 @@ public:
   bool isMustAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                    SILType TBAAType2 = SILType()) {
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MustAlias;
+  }
+
+  /// Convenience method that returns true if V1 and V2 partially alias.
+  bool isPartialAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                      SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::PartialAlias;
   }
 
   /// Convenience method that returns true if V1, V2 can not alias.

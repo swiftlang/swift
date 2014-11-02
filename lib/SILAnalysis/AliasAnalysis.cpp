@@ -86,6 +86,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
     return OS << "NoAlias";
   case AliasAnalysis::AliasResult::MayAlias:
     return OS << "MayAlias";
+  case AliasAnalysis::AliasResult::PartialAlias:
+    return OS << "PartialAlias";
   case AliasAnalysis::AliasResult::MustAlias:
     return OS << "MustAlias";
   }
