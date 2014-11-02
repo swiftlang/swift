@@ -100,6 +100,13 @@ namespace swift {
   LLVM_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
+  // Get the superclass pointer value used for Swift root classes.
+  const ClassMetadata *getRootSuperclass();
+  
+#if !SWIFT_OBJC_INTEROP
+  inline const ClassMetadata *getRootSuperclass() { return nullptr; }
+#endif
+  
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

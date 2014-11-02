@@ -419,15 +419,25 @@ void IRGenModule::emitRuntimeRegistration() {
   IRBuilder Builder(getLLVMContext());
   Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
   
+  // Register ObjC classes and extensions we added.
+  if (ObjCInterop) {
+    for (llvm::WeakVH &ObjCClass : ObjCClasses) {
+      Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
+    }
+      
+    for (ExtensionDecl *ext : ObjCCategoryDecls) {
+      CategoryInitializerVisitor(*this, Builder, ext).visitMembers(ext);
+    }
+  }
   // Register protocol conformances if we added any.
   if (!ProtocolConformanceRecords.empty()) {
     llvm::Constant *conformances
-      = emitGlobalList(*this, ProtocolConformanceRecords,
-                       "protocol_conformances",
-                       "__DATA, __swift1_proto, regular, no_dead_strip",
-                       llvm::GlobalValue::InternalLinkage,
-                       ProtocolConformanceRecordTy,
-                       true);
+    = emitGlobalList(*this, ProtocolConformanceRecords,
+                     "protocol_conformances",
+                     "__DATA, __swift1_proto, regular, no_dead_strip",
+                     llvm::GlobalValue::InternalLinkage,
+                     ProtocolConformanceRecordTy,
+                     true);
     llvm::Constant *beginIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, 0),
@@ -441,18 +451,6 @@ void IRGenModule::emitRuntimeRegistration() {
     auto end = llvm::ConstantExpr::getGetElementPtr(conformances, endIndices);
     
     Builder.CreateCall2(getRegisterProtocolConformancesFn(), begin, end);
-  }
-  
-  // Register ObjC classes and extensions we added.
-  if (ObjCInterop)
-    return;
-  
-  for (llvm::WeakVH &ObjCClass : ObjCClasses) {
-    Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
-  }
-    
-  for (ExtensionDecl *ext : ObjCCategoryDecls) {
-    CategoryInitializerVisitor(*this, Builder, ext).visitMembers(ext);
   }
 }
 

@@ -799,6 +799,7 @@ static const uintptr_t SwiftReservedBitPatternValue =
   
 struct NominalTypeDescriptor;
 struct GenericMetadata;
+struct ClassMetadata;
 
 /// The common structure of all type metadata.
 struct Metadata {
@@ -895,6 +896,10 @@ public:
   /// Get the generic metadata pattern from which this generic type instance was
   /// instantiated, or null if the type is not generic.
   const GenericMetadata *getGenericPattern() const;
+  
+  /// Get the class object for this type if it has one, or return null if the
+  /// type is not a class (or not a class with a class object).
+  const ClassMetadata *getClassObject() const;
   
 protected:
   friend struct OpaqueMetadata;

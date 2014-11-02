@@ -157,6 +157,8 @@ static NSString *_getDescription(SwiftObject *obj) {
   return [convertStringToNSString(tmp.x, tmp.y, tmp.z) autorelease];
 }
 
+
+
 @implementation SwiftObject
 + (void)load {}
 + (void)initialize {}
@@ -821,4 +823,8 @@ unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
 /// That function is otherwise unavailable to the core stdlib.
 size_t swift::_swift_class_getInstanceSize_class(const void* c) {
   return class_getInstanceSize((Class)c);
+}
+
+const ClassMetadata *swift::getRootSuperclass() {
+  return (const ClassMetadata *)[SwiftObject class];
 }

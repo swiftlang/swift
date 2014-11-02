@@ -2079,6 +2079,35 @@ Metadata::getGenericPattern() const {
   return ntd->GenericMetadataPattern;
 }
 
+const ClassMetadata *
+Metadata::getClassObject() const {
+  switch (getKind()) {
+  case MetadataKind::Class: {
+    // Native Swift class metadata is also the class object.
+    return static_cast<const ClassMetadata *>(this);
+  }
+  case MetadataKind::ObjCClassWrapper: {
+    // Objective-C class objects are referenced by their Swift metadata wrapper.
+    auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
+    return wrapper->Class;
+  }
+  // Other kinds of types don't have class objects.
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::Opaque:
+  case MetadataKind::Tuple:
+  case MetadataKind::Function:
+  case MetadataKind::Block:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Metatype:
+  case MetadataKind::HeapLocalVariable:
+    return nullptr;
+  }
+}
+
 /// Scan and return a single run-length encoded identifier.
 /// Returns a malloc-allocated string, or nullptr on failure.
 /// mangled is advanced past the end of the scanned token.

@@ -1737,10 +1737,14 @@ const void *swift::swift_conformsToProtocol2(const Metadata *type,
     _dyld_register_func_for_add_image(_addImageProtocolConformances);
   });
   
+  auto origType = type;
+  
 recur:
   // See if we have a cached conformance.
   // Try the specific type first.
   pthread_rwlock_rdlock(&ConformanceCacheLock);
+  
+recur_inside_cache_lock:
   auto found = ConformanceCache.find({type, protocol});
   if (found != ConformanceCache.end()) {
     auto entry = found->second;
@@ -1771,6 +1775,17 @@ recur:
       // patterns.
     }
   }
+  
+  // If the type is a class, try its superclass.
+  if (const ClassMetadata *classType = type->getClassObject()) {
+    if (auto super = classType->SuperClass) {
+      if (super != getRootSuperclass()) {
+        type = swift_getObjCClassMetadata(super);
+        goto recur_inside_cache_lock;
+      }
+    }
+  }
+  
   pthread_rwlock_unlock(&ConformanceCacheLock);
   
   // If we didn't have an up-to-date cache entry, scan the conformance records.
@@ -1821,7 +1836,8 @@ recur:
   
   pthread_rwlock_unlock(&ConformanceCacheLock);
   pthread_mutex_unlock(&SectionsToScanLock);
-  // Try again with our newly-populated cache.
+  // Start over with our newly-populated cache.
+  type = origType;
   goto recur;
 }
 
