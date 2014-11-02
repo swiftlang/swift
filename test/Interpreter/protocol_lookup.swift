@@ -1,4 +1,6 @@
+// Check both AOT and JIT modes
 // RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %swift -interpret %s | FileCheck %s
 // TODO: Write these using "x as P" casts when we support that.
 
 @asmname("swift_stdlib_dynamicCastToExistential1_2")
