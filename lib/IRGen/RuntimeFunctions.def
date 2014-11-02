@@ -61,6 +61,12 @@ FUNCTION(DeallocObject,  swift_deallocObject, RuntimeCC,
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
+// void swift_deallocClassInstance(RefCounted *obj, size_t size, size_t alignMask);
+FUNCTION(DeallocClassInstance,  swift_deallocClassInstance, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
 // void *swift_slowAlloc(size_t size, size_t alignMask);
 FUNCTION(SlowAlloc,      swift_slowAlloc,     RuntimeCC,
          RETURNS(Int8PtrTy),

@@ -70,6 +70,16 @@ void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,
                           object, size, alignMask);
 }
 
+void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
+                                        llvm::Value *object,
+                                        llvm::Value *size,
+                                        llvm::Value *alignMask) {
+  // FIXME: We should call a fast deallocator for heap objects with
+  // known size.
+  IGF.Builder.CreateCall3(IGF.IGM.getDeallocClassInstanceFn(),
+                          object, size, alignMask);
+}
+
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
 static llvm::Function *createDtorFn(IRGenModule &IGM,

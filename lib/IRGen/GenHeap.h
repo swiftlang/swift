@@ -60,6 +60,12 @@ void emitDeallocateHeapObject(IRGenFunction &IGF,
                               llvm::Value *size,
                               llvm::Value *alignMask);
 
+/// Emit a class instance deallocation.
+void emitDeallocateClassInstance(IRGenFunction &IGF,
+                                 llvm::Value *object,
+                                 llvm::Value *size,
+                                 llvm::Value *alignMask);
+
 } // end namespace irgen
 } // end namespace swift
 

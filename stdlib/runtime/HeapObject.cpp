@@ -29,6 +29,9 @@
 #include <cstdlib>
 #include <unistd.h>
 #include "../shims/RuntimeShims.h"
+#if SWIFT_OBJC_INTEROP
+# include <objc/objc-runtime.h>
+#endif
 
 using namespace swift;
 
@@ -336,8 +339,18 @@ void swift::_swift_deallocClassInstance(HeapObject *self) {
   assert(metadata->isClassObject());
   auto classMetadata = static_cast<const ClassMetadata*>(metadata);
   assert(classMetadata->isTypeMetadata());
-  swift_deallocObject(self, classMetadata->getInstanceSize(),
-                      classMetadata->getInstanceAlignMask());
+  swift_deallocClassInstance(self, classMetadata->getInstanceSize(),
+                             classMetadata->getInstanceAlignMask());
+}
+
+void swift::swift_deallocClassInstance(HeapObject *object, size_t allocatedSize,
+                                       size_t allocatedAlignMask) {
+#if SWIFT_OBJC_INTEROP
+  // We need to let the ObjC runtime clean up any associated objects or weak
+  // references associated with this object.
+  objc_destructInstance((id)object);
+#endif
+  swift_deallocObject(object, allocatedSize, allocatedAlignMask);
 }
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,

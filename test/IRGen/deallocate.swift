@@ -17,5 +17,5 @@ class CustomDeallocator {
 // CHECK-NEXT: [[SIZE:%.*]] = extractvalue { i64, i64 } [[T3]], 0
 // CHECK-NEXT: [[ALIGNMASK:%.*]] = extractvalue { i64, i64 } [[T3]], 1
 // CHECK-NEXT: [[T4:%.*]] = bitcast [[CD]]* [[T1]] to [[OBJECT]]*
-// CHECK-NEXT: call void @swift_deallocObject([[OBJECT]]* [[T4]], i64 [[SIZE]], i64 [[ALIGNMASK]])
+// CHECK-NEXT: call void @swift_deallocClassInstance([[OBJECT]]* [[T4]], i64 [[SIZE]], i64 [[ALIGNMASK]])
 // CHECK-NEXT: ret void

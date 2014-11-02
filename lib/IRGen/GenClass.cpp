@@ -704,7 +704,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
                               size, alignMask);
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
-  emitDeallocateHeapObject(IGF, selfValue, size, alignMask);
+  emitDeallocateClassInstance(IGF, selfValue, size, alignMask);
 }
 
 llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(

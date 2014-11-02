@@ -196,6 +196,23 @@ extern "C" size_t swift_retainCount(HeapObject *object);
 extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                     size_t allocatedAlignMask);
 
+/// Deallocate the given class instance; it was returned by swift_allocObject
+/// and possibly used as an Objective-C class instance, but is otherwise in an
+/// unknown state.
+///
+/// \param object - never null
+/// \param allocatedSize - the allocated size of the object from the
+///   program's perspective, i.e. the value
+/// \param allocatedAlignMask - the alignment requirement that was passed
+///   to allocObject
+///
+/// POSSIBILITIES: It may be useful to have a variant which
+/// requires the object to have been fully zeroed from offsets
+/// sizeof(SwiftHeapObject) to allocatedSize.
+extern "C" void swift_deallocClassInstance(HeapObject *object,
+                                           size_t allocatedSize,
+                                           size_t allocatedAlignMask);
+
 /// Deallocate the given memory allocated by swift_allocBox; it was returned
 /// by swift_allocBox but is otherwise in an unknown state. The given Metadata
 /// pointer must be the same metadata pointer that was passed to swift_allocBox
