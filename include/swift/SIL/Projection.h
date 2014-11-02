@@ -138,7 +138,11 @@ public:
 };
 
 class ProjectionPath {
-  llvm::SmallVector<Projection, 8> Path;
+public:
+  using PathTy = llvm::SmallVector<Projection, 8>;
+
+private:
+  PathTy Path;
 
   /// This is private since in all cases where we construct a projection path we
   /// can fail. That implies that we only want to allow ProjectionPaths to be
@@ -175,6 +179,21 @@ public:
 
   bool empty() const { return Path.empty(); }
   unsigned size() const { return Path.size(); }
+
+  using iterator = PathTy::iterator;
+  using const_iterator = PathTy::const_iterator;
+  using reverse_iterator = PathTy::reverse_iterator;
+  using const_reverse_iterator = PathTy::const_reverse_iterator;
+
+  iterator begin() { return Path.begin(); }
+  iterator end() { return Path.end(); }
+  const_iterator begin() const { return Path.begin(); }
+  const_iterator end() const { return Path.end(); }
+
+  reverse_iterator rbegin() { return Path.rbegin(); }
+  reverse_iterator rend() { return Path.rend(); }
+  const_reverse_iterator rbegin() const { return Path.rbegin(); }
+  const_reverse_iterator rend() const { return Path.rend(); }  
 };
 
 bool
