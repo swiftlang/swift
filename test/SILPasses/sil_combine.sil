@@ -713,6 +713,29 @@ bb0(%0 : $_StringCore):
   return %5 : $()
 }
 
+// CHECK-LABEL: sil @dead_closure_elimination2
+// CHECK:      bb0
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1
+// CHECK-NEXT:   release_value
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @dead_closure_elimination2 : $@thin (@owned _StringCore) -> () {
+bb0(%0 : $_StringCore):
+  %1 = function_ref @stringcore_invariant_check : $@thin (@owned _StringCore) -> @owned Optional<_CocoaStringType>
+  %2 = partial_apply %1(%0) : $@thin (@owned _StringCore) -> @owned Optional<_CocoaStringType>
+  %3 = function_ref @reabstruction_thunk : $@thin (@out Optional<_CocoaStringType>, @owned @callee_owned () -> @owned Optional<_CocoaStringType>) -> ()
+  %4 = partial_apply %3(%2) : $@thin (@out Optional<_CocoaStringType>, @owned @callee_owned () -> @owned Optional<_CocoaStringType>) -> ()
+  br bb1
+
+bb1:
+  strong_retain %4 : $@callee_owned (@out Optional<_CocoaStringType>) -> ()
+  strong_release %4 : $@callee_owned (@out Optional<_CocoaStringType>) -> ()
+  strong_release %4 : $@callee_owned (@out Optional<_CocoaStringType>) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
 class C1 {}
 class C2 : C1 {}
 class C3 : C2 {}
@@ -762,17 +785,14 @@ bb0:
   return %4 : $(Int, Int)                         // id: %5
 }
 
-//CHECK-LABEL: apply_and_pa_merge
-//CHECK-NOT: partial_apply
-//CHECK: %1 = function_ref @some_closure
-//CHECK: %2 = partial_apply
-//CHECK: function_ref @print_a_number
-//CHECK: strong_retain %2
-//CHECK: apply %1
-//CHECK: strong_release %2
-//CHECK: apply
-//CHECK: strong_release %2
-//CHECK: return
+// CHECK-LABEL: sil @apply_and_pa_merge
+// CHECK-NOT: partial_apply
+// CHECK:  [[C:%.*]]  = function_ref @some_closure
+// CHECK:  [[P:%.*]]  = function_ref @print_a_number
+// CHECK:  [[R1:%.*]] = apply [[C]](
+// CHECK:             = apply [[P]]([[R1]]
+// CHECK:  return
+
 sil @apply_and_pa_merge : $@thin (Int) -> () {
 bb0(%0 : $Int):
   %1 = function_ref @some_closure : $@thin (Int) -> Int // user: %2

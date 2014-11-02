@@ -409,6 +409,67 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   return nullptr;
 }
 
+/// Returns the post-dominating release of a series of cancelling
+/// retain/releases on the partial apply if there are no other users than the
+/// retain/release.
+/// Currently, this only handles the case where all retain/releases are in the
+/// same basic block.
+static StrongReleaseInst *
+hasOnlyRetainReleaseUsers(PartialApplyInst *PAI,
+                          SmallVectorImpl<RefCountingInst *> &RCsToDelete) {
+  SILBasicBlock *BB = nullptr;
+  SmallPtrSet<RefCountingInst *, 16> RCs;
+
+  // Collect all reference counting users.
+  for (auto *Opd : PAI->getUses()) {
+
+    // Reference counting instruction.
+    if (auto *RCounting = dyn_cast<RefCountingInst>(Opd->getUser())) {
+      if (!isa<StrongRetainInst>(RCounting) &&
+          !isa<StrongReleaseInst>(RCounting))
+        return nullptr;
+
+      RCs.insert(RCounting);
+      // Check that we are in the same BB (we don't handle any multi BB case).
+      if (!BB)
+        BB = RCounting->getParent();
+      else if (BB != RCounting->getParent())
+        return nullptr;
+    } else
+      return nullptr;
+  }
+
+  // Need to have a least one release.
+  if (!BB)
+    return nullptr;
+
+  // Find the postdominating release. For now we only handle the single BB case.
+  RefCountingInst *PostDom = nullptr;
+  unsigned RetainCount = 0;
+  unsigned ReleaseCount = 0;
+  for (auto &Inst : *BB) {
+    auto *RCounting = dyn_cast<RefCountingInst>(&Inst);
+    if (!RCounting)
+      continue;
+    // One of the retain/releases on the partial apply.
+    if (RCs.count(RCounting)) {
+      PostDom = RCounting;
+      RetainCount += isa<StrongRetainInst>(&Inst);
+      ReleaseCount += isa<StrongReleaseInst>(&Inst);
+    }
+  }
+
+  // The retain release count better match up.
+  assert(RetainCount == (ReleaseCount - 1) && "Retain release mismatch!?");
+  if (RetainCount != (ReleaseCount - 1))
+    return nullptr;
+
+  RCsToDelete.append(RCs.begin(), RCs.end());
+
+  assert(isa<StrongReleaseInst>(PostDom) && "Post dominating retain?!");
+  return dyn_cast<StrongReleaseInst>(PostDom);
+}
+
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function.
@@ -419,53 +480,55 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
 
   // Delete dead closures of this form:
   //
-  // %X = partial_apply %x(...)    // has 1 use.
-  // strong_release %X;
+  // %X = partial_apply %x(...)
+  // BB:
+  // strong_retain %X
+  // strong_release %X
+  // strong_release %X // <-- Post dominating release.
 
-  // Only handle PartialApplyInst with one use.
-  if (!PAI->hasOneUse())
+  SmallVector<RefCountingInst *, 16> RCToDelete;
+  auto *PostDomRelease = hasOnlyRetainReleaseUsers(PAI, RCToDelete);
+  if (!PostDomRelease)
     return nullptr;
 
   SILLocation Loc = PAI->getLoc();
 
-  // The single user must be the StrongReleaseInst.
-  if (auto *SRI = dyn_cast<StrongReleaseInst>(PAI->use_begin()->getUser())) {
-    SILFunctionType *ClosureTy =
-      dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
-    if (!ClosureTy)
-      return nullptr;
+  SILFunctionType *ClosureTy =
+    dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
+  if (!ClosureTy)
+    return nullptr;
 
-    // Emit a destroy value for each captured closure argument.
-    auto Params = ClosureTy->getParameters();
-    auto Args = PAI->getArguments();
-    unsigned Delta = Params.size() - Args.size();
-    assert(Delta <= Params.size() && "Error, more Args to partial apply than "
-           "params in its interface.");
+  // Emit a destroy value for each captured closure argument.
+  auto Params = ClosureTy->getParameters();
+  auto Args = PAI->getArguments();
+  unsigned Delta = Params.size() - Args.size();
+  assert(Delta <= Params.size() && "Error, more Args to partial apply than "
+                                   "params in its interface.");
 
-    // Set the insertion point of the release_value to be that of the release,
-    // which is the end of the lifetime of the partial_apply.
-    auto OrigInsertPoint = Builder->getInsertionPoint();
-    SILInstruction *SingleUser = PAI->use_begin()->getUser();
-    Builder->setInsertionPoint(SingleUser);
+  // Set the insertion point of the release_value to be that of the post
+  // dominating release, which is the end of the lifetime of the partial_apply.
+  auto OrigInsertPoint = Builder->getInsertionPoint();
+  Builder->setInsertionPoint(PostDomRelease);
 
-    for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
-      SILValue Arg = Args[AI];
-      auto Param = Params[AI + Delta];
+  for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
+    SILValue Arg = Args[AI];
+    auto Param = Params[AI + Delta];
 
-      if (!Param.isIndirect() && Param.isConsumed())
-        if (!Arg.getType().isAddress())
-          Builder->createReleaseValue(Loc, Arg)
-            ->setDebugScope(PAI->getDebugScope());
-    }
-
-    Builder->setInsertionPoint(OrigInsertPoint);
-
-    // Delete the strong_release.
-    eraseInstFromFunction(*SRI);
-    // Delete the partial_apply.
-    return eraseInstFromFunction(*PAI);
+    if (!Param.isIndirect() && Param.isConsumed())
+      if (!Arg.getType().isAddress())
+        Builder->createReleaseValue(Loc, Arg)
+          ->setDebugScope(PAI->getDebugScope());
   }
-  return nullptr;
+
+  // Reset the insert point.
+  Builder->setInsertionPoint(OrigInsertPoint);
+
+  // Delete the strong_release/retains.
+  for (auto *RC : RCToDelete)
+    eraseInstFromFunction(*RC);
+
+  // Delete the partial_apply.
+  return eraseInstFromFunction(*PAI);
 }
 
 SILInstruction *
