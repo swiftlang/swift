@@ -74,4 +74,3 @@ fooify(H<Int>()) // CHECK-NEXT: not fooable
 // TODO: objc classes
 // TODO: cf classes
 // TODO: objc protocols
-// TODO: jit
