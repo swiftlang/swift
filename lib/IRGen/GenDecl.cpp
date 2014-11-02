@@ -67,44 +67,6 @@ static bool isTypeMetadataEmittedLazily(CanType type) {
   llvm_unreachable("bad formal linkage");
 }
 
-/// Generates a function to call +load on all the given classes.
-static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
-                                                ArrayRef<llvm::WeakVH> classes){
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(llvm::Type::getVoidTy(IGM.LLVMContext), false);
-  llvm::Function *initFn =
-    llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
-                           "_swift_initObjCClasses", &IGM.Module);
-
-  IRGenFunction initIGF(IGM, initFn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(initIGF, initFn);
-
-  llvm::Value *loadSel = initIGF.emitObjCSelectorRefLoad("load");
-
-  llvm::Type *msgSendParams[] = {
-    IGM.ObjCPtrTy,
-    IGM.ObjCSELTy
-  };
-  llvm::FunctionType *msgSendType =
-    llvm::FunctionType::get(llvm::Type::getVoidTy(IGM.LLVMContext),
-                            msgSendParams, false);
-  llvm::Constant *msgSend =
-    llvm::ConstantExpr::getBitCast(IGM.getObjCMsgSendFn(),
-                                   msgSendType->getPointerTo());
-
-  for (auto nextClass : classes) {
-    llvm::Constant *receiver =
-      llvm::ConstantExpr::getBitCast(cast<llvm::Constant>(nextClass),
-                                     IGM.ObjCPtrTy);
-    initIGF.Builder.CreateCall2(msgSend, receiver, loadSel);
-  }
-
-  initIGF.Builder.CreateRetVoid();
-
-  return initFn;
-}
-
 namespace {
   
 class CategoryInitializerVisitor
@@ -256,26 +218,6 @@ public:
 
 } // end anonymous namespace
 
-static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
-                                         ArrayRef<ExtensionDecl*> categories) {
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(llvm::Type::getVoidTy(IGM.LLVMContext), false);
-  llvm::Function *initFn =
-    llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
-                           "_swift_initObjCCategories", &IGM.Module);
-  
-  IRGenFunction initIGF(IGM, initFn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(initIGF, initFn);
-  
-  for (ExtensionDecl *ext : categories) {
-    CategoryInitializerVisitor(IGM, initIGF.Builder, ext).visitMembers(ext);
-  }
-  
-  initIGF.Builder.CreateRetVoid();
-  return initFn;
-}
-
 namespace {
 class PrettySourceFileEmission : public llvm::PrettyStackTraceEntry {
   const SourceFile &SF;
@@ -325,19 +267,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   assert(mainFn && "no entry point for source file?!");
 
   IRBuilder B(getLLVMContext());
-  B.SetInsertPoint(mainFn->begin(), mainFn->begin()->begin());
-  
-  // Emit Objective-C runtime interop setup for immediate-mode code.
-  if (ObjCInterop && Opts.UseJIT) {
-    if (!ObjCClasses.empty()) {
-      // Emit an initializer for the Objective-C classes.
-      B.CreateCall(emitObjCClassInitializer(*this, ObjCClasses));
-    }
-    if (!ObjCCategoryDecls.empty()) {
-      // Emit an initializer to add declarations from category decls.
-      B.CreateCall(emitObjCCategoryInitializer(*this, ObjCCategoryDecls));
-    }
-  }
+  B.SetInsertPoint(mainFn->begin(), mainFn->begin()->begin());  
 }
 
 /// Emit a global list, i.e. a global constant array holding all of a
