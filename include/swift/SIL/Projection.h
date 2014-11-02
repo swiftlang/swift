@@ -196,11 +196,6 @@ public:
   const_reverse_iterator rend() const { return Path.rend(); }  
 };
 
-bool
-findAddressProjectionPathBetweenValues(SILValue V1, SILValue V2,
-                                       llvm::SmallVectorImpl<Projection> &Path,
-                                       bool IgnoreCasts = false);
-
 } // end namespace swift
 
 #endif
