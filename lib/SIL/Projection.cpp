@@ -37,9 +37,8 @@ static bool areProjectionsToDifferentFields(const Projection &P1,
 //===----------------------------------------------------------------------===//
 
 Optional<ProjectionPath>
-ProjectionPath::getAddressProjectionPathBetweenValues(SILValue Start,
-                                                      SILValue End,
-                                                      bool IgnoreCasts) {
+ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
+                                      bool IgnoreCasts) {
   // Do not inspect the body of structs with unreferenced types such as
   // bitfields and unions.
   if (Start.getType().aggregateHasUnreferenceableStorage() ||

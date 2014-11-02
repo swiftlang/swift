@@ -157,11 +157,11 @@ public:
   /// able to be constructed by calling our factory method.
   ProjectionPath(ProjectionPath &&Other) : Path(Other.Path) {}
 
-  /// Create a new address projection path in between Start and End. Returns
-  /// Nothing::None if there is no such path.
+  /// Create a new address projection path from the pointer Start through
+  /// various address projections to End. Returns Nothing::None if there is no
+  /// such path.
   static Optional<ProjectionPath>
-  getAddressProjectionPathBetweenValues(SILValue Start, SILValue End,
-                                        bool IgnoreCasts=false);
+  getAddrProjectionPath(SILValue Start, SILValue End, bool IgnoreCasts=false);
 
   /// Returns true if LHS and RHS have all the same projections in the same
   /// order.

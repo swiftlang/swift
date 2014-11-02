@@ -226,54 +226,6 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 //                           Projection Address AA
 //===----------------------------------------------------------------------===//
 
-/// Returns true if every projection in V1Path and V2Path equal. Returns false
-/// otherwise.
-static bool projectionListsEqual(llvm::SmallVectorImpl<Projection> &V1Path,
-                                 llvm::SmallVectorImpl<Projection> &V2Path) {
-  if (V1Path.size() != V2Path.size())
-    return false;
-
-  for (unsigned i = 0, e = V1Path.size(); i != e; ++i)
-    if (V1Path[i] != V2Path[i])
-      return false;
-
-  return true;
-}
-
-/// Returns true if we are accessing different fields.
-static bool areProjectionsToDifferentFields(Projection &P1, Projection &P2) {
-  // If operands have the same type and we are accessing different fields,
-  // returns true. Operand's type is not saved in Projection. Instead we check
-  // Decl's context.
-  return P1.getDecl() && P2.getDecl() &&
-         P1.getDecl()->getDeclContext() == P2.getDecl()->getDeclContext() &&
-         P1 != P2;
-}
-
-/// Returns true if we are accessing different fields of the same object.
-static bool projectionListsNoAlias(llvm::SmallVectorImpl<Projection> &V1Path,
-                                 llvm::SmallVectorImpl<Projection> &V2Path) {
-  if (V1Path.empty() || V2Path.empty())
-    return false;
-
-  // We reverse the projection path to scan from the common object.
-  std::reverse(V1Path.begin(), V1Path.end());
-  std::reverse(V2Path.begin(), V2Path.end());
-  // We scan up to the minimum path size.
-  unsigned e = V1Path.size() > V2Path.size() ? V2Path.size() : V1Path.size();
-  for (unsigned i = 0; i != e; ++i) {
-    // If we are accessing different fields of a common object, return true.
-    if (areProjectionsToDifferentFields(V1Path[i], V2Path[i])) {
-      DEBUG(llvm::dbgs() << "        Path different at index: " << i << '\n');
-      return true;
-    }
-    if (V1Path[i] != V2Path[i])
-      return false;
-    // Continue if we are accessing the same field.
-  }
-  return false;
-}
-
 /// Uses a bunch of ad-hoc rules to disambiguate a GEP instruction against
 /// another pointer. We know that V1 is a GEP, but we don't know anything about
 /// V2. O1, O2 are getUnderlyingObject of V1, V2 respectively.
@@ -297,11 +249,8 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     // Otherwise, we have a MustAlias result. Since the base pointers alias each
     // other exactly, see if computing offsets from the common pointer tells us
     // about the relation of the resulting pointer.
-    llvm::SmallVector<Projection, 4> V1Path, V2Path;
-    bool Result = findAddressProjectionPathBetweenValues(O1, V1, V1Path,
-                                                         true/*IgnoreCasts*/);
-    Result &= findAddressProjectionPathBetweenValues(O1, V2, V2Path,
-                                                     true/*IgnoreCasts*/);
+    auto V1Path = ProjectionPath::getAddrProjectionPath(O1, V1, true);
+    auto V2Path = ProjectionPath::getAddrProjectionPath(O1, V2, true);
 
     // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
     // what the base pointer of the two values are. Be conservative and return
@@ -313,17 +262,17 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     // solutions are to make address projections variadic (something on the wee
     // horizon) or enable Projection to represent a cast as a special sort of
     // projection.
-    if (!Result)
+    if (!V1Path || !V2Path)
       return AliasAnalysis::AliasResult::MayAlias;
 
     // If all of the projections are equal, the two GEPs must be the same.
-    if (projectionListsEqual(V1Path, V2Path))
+    if (V1Path.getValue() == V2Path.getValue())
       return AliasAnalysis::AliasResult::MustAlias;
 
     // The two GEPs do not alias if they are accessing different fields of
     // the same object, since different fields of the same object should not
     // overlap.
-    if (projectionListsNoAlias(V1Path, V2Path))
+    if (V1Path->hasNonEmptySymmetricDifference(V2Path.getValue()))
       return AliasAnalysis::AliasResult::NoAlias;
   }
 
