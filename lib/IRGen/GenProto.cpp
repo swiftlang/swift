@@ -3341,21 +3341,26 @@ getTypeReferenceForProtocolConformanceRecord(IRGenModule &IGM,
                                           ->getCanonicalType(),
                                         /* indirect */ false,
                                         /* pattern */ true);
-  }
-  /* TODO: Indirectly reference classes via their ref variable.
-  else if (auto ct = dyn_cast<ClassType>(conformingType)) {
-    ...
-  }
-   */
-  else if (auto nom = conformingType->getNominalOrBoundGenericNominal()) {
-    if (nom->hasClangNode()) {
-      // Metadata for Clang types needs to be uniqued by the runtime.
+  } else if (auto ct = dyn_cast<ClassType>(conformingType)) {
+    auto clas = ct->getDecl();
+    if (clas->isForeign()) {
       typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
+      typeRef = IGM.getAddrOfForeignTypeMetadataCandidate(ct);
     } else {
-      // We can reference the canonical metadata for native value types
-      // directly.
+      // TODO: We should indirectly reference classes. For now directly reference
+      // the class object, which is totally wrong for ObjC classes.
+      
       typeKind = ProtocolConformanceTypeKind::UniqueDirectType;
+      typeRef = IGM.getAddrOfTypeMetadata(ct,
+                                          /* indirect */ false,
+                                          /* pattern */ false);
     }
+  } else if (auto nom = conformingType->getNominalOrBoundGenericNominal()) {
+    // TODO: Metadata for Clang types should be uniqued like foreign classes.
+
+    // We can reference the canonical metadata for native value types
+    // directly.
+    typeKind = ProtocolConformanceTypeKind::UniqueDirectType;
     typeRef = IGM.getAddrOfTypeMetadata(nom->getDeclaredType()
                                           ->getCanonicalType(),
                                         /* indirect */ false,

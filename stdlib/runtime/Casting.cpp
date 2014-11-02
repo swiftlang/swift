@@ -1515,9 +1515,8 @@ const {
     // Already unique.
     return getDirectType();
   case ProtocolConformanceTypeKind::NonuniqueDirectType:
-    // Ask the runtime for the unique metadata record we're using.
-    // TODO: We don't unique these yet.
-    return getDirectType();
+    // Ask the runtime for the unique metadata record we've canonized.
+    return swift_getForeignTypeMetadata((ForeignTypeMetadata*)getDirectType());
   case ProtocolConformanceTypeKind::UniqueIndirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata.
