@@ -8,7 +8,7 @@ import gizmo
 // CHECK: @_TWVOSC16NSRuncingOptions = linkonce_odr hidden constant
 // CHECK: @_TMnOSC16NSRuncingOptions = linkonce_odr hidden constant
 // CHECK: @_TMdOSC16NSRuncingOptions = linkonce_odr hidden global
-// CHECK: @_TWPOSC28NeverActuallyMentionedByNameSs9Equatable = linkonce_odr hidden constant
+// CHECK: @_TWPOSC28NeverActuallyMentionedByNameSs9Equatable5gizmo = linkonce_odr hidden constant
 
 // CHECK-LABEL: define i32 @main
 // CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMdOSC16NSRuncingOptions

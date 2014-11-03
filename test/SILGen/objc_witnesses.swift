@@ -18,11 +18,11 @@ class Phoûx : NSObject, Fooable {
 }
 
 // witness for Foo.foo uses the foreign-to-native thunk:
-// CHECK-LABEL: sil hidden @_TTWCSo3Foo14objc_witnesses7FooableFS1_3fooUS1___fRQPS1_FT_GSQSS_
+// CHECK-LABEL: sil hidden @_TTWCSo3Foo14objc_witnesses7FooableS0_FS1_3fooUS1___fRQPS1_FT_GSQSS_
 // CHECK:         function_ref @_TTOFCSo3Foo3foofS_FT_GSQSS_
 
 // witness for Phoûx.foo uses the Swift vtable
-// CHECK-LABEL: _TTWC14objc_witnessesX8Phox_xraS_7FooableFS1_3fooUS1___fRQPS1_FT_GSQSS_
+// CHECK-LABEL: _TTWC14objc_witnessesX8Phox_xraS_7FooableS_FS1_3fooUS1___fRQPS1_FT_GSQSS_
 // CHECK:         class_method %1 : $Phoûx, #Phoûx.foo!1
 
 protocol Bells {
@@ -32,7 +32,7 @@ protocol Bells {
 extension Gizmo : Bells {
 }
 
-// CHECK: sil hidden @_TTWCSo5Gizmo14objc_witnesses5BellsFS1_CUS1___fMQPS1_FT7bellsOnSi_S2_
+// CHECK: sil hidden @_TTWCSo5Gizmo14objc_witnesses5BellsS0_FS1_CUS1___fMQPS1_FT7bellsOnSi_S2_
 // CHECK: bb0([[SELF:%[0-9]+]] : $*Gizmo, [[I:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick Gizmo.Type):
 
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFCSo5GizmoCfMS_FT7bellsOnSi_GSQS__ : $@thin (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>

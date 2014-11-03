@@ -1407,35 +1407,21 @@ void Mangler::mangleDirectness(bool isIndirect) {
 }
 
 void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
-  // protocol-conformance ::= type protocol
-  // FIXME: Should include the generic parameters and module, but this
-  // complicates our hack for swift_conformsToProtocol.
+  // protocol-conformance ::= ('U' generic-parameters '_')?
+  //                          type protocol module
   // FIXME: explosion level?
   
-  CanType type = conformance->getType()->getCanonicalType();
-  // FIXME: Assume that all generic conformances add no additional constraints
-  // to the conforming type's generic parameters and swallow them. This makes
-  // it easier for our hacked-up implementation of swift_conformsToProtocol
-  // to find them.
-  if (conformance->getGenericParams())
-    type = UnboundGenericType::get(type->getNominalOrBoundGenericNominal(),
-                                   nullptr,
-                                   type->getASTContext())->getCanonicalType();
-#if 0
   ContextStack context(*this);
   // If the conformance is generic, mangle its generic parameters.
   if (auto gp = conformance->getGenericParams()) {
     Buffer << 'U';
     bindGenericParameters(gp, /*mangle*/ true);
   }
-#endif
   
-  mangleType(type, ResilienceExpansion::Minimal, 0);
+  mangleType(conformance->getType()->getCanonicalType(),
+             ResilienceExpansion::Minimal, 0);
   mangleProtocolName(conformance->getProtocol());
-  
-#if 0
   mangleModule(conformance->getDeclContext()->getParentModule());
-#endif
 }
 
 void Mangler::mangleFieldOffsetFull(const ValueDecl *decl, bool isIndirect) {

@@ -156,7 +156,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-NEXT: init_enum_data_addr
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
-// CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PFS1_1fUS1___fRQPS1_FT_S2_
+// CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1fUS1___fRQPS1_FT_S2_
 
 // CHECK-LABEL: sil_witness_table hidden X: CP module dynamic_self {
-// CHECK: method #CP.f!1: @_TTWC12dynamic_self1XS_2CPFS1_1fUS1___fQPS1_FT_S2_
+// CHECK: method #CP.f!1: @_TTWC12dynamic_self1XS_2CPS_FS1_1fUS1___fQPS1_FT_S2_

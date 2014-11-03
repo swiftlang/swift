@@ -39,7 +39,7 @@ extension NSRuncingOptions: Bub {}
 // CHECK-DAG: sil_witness_table shared NSRuncingOptions: Hashable module gizmo
 // CHECK-DAG: sil_witness_table shared NSFungingMask: RawRepresentable module gizmo
 
-// CHECK-DAG: sil shared @_TTWOSC16NSRuncingOptionsSs16RawRepresentableFS0_CUS0__U__fMQPS0_FT8rawValueQS1_8RawValue_GSqS1__
+// CHECK-DAG: sil shared @_TTWOSC16NSRuncingOptionsSs16RawRepresentable5gizmoFS0_CUS0__U__fMQPS0_FT8rawValueQS2_8RawValue_GSqS2__
 
 // Extension conformances get linkage occording to the protocol's accessibility, as normal.
 // CHECK-DAG: sil_witness_table hidden NSRuncingOptions: Bub module objc_enum

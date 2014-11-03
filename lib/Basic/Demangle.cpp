@@ -1004,18 +1004,14 @@ private:
     NodePointer protocol = demangleProtocolName();
     if (!protocol)
       return nullptr;
-  #if 0
     NodePointer context = demangleContext();
     if (!context)
       return nullptr;
-  #endif
     NodePointer proto_conformance =
         NodeFactory::create(Node::Kind::ProtocolConformance);
     proto_conformance->addChild(type);
     proto_conformance->addChild(protocol);
-  #if 0
     proto_conformance->addChild(context);
-  #endif
     return proto_conformance;
   }
 
@@ -2682,16 +2678,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ProtocolConformance: {
     NodePointer child0 = pointer->getChild(0);
     NodePointer child1 = pointer->getChild(1);
-  #if 0
     NodePointer child2 = pointer->getChild(2);
-  #endif
     print(child0);
     Printer << " : ";
     print(child1);
-  #if 0
     Printer << " in ";
     print(child2);
-  #endif
     return;
   }
   case Node::Kind::TypeList:

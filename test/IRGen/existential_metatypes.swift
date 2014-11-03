@@ -21,13 +21,13 @@ func test0() {
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { %swift.type*, i8** }* [[V]], i32 0, i32 0
 // CHECK-NEXT: store %swift.type* getelementptr inbounds (%swift.full_type* @_TMdSi, i32 0, i32 1), %swift.type** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { %swift.type*, i8** }* [[V]], i32 0, i32 1
-// CHECK-NEXT: store i8** getelementptr inbounds ([1 x i8*]* @_TWPSi21existential_metatypes8Kindable, i32 0, i32 0), i8*** [[T0]], align 8
+// CHECK-NEXT: store i8** getelementptr inbounds ([1 x i8*]* @_TWPSi21existential_metatypes8KindableS_, i32 0, i32 0), i8*** [[T0]], align 8
   var v: Kindable.Type = Int.self
 
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { %swift.type*, i8** }* [[V]], i32 0, i32 0
 // CHECK-NEXT: store %swift.type* getelementptr inbounds (%swift.full_type* @_TMdSf, i32 0, i32 1), %swift.type** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { %swift.type*, i8** }* [[V]], i32 0, i32 1
-// CHECK-NEXT: store i8** getelementptr inbounds ([1 x i8*]* @_TWPSf21existential_metatypes8Kindable, i32 0, i32 0), i8*** [[T0]], align 8
+// CHECK-NEXT: store i8** getelementptr inbounds ([1 x i8*]* @_TWPSf21existential_metatypes8KindableS_, i32 0, i32 0), i8*** [[T0]], align 8
   v = Float.self
 
 // CHECK-NEXT: ret void

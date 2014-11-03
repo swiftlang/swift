@@ -100,11 +100,11 @@
 ; CHECK: _TWoFC3foo3bar3basFSiSi ---> witness table offset for foo.bar.bas (Swift.Int) -> Swift.Int
 ; CHECK: _TWvdvC3foo3bar3basSi ---> direct field offset for foo.bar.bas : Swift.Int
 ; CHECK: _TWvivC3foo3bar3basSi ---> indirect field offset for foo.bar.bas : Swift.Int
-; CHECK: _TWPC3foo3barS_8barrable ---> protocol witness table for foo.bar : foo.barrable
-; CHECK: _TWZC3foo3barS_8barrable ---> lazy protocol witness table accessor for foo.bar : foo.barrable
-; CHECK: _TWzC3foo3barS_8barrable ---> lazy protocol witness table template for foo.bar : foo.barrable
-; CHECK: _TWDC3foo3barS_8barrable ---> dependent protocol witness table generator for foo.bar : foo.barrable
-; CHECK: _TWdC3foo3barS_8barrable ---> dependent protocol witness table template for foo.bar : foo.barrable
+; CHECK: _TWPC3foo3barS_8barrableSs ---> protocol witness table for foo.bar : foo.barrable in Swift
+; CHECK: _TWZC3foo3barS_8barrableS_ ---> lazy protocol witness table accessor for foo.bar : foo.barrable in foo
+; CHECK: _TWzC3foo3barS_8barrableS_ ---> lazy protocol witness table template for foo.bar : foo.barrable in foo
+; CHECK: _TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for foo.bar : foo.barrable in foo
+; CHECK: _TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for foo.bar : foo.barrable in foo
 ; CHECK: _TFSCg5greenVSC5Color ---> C.green.getter : C.Color
 ; CHECK: _TIF1t1fFT1iSi1sSS_T_A_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 0)
 ; CHECK: _TIF1t1fFT1iSi1sSS_T_A0_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 1)
@@ -158,10 +158,10 @@
 ; CHECK: _TFIvVSs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> Swift._Process.(_arguments : [Swift.String]).(variable initialization expression).(closure #1)
 ; CHECK: _TFCSo1AE ---> ObjectiveC.A.__ivar_destroyer
 ; CHECK: _TFCSo1Ae ---> ObjectiveC.A.__ivar_initializer
-; CHECK: _TTWC13call_protocol1CS_1PFS1_3fooU_fRQPS1_FT_Si ---> protocol witness for call_protocol.P.foo (inout call_protocol.P.Self)() -> Swift.Int in conformance call_protocol.C : call_protocol.P
+; CHECK: _TTWC13call_protocol1CS_1PS_FS1_3fooU_fRQPS1_FT_Si ---> protocol witness for call_protocol.P.foo (inout call_protocol.P.Self)() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
 ; CHECK: _TFC12dynamic_self1X1ffDS0_FT_DS0_ ---> dynamic_self.X.f (Self)() -> Self
 ; CHECK: _TTSSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int> of Swift.Optional.init <A>(A?.Type)() -> A?
-; CHECK: _TTSSiSiSs3Foo_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int with Swift.Int : Swift.Foo, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
+; CHECK: _TTSSiSiSs3FooSs_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int with Swift.Int : Swift.Foo in Swift, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
 ; CHECK: _TTSSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
 ; CHECK: _TTSSi_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
 ; CHECK: _TTSS ---> _TTSS
