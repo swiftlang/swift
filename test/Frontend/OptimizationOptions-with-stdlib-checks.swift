@@ -4,7 +4,7 @@
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_asserts
-// XFAIL: *
+// REQUIRES: swift_stdlib_no_asserts
 
 func test_assert() (x: Int, y: Int) -> Int {
   assert(x >= y , "x smaller than y")
