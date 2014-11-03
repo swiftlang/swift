@@ -265,15 +265,32 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     if (!V1Path || !V2Path)
       return AliasAnalysis::AliasResult::MayAlias;
 
+    auto R = V1Path->computeSubSeqRelation(*V2Path);
+
     // If all of the projections are equal, the two GEPs must be the same.
-    if (V1Path.getValue() == V2Path.getValue())
+    if (R == SubSeqRelation_t::Equal)
       return AliasAnalysis::AliasResult::MustAlias;
 
     // The two GEPs do not alias if they are accessing different fields of
     // the same object, since different fields of the same object should not
     // overlap.
+    //
+    // TODO: Replace this with a check on the computed subseq relation. See the
+    // TODO in computeSubSeqRelation.
     if (V1Path->hasNonEmptySymmetricDifference(V2Path.getValue()))
       return AliasAnalysis::AliasResult::NoAlias;
+
+    // If one of the GEPs is a super path of the other then they partially
+    // alias. W
+    if (isStrictSubSeqRelation(R))
+      return AliasAnalysis::AliasResult::PartialAlias;
+  } else {
+    // Ok, V2 is not an address projection. See if V2 after stripping casts
+    // aliases O1. If so, then we know that V2 must partially alias V1 via a
+    // must alias relation on O1. This ensures that given an alloc_stack and a
+    // gep from that alloc_stack, we say that they partially alias.
+    if (O1 == V2.stripCasts())
+      return AliasAnalysis::AliasResult::PartialAlias;
   }
 
   // We failed to prove anything. Be conservative and return MayAlias.

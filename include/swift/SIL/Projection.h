@@ -137,6 +137,27 @@ public:
   }
 };
 
+enum class SubSeqRelation_t : uint8_t {
+  Unrelated = 0,
+  LHSStrictSubSeqOfRHS = 1,
+  RHSStrictSubSeqOfLHS = 2,
+  Equal = 3
+};
+
+/// Returns true if Seq is either LHSStrictSubSeqOfRHS or
+/// RHSStrictSubSeqOfLHS. Returns false if Seq is one of either Equal or
+/// Unrelated.
+inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
+  switch (Seq) {
+  case SubSeqRelation_t::Unrelated:
+  case SubSeqRelation_t::Equal:
+    return false;
+  case SubSeqRelation_t::LHSStrictSubSeqOfRHS:
+  case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
+    return true;
+  }
+}
+
 class ProjectionPath {
 public:
   using PathTy = llvm::SmallVector<Projection, 8>;
@@ -167,17 +188,31 @@ public:
   static Optional<ProjectionPath>
   getAddrProjectionPath(SILValue Start, SILValue End, bool IgnoreCasts=false);
 
-  /// Returns true if LHS and RHS have all the same projections in the same
-  /// order.
-  bool operator==(const ProjectionPath &RHS) const;
-
   /// Returns true if the two paths have a non-empty symmetric difference.
   ///
   /// This means that the two objects have the same base but access different
   /// fields of the base object.
   bool hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const;
 
+  /// Compute the subsequence relation in between LHS and RHS which tells the
+  /// user whether or not the two sequences are unrelated, equal, or if one is a
+  /// subsequence of the other.
+  SubSeqRelation_t computeSubSeqRelation(const ProjectionPath &RHS) const;
+
+  /// Returns true if LHS and RHS have all the same projections in the same
+  /// order.
+  bool operator==(const ProjectionPath &RHS) const {
+    return computeSubSeqRelation(RHS) == SubSeqRelation_t::Equal;
+  }
+
+  bool operator!=(const ProjectionPath &RHS) const {
+    return !(*this == RHS);
+  }
+
+  /// Returns true if the contained projection path is empty.
   bool empty() const { return Path.empty(); }
+
+  /// Returns the number of path elements in the given projection path.
   unsigned size() const { return Path.size(); }
 
   using iterator = PathTy::iterator;
@@ -193,7 +228,7 @@ public:
   reverse_iterator rbegin() { return Path.rbegin(); }
   reverse_iterator rend() { return Path.rend(); }
   const_reverse_iterator rbegin() const { return Path.rbegin(); }
-  const_reverse_iterator rend() const { return Path.rend(); }  
+  const_reverse_iterator rend() const { return Path.rend(); }
 };
 
 } // end namespace swift

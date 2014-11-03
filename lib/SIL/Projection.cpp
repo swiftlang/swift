@@ -80,18 +80,6 @@ ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
   return std::move(P);
 }
 
-bool
-ProjectionPath::operator==(const ProjectionPath &RHS) const {
-  if (size() != RHS.size())
-    return false;
-
-  for (unsigned i = 0, e = size(); i != e; ++i)
-    if (Path[i] != RHS.Path[i])
-      return false;
-
-  return true;
-}
-
 /// Returns true if the two paths have a non-empty symmetric difference.
 ///
 /// This means that the two objects have the same base but access different
@@ -134,4 +122,59 @@ hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const {
 
   // We checked
   return false;
+}
+
+/// TODO: Integrate has empty non-symmetric difference into here.
+SubSeqRelation_t
+ProjectionPath::
+computeSubSeqRelation(const ProjectionPath &RHS) const {
+  // If either path is empty, we can not prove anything, return Unrelated.
+  if (empty() || RHS.empty())
+    return SubSeqRelation_t::Unrelated;
+
+  // We reverse the projection path to scan from the common object.
+  auto LHSReverseIter = rbegin();
+  auto RHSReverseIter = RHS.rbegin();
+
+  unsigned MinPathSize = std::min(size(), RHS.size());
+
+  // For each index i until min path size...
+  for (unsigned i = 0; i != MinPathSize; ++i) {
+    // Grab the current projections.
+    const Projection &LHSProj = *LHSReverseIter;
+    const Projection &RHSProj = *RHSReverseIter;
+
+    // If the two projections do not equal exactly, return Unrelated.
+    //
+    // TODO: If Index equals zero, then we know that the two lists have nothing
+    // in common and should return unrelated. If Index is greater than zero,
+    // then we know that the two projection paths have a common base but a
+    // non-empty symmetric difference. For now we just return Unrelated since I
+    // can not remember why I had the special check in the
+    // hasNonEmptySymmetricDifference code.
+    if (LHSProj != RHSProj)
+      return SubSeqRelation_t::Unrelated;
+
+    // Otherwise increment reverse iterators.
+    LHSReverseIter++;
+    RHSReverseIter++;
+  }
+
+  // Ok, we now know that one of the paths is a subsequence of the other. If
+  // both size() and RHS.size() equal then we know that the entire sequences
+  // equal.
+  if (size() == RHS.size())
+    return SubSeqRelation_t::Equal;
+
+  // If MinPathSize == size(), then we know that LHS is a strict subsequence of
+  // RHS.
+  if (MinPathSize == size())
+    return SubSeqRelation_t::LHSStrictSubSeqOfRHS;
+
+  // Otherwise, we know that MinPathSize must be RHS.size() and RHS must be a
+  // strict subsequence of LHS. Assert to check this and return.
+  assert(MinPathSize == RHS.size() &&
+        "Since LHS and RHS don't equal and size() != MinPathSize, RHS.size() "
+         "must equal MinPathSize");
+  return SubSeqRelation_t::RHSStrictSubSeqOfLHS;
 }
