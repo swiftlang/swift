@@ -256,10 +256,8 @@ endif()
 set(PATH_TO_SWIFT_BUILD "" CACHE FILEPATH "Path to existing Swift build")
 if ( PATH_TO_SWIFT_BUILD STREQUAL "" )
    set(SWIFT_EXEC "swift")
-   set(SWIFT_IDE_TEST "swift-ide-test")
 else()
    set(SWIFT_EXEC "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift")
-   set(SWIFT_IDE_TEST "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift-ide-test")
 endif()
 
 # FIXME: unify with CLANG_HAVE_LIBXML, which is set in LLVM anyway.
@@ -575,14 +573,6 @@ function(compile_swift_files)
     set(swift_compiler_path "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${SWIFT_EXEC}c")
   else()
     set(swift_compiler_path "${SWIFT_EXEC}c")
-  endif()
-  
-  if (apinote_files AND SWIFT_IDE_TEST STREQUAL "swift-ide-test")
-    # We need to run swift-ide-test and we didn't get 
-    # one from PATH_TO_SWIFT_BUILD. Build it first.
-    set(swift_ide_test_dependency swift-ide-test)
-  else()
-    set(swift_ide_test_dependency)
   endif()
 
   add_custom_command(
