@@ -496,7 +496,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
       isRetainReleasedBeforeMutate(UseInst, ArrayVal))
     return true;
 
-  if (isa<ReleaseValueInst>(UseInst))
+  if (isa<ReleaseValueInst>(UseInst) || isa<StrongReleaseInst>(UseInst))
     // Releases are always safe. This case handles the release of an array
     // buffer that is loaded from a local array struct.
     return true;
