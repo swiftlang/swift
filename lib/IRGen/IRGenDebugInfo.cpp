@@ -177,9 +177,9 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   bool IsOptimized = Opts.Optimize;
   StringRef Flags = Opts.DWARFDebugFlags;
-
-  // FIXME.
-  unsigned RuntimeVersion = 1;
+  unsigned Major, Minor;
+  std::tie(Major, Minor) = version::getSwiftNumericVersion();
+  unsigned RuntimeVersion = Major*100 + Minor;
 
   // No split DWARF on Darwin.
   StringRef SplitName = StringRef();
