@@ -31,9 +31,15 @@ extension CFSet: Fooable {
   func foo() { println("CFSet") }
 }
 
+extension NSString: Fooable {
+  func foo() { println("NSString") }
+}
+
 fooify(NSRect()) // CHECK: NSRect
 fooify(NSPoint()) // CHECK-NEXT: not fooable
 fooify(CFSetCreate(kCFAllocatorDefault, nil, 0, nil)!) // CHECK-NEXT: CFSet
 fooify(CFArrayCreate(kCFAllocatorDefault, nil, 0, nil)!) // CHECK-NEXT: not fooable
+fooify(NSString()) // CHECK-NEXT: NSString
+fooify(NSMutableString()) // CHECK-NEXT: NSString
+fooify(NSSet()) // CHECK-NEXT: not fooable
 
-// TODO: objc classes

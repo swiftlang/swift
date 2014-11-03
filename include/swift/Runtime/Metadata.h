@@ -1863,12 +1863,31 @@ public:
     case ProtocolConformanceTypeKind::NonuniqueDirectType:
       break;
         
+    case ProtocolConformanceTypeKind::UniqueDirectClass:
     case ProtocolConformanceTypeKind::UniqueIndirectClass:
     case ProtocolConformanceTypeKind::UniqueGenericPattern:
       assert(false && "not direct type metadata");
     }
 
     return DirectType;
+  }
+  
+  // FIXME: This shouldn't exist
+  const ClassMetadata *getDirectClass() const {
+    switch (Flags.getTypeKind()) {
+    case ProtocolConformanceTypeKind::Universal: // will be null in this case
+    case ProtocolConformanceTypeKind::UniqueDirectClass:
+      break;
+        
+    case ProtocolConformanceTypeKind::UniqueDirectType:
+    case ProtocolConformanceTypeKind::NonuniqueDirectType:
+    case ProtocolConformanceTypeKind::UniqueGenericPattern:
+    case ProtocolConformanceTypeKind::UniqueIndirectClass:
+      assert(false && "not direct class object");
+    }
+    
+    return static_cast<const ClassMetadata*>(DirectType);
+    
   }
   
   const ClassMetadata * const *getIndirectClass() const {
@@ -1878,6 +1897,7 @@ public:
       break;
         
     case ProtocolConformanceTypeKind::UniqueDirectType:
+    case ProtocolConformanceTypeKind::UniqueDirectClass:
     case ProtocolConformanceTypeKind::NonuniqueDirectType:
     case ProtocolConformanceTypeKind::UniqueGenericPattern:
       assert(false && "not indirect class object");
@@ -1892,6 +1912,7 @@ public:
     case ProtocolConformanceTypeKind::UniqueGenericPattern:
       break;
         
+    case ProtocolConformanceTypeKind::UniqueDirectClass:
     case ProtocolConformanceTypeKind::UniqueIndirectClass:
     case ProtocolConformanceTypeKind::UniqueDirectType:
     case ProtocolConformanceTypeKind::NonuniqueDirectType:

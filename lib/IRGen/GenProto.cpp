@@ -3347,10 +3347,10 @@ getTypeReferenceForProtocolConformanceRecord(IRGenModule &IGM,
       typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
       typeRef = IGM.getAddrOfForeignTypeMetadataCandidate(ct);
     } else {
-      // TODO: We should indirectly reference classes. For now directly reference
-      // the class object, which is totally wrong for ObjC classes.
+      // TODO: We should indirectly reference classes. For now directly
+      // reference the class object, which is totally wrong for ObjC interop.
       
-      typeKind = ProtocolConformanceTypeKind::UniqueDirectType;
+      typeKind = ProtocolConformanceTypeKind::UniqueDirectClass;
       typeRef = IGM.getAddrOfTypeMetadata(ct,
                                           /* indirect */ false,
                                           /* pattern */ false);

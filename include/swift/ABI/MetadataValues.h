@@ -163,13 +163,21 @@ enum class ProtocolConformanceTypeKind : unsigned {
   /// metadata.
   ///
   /// On platforms without ObjC interop, this indirection isn't necessary,
-  /// and classes could be emitted as NativeDirectType.
+  /// and classes could be emitted as UniqueDirectType.
   UniqueIndirectClass,
   
   /// The conformance is for a generic type.
   /// getGenericPattern() points to the generic metadata pattern used to
   /// form instances of the type.
   UniqueGenericPattern,
+  
+  /// The conformance is for a nongeneric class type.
+  /// getDirectType() points to the unique class object.
+  ///
+  /// FIXME: This shouldn't exist. On ObjC interop platforms, class references
+  /// must be indirected (using UniqueIndirectClass). On non-ObjC interop
+  /// platforms, the class object always is the type metadata.
+  UniqueDirectClass = 0xF,
 };
   
 /// Kinds of reference to protocol conformance.

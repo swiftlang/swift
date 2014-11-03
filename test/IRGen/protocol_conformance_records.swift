@@ -61,8 +61,8 @@ struct NativeGenericType<T>: Runcible {
 // CHECK:           @_TMdVSC6NSRect
 // -- witness table
 // CHECK:           @_TWPVSC6NSRect28protocol_conformance_records8Runcible
-// -- flags 0x02: nonunique direct metadata
-// CHECK:           i32 2
+// -- flags 0x01: unique direct metadata (TODO should be 0x02 nonunique)
+// CHECK:           i32 1
 // CHECK:         },
 extension NSRect: Runcible {
   func runce() {}

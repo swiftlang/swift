@@ -1481,6 +1481,10 @@ void ProtocolConformanceRecord::dump() const {
         printf("<structural type>");
       }
       break;
+    case ProtocolConformanceTypeKind::UniqueDirectClass:
+      printf("unique direct class %s",
+             class_getName(getDirectClass()));
+      break;
     case ProtocolConformanceTypeKind::UniqueIndirectClass:
       printf("unique indirect class %s",
              class_getName(*getIndirectClass()));
@@ -1521,6 +1525,11 @@ const {
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata.
     return swift_getObjCClassMetadata(*getIndirectClass());
+      
+  case ProtocolConformanceTypeKind::UniqueDirectClass:
+    // The class may be ObjC, in which case we need to instantiate its Swift
+    // metadata.
+    return swift_getObjCClassMetadata(getDirectClass());
       
   case ProtocolConformanceTypeKind::UniqueGenericPattern:
   case ProtocolConformanceTypeKind::Universal:
