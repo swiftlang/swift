@@ -232,6 +232,17 @@ bool constraints::hasMandatoryTupleLabels(Expr *e) {
   return isa<TupleExpr>(e->getSemanticsProvidingExpr());
 }
 
+bool constraints::hasTrailingClosure(const ConstraintLocatorBuilder &locator) {
+  if (Expr *e = locator.trySimplifyToExpr()) {
+    if (ParenExpr *parenExpr = dyn_cast<ParenExpr>(e)) {
+      return parenExpr->hasTrailingClosure();
+    } else if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(e)) {
+      return tupleExpr->hasTrailingClosure();
+    }
+  }
+  return false;
+}
+
 //===--------------------------------------------------------------------===//
 // High-level entry points.
 //===--------------------------------------------------------------------===//

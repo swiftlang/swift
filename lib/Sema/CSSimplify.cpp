@@ -89,12 +89,9 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 }
 
 /// Function that determines whether the parameter at the given
-/// index can be treated as a trailing closure.
-///
-/// FIXME: This is the wrong question to ask. We should know when something is
-/// a trailing closure.
-static bool paramIsTrailingClosure(ArrayRef<TupleTypeElt> paramTuple,
-                                   unsigned paramIdx) {
+/// index could be bound to a trailing closure.
+static bool paramCanBeTrailingClosure(ArrayRef<TupleTypeElt> paramTuple,
+                                      unsigned paramIdx) {
   for (unsigned i = paramIdx, n = paramTuple.size(); i != n; ++i) {
     const auto &param = paramTuple[i];
     auto type = param.isVararg() ? param.getVarargBaseTy() : param.getType();
@@ -135,6 +132,7 @@ ArrayRef<TupleTypeElt> constraints::decomposeArgParamType(Type type,
 bool constraints::matchCallArguments(
        ArrayRef<TupleTypeElt> argTuple,
        ArrayRef<TupleTypeElt> paramTuple,
+       bool hasTrailingClosure,
        bool allowFixes,
        MatchCallArgumentListener &listener,
        SmallVectorImpl<ParamBinding> &parameterBindings) {
@@ -252,12 +250,13 @@ bool constraints::matchCallArguments(
       return claim(name, i);
     }
 
-    // If the current parameter appears to be a trailing closure, allow the
-    // argument to be unnamed even if the parameter has a name.
-    // FIXME: This is a hack. We should know whether it's a trailing closure
-    // or not.
-    if (nextArgIdx != numArgs && paramIsTrailingClosure(paramTuple, paramIdx) &&
-        argTuple[nextArgIdx].getName().empty()) {
+    // If the current parameter can claim a trailing closure, allow it even if
+    // the parameter has a name.
+    bool nextArgIsTrailingClosure = hasTrailingClosure &&
+                                    nextArgIdx + 1 == numArgs &&
+                                    argTuple[nextArgIdx].getName().empty();
+    if (nextArgIsTrailingClosure &&
+        paramCanBeTrailingClosure(paramTuple, paramIdx)) {
       return claim(Identifier(), nextArgIdx, /*ignoreNameClash=*/true);
     }
 
@@ -588,6 +587,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   Listener listener(cs, argType, paramType, locator);
   SmallVector<ParamBinding, 4> parameterBindings;
   if (constraints::matchCallArguments(argTuple, paramTuple,
+                                      hasTrailingClosure(locator),
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))
     return ConstraintSystem::SolutionKind::Error;
