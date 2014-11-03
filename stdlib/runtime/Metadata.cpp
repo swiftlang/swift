@@ -2012,6 +2012,7 @@ struct llvm::DenseMapInfo<GlobalString> {
 
 // We use a DenseMap over what are essentially StringRefs instead of a
 // StringMap because we don't need to actually copy the string.
+static pthread_mutex_t ForeignTypesLock = PTHREAD_MUTEX_INITIALIZER;
 static llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> ForeignTypes;
 
 const ForeignTypeMetadata *
@@ -2021,7 +2022,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
     return unique;
 
   // Okay, insert a new row.
-  // FIXME: locking!
+  pthread_mutex_lock(&ForeignTypesLock);
   auto insertResult = ForeignTypes.insert({GlobalString(nonUnique->getName()),
                                            nonUnique});
   auto uniqueMetadata = insertResult.first->second;
@@ -2039,6 +2040,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   // it will be possible for code to fast-path through this function
   // too soon.
   nonUnique->setCachedUniqueMetadata(uniqueMetadata);
+  pthread_mutex_unlock(&ForeignTypesLock);
   return uniqueMetadata;
 }
 
