@@ -655,8 +655,8 @@ function(handle_swift_sources sourcesvar externalvar name)
   translate_flag(${SWIFTSOURCES_INSTALL} "INSTALL" INSTALL_arg)
 
   if(swift_sources)
-    # Special-case hack to create swift.o for the swift_stdlib_* targets
-    if(name STREQUAL swiftCore)
+    # Special-case hack to create Swift.o for the core standard library.
+    if(SWIFTSOURCES_IS_STDLIB_CORE)
       set(swift_obj_base "Swift")
     else()
       # Otherwise, get the name from the first swift input file.  Also
