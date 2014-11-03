@@ -2351,15 +2351,9 @@ void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index);
 ///             check.
 /// \param protocol The protocol descriptor for the protocol to check
 ///                 conformance for.
-/// \param module The mangled name of the module from which to determine
-///               conformance visibility.
 extern "C"
 const void *swift_conformsToProtocol(const Metadata *type,
-                                     const ProtocolDescriptor *protocol,
-                                     const char *module);
-extern "C"
-const void *swift_conformsToProtocol2(const Metadata *type,
-                                      const ProtocolDescriptor *protocol);
+                                     const ProtocolDescriptor *protocol);
 
 /// Register a block of protocol conformance records for dynamic lookup.
 extern "C"

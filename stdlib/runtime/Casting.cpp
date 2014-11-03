@@ -1447,15 +1447,6 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
   return value;  
 }
 
-static std::string typeNameForObjCClass(const ClassMetadata *cls)
-{
-    const char* objc_class_name = class_getName(cls);
-    std::stringstream ostream;
-    ostream << "CSo" << strlen(objc_class_name) << objc_class_name;
-    ostream.flush();
-    return ostream.str();
-}
-
 #ifndef NDEBUG
 void ProtocolConformanceRecord::dump() const {
   auto symbolName = [&](const void *addr) -> const char * {
@@ -1734,7 +1725,7 @@ static void _addImageProtocolConformances(const mach_header *mh,
   swift_registerProtocolConformances(recordsBegin, recordsEnd);
 }
 
-const void *swift::swift_conformsToProtocol2(const Metadata *type,
+const void *swift::swift_conformsToProtocol(const Metadata *type,
                                             const ProtocolDescriptor *protocol){
   // TODO: Generic types, subclasses, foreign classes
 
@@ -1851,7 +1842,7 @@ recur_inside_cache_lock:
 
 #else // if !__APPLE__
 
-const void *swift::swift_conformsToProtocol2(const Metadata *type,
+const void *swift::swift_conformsToProtocol(const Metadata *type,
                                             const ProtocolDescriptor *protocol){
   // Not implemented for non-Apple platforms.
   return nullptr;
@@ -1889,7 +1880,7 @@ OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1_2(
     = static_cast<const ExistentialTypeMetadata*>(destType);
   assert(destExistential->Protocols.NumProtocols == 1);
   auto protocol = destExistential->Protocols[0];
-  auto witness = swift_conformsToProtocol2(sourceType, protocol);
+  auto witness = swift_conformsToProtocol(sourceType, protocol);
   if (!witness)
     return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
   
@@ -1899,168 +1890,6 @@ OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1_2(
   sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
   return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
                          reinterpret_cast<OpaqueValue *>(&outValue), destType);
-}
-
-/// A cache used for swift_conformsToProtocol.
-static llvm::DenseMap<std::pair<const Metadata*, const ProtocolDescriptor*>,
-                      const void *> FoundProtocolConformances;
-/// Read-write lock used to guard FoundProtocolConformances during lookup.
-static pthread_rwlock_t FoundProtocolConformancesLock
-  = PTHREAD_RWLOCK_INITIALIZER;
-
-
-/// \brief Check whether a type conforms to a given native Swift protocol,
-/// visible from the named module.
-///
-/// If so, returns a pointer to the witness table for its conformance.
-/// Returns void if the type does not conform to the protocol.
-///
-/// \param type The metadata for the type for which to do the conformance
-///             check.
-/// \param protocol The protocol descriptor for the protocol to check
-///                 conformance for.
-/// \param module The mangled name of the module from which to determine
-///               conformance visibility.
-const void *swift::swift_conformsToProtocol(const Metadata *type,
-                                            const ProtocolDescriptor *protocol,
-                                            const char *module) {
-  // FIXME: This is an unconscionable hack that only works for 1.0 because
-  // we brazenly assume that:
-  // - witness tables never require runtime instantiation
-  // - witness tables have external visibility
-  // - we in practice only have one module per program
-  // - all conformances are public, and defined in the same module as the
-  //   conforming type
-  // - only nominal types conform to protocols
-
-  // See whether we cached this lookup.
-  pthread_rwlock_rdlock(&FoundProtocolConformancesLock);
-  auto cached = FoundProtocolConformances.find({type, protocol});
-  if (cached != FoundProtocolConformances.end()) {
-    pthread_rwlock_unlock(&FoundProtocolConformancesLock);
-    return cached->second;
-  }
-  pthread_rwlock_unlock(&FoundProtocolConformancesLock);
-
-  auto origType = type;
-  auto origProtocol = protocol;
-  /// Cache and return the result.
-  auto cacheResult = [&](const void *result) -> const void * {
-    pthread_rwlock_wrlock(&FoundProtocolConformancesLock);
-    FoundProtocolConformances.insert({{origType, origProtocol}, result});
-    pthread_rwlock_unlock(&FoundProtocolConformancesLock);
-    return result;
-  };
-
-recur:
-
-  std::string TypeName;
-
-  switch (type->getKind()) {
-  case MetadataKind::ObjCClassWrapper: {
-    auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(type);
-    TypeName = typeNameForObjCClass(wrapper->Class);
-    break;
-  }
-  case MetadataKind::ForeignClass: {
-    auto metadata = static_cast<const ForeignClassMetadata*>(type);
-    TypeName = metadata->getName();
-    break;
-  }
-  case MetadataKind::Class: {
-    auto theClass = static_cast<const ClassMetadata *>(type);
-    if (theClass->isPureObjC()) {
-      TypeName = typeNameForObjCClass(theClass);
-      break;
-    }
-  }
-  [[clang::fallthrough]];  // FALL THROUGH to nominal type check
-  case MetadataKind::Tuple:
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Opaque:
-  case MetadataKind::Function:
-  case MetadataKind::Block:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype: {
-    // FIXME: Only check nominal types for now.
-    auto *descriptor = type->getNominalTypeDescriptor();
-    if (!descriptor)
-      return cacheResult(nullptr);
-    TypeName = std::string(descriptor->Name);
-    break;
-  }
-      
-  // Values should never use these metadata kinds.
-  case MetadataKind::PolyFunction:
-  case MetadataKind::HeapLocalVariable:
-    assert(false);
-    return nullptr;
-  }
-  
-  // Derive the symbol name that the witness table ought to have.
-  // _TWP <protocol conformance>
-  // protocol conformance ::= <type> <protocol> <module>
-  
-  std::string mangledName = "_TWP";
-  mangledName += TypeName;
-  // The name in the protocol descriptor gets mangled as a protocol type
-  // P <name> _
-  const char *begin = protocol->Name + 1;
-  const char *end = protocol->Name + strlen(protocol->Name) - 1;
-  mangledName.append(begin, end);
-  
-  // Look up the symbol for the conformance everywhere.
-  if (const void *result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
-    return cacheResult(result);
-  }
-  
-  // If the type was a class, try again with the superclass.
-  switch (type->getKind()) {
-  case MetadataKind::Class: {
-    auto theClass = static_cast<const ClassMetadata *>(type);
-    type = theClass->SuperClass;
-    if (!type)
-      return cacheResult(nullptr);
-    goto recur;
-  }
-  case MetadataKind::ObjCClassWrapper: {
-    auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
-    auto super = _swift_getSuperclass(wrapper->Class);
-    if (!super)
-      return cacheResult(nullptr);
-    
-    type = swift_getObjCClassMetadata(super);
-    goto recur;
-  }
-  case MetadataKind::ForeignClass: {
-    auto theClass = static_cast<const ForeignClassMetadata *>(type);
-    auto super = theClass->SuperClass;
-    if (!super)
-      return cacheResult(nullptr);
-
-    type = super;
-    goto recur;
-  }
-
-  case MetadataKind::Tuple:
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Opaque:
-  case MetadataKind::Function:
-  case MetadataKind::Block:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
-    return cacheResult(nullptr);
-      
-  // Values should never use these metadata kinds.
-  case MetadataKind::PolyFunction:
-  case MetadataKind::HeapLocalVariable:
-    assert(false);
-    return nullptr;
-  }
 }
 
 /// Given a possibly-existential value, find its dynamic type and the
@@ -2104,7 +1933,7 @@ findWitnessTableForDynamicCastToExistential1(OpaqueValue *sourceValue,
     swift::crash("Swift protocol conformance check failed: "
                  "source type is an existential");
 
-  return swift_conformsToProtocol(sourceType, destProtocolDescriptor, nullptr);
+  return swift_conformsToProtocol(sourceType, destProtocolDescriptor);
 }
 
 // func _stdlib_conformsToProtocol<SourceType, DestType>(
@@ -2435,7 +2264,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 //===----------------------------------------------------------------------===//
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
-  auto w = swift_conformsToProtocol(T, &_TMpSs21_ObjectiveCBridgeable, nullptr);
+  auto w = swift_conformsToProtocol(T, &_TMpSs21_ObjectiveCBridgeable);
   return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
 }
 

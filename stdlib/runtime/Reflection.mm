@@ -999,7 +999,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
   
   return {
     reinterpret_cast<const ReflectableWitnessTable*>(
-      swift_conformsToProtocol(T, &_TMpSs11Reflectable, nullptr)),
+      swift_conformsToProtocol(T, &_TMpSs11Reflectable)),
     T,
     Value
   };
