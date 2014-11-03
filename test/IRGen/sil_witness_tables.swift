@@ -34,9 +34,6 @@ struct Conformer: Q, QQ {
   func qMethod() {}
 }
 
-// CHECK: module asm ".desc __TWPV18sil_witness_tables9ConformerS_1P, 0x10"
-// CHECK: module asm ".desc __TWPV18sil_witness_tables9ConformerS_1Q, 0x10"
-
 // CHECK: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@_TWPV39sil_witness_tables_external_conformance17ExternalConformerS_9ExternalP]] = external global i8*
 // CHECK: [[CONFORMER_P_WITNESS_TABLE:@_TWPV18sil_witness_tables9ConformerS_1P]] = hidden constant [4 x i8*] [
 // -- FIXME: associated type and witness table

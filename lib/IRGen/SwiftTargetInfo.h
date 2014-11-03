@@ -77,8 +77,6 @@ public:
   bool ObjCUseFP2Ret = false;
   bool ObjCUseNullForEmptyVTable = false;
   bool ObjCUseISAMask = false;
-
-  bool MarkWitnessTablesUsedMachOStyle = false;
 };
 
 }

@@ -48,7 +48,6 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   if (triple.isOSDarwin()) {
     target.LeastValidPointerValue =
       SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
-    target.MarkWitnessTablesUsedMachOStyle = true;
   }
 
   // CGPoint and CGRect are both returned in registers.
@@ -76,7 +75,6 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
   if (triple.isOSDarwin()) {
     target.LeastValidPointerValue =
       SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
-    target.MarkWitnessTablesUsedMachOStyle = true;
   }
 
   // On simulator targets, use null instead of &_objc_empty_vtable.
@@ -94,9 +92,6 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
 /// Configures target-specific information for 32-bit x86 platforms.
 static void configureX86(IRGenModule &IGM, const llvm::Triple &triple,
                          SwiftTargetInfo &target) {
-  if (triple.isOSDarwin())
-    target.MarkWitnessTablesUsedMachOStyle = true;
-
   // On simulator targets, use null instead of &_objc_empty_vtable.
   if (triple.isiOS())
     target.ObjCUseNullForEmptyVTable = true;
