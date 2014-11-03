@@ -137,7 +137,7 @@ set(SWIFT_CHECK_ESSENTIAL_STDLIB NO CACHE BOOL
   "Check core standard library layering by linking its essential subset")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
- add_swift_library(swift_stdlib_essential IS_STDLIB_CORE
+ add_swift_library(swift_stdlib_essential IS_STDLIB_CORE TARGET_LIBRARY
    ${SWIFTLIB_ESSENTIAL}
    )
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
