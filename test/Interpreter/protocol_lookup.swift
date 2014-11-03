@@ -70,7 +70,3 @@ fooify(H<Float>()) // CHECK-NEXT: not fooable
 fooify(H<Int>()) // CHECK-NEXT: not fooable
 
 // TODO: generics w/ dependent witness tables
-// TODO: imported value types
-// TODO: objc classes
-// TODO: cf classes
-// TODO: objc protocols

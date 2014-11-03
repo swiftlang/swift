@@ -1330,28 +1330,47 @@ struct ForeignTypeMetadata : public Metadata {
     /// An optional callback performed when a particular metadata object
     /// is chosen as the unique structure.
     InitializationFunction_t InitializationFunction;
+    
+    /// The Swift-mangled name of the type. This is the uniquing key for the
+    /// type.
+    const char *Name;
+    
+    /// A pointer to the actual, runtime-uniqued metadata for this
+    /// type.  This is essentially an invasive cache for the lookup
+    /// structure.
+    mutable const ForeignTypeMetadata *Unique;
+    
+    /// Various flags.
+    enum : size_t {
+      /// This metadata has an initialization callback function.  If
+      /// this flag is not set, the metadata object needn't actually
+      /// have a InitializationFunction field.
+      HasInitializationFunction = 0x1,
+    } Flags;
   };
 
   struct HeaderType : HeaderPrefix, TypeMetadataHeader {};
 
-  /// The Swift-mangled name of the type.
-  const char *Name;
-
-  /// A pointer to the actual, runtime-uniqued metadata for this
-  /// type.  This is essentially an invasive cache for the lookup
-  /// structure.
-  const ForeignTypeMetadata *Unique;
-
-  /// Various flags.
-  enum : size_t {
-    /// This metadata has an initialization callback function.  If
-    /// this flag is not set, the metadata object needn't actually
-    /// have a InitializationFunction field.
-    HasInitializationFunction = 0x1,
-  } Flags;
+  const char *getName() const {
+    return asFullMetadata(this)->Name;
+  }
+  
+  const ForeignTypeMetadata *getCachedUniqueMetadata() const {
+    return asFullMetadata(this)->Unique;
+  }
+  
+  void setCachedUniqueMetadata(const ForeignTypeMetadata *unique) const {
+    assert(asFullMetadata(this)->Unique == nullptr
+           && "already set unique metadata");
+    asFullMetadata(this)->Unique = unique;
+  }
+  
+  size_t getFlags() const {
+    return asFullMetadata(this)->Flags;
+  }
 
   bool hasInitializationFunction() const {
-    return Flags & HasInitializationFunction;
+    return getFlags() & HeaderPrefix::HasInitializationFunction;
   }
 
   InitializationFunction_t getInitializationFunction() const {

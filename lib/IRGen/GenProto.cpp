@@ -3357,14 +3357,18 @@ getTypeReferenceForProtocolConformanceRecord(IRGenModule &IGM,
     }
   } else if (auto nom = conformingType->getNominalOrBoundGenericNominal()) {
     // TODO: Metadata for Clang types should be uniqued like foreign classes.
-
-    // We can reference the canonical metadata for native value types
-    // directly.
-    typeKind = ProtocolConformanceTypeKind::UniqueDirectType;
-    typeRef = IGM.getAddrOfTypeMetadata(nom->getDeclaredType()
-                                          ->getCanonicalType(),
-                                        /* indirect */ false,
-                                        /* pattern */ false);
+    if (nom->hasClangNode()) {
+      typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
+      typeRef = IGM.getAddrOfForeignTypeMetadataCandidate(conformingType);
+    } else {
+      // We can reference the canonical metadata for native value types
+      // directly.
+      typeKind = ProtocolConformanceTypeKind::UniqueDirectType;
+      typeRef = IGM.getAddrOfTypeMetadata(nom->getDeclaredType()
+                                            ->getCanonicalType(),
+                                          /* indirect */ false,
+                                          /* pattern */ false);
+    }
   } else {
     // TODO: Universal and/or structural conformances
     llvm_unreachable("unhandled protocol conformance");

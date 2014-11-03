@@ -19,7 +19,7 @@ import gizmo
 // CHECK: @"\01L_selector(bar)" = internal global i8* getelementptr inbounds ([4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
 
 // CHECK: @_TMnVSC4Rect = linkonce_odr hidden constant
-// CHECK: @_TMdVSC4Rect = linkonce_odr hidden constant
+// CHECK: @_TMdVSC4Rect = linkonce_odr hidden global
 
 struct id {
   var data : AnyObject
@@ -97,6 +97,9 @@ func test10(g: Gizmo, r: Rect) {
 
 // Force the emission of the Rect metadata.
 func test11_helper<T>(t: T) {}
+// NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
+// CHECK-LABEL: define hidden void @_TF4objc6test11FVSC4RectT_
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMdVSC4Rect
 func test11(r: Rect) { test11_helper(r) }
 
 class WeakObjC {

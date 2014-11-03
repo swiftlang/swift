@@ -1257,6 +1257,9 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // adjustment (due to the heap-metadata header).
   } else if (isa<ClassType>(concreteType) ||
              isa<BoundGenericClassType>(concreteType)) {
+    assert(!concreteType->getClassOrBoundGenericClass()->isForeign()
+           && "metadata for foreign classes should be emitted as "
+              "foreign candidate");
     defaultVarTy = FullHeapMetadataStructTy;
     defaultVarPtrTy = FullHeapMetadataPtrTy;
     adjustmentIndex = MetadataAdjustmentIndex::Class;
@@ -1264,6 +1267,12 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // All other non-pattern direct metadata use the full type and
   // require an adjustment.
   } else {
+    auto nom = concreteType->getNominalOrBoundGenericNominal();
+    assert((!nom || !nom->hasClangNode())
+           && "metadata for foreign type should be emitted as "
+              "foreign candidate");
+    (void)nom;
+    
     defaultVarTy = FullTypeMetadataStructTy;
     defaultVarPtrTy = FullTypeMetadataPtrTy;
     adjustmentIndex = MetadataAdjustmentIndex::ValueType;
@@ -1321,8 +1330,8 @@ llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   // What we save in GlobalVars is actually the offsetted value.
   auto entity = LinkEntity::forForeignTypeMetadataCandidate(type);
-  auto &entry = GlobalVars[entity];
-  if (entry) return entry;
+  if (auto entry = GlobalVars[entity])
+    return entry;
 
   // Compute the constant initializer and the offset of the type
   // metadata candidate within it.
@@ -1342,7 +1351,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
 
   // Only remember the offset.
-  entry = result;
+  GlobalVars[entity] = result;
 
   return result;
 }

@@ -251,6 +251,9 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
              "ObjC class cannot be generic");
       return emitObjCMetadataRef(IGF, theClass);
     }
+  } else if (theDecl->hasClangNode()) {
+    // Imported Clang types require foreign metadata uniquing too.
+    return emitForeignTypeMetadataRef(IGF, theType);
   }
 
   auto generics = isa<ProtocolDecl>(theDecl)
@@ -3630,133 +3633,6 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
 }
 
 //===----------------------------------------------------------------------===//
-// Foreign types
-//===----------------------------------------------------------------------===//
-
-namespace {
-  /// A CRTP layout class for foreign type metadata.
-  template <class Impl>
-  class ForeignTypeMetadataLayout {
-  protected:
-    IRGenModule &IGM;
-    Impl &asImpl() { return *static_cast<Impl*>(this); }
-
-    ForeignTypeMetadataLayout(IRGenModule &IGM) : IGM(IGM) {}
-
-  public:
-    void layout() {
-      if (asImpl().requiresInitializationFunction())
-        asImpl().addInitializationFunction();
-      asImpl().addValueWitnessTable();
-      asImpl().noteAddressPoint();
-      asImpl().addMetadataFlags();
-      asImpl().addForeignName();
-      asImpl().addUniquePointer();
-      asImpl().addForeignFlags();
-    }
-
-    void addInitializationFunction() {
-      llvm_unreachable("should have overridden this method if "
-                       "you need an initialization function");
-    }
-  };
-
-  /// A CRTP layout class for foreign class metadata.
-  template <class Impl>
-  class ForeignClassMetadataLayout
-         : public ForeignTypeMetadataLayout<Impl> {
-    using super = ForeignTypeMetadataLayout<Impl>;
-  protected:
-    ClassDecl *Target;
-    using super::asImpl;
-  public:
-    ForeignClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
-      : super(IGM), Target(target) {}
-
-    void layout() {
-      super::layout();
-      asImpl().addSuperClass();
-      asImpl().addReservedWord();
-      asImpl().addReservedWord();
-      asImpl().addReservedWord();
-    }
-
-    bool requiresInitializationFunction() {
-      // TODO: superclasses?
-      return false;
-    }
-  };
-
-  /// A builder for ForeignClassMetadata.
-  class ForeignClassMetadataBuilder : public ConstantBuilder<
-                  ForeignClassMetadataLayout<ForeignClassMetadataBuilder>> {
-    Size AddressPoint = Size::invalid();
-  public:
-    ForeignClassMetadataBuilder(IRGenModule &IGM, ClassDecl *target)
-      : ConstantBuilder(IGM, target) {}
-
-    Size getOffsetOfAddressPoint() const { return AddressPoint; }
-
-    // Visitor methods.
-
-    void addValueWitnessTable() {
-      auto type = IGM.Context.TheUnknownObjectType;
-      auto wtable = IGM.getAddrOfValueWitnessTable(type);
-      addWord(wtable);
-    }
-
-    void noteAddressPoint() {
-      AddressPoint = getNextOffset();
-    }
-
-    void addMetadataFlags() {
-      addConstantWord((unsigned) MetadataKind::ForeignClass);
-    }
-
-    void addForeignName() {
-      addWord(getMangledTypeName(IGM,
-                             Target->getDeclaredType()->getCanonicalType()));
-    }
-
-    void addUniquePointer() {
-      addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
-    }
-
-    void addForeignFlags() {
-      int64_t flags = 0;
-      if (requiresInitializationFunction()) flags |= 1;
-      addConstantWord(flags);
-    }
-
-    void addSuperClass() {
-      // TODO: superclasses
-      addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
-    }
-
-    void addReservedWord() {
-      addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
-    }
-  };
-}
-
-llvm::Constant *
-irgen::emitForeignTypeMetadataInitializer(IRGenModule &IGM, CanType type,
-                                          Size &offsetOfAddressPoint) {
-  if (auto classType = dyn_cast<ClassType>(type)) {
-    assert(!classType.getParent());
-    auto classDecl = classType->getDecl();
-    assert(classDecl->isForeign());
-
-    ForeignClassMetadataBuilder builder(IGM, classDecl);
-    builder.layout();
-    offsetOfAddressPoint = builder.getOffsetOfAddressPoint();
-    return builder.getInit();
-  } else {
-    llvm_unreachable("foreign type metadata layout for non-class!");
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Structs
 //===----------------------------------------------------------------------===//
 
@@ -4063,6 +3939,202 @@ llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
   }
 
   return loadSel;
+}
+
+//===----------------------------------------------------------------------===//
+// Foreign types
+//===----------------------------------------------------------------------===//
+
+namespace {
+  /// A CRTP layout class for foreign class metadata.
+  template <class Impl>
+  class ForeignClassMetadataLayout
+         : public MetadataLayout<Impl> {
+    using super = MetadataLayout<Impl>;
+  protected:
+    ClassDecl *Target;
+    using super::asImpl;
+  public:
+    ForeignClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
+      : super(IGM), Target(target) {}
+
+    void layout() {
+      super::layout();
+      asImpl().addSuperClass();
+      asImpl().addReservedWord();
+      asImpl().addReservedWord();
+      asImpl().addReservedWord();
+    }
+
+    bool requiresInitializationFunction() {
+      // TODO: superclasses?
+      return false;
+    }
+           
+    CanType getTargetType() const {
+      return Target->getDeclaredType()->getCanonicalType();
+    }
+  };
+  
+  /// An adapter that turns a metadata layout class into a foreign metadata
+  /// layout class. Foreign metadata has an additional header that
+  template<typename Impl, typename Base>
+  class ForeignMetadataBuilderBase : public Base {
+    typedef Base super;
+    
+  protected:
+    IRGenModule &IGM = super::IGM;
+    using super::asImpl;
+
+    template <class... T>
+    ForeignMetadataBuilderBase(IRGenModule &IGM,
+                               T &&...args)
+      : super(IGM, std::forward<T>(args)...) {}
+
+    Size AddressPoint = Size::invalid();
+
+  public:
+    void layout() {
+      if (asImpl().requiresInitializationFunction())
+        asImpl().addInitializationFunction();
+      asImpl().addForeignName();
+      asImpl().addUniquePointer();
+      asImpl().addForeignFlags();
+      super::layout();
+    }
+    
+    void addForeignFlags() {
+      int64_t flags = 0;
+      if (asImpl().requiresInitializationFunction()) flags |= 1;
+      asImpl().addConstantWord(flags);
+    }
+
+    void addForeignName() {
+      CanType targetType = asImpl().getTargetType();
+      asImpl().addWord(getMangledTypeName(IGM, targetType));
+    }
+
+    void addUniquePointer() {
+      asImpl().addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    }
+
+    void addInitializationFunction() {
+      asImpl().addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+    }
+
+    void noteAddressPoint() {
+      AddressPoint = asImpl().getNextOffset();
+    }
+
+    Size getOffsetOfAddressPoint() const { return AddressPoint; }
+  };
+
+  /// A builder for ForeignClassMetadata.
+  class ForeignClassMetadataBuilder :
+    public ForeignMetadataBuilderBase<ForeignClassMetadataBuilder,
+      ConstantBuilder<ForeignClassMetadataLayout<ForeignClassMetadataBuilder>>>{
+  public:
+    ForeignClassMetadataBuilder(IRGenModule &IGM, ClassDecl *target)
+      : ForeignMetadataBuilderBase(IGM, target) {}
+
+    // Visitor methods.
+
+    void addValueWitnessTable() {
+      auto type = IGM.Context.TheUnknownObjectType;
+      auto wtable = IGM.getAddrOfValueWitnessTable(type);
+      addWord(wtable);
+    }
+
+    void addMetadataFlags() {
+      addConstantWord((unsigned) MetadataKind::ForeignClass);
+    }
+
+    void addSuperClass() {
+      // TODO: superclasses
+      addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    }
+
+    void addReservedWord() {
+      addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+    }
+  };
+  
+  /// A builder for ForeignStructMetadata.
+  class ForeignStructMetadataBuilder :
+    public ForeignMetadataBuilderBase<ForeignStructMetadataBuilder,
+                      StructMetadataBuilderBase<ForeignStructMetadataBuilder>>
+  {
+  public:
+    ForeignStructMetadataBuilder(IRGenModule &IGM, StructDecl *target)
+      : ForeignMetadataBuilderBase(IGM, target)
+    {}
+    
+    CanType getTargetType() const {
+      return Target->getDeclaredType()->getCanonicalType();
+    }
+    bool requiresInitializationFunction() const {
+      return false;
+    }
+    void addValueWitnessTable() {
+      auto type = this->Target->getDeclaredType()->getCanonicalType();
+      addWord(emitValueWitnessTable(IGM, type));
+    }
+  };
+  
+  /// A builder for ForeignEnumMetadata.
+  class ForeignEnumMetadataBuilder :
+    public ForeignMetadataBuilderBase<ForeignEnumMetadataBuilder,
+                      EnumMetadataBuilderBase<ForeignEnumMetadataBuilder>>
+  {
+  public:
+    ForeignEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *target)
+      : ForeignMetadataBuilderBase(IGM, target)
+    {}
+    
+    CanType getTargetType() const {
+      return Target->getDeclaredType()->getCanonicalType();
+    }
+    bool requiresInitializationFunction() const {
+      return false;
+    }
+    void addValueWitnessTable() {
+      auto type = this->Target->getDeclaredType()->getCanonicalType();
+      addWord(emitValueWitnessTable(IGM, type));
+    }
+  };
+}
+
+llvm::Constant *
+irgen::emitForeignTypeMetadataInitializer(IRGenModule &IGM, CanType type,
+                                          Size &offsetOfAddressPoint) {
+  if (auto classType = dyn_cast<ClassType>(type)) {
+    assert(!classType.getParent());
+    auto classDecl = classType->getDecl();
+    assert(classDecl->isForeign());
+
+    ForeignClassMetadataBuilder builder(IGM, classDecl);
+    builder.layout();
+    offsetOfAddressPoint = builder.getOffsetOfAddressPoint();
+    return builder.getInit();
+  } else if (auto structType = dyn_cast<StructType>(type)) {
+    auto structDecl = structType->getDecl();
+    assert(structDecl->hasClangNode());
+    
+    ForeignStructMetadataBuilder builder(IGM, structDecl);
+    builder.layout();
+    offsetOfAddressPoint = builder.getOffsetOfAddressPoint();
+    return builder.getInit();
+  } else if (auto enumType = dyn_cast<EnumType>(type)) {
+    auto enumDecl = enumType->getDecl();
+    assert(enumDecl->hasClangNode());
+    
+    ForeignEnumMetadataBuilder builder(IGM, enumDecl);
+    builder.layout();
+    offsetOfAddressPoint = builder.getOffsetOfAddressPoint();
+    return builder.getInit();
+  } else {
+    llvm_unreachable("foreign metadata for unexpected type?!");
+  }
 }
 
 // Protocols

@@ -1964,7 +1964,7 @@ recur:
   }
   case MetadataKind::ForeignClass: {
     auto metadata = static_cast<const ForeignClassMetadata*>(type);
-    TypeName = metadata->Name;
+    TypeName = metadata->getName();
     break;
   }
   case MetadataKind::Class: {

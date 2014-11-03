@@ -2017,11 +2017,12 @@ static llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> ForeignTypes;
 const ForeignTypeMetadata *
 swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   // Fast path: check the invasive cache.
-  if (nonUnique->Unique) return nonUnique->Unique;
+  if (auto unique = nonUnique->getCachedUniqueMetadata())
+    return unique;
 
   // Okay, insert a new row.
   // FIXME: locking!
-  auto insertResult = ForeignTypes.insert({GlobalString(nonUnique->Name),
+  auto insertResult = ForeignTypes.insert({GlobalString(nonUnique->getName()),
                                            nonUnique});
   auto uniqueMetadata = insertResult.first->second;
 
@@ -2037,7 +2038,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   // to do this until after the initialization completes; otherwise,
   // it will be possible for code to fast-path through this function
   // too soon.
-  nonUnique->Unique = uniqueMetadata;
+  nonUnique->setCachedUniqueMetadata(uniqueMetadata);
   return uniqueMetadata;
 }
 

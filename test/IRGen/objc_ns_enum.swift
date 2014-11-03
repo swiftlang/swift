@@ -5,10 +5,13 @@
 import Foundation
 import gizmo
 
-// CHECK: @_TWPOSC28NeverActuallyMentionedByNameSs9Equatable = linkonce_odr hidden constant
 // CHECK: @_TWVOSC16NSRuncingOptions = linkonce_odr hidden constant
 // CHECK: @_TMnOSC16NSRuncingOptions = linkonce_odr hidden constant
-// CHECK: @_TMdOSC16NSRuncingOptions = linkonce_odr hidden constant
+// CHECK: @_TMdOSC16NSRuncingOptions = linkonce_odr hidden global
+// CHECK: @_TWPOSC28NeverActuallyMentionedByNameSs9Equatable = linkonce_odr hidden constant
+
+// CHECK-LABEL: define i32 @main
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMdOSC16NSRuncingOptions
 
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_aFT_OSC16NSRuncingOptions()
 // CHECK:   ret i16 123
