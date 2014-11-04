@@ -17,6 +17,7 @@
 #ifndef SWIFT_RUNTIME_METADATA_H
 #define SWIFT_RUNTIME_METADATA_H
 
+#include <atomic>
 #include <cassert>
 #include <climits>
 #include <cstddef>
@@ -1338,7 +1339,7 @@ struct ForeignTypeMetadata : public Metadata {
     /// A pointer to the actual, runtime-uniqued metadata for this
     /// type.  This is essentially an invasive cache for the lookup
     /// structure.
-    mutable const ForeignTypeMetadata *Unique;
+    mutable std::atomic<const ForeignTypeMetadata *> Unique;
     
     /// Various flags.
     enum : size_t {
@@ -1356,14 +1357,17 @@ struct ForeignTypeMetadata : public Metadata {
   }
   
   const ForeignTypeMetadata *getCachedUniqueMetadata() const {
-    return asFullMetadata(this)->Unique;
+    // This can be a relaxed-order load. If we miss a store to the invasive
+    // cache from another thread, at worst we do redundant work checking the
+    // (locked) global cache and find the canonical metadata there.
+    return asFullMetadata(this)->Unique.load(std::memory_order_relaxed);
   }
   
   void setCachedUniqueMetadata(const ForeignTypeMetadata *unique) const {
     assert((asFullMetadata(this)->Unique == nullptr
             || asFullMetadata(this)->Unique == unique)
            && "already set unique metadata");
-    asFullMetadata(this)->Unique = unique;
+    asFullMetadata(this)->Unique.store(unique);
   }
   
   size_t getFlags() const {
