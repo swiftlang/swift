@@ -668,3 +668,35 @@ bb0(%0 : $Int):
   dealloc_stack %7#0 : $*@local_storage Int
   return %11 : $Int
 }
+
+@objc protocol Foo { func foo() }
+
+// CHECK-LABEL: sil hidden [transparent] @protocolConstrained
+sil hidden [transparent] @protocolConstrained : $@thin <T where T : Foo> (@owned T) -> () {
+bb0(%0 : $T):
+  debug_value %0 : $T
+  strong_retain %0 : $T
+  %3 = witness_method [volatile] $T, #Foo.foo!1.foreign : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  %4 = apply %3<T>(%0) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  strong_release %0 : $T
+  strong_release %0 : $T
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil hidden @protocolTypedParam
+sil hidden @protocolTypedParam : $@thin (@owned Foo) -> () {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo
+  // CHECK: [[REF:%[a-zA-Z0-9]+]] = function_ref @protocolConstrained
+  %2 = function_ref @protocolConstrained : $@thin <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
+  strong_retain %0 : $Foo
+  // FIXME: We currently do not transparently inline in cases where the
+  //        substitution list includes protocols, although we could in the case
+  //        where it is an @objc protocol.
+  // CHECK: apply [transparent] [[REF]]
+  %4 = apply [transparent] %2<Foo>(%0) : $@thin <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
+  strong_release %0 : $Foo
+  %6 = tuple ()
+  return %6 : $()
+}
