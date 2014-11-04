@@ -94,7 +94,7 @@ public class ManagedBuffer<Value, Element>
     let p = ManagedBufferPointer<Value,Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
-      initialValue: { buffer, _ in initialValue(
+      { buffer, _ in initialValue(
           // FIXME: should be an unsafeDowncast <rdar://problem/18618169> 
           Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(buffer)))
       })

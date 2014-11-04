@@ -3735,7 +3735,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
                                                               argScalar);
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(argTupleElts, paramTuple,
-                                                hasTrailingClosure(locator),
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);
   assert(!failed && "Call arguments did not match up?");

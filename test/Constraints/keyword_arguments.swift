@@ -227,12 +227,14 @@ acceptAutoclosure(f: produceInt) // expected-error{{function produces expected t
 // -------------------------------------------
 // Trailing closures
 // -------------------------------------------
+// FIXME: The implementation of this is a hack.
 func trailingclosure1(#x: Int, #f: () -> Int) {}
 
 trailingclosure1(x: 1) { return 5 }
 trailingclosure1(1) { return 5 } // expected-error{{missing argument label 'x:' in call}}{{18-18=x: }}
 
-trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label 'f:' in call}}
+// FIXME: should complain about missing label "f:"
+trailingclosure1(x: 1, { return 5 })
 
 func trailingclosure2(#x: Int, #f: (() -> Int)!...) {}
 trailingclosure2(x: 5) { return 5 }

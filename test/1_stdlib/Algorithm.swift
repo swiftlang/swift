@@ -273,7 +273,7 @@ Algorithm.test("invalidOrderings") {
   */
   withInvalidOrderings {
     let predicate: (Int,Int)->Bool = $0
-    let result = lexicographicalCompare(randomArray(), randomArray(), isOrderedBefore: predicate)
+    let result = lexicographicalCompare(randomArray(), randomArray(), predicate)
   }
 }
 

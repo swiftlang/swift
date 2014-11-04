@@ -27,9 +27,9 @@ func funcdecl4(a: ((Int)->Int), b: Int) {} // expected-note{{in initialization o
 func funcdecl5(a: Int, y: Int) {
   // Pass in a closure containing the call to funcdecl3.
   funcdecl4({ funcdecl3() }, 12) // FIXME: expected-error{{'Int' is not a subtype of '()'}}
-  func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
-  func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
-  func6(fn: {($0) + $0})    // expected-error{{'UInt8' is not a subtype of 'Int'}}
+  func6({$0 + $1})       // Closure with two named anonymous arguments
+  func6({($0) + $1})    // Closure with sequence expr inferred type
+  func6({($0) + $0})    // expected-error{{'UInt8' is not a subtype of 'Int'}}
 
 
   var testfunc : ((), Int) -> Int
@@ -51,16 +51,16 @@ func funcdecl5(a: Int, y: Int) {
   
   
   // rdar://12017658 - Infer some argument types from func6.
-  func6(fn: { a, b -> Int in a+b})
+  func6({ a, b -> Int in a+b})
   // Return type inference.
-  func6(fn: { a,b in a+b })
+  func6({ a,b in a+b })
   
   // Infer incompatible type.
   // FIXME: Need to relate diagnostic to return type
-  func6(fn: {a,b->Float in 4.0 })    // expected-error {{'Float' is not a subtype of 'Int'}}
+  func6({a,b->Float in 4.0 })    // expected-error {{'Float' is not a subtype of 'Int'}}
 
   // Pattern doesn't need to name arguments.
-  func6(fn: { _,_ in 4 })
+  func6({ _,_ in 4 })
   
   var fn = {} // FIXME: maybe? expected-error{{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
   var fn2 = { 4 }

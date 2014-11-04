@@ -133,7 +133,7 @@ extension ${Self} {
     transform: (S.Generator.Element)->U
   ) -> ${Self}<${View}<S, U>> {
     return ${Self}<${View}<S, U>>(
-      ${View}(_base: self._base, _transform: transform)
+      ${View}(_base: self._base, transform)
     )
   }
 }
