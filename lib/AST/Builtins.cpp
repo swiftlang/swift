@@ -588,7 +588,9 @@ static ValueDecl *getFenceOperation(ASTContext &Context, Identifier Id) {
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
                                       Type T) {
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType, T, T };
-  Type ResultTy = T;
+  Type BoolTy = BuiltinIntegerType::get(1, Context);
+  TupleTypeElt ResultElts[] = { T, BoolTy };
+  Type ResultTy = TupleType::get(ResultElts, Context);
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
@@ -1185,7 +1187,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       return nullptr;
     auto NextPart = Parts.begin() + 2;
 
-    // Accept volatile and singlethread if present.
+    // Accept weak, volatile, and singlethread if present.
+    if (NextPart != Parts.end() && *NextPart == "weak")
+      NextPart++;
     if (NextPart != Parts.end() && *NextPart == "volatile")
       NextPart++;
     if (NextPart != Parts.end() && *NextPart == "singlethread")

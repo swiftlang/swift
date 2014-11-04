@@ -261,22 +261,46 @@ func fence_test() {
   Builtin.fence_acqrel_singlethread()
 }
 
-// FIXME: Disabled pending <rdar://problem/17309776> -- cmpxchg modeling needs
-// to update for LLVM changes.
-//func cmpxchg_test(ptr: Builtin.RawPointer, a: Builtin.Int32, b: Builtin.Int32) {
-//  // C/HECK: cmpxchg i32* {{.*}}, i32 {{.*}}, i32 {{.*}} acquire acquire
-//  var z = Builtin.cmpxchg_acquire_acquire_Int32(ptr, a, b)
-//
-//  // C/HECK: cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} monotonic monotonic
-//  var y = Builtin.cmpxchg_monotonic_monotonic_volatile_Int32(ptr, a, b)
-//  
-//  // C/HECK: cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} singlethread acquire monotonic
-//  var x = Builtin.cmpxchg_acquire_monotonic_volatile_singlethread_Int32(ptr, a, b)
-//
-//  // rdar://12939803 - ER: support atomic cmpxchg/xchg with pointers
-//  // C/HECK: cmpxchg volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
-//  var w = Builtin.cmpxchg_seqcst_seqcst_volatile_singlethread_RawPointer(ptr, ptr, ptr)
-//}
+func cmpxchg_test(ptr: Builtin.RawPointer, a: Builtin.Int32, b: Builtin.Int32) {
+  // rdar://12939803 - ER: support atomic cmpxchg/xchg with pointers
+
+  // CHECK: cmpxchg i32* {{.*}}, i32 {{.*}}, i32 {{.*}} acquire acquire
+  // CHECK: extractvalue { i32, i1 } {{.*}}, 0
+  // CHECK: extractvalue { i32, i1 } {{.*}}, 1
+  // CHECK: store i32 {{.*}}, i32* %z, align 4
+  // CHECK: store i1 {{.*}}, i1* %zSuccess, align 1
+  var (z, zSuccess) = Builtin.cmpxchg_acquire_acquire_Int32(ptr, a, b)
+
+  // CHECK: cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} monotonic monotonic
+  // CHECK: extractvalue { i32, i1 } {{.*}}, 0
+  // CHECK: extractvalue { i32, i1 } {{.*}}, 1
+  // CHECK: store i32 {{.*}}, i32* %y, align 4
+  // CHECK: store i1 {{.*}}, i1* %ySuccess, align 1
+  var (y, ySuccess) = Builtin.cmpxchg_monotonic_monotonic_volatile_Int32(ptr, a, b)
+
+  // CHECK: cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} singlethread acquire monotonic
+  // CHECK: extractvalue { i32, i1 } {{.*}}, 0
+  // CHECK: extractvalue { i32, i1 } {{.*}}, 1
+  // CHECK: store i32 {{.*}}, i32* %x, align 4
+  // CHECK: store i1 {{.*}}, i1* %xSuccess, align 1
+  var (x, xSuccess) = Builtin.cmpxchg_acquire_monotonic_volatile_singlethread_Int32(ptr, a, b)
+
+  // CHECK: cmpxchg volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
+  // CHECK: extractvalue { i64, i1 } {{.*}}, 0
+  // CHECK: extractvalue { i64, i1 } {{.*}}, 1
+  // CHECK: inttoptr i64 {{.*}} to i8*
+  // CHECK: store i8* {{.*}}, i8** %w, align 8
+  // CHECK: store i1 {{.*}}, i1* %wSuccess, align 1
+  var (w, wSuccess) = Builtin.cmpxchg_seqcst_seqcst_volatile_singlethread_RawPointer(ptr, ptr, ptr)
+
+  // CHECK: cmpxchg weak volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
+  // CHECK: extractvalue { i64, i1 } {{.*}}, 0
+  // CHECK: extractvalue { i64, i1 } {{.*}}, 1
+  // CHECK: inttoptr i64 {{.*}} to i8*
+  // CHECK: store i8* {{.*}}, i8** %v, align 8
+  // CHECK: store i1 {{.*}}, i1* %vSuccess, align 1
+  var (v, vSuccess) = Builtin.cmpxchg_seqcst_seqcst_weak_volatile_singlethread_RawPointer(ptr, ptr, ptr)
+}
 
 func atomicrmw_test(ptr: Builtin.RawPointer, a: Builtin.Int32,
                     ptr2: Builtin.RawPointer) {

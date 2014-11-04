@@ -265,7 +265,7 @@ BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", "", None)
 
-/// CmpXChg has type (Builtin.RawPointer, T, T) -> T.
+/// CmpXChg has type (Builtin.RawPointer, T, T) -> (T, Bool).
 BUILTIN_MISC_OPERATION(CmpXChg, "cmpxchg", "", Special)
 
 /// AtomicRMW has type (Builtin.RawPointer, T) -> T.

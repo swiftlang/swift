@@ -1518,8 +1518,12 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto failureOrdering = decodeLLVMAtomicOrdering(Parts[1]);
     auto NextPart = Parts.begin() + 2;
 
-    // Accept volatile and singlethread if present.
-    bool isVolatile = false, isSingleThread = false;
+    // Accept weak, volatile, and singlethread if present.
+    bool isWeak = false, isVolatile = false, isSingleThread = false;
+    if (NextPart != Parts.end() && *NextPart == "weak") {
+      isWeak = true;
+      NextPart++;
+    }
     if (NextPart != Parts.end() && *NextPart == "volatile") {
       isVolatile = true;
       NextPart++;
@@ -1547,11 +1551,17 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                                          failureOrdering,
                                                          isSingleThread ? llvm::SingleThread : llvm::CrossThread);
     cast<llvm::AtomicCmpXchgInst>(value)->setVolatile(isVolatile);
+    cast<llvm::AtomicCmpXchgInst>(value)->setWeak(isWeak);
+
+    auto valueLoaded = IGF.Builder.CreateExtractValue(value, {0});
+    auto loadSuccessful = IGF.Builder.CreateExtractValue(value, {1});
 
     if (origTy->isPointerTy())
-      value = IGF.Builder.CreateIntToPtr(value, origTy);
+      valueLoaded = IGF.Builder.CreateIntToPtr(valueLoaded, origTy);
 
-    out.add(value);
+    out.add(valueLoaded);
+    out.add(loadSuccessful);
+
     return;
   }
   
