@@ -2231,6 +2231,10 @@ bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 /// elements.
 bool hasMandatoryTupleLabels(Expr *expr);
 
+/// \brief Return whether the function argument indicated by `locator` has a
+/// trailing closure.
+bool hasTrailingClosure(const ConstraintLocatorBuilder &locator);
+
 /// Compute an argument or parameter type into an array of tuple type elements.
 ///
 /// \param type The type to decompose.
@@ -2280,6 +2284,7 @@ public:
 ///
 /// \param argTuple The elements in the argument tuple.
 /// \param paramTuple The elements in the parameter tuple.
+/// \param hasTrailingClosure Whether the last argument is a trailing closure.
 /// \param allowFixes Whether to allow fixes when matching arguments.
 ///
 /// \param listener Listener that will be notified when certain problems occur,
@@ -2290,6 +2295,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<TupleTypeElt> argTuple,
                         ArrayRef<TupleTypeElt> paramTuple,
+                        bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);

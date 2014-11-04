@@ -3,6 +3,8 @@
 func takeFunc(f: (Int) -> Int) -> Int {}
 func takeValueAndFunc(value: Int, f: (Int) -> Int) {}
 func takeTwoFuncs(f: (Int) -> Int, g: (Int) -> Int) {}
+func takeFuncWithDefault(f : ((Int) -> Int)? = nil) {}
+func takeTwoFuncsWithDefaults(f1 : ((Int) -> Int)? = nil, f2 : (() -> ())? = nil) {}
 
 struct X {
   func takeFunc(f: (Int) -> Int) {}
@@ -71,3 +73,16 @@ func multiTrailingClosure(a : () -> (), b : () -> ()) {
   
 }
 
+func labeledArgumentAndTrailingClosure() {
+  // Trailing closures can bind to labeled parameters.
+  takeFuncWithDefault { $0 + 1 }
+  takeFuncWithDefault() { $0 + 1 }
+  // ... but not non-trailing closures.
+  takeFuncWithDefault({ $0 + 1 }) // expected-error {{missing argument label 'f:' in call}}
+  takeFuncWithDefault(f: { $0 + 1 })
+
+  // Trailing closure binds to first function-type parameter.
+  takeTwoFuncsWithDefaults { $0 + 1 }
+  takeTwoFuncsWithDefaults {} // expected-error {{function produces expected type '((Int) -> Int)?'; did you mean to call it with '()'?}}
+  takeTwoFuncsWithDefaults(f2: {})
+}
