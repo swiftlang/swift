@@ -7,8 +7,7 @@
 //
 // RUN: echo '#line 1 "%s"' > "%t/main.swift" && cat "%s" >> "%t/main.swift" && chmod -w "%t/main.swift"
 // RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/../../test/1_stdlib/Inputs/SlurpFastEnumeration/ %t/main.swift %S/../../test/1_stdlib/Inputs/DictionaryKeyValueTypes.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
-// FIXME: <rdar://problem/18856858> ArrayBridging validation test temporarily XFAILed
-// DONTRUN: %target-run %t.out
+// RUN: %target-run %t.out
 
 import StdlibUnittest
 import Foundation

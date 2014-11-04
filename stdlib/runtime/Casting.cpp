@@ -1677,6 +1677,7 @@ namespace llvm {
 static pthread_rwlock_t ConformanceCacheLock = PTHREAD_RWLOCK_INITIALIZER;
 static llvm::DenseMap<ConformanceCacheKey,
                       ConformanceCacheEntry> ConformanceCache;
+unsigned ConformanceCacheGeneration = 0;
 
 // Conformance sections pending a scan.
 // TODO: This could easily be a lock-free FIFO.
@@ -1785,14 +1786,25 @@ recur_inside_cache_lock:
     }
   }
   
+  unsigned failedGeneration = ConformanceCacheGeneration;
   pthread_rwlock_unlock(&ConformanceCacheLock);
   
   // If we didn't have an up-to-date cache entry, scan the conformance records.
   pthread_mutex_lock(&SectionsToScanLock);
   pthread_rwlock_wrlock(&ConformanceCacheLock);
   
-  // If we have no new information to pull in, we're done.
+  // If we have no new information to pull in (and nobody else pulled in
+  // new information while we waited on the lock), we're done.
   if (SectionsToScan.empty()) {
+    if (failedGeneration != ConformanceCacheGeneration) {
+      // Someone else pulled in new conformances while we were waiting.
+      // Start over with our newly-populated cache.
+      pthread_rwlock_unlock(&ConformanceCacheLock);
+      pthread_mutex_unlock(&SectionsToScanLock);
+      type = origType;
+      goto recur;
+    }
+
     // Cache the negative result.
     ConformanceCache[{type, protocol}]
       = ConformanceCacheEntry::failure(ProtocolConformanceGeneration);
@@ -1832,6 +1844,7 @@ recur_inside_cache_lock:
       }
     }
   }
+  ++ConformanceCacheGeneration;
   
   pthread_rwlock_unlock(&ConformanceCacheLock);
   pthread_mutex_unlock(&SectionsToScanLock);
