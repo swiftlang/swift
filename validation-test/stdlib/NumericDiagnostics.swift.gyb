@@ -1,0 +1,27 @@
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
+// RUN: %S/../../utils/line-directive %t/main.swift -- %swift -verify -parse %t/main.swift
+
+% from SwiftIntTypes import all_integer_types
+% integer_types_array = [self_ty.stdlib_name for self_ty in all_integer_types(0)]
+// integer_types_array: ${integer_types_array}
+% floating_types_array = ['Float', 'Double']
+% typesToTest = floating_types_array + integer_types_array
+// typesToTest: ${typesToTest}
+
+% operatorsToTest = ['=', '*', '/', '%', '==', '!=', '>', '<', '>=', '<=']  # TODO: Restore '+', '-', when rdar://18695154 is fixed.
+// operatorsToTest: ${operatorsToTest} _The Swift Programming Language_ "Basic Operators," binary non-logical ops
+    //TODO: Better error regex, verify the type of the result
+
+func testIteratedOperations() {
+% for T1 in typesToTest:
+  % for T2 in typesToTest:
+    % for op in operatorsToTest:
+  if true {
+    var x1_${T1}: ${T1} = 0
+    var x2_${T2}: ${T2} = 0
+    x1_${T1} ${op} x2_${T2}  ${ "// expected-error{{ }}" if T1 != T2 else "" }
+  }
+    %end
+  %end
+%end
+}
