@@ -26,7 +26,7 @@ extension ALAssetsLibrary {
     }
     return enumerateGroupsWithTypes(ALAssetsGroupType(types), 
                                     usingBlock: enumerationBlock, 
-                                    failureBlock)
+                                    failureBlock: failureBlock)
 
   }
 }
