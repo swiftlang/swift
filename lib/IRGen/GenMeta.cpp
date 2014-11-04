@@ -229,8 +229,13 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
 static llvm::Value *emitForeignTypeMetadataRef(IRGenFunction &IGF,
                                                CanType type) {
   llvm::Value *candidate = IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type);
-  return IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
                                 candidate);
+  call->addAttribute(llvm::AttributeSet::FunctionIndex,
+                     llvm::Attribute::NoUnwind);
+  call->addAttribute(llvm::AttributeSet::FunctionIndex,
+                     llvm::Attribute::ReadNone);
+  return call;
 }
 
 /// Returns a metadata reference for a class type.

@@ -11,7 +11,7 @@ import gizmo
 // CHECK: @_TWPOSC28NeverActuallyMentionedByNameSs9Equatable5gizmo = linkonce_odr hidden constant
 
 // CHECK-LABEL: define i32 @main
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMdOSC16NSRuncingOptions
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMdOSC16NSRuncingOptions {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_aFT_OSC16NSRuncingOptions()
 // CHECK:   ret i16 123
@@ -81,3 +81,5 @@ func test_enum_without_name_Equatable(obj: TestThatEnumType) -> Bool {
 
 func use_metadata<T>(t:T){}
 use_metadata(NSRuncingOptions.Mince)
+
+// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
