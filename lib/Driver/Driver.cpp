@@ -721,13 +721,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
         // This will prefer the SDK alongside the Swift found by "xcrun swift".
         // We don't do this in compilation modes because defaulting to the
         // latest SDK may not be intended.
-        std::string xcrunPath = llvm::sys::FindProgramByName("xcrun");
-        if (!xcrunPath.empty()) {
+        auto xcrunPath = llvm::sys::findProgramByName("xcrun");
+        if (!xcrunPath.getError()) {
           const char *args[] = {
             "--show-sdk-path", "--sdk", "macosx", nullptr
           };
           sys::TaskQueue queue;
-          queue.addTask(xcrunPath.c_str(), args);
+          queue.addTask(xcrunPath->c_str(), args);
           queue.execute(nullptr,
                         [&OI](sys::ProcessId PID,
                               int returnCode,

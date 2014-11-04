@@ -74,9 +74,9 @@ Tool *ToolChain::selectTool(const JobAction &JA) const {
 std::string ToolChain::getProgramPath(StringRef Name) const {
   // TODO: perform ToolChain-specific lookup
 
-  std::string P = llvm::sys::FindProgramByName(Name);
-  if (!P.empty())
-    return P;
+  auto P = llvm::sys::findProgramByName(Name);
+  if (!P.getError())
+    return *P;
 
   return Name;
 }
