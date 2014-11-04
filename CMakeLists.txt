@@ -207,7 +207,6 @@ option(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE "Should the stdlib be build with a
 option(SWIFT_EMIT_SORTED_SIL "Sort SIL output by name to enable diffing of output" NO)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
-option(SWIFT_NEW_DRIVER "Enable the new Swift driver" ON)
 
 set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
 if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
