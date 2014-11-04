@@ -32,6 +32,19 @@ static bool areProjectionsToDifferentFields(const Projection &P1,
          P1 != P2;
 }
 
+bool Projection::matchesExtract(SILInstruction *I) const {
+  switch (I->getKind()) {
+  case ValueKind::StructExtractInst:
+    return *this == Projection(cast<StructExtractInst>(I));
+  case ValueKind::TupleExtractInst:
+    return *this == Projection(cast<TupleExtractInst>(I));
+  case ValueKind::UncheckedEnumDataInst:
+    return *this == Projection(cast<UncheckedEnumDataInst>(I));
+  default:
+    return false;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                              Projection Path
 //===----------------------------------------------------------------------===//
@@ -177,4 +190,77 @@ computeSubSeqRelation(const ProjectionPath &RHS) const {
         "Since LHS and RHS don't equal and size() != MinPathSize, RHS.size() "
          "must equal MinPathSize");
   return SubSeqRelation_t::RHSStrictSubSeqOfLHS;
+}
+
+bool ProjectionPath::
+findMatchingExtractPaths(SILInstruction *I,
+                         SmallVectorImpl<SILInstruction *> &Tails) const {
+  // We maintain the head of our worklist so we can use our worklist as a queue
+  // and work in breadth first order. This makes sense since we want to process
+  // in levels so we can maintain one tail list and delete the tail list when we
+  // move to the next level.
+  unsigned WorkListHead = 0;
+  llvm::SmallVector<SILInstruction *, 8> WorkList;
+  WorkList.push_back(I);
+
+  // Start at the root of the list.
+  for (auto PI = rbegin(), PE = rend(); PI != PE; ++PI) {
+    // When we start a new level, clear Tails.
+    Tails.clear();
+
+    // If we have an empty worklist, return false. We have been unable to
+    // complete the list.
+    unsigned WorkListSize = WorkList.size();
+    if (WorkListHead == WorkListSize)
+      return false;
+
+    // Otherwise, process each instruction in the worklist.
+    for (; WorkListHead != WorkListSize; WorkListHead++) {
+      SILInstruction *Ext = WorkList[WorkListHead];
+
+      // If the current projection does not match I, continue and process the
+      // next instruction.
+      if (!PI->matchesExtract(Ext)) {
+        continue;
+      }
+
+      // Otherwise, we know that Ext matched this projection path and we should
+      // visit all of its uses and add Ext itself to our tail list.
+      Tails.push_back(Ext);
+      for (auto *Op : Ext->getUses()) {
+        WorkList.push_back(Op->getUser());
+      }
+    }
+
+    // Reset the worklist size.
+    WorkListSize = WorkList.size();
+  }
+
+  return true;
+}
+
+Optional<ProjectionPath>
+ProjectionPath::subtractPaths(const ProjectionPath &LHS, const ProjectionPath &RHS) {
+  // If RHS is greater than or equal to LHS in size, RHS can not be a prefix of
+  // LHS. Return None.
+  unsigned RHSSize = RHS.size();
+  unsigned LHSSize = LHS.size();
+  if (RHSSize >= LHSSize)
+    return llvm::NoneType::None;
+
+  // First make sure that the prefix matches.
+  Optional<ProjectionPath> P = ProjectionPath();
+  for (unsigned i = 0; i < RHSSize; i++) {
+    if (LHS.Path[i] != RHS.Path[i]) {
+      P.reset();
+      return P;
+    }
+  }
+
+  // Add the rest of LHS to P and return P.
+  for (unsigned i = RHSSize, e = LHSSize; i != e; ++i) {
+    P->Path.push_back(LHS.Path[i]);
+  }
+
+  return P;
 }

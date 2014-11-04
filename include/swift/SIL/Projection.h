@@ -124,6 +124,10 @@ public:
       return Index < Other.Index;
   }
 
+  /// Determine if I is an extract instruction whose corresponding projection
+  /// equals this projection.
+  bool matchesExtract(SILInstruction *I) const;
+
   static bool isAddressProjection(SILValue V) {
     switch (V->getKind()) {
     case ValueKind::StructElementAddrInst:
@@ -188,6 +192,9 @@ public:
   static Optional<ProjectionPath>
   getAddrProjectionPath(SILValue Start, SILValue End, bool IgnoreCasts=false);
 
+  static Optional<ProjectionPath>
+  subtractPaths(const ProjectionPath &LHS, const ProjectionPath &RHS);
+
   /// Returns true if the two paths have a non-empty symmetric difference.
   ///
   /// This means that the two objects have the same base but access different
@@ -198,6 +205,11 @@ public:
   /// user whether or not the two sequences are unrelated, equal, or if one is a
   /// subsequence of the other.
   SubSeqRelation_t computeSubSeqRelation(const ProjectionPath &RHS) const;
+
+  /// Find all extract paths from I that matches this projection path. Return
+  /// the tails of each extract path in Tails.
+  bool findMatchingExtractPaths(SILInstruction *I,
+                                SmallVectorImpl<SILInstruction *> &Tails) const;
 
   /// Returns true if LHS and RHS have all the same projections in the same
   /// order.

@@ -23,6 +23,7 @@
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/None.h"
@@ -436,7 +437,8 @@ public:
 
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
-  bool tryToForwardLoad(LoadInst *LI, CoveredStoreMap &StoreMap,
+  bool tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
+                        CoveredStoreMap &StoreMap,
                         PredOrderInStoreList &PredOrder);
 
 private:
@@ -451,6 +453,8 @@ private:
                       std::vector<LSBBForwarder> &BBIDToForwarderMap,
                       CoveredStoreMap &StoreMap,
                       PredOrderInStoreList &PredOrder);
+
+  bool tryToSubstitutePartialAliasLoad(LoadInst *LI, LoadInst *PrevLI);
 };
 
 } // end anonymous namespace
@@ -515,6 +519,53 @@ bool LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI, AliasAnalysis *AA,
   return Changed;
 }
 
+/// See if there is an extract path from LI that we can replace with PrevLI. If
+/// we delete all uses of LI this way, delete LI.
+bool LSBBForwarder::tryToSubstitutePartialAliasLoad(LoadInst *LI,
+                                                    LoadInst *PrevLI) {
+  bool Changed = false;
+
+  // Since LI and PrevLI partially alias and we know that PrevLI is smaller than
+  // LI due to where we are in the computation, we compute the address
+  // projection path from PrevLI's operand to LI's operand.
+  SILValue PrevLIOp = PrevLI->getOperand();
+  SILValue UnderlyingPrevLIOp = getUnderlyingObject(PrevLIOp);
+  auto PrevLIPath = ProjectionPath::getAddrProjectionPath(UnderlyingPrevLIOp,
+                                                          PrevLIOp);
+  if (!PrevLIPath)
+    return false;
+
+  SILValue LIOp = LI->getOperand();
+  SILValue UnderlyingLIOp = getUnderlyingObject(LIOp);
+  auto LIPath = ProjectionPath::getAddrProjectionPath(UnderlyingLIOp, LIOp);
+  if (!LIPath)
+    return false;
+
+  // If LIPath matches a prefix of PrevLIPath, return the projection path with
+  // the prefix removed.
+  auto P = ProjectionPath::subtractPaths(*PrevLIPath, *LIPath);
+  if (!P)
+    return false;
+
+  // For all uses of LI, if we can traverse the entire projection path P for
+  // PrevLI, matching each projection to an extract, replace the final extract
+  // with the PrevLI.
+
+  llvm::SmallVector<SILInstruction *, 8> Tails;
+  for (auto *Op : LI->getUses()) {
+    if (P->findMatchingExtractPaths(Op->getUser(), Tails)) {
+      for (auto *FinalExt : Tails) {
+        FinalExt->replaceAllUsesWith(PrevLI);
+        NumForwardedLoads++;
+        Changed = true;
+      }
+    }
+    Tails.clear();
+  }
+
+  return Changed;
+}
+
 /// Add a BBArgument in Dest to combine sources of Stores.
 static SILValue fixPhiPredBlocks(SmallVectorImpl<StoreInst *> &Stores,
                                  SmallVectorImpl<SILBasicBlock *> &PredOrder,
@@ -534,7 +585,8 @@ static SILValue fixPhiPredBlocks(SmallVectorImpl<StoreInst *> &Stores,
   return PhiValue;
 }
 
-bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, CoveredStoreMap &StoreMap,
+bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
+                                     CoveredStoreMap &StoreMap,
                                      PredOrderInStoreList &PredOrder) {
   // If we are loading a value that we just stored, forward the stored value.
   for (auto *PrevStore : Stores) {
@@ -551,20 +603,44 @@ bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, CoveredStoreMap &StoreMap,
     return true;
   }
 
-  // Search the previous loads and replace the current load with one of the
-  // previous loads.
-  for (auto *PrevLI : Loads) {
-    SILValue Result = tryToForwardAddressValueToLoad(PrevLI->getOperand(),
-                                                     PrevLI, LI);
-    if (!Result)
-      continue;
+  // Search the previous loads and replace the current load or one of the
+  // current loads uses with one of the previous loads.
 
-    DEBUG(llvm::dbgs() << "        Replacing with previous load: "
-                       << *Result);
-    SILValue(LI, 0).replaceAllUsesWith(Result);
-    deleteInstruction(LI);
-    NumDupLoads++;
-    return true;
+  // This Changed is only returned at the end of the function to signal that a
+  // partial alias load was successfully forwarded. The reason why we do not use
+  // it for other exits is that all other exits after this point return true. So
+  // there is no point in assigning to Changed just to return it.
+  bool Changed = false;
+  for (auto *PrevLI : Loads) {
+    SILValue Address = PrevLI->getOperand();
+    SILValue StoredValue = PrevLI;
+
+    // First Check if LI can be completely replaced by PrevLI or if we can
+    // construct an extract path from PrevLI's loaded value. The latter occurs
+    // if PrevLI is a partially aliasing load that completely subsumes LI.
+    if (SILValue Result = tryToForwardAddressValueToLoad(Address, StoredValue,
+                                                         LI)) {
+
+      DEBUG(llvm::dbgs() << "        Replacing with previous load: "
+            << *Result);
+      SILValue(LI, 0).replaceAllUsesWith(Result);
+      deleteInstruction(LI);
+      NumDupLoads++;
+      return true;
+    }
+
+    // Otherwise check if LI's operand partially aliases PrevLI's operand. If
+    // so, see if LI has any uses which could use PrevLI instead of LI
+    // itself. If LI has no uses after this is completed, delete it and return
+    // true.
+    //
+    // We return true at the end of this if we succeeded to find any uses of LI
+    // that could be replaced with PrevLI, this means that there could not have
+    // been a store to LI in between LI and PrevLI since then the store would
+    // have invalidated PrevLI.
+    if (AA->isPartialAlias(LI->getOperand(), PrevLI->getOperand())) {
+      tryToSubstitutePartialAliasLoad(LI, PrevLI);
+    }
   }
 
   // Check if we can forward from multiple stores.
@@ -605,7 +681,6 @@ bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI,
   bool Changed = false;
   while (II != E) {
     SILInstruction *Inst = II++;
-
     DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
@@ -617,7 +692,7 @@ bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI,
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
-      Changed |= tryToForwardLoad(LI, StoreMap, PredOrder);
+      Changed |= tryToForwardLoad(LI, AA, StoreMap, PredOrder);
       continue;
     }
 

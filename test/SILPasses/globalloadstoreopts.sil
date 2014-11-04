@@ -6,6 +6,11 @@ struct A {
   var i : Builtin.Int32
 }
 
+struct AA {
+  var a : A
+  var i : Builtin.Int32
+}
+
 class B {
   var i : Builtin.Int32
   init()
@@ -635,7 +640,6 @@ struct C {
 // CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct
 // CHECK-NOT: unchecked_trivial_bit_cast
 // CHECK: return
-
 sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct : $@thin (A) -> () {
 bb0(%0 : $A):
   %1 = alloc_stack $A
@@ -643,6 +647,59 @@ bb0(%0 : $A):
   %2 = unchecked_addr_cast %1#1 : $*A to $*C
   %3 = load %2 : $*C
   dealloc_stack %1#0 : $*@local_storage A
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Check that we can perform partial load forwarding.
+// CHECK-LABEL: sil @forward_partial_aliasing_loads : $@thin (@in AA) -> () {
+// CHECK: bb0([[INPUT_PTR:%.*]] : $*AA):
+// CHECK: [[INPUT_GEP1:%.*]] = struct_element_addr [[INPUT_PTR]] : $*AA, #AA.a
+// CHECK: [[INPUT_GEP2:%.*]] = struct_element_addr [[INPUT_GEP1]] : $*A, #A.i
+// CHECK: [[LOAD_INPUT_GEP2:%.*]] = load [[INPUT_GEP2]]
+// CHECK: [[LOAD_INPUT:%.*]] = load [[INPUT_PTR]]
+// CHECK: [[USE_FUN:%.*]] = function_ref @use
+// CHECK: apply [[USE_FUN]]([[LOAD_INPUT_GEP2]])
+// CHECK: apply [[USE_FUN]]([[LOAD_INPUT_GEP2]])
+// CHECK: [[EXT_LOAD_INPUT:%.*]] = struct_extract [[LOAD_INPUT]] : $AA, #AA.i
+// CHECK: apply [[USE_FUN]]([[EXT_LOAD_INPUT]])
+// CHECK: [[ALLOC_STACK:%.*]] = alloc_stack $AA
+// CHECK: [[STACK_GEP1:%.*]] = struct_element_addr [[ALLOC_STACK]]#1 : $*AA, #AA.a
+// CHECK: [[STACK_GEP2:%.*]] = struct_element_addr [[STACK_GEP1]] : $*A, #A.i
+// CHECK: [[LOAD_STACK_GEP2:%.*]] = load [[STACK_GEP2]]
+// CHECK: apply [[USE_FUN]]([[LOAD_STACK_GEP2]])
+// CHECK: apply [[USE_FUN]]([[LOAD_STACK_GEP2]])
+sil @forward_partial_aliasing_loads : $@thin (@in AA) -> () {
+bb0(%0 : $*AA):
+  %1 = struct_element_addr %0 : $*AA, #AA.a
+  %2 = struct_element_addr %1 : $*A, #A.i
+  %3 = load %2 : $*Builtin.Int32
+
+  %4 = load %0 : $*AA
+  %5 = struct_extract %4 : $AA, #AA.a
+  %6 = struct_extract %5 : $A, #A.i
+  %7 = function_ref @use : $@thin (Builtin.Int32) -> ()
+  apply %7(%3) : $@thin (Builtin.Int32) -> ()
+  apply %7(%6) : $@thin (Builtin.Int32) -> ()
+
+  %8 = struct_extract %4 : $AA, #AA.i
+  apply %7(%8) : $@thin (Builtin.Int32) -> ()
+
+  %9 = alloc_stack $AA
+
+  %10 = struct_element_addr %9#1 : $*AA, #AA.a
+  %11 = struct_element_addr %10 : $*A, #A.i
+  %12 = load %11 : $*Builtin.Int32
+
+  %13 = load %9#1 : $*AA
+  %14 = struct_extract %13 : $AA, #AA.a
+  %15 = struct_extract %14 : $A, #A.i
+
+  apply %7(%12) : $@thin (Builtin.Int32) -> ()
+  apply %7(%15) : $@thin (Builtin.Int32) -> ()
+
+  dealloc_stack %9#0 : $*@local_storage AA
+
   %9999 = tuple()
   return %9999 : $()
 }
