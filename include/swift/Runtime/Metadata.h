@@ -1360,7 +1360,8 @@ struct ForeignTypeMetadata : public Metadata {
   }
   
   void setCachedUniqueMetadata(const ForeignTypeMetadata *unique) const {
-    assert(asFullMetadata(this)->Unique == nullptr
+    assert((asFullMetadata(this)->Unique == nullptr
+            || asFullMetadata(this)->Unique == unique)
            && "already set unique metadata");
     asFullMetadata(this)->Unique = unique;
   }
