@@ -172,13 +172,8 @@ OutputFilename("o",
 static llvm::cl::list<std::string>
 BuildConfigs("D", llvm::cl::desc("Build configurations"));
 
-#ifndef SWIFT_MODULES_SDK
-#define SWIFT_MODULES_SDK ""
-#endif
-
 static llvm::cl::opt<std::string>
-SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
-    llvm::cl::init(SWIFT_MODULES_SDK));
+SDK("sdk", llvm::cl::desc("path to the SDK to build against"));
 
 static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"));

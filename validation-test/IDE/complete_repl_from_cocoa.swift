@@ -1,4 +1,4 @@
-// RUN: %swift-ide-test -repl-code-completion -source-filename %s | FileCheck %s
+// RUN: %swift-ide-test -repl-code-completion -source-filename %s -sdk %sdk -module-cache-path %t/clang-module-cache | FileCheck %s
 
 // A smoketest for REPL code completion in Cocoa.
 

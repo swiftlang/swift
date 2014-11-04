@@ -35,13 +35,8 @@ static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
            llvm::cl::OneOrMore);
 
-#ifndef SWIFT_MODULES_SDK
-#define SWIFT_MODULES_SDK ""
-#endif
-
 static llvm::cl::opt<std::string>
-SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
-    llvm::cl::init(SWIFT_MODULES_SDK));
+SDK("sdk", llvm::cl::desc("path to the SDK to build against"));
 
 static llvm::cl::opt<bool>
 DumpModule("dump-module",

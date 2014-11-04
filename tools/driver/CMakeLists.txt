@@ -32,10 +32,6 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   endif()
 endif()
 
-if(MODULES_SDK)
-  add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )
-endif()
-
 install(TARGETS swift
   RUNTIME DESTINATION bin)
 

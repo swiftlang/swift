@@ -4,10 +4,6 @@ add_swift_executable(swift-ide-test
   DEPENDS swiftDriver swiftFrontend swiftIDE
   COMPONENT_DEPENDS bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
 
-if(MODULES_SDK)
-  add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )
-endif()
-
 # If libxml2 is available, make it available for swift-ide-test.
 if (SWIFT_HAVE_LIBXML)
   include_directories(SYSTEM ${LIBXML2_INCLUDE_DIR})
