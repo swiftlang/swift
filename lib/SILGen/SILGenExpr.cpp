@@ -2999,6 +2999,7 @@ static DeclName getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::Destroyer:
     return getMagicFunctionName(cast<DestructorDecl>(ref.getDecl()));
   case SILDeclRef::Kind::GlobalAccessor:
+  case SILDeclRef::Kind::GlobalGetter:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getMagicFunctionName(cast<AbstractFunctionDecl>(ref.getDecl()));
@@ -4620,42 +4621,64 @@ void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding) {
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(binding), ret);
 }
 
-void SILGenFunction::emitGlobalAccessor(VarDecl *global,
-                                        SILGlobalVariable *onceToken,
-                                        SILFunction *onceFunc) {
+static void emitOnceCall(SILGenFunction &gen, VarDecl *global,
+                         SILGlobalVariable *onceToken, SILFunction *onceFunc) {
   SILType rawPointerSILTy
-    = getLoweredLoadableType(getASTContext().TheRawPointerType);
+    = gen.getLoweredLoadableType(gen.getASTContext().TheRawPointerType);
 
   // Emit a reference to the global token.
-  SILValue onceTokenAddr = B.createGlobalAddr(global, onceToken);
-  onceTokenAddr = B.createAddressToPointer(global, onceTokenAddr,
-                                           rawPointerSILTy);
+  SILValue onceTokenAddr = gen.B.createGlobalAddr(global, onceToken);
+  onceTokenAddr = gen.B.createAddressToPointer(global, onceTokenAddr,
+                                               rawPointerSILTy);
 
   // Emit a reference to the function to execute once, then thicken
   // that reference as Builtin.once expects.
-  SILValue onceFuncRef = B.createFunctionRef(global, onceFunc);
+  SILValue onceFuncRef = gen.B.createFunctionRef(global, onceFunc);
   auto onceFuncThickTy
     = adjustFunctionType(onceFunc->getLoweredFunctionType(),
                          FunctionType::Representation::Thick);
   auto onceFuncThickSILTy = SILType::getPrimitiveObjectType(onceFuncThickTy);
-  onceFuncRef = B.createThinToThickFunction(global, onceFuncRef,
-                                            onceFuncThickSILTy);
+  onceFuncRef = gen.B.createThinToThickFunction(global, onceFuncRef,
+                                                onceFuncThickSILTy);
 
   // Call Builtin.once.
   SILValue onceArgs[] = {onceTokenAddr, onceFuncRef};
-  B.createBuiltin(global, getASTContext().getIdentifier("once"),
-                  SGM.Types.getEmptyTupleType(), {}, onceArgs);
-  
+  gen.B.createBuiltin(global, gen.getASTContext().getIdentifier("once"),
+                      gen.SGM.Types.getEmptyTupleType(), {}, onceArgs);
+}
+
+void SILGenFunction::emitGlobalAccessor(VarDecl *global,
+                                        SILGlobalVariable *onceToken,
+                                        SILFunction *onceFunc) {
+  emitOnceCall(*this, global, onceToken, onceFunc);
+
   // Return the address of the global variable.
   // FIXME: It'd be nice to be able to return a SIL address directly.
   auto *silG = SGM.getSILGlobalVariable(global, NotForDefinition);
   SILValue addr = B.createGlobalAddr(global, silG);
 
+  SILType rawPointerSILTy
+    = getLoweredLoadableType(getASTContext().TheRawPointerType);
   addr = B.createAddressToPointer(global, addr, rawPointerSILTy);
   B.createReturn(global, addr);
   if (!MainScope)
     MainScope = F.getDebugScope();
   setDebugScopeForInsertedInstrs(MainScope);
+}
+
+void SILGenFunction::emitGlobalGetter(VarDecl *global,
+                                      SILGlobalVariable *onceToken,
+                                      SILFunction *onceFunc) {
+  emitOnceCall(*this, global, onceToken, onceFunc);
+
+  auto *silG = SGM.getSILGlobalVariable(global, NotForDefinition);
+  SILValue addr = B.createGlobalAddr(global, silG);
+
+  auto refType = global->getType()->getCanonicalType();
+  ManagedValue value = emitLoad(global, addr, getTypeLowering(refType),
+                                SGFContext(), IsNotTake);
+  SILValue result = value.forward(*this);
+  B.createReturn(global, result);
 }
 
 RValue RValueEmitter::

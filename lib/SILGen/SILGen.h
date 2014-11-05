@@ -227,6 +227,10 @@ public:
   void emitGlobalAccessor(VarDecl *global,
                           SILGlobalVariable *onceToken,
                           SILFunction *onceFunc);
+
+  void emitGlobalGetter(VarDecl *global,
+                        SILGlobalVariable *onceToken,
+                        SILFunction *onceFunc);
   
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
