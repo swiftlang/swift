@@ -39,7 +39,6 @@ class NominalTypeDecl;
 enum OptionalTypeKind : unsigned;
 class ProtocolDecl;
 class StructDecl;
-class SubstitutableType;
 class TypeBase;
 class Type;
 class TypeWalker;

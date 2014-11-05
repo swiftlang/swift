@@ -2855,16 +2855,10 @@ END_CAN_TYPE_WRAPPER(InOutType, Type)
 /// SubstitutableType - A reference to a type that can be substituted, i.e.,
 /// an archetype or a generic parameter.
 class SubstitutableType : public TypeBase {
-  ArrayRef<ProtocolDecl *> ConformsTo;
-  Type Superclass;
-
 protected:
   SubstitutableType(TypeKind K, const ASTContext *C,
-                    RecursiveTypeProperties properties,
-                    ArrayRef<ProtocolDecl *> ConformsTo,
-                    Type Superclass)
-    : TypeBase(K, C, properties),
-      ConformsTo(ConformsTo), Superclass(Superclass) { }
+                    RecursiveTypeProperties properties)
+    : TypeBase(K, C, properties) { }
 
 public:
   /// \brief Retrieve the name of this type.
@@ -2873,29 +2867,6 @@ public:
   /// \brief Retrieve the parent of this type, or null if this is a
   /// primary type.
   SubstitutableType *getParent() const;
-
-  /// \brief Retrieve the archetype corresponding to this substitutable type.
-  ArchetypeType *getArchetype();
-
-  // FIXME: Temporary hack.
-  bool isPrimary() const;
-
-  /// getConformsTo - Retrieve the set of protocols to which this substitutable
-  /// type shall conform.
-  ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
-  
-  /// requiresClass - True if the type can only be substituted with class types.
-  /// This is true if the type conforms to one or more class protocols or has
-  /// a superclass constraint.
-  bool requiresClass() const;
-
-  /// \brief Retrieve the superclass of this type, if such a requirement exists.
-  Type getSuperclass() const { return Superclass; }
-
-  /// \brief Return true if the archetype has any requirements at all.
-  bool hasRequirements() const {
-    return !getConformsTo().empty() || getSuperclass();
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2927,6 +2898,9 @@ public:
   }
   
 private:
+  ArrayRef<ProtocolDecl *> ConformsTo;
+  Type Superclass;
+
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
   AssocTypeOrProtocolType AssocTypeOrProto;
   Identifier Name;
@@ -3018,6 +2992,23 @@ public:
     return false;
   }
 
+  /// getConformsTo - Retrieve the set of protocols to which this substitutable
+  /// type shall conform.
+  ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
+  
+  /// requiresClass - True if the type can only be substituted with class types.
+  /// This is true if the type conforms to one or more class protocols or has
+  /// a superclass constraint.
+  bool requiresClass() const;
+
+  /// \brief Retrieve the superclass of this type, if such a requirement exists.
+  Type getSuperclass() const { return Superclass; }
+
+  /// \brief Return true if the archetype has any requirements at all.
+  bool hasRequirements() const {
+    return !getConformsTo().empty() || getSuperclass();
+  }
+
   /// Retrieve either the associated type or the protocol to which this
   /// associated type corresponds.
   AssocTypeOrProtocolType getAssocTypeOrProtocol() const {
@@ -3077,9 +3068,9 @@ private:
                 Type Superclass,
                 bool isRecursive = false)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties::HasArchetype,
-                        ConformsTo, Superclass),
-      ParentOrOpened(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
+                        RecursiveTypeProperties::HasArchetype),
+      ConformsTo(ConformsTo), Superclass(Superclass), ParentOrOpened(Parent),
+      AssocTypeOrProto(AssocTypeOrProto), Name(Name),
       isRecursive(isRecursive) { }
 
   ArchetypeType(const ASTContext &Ctx, 
@@ -3087,9 +3078,9 @@ private:
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, bool isRecursive = false)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties::HasArchetype,
-                        ConformsTo, Superclass),
-      ParentOrOpened(Existential.getPointer()), 
+                        RecursiveTypeProperties::HasArchetype),
+      ConformsTo(ConformsTo), Superclass(Superclass),
+      ParentOrOpened(Existential.getPointer()),
       isRecursive(isRecursive) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
@@ -3102,7 +3093,7 @@ class AbstractTypeParamType : public SubstitutableType {
 protected:
   AbstractTypeParamType(TypeKind kind, const ASTContext *ctx,
                         RecursiveTypeProperties properties)
-    : SubstitutableType(kind, ctx, properties, { }, Type()) { }
+    : SubstitutableType(kind, ctx, properties) { }
 
 public:
   // Implement isa/cast/dyncast/etc.
@@ -3670,20 +3661,6 @@ inline SubstitutableType *SubstitutableType::getParent() const {
     return Archetype->getParent();
 
   return nullptr;
-}
-
-inline ArchetypeType *SubstitutableType::getArchetype() {
-  if (auto Archetype = dyn_cast<ArchetypeType>(this))
-    return Archetype;
-
-  llvm_unreachable("Not a substitutable type");
-}
-
-inline bool SubstitutableType::isPrimary() const {
-  if (auto Archetype = dyn_cast<ArchetypeType>(this))
-    return Archetype->isPrimary();
-
-  llvm_unreachable("Not a substitutable type");
 }
 
 inline CanType Type::getCanonicalTypeOrNull() const {

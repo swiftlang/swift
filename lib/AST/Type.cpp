@@ -97,7 +97,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
 
   // Archetypes and existentials are only class references if class-bounded.
   case TypeKind::Archetype:
-    return cast<SubstitutableType>(type)->requiresClass();
+    return cast<ArchetypeType>(type)->requiresClass();
   case TypeKind::Protocol:
     return cast<ProtocolType>(type)->requiresClass();
   case TypeKind::ProtocolComposition:
@@ -1408,8 +1408,8 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
         specializedTy = this;
       }
     }
-  } else if (auto substitutableTy = getAs<SubstitutableType>()) {
-    return substitutableTy->getSuperclass();
+  } else if (auto archetype = getAs<ArchetypeType>()) {
+    return archetype->getSuperclass();
   } else if (auto dynamicSelfTy = getAs<DynamicSelfType>()) {
     return dynamicSelfTy->getSelfType();
   } else {
@@ -1659,16 +1659,6 @@ int TupleType::getFieldForScalarInit() const {
   return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
 }
 
-
-bool SubstitutableType::requiresClass() const {
-  if (Superclass)
-    return true;
-  for (ProtocolDecl *conformed : getConformsTo())
-    if (conformed->requiresClass())
-      return true;
-  return false;
-}
-
 ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
                                      ArchetypeType *Parent,
                                      AssocTypeOrProtocolType AssocTypeOrProto,
@@ -1701,6 +1691,15 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
                                         Ctx.AllocateCopy(ConformsTo),
                                         Superclass, isRecursive);
+}
+
+bool ArchetypeType::requiresClass() const {
+  if (Superclass)
+    return true;
+  for (ProtocolDecl *conformed : getConformsTo())
+    if (conformed->requiresClass())
+      return true;
+  return false;
 }
 
 namespace {

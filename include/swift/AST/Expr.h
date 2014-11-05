@@ -50,7 +50,6 @@ namespace swift {
   class ProtocolConformance;
   class FuncDecl;
   class ConstructorDecl;
-  class SubstitutableType;
   class TypeDecl;
   class PatternBindingDecl;
   

@@ -34,7 +34,6 @@ class DiagnosticEngine;
 class GenericParamList;
 class NormalProtocolConformance;
 class ProtocolConformance;
-class SubstitutableType;
 class Module;
 enum class AllocationArena;
   
