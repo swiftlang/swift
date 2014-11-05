@@ -1330,6 +1330,9 @@ struct ForeignTypeMetadata : public Metadata {
   struct HeaderPrefix {
     /// An optional callback performed when a particular metadata object
     /// is chosen as the unique structure.
+    /// If there is no initialization function, this metadata record can be
+    /// assumed to be immutable (except for the \c Unique invasive cache
+    /// field).
     InitializationFunction_t InitializationFunction;
     
     /// The Swift-mangled name of the type. This is the uniquing key for the
@@ -1357,17 +1360,29 @@ struct ForeignTypeMetadata : public Metadata {
   }
   
   const ForeignTypeMetadata *getCachedUniqueMetadata() const {
-    // This can be a relaxed-order load. If we miss a store to the invasive
-    // cache from another thread, at worst we do redundant work checking the
-    // (locked) global cache and find the canonical metadata there.
-    return asFullMetadata(this)->Unique.load(std::memory_order_relaxed);
+#if 0 || __alpha__
+    // TODO: This can be a relaxed-order load if there is no initialization
+    // function. On platforms we care about, consume is no more expensive than
+    // relaxed, so there's no reason to branch here (and LLVM isn't smart
+    // enough to eliminate it when it's not needed).
+    if (!hasInitializationFunction())
+      return asFullMetadata(this)->Unique.load(std::memory_order_relaxed);
+#endif
+    return asFullMetadata(this)->Unique.load(std::memory_order_consume);
   }
   
   void setCachedUniqueMetadata(const ForeignTypeMetadata *unique) const {
     assert((asFullMetadata(this)->Unique == nullptr
             || asFullMetadata(this)->Unique == unique)
            && "already set unique metadata");
-    asFullMetadata(this)->Unique.store(unique);
+    
+    // If there is no initialization function, this can be a relaxed store.
+    if (!hasInitializationFunction())
+      asFullMetadata(this)->Unique.store(unique, std::memory_order_relaxed);
+    
+    // Otherwise, we need a release store to publish the result of
+    // initialization
+    asFullMetadata(this)->Unique.store(unique, std::memory_order_release);
   }
   
   size_t getFlags() const {
