@@ -91,7 +91,7 @@ static void updateTargetConfigurationOptions(LangOptions &LangOpts,
   }
 
   // Set the "runtime" target configuration.
-  if (triple.isOSDarwin())
+  if (LangOpts.EnableObjCInterop)
     LangOpts.addTargetConfigOption("_runtime", "_ObjC");
   else
     LangOpts.addTargetConfigOption("_runtime", "_Native");
@@ -629,6 +629,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   Opts.Playground |= Args.hasArg(OPT_playground);
 
+  if (auto A = Args.getLastArg(OPT_enable_objc_interop,
+                               OPT_disable_objc_interop)) {
+    Opts.EnableObjCInterop
+      = A->getOption().matches(OPT_enable_objc_interop);
+  }
+
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
                                OPT_disable_objc_attr_requires_foundation_module)) {
     Opts.EnableObjCAttrRequiresFoundation
@@ -940,6 +946,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_target))
     Opts.Triple = llvm::Triple::normalize(A->getValue());
+
+  if (auto A = Args.getLastArg(OPT_enable_objc_interop,
+                               OPT_disable_objc_interop)) {
+    Opts.EnableObjCInterop
+      = A->getOption().matches(OPT_enable_objc_interop);
+  }
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.

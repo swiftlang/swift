@@ -93,12 +93,15 @@ public:
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
 
+  /// Enable Objective-C interop code generation
+  unsigned EnableObjCInterop : 1;
+
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), DebugInfo(false), UseJIT(false),
                    EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
-                   Playground(false) {}
+                   Playground(false), EnableObjCInterop(true) {}
 };
 
 } // end namespace swift

@@ -295,8 +295,9 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   if (!generics) {
     assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
 
-    // If this is a class, we need to force ObjC initialization.
-    if (isa<ClassDecl>(theDecl)) {
+    // If this is a class, we need to force ObjC initialization,
+    // but only if we're doing Objective-C interop.
+    if (IGF.IGM.ObjCInterop && isa<ClassDecl>(theDecl)) {
       metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
       metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
                                         metadata);
@@ -2297,11 +2298,19 @@ namespace {
       static_assert(unsigned(MetadataKind::Class) == 0,
                     "class metadata kind is non-zero?");
 
-      // Get the metaclass pointer as an intptr_t.
-      auto metaclass = IGM.getAddrOfMetaclassObject(Target,
-                                                    NotForDefinition);
-      auto flags = llvm::ConstantExpr::getPtrToInt(metaclass, IGM.IntPtrTy);
-      addWord(flags);
+      if (IGM.ObjCInterop) {
+        // Get the metaclass pointer as an intptr_t.
+        auto metaclass = IGM.getAddrOfMetaclassObject(Target,
+                                                      NotForDefinition);
+        auto flags = llvm::ConstantExpr::getPtrToInt(metaclass, IGM.IntPtrTy);
+        addWord(flags);
+      } else {
+        // On non-objc platforms just fill it with a null, there
+        // is no objective-c metaclass.
+        // FIXME: Remove this to save metadata space.
+        // rdar://problem/18801263
+        addWord(llvm::ConstantExpr::getNullValue(IGM.IntPtrTy));
+      }
     }
 
     /// The runtime provides a value witness table for Builtin.NativeObject.
@@ -2435,11 +2444,18 @@ namespace {
     void addClassCacheData() {
       // We initially fill in these fields with addresses taken from
       // the ObjC runtime.
+      // FIXME: Remove null data altogether rdar://problem/18801263
       addWord(IGM.getObjCEmptyCachePtr());
       addWord(IGM.getObjCEmptyVTablePtr());
     }
 
     void addClassDataPointer() {
+      if (!IGM.ObjCInterop) {
+        // with no objective-c runtime, just give an empty pointer with the
+        // swift bit set.
+        addWord(llvm::ConstantInt::get(IGM.IntPtrTy, 1));
+        return;
+      }
       // Derive the RO-data.
       llvm::Constant *data = emitClassPrivateData(IGM, Target);
 
@@ -2621,6 +2637,12 @@ namespace {
     }
     
     void addDependentData() {
+      if (!IGM.ObjCInterop) {
+        // Every piece of data in the dependent data appears to be related to
+        // Objective-C information. If we're not doing Objective-C interop, we
+        // can just skip adding it to the class.
+        return;
+      }
       // Emit space for the dependent metaclass.
       DependentMetaclassPoint = getNextOffset();
       // isa
@@ -2729,31 +2751,42 @@ namespace {
                                 llvm::Value *metadata,
                                 llvm::Value *vwtable) {
       assert(!HasDependentVWT && "class should never have dependent VWT");
-      
+
       // Fill in the metaclass pointer.
       Address metadataPtr(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrPtrTy),
                           IGF.IGM.getPointerAlignment());
       
       llvm::Value *metaclass;
-      {
+      if (IGF.IGM.ObjCInterop) {
         assert(!DependentMetaclassPoint.isInvalid());
         assert(!MetaclassPtrOffset.isInvalid());
 
         Address metaclassPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
-                                               MetaclassPtrOffset - AddressPoint);
+                                            MetaclassPtrOffset - AddressPoint);
         metaclassPtrSlot = IGF.Builder.CreateBitCast(metaclassPtrSlot,
-                                          IGF.IGM.ObjCClassPtrTy->getPointerTo());
+                                        IGF.IGM.ObjCClassPtrTy->getPointerTo());
         Address metaclassRawPtr = createPointerSizedGEP(IGF, metadataPtr,
-                                          DependentMetaclassPoint - AddressPoint);
+                                        DependentMetaclassPoint - AddressPoint);
         metaclass = IGF.Builder.CreateBitCast(metaclassRawPtr,
                                               IGF.IGM.ObjCClassPtrTy)
           .getAddress();
         IGF.Builder.CreateStore(metaclass, metaclassPtrSlot);
+      } else {
+        // FIXME: Remove altogether rather than injecting a NULL value.
+        // rdar://problem/18801263
+        assert(!MetaclassPtrOffset.isInvalid());
+        Address metaclassPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
+                                            MetaclassPtrOffset - AddressPoint);
+        metaclassPtrSlot = IGF.Builder.CreateBitCast(metaclassPtrSlot,
+                                        IGF.IGM.ObjCClassPtrTy->getPointerTo());
+        IGF.Builder.CreateStore(
+          llvm::ConstantPointerNull::get(IGF.IGM.ObjCClassPtrTy), 
+          metaclassPtrSlot);
       }
       
       // Fill in the rodata reference in the class.
       Address classRODataPtr;
-      {
+      if (IGF.IGM.ObjCInterop) {
         assert(!DependentClassRODataPoint.isInvalid());
         assert(!ClassRODataPtrOffset.isInvalid());
         Address rodataPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
@@ -2764,42 +2797,59 @@ namespace {
         classRODataPtr = createPointerSizedGEP(IGF, metadataPtr,
                                       DependentClassRODataPoint - AddressPoint);
         // Set the low bit of the value to indicate "compiled by Swift".
-        llvm::Value *rodata = IGF.Builder.CreatePtrToInt(classRODataPtr.getAddress(),
-                                                         IGF.IGM.IntPtrTy);
+        llvm::Value *rodata = IGF.Builder.CreatePtrToInt(
+                                classRODataPtr.getAddress(), IGF.IGM.IntPtrTy);
         rodata = IGF.Builder.CreateOr(rodata, 1);
         IGF.Builder.CreateStore(rodata, rodataPtrSlot);
+      } else {
+        // NOTE: Unlike other bits of the metadata that should later be removed,
+        // this one is important because things check this value's flags to
+        // determine what kind of object it is. That said, if those checks
+        // are determined to be removeable, we can remove this as well per
+        // rdar://problem/18801263
+        assert(!ClassRODataPtrOffset.isInvalid());
+        Address rodataPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
+                                           ClassRODataPtrOffset - AddressPoint);
+        rodataPtrSlot = IGF.Builder.CreateBitCast(rodataPtrSlot,
+                                              IGF.IGM.IntPtrTy->getPointerTo());
+        
+        IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 1), 
+                                                                rodataPtrSlot);
       }
 
       // Fill in the rodata reference in the metaclass.
       Address metaclassRODataPtr;
-      {
+      if (IGF.IGM.ObjCInterop) {
         assert(!DependentMetaclassRODataPoint.isInvalid());
         assert(!MetaclassRODataPtrOffset.isInvalid());
         Address rodataPtrSlot = createPointerSizedGEP(IGF, metadataPtr,
                                       MetaclassRODataPtrOffset - AddressPoint);
         rodataPtrSlot = IGF.Builder.CreateBitCast(rodataPtrSlot,
-                                                IGF.IGM.IntPtrTy->getPointerTo());
+                                              IGF.IGM.IntPtrTy->getPointerTo());
         
         metaclassRODataPtr = createPointerSizedGEP(IGF, metadataPtr,
                                  DependentMetaclassRODataPoint - AddressPoint);
-        llvm::Value *rodata = IGF.Builder.CreatePtrToInt(metaclassRODataPtr.getAddress(),
-                                                         IGF.IGM.IntPtrTy);
+        llvm::Value *rodata = IGF.Builder.CreatePtrToInt(
+                            metaclassRODataPtr.getAddress(), IGF.IGM.IntPtrTy);
         IGF.Builder.CreateStore(rodata, rodataPtrSlot);
       }
       
-      // Generate the runtime name for the class and poke it into the rodata.
-      llvm::SmallString<32> buf;
-      auto basename = IGM.getAddrOfGlobalString(Target->getObjCRuntimeName(buf));
-      auto name = IGF.Builder.CreateCall2(IGM.getGetGenericClassObjCNameFn(),
-                                          metadata, basename);
-      name->setDoesNotThrow();
-      Size nameOffset(IGM.getPointerAlignment().getValue() > 4 ? 24 : 16);
-      for (Address rodataPtr : {classRODataPtr, metaclassRODataPtr}) {
-        auto namePtr = createPointerSizedGEP(IGF, rodataPtr, nameOffset);
-        namePtr = IGF.Builder.CreateBitCast(namePtr, IGM.Int8PtrPtrTy);
-        IGF.Builder.CreateStore(name, namePtr);
+      if (IGF.IGM.ObjCInterop) {
+        // Generate the runtime name for the class and poke it into the rodata.
+        llvm::SmallString<32> buf;
+        auto basename = IGM.getAddrOfGlobalString(
+                                              Target->getObjCRuntimeName(buf));
+        auto name = IGF.Builder.CreateCall2(IGM.getGetGenericClassObjCNameFn(),
+                                            metadata, basename);
+        name->setDoesNotThrow();
+        Size nameOffset(IGM.getPointerAlignment().getValue() > 4 ? 24 : 16);
+        for (Address rodataPtr : {classRODataPtr, metaclassRODataPtr}) {
+          auto namePtr = createPointerSizedGEP(IGF, rodataPtr, nameOffset);
+          namePtr = IGF.Builder.CreateBitCast(namePtr, IGM.Int8PtrPtrTy);
+          IGF.Builder.CreateStore(name, namePtr);
+        }
       }
-      
+
       // Get the superclass metadata.
       llvm::Value *superMetadata;
       if (Target->hasSuperclass()) {
@@ -2815,7 +2865,7 @@ namespace {
 
       // If the superclass is generic, we need to populate the
       // superclass field of the metaclass.
-      if (HasDependentSuperclass) {
+      if (IGF.IGM.ObjCInterop && HasDependentSuperclass) {
         // The superclass of the metaclass is the metaclass of the superclass.
 
         // Read the superclass's metaclass.
@@ -2830,7 +2880,7 @@ namespace {
 
         IGF.Builder.CreateStore(superMetaClass, metaSuperField);
       }
-      
+
       // If we have any ancestor generic parameters or field offset vectors,
       // copy them from the superclass metadata.
       if (!AncestorFieldOffsetVectors.empty() || !AncestorFillOps.empty()) {
@@ -2919,9 +2969,11 @@ namespace {
                                 firstField.getAddress(), fieldVector);
       }
 
-      // Register the class with the ObjC runtime.
-      llvm::Value *instantiateObjC = IGF.IGM.getInstantiateObjCClassFn();
-      IGF.Builder.CreateCall(instantiateObjC, metadata);
+      if (IGF.IGM.ObjCInterop) {
+        // Register the class with the ObjC runtime.
+        llvm::Value *instantiateObjC = IGF.IGM.getInstantiateObjCClassFn();
+        IGF.Builder.CreateCall(instantiateObjC, metadata);
+      }
     }
     
   };

@@ -91,6 +91,13 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     arguments.push_back("-aarch64-use-tbi");
   }
 
+  // Enable or disable ObjC interop appropriately for the platform
+  if (Triple.isOSDarwin()) {
+    arguments.push_back("-enable-objc-interop");
+  } else {
+    arguments.push_back("-disable-objc-interop");
+  }
+
   // Handle the CPU and its preferences.
   if (auto arg = inputArgs.getLastArg(options::OPT_target_cpu))
     arg->render(inputArgs, arguments);

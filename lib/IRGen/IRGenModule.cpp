@@ -97,7 +97,8 @@ IRGenModule::IRGenModule(ASTContext &Context,
     Module(*ClangCodeGen->GetModule()),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
     SILMod(SILMod), TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), Types(*new TypeConverter(*this))
+    DebugInfo(0), ObjCInterop(Opts.EnableObjCInterop),
+    Types(*new TypeConverter(*this))
 {
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
@@ -363,9 +364,14 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
 llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
   if (ObjCEmptyCachePtr) return ObjCEmptyCachePtr;
 
-  // struct objc_cache _objc_empty_cache;
-  ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
-                                               OpaquePtrTy->getElementType());
+  if (ObjCInterop) {
+    // struct objc_cache _objc_empty_cache;
+    ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
+                                                 OpaquePtrTy->getElementType());
+  } else {
+    // FIXME: Remove even the null value per rdar://problem/18801263
+    ObjCEmptyCachePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
+  }
   return ObjCEmptyCachePtr;
 }
 
@@ -383,7 +389,7 @@ llvm::Constant *IRGenModule::getObjCEmptyVTablePtr() {
   // symbols correctly, such as the iOS simulator, and for these we
   // have to fill in null directly.
 
-  if (TargetInfo.ObjCUseNullForEmptyVTable) {
+  if (!ObjCInterop || TargetInfo.ObjCUseNullForEmptyVTable) {
     ObjCEmptyVTablePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
   } else {
     ObjCEmptyVTablePtr = Module.getOrInsertGlobal("_objc_empty_vtable",

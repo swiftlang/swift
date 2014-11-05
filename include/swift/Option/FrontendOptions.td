@@ -56,7 +56,15 @@ def verify : Flag<["-"], "verify">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
-           
+
+def enable_objc_interop :
+  Flag<["-"], "enable-objc-interop">,
+  HelpText<"Enable Objective-C interop code generation and config directives">;
+
+def disable_objc_interop :
+  Flag<["-"], "disable-objc-interop">,
+  HelpText<"Disable Objective-C interop code generation and config directives">;
+
 def enable_objc_attr_requires_foundation_module :
   Flag<["-"], "enable-objc-attr-requires-foundation-module">,
   HelpText<"Enable requiring uses of @objc to require importing the "

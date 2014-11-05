@@ -241,6 +241,7 @@ llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
 
   switch (toMetatype->getRepresentation()) {
   case MetatypeRepresentation::Thick: {
+    assert(IGF.IGM.ObjCInterop && "should have objc runtime");
     // Get the Swift metadata for the type we're checking.
     toMetadata = IGF.emitTypeMetadataRef(toMetatype.getInstanceType());
     switch (mode) {
@@ -255,6 +256,8 @@ llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
   }
 
   case MetatypeRepresentation::ObjC: {
+    assert(IGF.IGM.ObjCInterop && "should have objc runtime");
+
     // Get the ObjC metadata for the type we're checking.
     toMetadata = emitClassHeapMetadataRef(IGF, toMetatype.getInstanceType(),
                                           MetadataValueType::ObjCClass);

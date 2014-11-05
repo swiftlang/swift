@@ -86,6 +86,10 @@ namespace swift {
     /// Whether to split imported Objective-C selectors into Swift method names.
     bool SplitPrepositions = false;
 
+    /// Enable Objective-C Runtime interop code generation and build
+    /// configuration options.
+    bool EnableObjCInterop = true;
+
     /// Enables checking that uses of @objc require importing
     /// the Foundation module.
     /// This is enabled by default because SILGen can crash in such a case, but

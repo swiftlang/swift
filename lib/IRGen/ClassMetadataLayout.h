@@ -70,11 +70,11 @@ public:
     // layout-compatible with an Objective-C class.  The superclass
     // pointer is useful regardless of mode, but the rest of the data
     // isn't necessary.
+    // FIXME: Figure out what can be removed altogether in non-objc-interop
+    // mode and remove it. rdar://problem/18801263
     asImpl().addSuperClass();
-    if (IGM.ObjCInterop) {
-      asImpl().addClassCacheData();
-      asImpl().addClassDataPointer();
-    }
+    asImpl().addClassCacheData();
+    asImpl().addClassDataPointer();
 
     asImpl().addClassFlags();
     asImpl().addInstanceAddressPoint();

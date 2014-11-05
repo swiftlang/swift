@@ -894,7 +894,7 @@ bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
 bool ASTContext::hasPointerArgumentIntrinsics(LazyResolver *resolver) const {
   return getUnsafeMutablePointerDecl()
     && getUnsafePointerDecl()
-    && getAutoreleasingUnsafeMutablePointerDecl()
+    && (!LangOpts.EnableObjCInterop || getAutoreleasingUnsafeMutablePointerDecl())
     && getConvertPointerToPointerArgument(resolver)
     && getConvertMutableArrayToPointerArgument(resolver)
     && getConvertConstArrayToPointerArgument(resolver)

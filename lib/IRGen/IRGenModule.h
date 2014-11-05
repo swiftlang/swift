@@ -129,7 +129,7 @@ public:
   CodeGenABITypes *ABITypes;
 
   /// Does the current target require Objective-C interoperation?
-  static const bool ObjCInterop = true;
+  bool ObjCInterop = true;
 
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
