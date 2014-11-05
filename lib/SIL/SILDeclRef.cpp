@@ -63,8 +63,8 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
            "can only create ivar initializer/destroyer SILDeclRef for class");
     naturalUncurryLevel = 1;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
-    assert(kind == Kind::GlobalAccessor &&
-           "can only create GlobalAccessor SILDeclRef for var");
+    assert((kind == Kind::GlobalAccessor || kind == Kind::GlobalGetter) &&
+           "can only create GlobalAccessor or GlobalGetter SILDeclRef for var");
 
     naturalUncurryLevel = 0;
     assert(!var->getDeclContext()->isLocalContext() &&
@@ -412,6 +412,12 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
   case SILDeclRef::Kind::GlobalAccessor:
     buffer << introducer;
     mangler.mangleAddressorEntity(c.getDecl());
+    return;
+
+  //   entity ::= declaration 'G'                 // getter
+  case SILDeclRef::Kind::GlobalGetter:
+    buffer << introducer;
+    mangler.mangleGlobalGetterEntity(c.getDecl());
     return;
 
   //   entity ::= context 'e' index           // default arg generator

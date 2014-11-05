@@ -1349,6 +1349,14 @@ void Mangler::mangleAddressorEntity(const ValueDecl *decl) {
   mangleDeclType(decl, ResilienceExpansion::Minimal, 0);
 }
 
+void Mangler::mangleGlobalGetterEntity(ValueDecl *decl) {
+  Buffer << 'F';
+  mangleContextOf(decl, BindGenerics::All);
+  Buffer << 'G';
+  mangleDeclName(decl);
+  mangleDeclType(decl, ResilienceExpansion::Minimal, 0);
+}
+
 void Mangler::mangleDefaultArgumentEntity(const DeclContext *func,
                                           unsigned index) {
   Buffer << 'I';

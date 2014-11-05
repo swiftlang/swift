@@ -472,6 +472,7 @@ namespace {
       case SILDeclRef::Kind::DefaultArgGenerator:
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
+      case SILDeclRef::Kind::GlobalGetter:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:

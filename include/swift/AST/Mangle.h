@@ -104,6 +104,7 @@ public:
   void mangleAccessorEntity(AccessorKind kind, const AbstractStorageDecl *decl,
                             ResilienceExpansion expansion);
   void mangleAddressorEntity(const ValueDecl *decl);
+  void mangleGlobalGetterEntity(ValueDecl *decl);
   void mangleDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
   void mangleInitializerEntity(const VarDecl *var);
   void mangleClosureEntity(const AbstractClosureExpr *closure,

@@ -1073,6 +1073,10 @@ private:
       entityKind = Node::Kind::Getter;
       name = demangleDeclName();
       if (!name) return nullptr;
+    } else if (Mangled.nextIf('G')) {
+      entityKind = Node::Kind::GlobalGetter;
+      name = demangleDeclName();
+      if (!name) return nullptr;
     } else if (Mangled.nextIf('s')) {
       entityKind = Node::Kind::Setter;
       name = demangleDeclName();
@@ -2007,6 +2011,7 @@ private:
     case Node::Kind::GenericTypeMetadataPattern:
     case Node::Kind::Getter:
     case Node::Kind::Global:
+    case Node::Kind::GlobalGetter:
     case Node::Kind::Identifier:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
@@ -2641,6 +2646,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::MutableAddressor:
     printEntity(true, true, ".mutableAddressor");
+    return;
+  case Node::Kind::GlobalGetter:
+    printEntity(true, true, ".getter");
     return;
   case Node::Kind::Getter:
     printEntity(true, true, ".getter");

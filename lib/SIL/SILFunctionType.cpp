@@ -810,6 +810,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
+  case SILDeclRef::Kind::GlobalGetter:
   case SILDeclRef::Kind::IVarDestroyer:
   case SILDeclRef::Kind::DefaultArgGenerator:
     return SelectorFamily::None;
