@@ -34,6 +34,7 @@ namespace {
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitSelectEnumInst(SelectEnumInst *SEI);
+    SILValue visitSelectEnumAddrInst(SelectEnumAddrInst *SEI);
     SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
     SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
@@ -181,23 +182,60 @@ static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
 }
 
 SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
-  // Simplify a select_enum on a enum instruction.
-  //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
-  //   %28 = integer_literal $Builtin.Int1, -1
-  //   %29 = integer_literal $Builtin.Int1, 0
-  //   %30 = select_enum %27 : $Optional<Int>, case #Optional.None!enumelt: %28,
-  //                                         case #Optional.Some!enumelt.1: %29
-  // We will return %29.
 
   auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
-  if (!EI)
-    return SILValue();
+  if (EI && EI->getType() == SEI->getEnumOperand().getType()) {
+    // Simplify a select_enum on a enum instruction.
+    //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
+    //   %28 = integer_literal $Builtin.Int1, -1
+    //   %29 = integer_literal $Builtin.Int1, 0
+    //   %30 = select_enum %27 : $Optional<Int>, case #Optional.None!enumelt: %28,
+    //                                         case #Optional.Some!enumelt.1: %29
+    // We will return %29.
+    return SEI->getCaseResult(EI->getElement());
+  }
 
-  // Check matching types.
-  if (EI->getType() != SEI->getEnumOperand().getType())
+  // Canonicalize a select_enum: if the default refers to exactly one case, then
+  // replace the default with that case.
+  if (!SEI->hasDefault())
     return SILValue();
+  
+  EnumElementDecl *elementDecl = SEI->getUniqueCaseForDefault();
+  if (!elementDecl)
+    return SILValue();
+  
+  // Construct a new instruction by copying all the case entries.
+  SmallVector<std::pair<EnumElementDecl*, SILValue>, 4> CaseValues;
+  for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; idx++) {
+    CaseValues.push_back(SEI->getCase(idx));
+  }
+  // Add the default-entry of the original instruction as case-entry.
+  CaseValues.push_back(std::make_pair(elementDecl, SEI->getDefaultResult()));
+  
+  return SILBuilderWithScope<1>(SEI).createSelectEnum(SEI->getLoc(),
+                 SEI->getEnumOperand(), SEI->getType(), SILValue(), CaseValues);
+}
 
-  return SEI->getCaseResult(EI->getElement());
+SILValue InstSimplifier::visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
+  // Canonicalize a select_enum_addr: if the default refers to exactly one case,
+  // then replace the default with that case.
+  if (!SEI->hasDefault())
+    return SILValue();
+  
+  EnumElementDecl *elementDecl = SEI->getUniqueCaseForDefault();
+  if (!elementDecl)
+    return SILValue();
+  
+  // Construct a new instruction by copying all the case entries.
+  SmallVector<std::pair<EnumElementDecl*, SILValue>, 4> CaseValues;
+  for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; idx++) {
+    CaseValues.push_back(SEI->getCase(idx));
+  }
+  // Add the default-entry of the original instruction as case-entry.
+  CaseValues.push_back(std::make_pair(elementDecl, SEI->getDefaultResult()));
+  
+  return SILBuilderWithScope<1>(SEI).createSelectEnumAddr(SEI->getLoc(),
+                    SEI->getEnumOperand(), SEI->getType(), nullptr, CaseValues);
 }
 
 SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {

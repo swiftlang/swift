@@ -1444,6 +1444,38 @@ SwitchEnumInstBase::SwitchEnumInstBase(
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
 }
 
+namespace {
+  template <class Inst> EnumElementDecl *
+  getUniqueCaseForDefaultValue(Inst *inst, SILValue enumValue) {
+    assert(inst->hasDefault() && "doesn't have a default");
+    SILType enumType = enumValue.getType();
+    
+    if (enumType.isResilient(inst->getParent()->getParent()->getModule()))
+      return nullptr;
+    
+    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    assert(decl && "switch_enum operand is not an enum");
+    
+    llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
+    for (auto elt : decl->getAllElements())
+      unswitchedElts.insert(elt);
+    
+    for (unsigned i = 0, e = inst->getNumCases(); i != e; ++i) {
+      auto Entry = inst->getCase(i);
+      unswitchedElts.erase(Entry.first);
+    }
+    
+    if (unswitchedElts.size() == 1)
+      return *unswitchedElts.begin();
+    
+    return nullptr;
+  }
+}
+
+EnumElementDecl *SelectEnumInstBase::getUniqueCaseForDefault() {
+  return getUniqueCaseForDefaultValue(this, getEnumOperand());
+}
+
 EnumElementDecl *
 SelectEnumInstBase::getSingleTrueElement() const {
   auto SEIType = getType().getAs<BuiltinIntegerType>();
@@ -1500,29 +1532,7 @@ SwitchEnumInstBase::createSwitchEnum(SILLocation Loc, SILValue Operand,
 }
 
 EnumElementDecl *SwitchEnumInstBase::getUniqueCaseForDefault() {
-  assert(hasDefault() && "doesn't have a default");
-  SILValue value = getOperand();
-  SILType enumType = value.getType();
-
-  if (enumType.isResilient(getParent()->getParent()->getModule()))
-    return nullptr;
-
-  EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
-  assert(decl && "switch_enum operand is not an enum");
-
-  llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
-  for (auto elt : decl->getAllElements())
-    unswitchedElts.insert(elt);
-
-  for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
-    auto Entry = getCase(i);
-    unswitchedElts.erase(Entry.first);
-  }
-
-  if (unswitchedElts.size() == 1)
-    return *unswitchedElts.begin();
-
-  return nullptr;
+  return getUniqueCaseForDefaultValue(this, getOperand());
 }
 
 EnumElementDecl *

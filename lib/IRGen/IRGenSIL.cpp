@@ -2276,6 +2276,8 @@ emitBBMapForSelect(IRGenSILFunction &IGF,
     addIncoming(inst->getDefaultResult());
     
     IGF.Builder.CreateBr(contBB);
+  } else {
+    defaultBB = nullptr;
   }
   
   IGF.Builder.emitBlock(contBB);

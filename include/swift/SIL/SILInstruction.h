@@ -1933,6 +1933,9 @@ public:
     return getDefaultResult();
   }
   
+  /// \brief If the default refers to exactly one case decl, return it.
+  EnumElementDecl *getUniqueCaseForDefault();
+      
   SILValue getDefaultResult() const {
     assert(HasDefault && "doesn't have a default");
     return Operands[NumCases + 1].get();
@@ -3181,7 +3184,6 @@ public:
   }
 
   /// \brief If the default refers to exactly one case decl, return it.
-  /// return it.
   EnumElementDecl *getUniqueCaseForDefault();
 
   /// \brief If the given block only has one enum element decl matched to it,
