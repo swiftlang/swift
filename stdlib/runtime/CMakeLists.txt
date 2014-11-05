@@ -45,7 +45,9 @@ add_swift_library(swiftRuntime
   HeapObject.cpp
   KnownMetadata.cpp
   Metadata.cpp
+  Reflection.cpp
   Stubs.cpp
+  SwiftObject.cpp
   Enum.cpp
   Once.cpp
   Heap.cpp

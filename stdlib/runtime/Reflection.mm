@@ -13,7 +13,6 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Basic/Demangle.h"
 #include "Debug.h"
@@ -23,13 +22,18 @@
 #include <new>
 #include <string>
 #include <regex>
-#include <Foundation/Foundation.h>
 #include <dlfcn.h>
+
+#if SWIFT_OBJC_INTEROP
+#include "swift/Runtime/ObjCBridge.h"
+#include <Foundation/Foundation.h>
 #include <objc/objc.h>
 #include <objc/runtime.h>
+#endif
 
 using namespace swift;
 
+#if SWIFT_OBJC_INTEROP
 // Declare the debugQuickLookObject selector.
 @interface DeclareSelectors
 
@@ -37,6 +41,7 @@ using namespace swift;
 @end
 
 @class SwiftObject;
+#endif
 
 namespace {
   
@@ -89,11 +94,12 @@ struct String {
     swift_stringFromUTF8InRawMemory(this, concatenated, len1 + len2);
     free(concatenated);
   }
-  
+#if SWIFT_OBJC_INTEROP  
   explicit String(NSString *s)
     // FIXME: Use the usual NSString bridging entry point.
     : String([s UTF8String])
   {}
+#endif
 };
   
 struct Array {
@@ -258,7 +264,8 @@ const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
   swift_release(owner);
   return r;
 }
-  
+
+#if SWIFT_OBJC_INTEROP
 extern "C"
 Any swift_MagicMirrorData_objcValue(HeapObject *owner,
                                     const OpaqueValue *value,
@@ -272,6 +279,8 @@ Any swift_MagicMirrorData_objcValue(HeapObject *owner,
   swift_release(owner);
   return result;
 }
+#endif
+
 extern "C"
 void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
   switch (T->getKind()) {
@@ -417,19 +426,23 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
 }
   
 // -- Class destructuring.
-  
 static bool classHasSuperclass(const ClassMetadata *c) {
+#if SWIFT_OBJC_INTEROP
   // A class does not have a superclass if its ObjC superclass is the
   // "SwiftObject" root class.
   return c->SuperClass
     && (Class)c->SuperClass != NSClassFromString(@"SwiftObject");
+#else
+  // In non-objc mode, the test is just if it has a non-null superclass.
+  return c->SuperClass != nullptr;
+#endif
 }
-  
+
 static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
                                      HeapObject *owner,
                                      const OpaqueValue *value,
                                      const Metadata *type);
-  
+
 extern "C"
 intptr_t swift_ClassMirror_count(HeapObject *owner,
                                  const OpaqueValue *value,
@@ -437,12 +450,12 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
   auto Clas = static_cast<const ClassMetadata*>(type);
   swift_release(owner);
   auto count = Clas->getDescription()->Class.NumFields;
-  
+
   // If the class has a superclass, the superclass instance is treated as the
   // first child.
   if (classHasSuperclass(Clas))
     count += 1;
-    
+
   return count;
 }
   
@@ -456,7 +469,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   StringMirrorTuple result;
   
   auto Clas = static_cast<const ClassMetadata*>(type);
-  
+
   if (classHasSuperclass(Clas)) {
     // If the class has a superclass, the superclass instance is treated as the
     // first child.
@@ -483,9 +496,13 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   if (usesNativeSwiftReferenceCounting(Clas)) {
     fieldOffset = Clas->getFieldOffsets()[i];
   } else {
+#if SWIFT_OBJC_INTEROP
     Ivar *ivars = class_copyIvarList((Class)Clas, nullptr);
     fieldOffset = ivar_getOffset(ivars[i]);
     free(ivars);
+#else
+    swift::crash("Object appears to be Objective-C, but no runtime.");
+#endif
   }
   
   auto bytes = *reinterpret_cast<const char * const*>(value);
@@ -598,7 +615,7 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   return 0;
 #endif
 }
-  
+#if SWIFT_OBJC_INTEROP
 static Mirror ObjC_getMirrorForSuperclass(Class sup,
                                           HeapObject *owner,
                                           const OpaqueValue *value,
@@ -749,6 +766,7 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
   result.optional.isNone = true;
   return result;
 }
+#endif
   
 // -- MagicMirror implementation.
   
@@ -769,6 +787,7 @@ extern "C" const MirrorWitnessTable _TWPVSs12_ClassMirrorSs10MirrorTypeSs;
 extern "C" const FullMetadata<Metadata> _TMdVSs17_ClassSuperMirror;
 extern "C" const MirrorWitnessTable _TWPVSs17_ClassSuperMirrorSs10MirrorTypeSs;
   
+#if SWIFT_OBJC_INTEROP
 // These type metadata objects are kept in swiftFoundation because they rely
 // on string bridging being installed.
 static const Metadata *getObjCMirrorMetadata() {
@@ -804,6 +823,7 @@ static const MirrorWitnessTable *getObjCSuperMirrorWitness() {
   
   return witness;
 }
+#endif
 
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
@@ -811,11 +831,13 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
                                      HeapObject *owner,
                                      const OpaqueValue *value,
                                      const Metadata *type) {
+#if SWIFT_OBJC_INTEROP
   // If the superclass is natively ObjC, cut over to the ObjC mirror
   // implementation.
   if (!sup->isTypeMetadata())
     return ObjC_getMirrorForSuperclass((Class)sup, owner, value, type);
-  
+#endif
+
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
   
@@ -828,6 +850,7 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
   return resultBuf;
 }
 
+#if SWIFT_OBJC_INTEROP
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 static Mirror ObjC_getMirrorForSuperclass(Class sup,
@@ -844,7 +867,8 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
   result->Data.Value = value;
   return resultBuf;
 }
-  
+#endif
+
 // (type being mirrored, mirror type, mirror witness)
 using MirrorTriple
   = std::tuple<const Metadata *, const Metadata *, const MirrorWitnessTable *>;
@@ -854,13 +878,16 @@ getImplementationForClass(const OpaqueValue *Value) {
   // Get the runtime type of the object.
   const void *obj = *reinterpret_cast<const void * const *>(Value);
   auto isa = _swift_getClass(obj);
-  
+
+#if SWIFT_OBJC_INTEROP
   // If this is a pure ObjC class, reflect it using ObjC's runtime facilities.
   if (!isa->isTypeMetadata())
     return {isa, getObjCMirrorMetadata(), getObjCMirrorWitness()};
-  
+#endif
+
   // Otherwise, use the native Swift facilities.
-  return {isa, &_TMdVSs12_ClassMirror, &_TWPVSs12_ClassMirrorSs10MirrorTypeSs};
+  return std::make_tuple(
+      isa, &_TMdVSs12_ClassMirror, &_TWPVSs12_ClassMirrorSs10MirrorTypeSs);
 }
   
 /// Get the magic mirror witnesses appropriate to a particular type.
@@ -868,10 +895,12 @@ static MirrorTriple
 getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   switch (T->getKind()) {
   case MetadataKind::Tuple:
-    return {T, &_TMdVSs12_TupleMirror, &_TWPVSs12_TupleMirrorSs10MirrorTypeSs};
+    return std::make_tuple(
+        T, &_TMdVSs12_TupleMirror, &_TWPVSs12_TupleMirrorSs10MirrorTypeSs);
       
   case MetadataKind::Struct:
-    return {T, &_TMdVSs13_StructMirror, &_TWPVSs13_StructMirrorSs10MirrorTypeSs};
+    return std::make_tuple(
+        T, &_TMdVSs13_StructMirror, &_TWPVSs13_StructMirrorSs10MirrorTypeSs);
       
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass:
@@ -880,12 +909,13 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   }
       
   case MetadataKind::Opaque: {
+#if SWIFT_OBJC_INTEROP
     // If this is the Builtin.UnknownObject type, use the dynamic type of the
     // object reference.
     if (T == &_TMdBO.base) {
       return getImplementationForClass(Value);
     }
-    
+#endif
     // If this is the Builtin.NativeObject type, and the heap object is a
     // class instance, use the dynamic type of the object reference.
     if (T == &_TMdBo.base) {
@@ -904,7 +934,8 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
-    return {T, &_TMdVSs13_OpaqueMirror, &_TWPVSs13_OpaqueMirrorSs10MirrorTypeSs};
+    return std::make_tuple(
+        T, &_TMdVSs13_OpaqueMirror, &_TWPVSs13_OpaqueMirrorSs10MirrorTypeSs);
       
   // Types can't have these kinds.
   case MetadataKind::PolyFunction:
@@ -968,12 +999,11 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
     unsigned wtOffset = 0;
     for (unsigned i = 0; i < existential->Protocols.NumProtocols; ++i) {
       if (existential->Protocols[i] == &_TMpSs11Reflectable) {
-        return {
-          reinterpret_cast<const ReflectableWitnessTable*>(
-            existential->getWitnessTable(Value, wtOffset)),
-          existential->getDynamicType(Value),
-          existential->projectValue(Value)
-        };
+        return std::make_tuple(
+            reinterpret_cast<const ReflectableWitnessTable*>(
+              existential->getWitnessTable(Value, wtOffset)),
+            existential->getDynamicType(Value),
+            existential->projectValue(Value));
       }
       if (existential->Protocols[i]->Flags.needsWitnessTable())
         ++wtOffset;
@@ -997,12 +1027,11 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
     swift::crash("Swift mirror lookup failure");
   }
   
-  return {
-    reinterpret_cast<const ReflectableWitnessTable*>(
-      swift_conformsToProtocol(T, &_TMpSs11Reflectable)),
-    T,
-    Value
-  };
+  return std::make_tuple(
+      reinterpret_cast<const ReflectableWitnessTable*>(
+        swift_conformsToProtocol(T, &_TMpSs11Reflectable)),
+      T,
+      Value);
 }
   
 } // end anonymous namespace
@@ -1121,9 +1150,14 @@ static void swift_stdlib_getTypeNameImpl(OpaqueValue *value,
     return;
 
   case MetadataKind::ObjCClassWrapper: {
+#if SWIFT_OBJC_INTEROP
     auto wrapperMetadata =
         static_cast<const ObjCClassWrapperMetadata *>(dynamicType);
     new (result) String(object_getClassName((id)wrapperMetadata->Class));
+#else
+    assert(false && "Unexpected ObjC Wrapper Object");
+    new (result) String("");
+#endif
     return;
   }
 

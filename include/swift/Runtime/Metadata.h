@@ -931,7 +931,9 @@ extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
 extern "C" const FullOpaqueMetadata _TMdBi128_;    // Builtin.Int128
 extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.NativeObject
 extern "C" const FullOpaqueMetadata _TMdBb;        // Builtin.BridgeObject
+#if SWIFT_OBJC_INTEROP
 extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.UnknownObject
+#endif
 
 /// The prefix on a heap metadata.
 struct HeapMetadataHeaderPrefix {
@@ -1993,7 +1995,7 @@ public:
   /// type.
   const void *getWitnessTable(const Metadata *type) const;
   
-#ifndef NDEBUG
+#if defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
 #endif
 };
@@ -2193,6 +2195,7 @@ extern "C" const void *
 swift_dynamicCastClassUnconditional(const void *object,
                                     const ClassMetadata *targetType);
 
+#if SWIFT_OBJC_INTEROP
 /// \brief Checked Objective-C-style dynamic cast to a class type.
 ///
 /// \param object The object to cast, or nil.
@@ -2241,6 +2244,7 @@ extern "C" const void *
 swift_dynamicCastForeignClassUnconditional(
   const void *object,
   const ForeignClassMetadata *targetType);
+#endif
 
 /// \brief Checked dynamic cast of a class instance pointer to the given type.
 ///
@@ -2295,6 +2299,7 @@ swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
                                        const Metadata *sourceType,
                                        const Metadata *targetType);
 
+#if SWIFT_OBJC_INTEROP
 extern "C" const Metadata *
 swift_dynamicCastMetatype(const Metadata *sourceType,
                           const Metadata *targetType);
@@ -2315,7 +2320,8 @@ extern "C" const ClassMetadata *
 swift_dynamicCastForeignClassMetatypeUnconditional(
   const ClassMetadata *sourceType,
   const ClassMetadata *targetType);
-  
+#endif
+
 /// \brief Return the dynamic type of an opaque value.
 ///
 /// \param value An opaque value.
