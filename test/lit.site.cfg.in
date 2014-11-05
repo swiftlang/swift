@@ -13,7 +13,8 @@ config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@TARGET_TRIPLE@"
 config.targets_to_build = "@TARGETS_TO_BUILD@"
 config.module_cache_path = "@SWIFT_MODULE_CACHE_PATH@"
-config.modules_sdk = "@MODULES_SDK@"
+config.variant_triple = "@VARIANT_TRIPLE@"
+config.variant_sdk = "@VARIANT_SDK@"
 
 # Support substitution of the tools and libs dirs with user parameters. This is
 # used when we can't determine the tool dir at configuration time.
