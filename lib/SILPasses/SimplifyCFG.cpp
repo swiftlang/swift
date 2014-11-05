@@ -51,6 +51,9 @@ namespace {
     // WorklistMap keeps track of which slot a BB is in, allowing efficient
     // containment query, and allows efficient removal.
     llvm::SmallDenseMap<SILBasicBlock*, unsigned, 32> WorklistMap;
+    // Keep track of loop headers - we don't want to jump-thread through them.
+    SmallPtrSet<SILBasicBlock *, 32> LoopHeaders;
+
     // Dominance and post-dominance info for the current function
     DominanceInfo *DT;
     PostDominanceInfo *PDT;
@@ -99,6 +102,9 @@ namespace {
 
       // Remove it from the map as well.
       WorklistMap.erase(It);
+
+      if (LoopHeaders.count(BB))
+        LoopHeaders.erase(BB);
     }
 
     bool simplifyBlocks();
@@ -120,6 +126,7 @@ namespace {
     bool simplifyUnreachableBlock(UnreachableInst *UI);
     bool simplifyArgument(SILBasicBlock *BB, unsigned i);
     bool simplifyArgs(SILBasicBlock *BB);
+    void findLoopHeaders();
   };
 
   class RemoveUnreachable {
@@ -565,6 +572,45 @@ static bool isThreadableSwitchEnumInst(SwitchEnumInst *SEI,
   return SwitchDestBB0->getNumBBArg() == 0 && SwitchDestBB1->getNumBBArg() == 0;
 }
 
+void SimplifyCFG::findLoopHeaders() {
+  /// Find back edges in the CFG. This performs a dfs search and identifies
+  /// back edges as edges going to an ancestor in the dfs search. If a basic
+  /// block is the target of such a back edge we will identify it as a header.
+  LoopHeaders.clear();
+
+  SmallPtrSet<SILBasicBlock *, 16> Visited;
+  SmallPtrSet<SILBasicBlock *, 16> InDFSStack;
+  SmallVector<std::pair<SILBasicBlock *, SILBasicBlock::succ_iterator>, 16>
+      DFSStack;
+
+  auto EntryBB = &Fn.front();
+  DFSStack.push_back(std::make_pair(EntryBB, EntryBB->succ_begin()));
+  Visited.insert(EntryBB);
+  InDFSStack.insert(EntryBB);
+
+  while (!DFSStack.empty()) {
+    auto &D = DFSStack.back();
+    // No successors.
+    if (D.second == D.first->succ_end()) {
+      // Retreat the dfs search.
+      DFSStack.pop_back();
+      InDFSStack.erase(D.first);
+    } else {
+      // Visit the next successor.
+      SILBasicBlock *NextSucc = *(D.second);
+      if (Visited.insert(NextSucc)) {
+        InDFSStack.insert(NextSucc);
+        DFSStack.push_back(std::make_pair(NextSucc, NextSucc->succ_begin()));
+      } else if (InDFSStack.count(NextSucc)) {
+        // We have already visited this node and it is in our dfs search. This
+        // is a back-edge.
+        LoopHeaders.insert(NextSucc);
+      }
+      ++D.second;
+    }
+  }
+}
+
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
@@ -647,6 +693,10 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     }
   }
 
+  // Don't jump thread through a potential header - this can produce irreducible
+  // control flow.
+  if (!isThreadableEnumInst && LoopHeaders.count(DestBB))
+    return false;
 
   // Okay, it looks like we want to do this and we can.  Duplicate the
   // destination block into this one, rewriting uses of the BBArgs to use the
@@ -739,6 +789,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
   simplifyAfterDroppingPredecessor(DestBB);
+
   ++NumJumpThreads;
   return true;
 }
@@ -818,6 +869,9 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     for (auto &Succ : BB->getSuccs())
       addToWorklist(Succ);
 
+    if (LoopHeaders.count(DestBB))
+      LoopHeaders.insert(BB);
+
     removeFromWorklist(DestBB);
     DestBB->eraseFromParent();
     ++NumBlocksMerged;
@@ -832,6 +886,9 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
                                             BI->getArgs());
     // Eliminating the trampoline can expose opportuntities to improve the
     // new block we branch to.
+    if (LoopHeaders.count(DestBB))
+      LoopHeaders.insert(BB);
+
     addToWorklist(Br->getDestBB());
     BI->eraseFromParent();
     removeIfDead(DestBB);
@@ -888,6 +945,9 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                         Br->getDestBB(), BI->getTrueArgs(),
                         BI->getFalseBB(), BI->getFalseArgs());
     BI->eraseFromParent();
+
+    if (LoopHeaders.count(TrueSide))
+      LoopHeaders.insert(ThisBB);
     removeIfDead(TrueSide);
     addToWorklist(ThisBB);
     return true;
@@ -900,6 +960,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                         BI->getTrueBB(), BI->getTrueArgs(),
                         Br->getDestBB(), BI->getFalseArgs());
     BI->eraseFromParent();
+    if (LoopHeaders.count(FalseSide))
+      LoopHeaders.insert(ThisBB);
     removeIfDead(FalseSide);
     addToWorklist(ThisBB);
     return true;
@@ -1279,6 +1341,9 @@ bool SimplifyCFG::run() {
 
   // First remove any block not reachable from the entry.
   bool Changed = RU.run();
+
+  // Find the set of loop headers. We don't want to jump-thread through headers.
+  findLoopHeaders();
 
   DT = nullptr;
   PDT = nullptr;

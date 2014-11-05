@@ -539,13 +539,13 @@ bb7(%6 : $Builtin.Int64):
 }
 
 // CHECK-LABEL: sil @simplify_loop_header
-// CHECK: bb0:
-// CHECK:  cond_br {{.*}}, bb1, bb2(
-// CHECK: bb1:
+// CHECK: bb1(
+// CHECK:  cond_br {{.*}}, bb2, bb3
+// CHECK: bb2:
 // CHECK:  return
-// CHECK: bb2({{.*}}):
+// CHECK: bb3:
 // CHECK:  enum $Optional<Int>, #Optional.Some
-// CHECK:  cond_br {{.*}}, bb1, bb2(
+// CHECK:  br bb1(
 
 sil @simplify_loop_header : $@thin () -> () {
 bb0:
