@@ -55,6 +55,10 @@ module LinkMusket {
   link framework "Barrel"
 }
 
+module MissingHeader {
+  header "this-header-does-not-exist.h"
+}
+
 module ObjCIRExtras {
   header "ObjCIRExtras.h"
   export *

@@ -42,11 +42,11 @@ namespace {
                                ArrayRef<clang::CharSourceRange> Ranges,
                                const clang::SourceManager *SM,
                                clang::DiagOrStoredDiag Info) override {
-      if (SM->isInMainFile(Loc))
+      StringRef bufName = StringRef(SM->getBufferName(Loc));
+      if (bufName == ClangImporter::Implementation::moduleImportBufferName ||
+          bufName == ClangImporter::Implementation::bridgingHeaderBufferName) {
         return;
-      if (StringRef(SM->getBufferName(Loc)) ==
-          ClangImporter::Implementation::bridgingHeaderBufferName)
-        return;
+      }
       callback(clang::FullSourceLoc(Loc, *SM), Level, Message);
     }
 
@@ -213,17 +213,16 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   llvm::SmallString<128> message;
   clangDiag.FormatDiagnostic(message);
 
-  clang::SourceManager *clangSrcMgr =
-  clangDiag.hasSourceManager() ? &clangDiag.getSourceManager() : nullptr;
   if (clangDiag.getLocation().isInvalid()) {
     // Diagnostic about the compiler arguments.
-    emitDiag(clang::FullSourceLoc(clangDiag.getLocation(), *clangSrcMgr),
-             clangDiagLevel, message);
+    emitDiag(clang::FullSourceLoc(), clangDiagLevel, message);
+
   } else {
+    assert(clangDiag.hasSourceManager());
     ClangDiagRenderer renderer(ImporterImpl.getClangASTContext(),
                                std::cref(emitDiag));
     renderer.emitDiagnostic(clangDiag.getLocation(), clangDiagLevel, message,
                             clangDiag.getRanges(), clangDiag.getFixItHints(),
-                            clangSrcMgr);
+                            &clangDiag.getSourceManager());
   }
 }

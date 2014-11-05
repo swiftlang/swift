@@ -230,6 +230,8 @@ public:
   const bool InferImplicitProperties;
   const bool ImportForwardDeclarations;
 
+  constexpr static const char * const moduleImportBufferName =
+    "<swift-imported-modules>";
   constexpr static const char * const bridgingHeaderBufferName =
     "<bridging-header-import>";
 

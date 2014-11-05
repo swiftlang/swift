@@ -265,7 +265,7 @@ ClangImporter::create(ASTContext &ctx,
                              extraArgs.end());
   }
 
-  invocationArgStrs.push_back("<swift-imported-modules>");
+  invocationArgStrs.push_back(Implementation::moduleImportBufferName);
 
   if (triple.isOSDarwin()) {
     std::string minVersionBuf;
@@ -403,9 +403,11 @@ ClangImporter::create(ASTContext &ctx,
 
   // Create an almost-empty memory buffer.
   auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
-    "extern int __swift __attribute__((unavailable));");
-  invocation->getPreprocessorOpts().addRemappedFile("<swift-imported-modules>",
-                                                    sourceBuffer.release());
+    "extern int __swift __attribute__((unavailable));",
+    Implementation::moduleImportBufferName);
+  clang::PreprocessorOptions &ppOpts = invocation->getPreprocessorOpts();
+  ppOpts.addRemappedFile(Implementation::moduleImportBufferName,
+                         sourceBuffer.release());
 
   // Create a compiler instance.
   importer->Impl.Instance.reset(new CompilerInstance);
