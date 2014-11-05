@@ -35,7 +35,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 
@@ -646,8 +645,11 @@ namespace {
 
     /// Map the given element to the appropriate value in the
     /// discriminator type.
-    virtual llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target)
-      const = 0;
+    llvm::ConstantInt *getDiscriminatorIdxConst(EnumElementDecl *target) const {
+      int64_t index = getDiscriminatorIndex(target);
+      return llvm::ConstantInt::get(getDiscriminatorType(), index);
+    }
+    
 
   public:
     NoPayloadEnumImplStrategyBase(IRGenModule &IGM,
@@ -682,7 +684,7 @@ namespace {
       auto *i = IGF.Builder.CreateSwitch(discriminator, defaultDest,
                                          dests.size());
       for (auto &dest : dests)
-        i->addCase(getDiscriminatorIndex(dest.first), dest.second);
+        i->addCase(getDiscriminatorIdxConst(dest.first), dest.second);
 
       if (unreachableDefault) {
         IGF.Builder.emitBlock(defaultDest);
@@ -713,7 +715,7 @@ namespace {
                             EnumElementDecl *elt,
                             Explosion &params,
                             Explosion &out) const {
-      out.add(getDiscriminatorIndex(elt));
+      out.add(getDiscriminatorIdxConst(elt));
     }
 
     Address projectDataForStore(IRGenFunction &IGF,
@@ -730,7 +732,7 @@ namespace {
     void storeTag(IRGenFunction &IGF, EnumElementDecl *elt, Address enumAddr,
                   SILType T)
     const override {
-      llvm::Value *discriminator = getDiscriminatorIndex(elt);
+      llvm::Value *discriminator = getDiscriminatorIdxConst(elt);
       Address discriminatorAddr
         = IGF.Builder.CreateStructGEP(enumAddr, 0, Size(0));
       IGF.Builder.CreateStore(discriminator, discriminatorAddr);
@@ -780,7 +782,7 @@ namespace {
     llvm::BitVector getBitPatternForNoPayloadElement(IRGenModule &IGM,
                                                EnumElementDecl *theCase) const {
       auto bits
-        = getBitVectorFromAPInt(getDiscriminatorIndex(theCase)->getValue());
+        = getBitVectorFromAPInt(getDiscriminatorIdxConst(theCase)->getValue());
       bits.resize(cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
       return bits;
     }
@@ -798,19 +800,6 @@ namespace {
   class NoPayloadEnumImplStrategy final
     : public NoPayloadEnumImplStrategyBase
   {
-  protected:
-    llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target)
-    const override {
-      // The elements are assigned discriminators in declaration order.
-      // FIXME: using a linear search here is fairly ridiculous.
-      unsigned index = 0;
-      for (auto elt : target->getParentEnum()->getAllElements()) {
-        if (elt == target) break;
-        index++;
-      }
-      return llvm::ConstantInt::get(getDiscriminatorType(), index);
-    }
-
   public:
     NoPayloadEnumImplStrategy(IRGenModule &IGM,
                               TypeInfoKind tik, unsigned NumElements,
@@ -830,6 +819,24 @@ namespace {
                                      SILType Type,
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
+
+    // TODO: Support this function also for other enum implementation strategies.
+    int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
+      // The elements are assigned discriminators in declaration order.
+      // FIXME: using a linear search here is fairly ridiculous.
+      unsigned index = 0;
+      for (auto elt : target->getParentEnum()->getAllElements()) {
+        if (elt == target) break;
+        index++;
+      }
+      return index;
+    }
+
+    // TODO: Support this function also for other enum implementation strategies.
+    llvm::Value *emitExtractDiscriminator(IRGenFunction &IGF,
+                                          Explosion &value) const override {
+      return value.claimNext();
+    }
 
     /// \group Extra inhabitants for no-payload enums.
 
@@ -905,8 +912,7 @@ namespace {
     : public NoPayloadEnumImplStrategyBase
   {
   protected:
-    llvm::ConstantInt *getDiscriminatorIndex(EnumElementDecl *target)
-    const override {
+    int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
       // The elements are assigned discriminators ABI-compatible with their
       // raw values from C.
       assert(target->hasRawValueExpr()
@@ -920,7 +926,7 @@ namespace {
       if (intExpr->isNegative())
         intValue = -intValue;
 
-      return llvm::ConstantInt::get(intType->getContext(), intValue);
+      return intValue.getZExtValue();
     }
 
   public:
@@ -4302,16 +4308,6 @@ llvm::Value *UnpackEnumPayload::claim(llvm::Type *ty) {
   if (isa<llvm::PointerType>(ty))
     return IGF.Builder.CreateIntToPtr(unpacked, ty);
   return IGF.Builder.CreateBitCast(unpacked, ty);
-}
-
-void irgen::emitSwitchLoadableEnumDispatch(IRGenFunction &IGF,
-                                  SILType enumTy,
-                                  Explosion &enumValue,
-                                  ArrayRef<std::pair<EnumElementDecl *,
-                                                     llvm::BasicBlock *>> dests,
-                                  llvm::BasicBlock *defaultDest) {
-  getEnumImplStrategy(IGF.IGM, enumTy)
-    .emitValueSwitch(IGF, enumValue, dests, defaultDest);
 }
 
 void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,

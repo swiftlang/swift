@@ -2179,8 +2179,8 @@ void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
     = emitBBMapForSwitchEnum(*this, dests, inst);
   
   // Emit the dispatch.
-  emitSwitchLoadableEnumDispatch(*this, inst->getOperand().getType(),
-                                  value, dests, defaultDest);
+  auto &EIS = getEnumImplStrategy(IGM, inst->getOperand().getType());
+  EIS.emitValueSwitch(*this, value, dests, defaultDest);
   
   // Bind arguments for cases that want them.
   for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
@@ -2286,6 +2286,78 @@ emitBBMapForSelect(IRGenSILFunction &IGF,
   return contBB;
 }
 
+// Try to map the value of a select_enum directly to an int type with a simple
+// cast from the tag value to the result type. Optinally also by adding a
+// constant offset.
+// This is useful, e.g. for rawValue or hashValue of C-like enums.
+static llvm::Value *
+mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnumInst *inst) {
+
+  // All cases must be covered
+  if (inst->hasDefault())
+    return nullptr;
+  
+  auto &ti = IGF.getTypeInfo(inst->getType());
+  ExplosionSchema schema = ti.getSchema();
+
+  // Check if the select_enum's result is a single integer scalar.
+  if (schema.size() != 1)
+    return nullptr;
+  
+  if (!schema[0].isScalar())
+    return nullptr;
+  
+  llvm::Type *type = schema[0].getScalarType();
+  llvm::IntegerType *resultType = dyn_cast<llvm::IntegerType>(type);
+  if (!resultType)
+    return nullptr;
+  
+  // Check if the case values directly map to the tag values, maybe with a
+  // constant offset.
+  APInt commonOffset;
+  bool offsetValid = false;
+
+  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
+    auto casePair = inst->getCase(i);
+
+    int64_t index = EIS.getDiscriminatorIndex(casePair.first);
+    if (index < 0)
+      return nullptr;
+    
+    IntegerLiteralInst *intLit = dyn_cast<IntegerLiteralInst>(casePair.second.getDef());
+    if (!intLit)
+      return nullptr;
+    
+    APInt caseValue = intLit->getValue();
+    APInt offset = caseValue - index;
+    if (offsetValid) {
+      if (offset != commonOffset)
+        return nullptr;
+    } else {
+      commonOffset = offset;
+      offsetValid = true;
+    }
+  }
+  
+  // Ask the enum implementation strategy to extract the enum tag as an integer
+  // value.
+  Explosion enumValue = IGF.getLoweredExplosion(inst->getEnumOperand());
+  llvm::Value *result = EIS.emitExtractDiscriminator(IGF, enumValue);
+  if (!result) {
+    enumValue.claimAll();
+    return nullptr;
+  }
+
+  // Cast to the result type.
+  result = IGF.Builder.CreateIntCast(result, resultType, false);
+  if (commonOffset != 0) {
+    // The the offset, if any.
+    auto *offsetConst = llvm::ConstantInt::get(resultType, commonOffset);
+    result = IGF.Builder.CreateAdd(result, offsetConst);
+  }
+  return result;
+}
+
 template <class C, class T>
 static LoweredValue
 getLoweredValueForSelect(IRGenSILFunction &IGF,
@@ -2298,23 +2370,27 @@ getLoweredValueForSelect(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
-  Explosion value = getLoweredExplosion(inst->getEnumOperand());
-
-  // Map the SIL dest bbs to their LLVM bbs.
-  SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
-  llvm::BasicBlock *defaultDest;
+  auto &EIS = getEnumImplStrategy(IGM, inst->getEnumOperand().getType());
   Explosion result;
-  llvm::BasicBlock *contBB
-    = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
-  
-  // Emit the dispatch.
-  emitSwitchLoadableEnumDispatch(*this, inst->getEnumOperand().getType(),
-                                  value, dests, defaultDest);
 
-  // emitBBMapForSelectEnum set up a continuation block and phi nodes to
-  // receive the result.
-  Builder.SetInsertPoint(contBB);
+  if (llvm::Value *R = mapTriviallyToInt(*this, EIS, inst)) {
+    result.add(R);
+  } else {
+    Explosion value = getLoweredExplosion(inst->getEnumOperand());
 
+    // Map the SIL dest bbs to their LLVM bbs.
+    SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
+    llvm::BasicBlock *defaultDest;
+    llvm::BasicBlock *contBB
+      = emitBBMapForSelect(*this, result, dests, defaultDest, inst);
+    
+    // Emit the dispatch.
+    EIS.emitValueSwitch(*this, value, dests, defaultDest);
+
+    // emitBBMapForSelectEnum set up a continuation block and phi nodes to
+    // receive the result.
+    Builder.SetInsertPoint(contBB);
+  }
   setLoweredValue(SILValue(inst, 0),
                   getLoweredValueForSelect(*this, result, inst));
 }

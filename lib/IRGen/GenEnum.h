@@ -30,6 +30,8 @@
 
 #include "TypeInfo.h"
 
+#include "llvm/IR/DerivedTypes.h"
+
 namespace llvm {
   class BasicBlock;
   class BitVector;
@@ -112,14 +114,6 @@ public:
     return claim(ty);
   }
 };
-
-/// \brief Emit the dispatch branch(es) for a loadable enum.
-void emitSwitchLoadableEnumDispatch(IRGenFunction &IGF,
-                                     SILType enumTy,
-                                     Explosion &enumValue,
-                                     ArrayRef<std::pair<EnumElementDecl*,
-                                                      llvm::BasicBlock*>> dests,
-                                     llvm::BasicBlock *defaultDest);
 
 /// \brief Emit the dispatch branch(es) for an address-only enum.
 void emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
@@ -285,6 +279,13 @@ public:
     return ElementsWithNoPayload;
   }
   
+  /// Map the given element to the appropriate index in the
+  /// discriminator type.
+  /// Returns -1 if this is not supported by the enum implementation.
+  virtual int64_t getDiscriminatorIndex(EnumElementDecl *target) const {
+    return -1;
+  }
+
   /// \brief Return the bits used for discriminators for payload cases.
   ///
   /// These bits are populated in increasing value according to the order of
@@ -335,7 +336,14 @@ public:
                                   ArrayRef<std::pair<EnumElementDecl*,
                                                      llvm::BasicBlock*>> dests,
                                   llvm::BasicBlock *defaultDest) const = 0;
-  
+
+  /// Emit code to extract the discriminator as an integer value.
+  /// Returns null if this is not supported by the enum implementation.
+  virtual llvm::Value *emitExtractDiscriminator(IRGenFunction &IGF,
+                                                Explosion &value) const {
+    return nullptr;
+  }
+
   /// \group Loadable enum operations
   
   /// Emit the construction sequence for an enum case into an explosion.
