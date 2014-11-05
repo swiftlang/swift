@@ -300,7 +300,7 @@ public:
   llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto,
                                            ForDefinition_t forDefinition);
   void addUsedGlobal(llvm::GlobalValue *global);
-  void addObjCClass(llvm::Constant *addr);
+  void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addProtocolConformanceRecord(llvm::Constant *record);
 
 private:
@@ -326,6 +326,9 @@ private:
 
   /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakVH, 4> ObjCClasses;
+  /// List of Objective-C classes that require nonlazy realization, bitcast to
+  /// i8*.
+  SmallVector<llvm::WeakVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakVH, 4> ObjCCategories;
   /// List of protocol conformance records.

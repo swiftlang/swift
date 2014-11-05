@@ -15,6 +15,9 @@ import SwiftShims
 /// Class used whose sole instance is used as storage for empty
 /// arrays.  The instance is defined in the runtime and statically
 /// initialized.  See stdlib/runtime/GlobalObjects.cpp for details.
+/// Because it's statically referenced, it requires nonlazy realization
+/// by the Objective-C runtime.
+@objc_non_lazy_realization
 internal final class _EmptyArrayStorage
   : _ContiguousArrayStorageBase {
 

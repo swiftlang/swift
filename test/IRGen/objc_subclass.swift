@@ -139,7 +139,7 @@
 
 // CHECK: @objc_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass10SwiftGizmo to %swift.full_heapmetadata*), i32 0, i32 2) to i8*), i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass11SwiftGizmo2 to %swift.full_heapmetadata*), i32 0, i32 2) to i8*)], section "__DATA, __objc_classlist, regular, no_dead_strip", align 8
 
-// CHECK: @objc_non_lazy_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass10SwiftGizmo to %swift.full_heapmetadata*), i32 0, i32 2) to i8*), i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass11SwiftGizmo2 to %swift.full_heapmetadata*), i32 0, i32 2) to i8*)], section "__DATA, __objc_nlclslist, regular, no_dead_strip", align 8
+// CHECK: @objc_non_lazy_classes = internal global [1 x i8*] [i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass11SwiftGizmo2 to %swift.full_heapmetadata*), i32 0, i32 2) to i8*)], section "__DATA, __objc_nlclslist, regular, no_dead_strip", align 8
 
 import gizmo
 
@@ -189,6 +189,7 @@ class GenericGizmo<T> : Gizmo {
 var sg = SwiftGizmo()
 sg.duplicate()
 
+@objc_non_lazy_realization
 class SwiftGizmo2 : Gizmo {
   var sg : SwiftGizmo
 

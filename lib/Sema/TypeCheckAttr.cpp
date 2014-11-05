@@ -63,6 +63,7 @@ public:
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
+  IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
@@ -544,6 +545,7 @@ public:
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)
     IGNORED_ATTR(ObjCBridged)
+    IGNORED_ATTR(ObjCNonLazyRealization)
     IGNORED_ATTR(Optional)
     IGNORED_ATTR(Ownership)
     IGNORED_ATTR(Override)

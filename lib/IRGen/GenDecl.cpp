@@ -392,8 +392,10 @@ void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
 }
 
 /// Add the given global value to the Objective-C class list.
-void IRGenModule::addObjCClass(llvm::Constant *classPtr) {
+void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
   ObjCClasses.push_back(classPtr);
+  if (nonlazy)
+    ObjCNonLazyClasses.push_back(classPtr);
 }
 
 /// Add the given protocol conformance record to the protocol conformances list.
@@ -416,10 +418,10 @@ void IRGenModule::emitGlobalLists() {
                  Int8PtrTy,
                  false);
 
-  // FIXME: We also emit the class references in a second magic section to make
-  // sure they are "realized" by the Objective-C runtime before any instances
+  // Emit nonlazily realized class references in a second magic section to make
+  // sure they are realized by the Objective-C runtime before any instances
   // are allocated.
-  emitGlobalList(*this, ObjCClasses, "objc_non_lazy_classes",
+  emitGlobalList(*this, ObjCNonLazyClasses, "objc_non_lazy_classes",
                  "__DATA, __objc_nlclslist, regular, no_dead_strip",
                  llvm::GlobalValue::InternalLinkage,
                  Int8PtrTy,
