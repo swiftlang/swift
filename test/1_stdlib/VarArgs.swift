@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -interpret -parse-stdlib -module-cache-path %t/clang-module-cache -sdk %sdk %s | FileCheck %s
+// RUN: %swift -interpret -parse-stdlib -module-cache-path %t/clang-module-cache -sdk %sdk -target %target-triple %s | FileCheck %s
 // REQUIRES: swift_interpreter
 // REQUIRES: sdk
 

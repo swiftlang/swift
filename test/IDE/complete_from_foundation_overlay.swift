@@ -1,11 +1,11 @@
 import Foundation
 
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift-ide-test -sdk=%sdk -module-cache-path %t/clang-module-cache -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
+// RUN: %swift-ide-test -sdk %sdk -target %target-triple -module-cache-path %t/clang-module-cache -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.toplevel.txt
 
-// RUN: %swift-ide-test -sdk=%sdk -module-cache-path %t/clang-module-cache -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_1 > %t.members.txt
+// RUN: %swift-ide-test -sdk %sdk -target %target-triple -module-cache-path %t/clang-module-cache -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_1 > %t.members.txt
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_1 < %t.members.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members.txt
 

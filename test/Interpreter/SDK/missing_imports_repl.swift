@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: touch %t/Corrupted_Module.swiftmodule
-// RUN: not %swift -sdk %sdk -I %t -repl <%s 2>%t/stderr.txt | FileCheck %s
+// RUN: not %swift -sdk %sdk -target %target-triple -I %t -repl <%s 2>%t/stderr.txt | FileCheck %s
 // RUN: FileCheck -check-prefix CHECK-ERROR %s < %t/stderr.txt
 // REQUIRES: sdk
 // REQUIRES: swift_repl
