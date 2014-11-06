@@ -1362,7 +1362,7 @@ struct ForeignTypeMetadata : public Metadata {
   }
   
   const ForeignTypeMetadata *getCachedUniqueMetadata() const {
-#if 0 || __alpha__
+#if __alpha__
     // TODO: This can be a relaxed-order load if there is no initialization
     // function. On platforms we care about, consume is no more expensive than
     // relaxed, so there's no reason to branch here (and LLVM isn't smart
@@ -1384,7 +1384,8 @@ struct ForeignTypeMetadata : public Metadata {
     
     // Otherwise, we need a release store to publish the result of
     // initialization
-    asFullMetadata(this)->Unique.store(unique, std::memory_order_release);
+    else
+      asFullMetadata(this)->Unique.store(unique, std::memory_order_release);
   }
   
   size_t getFlags() const {

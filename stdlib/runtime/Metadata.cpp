@@ -2016,7 +2016,7 @@ static pthread_mutex_t ForeignTypesLock = PTHREAD_MUTEX_INITIALIZER;
 static llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> ForeignTypes;
 
 const ForeignTypeMetadata *
-swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {  
+swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   // Fast path: check the invasive cache.
   if (auto unique = nonUnique->getCachedUniqueMetadata()) {
     return unique;
