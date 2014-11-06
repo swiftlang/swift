@@ -354,7 +354,9 @@ extension _ArrayBuffer {
   public
   subscript(i: Int) -> T {
     get {
-      _typeCheck(i...i)
+      if _isClassOrObjCExistential(T.self) {
+        _typeCheck(i...i)
+      }
       if _fastPath(_isNative) {
         return _native[i]
       }
