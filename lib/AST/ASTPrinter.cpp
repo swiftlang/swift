@@ -2623,22 +2623,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "unresolved";
   case CheckedCastKind::Coercion:
     return "coercion";
-  case CheckedCastKind::Downcast:
-    return "downcast";
-  case CheckedCastKind::SuperToArchetype:
-    return "super_to_archetype";
-  case CheckedCastKind::ArchetypeToArchetype:
-    return "archetype_to_archetype";
-  case CheckedCastKind::ArchetypeToConcrete:
-    return "archetype_to_concrete";
-  case CheckedCastKind::ExistentialToArchetype:
-    return "existential_to_archetype";
-  case CheckedCastKind::ExistentialToConcrete:
-    return "existential_to_concrete";
-  case CheckedCastKind::ConcreteToArchetype:
-    return "concrete_to_archetype";
-  case CheckedCastKind::ConcreteToUnrelatedExistential:
-    return "concrete_to_unrelated_existential";
+  case CheckedCastKind::ValueCast:
+    return "value_cast";
   case CheckedCastKind::ArrayDowncast:
     return "array_downcast";
   case CheckedCastKind::DictionaryDowncast:

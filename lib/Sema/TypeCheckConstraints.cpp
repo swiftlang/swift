@@ -2013,7 +2013,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         goto unsupported_existential_cast;
     }
     
-    return CheckedCastKind::ConcreteToUnrelatedExistential;
+    return CheckedCastKind::ValueCast;
     
   unsupported_existential_cast:
     diagnose(diagLoc, diag::downcast_to_non_objc_existential,
@@ -2026,24 +2026,24 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // A downcast can:
   //   - convert an archetype to a (different) archetype type.
   if (fromArchetype && toArchetype) {
-    return CheckedCastKind::ArchetypeToArchetype;
+    return CheckedCastKind::ValueCast;
   }
 
   //   - convert from an existential to an archetype or conforming concrete
   //     type.
   if (fromExistential) {
     if (toArchetype) {
-      return CheckedCastKind::ExistentialToArchetype;
+      return CheckedCastKind::ValueCast;
     } 
 
     if (isSubtypeOf(toType, fromType, dc)) {
-      return CheckedCastKind::ExistentialToConcrete;
+      return CheckedCastKind::ValueCast;
     } 
 
     if (Type objCClass 
                = getDynamicBridgedThroughObjCClass(dc, fromType, toType)) {
       if (isSubtypeOf(objCClass, fromType, dc))
-        return CheckedCastKind::ExistentialToConcrete;
+        return CheckedCastKind::ValueCast;
     }
     
     diagnose(diagLoc,
@@ -2064,7 +2064,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         .highlight(diagToRange);
       return CheckedCastKind::Unresolved;
     }
-    return CheckedCastKind::ArchetypeToConcrete;
+    return CheckedCastKind::ValueCast;
   }
   
   if (toArchetype) {
@@ -2074,13 +2074,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       if (convertToType(toSuperType))
         return CheckedCastKind::Unresolved;
       
-      return CheckedCastKind::SuperToArchetype;
+      return CheckedCastKind::ValueCast;
     }
     
     //  - convert a concrete type to an archetype for which it fulfills
     //    constraints.
     if (isSubstitutableFor(fromType, toType->castTo<ArchetypeType>(), dc)) {
-      return CheckedCastKind::ConcreteToArchetype;
+      return CheckedCastKind::ValueCast;
     }
     
     diagnose(diagLoc,
@@ -2119,7 +2119,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // If the destination type is a subtype of the source type, we have
   // a downcast.
   if (isSubtypeOf(toType, fromType, dc)) {
-    return CheckedCastKind::Downcast;
+    return CheckedCastKind::ValueCast;
   }
 
   // If we can bridge through an Objective-C class, do so.

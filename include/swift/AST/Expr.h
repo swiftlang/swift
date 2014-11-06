@@ -61,6 +61,9 @@ enum class ExprKind : uint8_t {
 };
   
 /// Discriminates the different kinds of checked cast supported.
+///
+/// This enumeration should not exist. Only the collection downcast kinds are
+/// currently significant. Please don't add new kinds.
 enum class CheckedCastKind : unsigned {
   /// The kind has not been determined yet.
   Unresolved,
@@ -70,24 +73,8 @@ enum class CheckedCastKind : unsigned {
 
   /// The requested cast is an implicit conversion, so this is a coercion.
   Coercion = First_Resolved,
-  /// A cast from a class to one of its subclasses.
-  Downcast,
-  /// A cast from a class to a type parameter constrained by that class as a
-  /// superclass.
-  SuperToArchetype,
-  /// A cast from a type parameter to another type parameter.
-  ArchetypeToArchetype,
-  /// A cast from a type parameter to a concrete type.
-  ArchetypeToConcrete,
-  /// A cast from an existential type to a type parameter.
-  ExistentialToArchetype,
-  /// A cast from an existential type to a concrete type.
-  ExistentialToConcrete,
-  /// A cast from a concrete type to a type parameter.
-  ConcreteToArchetype,
-  /// A cast from a concrete type to an existential type it is not statically
-  /// known to conform to.
-  ConcreteToUnrelatedExistential,
+  /// A non-value-changing checked cast.
+  ValueCast,
   // A downcast from an array type to another array type.
   ArrayDowncast,
   // A downcast from a dictionary type to another dictionary type.

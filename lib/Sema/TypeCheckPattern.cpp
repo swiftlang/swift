@@ -941,6 +941,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                IP->getCastTypeLoc().getType());
       return nullptr;
 
+    // Valid checks.
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::DictionaryDowncastBridged:
@@ -948,15 +949,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                *this, P, dc, type,
                subOptions|TR_FromNonInferredPattern);
 
-    // Valid checks.
-    case CheckedCastKind::Downcast:
-    case CheckedCastKind::SuperToArchetype:
-    case CheckedCastKind::ArchetypeToArchetype:
-    case CheckedCastKind::ArchetypeToConcrete:
-    case CheckedCastKind::ExistentialToArchetype:
-    case CheckedCastKind::ExistentialToConcrete:
-    case CheckedCastKind::ConcreteToArchetype:
-    case CheckedCastKind::ConcreteToUnrelatedExistential:
+    case CheckedCastKind::ValueCast:
     case CheckedCastKind::BridgeFromObjectiveC:
       IP->setCastKind(castKind);
       break;

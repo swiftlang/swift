@@ -2622,14 +2622,7 @@ namespace {
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
-      case CheckedCastKind::Downcast:
-      case CheckedCastKind::SuperToArchetype:
-      case CheckedCastKind::ArchetypeToArchetype:
-      case CheckedCastKind::ArchetypeToConcrete:
-      case CheckedCastKind::ExistentialToArchetype:
-      case CheckedCastKind::ExistentialToConcrete:
-      case CheckedCastKind::ConcreteToArchetype:
-      case CheckedCastKind::ConcreteToUnrelatedExistential:
+      case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         // Valid checks.
         expr->setCastKind(castKind);
@@ -2859,14 +2852,7 @@ namespace {
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
-      case CheckedCastKind::Downcast:
-      case CheckedCastKind::SuperToArchetype:
-      case CheckedCastKind::ArchetypeToArchetype:
-      case CheckedCastKind::ArchetypeToConcrete:
-      case CheckedCastKind::ExistentialToArchetype:
-      case CheckedCastKind::ExistentialToConcrete:
-      case CheckedCastKind::ConcreteToArchetype:
-      case CheckedCastKind::ConcreteToUnrelatedExistential:
+      case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         break;
       }
@@ -2940,14 +2926,7 @@ namespace {
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
-      case CheckedCastKind::Downcast:
-      case CheckedCastKind::SuperToArchetype:
-      case CheckedCastKind::ArchetypeToArchetype:
-      case CheckedCastKind::ArchetypeToConcrete:
-      case CheckedCastKind::ExistentialToArchetype:
-      case CheckedCastKind::ExistentialToConcrete:
-      case CheckedCastKind::ConcreteToArchetype:
-      case CheckedCastKind::ConcreteToUnrelatedExistential:
+      case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         expr->setCastKind(castKind);
         break;

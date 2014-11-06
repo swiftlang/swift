@@ -2226,8 +2226,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 /// This routine does not attempt to check whether the cast can actually
 /// succeed; that's the caller's responsibility.
 static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
-                                                    Type fromType,
-                                                    Type toType) {
+                                          Type fromType,
+                                          Type toType,
+                                          // FIXME
+                                          bool &isDowncast) {
+  isDowncast = false;
   // Classify the from/to types.
   bool toArchetype = toType->is<ArchetypeType>();
   bool fromArchetype = fromType->is<ArchetypeType>();
@@ -2254,39 +2257,40 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
   // objc and the source type is an objc class or an existential bounded by objc
   // protocols.
   if (toExistential) {
-    return CheckedCastKind::ConcreteToUnrelatedExistential;
+    return CheckedCastKind::ValueCast;
   }
 
   // A downcast can:
   //   - convert an archetype to a (different) archetype type.
   if (fromArchetype && toArchetype) {
-    return CheckedCastKind::ArchetypeToArchetype;
+    return CheckedCastKind::ValueCast;
   }
 
   //   - convert from an existential to an archetype or conforming concrete
   //     type.
   if (fromExistential) {
     if (toArchetype) {
-      return CheckedCastKind::ExistentialToArchetype;
+      return CheckedCastKind::ValueCast;
     }
 
-    return CheckedCastKind::ExistentialToConcrete;
+    isDowncast = true;
+    return CheckedCastKind::ValueCast;
   }
 
   //   - convert an archetype to a concrete type fulfilling its constraints.
   if (fromArchetype) {
-    return CheckedCastKind::ArchetypeToConcrete;
+    return CheckedCastKind::ValueCast;
   }
 
   if (toArchetype) {
     //   - convert from a superclass to an archetype.
     if (toType->castTo<ArchetypeType>()->getSuperclass()) {
-      return CheckedCastKind::SuperToArchetype;
+      return CheckedCastKind::ValueCast;
     }
 
     //  - convert a concrete type to an archetype for which it fulfills
     //    constraints.
-    return CheckedCastKind::ConcreteToArchetype;
+    return CheckedCastKind::ValueCast;
   }
 
   // The remaining case is a class downcast.
@@ -2295,7 +2299,8 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
   assert(!fromExistential && "existentials should have been handled above");
   assert(!toExistential && "existentials should have been handled above");
 
-  return CheckedCastKind::Downcast;
+  isDowncast = true;
+  return CheckedCastKind::ValueCast;
 
 }
 
@@ -2354,7 +2359,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       break;
   } while (true);
 
-  auto kind = getCheckedCastKind(this, fromType, toType);
+  bool isDowncast;
+  auto kind = getCheckedCastKind(this, fromType, toType, isDowncast);
   switch (kind) {
   case CheckedCastKind::ArrayDowncast: {
     auto fromBaseType = getBaseTypeForArrayType(fromType.getPointer());
@@ -2421,23 +2427,13 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       return SolutionKind::Error;
     }
   }
-  case CheckedCastKind::ArchetypeToArchetype:
-  case CheckedCastKind::ConcreteToUnrelatedExistential:
-  case CheckedCastKind::ExistentialToArchetype:
-  case CheckedCastKind::SuperToArchetype:
+      
+  case CheckedCastKind::ValueCast:
+    if (isDowncast) {
+      addConstraint(ConstraintKind::Subtype, toType, fromType,
+              getConstraintLocator(locator));
+    }
     return SolutionKind::Solved;
-
-  case CheckedCastKind::ArchetypeToConcrete:
-  case CheckedCastKind::ConcreteToArchetype:
-    // FIXME: Check substitutability.
-    return SolutionKind::Solved;
-
-  case CheckedCastKind::Downcast:
-  case CheckedCastKind::ExistentialToConcrete: {
-    addConstraint(ConstraintKind::Subtype, toType, fromType,
-                  getConstraintLocator(locator));
-    return SolutionKind::Solved;
-  }
 
   case CheckedCastKind::BridgeFromObjectiveC: {
     // This existential-to-concrete cast might bridge through an Objective-C
