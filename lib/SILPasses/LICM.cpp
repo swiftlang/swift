@@ -192,7 +192,9 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   WriteSet Writes;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
-
+      // Ignore fix_lifetime instructions.
+      if (isa<FixLifetimeInst>(&Inst))
+        continue;
       // Collect loads.
       auto LI = dyn_cast<LoadInst>(&Inst);
       if (LI) {
@@ -204,7 +206,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       // Remove clobbered loads we have seen before.
       removeWrittenTo(AA, Reads, &Inst);
 
-      if (Inst.mayHaveSideEffects())
+      if (mayHaveSideEffects(&Inst))
         Writes.push_back(&Inst);
     }
   }
@@ -285,6 +287,70 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   return false;
 }
 
+static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
+                           SILLoopInfo *LI) {
+  DEBUG(llvm::errs() << "Sink fix_lifetime attempt\n");
+  auto HeaderBB = Loop->getHeader();
+  if (!HeaderBB)
+    return false;
+
+  auto Preheader = Loop->getLoopPreheader();
+  if (!Preheader)
+    return false;
+
+  // Only handle innermost loops for now.
+  if (!Loop->getSubLoops().empty())
+    return false;
+
+  // Only handle single exit blocks for now.
+  auto *ExitBB = Loop->getExitBlock();
+  if (!ExitBB)
+    return false;
+  auto *ExitingBB = Loop->getExitingBlock();
+  if (!ExitingBB)
+    return false;
+
+  // We can sink fix_lifetime instructions if there are no reference counting
+  // instructions in the loop.
+  SmallVector<FixLifetimeInst *, 16> FixLifetimeInsts;
+  for (auto *BB : Loop->getBlocks()) {
+    for (auto &Inst : *BB) {
+      if (auto FLI = dyn_cast<FixLifetimeInst>(&Inst)) {
+        FixLifetimeInsts.push_back(FLI);
+      } else if (mayHaveSideEffects(&Inst) && !isa<LoadInst>(&Inst) &&
+                 !isa<StoreInst>(&Inst)) {
+        DEBUG(llvm::errs() << " mayhavesideeffects because of" << Inst);
+        DEBUG(Inst.getParent()->dump());
+        return false;
+      }
+    }
+  }
+
+  // Sink the fix_lifetime instruction.
+  bool Changed = false;
+  for (auto *FLI : FixLifetimeInsts)
+    if (DomTree->dominates(FLI->getOperand().getDef()->getParentBB(),
+                           Preheader)) {
+      auto Succs = ExitingBB->getSuccs();
+      for (unsigned EdgeIdx = 0; EdgeIdx <  Succs.size(); ++EdgeIdx) {
+        SILBasicBlock *BB = Succs[EdgeIdx];
+        if (BB == ExitBB) {
+          auto *SplitBB = splitCriticalEdge(ExitingBB->getTerminator(), EdgeIdx,
+                                            DomTree, LI);
+          auto *OutsideBB = SplitBB ? SplitBB : ExitBB;
+          // Update the ExitBB.
+          ExitBB = OutsideBB;
+          DEBUG(llvm::errs() << " moving fix_lifetime to exit BB " << *FLI);
+          FLI->moveBefore(&*OutsideBB->begin());
+          Changed = true;
+        }
+      }
+    } else {
+        DEBUG(llvm::errs() << " does not dominate " << *FLI);
+    }
+  return Changed;
+}
+
 namespace {
 /// Hoist loop invariant code out of innermost loops.
 class LICM : public SILFunctionTransform {
@@ -332,6 +398,7 @@ public:
         Changed |= sinkCondFail(work);
         Changed |= hoistInstructions(work, DT, LI, AA,
                                      ShouldVerify);
+        Changed |= sinkFixLiftime(work, DT, LI);
       }
     }
 
