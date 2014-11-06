@@ -636,21 +636,22 @@ struct _ParentProcess {
         default:
           preconditionFailure("unreachable")
         }
-        if testPassed {
-          if let crashOutputMatches = t.crashOutputMatches {
-            // If we still think that the test passed, check if the crash
-            // output matches our expectations.
+        if testPassed && t.crashOutputMatches.count > 0 {
+          // If we still think that the test passed, check if the crash
+          // output matches our expectations.
+          var crashOutput = crashStdout + crashStderr
+          for expectedCrashOutput in t.crashOutputMatches {
             var found = false
-            for s in crashStdout + crashStderr {
-              if findSubstring(s, crashOutputMatches) != nil {
+            for s in crashOutput {
+              if findSubstring(s, expectedCrashOutput) != nil {
                 found = true
                 break
               }
             }
             if !found {
-              println("did not find expected string \(crashOutputMatches.debugDescription)")
+              println("did not find expected string after crash: \(expectedCrashOutput)")
+              testPassed = false
             }
-            testPassed = found
           }
         }
 
@@ -743,7 +744,7 @@ public class TestSuite {
     let name: String
     let xfail: _UnitTestArray<TestRunPredicate>
     let skip: _UnitTestArray<TestRunPredicate>
-    let crashOutputMatches: String?
+    let crashOutputMatches: [String] = []
     let code: () -> ()
 
     func getActiveXFailPredicates() -> _UnitTestArray<TestRunPredicate> {
@@ -763,7 +764,7 @@ public class TestSuite {
     class _Data {
       var _xfail: _UnitTestArray<TestRunPredicate> = []
       var _skip: _UnitTestArray<TestRunPredicate> = []
-      var _crashOutputMatches: String?
+      var _crashOutputMatches: [String] = []
     }
 
     init(testSuite: TestSuite, name: String) {
@@ -782,7 +783,7 @@ public class TestSuite {
     }
 
     public func crashOutputMatches(string: String) -> _TestBuilder {
-      _data._crashOutputMatches = string
+      _data._crashOutputMatches.append(string)
       return self
     }
 
