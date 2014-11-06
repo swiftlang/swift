@@ -591,10 +591,6 @@ function(compile_swift_files)
     EXTERNAL_OBJECT true
     LANGUAGE C
     OBJECT_DEPENDS "${source_files}")
-
-  # Make sure this object file gets cleaned up.
-  set_directory_properties(
-    PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile};${module_file}")
 endfunction()
 
 # Compute the library subdirectory to use for the given sdk and
