@@ -60,13 +60,6 @@ namespace irgen {
                                       SILType fromType, SILType toType,
                                       CheckedCastMode mode);
 
-  /// \brief Convert the given explosion to the given destination archetype,
-  /// using a runtime-checked cast.
-  llvm::Value *emitSuperToClassArchetypeConversion(IRGenFunction &IGF,
-                                                   llvm::Value *super,
-                                                   SILType destType,
-                                                   CheckedCastMode mode);
-
   /// Emit a checked cast of a metatype.
   llvm::Value *emitMetatypeDowncast(IRGenFunction &IGF,
                                     llvm::Value *metatype,

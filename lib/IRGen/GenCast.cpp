@@ -76,17 +76,6 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
   return call;
 }
 
-llvm::Value *irgen::emitSuperToClassArchetypeConversion(IRGenFunction &IGF,
-                                                        llvm::Value *super,
-                                                        SILType destType,
-                                                        CheckedCastMode mode) {
-  assert(destType.is<ArchetypeType>() && "expected archetype type");
-  assert(destType.castTo<ArchetypeType>()->requiresClass()
-         && "expected class archetype type");
-
-  return emitClassDowncast(IGF, super, destType, mode);
-}
-
 llvm::Value *irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                            llvm::Value *from,
                                            SILType fromType,
