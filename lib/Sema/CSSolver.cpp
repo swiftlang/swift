@@ -594,9 +594,8 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::Conjunction:
   case ConstraintKind::Disjunction:
-    assert(false && "shouldBindToValueType() may only be called on "
-                    "relational constraints");
-    return false;
+    llvm_unreachable("shouldBindToValueType() may only be called on "
+                     "relational constraints");
   }
 }
 
