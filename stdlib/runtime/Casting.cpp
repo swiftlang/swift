@@ -351,19 +351,6 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   return true;
 }
 
-static const OpaqueValue *
-_dynamicCastToExistential(const OpaqueValue *value,
-                          const Metadata *sourceType,
-                          const ExistentialTypeMetadata *targetType) {
-  for (unsigned i = 0, n = targetType->Protocols.NumProtocols; i != n; ++i) {
-    auto *protocol = targetType->Protocols[i];
-    if (!_conformsToProtocol(value, sourceType, protocol, nullptr))
-      return nullptr;
-  }
-
-  return value;
-}
-
 static bool shouldDeallocateSource(bool castSucceeded, DynamicCastFlags flags) {
   return (castSucceeded && (flags & DynamicCastFlags::TakeOnSuccess)) ||
         (!castSucceeded && (flags & DynamicCastFlags::DestroyOnFailure));
