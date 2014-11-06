@@ -15,6 +15,10 @@ func ternary<T>(cond: Bool,
 ternary(false, 1, 2.5)
 ternary(false, 2.5, 1)
 
+// <rdar://problem/18447543>
+ternary(false, 1, 2 as Int32)
+ternary(false, 1, 2 as Float)
+
 func genericFloatingLiteral<T : FloatLiteralConvertible>(x: T) {
   var x2 : T = 2.5
 }

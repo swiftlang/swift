@@ -562,6 +562,44 @@ static bool typeVarOccursInType(ConstraintSystem &cs, TypeVariableType *typeVar,
   return result;
 }
 
+/// \brief Return whether a relational constraint between a type variable and a
+/// trivial wrapper type (autoclosure, unary tuple) should result in the type
+/// variable being potentially bound to the value type, as opposed to the
+/// wrapper type.
+static bool shouldBindToValueType(Constraint *constraint)
+{
+  switch (constraint->getKind()) {
+  case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OperatorArgumentTupleConversion:
+  case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::ArgumentTupleConversion:
+  case ConstraintKind::Conversion:
+  case ConstraintKind::Subtype:
+    return true;
+  case ConstraintKind::Bind:
+  case ConstraintKind::Equal:
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::CheckedCast:
+  case ConstraintKind::SelfObjectOfProtocol:
+  case ConstraintKind::ApplicableFunction:
+  case ConstraintKind::BindOverload:
+  case ConstraintKind::OptionalObject:
+    return false;
+  case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
+  case ConstraintKind::TypeMember:
+  case ConstraintKind::Archetype:
+  case ConstraintKind::Class:
+  case ConstraintKind::BridgedToObjectiveC:
+  case ConstraintKind::Conjunction:
+  case ConstraintKind::Disjunction:
+    assert(false && "shouldBindToValueType() may only be called on "
+                    "relational constraints");
+    return false;
+  }
+}
+
 /// \brief Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
@@ -756,12 +794,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     // Don't deduce autoclosure types or single-element, non-variadic
     // tuples.
-    if (constraint->getKind() == ConstraintKind::OperatorArgumentConversion ||
-        constraint->getKind()
-          == ConstraintKind::OperatorArgumentTupleConversion ||
-        constraint->getKind() == ConstraintKind::ArgumentTupleConversion ||
-        constraint->getKind() == ConstraintKind::Conversion ||
-        constraint->getKind() == ConstraintKind::Subtype) {
+    if (shouldBindToValueType(constraint)) {
       if (auto funcTy = type->getAs<FunctionType>()) {
         if (funcTy->isAutoClosure())
           type = funcTy->getResult();
