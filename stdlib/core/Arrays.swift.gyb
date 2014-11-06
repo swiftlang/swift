@@ -243,6 +243,9 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
     return _buffer.capacity
   }
 
+  // Don't inline copyBuffer - this would inline the copy loop into the current
+  // path preventing retains/releases to be matched accross that region.
+  @inline(never)
   func _copyBuffer(inout buffer: _Buffer) {
     var newBuffer = _ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
