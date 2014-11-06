@@ -123,6 +123,9 @@ struct ASTContext::Implementation {
 
   /// func _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
+  
+  /// func ==(Int, Int) -> Bool
+  FuncDecl *EqualIntDecl = nullptr;
 
   /// The declaration of Swift.nil.
   VarDecl *NilDecl = nullptr;
@@ -681,6 +684,45 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
 
   Impl.GetBoolDecl = decl;
   return decl;
+}
+
+FuncDecl *ASTContext::getEqualIntDecl(LazyResolver *resolver) const {
+  if (Impl.EqualIntDecl)
+    return Impl.EqualIntDecl;
+  
+  CanType intType = getIntDecl()->getDeclaredType().getCanonicalTypeOrNull();
+  CanType boolType = getBoolDecl()->getDeclaredType().getCanonicalTypeOrNull();
+  SmallVector<ValueDecl *, 30> equalFuncs;
+  lookupInSwiftModule("==", equalFuncs);
+  
+  // Find the overload for Int.
+  for (ValueDecl *vd : equalFuncs) {
+    // All "==" decls should be functions, but who knows...
+    FuncDecl *funcDecl = dyn_cast<FuncDecl>(vd);
+    if (!funcDecl)
+      continue;
+    
+    if (resolver)
+      resolver->resolveDeclSignature(funcDecl);
+
+    CanType input, resultType;
+    if (!isNonGenericIntrinsic(funcDecl, input, resultType))
+      continue;
+    
+    // Check for the signature: (Int, Int) -> Bool
+    auto tType = dyn_cast<TupleType>(input.getPointer());
+    assert(tType);
+    if (tType->getNumElements() != 2)
+      continue;
+
+    CanType argType1 = tType->getElementType(0).getCanonicalTypeOrNull();
+    CanType argType2 = tType->getElementType(1).getCanonicalTypeOrNull();
+    if (argType1 == intType && argType2 == intType && resultType == boolType) {
+      Impl.EqualIntDecl = funcDecl;
+      return funcDecl;
+    }
+  }
+  return nullptr;
 }
 
 FuncDecl *

@@ -430,6 +430,9 @@ public:
   /// Retrieve the declaration of Swift._getBool.
   FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;
 
+  /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
+  FuncDecl *getEqualIntDecl(LazyResolver *resolver) const;
+  
   /// Retrieve the declaration of Swift._unimplemented_initializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 
