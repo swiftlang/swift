@@ -306,7 +306,8 @@ namespace {
     ConstraintSystem &cs;
     DeclContext *dc;
     const Solution &solution;
-    
+    bool SuppressDiagnostics;
+
   private:
     /// \brief Coerce the given tuple to another tuple type.
     ///
@@ -1113,6 +1114,7 @@ namespace {
     /// \brief Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
                                    ConstructorDecl *ctor, SourceLoc loc,
+                                   bool isDelegating,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
@@ -1148,6 +1150,28 @@ namespace {
       // Build the constructor reference.
       Expr *refExpr = new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit,
                                                             resultTy);
+
+      // A non-failable initializer cannot delegate to a failable
+      // initializer.
+      if (auto inCtor = dyn_cast<ConstructorDecl>(cs.DC)) {
+        if (ctor->getFailability() == OTK_Optional &&
+            inCtor->getFailability() == OTK_None) {
+          // If we're suppressing diagnostics, just fail.
+          if (SuppressDiagnostics)
+            return nullptr;
+
+          // Note: we can't actually patch up the AST here, because we
+          // might have already type-checked calls to this initializer, so
+          // put the Fix-It on a note.
+          tc.diagnose(loc, diag::delegate_chain_nonoptional_to_optional, 
+                      !isDelegating, ctor->getFullName());
+          tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
+            .fixItInsert(Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                                    inCtor->getLoc()),
+                         "?");
+        }
+      }
+
       return refExpr;
     }
 
@@ -1269,8 +1293,10 @@ namespace {
     TypeAliasDecl *MaxFloatTypeDecl = nullptr;
     
   public:
-    ExprRewriter(ConstraintSystem &cs, const Solution &solution)
-      : cs(cs), dc(cs.DC), solution(solution) { }
+    ExprRewriter(ConstraintSystem &cs, const Solution &solution,
+                 bool suppressDiagnostics)
+      : cs(cs), dc(cs.DC), solution(solution), 
+        SuppressDiagnostics(suppressDiagnostics) { }
 
     ~ExprRewriter() {
       finalize();
@@ -1939,8 +1965,9 @@ namespace {
             // Make sure the reference to 'self' occurs within an initializer.
             if (!dyn_cast_or_null<ConstructorDecl>(
                    cs.DC->getInnermostMethodContext())) {
-              tc.diagnose(expr->getDotLoc(),
-                          diag::init_delegation_outside_initializer);
+              if (!SuppressDiagnostics)
+                tc.diagnose(expr->getDotLoc(),
+                            diag::init_delegation_outside_initializer);
               return nullptr;
             }
           }
@@ -1959,6 +1986,9 @@ namespace {
               }
             }
           }
+          
+          if (SuppressDiagnostics)
+            return nullptr;
 
           tc.diagnose(expr->getDotLoc(), diag::bad_init_ref_base, hasSuper);
         }
@@ -1971,9 +2001,11 @@ namespace {
       diagnoseIfOverloadChoiceUnavailable(choice, expr->getConstructorLoc());
       
       // Build a partial application of the initializer.
-      Expr *ctorRef = buildOtherConstructorRef(selected.openedFullType,
-                                               ctor, expr->getConstructorLoc(),
-                                               expr->isImplicit());
+      Expr *ctorRef = buildOtherConstructorRef(
+                        selected.openedFullType,
+                        ctor, expr->getConstructorLoc(),
+                        !expr->getSubExpr()->isSuperExpr(),
+                        expr->isImplicit());
       auto *call
         = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
                                                      expr->getDotLoc(),
@@ -2700,6 +2732,9 @@ namespace {
           destObjectType = metaTy->getInstanceType();
         if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
           if (destClass->isForeign()) {
+            if (SuppressDiagnostics)
+              return nullptr;
+
             tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
                         destValueType);
           }
@@ -2901,6 +2936,9 @@ namespace {
       case CheckedCastKind::Unresolved:
         return nullptr;
       case CheckedCastKind::Coercion: {
+        if (SuppressDiagnostics)
+          return nullptr;
+
         tc.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
                     sub->getType(), toType);
 
@@ -4706,6 +4744,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       !fn->isStaticallyDerivedMetatype() &&
       !decl->hasClangNode() &&
       !cast<ConstructorDecl>(decl)->isRequired()) {
+    if (SuppressDiagnostics)
+      return nullptr;
+
     tc.diagnose(apply->getLoc(), diag::dynamic_construct_class, ty)
       .highlight(fn->getSourceRange());
     auto ctor = cast<ConstructorDecl>(decl);
@@ -4885,7 +4926,8 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
 
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
+Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
+                                      bool suppressDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -5245,15 +5287,16 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
-  ExprRewriter rewriter(*this, solution);
+  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
   ExprWalker walker(rewriter);
   auto result = expr->walk(walker);
   return result;
 }
 
 Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
-                                             Expr *expr) {
-  ExprRewriter rewriter(*this, solution);
+                                             Expr *expr,
+                                             bool suppressDiagnostics) {
+  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
   return rewriter.visit(expr);
 }
 
@@ -5261,7 +5304,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
                              bool ignoreTopLevelInjection) const {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this);
+  ExprRewriter rewriter(cs, *this, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator);
   if (!result)
     return nullptr;
@@ -5386,7 +5429,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   }
 
   Solution &solution = solutions.front();
-  ExprRewriter rewriter(cs, solution);
+  ExprRewriter rewriter(cs, solution, /*suppressDiagnostics=*/false);
 
   auto memberRef = rewriter.buildMemberRef(base, openedFullType,
                                            base->getStartLoc(),
@@ -5428,7 +5471,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
                                        Diag<> brokenProtocolDiag,
                                        Diag<> brokenBuiltinDiag) {
   auto &cs = solution.getConstraintSystem();
-  ExprRewriter rewriter(cs, solution);
+  ExprRewriter rewriter(cs, solution, /*suppressDiagnostics=*/false);
 
   // FIXME: Cache name.
   auto &tc = cs.getTypeChecker();

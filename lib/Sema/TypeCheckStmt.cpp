@@ -890,52 +890,6 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   return 0;
 }
 
-/// Check failability of one initializer calling another.
-static bool checkInitializerFailability(TypeChecker &tc, SourceLoc loc,
-                                        ConstructorDecl *fromCtor,
-                                        ConstructorDecl *toCtor,
-                                        bool isDelegating,
-                                        bool implicitlyGenerated) {
-  if (toCtor->getFailability() == OTK_Optional &&
-      fromCtor->getFailability() == OTK_None) {
-    if (!implicitlyGenerated) {
-      // Note: we can't actually patch up the AST here, because we
-      // might have already type-checked calls to this initializer, so
-      // put the Fix-It on a note.
-      tc.diagnose(loc, diag::delegate_chain_nonoptional_to_optional, 
-                  !isDelegating, toCtor->getFullName());
-      tc.diagnose(fromCtor->getLoc(), diag::init_propagate_failure)
-        .fixItInsert(Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                fromCtor->getLoc()),
-                     "?");
-    }
-
-    return true;
-  }
-
-  return false;
-}
-                             
-/// Check a self.init call.
-///
-/// \returns true if an error occurred.
-static bool checkDelegatingInit(TypeChecker &tc, ConstructorDecl *fromCtor, 
-                                ApplyExpr *apply) {
-  // Make sure we are referring to a designated initializer.
-  auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
-                        apply->getFn()->getSemanticsProvidingExpr());
-  if (!otherCtorRef)
-    return false;
-
-  // If the target initializer is failable (using '?'), and the current
-  // initializer is not, complain.
-  auto ctor = otherCtorRef->getDecl();
-  return checkInitializerFailability(tc, apply->getFn()->getLoc(),
-                                     fromCtor, ctor, 
-                                     /*isDelegating=*/true,
-                                     /*implicitlyGenerated=*/false);
-}
-
 /// Check a super.init call.
 ///
 /// \returns true if an error occurred.
@@ -957,14 +911,6 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
     return true;
   }
   
-  // If the superclass initializer is failable (using '?'), and the current
-  // initializer is not, complain.
-  if (checkInitializerFailability(tc, apply->getArg()->getLoc(),
-                                  fromCtor, ctor, /*isDelegating=*/false,
-                                  implicitlyGenerated)) {
-    return true;
-  }
-
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
@@ -1015,8 +961,6 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     case ConstructorDecl::BodyInitKind::Delegating:
       isDelegating = true;
       wantSuperInitCall = false;
-      if (initExpr)
-        checkDelegatingInit(*this, ctor, initExpr);
       break;
 
     case ConstructorDecl::BodyInitKind::Chained:

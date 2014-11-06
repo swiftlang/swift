@@ -963,7 +963,8 @@ bool TypeChecker::typeCheckExpression(
   }
 
   // Apply the solution to the expression.
-  auto result = cs.applySolution(solution, expr);
+  auto result = cs.applySolution(solution, expr,
+                                 listener && listener->suppressDiagnostics());
   if (!result) {
     diagnoseExpr(*this, expr, dc, listener);
     // Failure already diagnosed, above, as part of applying the solution.
@@ -1059,7 +1060,8 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   }
 
   // Apply the solution to the expression.
-  auto result = cs.applySolutionShallow(solution, expr);
+  auto result = cs.applySolutionShallow(solution, expr, 
+                                        /*suppressDiagnostics=*/false);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return true;

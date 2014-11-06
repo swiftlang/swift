@@ -123,6 +123,14 @@ extension Super {
   }
 }
 
+struct SomeStruct {
+   init(nonFail: Int) { // expected-note{{propagate the failure with 'init?'}}{{8-8=?}}
+    self.init(fail: nonFail) // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
+  }
+
+  init?(fail: Int) {}
+}
+
 // ----------------------------------------------------------------------------
 // Initializer overriding
 // ----------------------------------------------------------------------------

@@ -2159,11 +2159,13 @@ public:
 
   /// \brief Apply a given solution to the expression, producing a fully
   /// type-checked expression.
-  Expr *applySolution(Solution &solution, Expr *expr);
+  Expr *applySolution(Solution &solution, Expr *expr,
+                      bool suppressDiagnostics);
 
   /// \brief Apply a given solution to the expression to the top-level
   /// expression, producing a fully type-checked expression.
-  Expr *applySolutionShallow(const Solution &solution, Expr *expr);
+  Expr *applySolutionShallow(const Solution &solution, Expr *expr,
+                             bool suppressDiagnostics);
   
   /// \brief Obtain the specializations computed for a type variable. This is
   /// useful when emitting diagnostics for computed type variables.
