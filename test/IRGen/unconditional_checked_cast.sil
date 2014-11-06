@@ -12,17 +12,16 @@ class D : C {}
 // CHECK-NEXT: [[I8INPUTPTR:%[0-9]+]] = bitcast %C26unconditional_checked_cast1C* [[INPUTPTR]] to i8*
 // CHECK-NEXT: [[T0:%.*]] = call %swift.type* @_TMaC26unconditional_checked_cast1D()
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
-// CHECK-NEXT: call i8* @swift_dynamicCastClassUnconditional(i8* [[I8INPUTPTR]], i8* [[T1]])
-// CHECK-NEXT: bitcast
-// CHECK-NEXT: [[DOWNCASTINPUTPTR:%[0-9]+]] = bitcast %C26unconditional_checked_cast1C** [[INPUTPTRPTR]] to %C26unconditional_checked_cast1D**
-// CHECK-NEXT: [[DOWNCASTLOADINPUTPTR:%[0-9]+]] = load %C26unconditional_checked_cast1D** [[DOWNCASTINPUTPTR]], align 8
-// CHECK-NEXT: store %C26unconditional_checked_cast1D* [[DOWNCASTLOADINPUTPTR]], %C26unconditional_checked_cast1D** {{%[0-9]+}}, align 8
+// CHECK-NEXT: [[I8RESULTPTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[I8INPUTPTR]], i8* [[T1]])
+// CHECK-NEXT: [[DOWNCASTINPUTPTR:%[0-9]+]] = bitcast i8* [[I8RESULTPTR]] to %C26unconditional_checked_cast1D*
+// CHECK-NEXT: store %C26unconditional_checked_cast1D* [[DOWNCASTINPUTPTR]], %C26unconditional_checked_cast1D** {{%[0-9]+}}, align 8
 // CHECK-NEXT: ret void
 
 sil @downcast_test : $@thin (@out D, @inout C) -> () {
 bb0(%0 : $*D, %1 : $*C):
-  %2 = unconditional_checked_cast %1 : $*C to $*D
-  copy_addr [take] %2 to [initialization] %0 : $*D
+  %a = load %1 : $*C
+  %2 = unconditional_checked_cast %a : $C to $D
+  store %2 to %0 : $*D
   %33 = tuple()
   return %33 : $()
 }

@@ -1524,8 +1524,8 @@ public:
     // Verify common invariants.
     require(fromTy != toTy || isExact,
             "can't checked cast to same type");
-    require(fromTy.isAddress() == toTy.isAddress(),
-            "address-ness of checked cast src and dest must match");
+    require(fromTy.isObject() && toTy.isObject(),
+            "value checked cast src and dest must be objects");
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
     // metatypes.

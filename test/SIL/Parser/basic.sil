@@ -704,23 +704,9 @@ bb0(%c : $Class1):
   return %0 : $T
 }
 
-sil @test_downcast_archetype_addr : $@thin <T, U> (@in T) -> () {
-bb0(%t : $*T):
-  %0 = unconditional_checked_cast %t : $*T to $*U
-  %1 = tuple ()
-  return %1 : $()
-}
-
 sil @test_downcast_archetype_ref : $@thin <T:Class1, U:Class1> (T) -> () {
 bb0(%t : $T):
   %0 = unconditional_checked_cast %t : $T to $U
-  %1 = tuple ()
-  return %1 : $()
-}
-
-sil @test_open_downcast_existential_addr : $@thin <U> (@in P) -> () {
-bb0(%t : $*P):
-  %0 = unconditional_checked_cast %t : $*P to $*U
   %1 = tuple ()
   return %1 : $()
 }
