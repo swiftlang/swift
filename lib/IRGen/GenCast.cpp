@@ -183,41 +183,6 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   return IGF.Builder.CreateBitCast(call, subTy);
 }
 
-static Address
-emitOpaqueDowncast(IRGenFunction &IGF,
-                   Address value,
-                   llvm::Value *srcMetadata,
-                   SILType destType,
-                   CheckedCastMode mode) {
-  llvm::Value *addr = IGF.Builder.CreateBitCast(value.getAddress(),
-                                                IGF.IGM.OpaquePtrTy);
-
-  srcMetadata = IGF.Builder.CreateBitCast(srcMetadata, IGF.IGM.Int8PtrTy);
-  // FIXME: We should take the formal destination type.
-  llvm::Value *destMetadata = IGF.emitTypeMetadataRef(destType.getSwiftRValueType());
-  destMetadata = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
-
-  llvm::Value *castFn;
-  switch (mode) {
-  case CheckedCastMode::Unconditional:
-    castFn = IGF.IGM.getDynamicCastIndirectUnconditionalFn();
-    break;
-  case CheckedCastMode::Conditional:
-    castFn = IGF.IGM.getDynamicCastIndirectFn();
-    break;
-  }
-
-  auto *call = IGF.Builder.CreateCall3(castFn, addr, srcMetadata, destMetadata);
-  // FIXME: Eventually, we may want to throw.
-  call->setDoesNotThrow();
-
-  // Convert the cast address to the destination type.
-  auto &destTI = IGF.getTypeInfo(destType);
-  llvm::Value *ptr = IGF.Builder.CreateBitCast(call,
-                                           destTI.StorageType->getPointerTo());
-  return destTI.getAddressForPointer(ptr);
-}
-
 /// Emit a checked cast of a metatype.
 llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
                                          llvm::Value *metatype,
@@ -268,37 +233,6 @@ llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
   auto call = IGF.Builder.CreateCall2(castFn, metatype, toMetadata);
   call->setDoesNotThrow();
   return call;
-}
-
-/// Emit a checked cast of an opaque archetype.
-Address irgen::emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
-                                           Address value,
-                                           SILType srcType,
-                                           SILType destType,
-                                           CheckedCastMode mode) {
-  // FIXME: We should take the formal source and destination types.
-  llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType.getSwiftRValueType());
-  return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
-}
-
-/// Emit a checked unconditional cast of an opaque existential container's
-/// contained value.
-Address irgen::emitIndirectExistentialDowncast(IRGenFunction &IGF,
-                                               Address container,
-                                               SILType srcType,
-                                               SILType destType,
-                                               CheckedCastMode mode) {
-  assert(srcType.isExistentialType());
-
-  // Project the value pointer and source type metadata out of the existential
-  // container.
-  Address value;
-  llvm::Value *srcMetadata;
-  std::tie(value, srcMetadata)
-    = emitIndirectExistentialProjectionWithMetadata(IGF, container, srcType,
-                                                    CanArchetypeType());
-
-  return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }
 
 /// Emit a Protocol* value referencing an ObjC protocol.

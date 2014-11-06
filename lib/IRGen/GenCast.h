@@ -66,21 +66,6 @@ namespace irgen {
                                     CanAnyMetatypeType toMetatype,
                                     CheckedCastMode mode);
 
-  /// Emit a checked cast of an opaque archetype.
-  Address emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
-                                      Address value,
-                                      SILType srcType,
-                                      SILType destType,
-                                      CheckedCastMode mode);
-
-  /// Emit a checked cast of an existential container's
-  /// contained value.
-  Address emitIndirectExistentialDowncast(IRGenFunction &IGF,
-                                          Address value,
-                                          SILType srcType,
-                                          SILType destType,
-                                          CheckedCastMode mode);
-
   /// Emit a checked cast to an Objective-C protocol or protocol composition.
   llvm::Value *emitObjCExistentialDowncast(IRGenFunction &IGF,
                                            llvm::Value *orig,
