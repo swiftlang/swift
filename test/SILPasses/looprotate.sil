@@ -5,32 +5,44 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// TODO: yikes! clean this up.
 // CHECK-LABEL: looprotate
-// CHECK: bb0(%0 : $Int):
+// CHECK: bb0(%0 : $Int, %1 : $Bar):
+// CHECK:  class_method
 // CHECK:  cond_br {{.*}}, bb4({{.*}} : $Builtin.Word), bb1
 
 // CHECK:bb1:
 // CHECK:  br bb2({{.*}} : $Builtin.Word, {{.*}} : $Builtin.Word, {{.*}}: $Int)
 
 // CHECK: bb2({{.*}}: $Builtin.Word, {{.*}} : $Builtin.Word, {{.*}} : $Int):
-// CHECK:   br bb3({{.*}} : $Builtin.Word, {{.*}} : $Builtin.Word)
+// CHECK:   br bb3({{.*}} : $Builtin.Word, {{.*}} : $Builtin.Word, {{.*}})
 
-// CHECK: bb3({{.*}} : $Builtin.Word, {{.*}} : $Builtin.Word):
+// CHECK: bb3({{.*}} : $Builtin.Word, {{.*}} : $Builtin.Word, {{.*}}):
+// CHECK:   class_method
 // CHECK:   cond_br {{%.*}}, bb4({{.*}} : $Builtin.Word), bb2({{.*}} : $Builtin.Word, {{.*}} : $Builtin.Word, {{.*}} : $Int)
 
 // CHECK: bb4({{.*}} : $Builtin.Word):
 // CHECK:   [[STRUCT:%.*]] = struct $Int ({{%.*}} : $Builtin.Word)
 // CHECK:   return [[STRUCT]] : $Int
 
+class Bar {
+  func foo()
+}
 
-sil @looprotate : $@thin (Int) -> Int {
-bb0(%0 : $Int):
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@owned Bar) -> ()
+
+sil_vtable Bar {
+  #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
+}
+
+sil @looprotate : $@thin (Int, @owned Bar) -> Int {
+bb0(%0 : $Int, %25: $Bar):
   %1 = struct_extract %0 : $Int, #Int.value
   %2 = integer_literal $Builtin.Word, 0
-  br bb1(%1 : $Builtin.Word, %2 : $Builtin.Word)
+  br bb1(%1 : $Builtin.Word, %2 : $Builtin.Word, %25: $Bar)
 
-bb1(%4 : $Builtin.Word, %5 : $Builtin.Word):
+bb1(%4 : $Builtin.Word, %5 : $Builtin.Word, %26: $Bar):
+  %24 = class_method %26 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@cc(method) @thin (@owned Bar) -> () // user: %6
+  %27 = apply %24(%25) : $@cc(method) @thin (@owned Bar) -> ()
   %6 = struct $Int (%5 : $Builtin.Word)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
   cond_br %8, bb3, bb2
@@ -46,13 +58,12 @@ bb2:
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %17 : $Builtin.Word, %19 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
-  br bb1(%21 : $Builtin.Word, %14 : $Builtin.Word)
+  br bb1(%21 : $Builtin.Word, %14 : $Builtin.Word, %26: $Bar)
 
 bb3:
   %23 = struct $Int (%4 : $Builtin.Word)
   return %23 : $Int
 }
-
 
 // This example illustrates the problem with using ValueUseIterators.
 // As part of updating SSA form we will introduce a phi node argument to the
