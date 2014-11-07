@@ -4354,8 +4354,8 @@ static void forwardCaptureArgs(SILGenFunction &gen,
                                CaptureInfo::LocalCaptureTy capture) {
   ASTContext &c = gen.getASTContext();
   
-  auto addSILArgument = [&](SILType t) {
-    args.push_back(new (gen.SGM.M) SILArgument(t, gen.F.begin()));
+  auto addSILArgument = [&](SILType t, ValueDecl *d) {
+    args.push_back(new (gen.SGM.M) SILArgument(t, gen.F.begin(), d));
   };
 
   auto *vd = capture.getPointer();
@@ -4366,7 +4366,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
 
   case CaptureKind::Constant:
     if (!gen.getTypeLowering(vd->getType()).isAddressOnly()) {
-      addSILArgument(gen.getLoweredType(vd->getType()));
+      addSILArgument(gen.getLoweredType(vd->getType()), vd);
       break;
     }
     SWIFT_FALLTHROUGH;
@@ -4375,25 +4375,25 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     SILType ty = gen.getLoweredType(vd->getType()->getRValueType())
       .getAddressType();
     // Forward the captured owning NativeObject.
-    addSILArgument(SILType::getNativeObjectType(c));
+    addSILArgument(SILType::getNativeObjectType(c), vd);
     // Forward the captured value address.
-    addSILArgument(ty);
+    addSILArgument(ty, vd);
     break;
   }
   case CaptureKind::LocalFunction:
     // Forward the captured value.
-    addSILArgument(gen.getLoweredType(vd->getType()));
+    addSILArgument(gen.getLoweredType(vd->getType()), vd);
     break;
   case CaptureKind::GetterSetter: {
     // Forward the captured setter.
     Type setTy = cast<AbstractStorageDecl>(vd)->getSetter()->getType();
-    addSILArgument(gen.getLoweredType(setTy));
+    addSILArgument(gen.getLoweredType(setTy), vd);
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Forward the captured getter.
     Type getTy = cast<AbstractStorageDecl>(vd)->getGetter()->getType();
-    addSILArgument(gen.getLoweredType(getTy));
+    addSILArgument(gen.getLoweredType(getTy), vd);
     break;
   }
   }
