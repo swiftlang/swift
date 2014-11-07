@@ -33,17 +33,14 @@ class MyObject : NSObject {
   // LOC-CHECK: define {{.*}} @_TToFC4main8MyObjectg5MyArrCSo7NSArray
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
-  // LOC-CHECK: ![[THUNK:.*]] = {{.*}}_TToFC4main8MyObjectg5MyArrCSo7NSArray{{.*}} ; [ DW_TAG_subprogram ] [line 0] [def]
-  // LOC-CHECK: ![[DBG]] = metadata !{i32 0, i32 0, metadata ![[THUNK]], null}
   var MyArr = NSArray()
 // Capture the pointer size from type Int
 // IMPORT-CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>
-// IMPORT-CHECK: metadata ![[FOUNDATION:[0-9]+]], {{[^,]+}}, {{[^,]+}}, null, null, metadata ![[NSARRAY:.*]]} ; [ DW_TAG_structure_type ] [NSArray]
-// IMPORT-CHECK: [[FOUNDATION]] = {{.*}} ; [ DW_TAG_module ] [Foundation]
-// IMPORT-CHECK: metadata ![[NSARRAY]]} ; [ DW_TAG_member ] [MyArr] [line 0, size [[PTRSIZE]], align [[PTRSIZE]], offset 0] [from _TtCSo7NSArray]
-// IMPORT-CHECK: \001\00", metadata ![[FOUNDATION_FILE:[0-9]+]], metadata ![[FOUNDATION_MODULE:[0-9]+]]} ; [ DW_TAG_imported_module ]
-// CHECK: ![[FOUNDATION_FILE]] = {{.*}}foundation.swift
-// CHECK: ![[FOUNDATION_MODULE]] = {{.*}}[ DW_TAG_module ] [foundation]
+// IMPORT-CHECK-DAG: metadata ![[FOUNDATION:[0-9]+]], {{[^,]+}}, {{[^,]+}}, null, null, metadata ![[NSARRAY:.*]]} ; [ DW_TAG_structure_type ] [NSArray]
+// IMPORT-CHECK-DAG: [[FOUNDATION]] = {{.*}}metadata ![[FOUNDATION_FILE:[0-9]+]], null} ; [ DW_TAG_module ] [Foundation]
+// IMPORT-CHECK-DAG: metadata ![[NSARRAY]]} ; [ DW_TAG_member ] [MyArr] [line 0, size [[PTRSIZE]], align [[PTRSIZE]], offset 0] [from _TtCSo7NSArray]
+// IMPORT-CHECK-DAG: metadata ![[FOUNDATION]]} ; [ DW_TAG_imported_module ]
+// IMPORT-CHECK-DAG: ![[FOUNDATION_FILE]] = {{.*}}Foundation
 
   // Force the use of Int.
   var count : Int = 0
@@ -76,6 +73,26 @@ func err() {
                       userInfo: ["a":1,"b":2,"c":3])
 }
 
-// CHECK: !"test-foundation.swift"
-// CHECK-DAG: !"Foundation"
-// CHECK-DAG: !"ObjectiveC"
+// LOC-CHECK: define {{.*}}4date
+func date() {
+  // LOC-CHECK: call {{.*}} @objc_retain to %CSo15NSDateFormatter{{.*}}, !dbg ![[L1:.*]]
+  let d1 = NSDateFormatter()
+  // LOC-CHECK: br{{.*}}, !dbg ![[L2:.*]]
+  d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2]]
+  // LOC-CHECK: call {{.*}} @objc_retain to %CSo15NSDateFormatter{{.*}}, !dbg ![[L3:.*]]
+  let d2 = NSDateFormatter()
+  // LOC-CHECK: br{{.*}}, !dbg ![[L4:.*]]
+  d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4]]
+}
+
+// IMPORT-CHECK-DAG: !"test-foundation.swift"
+// IMPORT-CHECK-DAG: [ DW_TAG_module ] [ObjectiveC]
+
+// LOC-CHECK: ![[THUNK:.*]] = {{.*}}_TToFC4main8MyObjectg5MyArrCSo7NSArray{{.*}} ; [ DW_TAG_subprogram ] [line 0] [def]
+// LOC-CHECK: ![[DBG]] = metadata !{i32 0, i32 0, metadata ![[THUNK]], null}
+
+// These debug locations should all be in ordered by increasing line number.
+// LOC-CHECK: ![[L1]] =
+// LOC-CHECK: ![[L2]] =
+// LOC-CHECK: ![[L3]] =
+// LOC-CHECK: ![[L4]] =
