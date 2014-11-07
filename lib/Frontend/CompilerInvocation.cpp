@@ -947,12 +947,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_target))
     Opts.Triple = llvm::Triple::normalize(A->getValue());
 
-  if (auto A = Args.getLastArg(OPT_enable_objc_interop,
-                               OPT_disable_objc_interop)) {
-    Opts.EnableObjCInterop
-      = A->getOption().matches(OPT_enable_objc_interop);
-  }
-
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
   if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {

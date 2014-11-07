@@ -97,7 +97,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
     Module(*ClangCodeGen->GetModule()),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
     SILMod(SILMod), TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), ObjCInterop(Opts.EnableObjCInterop),
+    DebugInfo(0), ObjCInterop(Context.LangOpts.EnableObjCInterop),
     Types(*new TypeConverter(*this))
 {
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
