@@ -1,11 +1,5 @@
 // RUN: %swift -repl < %s | FileCheck %s
 // REQUIRES: swift_repl
-// TODO: Write these using "x as P" casts when we support that.
-
-@asmname("swift_stdlib_dynamicCastToExistential1_2") func castToProtocol<SourceType, DestType>(
-    value: SourceType,
-    _: DestType.Type
-) -> DestType?;
 
 protocol Fooable {
   func foo()
@@ -15,7 +9,7 @@ class C {}
 class D: C {}
 
 func fooify<T>(x: T) {
-  if let foo = castToProtocol(x, Fooable.self) {
+  if let foo = x as? Fooable {
     foo.foo()
   } else {
     println("--not fooable--")

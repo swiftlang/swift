@@ -1,13 +1,6 @@
 // Check both AOT and JIT modes
 // RUN: %target-run-simple-swift | FileCheck %s
 // RUN: %swift -interpret %s | FileCheck %s
-// TODO: Write these using "x as P" casts when we support that.
-
-@asmname("swift_stdlib_dynamicCastToExistential1_2")
-func castToProtocol<SourceType, DestType>(
-    value: SourceType,
-    _: DestType.Type
-) -> DestType?
 
 protocol Fooable {
   func foo()
@@ -36,7 +29,7 @@ extension Int: Fooable {
 }
 
 func fooify<T>(x: T) {
-  if let foo = castToProtocol(x, Fooable.self) {
+  if let foo = x as? Fooable {
     foo.foo()
   } else {
     println("not fooable")

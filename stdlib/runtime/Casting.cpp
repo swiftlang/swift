@@ -1817,36 +1817,6 @@ extern "C" OpaqueExistentialContainer
 _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
 
 
-// Test harness for using swift_conformsToProtocol2 from Swift source.
-//
-// func _stdlib_dynamicCastToExistential1_2<SourceType, DestType>(
-//     value: SourceType,
-//     _: DestType.Type
-// ) -> DestType?
-//
-// The return type is incorrect.  It is only important that it is
-// passed using 'sret'.
-extern "C"
-OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1_2(
-    OpaqueValue *sourceValue, const Metadata *_destType,
-    const Metadata *sourceType, const Metadata *destType) {
-  assert(destType->getKind() == MetadataKind::Existential);
-  auto destExistential
-    = static_cast<const ExistentialTypeMetadata*>(destType);
-  assert(destExistential->Protocols.NumProtocols == 1);
-  auto protocol = destExistential->Protocols[0];
-  auto witness = swift_conformsToProtocol(sourceType, protocol);
-  if (!witness)
-    return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
-  
-  OpaqueExistentialBox<1>::Container outValue;
-  outValue.Header.Type = sourceType;
-  outValue.WitnessTables[0] = witness;
-  sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
-  return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
-                         reinterpret_cast<OpaqueValue *>(&outValue), destType);
-}
-
 /// Given a possibly-existential value, find its dynamic type and the
 /// address of its storage.
 static bool findDynamicValueAndType_NoMetatypes(OpaqueValue *value,
