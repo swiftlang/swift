@@ -315,6 +315,8 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
   } else {
     ObjCAttrBits.HasTrailingLocationInfo = false;
   }
+
+  ObjCAttrBits.ImplicitName = false;
 }
 
 ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name,
