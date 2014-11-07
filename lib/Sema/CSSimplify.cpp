@@ -2253,55 +2253,12 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
     return CheckedCastKind::BridgeFromObjectiveC;
   }
 
-  // We can only downcast to an existential if the destination protocols are
-  // objc and the source type is an objc class or an existential bounded by objc
-  // protocols.
-  if (toExistential) {
-    return CheckedCastKind::ValueCast;
-  }
+  // If the cast is between concrete types, we want to introduce a subtype
+  // constraint to catch trivially impossible casts such as 'int as String'.
+  isDowncast
+    = !(toExistential || fromExistential || toArchetype || fromArchetype);
 
-  // A downcast can:
-  //   - convert an archetype to a (different) archetype type.
-  if (fromArchetype && toArchetype) {
-    return CheckedCastKind::ValueCast;
-  }
-
-  //   - convert from an existential to an archetype or conforming concrete
-  //     type.
-  if (fromExistential) {
-    if (toArchetype) {
-      return CheckedCastKind::ValueCast;
-    }
-
-    isDowncast = true;
-    return CheckedCastKind::ValueCast;
-  }
-
-  //   - convert an archetype to a concrete type fulfilling its constraints.
-  if (fromArchetype) {
-    return CheckedCastKind::ValueCast;
-  }
-
-  if (toArchetype) {
-    //   - convert from a superclass to an archetype.
-    if (toType->castTo<ArchetypeType>()->getSuperclass()) {
-      return CheckedCastKind::ValueCast;
-    }
-
-    //  - convert a concrete type to an archetype for which it fulfills
-    //    constraints.
-    return CheckedCastKind::ValueCast;
-  }
-
-  // The remaining case is a class downcast.
-  assert(!fromArchetype && "archetypes should have been handled above");
-  assert(!toArchetype && "archetypes should have been handled above");
-  assert(!fromExistential && "existentials should have been handled above");
-  assert(!toExistential && "existentials should have been handled above");
-
-  isDowncast = true;
   return CheckedCastKind::ValueCast;
-
 }
 
 ConstraintSystem::SolutionKind
