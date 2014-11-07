@@ -300,9 +300,13 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     _failCorruptType(type);
   }
 
-  // FIXME: Can't handle protocols that require witness tables.
-  if (protocol->Flags.needsWitnessTable())
-    return false;
+  // Look up the witness table for protocols that need them.
+  if (protocol->Flags.needsWitnessTable()) {
+    auto witness = swift_conformsToProtocol(type, protocol);
+    if (!witness)
+      return false;
+    *conformance = witness;
+  }
 
   // For Objective-C protocols, check whether we have a class that
   // conforms to the given protocol.
