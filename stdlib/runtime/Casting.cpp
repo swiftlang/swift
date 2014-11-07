@@ -268,7 +268,7 @@ static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
 static bool _conformsToProtocol(const OpaqueValue *value,
                                 const Metadata *type,
                                 const ProtocolDescriptor *protocol,
-                                const void **conformance) {
+                                const WitnessTable **conformance) {
   // Handle AnyObject directly.
   // FIXME: strcmp here is horribly slow.
   if (strcmp(protocol->Name, "_TtPSs9AnyObject_") == 0) {
@@ -360,7 +360,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
 static bool _conformsToProtocols(const OpaqueValue *value,
                                  const Metadata *type,
                                  const ProtocolDescriptorList &protocols,
-                                 const void **conformances) {
+                                 const WitnessTable **conformances) {
   for (unsigned i = 0, n = protocols.NumProtocols; i != n; ++i) {
     const ProtocolDescriptor *protocol = protocols[i];
     if (!_conformsToProtocol(value, type, protocol, conformances))
@@ -370,7 +370,7 @@ static bool _conformsToProtocols(const OpaqueValue *value,
       ++conformances;
     }
   }
-
+  
   return true;
 }
 
@@ -1466,7 +1466,7 @@ const {
   }
 }
 
-const void *ProtocolConformanceRecord::getWitnessTable(const Metadata *type)
+const WitnessTable *ProtocolConformanceRecord::getWitnessTable(const Metadata *type)
 const {
   switch (getConformanceKind()) {
   case ProtocolConformanceReferenceKind::WitnessTable:
@@ -1560,7 +1560,7 @@ namespace {
     ConformanceCacheEntry() = default;
     
     /// Cache entry for a successful lookup.
-    static ConformanceCacheEntry success(const void *value) {
+    static ConformanceCacheEntry success(const WitnessTable *value) {
       return ConformanceCacheEntry((uintptr_t)value, true);
     }
     /// Cache entry for a failed lookup.
@@ -1577,9 +1577,9 @@ namespace {
     }
     
     /// Get the cached witness table, if successful.
-    const void *getWitnessTable() const {
+    const WitnessTable *getWitnessTable() const {
       assert(isSuccessful());
-      return (const void *)Data;
+      return (const WitnessTable *)Data;
     }
     
     /// Get the generation number under which this lookup failed.
@@ -1663,7 +1663,7 @@ static void _addImageProtocolConformances(const mach_header *mh,
   swift_registerProtocolConformances(recordsBegin, recordsEnd);
 }
 
-const void *swift::swift_conformsToProtocol(const Metadata *type,
+const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
                                             const ProtocolDescriptor *protocol){
   // TODO: Generic types, subclasses, foreign classes
 

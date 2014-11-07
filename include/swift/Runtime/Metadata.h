@@ -1678,6 +1678,11 @@ public:
     return ProtocolClassConstraint(bool(Data & ClassConstraintMask));
   }
 };
+  
+/// A witness table for a protocol. This type is intentionally opaque because
+/// the layout of a witness table is dependent on the protocol being
+/// represented.
+struct WitnessTable;
 
 /// The basic layout of an opaque (non-class-bounded) existential type.
 struct OpaqueExistentialContainer {
@@ -1685,11 +1690,11 @@ struct OpaqueExistentialContainer {
   const Metadata *Type;
   // const void *WitnessTables[];
 
-  const void **getWitnessTables() {
-    return reinterpret_cast<const void**>(this + 1);
+  const WitnessTable **getWitnessTables() {
+    return reinterpret_cast<const WitnessTable**>(this + 1);
   }
-  const void * const *getWitnessTables() const {
-    return reinterpret_cast<const void* const *>(this + 1);
+  const WitnessTable * const *getWitnessTables() const {
+    return reinterpret_cast<const WitnessTable* const *>(this + 1);
   }
 
   void copyTypeInto(OpaqueExistentialContainer *dest, unsigned numTables) const {
@@ -1703,11 +1708,11 @@ struct OpaqueExistentialContainer {
 struct ClassExistentialContainer {
   void *Value;
 
-  const void **getWitnessTables() {
-    return reinterpret_cast<const void**>(this + 1);
+  const WitnessTable **getWitnessTables() {
+    return reinterpret_cast<const WitnessTable**>(this + 1);
   }
-  const void * const *getWitnessTables() const {
-    return reinterpret_cast<const void* const *>(this + 1);
+  const WitnessTable * const *getWitnessTables() const {
+    return reinterpret_cast<const WitnessTable* const *>(this + 1);
   }
 
   void copyTypeInto(ClassExistentialContainer *dest, unsigned numTables) const {
@@ -1743,8 +1748,8 @@ struct ExistentialTypeMetadata : public Metadata {
   
   /// Get a witness table from an existential container of the type described
   /// by this metadata.
-  const void * const *getWitnessTable(const OpaqueValue *container,
-                                      unsigned i) const;
+  const WitnessTable * const *getWitnessTable(const OpaqueValue *container,
+                                              unsigned i) const;
 
   /// Return true iff all the protocol constraints are @objc.
   bool isObjC() const {
@@ -1845,7 +1850,7 @@ struct GenericMetadata {
 /// type's conformance to a protocol.
 struct ProtocolConformanceRecord {
 public:
-  using WitnessTableAccessor_t = const void *(*)(const Metadata*);
+  using WitnessTableAccessor_t = const WitnessTable *(*)(const Metadata*);
 
 private:
   /// The protocol being conformed to.
@@ -1871,7 +1876,7 @@ private:
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    const void *WitnessTable;
+    const WitnessTable *WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type. The function may return null if a specific instance does not
@@ -1965,7 +1970,7 @@ public:
   }
   
   /// Get the directly-referenced static witness table.
-  const void *getStaticWitnessTable() const {
+  const swift::WitnessTable *getStaticWitnessTable() const {
     switch (Flags.getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTable:
       break;
@@ -1994,7 +1999,7 @@ public:
   /// Get the witness table for the specified type, realizing it if
   /// necessary, or return null if the conformance does not apply to the
   /// type.
-  const void *getWitnessTable(const Metadata *type) const;
+  const swift::WitnessTable *getWitnessTable(const Metadata *type) const;
   
 #if defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
@@ -2352,8 +2357,8 @@ void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index);
 /// \param protocol The protocol descriptor for the protocol to check
 ///                 conformance for.
 extern "C"
-const void *swift_conformsToProtocol(const Metadata *type,
-                                     const ProtocolDescriptor *protocol);
+const WitnessTable *swift_conformsToProtocol(const Metadata *type,
+                                            const ProtocolDescriptor *protocol);
 
 /// Register a block of protocol conformance records for dynamic lookup.
 extern "C"

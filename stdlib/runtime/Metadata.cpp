@@ -1882,13 +1882,13 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   }
 }
 
-const void * const *
+const WitnessTable * const *
 ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
                                          unsigned i) const {
   assert(i < Flags.getNumWitnessTables());
 
   // The layout of the container depends on whether it's class-constrained.
-  const void * const * witnessTables;
+  const WitnessTable * const * witnessTables;
   if (isClassBounded()) {
     auto classContainer =
       reinterpret_cast<const ClassExistentialContainer*>(container);
@@ -1902,7 +1902,7 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
   // The return type here describes extra structure for the protocol
   // witness table for some reason.  We should probaby have a nominal
   // type for these, just for type safety reasons.
-  return reinterpret_cast<const void * const *>(witnessTables[i]);
+  return reinterpret_cast<const WitnessTable * const *>(witnessTables[i]);
 }
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
