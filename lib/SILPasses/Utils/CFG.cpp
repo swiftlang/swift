@@ -301,6 +301,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
   if (auto SEI = dyn_cast<SwitchValueInst>(T)) {
     auto *SuccBB = getNthEdgeBlock(SEI, EdgeIdx);
     assert(SuccBB->getNumBBArg() == 0 && "Can't take an argument");
+    (void) SuccBB;
     return;
   }
 

@@ -652,6 +652,7 @@ bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
     DEBUG(llvm::dbgs() << "        Checking from: ");
     for (auto *SI : I->second) {
       DEBUG(llvm::dbgs() << "          " << *SI);
+      (void) SI;
     }
 
     // Create a BBargument to merge in multiple stores.
@@ -810,6 +811,7 @@ updateStoreMap(llvm::DenseMap<SILBasicBlock *,
       return;
     }
     auto BBId = I->second;
+    (void) BBId;
     LSBBForwarder &Other = BBIDToForwarderMap[I->second];
 
     // Calculate SILValues that are stored once in this predecessor.

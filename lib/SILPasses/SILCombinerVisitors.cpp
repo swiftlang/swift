@@ -879,7 +879,9 @@ APInt StringConcatenationOptimizer::getConcatenatedLength() {
   // Real length of string literals computed based on its contents.
   // Length is in code units.
   auto SLILenLeft = SLILeft->getCodeUnitCount();
+  (void) SLILenLeft;
   auto SLILenRight = SLIRight->getCodeUnitCount();
+  (void) SLILenRight;
 
   // Length of string literals as reported by string.make functions.
   auto *LenLeft = dyn_cast<IntegerLiteralInst>(AILeft->getOperand(2));
