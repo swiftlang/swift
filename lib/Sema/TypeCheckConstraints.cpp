@@ -1986,43 +1986,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     fromExistential &= fromExistentialMetatype;
   }
   
-  // We can only downcast to an existential if the destination protocols are
-  // objc and the source type is a class or an existential bounded by objc
-  // protocols.
+  // Any type can be cast to an existential to check for protocol conformance.
   if (toExistential) {
-    if (fromExistential) {
-      for (auto fromProtocol : fromProtocols) {
-        if (!fromProtocol->isObjC())
-          goto unsupported_existential_cast;
-      }
-      
-      if (!(fromType->isAnyObject() || fromType->isObjCExistentialType())) {
-        diagnose(diagLoc, diag::downcast_to_unrelated,
-                 origFromType, origToType).
-        highlight(diagFromRange).
-        highlight(diagToRange);
-        return CheckedCastKind::Unresolved;
-      }
-      
-    } else {
-      auto fromClass = fromType->getClassOrBoundGenericClass();
-      if (!fromClass)
-        goto unsupported_existential_cast;
-    }
-
-    for (auto toProtocol : toProtocols) {
-      if (!toProtocol->isObjC())
-        goto unsupported_existential_cast;
-    }
-    
     return CheckedCastKind::ValueCast;
-    
-  unsupported_existential_cast:
-    diagnose(diagLoc, diag::downcast_to_non_objc_existential,
-             origFromType, origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
-    return CheckedCastKind::Unresolved;
   }
   
   // A downcast can:

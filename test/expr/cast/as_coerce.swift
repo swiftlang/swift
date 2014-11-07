@@ -48,10 +48,10 @@ c1.f(5)
 @objc protocol P {}
 class CC : P {}
 let cc: Any = CC()
-if cc is P { // expected-error{{downcast from 'Any' to unrelated type 'P'}}
+if cc is P {
    println("P")
 }
-if let p = cc as P { // expected-error{{downcast from 'Any' to unrelated type 'P'}}
+if let p = cc as? P {
    println("P")
 }
 

@@ -109,7 +109,7 @@ func protocol_concrete_casts(p1: P1, p2: P2, p12: protocol<P1, P2>) {
   var p1_as_d1 = p1 as D1
   var p1_as_s12 = p1 as S12
 
-  var p1_as_p12 = p1 as protocol<P1, P2> // expected-error{{}}
+  var p1_as_p12 = p1 as protocol<P1, P2>
 
   var p2_as_s1 = p2 as S1  // expected-error{{}}
 
@@ -124,7 +124,7 @@ func protocol_concrete_casts(p1: P1, p2: P2, p12: protocol<P1, P2>) {
   var p1_is_d1:Bool = p1 is D1
   var p1_is_s12:Bool = p1 is S12
 
-  var p1_is_p12:Bool = p1 is protocol<P1, P2> // expected-error{{}}
+  var p1_is_p12:Bool = p1 is protocol<P1, P2>
 
   var p2_is_s1:Bool = p2 is S1  // expected-error{{}}
 
@@ -149,13 +149,13 @@ func objc_protocol_casts(op1: ObjCProto1, opn: NonObjCProto) {
   var p1 = ObjCClass() as ObjCProto1
   var p2 = ObjCClass() as ObjCProto2
   var p12 = ObjCClass() as protocol<ObjCProto1, ObjCProto2>
-  var pn = ObjCClass() as NonObjCProto // expected-error{{}}
-  var p1n = ObjCClass() as protocol<ObjCProto1, NonObjCProto> // expected-error{{}}
+  var pn = ObjCClass() as NonObjCProto
+  var p1n = ObjCClass() as protocol<ObjCProto1, NonObjCProto>
 
   var op12 = op1 as protocol<ObjCProto1, ObjCProto2>
   var op2 = op1 as protocol<ObjCProto2>
-  var op1n = op1 as protocol<ObjCProto1, NonObjCProto> // expected-error{{}}
-  var opn1 = opn as ObjCProto1 // expected-error{{}}
+  var op1n = op1 as protocol<ObjCProto1, NonObjCProto>
+  var opn1 = opn as ObjCProto1
 
   var np1 = NonObjCClass() as ObjCProto1
 }
