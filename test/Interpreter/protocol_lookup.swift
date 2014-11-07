@@ -48,7 +48,6 @@ fooify(S()) // CHECK-NEXT: S
 fooify(S()) // CHECK-NEXT: S
 fooify(C()) // CHECK-NEXT: C
 fooify(C()) // CHECK-NEXT: C
-// TODO: Subclasses
 fooify(D()) // CHECK-NEXT: D
 fooify(D()) // CHECK-NEXT: D
 fooify(E()) // CHECK-NEXT: E
@@ -63,3 +62,45 @@ fooify(H<Float>()) // CHECK-NEXT: not fooable
 fooify(H<Int>()) // CHECK-NEXT: not fooable
 
 // TODO: generics w/ dependent witness tables
+
+// Check casts from existentials.
+
+fooify(1 as Any)   // CHECK:      Int
+fooify(2 as Any)   // CHECK-NEXT: Int
+fooify(S() as Any) // CHECK-NEXT: S
+fooify(S() as Any) // CHECK-NEXT: S
+fooify(C() as Any) // CHECK-NEXT: C
+fooify(C() as Any) // CHECK-NEXT: C
+fooify(D() as Any) // CHECK-NEXT: D
+fooify(D() as Any) // CHECK-NEXT: D
+fooify(E() as Any) // CHECK-NEXT: E
+fooify(E() as Any) // CHECK-NEXT: E
+fooify(X() as Any) // CHECK-NEXT: not fooable
+fooify(X() as Any) // CHECK-NEXT: not fooable
+fooify(G<Int>() as Any) // CHECK-NEXT: G
+fooify(G<Float>() as Any) // CHECK-NEXT: G
+fooify(G<Int>() as Any) // CHECK-NEXT: G
+fooify(H<Int>() as Any) // CHECK-NEXT: not fooable
+fooify(H<Float>() as Any) // CHECK-NEXT: not fooable
+fooify(H<Int>() as Any) // CHECK-NEXT: not fooable
+
+protocol Barrable {
+  func bar()
+}
+extension Int: Barrable {
+  func bar() { println("Int.bar") }
+}
+
+let foo: Fooable = 2
+if let bar = foo as? Barrable {
+  bar.bar() // CHECK-NEXT: Int.bar
+} else {
+  println("not barrable")
+}
+
+let foo2: Fooable = S()
+if let bar2 = foo2 as? Barrable {
+  bar2.bar()
+} else {
+  println("not barrable") // CHECK-NEXT: not barrable
+}
