@@ -124,6 +124,7 @@ namespace {
     bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
     bool simplifyUnreachableBlock(UnreachableInst *UI);
+    bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
     bool simplifyArgument(SILBasicBlock *BB, unsigned i);
     bool simplifyArgs(SILBasicBlock *BB);
     void findLoopHeaders();
@@ -611,6 +612,61 @@ void SimplifyCFG::findLoopHeaders() {
   }
 }
 
+/// Helper function to perform SSA updates in case of jump threading.
+static void updateSSAAfterCloning(ThreadingCloner &Cloner,
+                                  SILBasicBlock *SrcBB,
+                                  SILBasicBlock *DestBB) {
+  // We are updating SSA form. This means we need to be able to insert phi
+  // nodes. To make sure we can do this split all critical edges from
+  // instructions that don't support block arguments.
+  splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
+
+  SILSSAUpdater SSAUp;
+  for (auto AvailValPair : Cloner.AvailVals) {
+    ValueBase *Inst = AvailValPair.first;
+    if (Inst->use_empty())
+      continue;
+
+    for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
+      // Get the result index for the cloned instruction. This is going to be
+      // the result index stored in the available value for arguments (we look
+      // through the phi node) and the same index as the original value
+      // otherwise.
+      unsigned ResIdx = i;
+      if (isa<SILArgument>(Inst))
+        ResIdx = AvailValPair.second.getResultNumber();
+
+      SILValue Res(Inst, i);
+      SILValue NewRes(AvailValPair.second.getDef(), ResIdx);
+
+      SmallVector<UseWrapper, 16> UseList;
+      // Collect the uses of the value.
+      for (auto Use : Res.getUses())
+        UseList.push_back(UseWrapper(Use));
+
+      SSAUp.Initialize(Res.getType());
+      SSAUp.AddAvailableValue(DestBB, Res);
+      SSAUp.AddAvailableValue(SrcBB, NewRes);
+
+      if (UseList.empty())
+        continue;
+
+      // Update all the uses.
+      for (auto U : UseList) {
+        Operand *Use = U;
+        SILInstruction *User = Use->getUser();
+        assert(User && "Missing user");
+
+        // Ignore uses in the same basic block.
+        if (User->getParent() == DestBB)
+          continue;
+
+        SSAUp.RewriteUse(*Use);
+      }
+    }
+  }
+}
+
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
@@ -736,55 +792,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   }
 
   if (HasDestBBDefsUsedOutsideBlock) {
-    // We are updating SSA form. This means we need to be able to insert phi
-    // nodes. To make sure we can do this split all critical edges from
-    // instructions that don't support block arguments.
-    splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
-
-    SILSSAUpdater SSAUp;
-    for (auto AvailValPair : Cloner.AvailVals) {
-      ValueBase *Inst = AvailValPair.first;
-      if (Inst->use_empty())
-        continue;
-
-      for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
-        // Get the result index for the cloned instruction. This is going to be
-        // the result index stored in the available value for arguments (we look
-        // through the phi node) and the same index as the original value
-        // otherwise.
-        unsigned ResIdx = i;
-        if (isa<SILArgument>(Inst))
-          ResIdx = AvailValPair.second.getResultNumber();
-
-        SILValue Res(Inst, i);
-        SILValue NewRes(AvailValPair.second.getDef(), ResIdx);
-
-        SmallVector<UseWrapper, 16> UseList;
-        // Collect the uses of the value.
-        for (auto Use : Res.getUses())
-          UseList.push_back(UseWrapper(Use));
-
-        SSAUp.Initialize(Res.getType());
-        SSAUp.AddAvailableValue(DestBB, Res);
-        SSAUp.AddAvailableValue(SrcBB, NewRes);
-
-        if (UseList.empty())
-          continue;
-
-        // Update all the uses.
-        for (auto U : UseList) {
-          Operand *Use = U;
-          SILInstruction *User = Use->getUser();
-          assert(User && "Missing user");
-
-          // Ignore uses in the same basic block.
-          if (User->getParent() == DestBB)
-            continue;
-
-          SSAUp.RewriteUse(*Use);
-        }
-      }
-    }
+    updateSSAAfterCloning(Cloner, SrcBB, DestBB);
   }
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
@@ -1224,6 +1232,114 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
   return Changed;
 }
 
+/// simplifyCheckedCastBranchBlock - Simplify a basic block that ends with a
+/// checked_cast_br instruction.
+///
+/// Check if this BB is reachable only from two basic blocks which end
+/// with an unconditional branch and which are reachable from
+/// a single basic block that ends with a checked_cast_br with the
+/// same condition. If this is the case, we can perform jump-threading.
+bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
+  auto *BB = CCBI->getParent();
+  SmallVector<SILBasicBlock *, 2> Preds;
+
+  // It should be an exact checked_cast_br
+  if (!CCBI->isExact())
+    return false;
+
+  // There should be exactly 2 predecessors.
+  for (auto Pred : BB->getPreds()) {
+    Preds.push_back(Pred);
+    if (Preds.size() > 2)
+      return false;
+  }
+
+  if (Preds.size() != 2)
+    return false;
+
+  // They should have a single predecessor.
+  if (!Preds[0]->getSinglePredecessor())
+    return false;
+
+  // They should have the same single predecessor.
+  if (Preds[0]->getSinglePredecessor() != Preds[1]->getSinglePredecessor())
+    return false;
+
+  // And this predecessor should end with checked_cast_br.
+  TermInst *PredTI = Preds[0]->getSinglePredecessor()->getTerminator();
+
+  // Previous checked_cast_br instruction, whose result is being used
+  // for jump-threading.
+  CheckedCastBranchInst *PCCBI = dyn_cast<CheckedCastBranchInst>(PredTI);
+  if (!PCCBI)
+    return false;
+
+  // Bail if the condition being checked is not exactly the same.
+  if (PCCBI->isExact() != CCBI->isExact() ||
+      PCCBI->getCastType() != CCBI->getCastType() ||
+      PCCBI->getOperand() != CCBI->getOperand())
+    return false;
+
+  // Bail if predecessors do not end with a branch.
+  for (auto Pred : Preds) {
+    TermInst *TI = Pred->getTerminator();
+    auto *BI = dyn_cast<BranchInst>(TI);
+    if (!BI)
+      return false;
+  }
+
+  // At this point we know that we can perform a jump-threading.
+
+  // Targets of the checked_cast_br instruction being eliminated.
+  auto *TargetSuccessBB = CCBI->getSuccessBB();
+  auto *TargetFailureBB = CCBI->getFailureBB();
+
+  // Targets of the previous checked_cast_br instruction, whose
+  // results is being used for jump-threading.
+  auto *SuccessBB = (PCCBI->getSuccessBB() == Preds[0]) ? Preds[0] : Preds[1];
+  auto *FailureBB = (PCCBI->getFailureBB() == Preds[0]) ? Preds[0] : Preds[1];
+
+  // First process the failure-branch of the PCCBI.
+  auto *BI = dyn_cast<BranchInst>(FailureBB->getTerminator());
+  SILBuilderWithScope<2> Builder(CCBI);
+  SmallVector<SILValue, 8> FailureBBArgs;
+  for (auto Arg : FailureBB->getBBArgs())
+    FailureBBArgs.push_back(Arg);
+  // Replace checked_cast_br by an unconditional branch to its failure-branch.
+  auto *InsertedBI = Builder.createBranch(BI->getLoc(), TargetFailureBB,
+                                          FailureBBArgs);
+  // Remove the original checked_cast_br instruction.
+  CCBI->eraseFromParent();
+
+  // Then process the success-branch of the PCCBI.
+  BI = dyn_cast<BranchInst>(SuccessBB->getTerminator());
+  ThreadingCloner Cloner(dyn_cast<BranchInst>(SuccessBB->getTerminator()));
+  // Clone the target block into the success-branch block.
+  for (auto &I : *BB) {
+    if (&I != InsertedBI && !dyn_cast<CheckedCastBranchInst>(&I))
+      Cloner.process(&I);
+  }
+
+  // We add this block back to the worklist now that the terminator (likely)
+  // can be simplified.
+  addToWorklist(SuccessBB);
+
+  // Add an unconditional jump at the end of the block.
+  auto &InsnList = SuccessBB->getInstList();
+  SmallVector<SILValue, 8> SuccessBBArgs;
+  for (auto Arg : SuccessBB->getBBArgs())
+    SuccessBBArgs.push_back(Arg);
+  InsertedBI = BranchInst::create(BI->getLoc(), TargetSuccessBB, SuccessBBArgs,
+                                  *BB->getParent());
+  InsnList.insert(InsnList.end(), InsertedBI);
+  // Remove the original branch.
+  BI->eraseFromParent();
+
+  // Now update the SSA form.
+  updateSSAAfterCloning(Cloner, SuccessBB, BB);
+  return true;
+}
+
 void RemoveUnreachable::visit(SILBasicBlock *BB) {
   if (!Visited.insert(BB))
     return;
@@ -1286,6 +1402,9 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case ValueKind::UnreachableInst:
       Changed |= simplifyUnreachableBlock(cast<UnreachableInst>(TI));
+      break;
+    case ValueKind::CheckedCastBranchInst:
+      Changed |= simplifyCheckedCastBranchBlock(cast<CheckedCastBranchInst>(TI));
       break;
     default:
       break;
