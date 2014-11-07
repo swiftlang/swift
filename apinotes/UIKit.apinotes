@@ -5141,7 +5141,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - O
     NullabilityOfRet: S
   - Selector: 'application:viewControllerWithRestorationIdentifierPath:coder:'
     MethodKind: Instance
