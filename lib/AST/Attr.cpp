@@ -189,7 +189,8 @@ void DeclAttribute::print(ASTPrinter &Printer,
     Printer << "@objc";
     llvm::SmallString<32> scratch;
     if (auto Name = cast<ObjCAttr>(this)->getName()) {
-      Printer << "(" << Name->getString(scratch) << ")";
+      if (!cast<ObjCAttr>(this)->isNameImplicit())
+        Printer << "(" << Name->getString(scratch) << ")";
     }
     break;
   }
@@ -316,8 +317,9 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
   }
 }
 
-ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name) {
-  return new (Ctx) ObjCAttr(name);
+ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name,
+                           bool isNameImplicit) {
+  return new (Ctx) ObjCAttr(name, isNameImplicit);
 }
 
 ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
@@ -327,7 +329,7 @@ ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
 }
 
 ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
-  return new (Ctx) ObjCAttr(None);
+  return new (Ctx) ObjCAttr(None, false);
 }
 
 ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
@@ -342,8 +344,9 @@ ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc,
                             NameLoc);
 }
 
-ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, Identifier Name) {
-  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, 0, Name));
+ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, Identifier Name,
+                                  bool isNameImplicit) {
+  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, 0, Name), isNameImplicit);
 }
 
 ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
@@ -361,8 +364,10 @@ ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
 }
 
 ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, 
-                                   ArrayRef<Identifier> Names) {
-  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, Names.size(), Names));
+                                   ArrayRef<Identifier> Names,
+                                   bool isNameImplicit) {
+  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, Names.size(), Names), 
+                            isNameImplicit);
 }
 
 ArrayRef<SourceLoc> ObjCAttr::getNameLocs() const {
@@ -387,7 +392,7 @@ SourceLoc ObjCAttr::getRParenLoc() const {
 }
 
 ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
-  return new (context) ObjCAttr(getName());
+  return new (context) ObjCAttr(getName(), isNameImplicit());
 }
 
 AvailabilityAttr *AvailabilityAttr::createUnavailableAttr(ASTContext &C,

@@ -45,19 +45,6 @@ class Derived : Base {
     return arg
   }
 
-  // FIXME: This override is actually safe.
-  override func safeOverrideProto(arg: NSObjectProtocol) -> ForwardProtoAdopter { // expected-error{{incompatible type}}
-    return ForwardProtoAdopter()
-  }
-
-  override func unsafeOverrideParam(arg: ForwardProtoAdopter) -> NSObjectProtocol { // expected-error{{incompatible type}}
-    return arg
-  }
-
-  override func unsafeOverrideReturn(arg: ForwardProtoAdopter) -> NSObjectProtocol { // expected-error{{incompatible type}}
-    return arg
-  }
-
   override func safeOverridePartialSub(arg: NSObject?) -> PartialSubClass { // no-warning
     return PartialSubClass()
   }

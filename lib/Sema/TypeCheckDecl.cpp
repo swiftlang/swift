@@ -3478,6 +3478,78 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   D->getAttrs().add(new (ctx) DynamicAttr(/*isImplicit=*/true));
 }
 
+/// Check runtime functions responsible for implicit bridging of Objective-C
+/// types.
+static void checkObjCBridgingFunctions(TypeChecker &TC,
+                                       Module *mod,
+                                       StringRef bridgedTypeName,
+                                       StringRef forwardConversion,
+                                       StringRef reverseConversion) {
+  assert(mod);
+  Module::AccessPathTy unscopedAccess = {};
+  SmallVector<ValueDecl *, 4> results;
+  
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(bridgedTypeName),
+                   NLKind::QualifiedLookup, results);
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(forwardConversion),
+                   NLKind::QualifiedLookup, results);
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(reverseConversion),
+                   NLKind::QualifiedLookup, results);
+  
+  for (auto D : results)
+    TC.validateDecl(D);
+}
+
+static void checkBridgedFunctions(TypeChecker &TC) {
+  if (TC.HasCheckedBridgeFunctions)
+    return;
+  
+  TC.HasCheckedBridgeFunctions = true;
+  
+  #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
+  Identifier ID_##BRIDGED_MOD = TC.Context.getIdentifier(#BRIDGED_MOD);\
+  if (Module *module = TC.Context.getLoadedModule(ID_##BRIDGED_MOD)) {\
+    checkObjCBridgingFunctions(TC, module, #BRIDGED_TYPE, \
+    "_convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
+    "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
+  }
+  #include "swift/SIL/BridgedTypes.def"
+  
+  if (Module *module = TC.Context.getLoadedModule(ID_Foundation)) {
+    checkObjCBridgingFunctions(TC, module, "NSArray",
+                               "_convertNSArrayToArray",
+                               "_convertArrayToNSArray");
+    checkObjCBridgingFunctions(TC, module, "NSDictionary",
+                               "_convertNSDictionaryToDictionary",
+                               "_convertDictionaryToNSDictionary");
+  }
+}
+
+/// Mark the given declarations as being Objective-C compatible (or
+/// not) as appropriate.
+static void markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
+  D->setIsObjC(isObjC);
+  
+  if (isObjC) {
+    // Make sure we have the appropriate bridging operations.
+    checkBridgedFunctions(TC);
+
+    // Record the name of this Objective-C method in its class.
+    if (auto classDecl
+          = D->getDeclContext()->isClassOrClassExtensionContext()) {
+      if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
+        classDecl->recordObjCMethod(method);
+      }
+    }
+
+    return;
+  } 
+
+  // FIXME: For now, only @objc declarations can be dynamic.
+  if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
+    attr->setInvalid();
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -3521,63 +3593,6 @@ public:
 
     D->setConformances(D->getASTContext().AllocateCopy(conformances));
   }
-  
-  /// Check runtime functions responsible for implicit bridging of Objective-C
-  /// types.
-  void checkObjCBridgingFunctions(Module *mod,
-                              StringRef bridgedTypeName,
-                              StringRef forwardConversion,
-                              StringRef reverseConversion) {
-    assert(mod);
-    Module::AccessPathTy unscopedAccess = {};
-    SmallVector<ValueDecl *, 4> results;
-    
-    mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(bridgedTypeName),
-                     NLKind::QualifiedLookup, results);
-    mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(forwardConversion),
-                     NLKind::QualifiedLookup, results);
-    mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(reverseConversion),
-                     NLKind::QualifiedLookup, results);
-    
-    for (auto D : results)
-      TC.validateDecl(D);
-  }
-  
-  void checkBridgedFunctions() {
-    if (TC.HasCheckedBridgeFunctions)
-      return;
-    
-    TC.HasCheckedBridgeFunctions = true;
-    
-    #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
-    Identifier ID_##BRIDGED_MOD = TC.Context.getIdentifier(#BRIDGED_MOD);\
-    if (Module *module = TC.Context.getLoadedModule(ID_##BRIDGED_MOD)) {\
-      checkObjCBridgingFunctions(module, #BRIDGED_TYPE, \
-      "_convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
-      "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
-    }
-    #include "swift/SIL/BridgedTypes.def"
-    
-    if (Module *module = TC.Context.getLoadedModule(ID_Foundation)) {
-      checkObjCBridgingFunctions(module, "NSArray",
-                                 "_convertNSArrayToArray",
-                                 "_convertArrayToNSArray");
-      checkObjCBridgingFunctions(module, "NSDictionary",
-                                 "_convertNSDictionaryToDictionary",
-                                 "_convertDictionaryToNSDictionary");
-    }
-  }
-  
-  void markAsObjC(ValueDecl *D, bool isObjC) {
-    D->setIsObjC(isObjC);
-    
-    if (isObjC) {
-      checkBridgedFunctions();
-    } else {
-      if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
-        attr->setInvalid();
-    }
-  }
 
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -3606,9 +3621,6 @@ public:
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
     // when the VarDecl is merely used from another file.
-
-    if (VD->isObjC())
-      checkBridgedFunctions();
 
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
@@ -3877,7 +3889,7 @@ public:
       if (isObjC && !TC.isRepresentableInObjC(SD, reason))
         isObjC = false;
       
-      markAsObjC(SD, isObjC);
+      markAsObjC(TC, SD, isObjC);
     }
 
     // If this variable is marked final and has a getter or setter, mark the
@@ -4287,7 +4299,7 @@ public:
                                        [&](ValueDecl *req,
                                            ConcreteDeclRef witness) {
         if (req->isObjC() && witness)
-          markAsObjC(witness.getDecl(), true);
+          markAsObjC(TC, witness.getDecl(), true);
       });
     }
 
@@ -5224,7 +5236,7 @@ public:
       if (isObjC &&
           (FD->isInvalid() || !TC.isRepresentableInObjC(FD, reason)))
         isObjC = false;
-      markAsObjC(FD, isObjC);
+      markAsObjC(TC, FD, isObjC);
     }
     
     if (!checkOverrides(TC, FD)) {
@@ -5907,7 +5919,7 @@ public:
         }
 
         // Set the name on the attribute.
-        const_cast<ObjCAttr *>(overrideAttr)->setName(name);
+        const_cast<ObjCAttr *>(overrideAttr)->setName(name, /*implicit=*/true);
         return;
       }
 
@@ -6393,7 +6405,7 @@ public:
       if (isObjC &&
           (CD->isInvalid() || !TC.isRepresentableInObjC(CD, reason)))
         isObjC = false;
-      markAsObjC(CD, isObjC);
+      markAsObjC(TC, CD, isObjC);
     }
 
     // Check whether this initializer overrides an initializer in its
@@ -6525,7 +6537,7 @@ public:
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
-    markAsObjC(DD, true);
+    markAsObjC(TC, DD, true);
 
     validateAttributes(TC, DD);
     TC.checkDeclAttributes(DD);
@@ -6675,8 +6687,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (CD->hasSuperclass())
         superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
 
-      CD->setIsObjC(CD->getAttrs().hasAttribute<ObjCAttr>() ||
-                    (superclassDecl && superclassDecl->isObjC()));
+      markAsObjC(*this, CD,
+                 (CD->getAttrs().hasAttribute<ObjCAttr>() ||
+                    (superclassDecl && superclassDecl->isObjC())));
 
       // Determine whether we require in-class initializers.
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
@@ -6740,7 +6753,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         }
       }
 
-      proto->setIsObjC(isObjC);
+      markAsObjC(*this, proto, isObjC);
     }
     break;
   }
@@ -6878,10 +6891,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (isObjC)
           isObjC = isRepresentableInObjC(VD, reason);
 
-        VD->setIsObjC(isObjC);
-        if (!isObjC)
-          if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
-            attr->setInvalid();
+        markAsObjC(*this, VD, isObjC);
       }
 
       inferDynamic(Context, VD);
@@ -6889,12 +6899,19 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (!DeclChecker::checkOverrides(*this, VD)) {
         // If a property has an override attribute but does not override
         // anything, complain.
+        auto overridden = VD->getOverriddenDecl();
         if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
-          if (!VD->getOverriddenDecl()) {
+          if (!overridden) {
             diagnose(VD, diag::property_does_not_override)
               .highlight(OA->getLocation());
             OA->setInvalid();
           }
+        }
+
+        // FIXME: Weird hack because override checking depends on
+        // @objc, but it can also infer @objc. The former is wrong.
+        if (overridden && overridden->isObjC() && !VD->isObjC()) {
+          markAsObjC(*this, VD, true);
         }
       }
 
@@ -7499,7 +7516,7 @@ createDesignatedInitOverride(TypeChecker &tc,
   configureConstructorType(ctor, outerGenericParams, selfType, 
                            bodyParamPatterns->getType());
   if (superclassCtor->isObjC()) {
-    ctor->setIsObjC(true);
+    markAsObjC(tc, ctor, true);
 
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
@@ -8048,7 +8065,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
           TC.diagnose(firstNameLoc, diag::objc_name_req_nullary, which)
             .fixItRemoveChars(afterFirstNameLoc, objcAttr->getRParenLoc());
           const_cast<ObjCAttr *>(objcAttr)->setName(
-            ObjCSelector(TC.Context, 0, objcName->getSelectorPieces()[0]));
+            ObjCSelector(TC.Context, 0, objcName->getSelectorPieces()[0]),
+            /*implicit=*/false);
         }
       } else if (isa<SubscriptDecl>(D)) {
       // Subscripts can never have names.

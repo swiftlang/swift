@@ -74,7 +74,7 @@ class Y : P {
 class Z : Y {
   @objc override func ovl1() -> B { }
   @objc func ovl2() -> C { } // expected-note{{found this candidate}}
-  @objc func ovl3() -> A { }
+  @objc(ovl3_A) func ovl3() -> A { }
   @objc func ovl3() -> B { }
   func generic4<T>(x : T) { }
 }

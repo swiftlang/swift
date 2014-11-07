@@ -328,8 +328,11 @@ protected:
     /// Whether this attribute has location information that trails the main
     /// record, which contains the locations of the parentheses and any names.
     unsigned HasTrailingLocationInfo : 1;
+
+    /// Whether the name is implicit, produced as the result of caching.
+    unsigned ImplicitName : 1;
   };
-  enum { NumObjCAttrBits = NumDeclAttrBits + 1 };
+  enum { NumObjCAttrBits = NumDeclAttrBits + 2 };
   static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
 
   class AccessibilityAttrBitFields {
@@ -680,11 +683,12 @@ class ObjCAttr : public DeclAttribute {
   void *NameData;
 
   /// Create an implicit @objc attribute with the given (optional) name.
-  explicit ObjCAttr(Optional<ObjCSelector> name)
+  explicit ObjCAttr(Optional<ObjCSelector> name, bool implicitName)
     : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
       NameData(nullptr)
   {
     ObjCAttrBits.HasTrailingLocationInfo = false;
+    ObjCAttrBits.ImplicitName = implicitName;
 
     if (name) {
       NameData = name->getOpaqueValue();
@@ -720,7 +724,8 @@ class ObjCAttr : public DeclAttribute {
 
 public:
   /// Create implicit ObjC attribute with a given (optional) name.
-  static ObjCAttr *create(ASTContext &Ctx, Optional<ObjCSelector> name);
+  static ObjCAttr *create(ASTContext &Ctx, Optional<ObjCSelector> name,
+                          bool implicitName);
 
   /// Create an unnamed Objective-C attribute, i.e., @objc.
   static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
@@ -745,7 +750,8 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name);
+  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name, 
+                                 bool isNameImplicit);
 
   /// Create a "selector" Objective-C attribute, which has some number
   /// of identifiers followed by colons.
@@ -757,7 +763,8 @@ public:
 
   /// Create an implicit "selector" Objective-C attribute, which has
   /// some number of identifiers followed by colons.
-  static ObjCAttr *createSelector(ASTContext &Ctx, ArrayRef<Identifier> Names);
+  static ObjCAttr *createSelector(ASTContext &Ctx, ArrayRef<Identifier> Names,
+                                  bool isNameImplicit);
 
   /// Determine whether this attribute has a name associated with it.
   bool hasName() const { return NameData != nullptr; }
@@ -770,8 +777,12 @@ public:
     return ObjCSelector::getFromOpaqueValue(NameData);
   }
 
+  /// Determine whether the name associated with this attribute was
+  /// implicit.
+  bool isNameImplicit() const { return ObjCAttrBits.ImplicitName; }
+
   /// Set the name of this entity.
-  void setName(ObjCSelector name) {
+  void setName(ObjCSelector name, bool implicit) {
     // If we already have a name and we have location information, make sure
     // drop the location information rather than allowing it to corrupt our
     // state
@@ -782,6 +793,7 @@ public:
     }
 
     NameData = name.getOpaqueValue();
+    ObjCAttrBits.ImplicitName = implicit;
   }
 
   /// Clear the name of this entity.

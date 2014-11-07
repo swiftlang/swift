@@ -3,7 +3,7 @@
 class A {
   @objc func do_a() {}
 
-  @objc func do_b(x: Int) {}
+  @objc(do_b_2:) func do_b(x: Int) {}
   @objc func do_b(x: Float) {}
 
   @objc func do_c(#x: Int) {}

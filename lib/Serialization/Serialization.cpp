@@ -1474,7 +1474,8 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     }
     auto abbrCode = DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
     ObjCDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   theAttr->isImplicit(), numArgs, pieces);
+                                   theAttr->isImplicit(), 
+                                   theAttr->isNameImplicit(), numArgs, pieces);
     return;
   }
   }

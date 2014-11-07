@@ -418,7 +418,9 @@ func testNSExtensionContext(url: NSURL, extensionContext: NSExtensionContext) {
 }
 
 func testDealloc(obj: NSObject) {
-  obj.dealloc() // expected-error{{'dealloc()' is unavailable: use 'deinit' to define a de-initializer}}
+  // dealloc is subsumed by deinit.
+  // FIXME: Special-case diagnostic in the type checker?
+  obj.dealloc() // expected-error{{'NSObject' does not have a member named 'dealloc'}}
 }
 
 func testConstantGlobals() {

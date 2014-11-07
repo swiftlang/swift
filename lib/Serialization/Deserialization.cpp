@@ -1710,19 +1710,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       case decls_block::ObjC_DECL_ATTR: {
         bool isImplicit;
+        bool isImplicitName;
         uint64_t numArgs;
         ArrayRef<uint64_t> rawPieceIDs;
         serialization::decls_block::ObjCDeclAttrLayout::readRecord(
-            scratch, isImplicit, numArgs, rawPieceIDs);
+          scratch, isImplicit, isImplicitName, numArgs, rawPieceIDs);
 
         SmallVector<Identifier, 4> pieces;
         for (auto pieceID : rawPieceIDs)
           pieces.push_back(getIdentifier(pieceID));
 
         if (numArgs == 0)
-          Attr = ObjCAttr::create(ctx, None);
+          Attr = ObjCAttr::create(ctx, None, isImplicitName);
         else
-          Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces));
+          Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces),
+                                  isImplicitName);
         Attr->setImplicit(isImplicit);
         break;
       }

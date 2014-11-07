@@ -2996,7 +2996,7 @@ public:
   }
 };
 
-class ObjCMemberLookupTable;
+class ObjCMethodLookupTable;
 
 /// ClassDecl - This is the declaration of a class, for example:
 ///
@@ -3007,10 +3007,10 @@ class ObjCMemberLookupTable;
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   Type Superclass;
-  ObjCMemberLookupTable *ObjCMemberLookup = nullptr;
+  ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
 
   /// Create the Objective-C member lookup table.
-  void createObjCMemberLookup();
+  void createObjCMethodLookup();
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -3108,12 +3108,20 @@ public:
   /// Look in this class and its extensions (but not any of its protocols or
   /// superclasses) for declarations with a given Objective-C selector.
   ///
-  /// Note that this can find methods, initializers, getters, and setters.
-  ArrayRef<ValueDecl *> lookupDirect(ObjCSelector selector);
+  /// Note that this can find methods, initializers, deinitializers,
+  /// getters, and setters.
+  ///
+  /// \param selector The Objective-C selector of the method we're
+  /// looking for.
+  ///
+  /// \param isInstance Whether we are looking for an instance method
+  /// (vs. a class method).
+  MutableArrayRef<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
+                                                       bool isInstance);
 
-  /// Record the presence of an @objc member whose Objective-C name has been
+  /// Record the presence of an @objc method whose Objective-C name has been
   /// finalized.
-  void recordObjCMember(ValueDecl *vd);
+  void recordObjCMethod(AbstractFunctionDecl *method);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

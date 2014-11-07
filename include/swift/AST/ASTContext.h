@@ -642,6 +642,19 @@ public:
   /// \brief Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
+  /// Note that there is a conflict between different definitions that
+  /// produce the same Objective-C method.
+  void recordObjCMethodConflict(ClassDecl *classDecl, ObjCSelector selector,
+                                bool isInstance);
+
+  /// Diagnose all conflicts between members that have the same
+  /// Objective-C selector in the same class.
+  ///
+  /// \param sf The source file for which we are diagnosing conflicts.
+  ///
+  /// \returns true if there were any conflicts diagnosed.
+  bool diagnoseObjCMethodConflicts(SourceFile &sf);
+
 private:
   friend class Decl;
   Optional<RawComment> getRawComment(const Decl *D);

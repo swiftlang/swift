@@ -127,7 +127,13 @@ public:
   static Identifier getFromOpaquePointer(void *P) {
     return Identifier((const char*)P);
   }
-  
+
+  /// Compare two identifiers, producing -1 if \c *this comes before \c other,
+  /// 1 if \c *this comes after \c other, and 0 if they are equal.
+  ///
+  /// Null identifiers come after all other identifiers.
+  int compare(Identifier other) const;
+
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
   bool operator!=(Identifier RHS) const { return Pointer != RHS.Pointer; }
 
@@ -233,7 +239,7 @@ class DeclName {
   DeclName(void *Opaque)
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
   {}
-  
+
 public:
   /// Build a null name.
   DeclName() : SimpleOrCompound(IdentifierAndCompound()) {}
@@ -328,12 +334,35 @@ public:
       table[getBaseName()].push_back(elt);
     }
   }
-  
+
+  /// Compare two declaration names, producing -1 if \c *this comes before
+  /// \c other,  1 if \c *this comes after \c other, and 0 if they are equal.
+  ///
+  /// Null declaration names come after all other declaration names.
+  int compare(DeclName other) const;
+
   friend bool operator==(DeclName lhs, DeclName rhs) {
     return lhs.getOpaqueValue() == rhs.getOpaqueValue();
   }
+
   friend bool operator!=(DeclName lhs, DeclName rhs) {
     return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+  }
+
+  friend bool operator<(DeclName lhs, DeclName rhs) {
+    return lhs.compare(rhs) < 0;
+  }
+
+  friend bool operator<=(DeclName lhs, DeclName rhs) {
+    return lhs.compare(lhs) <= 0;
+  }
+
+  friend bool operator>(DeclName lhs, DeclName rhs) {
+    return lhs.compare(lhs) > 0;
+  }
+
+  friend bool operator>=(DeclName lhs, DeclName rhs) {
+    return lhs.compare(lhs) >= 0;
   }
 
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }

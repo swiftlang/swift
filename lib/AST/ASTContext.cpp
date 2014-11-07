@@ -20,6 +20,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
@@ -31,6 +32,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include <algorithm>
 #include <memory>
 
 using namespace swift;
@@ -47,6 +49,10 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 #include "swift/AST/KnownProtocols.def"
   }
   llvm_unreachable("bad KnownProtocolKind");
+}
+
+namespace {
+  typedef std::tuple<ClassDecl *, ObjCSelector, bool> ObjCMethodConflict;
 }
 
 struct ASTContext::Implementation {
@@ -233,6 +239,9 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<GenericSignature> GenericSignatures;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, ArchetypeType *> OpenedExistentialArchetypes;
+
+  /// List of Objective-C member conflicts we have found during type checking.
+  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
   /// \brief The permanent arena.
   Arena Permanent;
@@ -1354,6 +1363,265 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // SpecializedConformances ?
     // InheritedConformances ?
     llvm::capacity_in_bytes(ConformsTo);
+}
+
+void ASTContext::recordObjCMethodConflict(ClassDecl *classDecl,
+                                          ObjCSelector selector,
+                                          bool isInstance) {
+  Impl.ObjCMethodConflicts.push_back(std::make_tuple(classDecl, selector,
+                                                      isInstance));
+}
+
+/// Retrieve the source file for the given Objective-C member conflict.
+static MutableArrayRef<AbstractFunctionDecl *>
+getObjCMethodConflictDecls(const ObjCMethodConflict &conflict) {
+  ClassDecl *classDecl = std::get<0>(conflict);
+  ObjCSelector selector = std::get<1>(conflict);
+  bool isInstanceMethod = std::get<2>(conflict);
+
+  return classDecl->lookupDirect(selector, isInstanceMethod);
+}
+
+namespace {
+  /// Produce a deterministic ordering of the given declarations.
+  class OrderDeclarations {
+    SourceManager &SrcMgr;
+
+  public:
+    OrderDeclarations(SourceManager &srcMgr) : SrcMgr(srcMgr) { }
+
+    bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
+      // If the declarations come from different modules, order based on the
+      // module.
+      Module *lhsModule = lhs->getDeclContext()->getParentModule();
+      Module *rhsModule = rhs->getDeclContext()->getParentModule();
+      if (lhsModule != rhsModule) {
+        return lhsModule->Name.str() < rhsModule->Name.str();
+      }
+
+      // If the two declarations are in the same source file, order based on
+      // location within that source file.
+      SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
+      SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
+      if (lhsSF == rhsSF) {
+        // If only one location is valid, the valid location comes first.
+        if (lhs->getLoc().isValid() != rhs->getLoc().isValid()) {
+          return lhs->getLoc().isValid();
+        }
+
+        // Prefer the declaration that comes first in the source file.
+        return SrcMgr.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
+      }
+
+      // The declarations are in different source files (or unknown source
+      // files) of the same module. Order based on name.
+      // FIXME: This isn't a total ordering.
+      return lhs->getFullName() < rhs->getFullName();
+    }
+  };
+
+  /// Produce a deterministic ordering of the given declarations with a bias
+  /// that favors declarations in the given source file.
+  class OrderDeclarationsWithSourceFileBias {
+    SourceManager &SrcMgr;
+    SourceFile &SF;
+
+  public:
+    OrderDeclarationsWithSourceFileBias(SourceManager &srcMgr, SourceFile &sf)
+      : SrcMgr(srcMgr), SF(sf) { }
+
+    bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
+      // If the two declarations are in different source files, and one of those
+      // source files is the source file we're biasing toward, prefer that
+      // declaration.
+      SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
+      SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
+      if (lhsSF != rhsSF) {
+        if (lhsSF == &SF) return true;
+        if (rhsSF == &SF) return false;
+      }
+
+      // Fall back to the normal deterministic ordering.
+      return OrderDeclarations(SrcMgr)(lhs, rhs);
+    }
+  };
+}
+
+/// Compute the information used to describe an Objective-C redeclaration.
+static std::pair<unsigned, DeclName> getObjCRedeclInfo(
+                                       AbstractFunctionDecl *member) {
+  if (isa<ConstructorDecl>(member))
+    return { 0 + member->isImplicit(), member->getFullName() };
+
+  if (isa<DestructorDecl>(member))
+    return { 2 + member->isImplicit(), member->getFullName() };
+
+  auto func = dyn_cast<FuncDecl>(member);
+  switch (func->getAccessorKind()) {
+  case AccessorKind::IsAddressor:
+  case AccessorKind::IsDidSet:
+  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::IsWillSet:
+    llvm_unreachable("Not an Objective-C entry point");
+
+  case AccessorKind::IsGetter:
+    if (auto var = dyn_cast<VarDecl>(func->getAccessorStorageDecl()))
+      return { 5, var->getFullName() };
+
+    return { 6, Identifier() };
+
+  case AccessorKind::IsSetter:
+    if (auto var = dyn_cast<VarDecl>(func->getAccessorStorageDecl()))
+      return { 7, var->getFullName() };
+    return { 8, Identifier() };
+
+  case AccessorKind::NotAccessor:
+    // Normal method.
+    return { 4, func->getFullName() };
+  }
+}
+
+/// Given a set of conflicting Objective-C methods, remove any methods
+/// that are legitimately overridden in Objective-C, i.e., because
+/// they occur in different modules, one is defined in the class, and
+/// the other is defined in an extension (category) thereof.
+static void removeValidObjCConflictingMethods(
+              MutableArrayRef<AbstractFunctionDecl *> &methods) {
+  // Erase any invalid declarations. We don't want to complain about
+  // them, because we might already have complained about
+  // redeclarations based on Swift matching.
+  auto newEnd = std::remove_if(methods.begin(), methods.end(),
+                               [&](AbstractFunctionDecl *method) {
+                                 if (method->isInvalid())
+                                   return true;
+
+                                 if (auto func = dyn_cast<FuncDecl>(method)) {
+                                   if (func->isAccessor()) {
+                                     return func->getAccessorStorageDecl()
+                                             ->isInvalid();
+                                   }
+                                 }
+                                 
+                                 return false;
+                               });
+  methods = methods.slice(0, newEnd - methods.begin());
+
+  // Identify the method that occurs in a class definition (not an
+  // extension).
+  Optional<unsigned> methodInClass;
+  for (unsigned i = 0, n = methods.size(); i != n; ++i) {
+    auto method = methods[i];
+
+    if (isa<ClassDecl>(method->getDeclContext())) {
+      if (methodInClass)
+        return;
+
+      methodInClass = i;
+      break;
+    }
+  }
+
+  if (!methodInClass)
+    return;
+
+  // Verify that at least one other declaration comes from a different module.
+  auto classModule
+    = methods[*methodInClass]->getDeclContext()->getParentModule();
+  for (auto method : methods) {
+    if (method->getDeclContext()->getParentModule() != classModule) {
+      // Remove the method that comes from the class.
+      std::copy(methods.begin() + *methodInClass + 1, methods.end(),
+                methods.begin() + *methodInClass);
+      methods = methods.slice(0, methods.size() - 1);
+      return;
+    }
+  }
+}
+
+bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
+  // If there were no conflicts, we're done.
+  if (Impl.ObjCMethodConflicts.empty())
+    return false;
+
+  // Partition the set of conflicts to put the conflicts that involve
+  // this source file at the end.
+  auto firstLocalConflict
+    = std::partition(Impl.ObjCMethodConflicts.begin(),
+                     Impl.ObjCMethodConflicts.end(),
+                     [&](const ObjCMethodConflict &conflict) -> bool {
+                       auto decls = getObjCMethodConflictDecls(conflict);
+                       for (auto decl : decls) {
+                         if (decl->getDeclContext()->getParentSourceFile() 
+                               == &sf) {
+                           // It's in this source file. Sort the conflict
+                           // declarations. We'll use this later.
+                           std::sort(
+                             decls.begin(), decls.end(),
+                             OrderDeclarationsWithSourceFileBias(SourceMgr,
+                                                                 sf));
+
+                           return false;
+                         }
+                       }
+
+                       return true;
+                     });
+
+  // If there were no local conflicts, we're done.
+  unsigned numLocalConflicts
+    = Impl.ObjCMethodConflicts.end() - firstLocalConflict;
+  if (numLocalConflicts == 0)
+    return false;
+
+  // Sort the set of conflicts so we get a deterministic order for
+  // diagnostics. We use the first conflicting declaration in each set to
+  // perform the sort.
+  MutableArrayRef<ObjCMethodConflict> localConflicts(&*firstLocalConflict,
+                                                     numLocalConflicts);
+  std::sort(localConflicts.begin(), localConflicts.end(),
+            [&](const ObjCMethodConflict &lhs, const ObjCMethodConflict &rhs) {
+              OrderDeclarations ordering(SourceMgr);
+              return ordering(getObjCMethodConflictDecls(lhs)[1],
+                              getObjCMethodConflictDecls(rhs)[1]);
+            });
+
+  // Diagnose each conflict.
+  bool anyConflicts = false;
+  for (const ObjCMethodConflict &conflict : localConflicts) {
+    ObjCSelector selector = std::get<1>(conflict);
+
+    auto methods = getObjCMethodConflictDecls(conflict);
+
+    // Prune out cases where it is acceptable to have a conflict.
+    removeValidObjCConflictingMethods(methods);
+    if (methods.size() < 2)
+      continue;
+
+    // Diagnose the conflict.
+    anyConflicts = true;
+    auto originalMethod = methods.front();
+    auto conflictingMethods = methods.slice(1);
+
+    auto origRedeclInfo = getObjCRedeclInfo(originalMethod);
+    for (auto conflictingDecl : conflictingMethods) {
+      auto redeclInfo = getObjCRedeclInfo(conflictingDecl);
+      Diags.diagnose(conflictingDecl->getLoc(), diag::objc_redecl,
+                     redeclInfo.first,
+                     redeclInfo.second,
+                     selector);
+      Diags.diagnose(originalMethod->getLoc(), diag::objc_redecl_prev,
+                     origRedeclInfo.first,
+                     origRedeclInfo.second,
+                     selector);
+    }
+  }
+
+  // Erase the local conflicts from the list of conflicts.
+  Impl.ObjCMethodConflicts.erase(firstLocalConflict,
+                                 Impl.ObjCMethodConflicts.end());
+
+  return anyConflicts;
 }
 
 //===----------------------------------------------------------------------===//

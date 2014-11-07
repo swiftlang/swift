@@ -2003,7 +2003,25 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
   }
   
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    if (!FD->isAccessor()) {
+    if (FD->isAccessor()) {
+      // Accessors can only be @objc if the storage declaration is.
+      auto storage = FD->getAccessorStorageDecl();
+      if (!storage->isObjC()) {
+        if (Diagnose) {
+          auto error = FD->isGetter()
+                    ? (isa<VarDecl>(storage) 
+                         ? diag::objc_getter_for_nonobjc_property
+                         : diag::objc_getter_for_nonobjc_subscript)
+                    : (isa<VarDecl>(storage)
+                         ? diag::objc_setter_for_nonobjc_property
+                         : diag::objc_setter_for_nonobjc_subscript);
+
+          diagnose(FD->getLoc(), error);
+          describeObjCReason(*this, AFD, Reason);
+        }
+        return false;
+      }
+    } else {
       unsigned ExpectedParamPatterns = 1;
       if (FD->getImplicitSelfDecl())
         ExpectedParamPatterns++;

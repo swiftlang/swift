@@ -64,6 +64,39 @@ bool Identifier::isOperatorSlow() const {
   return !empty() && isOperatorStartCodePoint(codePoint);
 }
 
+int Identifier::compare(Identifier other) const {
+  // Handle empty identifiers.
+  if (empty() || other.empty()) {
+    if (empty() != other.empty()) {
+      return other.empty() ? -1 : 1;
+    }
+
+    return 0;
+  }
+
+  return str().compare(other.str());
+}
+
+int DeclName::compare(DeclName other) const {
+  // Compare base names.
+  if (int result = getBaseName().compare(other.getBaseName()))
+    return result;
+
+  // Compare argument names.
+  auto argNames = getArgumentNames();
+  auto otherArgNames = other.getArgumentNames();
+  for (unsigned i = 0, n = std::min(argNames.size(), otherArgNames.size());
+       i != n; ++i) {
+    if (int result = argNames[i].compare(otherArgNames[i]))
+      return result;
+  }
+
+  if (argNames.size() == otherArgNames.size())
+    return 0;
+
+  return argNames.size() < otherArgNames.size() ? -1 : 1;
+}
+
 void DeclName::dump() const {
   llvm::errs() << *this << "\n";
 }

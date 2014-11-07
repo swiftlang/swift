@@ -2043,13 +2043,15 @@ namespace {
     /// The importer should use this rather than adding the attribute directly.
     void addObjCAttribute(ValueDecl *decl, Optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
-      decl->getAttrs().add(ObjCAttr::create(ctx, name));
+      decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicit=*/true));
 
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.
       if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
         if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
-          classDecl->recordObjCMember(decl);
+          if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
+            classDecl->recordObjCMethod(method);
+          }
         }
       }
     }
@@ -2086,12 +2088,7 @@ namespace {
         return false;
 
       // Look for a matching member.
-      for (auto member : classDecl->lookupDirect(selector)) {
-        if (member->isInstanceMember() == isInstance)
-          return true;
-      }
-
-      return false;
+      return !classDecl->lookupDirect(selector, isInstance).empty();
     }
 
     /// If the given method is a factory method, import it as a constructor
@@ -2312,14 +2309,14 @@ namespace {
         result->getAttrs().add(new (Impl.SwiftContext)
                                       OptionalAttr(/*implicit*/false));
 
-      // Mark this method @objc.
-      addObjCAttribute(result, selector);
-
       // Mark class methods as static.
       if (decl->isClassMethod() || forceClassMethod)
         result->setStatic();
       if (forceClassMethod)
         result->setImplicit();
+
+      // Mark this method @objc.
+      addObjCAttribute(result, selector);
 
       // If this method overrides another method, mark it as such.
       recordObjCOverride(result);

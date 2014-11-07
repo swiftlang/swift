@@ -774,12 +774,13 @@ public:
 
 /// Class member lookup table, which is a member lookup table with a second
 /// table for lookup based on Objective-C selector.
-class swift::ObjCMemberLookupTable
-        : public llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<ValueDecl *>>
+class swift::ObjCMethodLookupTable
+        : public llvm::DenseMap<std::pair<ObjCSelector, char>,
+                                llvm::TinyPtrVector<AbstractFunctionDecl *>>
 {
 public:
   void destroy() {
-    this->~ObjCMemberLookupTable();
+    this->~ObjCMethodLookupTable();
   }
 
   // Only allow allocation of member lookup tables using the allocator in
@@ -989,51 +990,59 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
   return { known->second.begin(), known->second.size() };
 }
 
-void ClassDecl::createObjCMemberLookup() {
-  assert(!ObjCMemberLookup && "Already have an Objective-C member table");
+void ClassDecl::createObjCMethodLookup() {
+  assert(!ObjCMethodLookup && "Already have an Objective-C member table");
   auto &ctx = getASTContext();
-  ObjCMemberLookup = new (ctx) ObjCMemberLookupTable();
+  ObjCMethodLookup = new (ctx) ObjCMethodLookupTable();
 
   // Register a cleanup with the ASTContext to call the lookup table
   // destructor.
   ctx.addCleanup([this]() {
-    this->ObjCMemberLookup->destroy();
+    this->ObjCMethodLookup->destroy();
   });
 }
 
-ArrayRef<ValueDecl *> ClassDecl::lookupDirect(ObjCSelector selector) {
-  if (!ObjCMemberLookup) {
-    createObjCMemberLookup();
+MutableArrayRef<AbstractFunctionDecl *>
+ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
+  if (!ObjCMethodLookup) {
+    createObjCMethodLookup();
   }
 
-  auto known = ObjCMemberLookup->find(selector);
-  if (known != ObjCMemberLookup->end())
+  auto known = ObjCMethodLookup->find({selector, isInstance});
+  if (known != ObjCMethodLookup->end())
     return { known->second.begin(), known->second.end() };
 
   // FIXME: Callback to perform lazy lookup of selectors.
   return { };
 }
 
-void ClassDecl::recordObjCMember(ValueDecl *vd) {
-  if (!ObjCMemberLookup) {
-    createObjCMemberLookup();
+void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
+  if (!ObjCMethodLookup) {
+    createObjCMethodLookup();
   }
 
-  assert(vd->isObjC() && "Not an Objective-C member");
+  assert(method->isObjC() && "Not an Objective-C method");
 
-  // For variables and subscripts, record the getter and setter separately.
-  if (auto storageDecl = dyn_cast<AbstractStorageDecl>(vd)) {
-    auto getter = storageDecl->getGetter();
-    (*ObjCMemberLookup)[getter->getObjCSelector()].push_back(getter);
+  // Record the method.
+  bool isInstanceMethod = method->isInstanceMember();
+  auto selector = method->getObjCSelector();
+  auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}];
 
-    if (auto setter = storageDecl->getSetter())
-      (*ObjCMemberLookup)[setter->getObjCSelector()].push_back(setter);
-    return;
+  // In a non-empty vector, we could have duplicates or conflicts.
+  if (!vec.empty()) {
+    // Check whether we have a duplicate. This only checks more than one
+    // element in ill-formed code, so the linear search is acceptable.
+    if (std::find(vec.begin(), vec.end(), method) != vec.end())
+      return;
+
+    if (vec.size() == 1) {
+      // We have a conflict.
+      getASTContext().recordObjCMethodConflict(this, selector,
+                                               isInstanceMethod);
+    }
   }
 
-  // For methods and initializers, record just the method or initializer.
-  auto afd = cast<AbstractFunctionDecl>(vd);
-  (*ObjCMemberLookup)[afd->getObjCSelector()].push_back(afd);
+  vec.push_back(method);
 }
 
 static bool checkAccessibility(const DeclContext *useDC,

@@ -2445,7 +2445,7 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
 
   // Cache the result, so we don't perform string manipulation again.
   if (objcAttr)
-    const_cast<ObjCAttr *>(objcAttr)->setName(result);
+    const_cast<ObjCAttr *>(objcAttr)->setName(result, /*implicit=*/true);
 
   return result;
 }
@@ -3273,7 +3273,7 @@ ObjCSelector FuncDecl::getObjCSelector() const {
   // If we did any string manipulation, cache the result. We don't want to
   // do that again.
   if (didStringManipulation && objc)
-    const_cast<ObjCAttr *>(objc)->setName(result);
+    const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
 
   return result;
 }
@@ -3396,7 +3396,7 @@ ObjCSelector ConstructorDecl::getObjCSelector() const {
         // Cache the name in the 'objc' attribute. We don't want to perform
         // string manipulation again.
         if (objc)
-          const_cast<ObjCAttr *>(objc)->setName(result);
+          const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
         return result;
       }
     } else {
@@ -3412,7 +3412,7 @@ ObjCSelector ConstructorDecl::getObjCSelector() const {
   // Cache the name in the 'objc' attribute. We don't want to perform
   // string manipulation again.
   if (objc && didStringManipulation)
-    const_cast<ObjCAttr *>(objc)->setName(result);
+    const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
 
   return result;
 }
