@@ -28,6 +28,11 @@ using namespace swift;
 static_assert(std::is_same<swift_once_t, dispatch_once_t>::value,
               "swift_once_t and dispatch_once_t must stay in sync");
 #endif
+// The compiler generates the swift_once_t values as word-sized zero-initialized
+// variables, so we want to make sure swift_once_t isn't larger than the
+// platform word or the function below might overwrite something it shouldn't.
+static_assert(sizeof(swift_once_t) <= sizeof(void*),
+              "swift_once_t must be no larger than the platform word");
 
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must point to a global or static variable of static
