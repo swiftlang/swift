@@ -50,9 +50,9 @@ CastTrapsTestSuite.test("${t1}__${t2}")
   .crashOutputMatches(" to '${t2}'")
   .code
 {
+  let o = ${t1}() as Any
   expectCrashLater()
-  (${t1}() as Any) as ${t2}
-  expectTrue(false)  // should have crashed
+  o as ${t2}
 }
 
 %   end
@@ -69,9 +69,9 @@ CastTrapsTestSuite.test("${t1}__${t2}")
   .crashOutputMatches(" to '${t2}'")
   .code
 {
+  let o = ${t1}() as AnyObject
   expectCrashLater()
-  (${t1}() as AnyObject) as ${t2}
-  expectTrue(false)  // should have crashed
+  o as ${t2}
 }
 
 %   end
