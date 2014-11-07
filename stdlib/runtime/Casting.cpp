@@ -306,6 +306,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     if (!witness)
       return false;
     *conformance = witness;
+    return true;
   }
 
   // For Objective-C protocols, check whether we have a class that
