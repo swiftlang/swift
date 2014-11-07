@@ -23,6 +23,7 @@
 #include "swift/Driver/Tool.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
@@ -46,33 +47,48 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
     SkipTaskExecution(SkipTaskExecution) {
 };
 
+using CommandSet = llvm::DenseSet<const Command *>;
+
+struct Compilation::PerformJobsState {
+  /// All Commands which have been scheduled for execution (whether or not
+  /// they've finished execution), or which have been determined that they
+  /// don't need to run.
+  CommandSet ScheduledCommands;
+
+  /// All Commands which have finished execution or which have been determined
+  /// that they don't need to run.
+  CommandSet FinishedCommands;
+
+  /// A map from a Command to the Commands it is known to be blocking.
+  ///
+  /// The blocked Commands should be scheduled as soon as possible.
+  llvm::DenseMap<const Command *, TinyPtrVector<const Command *>>
+      BlockingCommands;
+};
+
 Compilation::~Compilation() = default;
 
 void Compilation::addJob(Job *J) {
   Jobs->addJob(J);
 }
 
-typedef llvm::DenseSet<const Command *> CommandSet;
-
-static bool allJobsInListHaveFinished(const JobList &JL,
-                                      const CommandSet &FinishedCommands) {
+static const Command *findUnfinishedJob(const JobList &JL,
+                                        const CommandSet &FinishedCommands) {
   for (const Job *J : JL) {
     if (const Command *Cmd = dyn_cast<Command>(J)) {
       if (!FinishedCommands.count(Cmd))
-        return false;
+        return Cmd;
     } else if (const JobList *List = dyn_cast<JobList>(J)) {
-      if (!allJobsInListHaveFinished(*List, FinishedCommands))
-        return false;
+      if (auto *Unfinished = findUnfinishedJob(*List, FinishedCommands))
+        return Unfinished;
     } else {
       llvm_unreachable("Unknown Job class!");
     }
   }
-  return true;
+  return nullptr;
 }
 
-int Compilation::performJobsInList(const JobList &JL,
-                                   CommandSet &ScheduledCommands,
-                                   CommandSet &FinishedCommands) {
+int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   // Create a TaskQueue for execution.
   std::unique_ptr<TaskQueue> TQ;
   if (SkipTaskExecution)
@@ -80,17 +96,25 @@ int Compilation::performJobsInList(const JobList &JL,
   else
     TQ.reset(new TaskQueue(NumberOfParallelCommands));
 
+  llvm::DenseMap<const Command *, TinyPtrVector<const Command *>>
+      BlockingCommands;
+
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
   // and if all of its inputs are in FinishedCommands.
   auto scheduleCommandIfNecessaryAndPossible = [&] (const Command *Cmd) {
-    if (!ScheduledCommands.count(Cmd)) {
-      if (allJobsInListHaveFinished(Cmd->getInputs(), FinishedCommands)) {
-        ScheduledCommands.insert(Cmd);
-        TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
-                    (void *)Cmd);
-      }
+    if (State.ScheduledCommands.count(Cmd))
+      return;
+
+    if (auto Blocking = findUnfinishedJob(Cmd->getInputs(),
+                                          State.FinishedCommands)) {
+      State.BlockingCommands[Blocking].push_back(Cmd);
+      return;
     }
+
+    State.ScheduledCommands.insert(Cmd);
+    TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
+                (void *)Cmd);
   };
 
   // Set up handleCommandWhichDoesNotNeedToExecute.
@@ -103,16 +127,15 @@ int Compilation::performJobsInList(const JobList &JL,
       parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
     }
 
-    ScheduledCommands.insert(Cmd);
-    FinishedCommands.insert(Cmd);
+    State.ScheduledCommands.insert(Cmd);
+    State.FinishedCommands.insert(Cmd);
   };
 
   // Perform all inputs to the Jobs in our JobList, and schedule any Commands
   // which we know need to execute.
   for (const Job *J : JL) {
     if (const Command *Cmd = dyn_cast<Command>(J)) {
-      int res = performJobsInList(Cmd->getInputs(), ScheduledCommands,
-                                  FinishedCommands);
+      int res = performJobsInList(Cmd->getInputs(), State);
       if (res != 0)
         return res;
 
@@ -123,7 +146,7 @@ int Compilation::performJobsInList(const JobList &JL,
       else
         handleCommandWhichDoesNotNeedToExecute(Cmd);
     } else if (const JobList *List = dyn_cast<JobList>(J)) {
-      int res = performJobsInList(*List, ScheduledCommands, FinishedCommands);
+      int res = performJobsInList(*List, State);
       if (res != 0)
         return res;
     } else {
@@ -188,20 +211,13 @@ int Compilation::performJobsInList(const JobList &JL,
     // JobList.
 
     // TODO: use the Command which just finished to evaluate other Commands.
-    FinishedCommands.insert(FinishedCmd);
-    for (const Job *J : JL) {
-      if (const Command *Cmd = dyn_cast<Command>(J)) {
-        // TODO: replace with a real check once available.
-        if (Cmd != FinishedCmd) {
-          bool needsToExecute = true;
-          if (needsToExecute)
-            scheduleCommandIfNecessaryAndPossible(Cmd);
-          else
-            handleCommandWhichDoesNotNeedToExecute(Cmd);
-        }
-      } else {
-        assert(isa<JobList>(J) && "Unknown Job class!");
-      }
+    State.FinishedCommands.insert(FinishedCmd);
+
+    auto BlockedIter = State.BlockingCommands.find(FinishedCmd);
+    if (BlockedIter != State.BlockingCommands.end()) {
+      for (auto *Blocked : BlockedIter->second)
+        scheduleCommandIfNecessaryAndPossible(Blocked);
+      State.BlockingCommands.erase(BlockedIter);
     }
 
     return TaskFinishedResponse::ContinueExecution;
@@ -237,6 +253,11 @@ int Compilation::performJobsInList(const JobList &JL,
 
   // Ask the TaskQueue to execute.
   TQ->execute(taskBegan, taskFinished, taskSignalled);
+
+  if (Result == 0) {
+    assert(State.BlockingCommands.empty() &&
+           "some blocking commands never finished properly");
+  }
 
   return Result;
 }
@@ -287,17 +308,9 @@ int Compilation::performJobs() {
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
-  
-  // Set up a set for storing all Commands which have been scheduled for
-  // execution (whether or not they've finished execution),
-  // or which have been determined that they don't need to run.
-  CommandSet ScheduledCommands;
 
-  // Set up a set for storing all Commands which have finished execution or
-  // which have been determined that they don't need to run.
-  CommandSet FinishedCommands;
-
-  int result = performJobsInList(*Jobs, ScheduledCommands, FinishedCommands);
+  PerformJobsState State;
+  int result = performJobsInList(*Jobs, State);
 
   // FIXME: Do we want to be deleting temporaries even when a child process
   // crashes?

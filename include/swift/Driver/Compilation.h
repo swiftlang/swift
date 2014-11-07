@@ -125,19 +125,17 @@ public:
   int performJobs();
 
 private:
+  struct PerformJobsState;
+
   /// \brief Perform the Jobs in \p JL if necessary.
   ///
   /// \param JL the list of Jobs to perform
-  /// \param ScheduledCommands a set of Commands which have been previously
-  /// scheduled
-  /// \param FinishedCommands a set of Commands which have finished execution,
+  /// \param State persistent state that crosses the entire compilation
   /// or which are known not to need to execute.
   ///
   /// \returns exit code of the first failed Job, or 0 on success. A return
   /// value of -2 indicates that a Job crashed during execution.
-  int performJobsInList(const JobList &JL,
-                        llvm::DenseSet<const Command *> &ScheduledCommands,
-                        llvm::DenseSet<const Command *> &FinishedCommands);
+  int performJobsInList(const JobList &JL, PerformJobsState &State);
 
   /// \brief Performs a single Command by executing in place, if possible.
   ///
