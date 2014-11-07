@@ -2436,8 +2436,6 @@ Classes:
   Properties:
   - Name: defaultDate
     Nullability: O
-  - Name: locale
-    Nullability: O
 - Name: NSDateIntervalFormatter
   Methods:
   - Selector: 'stringFromDate:toDate:'
@@ -9282,7 +9280,7 @@ Classes:
     NullabilityOfRet: S
   Properties:
   - Name: threadDictionary
-    Nullability: O
+    Nullability: N
 - Name: NSTimer
   Methods:
   - Selector: 'initWithFireDate:interval:target:selector:userInfo:repeats:'
@@ -9643,7 +9641,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - O
     - N
     - N
     NullabilityOfRet: N
@@ -9869,7 +9867,7 @@ Classes:
   - Name: host
     Nullability: O
   - Name: lastPathComponent
-    Nullability: N
+    Nullability: O
   - Name: parameterString
     Nullability: O
   - Name: password
@@ -9877,9 +9875,9 @@ Classes:
   - Name: path
     Nullability: O
   - Name: pathComponents
-    Nullability: N
+    Nullability: O
   - Name: pathExtension
-    Nullability: N
+    Nullability: O
   - Name: port
     Nullability: O
   - Name: query

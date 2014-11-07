@@ -1100,7 +1100,7 @@ Classes:
     NullabilityOfRet: O
   - Selector: indexPathsForSelectedItems
     MethodKind: Instance
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: indexPathsForVisibleItems
     MethodKind: Instance
     NullabilityOfRet: N
@@ -1240,7 +1240,7 @@ Classes:
     NullabilityOfRet: N
   Properties:
   - Name: collectionView
-    Nullability: N
+    Nullability: O
 - Name: UICollectionViewLayout
   Methods:
   - Selector: 'finalLayoutAttributesForDisappearingDecorationElementOfKind:atIndexPath:'
@@ -1815,7 +1815,7 @@ Classes:
   - Name: localizedName
     Nullability: N
   - Name: undoManager
-    Nullability: O
+    Nullability: N
   - Name: userActivity
     Nullability: O
 - Name: UIDocumentInteractionController
@@ -3873,13 +3873,13 @@ Classes:
   - Name: editingAccessoryView
     Nullability: O
   - Name: imageView
-    Nullability: N
+    Nullability: O
   - Name: multipleSelectionBackgroundView
     Nullability: O
   - Name: reuseIdentifier
     Nullability: O
   - Name: textLabel
-    Nullability: N
+    Nullability: O
 - Name: UITableViewController
   Methods:
   - Selector: 'initWithStyle:'
@@ -3887,6 +3887,7 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: N
+    DesignatedInit: true
   Properties:
   - Name: refreshControl
     Nullability: O
@@ -4667,8 +4668,6 @@ Classes:
     Nullability: N
   - Name: transitioningDelegate
     Nullability: O
-  - Name: view
-    Nullability: N
 - Name: UIViewPrintFormatter
   Properties:
   - Name: view
