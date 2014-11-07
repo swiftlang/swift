@@ -125,8 +125,39 @@ TestSuiteCrashes.test("crashesWithMessageFails")
 // CHECK: out>>> this should crash
 // CHECK: err>>> fatal error: unexpected message:
 // CHECK: err>>> CRASHED: SIG
-// CHECK: did not find expected string "this should crash"
+// CHECK: did not find expected string after crash: "this should crash"
 // CHECK: [     FAIL ] TestSuiteCrashes.crashesWithMessageFails
+
+TestSuiteCrashes.test("crashesWithMultipleMessagesPasses")
+  .crashOutputMatches("little dog")
+  .crashOutputMatches("this should crash")
+  .crashOutputMatches("too")
+  .code {
+  println("abcd")
+  expectCrashLater()
+  fatalError("this should crash and your little dog too")
+}
+// CHECK: out>>> abcd
+// CHECK: err>>> fatal error: this should crash and your little dog too:
+// CHECK: err>>> CRASHED: SIG
+// CHECK: [       OK ] TestSuiteCrashes.crashesWithMultipleMessagesPasses
+
+TestSuiteCrashes.test("crashesWithMultipleMessagesFails")
+  .crashOutputMatches("unexpected message")
+  .crashOutputMatches("this should crash")
+  .crashOutputMatches("big dog")
+  .crashOutputMatches("and your little dog too")
+.code {
+  println("this should crash")
+  expectCrashLater()
+  fatalError("unexpected message and your little dog too")
+}
+// CHECK: out>>> this should crash
+// CHECK: err>>> fatal error: unexpected message and your little dog too:
+// CHECK: err>>> CRASHED: SIG
+// CHECK: did not find expected string after crash: "this should crash"
+// CHECK: did not find expected string after crash: "big dog"
+// CHECK: [     FAIL ] TestSuiteCrashes.crashesWithMultipleMessagesFails
 
 // CHECK: TestSuiteCrashes: Some tests failed, aborting
 // CHECK: abort()

@@ -639,7 +639,7 @@ struct _ParentProcess {
         if testPassed && t.crashOutputMatches.count > 0 {
           // If we still think that the test passed, check if the crash
           // output matches our expectations.
-          var crashOutput = crashStdout + crashStderr
+          let crashOutput = crashStdout + crashStderr
           for expectedCrashOutput in t.crashOutputMatches {
             var found = false
             for s in crashOutput {
@@ -649,7 +649,7 @@ struct _ParentProcess {
               }
             }
             if !found {
-              println("did not find expected string after crash: \(expectedCrashOutput)")
+              println("did not find expected string after crash: \(expectedCrashOutput.debugDescription)")
               testPassed = false
             }
           }
