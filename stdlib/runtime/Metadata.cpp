@@ -2052,7 +2052,8 @@ Metadata::getNominalTypeDescriptor() const {
   switch (getKind()) {
   case MetadataKind::Class: {
     const ClassMetadata *cls = static_cast<const ClassMetadata *>(this);
-    assert(cls->isTypeMetadata());
+    if (!cls->isTypeMetadata()) 
+      return nullptr;
     if (cls->isArtificialSubclass())
       return nullptr;
     return cls->getDescription();

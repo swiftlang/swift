@@ -54,8 +54,13 @@ using namespace swift;
 using namespace metadataimpl;
 
 #if SWIFT_OBJC_INTEROP
-// Objective-C runtime entry points.
-extern "C" const char* class_getName(const ClassMetadata*);
+#include <objc/objc-runtime.h>
+
+// Aliases for Objective-C runtime entry points.
+const char *class_getName(const ClassMetadata* type) {
+  return class_getName(
+    reinterpret_cast<Class>(const_cast<ClassMetadata*>(type)));
+}
 
 // Aliases for Swift runtime entry points for Objective-C types.
 extern "C" const void *swift_dynamicCastObjCProtocolConditional(
@@ -75,9 +80,16 @@ static std::string nameForMetadata(const Metadata *type) {
 
   switch (type->getKind()) {
   case MetadataKind::Class: 
+#if SWIFT_OBJC_INTEROP
+    // Swift Objective-C classes have a NominalTypeDescriptor.
+    // Non-Swift Objective-C classes fall here.
+    return class_getName(static_cast<const ClassMetadata *>(type));
+#else
     return "<unknown class type>";
+#endif
   case MetadataKind::ObjCClassWrapper: 
-    return "<unknown Objective-C class type>";
+    return nameForMetadata(
+      static_cast<const ObjCClassWrapperMetadata*>(type)->Class);
   case MetadataKind::ForeignClass:
     return "<unknown foreign class type>";
   case MetadataKind::Existential:
@@ -112,18 +124,29 @@ static std::string nameForMetadata(const Metadata *type) {
 // during the diagnostic because some Metadata is invalid.
 LLVM_ATTRIBUTE_NORETURN
 LLVM_ATTRIBUTE_NOINLINE
-static void swift_dynamicCastFailure(const Metadata *sourceType,
-                                     const Metadata *targetType, 
-                                     const char *message = nullptr) {
+void 
+swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName, 
+                                const void *targetType, const char *targetName, 
+                                const char *message) {
   asm("");
 
+  swift::fatalError("Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
+                    sourceName, sourceType, 
+                    targetName, targetType, 
+                    message ? ": " : ".", 
+                    message ? message : "");
+}
+
+LLVM_ATTRIBUTE_NORETURN
+void 
+swift::swift_dynamicCastFailure(const Metadata *sourceType,
+                                const Metadata *targetType, 
+                                const char *message) {
   std::string sourceName = nameForMetadata(sourceType);
   std::string targetName = nameForMetadata(targetType);
 
-  swift::fatalError("Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
-                    sourceName.c_str(), (void *)sourceType, 
-                    targetName.c_str(), (void *)targetType, 
-                    message ? ": " : ".", message ?: "");
+  swift_dynamicCastFailure(sourceType, sourceName.c_str(), 
+                           targetType, targetName.c_str(), message);
 }
 
 

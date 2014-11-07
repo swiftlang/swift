@@ -678,7 +678,9 @@ swift::swift_dynamicCastObjCClassUnconditional(const void *object,
     return object;
   }
 
-  swift::crash("Swift dynamic cast failed");
+  Class sourceType = object_getClass((id)object);
+  swift_dynamicCastFailure(reinterpret_cast<const Metadata *>(sourceType), 
+                           targetType);
 }
 
 const void *
@@ -709,9 +711,10 @@ extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
                                                  size_t numProtocols,
                                                  Protocol * const *protocols) {
   for (size_t i = 0; i < numProtocols; ++i) {
-    // FIXME: More informative failure message
     if (![object conformsToProtocol:protocols[i]]) {
-      abort();
+      Class sourceType = object_getClass(object);
+      swift_dynamicCastFailure(sourceType, class_getName(sourceType), 
+                               protocols[i], protocol_getName(protocols[i]));
     }
   }
   
@@ -761,7 +764,8 @@ swift::swift_dynamicCastObjCClassMetatypeUnconditional(
                                                    const ClassMetadata *dest) {
   if ([(Class)source isSubclassOfClass:(Class)dest])
     return source;
-  swift::crash("Swift dynamic cast failed");
+
+  swift_dynamicCastFailure(source, dest);
 }
 
 const ClassMetadata *

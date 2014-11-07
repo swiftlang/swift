@@ -50,6 +50,25 @@ LLVM_ATTRIBUTE_NORETURN
 extern void
 fatalError(const char *format, ...);
 
+struct Metadata;
+
+// swift_dynamicCastFailure halts using fatalError()
+// with a description of a failed cast's types.
+LLVM_ATTRIBUTE_NORETURN
+void
+swift_dynamicCastFailure(const swift::Metadata *sourceType,
+                         const swift::Metadata *targetType, 
+                         const char *message = nullptr);
+
+// swift_dynamicCastFailure halts using fatalError()
+// with a description of a failed cast's types.
+LLVM_ATTRIBUTE_NORETURN
+void
+swift_dynamicCastFailure(const void *sourceType, const char *sourceName, 
+                         const void *targetType, const char *targetName, 
+                         const char *message = nullptr);
+
+// namespace swift
 };
 
 #endif // _SWIFT_RUNTIME_DEBUG_HELPERS_
