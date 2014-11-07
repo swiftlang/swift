@@ -92,15 +92,14 @@ static void escapeAndPrintString(llvm::raw_ostream &os, StringRef Str) {
   os << '"';
 }
 
-void Command::printArguments(llvm::raw_ostream &os,
-                             const llvm::opt::ArgStringList &Args) {
+void Job::printArguments(raw_ostream &os,
+                         const llvm::opt::ArgStringList &Args) {
   interleave(Args,
              [&](const char *Arg) { escapeAndPrintString(os, Arg); },
              [&] { os << ' '; });
 }
 
-void Command::printCommandLine(llvm::raw_ostream &os,
-                               StringRef Terminator) const {
+void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {
   escapeAndPrintString(os, Executable);
   os << ' ';
   printArguments(os, Arguments);

@@ -47,23 +47,22 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
     SkipTaskExecution(SkipTaskExecution) {
 };
 
-using CommandSet = llvm::DenseSet<const Command *>;
+using CommandSet = llvm::DenseSet<const Job *>;
 
 struct Compilation::PerformJobsState {
-  /// All Commands which have been scheduled for execution (whether or not
+  /// All jobs which have been scheduled for execution (whether or not
   /// they've finished execution), or which have been determined that they
   /// don't need to run.
   CommandSet ScheduledCommands;
 
-  /// All Commands which have finished execution or which have been determined
+  /// All jobs which have finished execution or which have been determined
   /// that they don't need to run.
   CommandSet FinishedCommands;
 
-  /// A map from a Command to the Commands it is known to be blocking.
+  /// A map from a Job to the commands it is known to be blocking.
   ///
-  /// The blocked Commands should be scheduled as soon as possible.
-  llvm::DenseMap<const Command *, TinyPtrVector<const Command *>>
-      BlockingCommands;
+  /// The blocked jobs should be scheduled as soon as possible.
+  llvm::DenseMap<const Job *, TinyPtrVector<const Job *>> BlockingCommands;
 };
 
 Compilation::~Compilation() = default;
@@ -72,18 +71,11 @@ void Compilation::addJob(Job *J) {
   Jobs->addJob(J);
 }
 
-static const Command *findUnfinishedJob(const JobList &JL,
-                                        const CommandSet &FinishedCommands) {
-  for (const Job *J : JL) {
-    if (const Command *Cmd = dyn_cast<Command>(J)) {
-      if (!FinishedCommands.count(Cmd))
-        return Cmd;
-    } else if (const JobList *List = dyn_cast<JobList>(J)) {
-      if (auto *Unfinished = findUnfinishedJob(*List, FinishedCommands))
-        return Unfinished;
-    } else {
-      llvm_unreachable("Unknown Job class!");
-    }
+static const Job *findUnfinishedJob(const JobList &JL,
+                                    const CommandSet &FinishedCommands) {
+  for (const Job *Cmd : JL) {
+    if (!FinishedCommands.count(Cmd))
+      return Cmd;
   }
   return nullptr;
 }
@@ -96,13 +88,10 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   else
     TQ.reset(new TaskQueue(NumberOfParallelCommands));
 
-  llvm::DenseMap<const Command *, TinyPtrVector<const Command *>>
-      BlockingCommands;
-
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
   // and if all of its inputs are in FinishedCommands.
-  auto scheduleCommandIfNecessaryAndPossible = [&] (const Command *Cmd) {
+  auto scheduleCommandIfNecessaryAndPossible = [&] (const Job *Cmd) {
     if (State.ScheduledCommands.count(Cmd))
       return;
 
@@ -118,9 +107,9 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   };
 
   // Set up handleCommandWhichDoesNotNeedToExecute.
-  // This will mark the Command as both scheduled and finished, which meets the
-  // definitions of Commands which should be in those sets.
-  auto handleCommandWhichDoesNotNeedToExecute = [&] (const Command *Cmd) {
+  // This will mark the command as both scheduled and finished, which meets the
+  // definitions of commands which should be in those sets.
+  auto handleCommandWhichDoesNotNeedToExecute = [&] (const Job *Cmd) {
     if (Level == OutputLevel::Parseable) {
       // Provide output indicating this command was skipped if parseable output
       // was requested.
@@ -131,27 +120,19 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     State.FinishedCommands.insert(Cmd);
   };
 
-  // Perform all inputs to the Jobs in our JobList, and schedule any Commands
+  // Perform all inputs to the Jobs in our JobList, and schedule any commands
   // which we know need to execute.
-  for (const Job *J : JL) {
-    if (const Command *Cmd = dyn_cast<Command>(J)) {
-      int res = performJobsInList(Cmd->getInputs(), State);
-      if (res != 0)
-        return res;
+  for (const Job *Cmd : JL) {
+    int res = performJobsInList(Cmd->getInputs(), State);
+    if (res != 0)
+      return res;
 
-      // TODO: replace with a real check once available.
-      bool needsToExecute = true;
-      if (needsToExecute)
-        scheduleCommandIfNecessaryAndPossible(Cmd);
-      else
-        handleCommandWhichDoesNotNeedToExecute(Cmd);
-    } else if (const JobList *List = dyn_cast<JobList>(J)) {
-      int res = performJobsInList(*List, State);
-      if (res != 0)
-        return res;
-    } else {
-      llvm_unreachable("Unknown Job class!");
-    }
+    // TODO: replace with a real check once available.
+    bool needsToExecute = true;
+    if (needsToExecute)
+      scheduleCommandIfNecessaryAndPossible(Cmd);
+    else
+      handleCommandWhichDoesNotNeedToExecute(Cmd);
   }
 
   int Result = 0;
@@ -161,7 +142,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   // task began.
   auto taskBegan = [this] (ProcessId Pid, void *Context) {
     // TODO: properly handle task began.
-    const Command *BeganCmd = (const Command *)Context;
+    const Job *BeganCmd = (const Job *)Context;
 
     // For verbose output, print out each command as it begins execution.
     if (Level == OutputLevel::Verbose)
@@ -177,7 +158,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   // to run.
   auto taskFinished = [&] (ProcessId Pid, int ReturnCode, StringRef Output,
                            void *Context) -> TaskFinishedResponse {
-    const Command *FinishedCmd = (const Command *)Context;
+    const Job *FinishedCmd = (const Job *)Context;
 
     if (Level == OutputLevel::Parseable) {
       // Parseable output was requested.
@@ -207,10 +188,10 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
       return TaskFinishedResponse::StopExecution;
     }
 
-    // When a task finishes, we need to reevaluate the other Commands in our
+    // When a task finishes, we need to reevaluate the other commands in our
     // JobList.
 
-    // TODO: use the Command which just finished to evaluate other Commands.
+    // TODO: use the command which just finished to evaluate other commands.
     State.FinishedCommands.insert(FinishedCmd);
 
     auto BlockedIter = State.BlockingCommands.find(FinishedCmd);
@@ -225,7 +206,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
 
   auto taskSignalled = [&] (ProcessId Pid, StringRef ErrorMsg, StringRef Output,
                             void *Context) -> TaskFinishedResponse {
-    const Command *SignalledCmd = (const Command *)Context;
+    const Job *SignalledCmd = (const Job *)Context;
 
     if (Level == OutputLevel::Parseable) {
       // Parseable output was requested.
@@ -262,26 +243,19 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   return Result;
 }
 
-static const Command *getOnlyCommandInList(const JobList *List) {
+static const Job *getOnlyCommandInList(const JobList *List) {
   if (List->size() != 1)
     return nullptr;
 
-  const Job *J = List->getJobs()[0];
-  if (const Command *Cmd = dyn_cast<Command>(J)) {
-    if (Cmd->getInputs().empty())
-      return Cmd;
-    else
-      return nullptr;
-  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-    return getOnlyCommandInList(JL);
-  } else {
-    llvm_unreachable("Unknown Job class!");
-  }
+  const Job *Cmd = List->front();
+  if (Cmd->getInputs().empty())
+    return Cmd;
+  return nullptr;
 }
 
-int Compilation::performSingleCommand(const Command *Cmd) {
+int Compilation::performSingleCommand(const Job *Cmd) {
   assert(Cmd->getInputs().empty() &&
-         "This can only be used to run a single Command with no inputs");
+         "This can only be used to run a single command with no inputs");
 
   if (Level == OutputLevel::Verbose)
     Cmd->printCommandLine(llvm::errs());
@@ -301,7 +275,7 @@ int Compilation::performJobs() {
   // We require buffered output if Parseable output was requested.
   bool RequiresBufferedOutput = (Level == OutputLevel::Parseable);
   if (!RequiresBufferedOutput) {
-    if (const Command *OnlyCmd = getOnlyCommandInList(Jobs.get()))
+    if (const Job *OnlyCmd = getOnlyCommandInList(Jobs.get()))
       return performSingleCommand(OnlyCmd);
   }
 

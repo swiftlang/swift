@@ -35,7 +35,6 @@ namespace swift {
   class DiagnosticEngine;
 
 namespace driver {
-  class Command;
   class Driver;
   class Job;
   class JobList;
@@ -137,15 +136,15 @@ private:
   /// value of -2 indicates that a Job crashed during execution.
   int performJobsInList(const JobList &JL, PerformJobsState &State);
 
-  /// \brief Performs a single Command by executing in place, if possible.
+  /// \brief Performs a single Job by executing in place, if possible.
   ///
-  /// \param Cmd the Command which should be performed.
+  /// \param Cmd the Job which should be performed.
   ///
   /// \returns Typically, this function will not return, as the current process
   /// will no longer exist, or it will call exit() if the program was
   /// successfully executed. In the event of an error, this function will return
   /// a negative value indicating a failure to execute.
-  int performSingleCommand(const Command *Cmd);
+  int performSingleCommand(const Job *Cmd);
 };
 
 } // end namespace driver

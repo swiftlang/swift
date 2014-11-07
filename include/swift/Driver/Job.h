@@ -26,29 +26,13 @@
 
 namespace swift {
 namespace driver {
-  class Action;
-  class InputAction;
-  class Tool;
 
-class Job {
-public:
-  enum JobClass {
-    CommandClass,
-    JobListClass
-  };
+class Action;
+class InputAction;
+class Job;
+class Tool;
 
-private:
-  JobClass Kind;
-
-protected:
-  Job(JobClass Kind) : Kind(Kind) {}
-public:
-  virtual ~Job() = default;
-
-  JobClass getKind() const { return Kind; }
-};
-
-class JobList : public Job {
+class JobList {
   typedef SmallVector<Job *, 4> list_type;
     
 public:
@@ -61,8 +45,8 @@ private:
   bool OwnsJobs;
 
 public:
-  JobList() : Job(JobListClass), OwnsJobs(true) {}
-  virtual ~JobList();
+  JobList() : OwnsJobs(true) {}
+  ~JobList();
 
   bool getOwnsJobs() const { return OwnsJobs; }
   void setOwnsJobs(bool Value) { OwnsJobs = Value; }
@@ -81,10 +65,6 @@ public:
   const_iterator end() const { return Jobs.end(); }
   Job *front() const { return Jobs.front(); }
   Job *back() const { return Jobs.back(); }
-
-  static bool classof(const Job *J) {
-    return J->getKind() == JobListClass;
-  }
 };
 
 class CommandOutput {
@@ -120,7 +100,7 @@ public:
   StringRef getBaseInput() const { return BaseInput; }
 };
 
-class Command : public Job {
+class Job {
   /// The action which caused the creation of this Job.
   const Action &Source;
 
@@ -141,14 +121,12 @@ class Command : public Job {
   llvm::opt::ArgStringList Arguments;
 
 public:
-  Command(const Action &Source, const Tool &Creator,
-          std::unique_ptr<JobList> Inputs,
-          std::unique_ptr<CommandOutput> Output, const char *Executable,
-          llvm::opt::ArgStringList &Arguments)
-      : Job(CommandClass), Source(Source), Creator(Creator),
+  Job(const Action &Source, const Tool &Creator,
+      std::unique_ptr<JobList> Inputs, std::unique_ptr<CommandOutput> Output,
+      const char *Executable, llvm::opt::ArgStringList &Arguments)
+      : Source(Source), Creator(Creator),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(Arguments) {}
-  virtual ~Command() = default;
 
   const Action &getSource() const { return Source; }
   const Tool &getCreator() const { return Creator; }
@@ -159,16 +137,12 @@ public:
   const JobList &getInputs() const { return *Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
 
-  /// Print the command line for this Command to the given \p stream,
+  /// Print the command line for this Job to the given \p stream,
   /// terminating output with the given \p terminator.
   void printCommandLine(raw_ostream &Stream, StringRef Terminator = "\n") const;
 
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);
-
-  static bool classof(const Job *J) {
-    return J->getKind() == CommandClass;
-  }
 };
 
 } // end namespace driver

@@ -18,36 +18,31 @@
 #ifndef SWIFT_DRIVER_PARSEABLEOUTPUT_H
 #define SWIFT_DRIVER_PARSEABLEOUTPUT_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/TaskQueue.h"
-
-namespace llvm {
-  class raw_ostream;
-}
 
 namespace swift {
 namespace driver {
 
-class Command;
+class Job;
 
 namespace parseable_output {
 
 using swift::sys::ProcessId;
 
 /// \brief Emits a "began" message to the given stream.
-void emitBeganMessage(llvm::raw_ostream &os, const Command &Cmd,
-                      ProcessId Pid);
+void emitBeganMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid);
 
 /// \brief Emits a "finished" message to the given stream.
-void emitFinishedMessage(llvm::raw_ostream &os, const Command &Cmd,
-                         ProcessId Pid, int ExitStatus, StringRef Output);
+void emitFinishedMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid,
+                         int ExitStatus, StringRef Output);
 
 /// \brief Emits a "signalled" message to the given stream.
-void emitSignalledMessage(llvm::raw_ostream &os, const Command &Cmd,
-                          ProcessId Pid, StringRef ErrorMsg,
-                          StringRef Output);
+void emitSignalledMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid,
+                          StringRef ErrorMsg, StringRef Output);
 
 /// \brief Emits a "skipped" message to the given stream.
-void emitSkippedMessage(llvm::raw_ostream &os, const Command &Cmd);
+void emitSkippedMessage(raw_ostream &os, const Job &Cmd);
 
 } // end namespace parseable_output
 } // end namespace driver

@@ -45,31 +45,22 @@ static void addInputsOfType(ArgStringList &Arguments, const ActionList &Inputs,
   }
 }
 
-static void addInputsOfType(ArgStringList &Arguments, const Job *J,
+static void addInputsOfType(ArgStringList &Arguments, const JobList &Jobs,
                             types::ID InputType) {
-  if (const Command *Cmd = dyn_cast<Command>(J)) {
+  for (const Job *Cmd : Jobs) {
     auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
     if (!output.empty())
       Arguments.push_back(output.c_str());
-  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-    for (const Job *J : *JL)
-      addInputsOfType(Arguments, J, InputType);
-  } else {
-    llvm_unreachable("Unable to add input arguments for unknown Job class");
   }
 }
 
-static void addPrimaryInputsOfType(ArgStringList &Arguments, const Job *J,
+static void addPrimaryInputsOfType(ArgStringList &Arguments,
+                                   const JobList &Jobs,
                                    types::ID InputType) {
-  if (const Command *Cmd = dyn_cast<Command>(J)) {
+  for (const Job *Cmd : Jobs) {
     auto &outputInfo = Cmd->getOutput();
     if (outputInfo.getPrimaryOutputType() == InputType)
       Arguments.push_back(outputInfo.getPrimaryOutputFilename().c_str());
-  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-    for (const Job *J : *JL)
-      addPrimaryInputsOfType(Arguments, J, InputType);
-  } else {
-    llvm_unreachable("Unable to add input arguments for unknown Job class");
   }
 }
 
@@ -323,8 +314,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   if (OI.CompilerMode == OutputInfo::Mode::Immediate)
     Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
 
-  return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
-                     Arguments);
+  return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
+                 Arguments);
 }
 
 
@@ -347,7 +338,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
 
   size_t origLen = Arguments.size();
   (void)origLen;
-  addInputsOfType(Arguments, Inputs.get(), types::TY_SwiftModuleFile);
+  addInputsOfType(Arguments, *Inputs, types::TY_SwiftModuleFile);
   addInputsOfType(Arguments, InputActions, types::TY_SwiftModuleFile);
   assert(Arguments.size() - origLen >= Inputs->size() + InputActions.size());
   assert((Arguments.size() - origLen == Inputs->size() ||
@@ -376,8 +367,8 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
-  return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
-                     Arguments);
+  return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
+                 Arguments);
 }
 
 bool LLDB::isPresentRelativeToDriver() const {
@@ -405,7 +396,7 @@ Job *LLDB::constructJob(const JobAction &JA,
   std::string SingleArg = "--repl=";
   {
     llvm::raw_string_ostream os(SingleArg);
-    Command::printArguments(os, FrontendArgs);
+    Job::printArguments(os, FrontendArgs);
   }
 
   ArgStringList Arguments;
@@ -419,8 +410,8 @@ Job *LLDB::constructJob(const JobAction &JA,
     Exec = Args.MakeArgString(TC.getProgramPath("lldb"));
   }
 
-  return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
-                     Arguments);
+  return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
+                 Arguments);
 }
 
 Job *Dsymutil::constructJob(const JobAction &JA,
@@ -435,16 +426,15 @@ Job *Dsymutil::constructJob(const JobAction &JA,
 
   ArgStringList Arguments;
 
-  auto inputJob = cast<Command>(Inputs->front());
-  StringRef inputPath = inputJob->getOutput().getPrimaryOutputFilename();
+  StringRef inputPath = Inputs->front()->getOutput().getPrimaryOutputFilename();
   Arguments.push_back(Args.MakeArgString(inputPath));
 
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
   std::string Exec = getToolChain().getProgramPath("dsymutil");
-  return new Command(JA, *this, std::move(Inputs), std::move(Output),
-                     Args.MakeArgString(Exec), Arguments);
+  return new Job(JA, *this, std::move(Inputs), std::move(Output),
+                 Args.MakeArgString(Exec), Arguments);
 }
 
 /// Darwin Tools
@@ -498,7 +488,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   const llvm::Triple &Triple = TC.getTriple();
 
   ArgStringList Arguments;
-  addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
+  addPrimaryInputsOfType(Arguments, *Inputs, types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
   if (OI.ShouldGenerateDebugInfo) {
@@ -506,10 +496,9 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
 
     size_t argCount = Arguments.size();
     if (OI.CompilerMode == OutputInfo::Mode::SingleCompile)
-      addInputsOfType(Arguments, Inputs.get(), types::TY_SwiftModuleFile);
+      addInputsOfType(Arguments, *Inputs, types::TY_SwiftModuleFile);
     else
-      addPrimaryInputsOfType(Arguments, Inputs.get(),
-                             types::TY_SwiftModuleFile);
+      addPrimaryInputsOfType(Arguments, *Inputs, types::TY_SwiftModuleFile);
     assert(argCount + 1 == Arguments.size() && "no swiftmodule found for -g");
     (void)argCount;
   }
@@ -610,8 +599,8 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
 
   std::string Exec = getToolChain().getProgramPath("ld");
 
-  return new Command(JA, *this, std::move(Inputs), std::move(Output),
-                     Args.MakeArgString(Exec), Arguments);
+  return new Job(JA, *this, std::move(Inputs), std::move(Output),
+                 Args.MakeArgString(Exec), Arguments);
 }
 
 /// Linux Tools
@@ -641,7 +630,7 @@ Job *linux::Linker::constructJob(const JobAction &JA,
     break;
   }
 
-  addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
+  addPrimaryInputsOfType(Arguments, *Inputs, types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
   Args.AddAllArgs(Arguments, options::OPT_Xlinker);
@@ -684,6 +673,6 @@ Job *linux::Linker::constructJob(const JobAction &JA,
   // be able to link, so use clang for now.
   std::string Exec = TC.getProgramPath("clang++");
 
-  return new Command(JA, *this, std::move(Inputs), std::move(Output),
-                     Args.MakeArgString(Exec), Arguments);
+  return new Job(JA, *this, std::move(Inputs), std::move(Output),
+                 Args.MakeArgString(Exec), Arguments);
 }

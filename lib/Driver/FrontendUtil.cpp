@@ -23,18 +23,14 @@
 using namespace swift;
 using namespace swift::driver;
 
-typedef llvm::DenseSet<const Command *> CommandSet;
+typedef SmallPtrSet<const Job *, 4> SmallCommandSet;
 
-static void collectCompileCommands(const JobList &source, CommandSet &outCmds) {
-  for (const Job *J : source) {
-    if (const Command *Cmd = dyn_cast<Command>(J)) {
-      if (isa<CompileJobAction>(Cmd->getSource()))
-        outCmds.insert(Cmd);
+static void collectCompileCommands(const JobList &source, SmallCommandSet &outCmds) {
+  for (const Job *Cmd : source) {
+    if (isa<CompileJobAction>(Cmd->getSource()))
+      outCmds.insert(Cmd);
 
-      collectCompileCommands(Cmd->getInputs(), outCmds);
-    }
-    else if (const JobList *JL = dyn_cast<JobList>(J))
-      collectCompileCommands(*JL, outCmds);
+    collectCompileCommands(Cmd->getInputs(), outCmds);
   }
 }
 
@@ -60,7 +56,7 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
   if (!C || C->getJobs().empty())
     return nullptr; // Don't emit an error; one should already have been emitted
 
-  CommandSet CompileCommands;
+  SmallCommandSet CompileCommands;
   collectCompileCommands(C->getJobs(), CompileCommands);
 
   if (CompileCommands.size() != 1) {
@@ -69,7 +65,7 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
     return nullptr;
   }
 
-  const Command *Cmd = *CompileCommands.begin();
+  const Job *Cmd = *CompileCommands.begin();
   if (Cmd->getCreator().getName() != "swift") {
     Diags.diagnose(SourceLoc(), diag::error_expected_frontend_command);
     return nullptr;

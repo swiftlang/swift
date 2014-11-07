@@ -95,7 +95,7 @@ public:
 
 class CommandBasedMessage : public Message {
 public:
-  CommandBasedMessage(StringRef Kind, const Command &Cmd) :
+  CommandBasedMessage(StringRef Kind, const Job &Cmd) :
       Message(Kind, Cmd.getSource().getClassName()) {}
 };
 
@@ -104,7 +104,7 @@ class DetailedCommandBasedMessage : public CommandBasedMessage {
   SmallVector<CommandInput, 4> Inputs;
   SmallVector<OutputPair, 8> Outputs;
 public:
-  DetailedCommandBasedMessage(StringRef Kind, const Command &Cmd) :
+  DetailedCommandBasedMessage(StringRef Kind, const Job &Cmd) :
       CommandBasedMessage(Kind, Cmd) {
     llvm::raw_string_ostream wrapper(CommandLine);
     Cmd.printCommandLine(wrapper, "");
@@ -116,9 +116,8 @@ public:
     }
 
     for (const Job *J : Cmd.getInputs()) {
-      if (const Command *InputCmd = dyn_cast<Command>(J))
-        Inputs.push_back(
-            CommandInput(InputCmd->getOutput().getPrimaryOutputFilename()));
+      Inputs.push_back(
+            CommandInput(J->getOutput().getPrimaryOutputFilename()));
     }
 
     // TODO: set up Outputs appropriately.
@@ -146,7 +145,7 @@ public:
 class TaskBasedMessage : public CommandBasedMessage {
   ProcessId Pid;
 public:
-  TaskBasedMessage(StringRef Kind, const Command &Cmd, ProcessId Pid) :
+  TaskBasedMessage(StringRef Kind, const Job &Cmd, ProcessId Pid) :
       CommandBasedMessage(Kind, Cmd), Pid(Pid) {}
 
   virtual void provideMapping(swift::json::Output &out) {
@@ -158,7 +157,7 @@ public:
 class BeganMessage : public DetailedCommandBasedMessage {
   ProcessId Pid;
 public:
-  BeganMessage(const Command &Cmd, ProcessId Pid) :
+  BeganMessage(const Job &Cmd, ProcessId Pid) :
       DetailedCommandBasedMessage("began", Cmd), Pid(Pid) {}
 
   virtual void provideMapping(swift::json::Output &out) {
@@ -170,7 +169,7 @@ public:
 class TaskOutputMessage : public TaskBasedMessage {
   std::string Output;
 public:
-  TaskOutputMessage(StringRef Kind, const Command &Cmd, ProcessId Pid,
+  TaskOutputMessage(StringRef Kind, const Job &Cmd, ProcessId Pid,
                     StringRef Output) : TaskBasedMessage(Kind, Cmd, Pid),
                                         Output(Output) {}
 
@@ -183,7 +182,7 @@ public:
 class FinishedMessage : public TaskOutputMessage {
   int ExitStatus;
 public:
-  FinishedMessage(const Command &Cmd, ProcessId Pid, StringRef Output,
+  FinishedMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
                   int ExitStatus) : TaskOutputMessage("finished", Cmd, Pid,
                                                       Output),
                                     ExitStatus(ExitStatus) {}
@@ -197,7 +196,7 @@ public:
 class SignalledMessage : public TaskOutputMessage {
   std::string ErrorMsg;
 public:
-  SignalledMessage(const Command &Cmd, ProcessId Pid, StringRef Output,
+  SignalledMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
                    StringRef ErrorMsg) : TaskOutputMessage("signalled", Cmd,
                                                            Pid, Output),
                                          ErrorMsg(ErrorMsg) {}
@@ -210,7 +209,7 @@ public:
 
 class SkippedMessage : public DetailedCommandBasedMessage {
 public:
-  SkippedMessage(const Command &Cmd) :
+  SkippedMessage(const Job &Cmd) :
       DetailedCommandBasedMessage("skipped", Cmd) {}
 };
 
@@ -229,7 +228,7 @@ struct ObjectTraits<Message> {
 } // end namespace yaml
 } // end namespace llvm
 
-static void emitMessage(llvm::raw_ostream &os, Message &msg) {
+static void emitMessage(raw_ostream &os, Message &msg) {
   std::string JSONString;
   llvm::raw_string_ostream BufferStream(JSONString);
   json::Output yout(BufferStream);
@@ -239,29 +238,28 @@ static void emitMessage(llvm::raw_ostream &os, Message &msg) {
   os << JSONString << '\n';
 }
 
-void parseable_output::emitBeganMessage(llvm::raw_ostream &os,
-                                        const Command &Cmd, ProcessId Pid) {
+void parseable_output::emitBeganMessage(raw_ostream &os,
+                                        const Job &Cmd, ProcessId Pid) {
   BeganMessage msg(Cmd, Pid);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitFinishedMessage(llvm::raw_ostream &os,
-                                           const Command &Cmd, ProcessId Pid,
+void parseable_output::emitFinishedMessage(raw_ostream &os,
+                                           const Job &Cmd, ProcessId Pid,
                                            int ExitStatus, StringRef Output) {
   FinishedMessage msg(Cmd, Pid, Output, ExitStatus);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitSignalledMessage(llvm::raw_ostream &os,
-                                            const Command &Cmd, ProcessId Pid,
+void parseable_output::emitSignalledMessage(raw_ostream &os,
+                                            const Job &Cmd, ProcessId Pid,
                                             StringRef ErrorMsg,
                                             StringRef Output) {
   SignalledMessage msg(Cmd, Pid, Output, ErrorMsg);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitSkippedMessage(llvm::raw_ostream &os,
-                                          const Command &Cmd) {
+void parseable_output::emitSkippedMessage(raw_ostream &os, const Job &Cmd) {
   SkippedMessage msg(Cmd);
   emitMessage(os, msg);
 }

@@ -984,31 +984,6 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 }
 
-static StringRef getBaseInputForJob(Job *J) {
-  if (Command *Cmd = dyn_cast<Command>(J)) {
-    return Cmd->getOutput().getBaseInput();
-  } else if (JobList *JL = dyn_cast<JobList>(J)) {
-    return getBaseInputForJob(JL->getJobs()[0]);
-  } else {
-    llvm_unreachable("Unknown Job class; cannot get base input");
-  }
-}
-
-static void printJobOutputs(const Job *J) {
-  if (const Command *Cmd = dyn_cast<Command>(J)) {
-    llvm::outs() << '"' << Cmd->getOutput().getPrimaryOutputFilename() << '"';
-  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-    for (unsigned long i = 0, e = JL->size(); i != e; ++i) {
-      printJobOutputs(JL->getJobs()[i]);
-      if (i+1 != e) {
-        llvm::outs() << ", ";
-      }
-    }
-  } else {
-    llvm_unreachable("Unknown Job class");
-  }
-}
-
 static StringRef getOutputFilename(const JobAction *JA,
                                    const OutputInfo &OI,
                                    const TypeToPathMap *OutputMap,
@@ -1057,8 +1032,7 @@ static StringRef getOutputFilename(const JobAction *JA,
 
   // dSYM actions are never treated as top-level.
   if (isa<GenerateDSYMJobAction>(JA)) {
-    auto linkJob = cast<Command>(InputJobs.front());
-    Buffer = linkJob->getOutput().getPrimaryOutputFilename();
+    Buffer = InputJobs.front()->getOutput().getPrimaryOutputFilename();
     Buffer.push_back('.');
     Buffer.append(types::getTypeTempSuffix(JA->getType()));
     return Buffer.str();
@@ -1074,7 +1048,7 @@ static StringRef getOutputFilename(const JobAction *JA,
   }
 
   assert(!BaseInput.empty() &&
-         "A Command which produces output must have a BaseInput!");
+         "A Job which produces output must have a BaseInput!");
   StringRef BaseName(BaseInput);
   if (isa<MergeModuleJobAction>(JA) ||
       OI.CompilerMode == OutputInfo::Mode::SingleCompile ||
@@ -1130,10 +1104,7 @@ collectTemporaryFilesForAction(const Action &A, const Job &J,
                                const OutputInfo &OI, const OutputFileMap *OFM,
                                std::function<void(StringRef)> callback) {
   if (isa<MergeModuleJobAction>(A)) {
-    for (const Job *input : cast<Command>(J).getInputs()) {
-      auto cmd = dyn_cast<Command>(input);
-      if (!cmd)
-        continue;
+    for (const Job *cmd : J.getInputs()) {
       const CommandOutput &output = cmd->getOutput();
       const TypeToPathMap *outputMap = nullptr;
       if (OFM)
@@ -1147,10 +1118,7 @@ collectTemporaryFilesForAction(const Action &A, const Job &J,
   }
 
   if (isa<LinkJobAction>(A)) {
-    for (const Job *input : cast<Command>(J).getInputs()) {
-      auto cmd = dyn_cast<Command>(input);
-      if (!cmd)
-        continue;
+    for (const Job *cmd : J.getInputs()) {
       const CommandOutput &output = cmd->getOutput();
       const TypeToPathMap *outputMap = nullptr;
       if (OFM)
@@ -1256,8 +1224,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     BaseInput = IA->getInputArg().getValue();
   } else if (!InputJobs->empty()) {
     // Use the first Job's BaseInput as our BaseInput.
-    Job *J = InputJobs->getJobs()[0];
-    BaseInput = getBaseInputForJob(J);
+    BaseInput = InputJobs->front()->getOutput().getBaseInput();
   }
 
   const TypeToPathMap *OutputMap = nullptr;
@@ -1411,7 +1378,12 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       if (i+1 != e || !InputJobs->empty())
         llvm::outs() << ", ";
     }
-    printJobOutputs(InputJobs.get());
+    interleave(InputJobs->begin(), InputJobs->end(),
+               [](const Job *J) {
+                 llvm::outs()
+                    << '"' << J->getOutput().getPrimaryOutputFilename() << '"';
+               },
+               [] { llvm::outs() << ", "; });
     llvm::outs() << "], output: {"
                  << types::getTypeName(Output->getPrimaryOutputType())
                  << ": \"" << Output->getPrimaryOutputFilename() << '"';
@@ -1477,28 +1449,20 @@ void Driver::printActions(const ActionList &Actions) const {
   }
 }
 
-static void printJob(const Job *J, llvm::DenseSet<const Job *> &VisitedJobs) {
-  if (!VisitedJobs.insert(J).second)
+static void printJob(const Job *Cmd, llvm::DenseSet<const Job *> &VisitedJobs) {
+  if (!VisitedJobs.insert(Cmd).second)
     return;
   
-  if (const JobList *JL = dyn_cast<JobList>(J)) {
-    for (const Job *Job : *JL) {
-      printJob(Job, VisitedJobs);
-    }
-  } else if (const Command *Cmd = dyn_cast<Command>(J)) {
-    const JobList &Inputs = Cmd->getInputs();
-    printJob(&Inputs, VisitedJobs);
-    Cmd->printCommandLine(llvm::outs());
-  } else {
-    llvm_unreachable("Unknown JobClass");
-  }
+  const JobList &Inputs = Cmd->getInputs();
+  for (const Job *J : Inputs)
+    printJob(J, VisitedJobs);
+  Cmd->printCommandLine(llvm::outs());
 }
 
 void Driver::printJobs(const JobList &Jobs) const {
   llvm::DenseSet<const Job *> VisitedJobs;
-  for (const Job *J : Jobs) {
+  for (const Job *J : Jobs)
     printJob(J, VisitedJobs);
-  }
 }
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {
