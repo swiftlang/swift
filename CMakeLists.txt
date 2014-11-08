@@ -236,12 +236,6 @@ set(SWIFT_DISTCC "" CACHE PATH
 if(SWIFT_DISTCC) 
 endif()
 
-# FIXME: Remove this when OS X builds as an SDK.
-set(SWIFTLIB_EXTRA_DEFAULT_COMPILE_FLAGS "" CACHE STRING
-  "Extra compile flags to pass when building the default (OS X) target library")
-set(SWIFTLIB_EXTRA_DEFAULT_LINK_FLAGS "" CACHE STRING
-  "Extra link flags to pass when building the default (OS X) target library")
-
 # Find the 'clang' executable for compiling API notes.
 set (CLANG_APINOTES "" CACHE FILEPATH "Path to Clang executable to be used for compiling API notes")
 if ( CLANG_APINOTES STREQUAL "" )
@@ -1191,10 +1185,8 @@ macro(add_swift_library name)
         FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
         COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
         COMPILE_FLAGS
-          "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS} ${SWIFTLIB_EXTRA_DEFAULT_COMPILE_FLAGS}"
-          
-        LINK_FLAGS 
-          "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_DEFAULT_LINK_FLAGS} ${SWIFTLIB_EXTRA_DEFAULT_LINK_FLAGS}"
+          "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
+        LINK_FLAGS "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_DEFAULT_LINK_FLAGS}"
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
         ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
         ${SWIFTLIB_INSTALL_FLAG}
