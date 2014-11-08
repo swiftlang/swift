@@ -18,6 +18,8 @@ entry(%a : $*A):
 }
 
 protocol CP: class {}
+protocol CP2: class {}
+@objc protocol OP: class {}
 
 // CHECK-LABEL: define i8* @ref_to_raw_pointer_existential(%objc_object*, i8**) {
 // CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
@@ -41,4 +43,109 @@ sil @unchecked_ref_cast_to_existential : $@thin (@owned Builtin.NativeObject) ->
 entry(%n : $Builtin.NativeObject):
   %r = unchecked_ref_cast %n : $Builtin.NativeObject to $AnyObject
   return %r : $AnyObject
+}
+
+// CHECK-LABEL: define { %objc_object*, i8** } @u_cast_to_class_existential(%objc_object*)
+// CHECK:         call i8** @dynamic_cast_existential_1_unconditional(%swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP)
+// CHECK-LABEL: define private i8** @dynamic_cast_existential_1_unconditional(%swift.type*, %swift.protocol*) {
+// CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %0, %swift.protocol* %1)
+// CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
+// CHECK:       cont:
+// CHECK:         ret i8** [[WITNESS]]
+// CHECK:       fail:
+// CHECK:         call void @llvm.trap()
+sil @u_cast_to_class_existential : $@thin (@owned AnyObject) -> @owned CP {
+entry(%a : $AnyObject):
+  %p = unconditional_checked_cast %a : $AnyObject to $CP
+  return %p : $CP
+}
+
+// CHECK-LABEL: define { %objc_object*, i8**, i8** } @u_cast_to_class_existential_2(%objc_object*)
+// CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
+// CHECK-LABEL: define private { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type*, %swift.protocol*, %swift.protocol*)
+// CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %0, %swift.protocol* %1)
+// CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
+// CHECK:       cont:
+// CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %0, %swift.protocol* %2)
+// CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont1
+// CHECK:       cont1:
+// CHECK:         ret { i8**, i8** }
+// CHECK:       fail:
+// CHECK:         call void @llvm.trap()
+sil @u_cast_to_class_existential_2 : $@thin (@owned AnyObject) -> @owned protocol<CP, CP2> {
+entry(%a : $AnyObject):
+  %p = unconditional_checked_cast %a : $AnyObject to $protocol<CP, CP2>
+  return %p : $protocol<CP, CP2>
+}
+
+// CHECK-LABEL: define { %objc_object*, i8**, i8** } @u_cast_to_class_existential_mixed(%objc_object*)
+// CHECK:         call %objc_object* @swift_dynamicCastObjCProtocolUnconditional
+// CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
+sil @u_cast_to_class_existential_mixed : $@thin (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
+entry(%a : $AnyObject):
+  %p = unconditional_checked_cast %a : $AnyObject to $protocol<CP, OP, CP2>
+  return %p : $protocol<CP, OP, CP2>
+}
+
+// CHECK-LABEL: define { %objc_object*, i8** } @c_cast_to_class_existential(%objc_object*)
+// CHECK:         call i8** @dynamic_cast_existential_1_conditional(%swift.type* %.Type, %swift.protocol* @_TMp5casts2CP)
+// CHECK-LABEL: define private i8** @dynamic_cast_existential_1_conditional(%swift.type*, %swift.protocol*)
+// CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %0, %swift.protocol* %1)
+// CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
+// CHECK:       cont:
+// CHECK:         ret i8** [[WITNESS]]
+// CHECK:       fail:
+// CHECK:         ret i8** null
+sil @c_cast_to_class_existential : $@thin (@owned AnyObject) -> @owned CP {
+entry(%a : $AnyObject):
+  checked_cast_br %a : $AnyObject to $CP, yea, nay
+yea(%p : $CP):
+  return %p : $CP
+nay:
+  unreachable
+}
+
+// CHECK-LABEL: define { %objc_object*, i8**, i8** } @c_cast_to_class_existential_2(%objc_object*)
+// CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_conditional(%swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
+// CHECK-LABEL: define private { i8**, i8** } @dynamic_cast_existential_2_conditional(%swift.type*, %swift.protocol*, %swift.protocol*)
+// CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %0, %swift.protocol* %1)
+// CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
+// CHECK:       cont:
+// CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %0, %swift.protocol* %2)
+// CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont1
+// CHECK:       cont1:
+// CHECK:         ret { i8**, i8** }
+// CHECK:       fail:
+// CHECK:         ret { i8**, i8** } zeroinitializer
+sil @c_cast_to_class_existential_2 : $@thin (@owned AnyObject) -> @owned protocol<CP, CP2> {
+entry(%a : $AnyObject):
+  checked_cast_br %a : $AnyObject to $protocol<CP, CP2>, yea, nay
+yea(%p : $protocol<CP, CP2>):
+  return %p : $protocol<CP, CP2>
+nay:
+  unreachable
+}
+
+// CHECK-LABEL: define { %objc_object*, i8**, i8** } @c_cast_to_class_existential_mixed(%objc_object*)
+// CHECK:         [[CAST:%.*]] = call %objc_object* @swift_dynamicCastObjCProtocolConditional
+// CHECK:         [[IS_NULL:%.*]] = icmp eq %objc_object* [[CAST]], null
+// CHECK:         br i1 [[IS_NULL]], label %cont, label %success
+// CHECK:       success:
+// CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_conditional(%swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
+// CHECK:         br label %cont
+// CHECK:       cont:
+// CHECK:         phi %objc_object* [ [[CAST:%.*]], %success ], [ null, %entry ]
+sil @c_cast_to_class_existential_mixed : $@thin (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
+entry(%a : $AnyObject):
+  checked_cast_br %a : $AnyObject to $protocol<CP, OP, CP2>, yea, nay
+yea(%p : $protocol<CP, OP, CP2>):
+  return %p : $protocol<CP, OP, CP2>
+nay:
+  unreachable
 }

@@ -2509,6 +2509,38 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   return Builder.CreateLoad(coerced);
 }
 
+void IRGenFunction::emitScalarReturn(llvm::Type *resultType,
+                                     Explosion &result) {
+  if (result.size() == 0) {
+    Builder.CreateRetVoid();
+    return;
+  }
+
+  auto *ABIType = CurFn->getReturnType();
+
+  if (result.size() == 1) {
+    auto *returned = result.claimNext();
+    if (ABIType != returned->getType())
+      returned = coerceValue(returned, ABIType, IGM.DataLayout);
+
+    Builder.CreateRet(returned);
+    return;
+  }
+
+  // Multiple return values are returned as a struct.
+  assert(cast<llvm::StructType>(resultType)->getNumElements() == result.size());
+  llvm::Value *resultAgg = llvm::UndefValue::get(resultType);
+  for (unsigned i = 0, e = result.size(); i != e; ++i) {
+    llvm::Value *elt = result.claimNext();
+    resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
+  }
+
+  if (ABIType != resultType)
+    resultAgg = coerceValue(resultAgg, ABIType, IGM.DataLayout);
+
+  Builder.CreateRet(resultAgg);
+}
+
 void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   if (result.size() == 0) {
     Builder.CreateRetVoid();

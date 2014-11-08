@@ -31,6 +31,7 @@ namespace swift {
 namespace irgen {
   class Address;
   class IRGenFunction;
+  class Explosion;
 
   /// Discriminator for checked cast modes.
   enum class CheckedCastMode : unsigned char {
@@ -61,17 +62,20 @@ namespace irgen {
                                       CheckedCastMode mode);
 
   /// Emit a checked cast of a metatype.
-  llvm::Value *emitMetatypeDowncast(IRGenFunction &IGF,
-                                    llvm::Value *metatype,
-                                    CanAnyMetatypeType toMetatype,
-                                    CheckedCastMode mode);
+  void emitMetatypeDowncast(IRGenFunction &IGF,
+                            llvm::Value *metatype,
+                            CanAnyMetatypeType toMetatype,
+                            CheckedCastMode mode,
+                            Explosion &ex);
 
-  /// Emit a checked cast to an Objective-C protocol or protocol composition.
-  llvm::Value *emitObjCExistentialDowncast(IRGenFunction &IGF,
-                                           llvm::Value *orig,
-                                           SILType srcType,
-                                           SILType destType,
-                                           CheckedCastMode mode);
+  /// Emit a checked cast to a class-constrained protocol or protocol
+  /// composition.
+  void emitClassExistentialDowncast(IRGenFunction &IGF,
+                                    llvm::Value *orig,
+                                    SILType srcType,
+                                    SILType destType,
+                                    CheckedCastMode mode,
+                                    Explosion &ex);
 
   /// Emit a Protocol* value referencing an ObjC protocol.
   llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,

@@ -16,11 +16,14 @@
 
 #include "GenCast.h"
 
+#include "Explosion.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "TypeInfo.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
@@ -184,10 +187,11 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 }
 
 /// Emit a checked cast of a metatype.
-llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
-                                         llvm::Value *metatype,
-                                         CanAnyMetatypeType toMetatype,
-                                         CheckedCastMode mode) {
+void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
+                                 llvm::Value *metatype,
+                                 CanAnyMetatypeType toMetatype,
+                                 CheckedCastMode mode,
+                                 Explosion &ex) {
   // Pick a runtime entry point and target metadata based on what kind of
   // representation we're casting.
   llvm::Value *castFn;
@@ -232,7 +236,7 @@ llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
 
   auto call = IGF.Builder.CreateCall2(castFn, metatype, toMetadata);
   call->setDoesNotThrow();
-  return call;
+  ex.add(call);
 }
 
 /// Emit a Protocol* value referencing an ObjC protocol.
@@ -250,45 +254,224 @@ llvm::Value *irgen::emitReferenceToObjCProtocol(IRGenFunction &IGF,
   return IGF.Builder.CreateLoad(addr);
 }
 
-/// Emit a checked cast to an Objective-C protocol or protocol composition.
-llvm::Value *irgen::emitObjCExistentialDowncast(IRGenFunction &IGF,
-                                                llvm::Value *orig,
-                                                SILType srcType,
-                                                SILType destType,
-                                                CheckedCastMode mode) {
-  orig = IGF.Builder.CreateBitCast(orig, IGF.IGM.ObjCPtrTy);
-  SmallVector<ProtocolDecl*, 4> protos;
-  destType.getSwiftRValueType().getAnyExistentialTypeProtocols(protos);
-
-  // Get references to the ObjC Protocol* values for each protocol.
-  Address protoRefsBuf = IGF.createAlloca(llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
-                                                               protos.size()),
-                                          IGF.IGM.getPointerAlignment(),
-                                          "objc_protocols");
-  protoRefsBuf = IGF.Builder.CreateBitCast(protoRefsBuf,
-                                           IGF.IGM.Int8PtrPtrTy);
-
-  unsigned index = 0;
-  for (auto proto : protos) {
-    Address protoRefSlot = IGF.Builder.CreateConstArrayGEP(protoRefsBuf, index,
-                                                     IGF.IGM.getPointerSize());
-    auto protoRef = emitReferenceToObjCProtocol(IGF, proto);
-    IGF.Builder.CreateStore(protoRef, protoRefSlot);
-    ++index;
+/// Emit a helper function to look up \c numProtocols witness tables given
+/// a type metadata reference.
+static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
+                                                   unsigned numProtocols,
+                                                   CheckedCastMode mode) {
+  // Build the function name.
+  llvm::SmallString<32> name;
+  {
+    llvm::raw_svector_ostream os(name);
+    os << "dynamic_cast_existential_";
+    os << numProtocols;
+    switch (mode) {
+    case CheckedCastMode::Unconditional:
+      os << "_unconditional";
+      break;
+    case CheckedCastMode::Conditional:
+      os << "_conditional";
+      break;
+    }
+    os.flush();
   }
-
-  // Perform the cast.
-  llvm::Value *castFn;
+  
+  // See if we already defined this function.
+  
+  if (auto fn = IGM.Module.getFunction(name))
+    return fn;
+  
+  // Build the function type.
+  
+  llvm::SmallVector<llvm::Type *, 4> argTys;
+  llvm::SmallVector<llvm::Type *, 4> returnTys;
+  argTys.push_back(IGM.TypeMetadataPtrTy);
+  for (unsigned i = 0; i < numProtocols; ++i) {
+    argTys.push_back(IGM.ProtocolDescriptorPtrTy);
+    returnTys.push_back(IGM.WitnessTablePtrTy);
+  }
+  
+  llvm::Type *returnTy;
+  if (numProtocols == 1)
+    returnTy = returnTys.front();
+  else
+    returnTy = llvm::StructType::get(IGM.getLLVMContext(), returnTys);
+  
+  auto fnTy = llvm::FunctionType::get(returnTy, argTys, /*vararg*/ false);
+  auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
+                                   llvm::Twine(name), IGM.getModule());
+  
+  auto IGF = IRGenFunction(IGM, fn);
+  Explosion args = IGF.collectParameters();
+  
+  auto ref = args.claimNext();
+  auto failBB = IGF.createBasicBlock("fail");
+  auto conformsToProtocol = IGM.getConformsToProtocolFn();
+  
+  Explosion rets;
+  // Look up each protocol conformance we want.
+  for (unsigned i = 0; i < numProtocols; ++i) {
+    auto proto = args.claimNext();
+    auto witness = IGF.Builder.CreateCall2(conformsToProtocol, ref, proto);
+    auto isNull = IGF.Builder.CreateICmpEQ(witness,
+                     llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+    auto contBB = IGF.createBasicBlock("cont");
+    IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+    
+    IGF.Builder.emitBlock(contBB);
+    rets.add(witness);
+  }
+  
+  // If we succeeded, return the witnesses.
+  IGF.emitScalarReturn(returnTy, rets);
+  
+  // If we failed, return nil.
+  IGF.Builder.emitBlock(failBB);
   switch (mode) {
-  case CheckedCastMode::Unconditional:
-    castFn = IGF.IGM.getDynamicCastObjCProtocolUnconditionalFn();
-    break;
-  case CheckedCastMode::Conditional:
-    castFn = IGF.IGM.getDynamicCastObjCProtocolConditionalFn();
+  case CheckedCastMode::Conditional: {
+    auto null = llvm::ConstantStruct::getNullValue(returnTy);
+    IGF.Builder.CreateRet(null);
     break;
   }
 
-  return IGF.Builder.CreateCall3(castFn, orig,
-                                 IGF.IGM.getSize(Size(protos.size())),
-                                 protoRefsBuf.getAddress());
+  case CheckedCastMode::Unconditional: {
+    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
+                                                    llvm::Intrinsic::ID::trap);
+    IGF.Builder.CreateCall(trapIntrinsic);
+    IGF.Builder.CreateUnreachable();
+    break;
+  }
+  }
+  
+  return fn;
+}
+
+
+/// Emit a checked cast to an Objective-C protocol or protocol composition.
+void irgen::emitClassExistentialDowncast(IRGenFunction &IGF,
+                                         llvm::Value *orig,
+                                         SILType srcType,
+                                         SILType destType,
+                                         CheckedCastMode mode,
+                                         Explosion &ex) {
+  SmallVector<ProtocolDecl*, 4> allProtos;
+  destType.getSwiftRValueType().getAnyExistentialTypeProtocols(allProtos);
+
+  // Get references to the ObjC Protocol* values for the objc protocols.
+  SmallVector<llvm::Value*, 4> objcProtos;
+  bool requiresWitnessTableLookup = false;
+
+  for (auto proto : allProtos) {
+    if (requiresProtocolWitnessTable(proto))
+      requiresWitnessTableLookup = true;
+    if (!proto->isObjC())
+      continue;
+    objcProtos.push_back(emitReferenceToObjCProtocol(IGF, proto));
+  }
+  
+  // Check the ObjC protocol conformances if there were any.
+  orig = IGF.Builder.CreateBitCast(orig, IGF.IGM.ObjCPtrTy);
+  if (!objcProtos.empty()) {
+    llvm::Value *castFn;
+    switch (mode) {
+    case CheckedCastMode::Unconditional:
+      castFn = IGF.IGM.getDynamicCastObjCProtocolUnconditionalFn();
+      break;
+    case CheckedCastMode::Conditional:
+      castFn = IGF.IGM.getDynamicCastObjCProtocolConditionalFn();
+      break;
+    }
+    
+    Address protoRefsBuf = IGF.createAlloca(
+                                        llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
+                                                             objcProtos.size()),
+                                        IGF.IGM.getPointerAlignment(),
+                                        "objc_protocols");
+    protoRefsBuf = IGF.Builder.CreateBitCast(protoRefsBuf,
+                                             IGF.IGM.Int8PtrPtrTy);
+
+    for (unsigned index : indices(objcProtos)) {
+      Address protoRefSlot = IGF.Builder.CreateConstArrayGEP(
+                                                     protoRefsBuf, index,
+                                                     IGF.IGM.getPointerSize());
+      IGF.Builder.CreateStore(objcProtos[index], protoRefSlot);
+      ++index;
+    }
+
+    
+    orig = IGF.Builder.CreateCall3(castFn, orig,
+                                   IGF.IGM.getSize(Size(objcProtos.size())),
+                                   protoRefsBuf.getAddress());
+  }
+  
+  ex.add(orig);
+  
+  // If we don't need to look up any witness tables, we're done.
+  if (!requiresWitnessTableLookup)
+    return;
+  
+  // If we're doing a conditional cast, and the ObjC protocol checks failed,
+  // then the cast is done.
+  llvm::BasicBlock *origBB = nullptr, *successBB = nullptr, *contBB = nullptr;
+  if (!objcProtos.empty()) {
+    switch (mode) {
+    case CheckedCastMode::Unconditional:
+      break;
+    case CheckedCastMode::Conditional: {
+      origBB = IGF.Builder.GetInsertBlock();
+      successBB = IGF.createBasicBlock("success");
+      contBB = IGF.createBasicBlock("cont");
+      auto isNull = IGF.Builder.CreateICmpEQ(orig,
+                             llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy));
+      IGF.Builder.CreateCondBr(isNull, contBB, successBB);
+      IGF.Builder.emitBlock(successBB);
+    }
+    }
+  }
+
+  // Look up witness tables for the protocols that need them.
+  auto classValue = emitDynamicTypeOfHeapObject(IGF, orig, srcType);
+  SmallVector<llvm::Value*, 4> witnessTableProtos;
+  for (auto proto : allProtos) {
+    if (!requiresProtocolWitnessTable(proto))
+      continue;
+    auto descriptor = emitProtocolDescriptorRef(IGF, proto);
+    witnessTableProtos.push_back(descriptor);
+  }
+  
+  if (!witnessTableProtos.empty()) {
+    auto fn = emitExistentialScalarCastFn(IGF.IGM, witnessTableProtos.size(),
+                                          mode);
+    llvm::SmallVector<llvm::Value *, 4> args;
+    args.push_back(classValue);
+    for (auto proto : witnessTableProtos)
+      args.push_back(proto);
+    auto wts = IGF.Builder.CreateCall(fn, args);
+    if (witnessTableProtos.size() == 1)
+      ex.add(wts);
+    else
+      for (unsigned i = 0, e = witnessTableProtos.size(); i < e; ++i) {
+        auto wt = IGF.Builder.CreateExtractValue(wts, i);
+        ex.add(wt);
+      }
+  }
+  
+  // If we had conditional ObjC checks, join the failure paths.
+  if (contBB) {
+    IGF.Builder.CreateBr(contBB);
+    IGF.Builder.emitBlock(contBB);
+    
+    // Return null on the failure path.
+    Explosion successEx = std::move(ex);
+    ex.reset();
+    
+    while (!successEx.empty()) {
+      auto successVal = successEx.claimNext();
+      auto failureVal = llvm::Constant::getNullValue(successVal->getType());
+      auto phi = IGF.Builder.CreatePHI(successVal->getType(), 2);
+      phi->addIncoming(successVal, successBB);
+      phi->addIncoming(failureVal, origBB);
+      ex.add(phi);
+    }
+  }
 }

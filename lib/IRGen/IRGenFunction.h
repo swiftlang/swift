@@ -95,6 +95,7 @@ public:
 public:
   Explosion collectParameters();
   void emitScalarReturn(SILType resultTy, Explosion &scalars);
+  void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
   bool emitBranchToReturnBB();

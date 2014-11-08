@@ -580,7 +580,14 @@ FUNCTION(DynamicCastObjCProtocolConditional,
          RETURNS(ObjCPtrTy),
          ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy),
          ATTRS(NoUnwind))
-         
+
+// witness_table* swift_conformsToProtocol(type*, protocol*);
+FUNCTION(ConformsToProtocol,
+         swift_conformsToProtocol, RuntimeCC,
+         RETURNS(WitnessTablePtrTy),
+         ARGS(TypeMetadataPtrTy, ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // void swift_once(swift_once_t *predicate,
 //                 void (*function_code)(RefCounted*),
 //                 RefCounted *context);

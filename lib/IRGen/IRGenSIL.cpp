@@ -1459,8 +1459,7 @@ static llvm::Value *getClassMetatype(IRGenFunction &IGF,
   }
 }
 
-void IRGenSILFunction::visitValueMetatypeInst(
-                                              swift::ValueMetatypeInst *i) {
+void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
   SILType instanceTy = i->getOperand().getType();
   auto metaTy = i->getType().castTo<MetatypeType>();
   
@@ -1499,7 +1498,7 @@ void IRGenSILFunction::visitValueMetatypeInst(
 }
 
 void IRGenSILFunction::visitExistentialMetatypeInst(
-                                               swift::ExistentialMetatypeInst *i) {
+                                            swift::ExistentialMetatypeInst *i) {
   Explosion result;
   if (i->getOperand().getType().isClassExistentialType()) {
     Explosion existential = getLoweredExplosion(i->getOperand());
@@ -3149,10 +3148,8 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
       // value, which we don't need.
       fromEx.claimAll();
     }
-    llvm::Value *result = emitMetatypeDowncast(IGF, metatypeVal,
-                                          cast<AnyMetatypeType>(targetType),
-                                               mode);
-    ex.add(result);
+    emitMetatypeDowncast(IGF, metatypeVal, cast<AnyMetatypeType>(targetType),
+                         mode, ex);
     return;
   }
 
@@ -3184,24 +3181,22 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
 
     llvm::Value *toValue;
     if (loweredTargetType.isExistentialType()) {
-      toValue = emitObjCExistentialDowncast(IGF, instance,
-                                            operand.getType(),
-                                            loweredTargetType, mode);
+      emitClassExistentialDowncast(IGF, instance,
+                                   operand.getType(),
+                                   loweredTargetType, mode, ex);
     } else {
       toValue = emitClassDowncast(IGF, instance, loweredTargetType, mode);
+      ex.add(toValue);
     }
     
-    ex.add(toValue);
     return;
   }
 
   if (targetType.isExistentialType()) {
     Explosion from = IGF.getLoweredExplosion(operand);
     llvm::Value *fromValue = from.claimNext();
-    llvm::Value *cast = emitObjCExistentialDowncast(IGF, fromValue,
-                                                    operand.getType(),
-                                                    loweredTargetType, mode);
-    ex.add(cast);
+    emitClassExistentialDowncast(IGF, fromValue, operand.getType(),
+                                 loweredTargetType, mode, ex);
     return;
   }
 
@@ -3393,6 +3388,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
   unsigned phiIndex = 0;
   Explosion ex2;
   ex2.add(val);
+  ex2.add(ex.claimAll());
   addIncomingExplosionToPHINodes(*this, successBB, phiIndex, ex2);
 }
 
