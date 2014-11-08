@@ -5461,6 +5461,25 @@ public:
     checkResult(methodAsFunc->getBodyResultTypeLoc(), parentTy->getResult());
   }
 
+  /// Make sure that there is an invalid 'override' attribute on the
+  /// given declaration.
+  static void makeInvalidOverrideAttr(TypeChecker &TC, ValueDecl *decl) {
+    if (auto overrideAttr = decl->getAttrs().getAttribute<OverrideAttr>()) {
+      overrideAttr->setInvalid();
+    } else {
+      auto attr = new (TC.Context) OverrideAttr(true);
+      decl->getAttrs().add(attr);
+      attr->setInvalid();
+    }
+
+    if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+      if (auto getter = storage->getGetter())
+        makeInvalidOverrideAttr(TC, getter);
+      if (auto setter = storage->getSetter())
+        makeInvalidOverrideAttr(TC, setter);
+    }
+  }
+
   /// Determine which method or subscript this method or subscript overrides
   /// (if any).
   ///
@@ -5629,6 +5648,10 @@ public:
         }
         TC.diagnose(parentDecl, diag::overridden_here_with_type,
                     parentDeclTy);
+        
+        // Put an invalid 'override' attribute here.
+        makeInvalidOverrideAttr(TC, decl);
+
         return true;
       }
     }
@@ -7400,7 +7423,7 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
                                   SourceLoc(),
                                   /*Implicit=*/true));
 
-  // Note that this is a stub implementation/
+  // Note that this is a stub implementation.
   ctor->setStubImplementation(true);
 }
 
@@ -7528,7 +7551,6 @@ createDesignatedInitOverride(TypeChecker &tc,
         ctor->getAttrs().add(clonedAttr);
       }
     }
-
   }
 
   // Wire up the overrides.

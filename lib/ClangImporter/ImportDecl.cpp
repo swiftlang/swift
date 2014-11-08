@@ -2530,7 +2530,7 @@ namespace {
       
       // Check whether there is already a method with this selector.
       auto selector = Impl.importSelector(objcMethod->getSelector());
-      if (methodAlreadyImported(selector, /*isInstance=*/false, dc))
+      if (methodAlreadyImported(selector, /*isInstance=*/true, dc))
         return nullptr;
 
       // Map the name and complete the import.

@@ -1024,7 +1024,8 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   assert(method->isObjC() && "Not an Objective-C method");
 
   // Record the method.
-  bool isInstanceMethod = method->isInstanceMember();
+  bool isInstanceMethod
+    = method->isInstanceMember() || isa<ConstructorDecl>(method);
   auto selector = method->getObjCSelector();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}];
 
@@ -1040,6 +1041,9 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
       getASTContext().recordObjCMethodConflict(this, selector,
                                                isInstanceMethod);
     }
+  } else {
+    // Record the first method that has this selector.
+    getASTContext().recordObjCMethod(method);
   }
 
   vec.push_back(method);

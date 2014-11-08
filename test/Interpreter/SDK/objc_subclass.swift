@@ -16,7 +16,7 @@ class SuperString : NSString {
     super.init(coder: aDecoder)
   }
 
-  func length() -> Int {
+  override var length: Int {
     return len
   }
 

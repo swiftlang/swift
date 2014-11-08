@@ -509,8 +509,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   typeCheckFunctionsAndExternalDecls(TC);
 
-  // Diagnose conflicts between Objective-C methods.
+  // Diagnose conflicts and unintended overrides between Objective-C methods.
   Ctx.diagnoseObjCMethodConflicts(SF);
+  Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
 
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;

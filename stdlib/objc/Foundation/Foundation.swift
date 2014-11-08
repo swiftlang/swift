@@ -231,7 +231,7 @@ func _cocoaStringSubscriptImpl(
 // A substring of an arbitrary immutable NSString.  The underlying
 // NSString is assumed to not provide contiguous UTF-16 storage.
 final class _NSOpaqueString : NSString {
-  func length() -> Int {
+  override var length: Int { 
     return subRange.length
   }
 

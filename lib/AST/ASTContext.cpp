@@ -243,6 +243,11 @@ struct ASTContext::Implementation {
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
+  /// List of Objective-C methods created by the type checker (and not
+  /// by the Clang importer or deserialized), which is used for
+  /// checking unintended Objective-C overrides.
+  std::vector<AbstractFunctionDecl *> ObjCMethods;
+
   /// \brief The permanent arena.
   Arena Permanent;
 
@@ -1365,23 +1370,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ConformsTo);
 }
 
-void ASTContext::recordObjCMethodConflict(ClassDecl *classDecl,
-                                          ObjCSelector selector,
-                                          bool isInstance) {
-  Impl.ObjCMethodConflicts.push_back(std::make_tuple(classDecl, selector,
-                                                      isInstance));
-}
-
-/// Retrieve the source file for the given Objective-C member conflict.
-static MutableArrayRef<AbstractFunctionDecl *>
-getObjCMethodConflictDecls(const ObjCMethodConflict &conflict) {
-  ClassDecl *classDecl = std::get<0>(conflict);
-  ObjCSelector selector = std::get<1>(conflict);
-  bool isInstanceMethod = std::get<2>(conflict);
-
-  return classDecl->lookupDirect(selector, isInstanceMethod);
-}
-
 namespace {
   /// Produce a deterministic ordering of the given declarations.
   class OrderDeclarations {
@@ -1482,13 +1470,158 @@ static std::pair<unsigned, DeclName> getObjCRedeclInfo(
   }
 }
 
+void ASTContext::recordObjCMethod(AbstractFunctionDecl *func) {
+  // If this method comes from Objective-C, ignore it.
+  if (func->hasClangNode())
+    return;
+
+  Impl.ObjCMethods.push_back(func);
+}
+
+/// Lookup for an Objective-C method with the given selector in the
+/// given class type or any of its superclasses.
+static AbstractFunctionDecl *lookupObjCMethodInType(Type classType,
+                                                    ObjCSelector selector,
+                                                    bool isInstanceMethod,
+                                                    SourceManager &srcMgr) {
+  // Dig out the declaration of the class.
+  auto classDecl = classType->getClassOrBoundGenericClass();
+  if (!classDecl)
+    return nullptr;
+
+  // Look for an Objective-C method in this class.
+  auto methods = classDecl->lookupDirect(selector, isInstanceMethod);
+  if (!methods.empty()) {
+    return *std::min_element(methods.begin(), methods.end(),
+                             OrderDeclarations(srcMgr));
+  }
+
+  // Recurse into the superclass.
+  if (!classDecl->hasSuperclass())
+    return nullptr;
+
+  return lookupObjCMethodInType(classDecl->getSuperclass(), selector,
+                                isInstanceMethod, srcMgr);
+}
+
+bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
+  /// Partition the set of Objective-C methods 
+  auto firstLocalMethod 
+    = std::partition(Impl.ObjCMethods.begin(), Impl.ObjCMethods.end(),
+                     [&](AbstractFunctionDecl *method) {
+                       return method->getDeclContext()->getParentSourceFile()
+                                != &sf;
+                     });
+
+  // If no Objective-C methods were defined in this file, we're done.
+  unsigned numLocalMethods = Impl.ObjCMethods.end() - firstLocalMethod;
+  if (numLocalMethods == 0)
+    return false;
+
+  // Sort the Objective-C methods within this source file.
+  MutableArrayRef<AbstractFunctionDecl *> methods(&*firstLocalMethod,
+                                                  numLocalMethods);
+  std::sort(methods.begin(), methods.end(), OrderDeclarations(SourceMgr));
+
+  // For each Objective-C method declared in this file, check whether
+  // it overrides something in one of its superclasses. We
+  // intentionally don't respect access control here, since everything
+  // is visible to the Objective-C runtime.
+  bool diagnosedAny = false;
+  for (auto method : methods) {
+    // If the method has an @objc override, we don't need to do any
+    // more checking.
+    if (auto overridden = method->getOverriddenDecl()) {
+      if (overridden->isObjC())
+        continue;
+    }
+
+    // Skip deinitializers.
+    if (isa<DestructorDecl>(method))
+      continue;
+
+    // Skip invalid declarations.
+    if (method->isInvalid())
+      continue;
+
+    // Skip declarations with an invalid 'override' attribute on them.
+    if (auto attr = method->getAttrs().getAttribute<OverrideAttr>(true)) {
+      if (attr->isInvalid())
+        continue;
+    }
+
+    auto classDecl = method->getDeclContext()->isClassOrClassExtensionContext();
+    if (!classDecl)
+      continue; // error-recovery path, only
+
+    if (!classDecl->hasSuperclass())
+      continue;
+
+    // Look for a method that we have overridden in one of our
+    // superclasses.
+    auto selector = method->getObjCSelector();
+    bool isInstanceMethod
+      = method->isInstanceMember() || isa<ConstructorDecl>(method);
+    AbstractFunctionDecl *overriddenMethod
+      = lookupObjCMethodInType(classDecl->getSuperclass(),
+                               selector, isInstanceMethod,
+                               SourceMgr);
+    if (!overriddenMethod)
+      continue;
+
+    // Ignore stub implementations.
+    if (auto overriddenCtor = dyn_cast<ConstructorDecl>(overriddenMethod)) {
+      if (overriddenCtor->hasStubImplementation())
+        continue;
+    }
+
+    // Diagnose the override.
+    auto methodRedeclInfo = getObjCRedeclInfo(method);
+    auto overriddenRedeclInfo = getObjCRedeclInfo(overriddenMethod);
+    Diags.diagnose(method->getLoc(), diag::objc_override_other,
+                   methodRedeclInfo.first,
+                   methodRedeclInfo.second,
+                   selector,
+                   overriddenMethod->getDeclContext()
+                     ->getDeclaredInterfaceType());
+    Diags.diagnose(overriddenMethod->getLoc(), diag::objc_override_other_here,
+                   overriddenRedeclInfo.first,
+                   overriddenRedeclInfo.second,
+                   selector);
+
+    diagnosedAny = true;
+  }
+
+  // Remove all of the local methods from the list of Objective-C methods.
+  Impl.ObjCMethods.erase(firstLocalMethod, Impl.ObjCMethods.end());
+
+  return diagnosedAny;
+}
+
+void ASTContext::recordObjCMethodConflict(ClassDecl *classDecl,
+                                          ObjCSelector selector,
+                                          bool isInstance) {
+  Impl.ObjCMethodConflicts.push_back(std::make_tuple(classDecl, selector,
+                                                     isInstance));
+}
+
+/// Retrieve the source file for the given Objective-C member conflict.
+static MutableArrayRef<AbstractFunctionDecl *>
+getObjCMethodConflictDecls(const ObjCMethodConflict &conflict) {
+  ClassDecl *classDecl = std::get<0>(conflict);
+  ObjCSelector selector = std::get<1>(conflict);
+  bool isInstanceMethod = std::get<2>(conflict);
+
+  return classDecl->lookupDirect(selector, isInstanceMethod);
+}
+
 /// Given a set of conflicting Objective-C methods, remove any methods
 /// that are legitimately overridden in Objective-C, i.e., because
 /// they occur in different modules, one is defined in the class, and
 /// the other is defined in an extension (category) thereof.
 static void removeValidObjCConflictingMethods(
               MutableArrayRef<AbstractFunctionDecl *> &methods) {
-  // Erase any invalid declarations. We don't want to complain about
+  // Erase any invalid or stub declarations. We don't want to complain about
   // them, because we might already have complained about
   // redeclarations based on Swift matching.
   auto newEnd = std::remove_if(methods.begin(), methods.end(),
@@ -1501,8 +1634,18 @@ static void removeValidObjCConflictingMethods(
                                      return func->getAccessorStorageDecl()
                                              ->isInvalid();
                                    }
-                                 }
+
+                                   return false;
+                                 } 
                                  
+                                 if (auto ctor 
+                                       = dyn_cast<ConstructorDecl>(method)) {
+                                   if (ctor->hasStubImplementation())
+                                     return true;
+
+                                   return false;
+                                 }
+
                                  return false;
                                });
   methods = methods.slice(0, newEnd - methods.begin());

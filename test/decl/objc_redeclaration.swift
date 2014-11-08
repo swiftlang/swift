@@ -1,7 +1,7 @@
 // RUN: %swift -parse -disable-objc-attr-requires-foundation-module %s -verify
 
 @objc class Redecl1 { // expected-note{{Objective-C method 'dealloc' previously declared by implicit deinitializer here}}
-  @objc init() { }
+  @objc init() { } // expected-note{{Objective-C method 'init' previously declared by initializer 'init()' here}}
 
   @objc
   func method1() { } // expected-note 2{{Objective-C method 'method1' previously declared by method 'method1()' here}}
@@ -35,7 +35,7 @@ extension Redecl1 {
   func indexed(x: Int) { } // expected-error{{method 'indexed' redeclares Objective-C method 'objectAtIndexedSubscript:'}}
 
   @objc(init)
-  func initialize() { }
+  func initialize() { } // expected-error{{method 'initialize()' redeclares Objective-C method 'init'}}
 
   @objc
   func dealloc() { } // expected-error{{method 'dealloc()' redeclares Objective-C method 'dealloc'}}

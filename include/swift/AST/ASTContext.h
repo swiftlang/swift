@@ -642,6 +642,13 @@ public:
   /// \brief Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
+  /// Note that the given method produces an Objective-C method.
+  void recordObjCMethod(AbstractFunctionDecl *method);
+
+  /// Diagnose any Objective-C method overrides that aren't reflected
+  /// as overrides in Swift.
+  bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
+
   /// Note that there is a conflict between different definitions that
   /// produce the same Objective-C method.
   void recordObjCMethodConflict(ClassDecl *classDecl, ObjCSelector selector,

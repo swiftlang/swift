@@ -1692,6 +1692,13 @@ NOTE(objc_redecl_prev,sema_nb,none,
      "Objective-C method %2 previously declared by " OBJC_REDECL_SELECT " here",
      (unsigned, DeclName, ObjCSelector))
 
+ERROR(objc_override_other,sema_objc,none,
+      OBJC_REDECL_SELECT " overrides Objective-C method %2 from superclass %3",
+      (unsigned, DeclName, ObjCSelector, Type))
+NOTE(objc_override_other_here,sema_objc,none,
+     "Objective-C method %2 defined by " OBJC_REDECL_SELECT " here",
+      (unsigned, DeclName, ObjCSelector))
+
 #undef OBJC_REDECL_SELECT
 
 //------------------------------------------------------------------------------
