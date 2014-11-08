@@ -19,6 +19,7 @@
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/IVAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/Passes.h"
@@ -106,18 +107,39 @@ static bool isArrayEltStore(StoreInst *SI) {
   return false;
 }
 
+static bool isArrayReference(SILValue Ref, ArraySet &ArrayReferences,
+                             RCIdentityAnalysis *RCIA) {
+  auto RefRoot = RCIA->getRCIdentityRoot(Ref);
+  if (ArrayReferences.count(RefRoot))
+    return true;
+  RefRoot = getArrayStructPointer(ArrayCallKind::kCheckIndex, RefRoot);
+  return ArrayReferences.count(RefRoot);
+}
+
 /// Determines the kind of array bounds effect the instruction can have.
-static ArrayBoundsEffect mayChangeArraySize(SILInstruction *I,
-                                            ArrayCallKind &Kind,
-                                            SILValue &Array) {
+static ArrayBoundsEffect
+mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
+                   ArraySet &ArrayReferences, RCIdentityAnalysis *RCIA) {
   Array = SILValue();
   Kind = ArrayCallKind::kNone;
 
   // TODO: What else.
   if (isa<StrongRetainInst>(I) || isa<RetainValueInst>(I) ||
-      isa<ReleaseValueInst>(I) || isa<CondFailInst>(I) ||
-      isa<DeallocStackInst>(I) || isa<AllocationInst>(I))
+      isa<CondFailInst>(I) || isa<DeallocStackInst>(I) ||
+      isa<AllocationInst>(I))
     return ArrayBoundsEffect::kNone;
+
+  // A retain on an arbitrary class can have sideeffects because of the deinit
+  // function.
+  if (auto SR = dyn_cast<StrongReleaseInst>(I))
+    return isArrayReference(SR->getOperand(), ArrayReferences, RCIA)
+               ? ArrayBoundsEffect::kNone
+               : ArrayBoundsEffect::kMayChangeAny;
+
+  if (auto RV = dyn_cast<ReleaseValueInst>(I))
+    return isArrayReference(RV->getOperand(), ArrayReferences, RCIA)
+               ? ArrayBoundsEffect::kNone
+               : ArrayBoundsEffect::kMayChangeAny;
 
   // Check array bounds semantic.
   ArraySemanticsCall ArrayCall(I);
@@ -190,10 +212,13 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
 class ABCAnalysis {
   ArraySet SafeArrays;
   ArraySet UnsafeArrays;
+  ArraySet &ArrayReferences;
+  RCIdentityAnalysis *RCIA;
   bool LoopMode;
 
 public:
-  ABCAnalysis(bool loopMode = true) : LoopMode(loopMode) {}
+  ABCAnalysis(bool loopMode, ArraySet &Arrays, RCIdentityAnalysis *rcia)
+      : ArrayReferences(Arrays), RCIA(rcia), LoopMode(loopMode) {}
 
   ABCAnalysis(const ABCAnalysis &) = delete;
   ABCAnalysis &operator=(const ABCAnalysis &) = delete;
@@ -235,7 +260,8 @@ private:
   bool analyseInstruction(SILInstruction *Inst) {
     SILValue Array;
     ArrayCallKind K;
-    auto BoundsEffect = mayChangeArraySize(Inst, K, Array);
+    auto BoundsEffect =
+        mayChangeArraySize(Inst, K, Array, ArrayReferences, RCIA);
     assert(Array || K == ArrayCallKind::kNone);
 
     if (BoundsEffect == ArrayBoundsEffect::kMayChangeAny) {
@@ -287,8 +313,9 @@ getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
 /// Remove redundant checks in a basic block. This pass will reset the state
 /// after an instruction that may modify any array allowing removal of redundant
 /// checks up to that point and after that point.
-static bool removeRedundantChecksInBlock(SILBasicBlock &BB) {
-  ABCAnalysis ABC(false);
+static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
+                                         RCIdentityAnalysis *RCIA) {
+  ABCAnalysis ABC(false, Arrays, RCIA);
   IndexedArraySet RedundantChecks;
   bool Changed = false;
 
@@ -925,7 +952,8 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 /// Analyse the loop for arrays that are not modified and perform dominator tree
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
-                              IVInfo &IVs, bool ShouldVerify) {
+                              IVInfo &IVs, ArraySet &Arrays,
+                              RCIdentityAnalysis *RCIA, bool ShouldVerify) {
   auto *Header = Loop->getHeader();
   if (!Header) return false;
 
@@ -944,7 +972,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   // Collect safe arrays. Arrays are safe if there is no function call that
   // could mutate their size in the loop.
-  ABCAnalysis ABC;
+  ABCAnalysis ABC(true, Arrays, RCIA);
   for (auto *BB : Loop->getBlocks())
     // If analyseBlock fails we have seen an instruction that might-modify any
     // array.
@@ -1061,13 +1089,30 @@ public:
     DominanceInfo *DT = DA->getDomInfo(F);
     assert(DT);
     IVInfo &IVs = IVA->getIVInfo(F);
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>();
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
+    // Collect all arrays in this function. A release is only 'safe' if we know
+    // its deinitializer does not have sideeffects that could cause memory
+    // safety issues. A deinit could deallocate array or put a different array
+    // in its location.
+    ArraySet Arrays;
+    for (auto &BB : *F)
+      for (auto &Inst : BB) {
+        ArraySemanticsCall Call(&Inst);
+        if (Call) {
+          DEBUG(llvm::dbgs() << "Gathering " << *(ApplyInst*)Call);
+          auto rcRoot = RCIA->getRCIdentityRoot(Call.getSelf());
+          Arrays.insert(rcRoot);
+          Arrays.insert(
+              getArrayStructPointer(ArrayCallKind::kCheckIndex, rcRoot));
+        }
+      }
 
     // Remove redundant checks on a per basic block basis.
     bool Changed = false;
     for (auto &BB : *F)
-      Changed |= removeRedundantChecksInBlock(BB);
+      Changed |= removeRedundantChecksInBlock(BB, Arrays, RCIA);
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
 
@@ -1091,7 +1136,7 @@ public:
 
         while (!Worklist.empty()) {
           Changed |= hoistBoundsChecks(Worklist.pop_back_val(), DT, LI, IVs,
-                                       ShouldVerify);
+                                       Arrays, RCIA, ShouldVerify);
         }
       }
 

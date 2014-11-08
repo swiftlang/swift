@@ -595,6 +595,46 @@ bb3:
   %23 = struct $Int (%4 : $Builtin.Word)
   return %23 : $Int
 }
+
+// HOIST-LABEL: sil @dont_hoist_due_to_unknown_release
+// HOIST: bb2
+// HOIST:   [[CB:%.*]] = function_ref @checkbounds
+// HOIST:   apply [[CB]]
+// HOIST:   cond_br {{.*}}, bb3({{.*}}), bb2
+
+sil @dont_hoist_due_to_unknown_release : $@thin (Int, @inout ArrayInt, Builtin.NativeObject) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt, %100: $Builtin.NativeObject):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  br bb1(%2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %8 = builtin "cmp_eq_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %37 = struct $Int(%4 : $Builtin.Word)
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %10 = integer_literal $Builtin.Word, 1
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %10 : $Builtin.Word, %19 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  %22 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 1
+  // This release could have memory unsafe sideeffects in the deinit function.
+  strong_release %100: $Builtin.NativeObject
+  cond_fail %22 : $Builtin.Int1
+  br bb1(%21 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
+
 sil public_external [semantics "array.check_subscript"] @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> () {
   bb0(%0: $Int, %1: $ArrayInt):
     unreachable
