@@ -945,9 +945,27 @@ Reflection.test("CustomMirror") {
     // Check that object identifiers are unique to class instances.
     let a = Brilliant(1, "")
     let b = Brilliant(2, "")
+    let c = Brilliant(3, "")
 
+    // Equatable
     checkEquatable(true, ObjectIdentifier(a), ObjectIdentifier(a))
     checkEquatable(false, ObjectIdentifier(a), ObjectIdentifier(b))
+
+    // Comparable
+    func isComparable<X : Comparable>(x: X) {}
+    isComparable(ObjectIdentifier(a))
+    // Check the ObjectIdentifier created is stable
+    expectTrue(
+      (ObjectIdentifier(a) < ObjectIdentifier(b))
+      ^ (ObjectIdentifier(a) > ObjectIdentifier(b)))
+    expectFalse(
+      ObjectIdentifier(a) >= ObjectIdentifier(b)
+      && ObjectIdentifier(a) <= ObjectIdentifier(b))
+
+    // Check ordering is transitive
+    expectEqual(
+      sorted([ObjectIdentifier(a), ObjectIdentifier(b), ObjectIdentifier(c)]),
+      sorted([ObjectIdentifier(c), ObjectIdentifier(b), ObjectIdentifier(a)]))
   }
 }
 

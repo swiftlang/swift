@@ -26,7 +26,7 @@ public protocol Reflectable {
 ///
 /// In Swift, only class instances have unique identities. There is no notion
 /// of identity for structs, enums, or tuples.
-public struct ObjectIdentifier : Hashable {
+public struct ObjectIdentifier : Hashable, Comparable {
   let value: Builtin.RawPointer
 
   /// Convert to a `UInt` that captures the full value of `self`.
@@ -52,6 +52,10 @@ public struct ObjectIdentifier : Hashable {
   public init(_ x: AnyObject) {
     self.value = unsafeBitCast(x, Builtin.RawPointer.self)
   }
+}
+
+public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
+  return lhs.uintValue() < rhs.uintValue()
 }
 
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
