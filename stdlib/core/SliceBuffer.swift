@@ -17,7 +17,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   typealias NativeStorage = _ContiguousArrayStorage<T>
   typealias NativeBuffer = _ContiguousArrayBuffer<T>
 
-  init(owner: AnyObject?, start: UnsafeMutablePointer<T>, count: Int, 
+  init(owner: AnyObject, start: UnsafeMutablePointer<T>, count: Int, 
        hasNativeBuffer: Bool) {
     self.owner = owner
     self.start = start
@@ -26,9 +26,10 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   public
   init() {
-    owner = .None
-    start = nil
-    _countAndFlags = 0
+    let empty = _ContiguousArrayBuffer<T>()
+    owner = empty.owner
+    start = empty.baseAddress
+    _countAndFlags = 1
     _invariantCheck()
   }
 
@@ -36,31 +37,27 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   init(_ buffer: NativeBuffer) {
     owner = buffer._storage
     start = buffer.baseAddress
-    _countAndFlags = (UInt(buffer.count) << 1) | ((owner != nil) ? 1 : 0)
+    _countAndFlags = (UInt(buffer.count) << 1) | 1
     _invariantCheck()
   }
 
   func _invariantCheck() {
     let isNative = _hasNativeBuffer
     let isNativeStorage: Bool = (owner as? _ContiguousArrayStorageBase) != nil
-    _sanityCheck(
-      isNativeStorage == isNative
-    )
+    _sanityCheck(isNativeStorage == isNative)
     if isNative {
       _sanityCheck(count <= nativeBuffer.count)
     }
   }
   
   var _hasNativeBuffer: Bool {
-    _sanityCheck(
-      (owner != nil) || (_countAndFlags & 1) == 0,
-      "Something went wrong: an unowned buffer cannot have a native buffer")
     return (_countAndFlags & 1) != 0
   }
 
   var nativeBuffer: NativeBuffer {
     _sanityCheck(_hasNativeBuffer)
-    return NativeBuffer(owner as? NativeStorage)
+    return NativeBuffer(
+      (owner as? _ContiguousArrayStorageBase) ?? _emptyArrayStorage)
   }
 
   /// Replace the given subRange with the first newCount elements of
@@ -110,7 +107,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   
   /// An object that keeps the elements stored in this buffer alive
   public
-  var owner: AnyObject?
+  var owner: AnyObject
   var start: UnsafeMutablePointer<T>
   var _countAndFlags: UInt
 

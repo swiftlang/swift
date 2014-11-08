@@ -160,7 +160,7 @@ func test() {
   let n2 = a0~>cp
 
   // CHECK-NEXT: true
-  println(n1._base == n2._base)
+  println(n1.identity == n2.identity)
 }
 test()
 

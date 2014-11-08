@@ -92,7 +92,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
 
   /// Adopt the storage of x
   public init(_ buffer: _ContiguousArrayBuffer<Element>) {
-    self._base = buffer._base
+    _base = _HeapBuffer(buffer.owner)
   }
 
   public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
@@ -112,7 +112,8 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
   public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
-    return _ContiguousArrayBuffer(_base.storage as _ContiguousArrayStorageBase?)
+    return _ContiguousArrayBuffer(
+      (_base.storage as? _ContiguousArrayStorageBase) ?? _emptyArrayStorage)
   }
 
   /// Replace the given subRange with the first newCount elements of
@@ -210,7 +211,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   public subscript(subRange: Range<Int>) -> _SliceBuffer<T>
   {
     return _SliceBuffer(
-      owner: _base.storage,
+      owner: _base.storage ?? _emptyArrayStorage,
       start: baseAddress + subRange.startIndex,
       count: subRange.endIndex - subRange.startIndex,
       hasNativeBuffer: true)
@@ -245,8 +246,8 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   }
 
   /// An object that keeps the elements stored in this buffer alive
-  public var owner: AnyObject? {
-    return _storage
+  public var owner: AnyObject {
+    return _storage ?? _emptyArrayStorage
   }
 
   /// A value that identifies the storage used by the buffer.  Two
