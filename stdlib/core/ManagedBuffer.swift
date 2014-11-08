@@ -24,10 +24,8 @@ public class NonObjectiveCBase {}
 /// During instance creation, in particular during
 /// `ManagedBuffer.create`\ 's call to initialize, `ManagedBuffer`\ 's
 /// `value` property is as-yet uninitialized, and therefore
-///
-/// `ManagedProtoBuffer` does not offer
-/// access to the as-yet uninitialized `value` property of
-/// `ManagedBuffer`,
+/// `ManagedProtoBuffer` does not offer access to the as-yet
+/// uninitialized `value` property of `ManagedBuffer`.
 public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// The actual number of elements that can be stored in this object.
   ///
@@ -39,22 +37,27 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
     return p.allocatedElementCount
   }
 
-  /// Call `body` with an `UnsafeMutablePointer` to the stored `Value`
+  /// Call `body` with an `UnsafeMutablePointer` to the stored
+  /// `Value`.  **Note**: this pointer is only valid
+  /// for the duration of the call to `body`.
   public final func withUnsafeMutablePointerToValue<R>(
     body: (UnsafeMutablePointer<Value>)->R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
   
-  /// Call body with an `UnsafeMutablePointer` to the `Element` storage
+  /// Call `body` with an `UnsafeMutablePointer` to the `Element`
+  /// storage.  **Note**: this pointer is only valid
+  /// for the duration of the call to `body`.
   public final func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>)->R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
 
-  /// Call body with `UnsafeMutablePointer`\ s to the stored `Value`
-  /// and raw `Element` storage
+  /// Call `body` with `UnsafeMutablePointer`\ s to the stored `Value`
+  /// and raw `Element` storage.  **Note**: these pointers are only valid
+  /// for the duration of the call to `body`.
   public final func withUnsafeMutablePointers<R>(
     body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
   ) -> R {
@@ -111,9 +114,7 @@ public class ManagedBuffer<Value, Element>
   /// The stored `Value` instance.
   public final var value: Value {
     address {
-      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue {
-        UnsafePointer($0)
-      }
+      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue { UnsafePointer($0) }
     }
     mutableAddress {
       return ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0 }
@@ -180,24 +181,13 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     minimumCapacity: Int,
     initialValue: (buffer: AnyObject, allocatedCount: (AnyObject)->Int)->Value
   ) {
-    ManagedBufferPointer._checkValidBufferClass(bufferClass, creating: true)
-    _precondition(
-      minimumCapacity >= 0,
-      "ManagedBufferPointer must have non-negative capacity")
-
-    let totalSize = _My._elementOffset
-      +  minimumCapacity * strideof(Element.self)
-
-    let newBuffer: AnyObject = _swift_bufferAllocate(
-      bufferClass, totalSize, _My._alignmentMask)
-
-    self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
+    self = ManagedBufferPointer(bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
     // initialize the value field
     withUnsafeMutablePointerToValue {
       $0.initialize(
         initialValue(
-          buffer: newBuffer,
+          buffer: self.buffer,
           allocatedCount: {
             ManagedBufferPointer(unsafeBufferObject: $0).allocatedElementCount
           }))
@@ -220,10 +210,10 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// The stored `Value` instance.
   public var value: Value {    
     address {
-      return withUnsafeMutablePointerToValue { UnsafePointer($0) }
+      return UnsafePointer(_valuePointer)
     }
     mutableAddress {
-      return withUnsafeMutablePointerToValue { $0 }
+      return _valuePointer
     }
   }
 
@@ -241,29 +231,31 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     return (_allocatedByteCount &- _My._elementOffset) &/ strideof(Element)
   }
 
-  /// Call `body` with an `UnsafeMutablePointer` to the stored `Value`
+  /// Call `body` with an `UnsafeMutablePointer` to the stored
+  /// `Value`.  **Note**: this pointer is only valid
+  /// for the duration of the call to `body`
   public func withUnsafeMutablePointerToValue<R>(
     body: (UnsafeMutablePointer<Value>)->R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
   
-  /// Call body with an `UnsafeMutablePointer` to the `Element` storage
+  /// Call `body` with an `UnsafeMutablePointer` to the `Element`
+  /// storage.  **Note**: this pointer is only valid
+  /// for the duration of the call to `body`.
   public func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>)->R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
 
-  /// Call body with `UnsafeMutablePointer`\ s to the stored `Value`
-  /// and raw `Element` storage
+  /// Call `body` with `UnsafeMutablePointer`\ s to the stored `Value`
+  /// and raw `Element` storage.  **Note**: these pointers are only valid
+  /// for the duration of the call to `body`.
   public func withUnsafeMutablePointers<R>(
     body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
   ) -> R {
-    let result = body(
-      UnsafeMutablePointer(_address + _My._valueOffset),
-      UnsafeMutablePointer(_address + _My._elementOffset)
-    )
+    let result = body(_valuePointer, _elementPointer)
     _fixLifetime(_nativeBuffer)
     return result
   }
@@ -280,6 +272,35 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   
   //===--- internal/private API -------------------------------------------===//
   
+  /// Create with new storage containing space for an initial `Value`
+  /// and at least `minimumCapacity` `element`\ s.
+  ///
+  /// :param: `bufferClass` the class of the object used for storage.
+  /// :param: `minimumCapacity` the minimum number of `Element`\ s that
+  ///   must be able to be stored in the new buffer.
+  ///
+  /// Requires: minimumCapacity >= 0, and the type indicated by
+  /// `bufferClass` is a non-`@objc` class with no declared stored
+  /// properties.  The `deinit` of `bufferClass` must destroy its
+  /// stored `Value` and any constructed `Element`\ s.
+  internal init(
+    bufferClass: AnyClass,
+    minimumCapacity: Int
+  ) {
+    ManagedBufferPointer._checkValidBufferClass(bufferClass, creating: true)
+    _precondition(
+      minimumCapacity >= 0,
+      "ManagedBufferPointer must have non-negative capacity")
+
+    let totalSize = _My._elementOffset
+      +  minimumCapacity * strideof(Element.self)
+
+    let newBuffer: AnyObject = _swift_bufferAllocate(
+      bufferClass, totalSize, _My._alignmentMask)
+
+    self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
+  }
+
   /// Manage the given `buffer`.
   ///
   /// **Note:** it is an error to use the `value` property of the resulting
@@ -332,6 +353,20 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// Offset from the allocated storage for `self` to the stored `Value`
   internal static var _valueOffset: Int {
     return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
+  }
+
+  /// An **unmanaged** pointer to the storage for the `Value`
+  /// instance.  Not safe to use without _fixLifetime calls to
+  /// guarantee it doesn't dangle
+  internal var _valuePointer: UnsafeMutablePointer<Value> {
+    return UnsafeMutablePointer(_address + _My._valueOffset)
+  }
+
+  /// An **unmanaged** pointer to the storage for `Element`\ s.  Not
+  /// safe to use without _fixLifetime calls to guarantee it doesn't
+  /// dangle.
+  internal var _elementPointer: UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(_address + _My._elementOffset)
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage
