@@ -61,17 +61,20 @@ void *TypeRepr::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
+static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
+                          const PrintOptions &Opts) {
+  if (TyR == nullptr)
+    Printer << "<null>";
+  else
+    TyR->print(Printer, Opts);
+}
+
 void TypeRepr::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
 }
 
 void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
-  if (this == nullptr) {
-    Printer << "<null>";
-    return;
-  }
-
   switch (getKind()) {
 #define TYPEREPR(CLASS, PARENT) \
   case TypeReprKind::CLASS: { \
@@ -199,7 +202,7 @@ void AttributedTypeRepr::printImpl(ASTPrinter &Printer,
                                    const PrintOptions &Opts) const {
   printAttrs(Printer);
   Printer << " ";
-  Ty->print(Printer, Opts);
+  printTypeRepr(Ty, Printer, Opts);
 }
 
 void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
@@ -246,7 +249,7 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
       First = false;
     else
       Printer << ", ";
-    Arg->print(Printer, Opts);
+    printTypeRepr(Arg, Printer, Opts);
   }
   Printer << ">";
 }
@@ -269,31 +272,31 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
 
 void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                       const PrintOptions &Opts) const {
-  Components.front()->print(Printer, Opts);
+  printTypeRepr(Components.front(), Printer, Opts);
   for (auto C : Components.slice(1)) {
     Printer << ".";
-    C->print(Printer, Opts);
+    printTypeRepr(C, Printer, Opts);
   }
 }
 
 void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
-  ArgsTy->print(Printer, Opts);
+  printTypeRepr(ArgsTy, Printer, Opts);
   Printer << " -> ";
-  RetTy->print(Printer, Opts);
+  printTypeRepr(RetTy, Printer, Opts);
 }
 
 void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   if (usesOldSyntax()) {
-    Base->print(Printer, Opts);
+    printTypeRepr(Base, Printer, Opts);
     Printer << "[";
     if (auto size = getSize())
       size->getExpr()->print(Printer, Opts);
     Printer << "]";
   } else {
     Printer << "[";
-    Base->print(Printer, Opts);
+    printTypeRepr(Base, Printer, Opts);
     Printer << "]";
   }
 }
@@ -301,21 +304,21 @@ void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
 void DictionaryTypeRepr::printImpl(ASTPrinter &Printer,
                                    const PrintOptions &Opts) const {
   Printer << "[";
-  Key->print(Printer, Opts);
+  printTypeRepr(Key, Printer, Opts);
   Printer << " : ";
-  Value->print(Printer, Opts);
+  printTypeRepr(Value, Printer, Opts);
   Printer << "]";
 }
 
 void OptionalTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
-  Base->print(Printer, Opts);
+  printTypeRepr(Base, Printer, Opts);
   Printer << "?";
 }
 
 void ImplicitlyUnwrappedOptionalTypeRepr::printImpl(ASTPrinter &Printer,
                                           const PrintOptions &Opts) const {
-  Base->print(Printer, Opts);
+  printTypeRepr(Base, Printer, Opts);
   Printer << "!";
 }
 
@@ -333,7 +336,7 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     if (i) Printer << ", ";
-    Elements[i]->print(Printer, Opts);
+    printTypeRepr(Elements[i], Printer, Opts);
   }
   if (hasEllipsis())
     Printer << "...";
@@ -346,7 +349,7 @@ void NamedTypeRepr::printImpl(ASTPrinter &Printer,
     Printer.printName(Id);
     Printer << ": ";
   }
-  Ty->print(Printer, Opts);
+  printTypeRepr(Ty, Printer, Opts);
 }
 
 ProtocolCompositionTypeRepr *
@@ -367,20 +370,20 @@ void ProtocolCompositionTypeRepr::printImpl(ASTPrinter &Printer,
       First = false;
     else
       Printer << ", ";
-    Proto->print(Printer, Opts);
+    printTypeRepr(Proto, Printer, Opts);
   }
   Printer << ">";
 }
 
 void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
-  Base->print(Printer, Opts);
+  printTypeRepr(Base, Printer, Opts);
   Printer << ".Type";
 }
 
 void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
-  Base->print(Printer, Opts);
+  printTypeRepr(Base, Printer, Opts);
   Printer << ".Protocol";
 }
 
@@ -388,6 +391,5 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
 void InOutTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   Printer << "inout ";
-  Base->print(Printer, Opts);
+  printTypeRepr(Base, Printer, Opts);
 }
-
