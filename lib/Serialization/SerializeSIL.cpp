@@ -1529,7 +1529,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
 /// Helper function for whether to emit a function body.
 bool SILSerializer::shouldEmitFunctionBody(const SILFunction &F) {
   // If F is a declaration, it has no body to emit...
-  if (F.empty())
+  if (F.isExternalDeclaration())
     return false;
 
   // If F is transparent, we should always emit its body.
