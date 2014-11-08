@@ -607,7 +607,7 @@ endfunction(compute_library_subdir)
 #   handle_swift_sources(sourcesvar externalvar)
 function(handle_swift_sources sourcesvar externalvar name)
   parse_arguments(SWIFTSOURCES  
-    "DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
+    "DEPENDS;SDK;ARCHITECTURE;API_NOTES;COMPILE_FLAGS;OPT_FLAGS"
     "IS_MAIN;IS_STDLIB_CORE;STATIC;INSTALL"
     ${ARGN})
 
@@ -623,9 +623,9 @@ function(handle_swift_sources sourcesvar externalvar name)
     endif()
   endforeach()
 
-  set(swift_flags)
+  set(swift_compile_flags ${SWIFTSOURCES_COMPILE_FLAGS})
   if (NOT SWIFTSOURCES_IS_MAIN)
-    set(swift_flags -module-link-name "${name}")
+    list(APPEND swift_compile_flags -module-link-name "${name}")
   endif()
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
   translate_flag(${SWIFTSOURCES_IS_STDLIB_CORE} "IS_STDLIB_CORE"
@@ -664,7 +664,7 @@ function(handle_swift_sources sourcesvar externalvar name)
     compile_swift_files(OUTPUT ${swift_obj}
       SOURCES ${swift_sources}
       DEPENDS ${SWIFTSOURCES_DEPENDS}
-      FLAGS ${swift_flags}
+      FLAGS ${swift_compile_flags}
       SDK ${SWIFTSOURCES_SDK}
       ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
       API_NOTES ${SWIFTSOURCES_API_NOTES}
@@ -778,7 +778,8 @@ endfunction()
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
 #     [FRAMEWORK_DEPENDS dep1 ...]   # System frameworks this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
-#     [COMPILE_FLAGS flag1...]       # Extra compile flags (C/C++/ObjC)
+#     [C_COMPILE_FLAGS flag1...]     # Extra compile flags (C/C++/ObjC)
+#     [SWIFT_COMPILE_FLAGS flag1...] # Extra compile flags (Swift)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
 #     [API_NOTES_NON_OVERLAY]        # Generate API notes for non-overlayed 
 #                                    # modules with this target.
@@ -789,7 +790,7 @@ endfunction()
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library_single target name)
   parse_arguments(SWIFTLIB_SINGLE
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;COMPILE_FLAGS;LINK_FLAGS;FILE_DEPENDS;SDK;ARCHITECTURE" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;FILE_DEPENDS;SDK;ARCHITECTURE"
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;API_NOTES_NON_OVERLAY"
     ${ARGN})
 
@@ -870,6 +871,7 @@ macro(add_swift_library_single target name)
     SDK ${SWIFTLIB_SINGLE_SDK}
     ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
     API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
+    COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
     ${IS_STDLIB_CORE_arg} ${INSTALL_arg})
 
   add_library( ${target} ${libkind}
@@ -883,10 +885,10 @@ macro(add_swift_library_single target name)
   set_output_directory(${target} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   # Collect compile and link flags for the static and non-static targets.
-  # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly. 
-  set(compile_flags "${SWIFTLIB_SINGLE_COMPILE_FLAGS}")
+  # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
+  set(c_compile_flags "${SWIFTLIB_SINGLE_C_COMPILE_FLAGS}")
   set(link_flags "${SWIFTLIB_SINGLE_LINK_FLAGS}")
-  
+
   if (MODULE)
     set_target_properties(${target} PROPERTIES
       PREFIX ""
@@ -935,8 +937,8 @@ macro(add_swift_library_single target name)
         "-m${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}")
     set(link_flags "${link_flags} ${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}")
     # SDK, deployment target, architecture.
-    set(compile_flags
-      "${compile_flags} ${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}")
+    set(c_compile_flags
+      "${c_compile_flags} ${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}")
     set_target_properties(${target}
       PROPERTIES
       # Library name (without the variant information)
@@ -944,7 +946,7 @@ macro(add_swift_library_single target name)
   else()
     if (SWIFT_SDKS)
       # Deployment flags.
-      set(compile_flags "${compile_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
+      set(c_compile_flags "${c_compile_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
       set(link_flags "${link_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
     endif()
   endif()
@@ -1002,6 +1004,7 @@ macro(add_swift_library_single target name)
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
+      COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${IS_STDLIB_CORE_arg} ${INSTALL_arg}
       STATIC)
 
@@ -1077,12 +1080,12 @@ macro(add_swift_library_single target name)
 
   # Set compilation and link flags.
   set_target_properties(${target} PROPERTIES 
-    COMPILE_FLAGS "${compile_flags}"
+    COMPILE_FLAGS "${c_compile_flags}"
     LINK_FLAGS "${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
 
   if (target_static)
     set_target_properties(${target_static} PROPERTIES 
-      COMPILE_FLAGS "${compile_flags}"
+      COMPILE_FLAGS "${c_compile_flags}"
       LINK_FLAGS "${link_flags} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
   endif()
 
@@ -1116,7 +1119,8 @@ endmacro(translate_flag)
 #     [TARGET_SDKS sdk1...]          # The set of SDKs in which this library
 #                                    # is included. If empty, the library is
 #                                    # included in all SDKs.
-#     [COMPILE_FLAGS flag1...]       # Extra compile flags (C/C++/ObjC)
+#     [C_COMPILE_FLAGS flag1...]     # Extra compile flags (C/C++/ObjC)
+#     [SWIFT_COMPILE_FLAGS flag1...] # Extra compile flags (Swift)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
 #     [API_NOTES_NON_OVERLAY]        # Generate API notes for non-overlayed 
 #                                    # modules with this target.
@@ -1127,7 +1131,7 @@ endmacro(translate_flag)
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
   parse_arguments(SWIFTLIB 
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;COMPILE_FLAGS;LINK_FLAGS" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS"
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY;API_NOTES_NON_OVERLAY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
@@ -1142,12 +1146,12 @@ macro(add_swift_library name)
                  "API_NOTES_NON_OVERLAY" 
                  SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG)
 
-  set(SWIFTLIB_DEFAULT_COMPILE_FLAGS)
+  set(SWIFTLIB_DEFAULT_C_COMPILE_FLAGS)
   if (SWIFT_OPTIMIZED AND SWIFTLIB_TARGET_LIBRARY)
     if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-      set(SWIFTLIB_DEFAULT_COMPILE_FLAGS "-momit-leaf-frame-pointer")
+      set(SWIFTLIB_DEFAULT_C_COMPILE_FLAGS "-momit-leaf-frame-pointer")
     elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-      set(SWIFTLIB_DEFAULT_COMPILE_FLAGS "-momit-leaf-frame-pointer")
+      set(SWIFTLIB_DEFAULT_C_COMPILE_FLAGS "-momit-leaf-frame-pointer")
     endif()
   endif()
 
@@ -1184,8 +1188,9 @@ macro(add_swift_library name)
         DEPENDS ${SWIFTLIB_DEPENDS}
         FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
         COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
-        COMPILE_FLAGS
-          "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
+        C_COMPILE_FLAGS
+          "${SWIFTLIB_C_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_C_COMPILE_FLAGS}"
+        SWIFT_COMPILE_FLAGS ${SWIFTLIB_SWIFT_COMPILE_FLAGS}
         LINK_FLAGS "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_DEFAULT_LINK_FLAGS}"
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
         ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
@@ -1225,12 +1230,12 @@ macro(add_swift_library name)
           endforeach()
 
           # Add -momit-leaf-frame-pointer on x86.
-          set(SWIFTLIB_CURRENT_COMPILE_FLAGS)
+          set(SWIFTLIB_CURRENT_C_COMPILE_FLAGS)
           if (SWIFT_OPTIMIZED)
             if (ARCH STREQUAL "i386")
-              set(SWIFTLIB_CURRENT_COMPILE_FLAGS "-momit-leaf-frame-pointer")
+              set(SWIFTLIB_CURRENT_C_COMPILE_FLAGS "-momit-leaf-frame-pointer")
             elseif (ARCH STREQUAL "x86_64")
-              set(SWIFTLIB_CURRENT_COMPILE_FLAGS "-momit-leaf-frame-pointer")
+              set(SWIFTLIB_CURRENT_C_COMPILE_FLAGS "-momit-leaf-frame-pointer")
             endif()
           endif()
         
@@ -1254,10 +1259,10 @@ macro(add_swift_library name)
             FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
             COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
             FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
-            COMPILE_FLAGS
-              "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_CURRENT_COMPILE_FLAGS}"
-            LINK_FLAGS 
-              "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_CURRENT_LINK_FLAGS}"
+            C_COMPILE_FLAGS
+              "${SWIFTLIB_C_COMPILE_FLAGS} ${SWIFTLIB_CURRENT_C_COMPILE_FLAGS}"
+            SWIFT_COMPILE_FLAGS ${SWIFTLIB_SWIFT_COMPILE_FLAGS}
+            LINK_FLAGS "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_CURRENT_LINK_FLAGS}"
             ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
             ${SWIFTLIB_INSTALL_FLAG}
             ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
@@ -1325,10 +1330,10 @@ macro(add_swift_library name)
       FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
       COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
       FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
-      COMPILE_FLAGS
-        "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
-      LINK_FLAGS
-        "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_DEFAULT_LINK_FLAGS}"
+      C_COMPILE_FLAGS
+        "${SWIFTLIB_C_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_C_COMPILE_FLAGS}"
+      SWIFT_COMPILE_FLAGS ${SWIFTLIB_SWIFT_COMPILE_FLAGS}
+      LINK_FLAGS "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_DEFAULT_LINK_FLAGS}"
       ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
       ${SWIFTLIB_INSTALL_FLAG}
       ${SWIFTLIB_IS_STDLIB_CORE_FLAG}

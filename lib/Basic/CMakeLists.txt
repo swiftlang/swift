@@ -33,7 +33,7 @@ add_swift_library(swiftBasic
 
   ${UNICODE_TABLES}
 
-  COMPILE_FLAGS "-I${UUID_INCLUDE_DIRS}"
+  C_COMPILE_FLAGS "-I${UUID_INCLUDE_DIRS}"
   DEPENDS ${UUID_LIBRARIES}
   )
 
