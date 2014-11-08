@@ -202,7 +202,8 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState,
                         DelayedCB.get());
-    performTypeChecking(SF, PersistentState.getTopLevelContext(), CurElem);
+    performTypeChecking(SF, PersistentState.getTopLevelContext(), None, 
+                        CurElem);
     CurElem = SF.Decls.size();
   } while (!Done);
 

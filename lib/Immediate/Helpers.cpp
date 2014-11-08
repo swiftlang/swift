@@ -38,7 +38,8 @@ bool swift::appendToREPLFile(SourceFile &SF,
     FoundAnySideEffects |=
         parseIntoSourceFile(SF, RC.CurBufferID, &Done, nullptr,
                             &PersistentState);
-    performTypeChecking(SF, PersistentState.getTopLevelContext(), CurElem);
+    performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
+                        CurElem);
     CurElem = SF.Decls.size();
   } while (!Done);
   return FoundAnySideEffects;

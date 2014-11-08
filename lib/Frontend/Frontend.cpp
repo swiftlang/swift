@@ -375,7 +375,13 @@ void CompilerInstance::performSema() {
 
   if (hadLoadError)
     return;
-  
+
+  // Compute the options we want to use for type checking.
+  OptionSet<TypeCheckingFlags> TypeCheckOptions;
+  if (PrimaryBufferID == NO_SUCH_BUFFER) {
+    TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
+  }
+
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
     bool mainIsPrimary =
@@ -395,7 +401,7 @@ void CompilerInstance::performSema() {
                           &PersistentState, DelayedCB.get());
       if (mainIsPrimary) {
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
-                            CurTUElem);
+                            TypeCheckOptions, CurTUElem);
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
@@ -410,7 +416,8 @@ void CompilerInstance::performSema() {
   for (auto File : MainModule->getFiles())
     if (auto SF = dyn_cast<SourceFile>(File))
       if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
-        performTypeChecking(*SF, PersistentState.getTopLevelContext());
+        performTypeChecking(*SF, PersistentState.getTopLevelContext(),
+                            TypeCheckOptions);
 
   // Even if there were no source files, we should still record known
   // protocols.
@@ -422,6 +429,12 @@ void CompilerInstance::performSema() {
                           Invocation.getCodeCompletionFactory());
   }
 
+  // Perform whole-module type checking.
+  if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
+    for (auto File : MainModule->getFiles())
+      if (auto SF = dyn_cast<SourceFile>(File))
+        performWholeModuleTypeChecking(*SF);
+  }
 }
 
 void CompilerInstance::performParseOnly() {

@@ -132,7 +132,8 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   if (SkipBodies)
     performNameBinding(*importFile);
   else
-    performTypeChecking(*importFile, persistentState.getTopLevelContext());
+    performTypeChecking(*importFile, persistentState.getTopLevelContext(), 
+                        None);
 
   return importMod;
 }

@@ -18,6 +18,7 @@
 #define SWIFT_SUBSYSTEMS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -124,13 +125,30 @@ namespace swift {
   /// ASTs to add calls to external logging functions.
   void performPlaygroundTransform(SourceFile &SF);
   
+  /// Flags used to control type checking.
+  enum class TypeCheckingFlags : unsigned {
+    /// Whether to delay checking that benefits from having the entire
+    /// module parsed, e.g., Objective-C method override checking.
+    DelayWholeModuleChecking = 0x01
+  };
+
   /// Once parsing and name-binding are complete, this walks the AST to resolve
   /// types and diagnose problems therein.
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
   ///                  source file.
   void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
+                           OptionSet<TypeCheckingFlags> Options,
                            unsigned StartElem = 0);
+
+  /// Now that we have type-checked an entire module, perform any type
+  /// checking that requires the full module, e.g., Objective-C method
+  /// override checking.
+  ///
+  /// Note that clients still perform this checking file-by-file to
+  /// provide a somewhat defined order in which diagnostics should be
+  /// emitted.
+  void performWholeModuleTypeChecking(SourceFile &SF);
 
   /// Incrementally type-check only added external definitions.
   void typeCheckExternalDefinitions(SourceFile &SF);

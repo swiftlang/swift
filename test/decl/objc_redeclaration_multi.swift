@@ -1,10 +1,10 @@
 // RUN: %swift -parse -disable-objc-attr-requires-foundation-module %s %S/Inputs/objc_redeclaration_multi_2.swift -verify
 
 @objc class Redecl1 {
-  @objc init() { } // expected-error{{initializer 'init()' redeclares Objective-C method 'init'}}
+  @objc init() { } // expected-note{{Objective-C method 'init' previously declared by initializer 'init()' here}}
 
   @objc
-  func method1() { } // expected-error{{method 'method1()' redeclares Objective-C method 'method1'}}
+  func method1() { } // expected-note{{Objective-C method 'method1' previously declared by method 'method1()' here}}
 }
 
 extension Redecl2 {

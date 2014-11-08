@@ -418,6 +418,7 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
 }
 
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
+                                OptionSet<TypeCheckingFlags> Options,
                                 unsigned StartElem) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
@@ -509,9 +510,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   typeCheckFunctionsAndExternalDecls(TC);
 
-  // Diagnose conflicts and unintended overrides between Objective-C methods.
-  Ctx.diagnoseObjCMethodConflicts(SF);
-  Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
+  // Checking that benefits from having the whole module available.
+  if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
+    // Diagnose conflicts and unintended overrides between
+    // Objective-C methods.
+    Ctx.diagnoseObjCMethodConflicts(SF);
+    Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
+  }
 
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
@@ -538,6 +543,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     Ctx.verifyAllLoadedModules();
   }
 #endif
+}
+
+void swift::performWholeModuleTypeChecking(SourceFile &SF) {
+  auto &Ctx = SF.getASTContext();
+  Ctx.diagnoseObjCMethodConflicts(SF);
+  Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
