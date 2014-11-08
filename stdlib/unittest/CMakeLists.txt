@@ -20,6 +20,13 @@ set(SWIFTUNITTEST_SOURCES
 
 add_swift_library(swiftStdlibUnittest INSTALL TARGET_LIBRARY
   ${SWIFTUNITTEST_SOURCES}
+
+  # Can not serialize StdlibUnittest because of:
+  # <rdar://problem/18917405> Compiling StdlibUnittest with -sil-serialize-all
+  # crashes in SIL serializer
+  #
+  # SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
+
   FRAMEWORK_DEPENDS Foundation
   DEPENDS swiftCore swiftDarwin swiftFoundation)
 
