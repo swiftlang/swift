@@ -47,14 +47,8 @@ class _IndirectArrayBuffer {
     self.buffer = source.buffer
     self.isCocoa = source.isCocoa
     
-    if source.isCocoa {
-      self.isMutable = false
-    }
-    else {
-      self.isMutable = source
-        .getNativeBufferOf(AnyObject.self)
-        .canStoreElementsOfDynamicType(Target.self)
-    }
+    self.isMutable = !source.isCocoa
+      && source.getNative().canStoreElementsOfDynamicType(Target.self)
     
     self.needsElementTypeCheck = source.needsElementTypeCheck
       ? !(AnyObject.self is Target.Type)
@@ -74,10 +68,10 @@ class _IndirectArrayBuffer {
   var isMutable: Bool
   var isCocoa: Bool
   var needsElementTypeCheck: Bool
-  
-  func getNativeBufferOf<T>(_: T.Type) -> _ContiguousArrayBuffer<T> {
+
+  func getNative() -> _ContiguousArrayStorageBase {
     _sanityCheck(!isCocoa)
-    return _ContiguousArrayBuffer(unsafeDowncast(buffer))
+    return unsafeDowncast(buffer)
   }
 
   func getCocoa() -> _NSArrayCoreType {
@@ -200,10 +194,7 @@ extension _ArrayBuffer {
       return _native
     }
     else {
-      let i = indirect
-      return _fastPath(!i.isCocoa)
-        ? i.getNativeBufferOf(T.self) 
-        : nil
+      return indirect.isCocoa ? nil : NativeBuffer(indirect.getNative())
     }
   }
 
@@ -475,10 +466,8 @@ extension _ArrayBuffer {
       return NativeBuffer(s)
     }
     else {
-      let i = indirect
-      return _fastPath(!i.isCocoa)
-        ? i.getNativeBufferOf(T.self) 
-        : NativeBuffer()
+      return indirect.isCocoa
+        ? NativeBuffer() : NativeBuffer(indirect.getNative())
     }
   }
 
