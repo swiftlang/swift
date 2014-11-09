@@ -295,15 +295,6 @@ if ( XCODE )
 
   # Disable exceptions
   set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_CPP_EXCEPTIONS "NO") 
-else ()
-  # Compile with C++11, without RTTI, exceptions
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    # Use libc++.
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -stdlib=libc++")
-  endif ()
 endif ()
 
 # Add additional warnings.
@@ -877,6 +868,7 @@ macro(add_swift_library_single target name)
   add_library( ${target} ${libkind}
     ${SWIFTLIB_SINGLE_SOURCES}
     ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
+  llvm_update_compile_flags(${target})
 
   set_source_files_properties(
     ${SWIFTLIB_SINGLE_SOURCES}
@@ -1014,6 +1006,7 @@ macro(add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_STATIC_SOURCES}
       ${SWIFTLIB_SINGLE_STATIC_EXTERNAL_SOURCES}
       ${SWIFT_SOURCE_DIR}/cmake/dummy.c)
+    llvm_update_compile_flags(${target_static})
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
 
     set_output_directory(${target_static}
@@ -1079,14 +1072,16 @@ macro(add_swift_library_single target name)
   endif() 
 
   # Set compilation and link flags.
-  set_target_properties(${target} PROPERTIES 
-    COMPILE_FLAGS "${c_compile_flags}"
-    LINK_FLAGS "${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+  set_property(TARGET ${target} APPEND_STRING PROPERTY
+    COMPILE_FLAGS " ${c_compile_flags}")
+  set_property(TARGET ${target} APPEND_STRING PROPERTY
+    LINK_FLAGS " ${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
 
   if (target_static)
-    set_target_properties(${target_static} PROPERTIES 
-      COMPILE_FLAGS "${c_compile_flags}"
-      LINK_FLAGS "${link_flags} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+    set_property(TARGET ${target_static} APPEND_STRING PROPERTY
+      COMPILE_FLAGS " ${c_compile_flags}")
+    set_property(TARGET ${target_static} APPEND_STRING PROPERTY
+      LINK_FLAGS " ${link_flags} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
   endif()
 
   # Do not add code here.
@@ -1372,6 +1367,7 @@ macro(add_swift_executable name)
   else()
     add_executable(${name} ${SWIFTEXE_DEFAULT_ARGS} ${SWIFTEXE_EXTERNAL_SOURCES})
   endif()
+  llvm_update_compile_flags(${name})
   set_source_files_properties(
     ${SWIFTEXE_DEFAULT_ARGS}
     PROPERTIES OBJECT_DEPENDS "${SWIFTEXE_FILE_DEPENDS}")

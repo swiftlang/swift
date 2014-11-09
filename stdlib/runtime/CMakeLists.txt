@@ -67,6 +67,6 @@ find_library(CRASHREPORTERCLIENT CrashReporterClient ONLY_CMAKE_FIND_ROOT_PATH)
 
 if (CRASHREPORTERCLIENT)
   target_link_libraries(swiftRuntime "-lCrashReporterClient")
-  set_target_properties(swiftRuntime 
-    PROPERTIES COMPILE_FLAGS "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
+  set_property(TARGET swiftRuntime APPEND_STRING PROPERTY
+    COMPILE_FLAGS " -DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
 endif()
