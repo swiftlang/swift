@@ -35,7 +35,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   public
   init(_ buffer: NativeBuffer) {
-    owner = buffer._storage
+    owner = buffer.owner
     start = buffer.baseAddress
     _countAndFlags = (UInt(buffer.count) << 1) | 1
     _invariantCheck()
@@ -79,8 +79,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     /* _sanityCheck(insertCount <= numericCast(count(newValues))) */
     
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
-    
-    var native = unsafeBitCast(owner, NativeBuffer.self)
+
+    var native = nativeBuffer
     let offset = start - native.baseAddress
     let eraseCount = Swift.count(subRange)
     let growth = insertCount - eraseCount
@@ -125,19 +125,19 @@ struct _SliceBuffer<T> : _ArrayBufferType {
         // tend to reduce shuffling of later elements.  Since this
         // function isn't called for subscripting, this won't slow
         // down that case.
-        var backing = unsafeBitCast(owner, NativeBuffer.self)
-        let offset = self.baseAddress - backing.baseAddress
-        let backingCount = backing.count
+        var native = nativeBuffer
+        let offset = self.baseAddress - native.baseAddress
+        let backingCount = native.count
         let myCount = count
 
         if _slowPath(backingCount > myCount + offset) {
-          backing.replace(
+          native.replace(
             subRange: (myCount+offset)..<backingCount,
             with: 0,
             elementsOf: EmptyCollection())
         }
         _invariantCheck()
-        return backing
+        return native
       }
     }
     return nil
@@ -154,11 +154,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   public
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
-    if _fastPath(_hasNativeBuffer) {
-      let n = unsafeBitCast(owner, NativeBuffer.self)
-      if n.count == count {
-        return n
-      }
+    if _fastPath(_hasNativeBuffer && nativeBuffer.count == count) {
+      return nativeBuffer
     }
     return nil
   }
