@@ -252,7 +252,7 @@ extension _ArrayBuffer {
       location:subRange.startIndex,
       length: subRange.endIndex - subRange.startIndex)
 
-    let buffer = unsafeBitCast(target, UnsafeMutablePointer<AnyObject>.self)
+    let buffer = UnsafeMutablePointer<AnyObject>(target)
     
     // Copies the references out of the NSArray without retaining them
     nonNative.getObjects(buffer, range: nsSubRange)
