@@ -3126,30 +3126,24 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
   CanType targetType = loweredTargetType.getSwiftRValueType();
 
   if (isa<AnyMetatypeType>(sourceType)) {
-    // FIXME: To-existential-metatype checks require a runtime function we don't
-    // have implemented yet.
-    if (isa<ExistentialMetatypeType>(targetType))
-      IGF.unimplemented(operand.getLoc() ? operand.getLoc()->getSourceLoc()
-                                         : SourceLoc(),
-                        "downcast to existential metatype");
-
     llvm::Value *metatypeVal;
-    if (operand.getType().isAddress()) {
-      auto fromAddr = IGF.getLoweredAddress(operand);
-      // If the metatype is existential, there may be witness tables in the
-      // value, which we don't need. Narrow the address type to just load the
-      // type metadata.
-      fromAddr = IGF.Builder.CreateBitCast(fromAddr, IGF.IGM.TypeMetadataPtrTy);
-      metatypeVal = IGF.Builder.CreateLoad(fromAddr);
-    } else {
-      auto fromEx = IGF.getLoweredExplosion(operand);
-      metatypeVal = fromEx.claimNext();
-      // If the metatype is existential, there may be witness tables in the
-      // value, which we don't need.
-      fromEx.claimAll();
-    }
-    emitMetatypeDowncast(IGF, metatypeVal, cast<AnyMetatypeType>(targetType),
-                         mode, ex);
+    auto fromEx = IGF.getLoweredExplosion(operand);
+    metatypeVal = fromEx.claimNext();
+    // If the metatype is existential, there may be witness tables in the
+    // value, which we don't need.
+    // TODO: In existential-to-existential casts, we should carry over common
+    // witness tables from the source to the destination.
+    fromEx.claimAll();
+    
+    if (auto existential = dyn_cast<ExistentialMetatypeType>(targetType))
+      emitScalarExistentialDowncast(IGF, metatypeVal,
+                                    operand.getType(), loweredTargetType,
+                                    mode,
+                                    existential->getRepresentation(),
+                                    ex);
+    else
+      emitMetatypeDowncast(IGF, metatypeVal, cast<MetatypeType>(targetType),
+                           mode, ex);
     return;
   }
 
@@ -3181,9 +3175,11 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
 
     llvm::Value *toValue;
     if (loweredTargetType.isExistentialType()) {
-      emitClassExistentialDowncast(IGF, instance,
-                                   operand.getType(),
-                                   loweredTargetType, mode, ex);
+      emitScalarExistentialDowncast(IGF, instance,
+                                    operand.getType(),
+                                    loweredTargetType, mode,
+                                    None /*not a metatype*/,
+                                    ex);
     } else {
       toValue = emitClassDowncast(IGF, instance, loweredTargetType, mode);
       ex.add(toValue);
@@ -3195,8 +3191,10 @@ void emitValueCheckedCast(IRGenSILFunction &IGF,
   if (targetType.isExistentialType()) {
     Explosion from = IGF.getLoweredExplosion(operand);
     llvm::Value *fromValue = from.claimNext();
-    emitClassExistentialDowncast(IGF, fromValue, operand.getType(),
-                                 loweredTargetType, mode, ex);
+    emitScalarExistentialDowncast(IGF, fromValue, operand.getType(),
+                                  loweredTargetType, mode,
+                                  None /*not a metatype*/,
+                                  ex);
     return;
   }
 

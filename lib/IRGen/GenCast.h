@@ -64,18 +64,22 @@ namespace irgen {
   /// Emit a checked cast of a metatype.
   void emitMetatypeDowncast(IRGenFunction &IGF,
                             llvm::Value *metatype,
-                            CanAnyMetatypeType toMetatype,
+                            CanMetatypeType toMetatype,
                             CheckedCastMode mode,
                             Explosion &ex);
 
   /// Emit a checked cast to a class-constrained protocol or protocol
   /// composition.
-  void emitClassExistentialDowncast(IRGenFunction &IGF,
-                                    llvm::Value *orig,
-                                    SILType srcType,
-                                    SILType destType,
-                                    CheckedCastMode mode,
-                                    Explosion &ex);
+  ///
+  /// If a metatype kind is provided, the cast is done as a metatype cast. If
+  /// not, the cast is done as a class instance cast.
+  void emitScalarExistentialDowncast(IRGenFunction &IGF,
+                                  llvm::Value *orig,
+                                  SILType srcType,
+                                  SILType destType,
+                                  CheckedCastMode mode,
+                                  Optional<MetatypeRepresentation> metatypeKind,
+                                  Explosion &ex);
 
   /// Emit a Protocol* value referencing an ObjC protocol.
   llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,

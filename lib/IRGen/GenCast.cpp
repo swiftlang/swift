@@ -189,7 +189,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 /// Emit a checked cast of a metatype.
 void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
                                  llvm::Value *metatype,
-                                 CanAnyMetatypeType toMetatype,
+                                 CanMetatypeType toMetatype,
                                  CheckedCastMode mode,
                                  Explosion &ex) {
   // Pick a runtime entry point and target metadata based on what kind of
@@ -346,14 +346,14 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   return fn;
 }
 
-
 /// Emit a checked cast to an Objective-C protocol or protocol composition.
-void irgen::emitClassExistentialDowncast(IRGenFunction &IGF,
-                                         llvm::Value *orig,
-                                         SILType srcType,
-                                         SILType destType,
-                                         CheckedCastMode mode,
-                                         Explosion &ex) {
+void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
+                                  llvm::Value *value,
+                                  SILType srcType,
+                                  SILType destType,
+                                  CheckedCastMode mode,
+                                  Optional<MetatypeRepresentation> metatypeKind,
+                                  Explosion &ex) {
   SmallVector<ProtocolDecl*, 4> allProtos;
   destType.getSwiftRValueType().getAnyExistentialTypeProtocols(allProtos);
 
@@ -370,8 +370,33 @@ void irgen::emitClassExistentialDowncast(IRGenFunction &IGF,
   }
   
   // Check the ObjC protocol conformances if there were any.
-  orig = IGF.Builder.CreateBitCast(orig, IGF.IGM.ObjCPtrTy);
+  llvm::Value *objcCast = nullptr;
   if (!objcProtos.empty()) {
+    // Get the ObjC instance or class object to check for these conformances.
+    llvm::Value *objcObject;
+    if (metatypeKind) {
+      switch (*metatypeKind) {
+      case MetatypeRepresentation::Thin:
+        llvm_unreachable("can't cast to thin metatype");
+      case MetatypeRepresentation::Thick: {
+        // Get the ObjC class from the type metadata reference.
+        objcObject =
+          emitClassHeapMetadataRefForMetatype(IGF, value,
+                                              srcType.getSwiftRValueType());
+        break;
+      }
+      case MetatypeRepresentation::ObjC:
+        // Metatype is already an ObjC object.
+        objcObject = value;
+        break;
+      }
+    } else {
+      // Class instance is already an ObjC object.
+      objcObject = value;
+    }
+    objcObject = IGF.Builder.CreateBitCast(objcObject,
+                                           IGF.IGM.UnknownRefCountedPtrTy);
+    
     llvm::Value *castFn;
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -399,12 +424,57 @@ void irgen::emitClassExistentialDowncast(IRGenFunction &IGF,
     }
 
     
-    orig = IGF.Builder.CreateCall3(castFn, orig,
-                                   IGF.IGM.getSize(Size(objcProtos.size())),
-                                   protoRefsBuf.getAddress());
+    objcCast = IGF.Builder.CreateCall3(castFn, objcObject,
+                                       IGF.IGM.getSize(Size(objcProtos.size())),
+                                       protoRefsBuf.getAddress());
   }
-  
-  ex.add(orig);
+
+  // Add the value to the explosion.
+  llvm::Value *resultValue;
+  if (metatypeKind) {
+    switch (*metatypeKind) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("can't cast to thin metatype");
+    case MetatypeRepresentation::Thick:
+      // Return the original value, not the ObjC class object.
+      switch (mode) {
+      case CheckedCastMode::Unconditional:
+        resultValue = value;
+        break;
+      case CheckedCastMode::Conditional:
+        // We still need to make the value nil if the result of the ObjC cast
+        // was.
+        if (objcCast) {
+          auto isNull = IGF.Builder.CreateICmpEQ(objcCast,
+                             llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy));
+          auto valueOrNull = IGF.Builder.CreateSelect(isNull,
+                      llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy),
+                      value);
+          resultValue = valueOrNull;
+        } else {
+          resultValue = value;
+        }
+        break;
+      }
+      break;
+    case MetatypeRepresentation::ObjC:
+      // Return the class object returned back from the call.
+      if (objcCast) {
+        auto objcClass = IGF.Builder.CreateBitCast(objcCast,
+                                             IGF.IGM.ObjCClassPtrTy);
+        resultValue = objcClass;
+      } else {
+        resultValue = value;
+      }
+      break;
+    }
+  } else {
+    if (objcCast)
+      resultValue = objcCast;
+    else
+      resultValue = value;
+  }
+  ex.add(resultValue);
   
   // If we don't need to look up any witness tables, we're done.
   if (!requiresWitnessTableLookup)
@@ -421,7 +491,7 @@ void irgen::emitClassExistentialDowncast(IRGenFunction &IGF,
       origBB = IGF.Builder.GetInsertBlock();
       successBB = IGF.createBasicBlock("success");
       contBB = IGF.createBasicBlock("cont");
-      auto isNull = IGF.Builder.CreateICmpEQ(orig,
+      auto isNull = IGF.Builder.CreateICmpEQ(objcCast,
                              llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy));
       IGF.Builder.CreateCondBr(isNull, contBB, successBB);
       IGF.Builder.emitBlock(successBB);
@@ -429,8 +499,26 @@ void irgen::emitClassExistentialDowncast(IRGenFunction &IGF,
     }
   }
 
+  // Get the Swift type metadata for the type.
+  llvm::Value *metadataValue;
+  if (metatypeKind) {
+    switch (*metatypeKind) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("can't cast to thin metatype");
+    case MetatypeRepresentation::Thick:
+      // The value is already a native metatype.
+      metadataValue = value;
+      break;
+    case MetatypeRepresentation::ObjC:
+      // Get the type metadata from the ObjC class, which may be a wrapper.
+      metadataValue = emitObjCMetadataRefForMetadata(IGF, value);
+    }
+  } else {
+    // Get the type metadata for the instance.
+    metadataValue = emitDynamicTypeOfHeapObject(IGF, value, srcType);
+  }
+  
   // Look up witness tables for the protocols that need them.
-  auto classValue = emitDynamicTypeOfHeapObject(IGF, orig, srcType);
   SmallVector<llvm::Value*, 4> witnessTableProtos;
   for (auto proto : allProtos) {
     if (!requiresProtocolWitnessTable(proto))
@@ -443,7 +531,7 @@ void irgen::emitClassExistentialDowncast(IRGenFunction &IGF,
     auto fn = emitExistentialScalarCastFn(IGF.IGM, witnessTableProtos.size(),
                                           mode);
     llvm::SmallVector<llvm::Value *, 4> args;
-    args.push_back(classValue);
+    args.push_back(metadataValue);
     for (auto proto : witnessTableProtos)
       args.push_back(proto);
     auto wts = IGF.Builder.CreateCall(fn, args);

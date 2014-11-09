@@ -61,6 +61,14 @@ entry(%a : $AnyObject):
   return %p : $CP
 }
 
+// CHECK-LABEL: define { %swift.type*, i8** } @u_cast_to_existential_metatype(%swift.type*)
+// CHECK:         call i8** @dynamic_cast_existential_1_unconditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP)
+sil @u_cast_to_existential_metatype : $@thin (@owned @thick Any.Type) -> @owned @thick CP.Type {
+entry(%a : $@thick Any.Type):
+  %p = unconditional_checked_cast %a : $@thick Any.Type to $@thick CP.Type
+  return %p : $@thick CP.Type
+}
+
 // CHECK-LABEL: define { %objc_object*, i8**, i8** } @u_cast_to_class_existential_2(%objc_object*)
 // CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
 // CHECK-LABEL: define private { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type*, %swift.protocol*, %swift.protocol*)
@@ -90,6 +98,19 @@ entry(%a : $AnyObject):
   return %p : $protocol<CP, OP, CP2>
 }
 
+// CHECK-LABEL: define { %swift.type*, i8**, i8** } @u_cast_to_existential_metatype_mixed(%swift.type*)
+// CHECK:         [[OBJC_CLASS:%.*]] = phi %swift.type* [ %0,
+// CHECK:         [[OBJC_CLASS_ID:%.*]] = bitcast %swift.type* [[OBJC_CLASS]] to %objc_object*
+// CHECK:         [[CAST:%.*]] = call %objc_object* @swift_dynamicCastObjCProtocolUnconditional(%objc_object* [[OBJC_CLASS_ID]], i64 1, i8** {{%.*}})
+// CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
+// CHECK:         insertvalue {{.*}} %0
+sil @u_cast_to_existential_metatype_mixed : $@thin (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
+entry(%a : $@thick Any.Type):
+  %p = unconditional_checked_cast %a : $@thick Any.Type to $@thick protocol<CP, OP, CP2>.Type
+  return %p : $@thick protocol<CP, OP, CP2>.Type
+}
+
+
 // CHECK-LABEL: define { %objc_object*, i8** } @c_cast_to_class_existential(%objc_object*)
 // CHECK:         call i8** @dynamic_cast_existential_1_conditional(%swift.type* %.Type, %swift.protocol* @_TMp5casts2CP)
 // CHECK-LABEL: define private i8** @dynamic_cast_existential_1_conditional(%swift.type*, %swift.protocol*)
@@ -105,6 +126,17 @@ entry(%a : $AnyObject):
   checked_cast_br %a : $AnyObject to $CP, yea, nay
 yea(%p : $CP):
   return %p : $CP
+nay:
+  unreachable
+}
+
+// CHECK-LABEL: define { %swift.type*, i8** } @c_cast_to_existential_metatype(%swift.type*) {
+// CHECK:         call i8** @dynamic_cast_existential_1_conditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP)
+sil @c_cast_to_existential_metatype : $@thin (@owned @thick Any.Type) -> @owned @thick CP.Type {
+entry(%a : $@thick Any.Type):
+  checked_cast_br %a : $@thick Any.Type to $@thick CP.Type, yea, nay
+yea(%p : $@thick CP.Type):
+  return %p : $@thick CP.Type
 nay:
   unreachable
 }
@@ -146,6 +178,24 @@ entry(%a : $AnyObject):
   checked_cast_br %a : $AnyObject to $protocol<CP, OP, CP2>, yea, nay
 yea(%p : $protocol<CP, OP, CP2>):
   return %p : $protocol<CP, OP, CP2>
+nay:
+  unreachable
+}
+
+// CHECK-LABEL: define { %swift.type*, i8**, i8** } @c_cast_to_existential_metatype_mixed(%swift.type*)
+// CHECK:         [[OBJC_CLASS:%.*]] = phi %swift.type* [ %0
+// CHECK:         [[OBJC_CLASS_ID:%.*]] = bitcast %swift.type* [[OBJC_CLASS]] to %objc_object*
+// CHECK:         [[OBJC_CAST:%.*]] = call %objc_object* @swift_dynamicCastObjCProtocolConditional(%objc_object* %6, i64 1, i8** {{%.*}})
+// CHECK:         [[IS_NULL:%.*]] = icmp eq %objc_object* [[OBJC_CAST]], null
+// CHECK:         [[METATYPE_OR_NULL:%.*]] = select i1 [[IS_NULL]], %swift.type* null, %swift.type* %0
+// CHECK:         br i1 {{%.*}}, label %cont, label %success
+// CHECK:       success:
+// CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_conditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
+sil @c_cast_to_existential_metatype_mixed : $@thin (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
+entry(%a : $@thick Any.Type):
+  checked_cast_br %a : $@thick Any.Type to $@thick protocol<CP, OP, CP2>.Type, yea, nay
+yea(%p : $@thick protocol<CP, OP, CP2>.Type):
+  return %p : $@thick protocol<CP, OP, CP2>.Type
 nay:
   unreachable
 }
