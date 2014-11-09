@@ -826,7 +826,7 @@ unsigned char swift::_swift_isUniquelyReferenced_nonNull_native(
 }
 
 // Given a non-@objc object reference, return true iff the
-// object has a strong reference count of 1.
+// object is non-nil and has a strong reference count of 1.
 unsigned char swift::_swift_isUniquelyReferenced_native(
   const HeapObject* object
 ) {
