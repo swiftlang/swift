@@ -97,13 +97,10 @@ public class ManagedBuffer<Value, Element>
     let p = ManagedBufferPointer<Value,Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
-      initialValue: { buffer, _ in initialValue(
-          // FIXME: should be an unsafeDowncast <rdar://problem/18618169> 
-          Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(buffer)))
-      })
+      initialValue: { buffer, _ in initialValue(unsafeDowncast(buffer)) })
 
     // FIXME: should be an unsafeDowncast <rdar://problem/18618169> 
-    return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(p.buffer))
+    return unsafeDowncast(p.buffer)
   }
 
   /// Destroy the stored Value
