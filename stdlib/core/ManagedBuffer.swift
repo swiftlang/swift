@@ -99,7 +99,6 @@ public class ManagedBuffer<Value, Element>
       minimumCapacity: minimumCapacity,
       initialValue: { buffer, _ in initialValue(unsafeDowncast(buffer)) })
 
-    // FIXME: should be an unsafeDowncast <rdar://problem/18618169> 
     return unsafeDowncast(p.buffer)
   }
 
