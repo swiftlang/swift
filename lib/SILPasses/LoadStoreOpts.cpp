@@ -605,12 +605,6 @@ bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
 
   // Search the previous loads and replace the current load or one of the
   // current loads uses with one of the previous loads.
-
-  // This Changed is only returned at the end of the function to signal that a
-  // partial alias load was successfully forwarded. The reason why we do not use
-  // it for other exits is that all other exits after this point return true. So
-  // there is no point in assigning to Changed just to return it.
-  bool Changed = false;
   for (auto *PrevLI : Loads) {
     SILValue Address = PrevLI->getOperand();
     SILValue StoredValue = PrevLI;
