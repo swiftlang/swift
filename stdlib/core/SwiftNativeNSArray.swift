@@ -264,4 +264,9 @@ internal class _ContiguousArrayStorageBase
     _sanityCheckFailure(
       "Concrete subclasses must implement staticElementType")
   }
+
+  deinit {
+    _sanityCheck(
+      self !== _emptyArrayStorage, "Deallocating empty array storage?!")
+  }
 }
