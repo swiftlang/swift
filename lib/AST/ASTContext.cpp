@@ -1408,17 +1408,25 @@ namespace {
     }
   };
 
-  /// Produce a deterministic ordering of the given declarations with a bias
-  /// that favors declarations in the given source file.
-  class OrderDeclarationsWithSourceFileBias {
+  /// Produce a deterministic ordering of the given declarations with
+  /// a bias that favors declarations in the given source file and
+  /// members of a class.
+  class OrderDeclarationsWithSourceFileAndClassBias {
     SourceManager &SrcMgr;
     SourceFile &SF;
 
   public:
-    OrderDeclarationsWithSourceFileBias(SourceManager &srcMgr, SourceFile &sf)
+    OrderDeclarationsWithSourceFileAndClassBias(SourceManager &srcMgr, 
+                                                SourceFile &sf)
       : SrcMgr(srcMgr), SF(sf) { }
 
     bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
+      // Check whether the declarations are in a class.
+      bool lhsInClass = isa<ClassDecl>(lhs->getDeclContext());
+      bool rhsInClass = isa<ClassDecl>(rhs->getDeclContext());
+      if (lhsInClass != rhsInClass)
+        return lhsInClass;
+
       // If the two declarations are in different source files, and one of those
       // source files is the source file we're biasing toward, prefer that
       // declaration.
@@ -1682,6 +1690,33 @@ static void removeValidObjCConflictingMethods(
   }
 }
 
+/// Determine whether the should associate a conflict among the given
+/// set of methods with the specified source file.
+static bool shouldAssociateConflictWithSourceFile(
+              SourceFile &sf, 
+              ArrayRef<AbstractFunctionDecl *> methods) {
+  bool anyInSourceFile = false;
+  bool anyInOtherSourceFile = false;
+  bool anyClassMethodsInSourceFile = false;
+  for (auto method : methods) {
+    // Skip methods in the class itself; we want to only diagnose
+    // those if there is a conflict within that file.
+    if (isa<ClassDecl>(method->getDeclContext())) {
+      if (method->getParentSourceFile() == &sf)
+        anyClassMethodsInSourceFile = true;
+      continue;
+    }
+
+    if (method->getParentSourceFile() == &sf)
+      anyInSourceFile = true;
+    else
+      anyInOtherSourceFile = true;
+  }
+
+  return anyInSourceFile || 
+    (!anyInOtherSourceFile && anyClassMethodsInSourceFile);
+}
+
 bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // If there were no conflicts, we're done.
   if (Impl.ObjCMethodConflicts.empty())
@@ -1694,18 +1729,15 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
                      Impl.ObjCMethodConflicts.end(),
                      [&](const ObjCMethodConflict &conflict) -> bool {
                        auto decls = getObjCMethodConflictDecls(conflict);
-                       for (auto decl : decls) {
-                         if (decl->getDeclContext()->getParentSourceFile() 
-                               == &sf) {
-                           // It's in this source file. Sort the conflict
-                           // declarations. We'll use this later.
-                           std::sort(
-                             decls.begin(), decls.end(),
-                             OrderDeclarationsWithSourceFileBias(SourceMgr,
-                                                                 sf));
+                       if (shouldAssociateConflictWithSourceFile(sf, decls)) {
+                         // It's in this source file. Sort the conflict
+                         // declarations. We'll use this later.
+                         std::sort(
+                           decls.begin(), decls.end(),
+                           OrderDeclarationsWithSourceFileAndClassBias(
+                             SourceMgr, sf));
 
-                           return false;
-                         }
+                         return false;
                        }
 
                        return true;

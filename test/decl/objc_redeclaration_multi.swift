@@ -9,8 +9,12 @@
 
 extension Redecl2 {
   @objc(method1)
-  func method1_alias() { } // expected-note{{Objective-C method 'method1' previously declared by method 'method1_alias()' here}}
+  func method1_alias() { } // expected-error{{method 'method1_alias()' redeclares Objective-C method 'method1'}}
 
   @objc(init)
-  func initialize() { } // expected-note{{Objective-C method 'init' previously declared by method 'initialize()' here}}
+  func initialize() { } // expected-error{{method 'initialize()' redeclares Objective-C method 'init'}}
+}
+
+extension Redecl1 {
+  @objc(method2) func method2_alias() { } // expected-note{{Objective-C method 'method2' previously declared by method 'method2_alias()' here}}
 }
