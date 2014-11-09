@@ -1123,8 +1123,21 @@ llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
 llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
                                              MetadataValueType desiredType,
                                              bool allowUninitialized) {
-  assert(isa<ClassType>(type) || isa<BoundGenericClassType>(type));
+  assert(type->mayHaveSuperclass());
 
+  // Archetypes may or may not be ObjC classes and need unwrapping to get at
+  // the class object.
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    // Look up the Swift metadata from context.
+    llvm::Value *archetypeMeta = IGF.emitTypeMetadataRef(type);
+    // Get the class pointer.
+    auto classPtr = emitClassHeapMetadataRefForMetatype(IGF, archetypeMeta,
+                                                        archetype);
+    if (desiredType == MetadataValueType::ObjCClass)
+      classPtr = IGF.Builder.CreateBitCast(classPtr, IGF.IGM.ObjCClassPtrTy);
+    return classPtr;
+  }
+  
   // ObjC-defined classes will always be top-level non-generic classes.
 
   if (auto classType = dyn_cast<ClassType>(type)) {

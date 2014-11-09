@@ -67,3 +67,18 @@ bb0(%0 : $Optional<@thick Gizmo.Type>):
   %1 = tuple ()
   return %1 : $()
 }
+
+protocol CP: class {}
+
+// CHECK-LABEL: define %objc_class* @archetype_objc_metatype(%swift.type* %T, i8** %T.CP)
+// CHECK:         [[IS_OBJC_WRAPPER:%.*]] = icmp eq i64 {{%.*}}, 14
+// CHECK:         br i1 [[IS_OBJC_WRAPPER]], label %isWrapper, label %metadataForClass.cont
+// CHECK:       isWrapper:
+// CHECK:         [[WRAPPED_CLASS:%.*]] = load %swift.type**
+// CHECK:       metadataForClass.cont:
+// CHECK:         phi %swift.type* [ %T, %entry ], [ [[WRAPPED_CLASS]], %isWrapper ]
+sil @archetype_objc_metatype : $@thin <T: CP> () -> @objc_metatype T.Type {
+entry:
+  %m = metatype $@objc_metatype T.Type
+  return %m : $@objc_metatype T.Type
+}
