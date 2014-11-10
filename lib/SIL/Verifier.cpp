@@ -1142,18 +1142,17 @@ public:
               ->getDecl() == protocol,
             "method's Self parameter should be constrained by protocol");
 
-    if (isa<ArchetypeType>(AMI->getLookupType())) {
+    auto lookupType = AMI->getLookupType();
+    if (isa<ArchetypeType>(lookupType) || lookupType->isAnyExistentialType()) {
       require(AMI->getConformance() == nullptr,
-              "archetype lookup should have null conformance");
+              "archetype or existential lookup should have null conformance");
     } else {
       require(AMI->getConformance(),
               "concrete type lookup requires conformance");
       require(AMI->getConformance()->getType()
                 ->isEqual(AMI->getLookupType()),
               "concrete type lookup requires conformance that matches type");
-      // We allow for null conformances.
-      require(!AMI->getConformance() ||
-              AMI->getModule().lookUpWitnessTable(AMI->getConformance(),
+      require(AMI->getModule().lookUpWitnessTable(AMI->getConformance(),
                                                   false).first,
               "Could not find witness table for conformance.");
     }
