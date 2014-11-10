@@ -1232,6 +1232,30 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
   return Changed;
 }
 
+
+/// We can not duplicate blocks with AllocStack instructions (they need to be
+/// FIFO). Other instructions can be duplicated.
+/// TODO: The logic is borrowed from LoopRotate. We should generalize and have
+/// only one version of it.
+static bool
+canDuplicateBlock(SILBasicBlock *BB) {
+  for (auto &I : *BB) {
+    auto *Inst = &I;
+    if (isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst)) {
+      return false;
+    } else if (isa<OpenExistentialInst>(Inst) ||
+               isa<OpenExistentialRefInst>(Inst) ||
+               isa<OpenExistentialMetatypeInst>(Inst)) {
+      // Don't know how to clone these properly yet. Inst.clone() per
+      // instruction does not work. Because the follow-up instructions need to
+      // reuse the same archetype uuid which would only work if we used a
+      // cloner.
+      return false;
+    }
+  }
+  return true;
+}
+
 /// simplifyCheckedCastBranchBlock - Simplify a basic block that ends with a
 /// checked_cast_br instruction.
 ///
@@ -1287,6 +1311,9 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
     if (!BI)
       return false;
   }
+
+  if (!canDuplicateBlock(BB))
+    return false;
 
   // At this point we know that we can perform a jump-threading.
 
