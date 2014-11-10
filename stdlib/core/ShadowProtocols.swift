@@ -20,7 +20,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 import SwiftShims
 
 @objc
@@ -114,4 +113,3 @@ public protocol _NSDictionaryType : _NSDictionaryCoreType {
   func getObjects(objects: UnsafeMutablePointer<AnyObject>,
       andKeys keys: UnsafeMutablePointer<AnyObject>)
 }
-#endif

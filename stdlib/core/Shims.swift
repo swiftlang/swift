@@ -14,7 +14,6 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 import SwiftShims
 
 internal func _makeSwiftNSFastEnumerationState()
@@ -44,4 +43,4 @@ internal func _isUniquelyReferenced_native(
   Builtin.fixLifetime(x)
   return result
 }
-#endif
+

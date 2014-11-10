@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 import SwiftShims
 
 final internal
@@ -208,7 +207,7 @@ extension _ArrayBuffer {
   ) {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }
-
+  
   func _typeCheck(subRange: Range<Int>) {
     if !_isClassOrObjCExistential(T.self) {
       return
@@ -477,4 +476,4 @@ extension _ArrayBuffer {
     return i.getCocoa()
   }
 }
-#endif
+

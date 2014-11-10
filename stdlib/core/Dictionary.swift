@@ -512,7 +512,6 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   }
 }
 
-#if _runtime(_ObjC)
 /// Storage for bridged `Dictionary` elements.  We could have used
 /// `Dictionary<AnyObject, AnyObject>`, but `AnyObject` can not be a
 /// `Dictionary` key because it is not `Hashable`.
@@ -777,9 +776,6 @@ class _NativeDictionaryStorageOwnerBase
         state, objects: objects, count: count, dummy: ())
   }
 }
-#else
-class _NativeDictionaryStorageOwnerBase {}
-#endif
 
 /// This class is an artifact of the COW implementation.  This class only
 /// exists to keep separate retain counts separate for:
@@ -797,9 +793,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     : _NativeDictionaryStorageOwnerBase {
 
   typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
-#if _runtime(_ObjC)
   typealias BridgedNativeStorage = _BridgedNativeDictionaryStorage
-#endif
 
   required init(
     objects: UnsafePointer<AnyObject?>,
@@ -827,7 +821,6 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
 
   var nativeStorage: NativeStorage
 
-#if _runtime(_ObjC)
   /// Returns the pointer to the stored property, which contains bridged
   /// Dictionary elements.
   var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
@@ -977,10 +970,8 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     state.memory = theState
     return stored
   }
-#endif
 }
 
-#if _runtime(_ObjC)
 struct _CocoaDictionaryStorage : _DictionaryStorageType {
   var cocoaDictionary: _NSDictionaryType
 
@@ -1058,9 +1049,6 @@ struct _CocoaDictionaryStorage : _DictionaryStorageType {
     _sanityCheckFailure("this function should never be called")
   }
 }
-#else
-struct _CocoaDictionaryStorage {}
-#endif
 
 enum _VariantDictionaryStorage<Key : Hashable, Value> :
     _DictionaryStorageType {
@@ -1109,7 +1097,6 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     }
   }
 
-#if _runtime(_ObjC)
   var cocoa: CocoaStorage {
     switch self {
     case .Native:
@@ -1118,7 +1105,6 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
       return cocoaStorage
     }
   }
-#endif
 
   /// Ensure this we hold a unique reference to a native storage
   /// having at least `minimumCapacity` elements.
@@ -1128,7 +1114,6 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       let oldNativeStorage = native
       let oldCapacity = oldNativeStorage.capacity
-#if _runtime(_ObjC)
       if isUniquelyReferenced() && oldCapacity >= minimumCapacity {
         // Clear the cache of bridged elements.
         switch self {
@@ -1139,7 +1124,6 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
         }
         return (reallocated: false, capacityChanged: false)
       }
-#endif
 
       let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
       var newNativeStorage = newNativeOwner.nativeStorage
@@ -1166,7 +1150,6 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
               capacityChanged: oldCapacity != newNativeStorage.capacity)
 
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       let cocoaDictionary = cocoaStorage.cocoaDictionary
       let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
       var newNativeStorage = newNativeOwner.nativeStorage
@@ -1180,13 +1163,9 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
 
       self = .Native(newNativeOwner)
       return (reallocated: true, capacityChanged: true)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
-#if _runtime(_ObjC)
   mutating func migrateDataToNativeStorage(
     cocoaStorage: _CocoaDictionaryStorage
   ) {
@@ -1195,7 +1174,6 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     let allocated = ensureUniqueNativeStorage(minCapacity).reallocated
     _sanityCheck(allocated, "failed to allocate native dictionary storage")
   }
-#endif
 
   //
   // _DictionaryStorageType conformance
@@ -1208,11 +1186,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return ._Native(native.startIndex)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       return ._Cocoa(cocoaStorage.startIndex)
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1221,11 +1195,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return ._Native(native.endIndex)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       return ._Cocoa(cocoaStorage.endIndex)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1237,15 +1207,11 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
       }
       return .None
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if let cocoaIndex = cocoaStorage.indexForKey(anyObjectKey) {
         return .Some(._Cocoa(cocoaIndex))
       }
       return .None
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1254,15 +1220,11 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return native.assertingGet(i._nativeIndex)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       var (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaStorage.assertingGet(i._cocoaIndex)
       let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       return (nativeKey, nativeValue)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1271,14 +1233,10 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return native.assertingGet(key)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       // FIXME: This assumes that Key and Value are bridged verbatim.
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       let anyObjectValue: AnyObject = cocoaStorage.assertingGet(anyObjectKey)
       return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1287,15 +1245,11 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return native.maybeGet(key)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if let anyObjectValue: AnyObject = cocoaStorage.maybeGet(anyObjectKey) {
         return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       }
       return .None
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1339,12 +1293,8 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return nativeUpdateValue(value, forKey: key)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       migrateDataToNativeStorage(cocoaStorage)
       return nativeUpdateValue(value, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1457,7 +1407,6 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       nativeRemoveAtIndex(index._nativeIndex)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       // We have to migrate the data first.  But after we do so, the Cocoa
       // index becomes useless, so get the key first.
       //
@@ -1469,9 +1418,6 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
       migrateDataToNativeStorage(cocoaStorage)
       nativeRemoveObjectForKey(
           _forceBridgeFromObjectiveC(anyObjectKey, Key.self))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1484,16 +1430,12 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return nativeRemoveObjectForKey(key)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if cocoaStorage.maybeGet(anyObjectKey) == nil {
         return .None
       }
       migrateDataToNativeStorage(cocoaStorage)
       return nativeRemoveObjectForKey(key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1533,11 +1475,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       nativeRemoveAll()
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       self = .Native(NativeStorage.Owner(minimumCapacity: cocoaStorage.count))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1546,11 +1484,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return native.count
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       return cocoaStorage.count
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1562,11 +1496,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native:
       return ._Native(start: native.startIndex, end: native.endIndex)
     case .Cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
       return ._Cocoa(_CocoaDictionaryGenerator(cocoaStorage.cocoaDictionary))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1636,7 +1566,6 @@ func < <Key : Hashable, Value> (
   return lhs.offset < rhs.offset
 }
 
-#if _runtime(_ObjC)
 struct _CocoaDictionaryIndex : BidirectionalIndexType, Comparable {
   // Assumption: we rely on NSDictionary.getObjects:andKeys: when being
   // repeatedly called on the same NSDictionary, returning keys in the same
@@ -1703,9 +1632,6 @@ func <(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
 
   return lhs.currentKeyIndex < rhs.currentKeyIndex
 }
-#else
-struct _CocoaDictionaryIndex {}
-#endif
 
 enum _DictionaryIndexRepresentation<Key : Hashable, Value> {
   typealias _Index = DictionaryIndex<Key, Value>
@@ -1745,11 +1671,10 @@ public struct DictionaryIndex<Key : Hashable, Value> :
   static func _Native(index: _NativeIndex) -> DictionaryIndex {
     return DictionaryIndex(_value: ._Native(index))
   }
-#if _runtime(_ObjC)
   static func _Cocoa(index: _CocoaIndex) -> DictionaryIndex {
     return DictionaryIndex(_value: ._Cocoa(index))
   }
-#endif
+
   @transparent
   var _guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
@@ -1765,7 +1690,6 @@ public struct DictionaryIndex<Key : Hashable, Value> :
     }
   }
 
-#if _runtime(_ObjC)
   @transparent
   var _cocoaIndex: _CocoaIndex {
     switch _value {
@@ -1775,7 +1699,6 @@ public struct DictionaryIndex<Key : Hashable, Value> :
       return cocoaIndex
     }
   }
-#endif
 
   /// Identical to `self.dynamicType`
   public typealias Index = DictionaryIndex<Key, Value>
@@ -1792,11 +1715,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
     case ._Native(let nativeIndex):
       return ._Native(nativeIndex.predecessor())
     case ._Cocoa(let cocoaIndex):
-#if _runtime(_ObjC)
       return ._Cocoa(cocoaIndex.predecessor())
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 
@@ -1812,11 +1731,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
     case ._Native(let nativeIndex):
       return ._Native(nativeIndex.successor())
     case ._Cocoa(let cocoaIndex):
-#if _runtime(_ObjC)
       return ._Cocoa(cocoaIndex.successor())
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 }
@@ -1833,11 +1748,7 @@ public func == <Key : Hashable, Value> (
   case (._Native(let lhsNative), ._Native(let rhsNative)):
     return lhsNative == rhsNative
   case (._Cocoa(let lhsCocoa), ._Cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
     return lhsCocoa == rhsCocoa
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
   default:
     _preconditionFailure("comparing indexes from different dictionaries")
   }
@@ -1855,17 +1766,12 @@ public func < <Key : Hashable, Value> (
   case (._Native(let lhsNative), ._Native(let rhsNative)):
     return lhsNative < rhsNative
   case (._Cocoa(let lhsCocoa), ._Cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
     return lhsCocoa < rhsCocoa
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
   default:
     _preconditionFailure("comparing indexes from different dictionaries")
   }
 }
 
-#if _runtime(_ObjC)
 struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
   var item0: Builtin.RawPointer
@@ -1911,9 +1817,7 @@ struct _CocoaFastEnumerationStackBuf {
     _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * length)
   }
 }
-#endif
 
-#if _runtime(_ObjC)
 final
 class _CocoaDictionaryGenerator : GeneratorType {
   // Cocoa dictionary generator has to be a class, otherwise we can not
@@ -1964,10 +1868,6 @@ class _CocoaDictionaryGenerator : GeneratorType {
     return (key, value)
   }
 }
-#else
-final
-class _CocoaDictionaryGenerator {}
-#endif
 
 enum _DictionaryGeneratorRepresentation<Key : Hashable, Value> {
   typealias _Generator = DictionaryGenerator<Key, Value>
@@ -1997,13 +1897,12 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
   ) -> DictionaryGenerator {
     return DictionaryGenerator(_state: ._Native(start: start, end: end))
   }
-#if _runtime(_ObjC)
   static func _Cocoa(
     generator: _CocoaDictionaryGenerator
   ) -> DictionaryGenerator{
     return DictionaryGenerator(_state: ._Cocoa(generator))
   }
-#endif
+
   @transparent
   var _guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
@@ -2036,7 +1935,6 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
     case ._Native(var startIndex, var endIndex):
       return _nativeNext()
     case ._Cocoa(var cocoaGenerator):
-#if _runtime(_ObjC)
       if let (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaGenerator.next() {
         let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
@@ -2044,9 +1942,6 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
         return (nativeKey, nativeValue)
       }
       return .None
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
     }
   }
 }
@@ -2091,7 +1986,6 @@ public struct Dictionary<
     _variantStorage = .Native(_nativeStorageOwner)
   }
 
-#if _runtime(_ObjC)
   /// Private initializer used for bridging.
   ///
   /// Only use this initializer when both conditions are true:
@@ -2106,7 +2000,6 @@ public struct Dictionary<
     _variantStorage = .Cocoa(
         _CocoaDictionaryStorage(cocoaDictionary: _immutableCocoaDictionary))
   }
-#endif
 
   //
   // All APIs below should dispatch to `_variantStorage`, without doing any
@@ -2310,18 +2203,13 @@ public func == <Key : Equatable, Value : Equatable>(
     return true
 
   case (.Cocoa(let lhsCocoa), .Cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
     if lhsCocoa.cocoaDictionary === rhsCocoa.cocoaDictionary {
       return true
     }
     return _stdlib_NSObject_isEqual(
         lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
 
   case (.Native(let lhsNativeOwner), .Cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
     let lhsNative = lhsNativeOwner.nativeStorage
 
     if lhsNative.count != rhsCocoa.count {
@@ -2341,16 +2229,9 @@ public func == <Key : Equatable, Value : Equatable>(
       return false
     }
     return true
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
 
   case (.Cocoa, .Native):
-#if _runtime(_ObjC)
     return rhs == lhs
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
   }
 }
 
@@ -2536,7 +2417,6 @@ public struct _DictionaryBuilder<Key : Hashable, Value> {
   }
 }
 
-#if _runtime(_ObjC)
 /// Call `[lhs isEqual: rhs]`.
 ///
 /// This function is part of the runtime because `Bool` type is bridged to
@@ -2824,7 +2704,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
   }
   return result
 }
-#endif
+
 
 //===--- Hacks and workarounds --------------------------------------------===//
 

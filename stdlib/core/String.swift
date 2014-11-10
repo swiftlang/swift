@@ -266,7 +266,6 @@ extension String {
   }
 }
 
-#if _runtime(_ObjC)
 /// Compare two strings using the Unicode collation algorithm in the
 /// deterministic comparison mode.  (The strings which are equivalent according
 /// to their NFD form are considered equal.  Strings which are equivalent
@@ -285,36 +284,23 @@ extension String {
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   lhs: AnyObject, rhs: AnyObject
 )-> Int32
-#endif
 
 extension String: Equatable {
 }
 
 public func ==(lhs: String, rhs: String) -> Bool {
-#if _runtime(_ObjC)
   // Note: this operation should be consistent with equality comparison of
   // Character.
   return _stdlib_compareNSStringDeterministicUnicodeCollation(
     lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) == 0
-#else
-  // FIXME: Actually implement. For now, all strings are unequal.
-  // rdar://problem/18878343
-  return false
-#endif
 }
 
 extension String : Comparable {
 }
 
 public func <(lhs: String, rhs: String) -> Bool {
-#if _runtime(_ObjC)
   return _stdlib_compareNSStringDeterministicUnicodeCollation(
     lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) < 0
-#else
-  // FIXME: Actually implement. For now, all strings are unequal
-  // rdar://problem/18878343
-  return false
-#endif
 }
 
 // Support for copy-on-write
@@ -341,10 +327,8 @@ extension String {
   }
 }
 
-#if _runtime(_ObjC)
 @asmname("swift_stdlib_NSStringNFDHashValue")
 func _stdlib_NSStringNFDHashValue(str: AnyObject) -> Int
-#endif
 
 extension String : Hashable {
   /// The hash value.
@@ -362,17 +346,11 @@ extension String : Hashable {
 #else
     let hashOffset = 0x429b126688ddcc21
 #endif
-#if _runtime(_ObjC)
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
     let cocoaString =
       unsafeBitCast(self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
     return hashOffset ^ _stdlib_NSStringNFDHashValue(cocoaString)
-#else
-    // FIXME: Actually implement. For now, all strings have the same hash.
-    // rdar://problem/18878343
-    return hashOffset
-#endif
   }
 }
 
@@ -412,6 +390,10 @@ public func += (inout lhs: String, rhs: String) {
   else {
     lhs._core.append(rhs._core)
   }
+}
+
+// Comparison operators
+extension String : Comparable {
 }
 
 extension String {

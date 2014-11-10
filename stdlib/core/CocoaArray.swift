@@ -18,7 +18,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 import SwiftShims
 
 /// A wrapper around any `_NSArrayCoreType` that gives it
@@ -77,4 +76,4 @@ internal struct _CocoaArrayWrapper : CollectionType {
 
   var buffer: _NSArrayCoreType
 }
-#endif
+

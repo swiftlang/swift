@@ -18,7 +18,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 import SwiftShims
 
 /// Return true iff the given `index` is valid as a position, i.e. `0
@@ -219,16 +218,11 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
       ?? _nativeStorage._getNonVerbatimBridgedCount()
   }
 }
-#else
-// Empty shim version for non-objc platforms.
-class _SwiftNativeNSArrayWithContiguousStorage {}
-#endif
 
 /// Base class of the heap buffer backing arrays.  
 internal class _ContiguousArrayStorageBase
   : _SwiftNativeNSArrayWithContiguousStorage {
 
-#if _runtime(_ObjC)
   internal override func withUnsafeBufferOfObjects<R>(
     body: (UnsafeBufferPointer<AnyObject>)->R
   ) -> R {
@@ -259,7 +253,6 @@ internal class _ContiguousArrayStorageBase
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedHeapBuffer")
   }
-#endif
 
   func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
     _sanityCheckFailure(

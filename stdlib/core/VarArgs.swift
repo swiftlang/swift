@@ -10,11 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
-// Excluded due to use of dynamic casting and Builtin.autorelease, neither
-// of which correctly work without the ObjC Runtime right now.
-// See rdar://problem/18801510
-
 /// Instances of conforming types can be encoded, and appropriately
 /// passed, as elements of a C `va_list`.
 ///
@@ -281,5 +276,3 @@ final public class VaListBuilder {
 }
 
 #endif
-
-#endif // _runtime(_ObjC)

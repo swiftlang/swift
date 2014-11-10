@@ -63,7 +63,6 @@ extension String {
   func _isSpace() -> Bool { return _isAll({ $0._isSpace() }) }
 }
 
-#if _runtime(_ObjC)
 /// Determines if `theString` starts with `prefix` comparing the strings under
 /// canonical equivalence.
 @asmname("swift_stdlib_NSStringHasPrefixNFD")
@@ -87,10 +86,6 @@ extension String {
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
   }
 }
-#else
-// FIXME: Implement hasPrefix and hasSuffix without objc
-// rdar://problem/18878343
-#endif
 
 // Conversions to string from other types.
 extension String {
@@ -256,3 +251,4 @@ extension String {
     return scalarSlices.map { String($0) }
   }
 }
+

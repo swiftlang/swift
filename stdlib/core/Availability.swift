@@ -21,7 +21,6 @@ public func _stdlib_isOSVersionAtLeast(
   minor: Builtin.Word,
   patch: Builtin.Word
 ) -> Builtin.Int1 {
-#if os(OSX) || os(iOS)
   let version = _swift_stdlib_operatingSystemVersion()
 
   let result =
@@ -30,10 +29,4 @@ public func _stdlib_isOSVersionAtLeast(
     (version.patchVersion >= Int(patch))
   
   return result.value
-#else
-  // FIXME: As yet, there is no obvious versioning standard for platforms other
-  // than Darwin-based OS', so we just assume false for now. 
-  // rdar://problem/18881232
-  return false.value
-#endif
 }

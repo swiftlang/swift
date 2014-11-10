@@ -16,10 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
-// FIXME: These need to be implemented even for non-objc:
-// rdar://problem/18881196
-
 enum _ValueOrReference {
 case Reference, Value
   init<T>(_: T.Type) {
@@ -189,4 +185,3 @@ public func _arrayConditionalCast<SourceElement, TargetElement>(
     return _arrayConditionalBridgeElements(source)
   }
 }
-#endif
