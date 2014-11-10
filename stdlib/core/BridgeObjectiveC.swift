@@ -321,10 +321,6 @@ func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 internal var _nilNativeObject: AnyObject? {
   return nil
 }
-@transparent
-internal var _nilRawPointer: Builtin.RawPointer {
-  return Builtin.inttoptr_Word(0.value)
-}
 
 /// A mutable pointer-to-ObjC-pointer argument.
 ///

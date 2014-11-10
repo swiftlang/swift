@@ -15,6 +15,12 @@ import SwiftShims
 // Definitions that make elements of Builtin usable in real code
 // without gobs of boilerplate.
 
+/// An initialized raw pointer to use as a NULL value.
+@transparent
+internal var _nilRawPointer: Builtin.RawPointer {
+  return Builtin.inttoptr_Word(0.value)
+}
+
 /// Returns the contiguous memory footprint of `T`.
 ///
 /// Does not include any dynamically-allocated or "remote" storage.
