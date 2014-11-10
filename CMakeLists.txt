@@ -1006,7 +1006,6 @@ macro(add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_STATIC_SOURCES}
       ${SWIFTLIB_SINGLE_STATIC_EXTERNAL_SOURCES}
       ${SWIFT_SOURCE_DIR}/cmake/dummy.c)
-    llvm_update_compile_flags(${target_static})
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
 
     set_output_directory(${target_static}
