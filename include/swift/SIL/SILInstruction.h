@@ -193,6 +193,11 @@ public:
   /// leaf class destructor for the type of the instruction. This does not
   /// deallocate the instruction.
   static void destroy(SILInstruction *I);
+
+  /// Returns true if the instruction can be duplicated without any special
+  /// additional handling. It is important to know this information when
+  /// you perform such optimizations like e.g. jump-threading.
+  bool isTriviallyDuplicatable() const;
 };
 
 /// A template base class for instructions that take a single SILValue operand

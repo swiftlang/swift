@@ -668,6 +668,23 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
   return NewInst;
 }
 
+/// Returns true if the instruction can be duplicated without any special
+/// additional handling. It is important to know this information when
+/// you perform such optimizations like e.g. jump-threading.
+bool SILInstruction::isTriviallyDuplicatable() const {
+  if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
+    return false;
+  } else if (isa<OpenExistentialInst>(this) ||
+             isa<OpenExistentialRefInst>(this) ||
+             isa<OpenExistentialMetatypeInst>(this)) {
+    // Don't know how to duplicate these properly yet. Inst.clone() per
+    // instruction does not work. Because the follow-up instructions need to
+    // reuse the same archetype uuid which would only work if we used a
+    // cloner.
+    return false;
+  }
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 // SILInstruction Subclasses

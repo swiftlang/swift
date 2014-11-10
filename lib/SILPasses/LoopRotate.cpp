@@ -83,12 +83,12 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
                               SmallVectorImpl<SILInstruction *> &Move) {
   llvm::DenseSet<SILInstruction *> Invariant;
   for (auto &I : *Blk) {
+    if (!I.isTriviallyDuplicatable())
+      return false;
     auto *Inst = &I;
     if (isa<FunctionRefInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
-    } else if (isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst)) {
-      return false;
     } else if (isa<IntegerLiteralInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
@@ -97,14 +97,6 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
         continue;
       Move.push_back(Inst);
       Invariant.insert(Inst);
-    } else if (isa<OpenExistentialInst>(Inst) ||
-               isa<OpenExistentialRefInst>(Inst) ||
-               isa<OpenExistentialMetatypeInst>(Inst)) {
-      // Don't know how to clone these properly yet. Inst.clone() per
-      // instruction does not work. Because the follow-up instructions need to
-      // reuse the same archetype uuid which would only work if we used a
-      // cloner.
-      return false;
     } else if (!Inst->mayHaveSideEffects() &&
                !Inst->mayReadFromMemory() &&
                !isa<TermInst>(Inst) &&
