@@ -223,6 +223,61 @@ bb6:                                              // Preds: bb1
   br bb2(%28 : $Int)                              // id: %29
 }
 
+
+
+// Check that checked_cast_br in bb1 does not get jump threaded
+// because bb1 contains some instructions that cannot be cloned, namely alloc_stack.
+//
+// CHECK-LABEL: sil @_TF18devirt_jump_thread6dont_jump_threadFCS_8FooClassSi
+// CHECK: bb0(%{{.*}} : $FooClass):
+// CHECK: checked_cast_br
+// CHECK: bb1(%{{.*}} : $Int):
+// CHECK: checked_cast_br
+// CHECK: bb2(%{{.*}} : $Int):
+// CHECK }
+sil @_TF18devirt_jump_thread6dont_jump_threadFCS_8FooClassSi : $@thin (@owned FooClass) -> Int {
+bb0(%0 : $FooClass):
+  checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
+
+bb1(%2 : $Int):                                   // Preds: bb3 bb4
+  %60 = alloc_stack $Int
+  checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
+
+bb2(%4 : $Int):                                   // Preds: bb5 bb6
+  %5 = struct_extract %2 : $Int, #Int.value       // user: %8
+  %6 = struct_extract %4 : $Int, #Int.value       // user: %8
+  %7 = integer_literal $Builtin.Int1, -1          // user: %8
+  %8 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %6 : $Builtin.Word, %7 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1) // users: %9, %10
+  %9 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 0 // user: %12
+  %10 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 1 // user: %11
+  cond_fail %10 : $Builtin.Int1                   // id: %11
+  dealloc_stack %60#0 : $*@local_storage Int
+  %12 = struct $Int (%9 : $Builtin.Word)          // user: %13
+  return %12 : $Int                               // id: %13
+
+bb3(%14 : $FooClass):                             // Preds: bb0
+  %15 = ref_element_addr %14 : $FooClass, #FooClass.value // user: %16
+  %16 = load %15 : $*Int                          // user: %17
+  br bb1(%16 : $Int)                              // id: %17
+
+bb4:                                              // Preds: bb0
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int , $@cc(method) @thin (@owned FooClass) -> Int // user: %20
+  strong_retain %0 : $FooClass                    // id: %19
+  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int // user: %21
+  br bb1(%20 : $Int)                              // id: %21
+
+bb5(%22 : $FooClass):                             // Preds: bb1
+  %23 = ref_element_addr %22 : $FooClass, #FooClass.value // user: %24
+  %24 = load %23 : $*Int                          // user: %26
+  strong_release %22 : $FooClass                  // id: %25
+  br bb2(%24 : $Int)                              // id: %26
+
+bb6:                                              // Preds: bb1
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int , $@cc(method) @thin (@owned FooClass) -> Int // user: %28
+  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int // user: %29
+  br bb2(%28 : $Int)                              // id: %29
+}
+
 // @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
 sil [noinline] @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int, @guaranteed FooClass) -> Int {
 bb0(%0 : $Int, %1 : $FooClass):
