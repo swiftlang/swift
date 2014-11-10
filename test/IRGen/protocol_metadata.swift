@@ -49,7 +49,7 @@ protocol ABO : A, B, O { func abo() }
 
 // -- inheritance lists for refined protocols
 
-// CHECK: [[AB_INHERITED:@.*]] = internal constant { {{.*}}* } {
+// CHECK: [[AB_INHERITED:@.*]] = private constant { {{.*}}* } {
 // CHECK:   i64 2,
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1A,
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1B
@@ -59,7 +59,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK:   i32 72, i32 7
 // CHECK: }
 
-// CHECK: [[ABO_INHERITED:@.*]] = internal constant { {{.*}}* } {
+// CHECK: [[ABO_INHERITED:@.*]] = private constant { {{.*}}* } {
 // CHECK:   i64 3,
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1A,
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1B,

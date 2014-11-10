@@ -1628,7 +1628,7 @@ namespace {
     auto fnTy = llvm::FunctionType::get(metadataArrayPtrTy,
                                         IGM.TypeMetadataPtrTy,
                                         /*vararg*/ false);
-    auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::InternalLinkage,
+    auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
                                      llvm::Twine("get_field_types_")
                                        + type->getName().str(),
                                      IGM.getModule());
@@ -1647,7 +1647,7 @@ namespace {
       vectorPtr = new llvm::GlobalVariable(*IGM.getModule(),
                                            metadataArrayPtrTy,
                                            /*constant*/ false,
-                                           llvm::GlobalValue::InternalLinkage,
+                                           llvm::GlobalValue::PrivateLinkage,
                                            nullVector,
                                            llvm::Twine("field_type_vector_")
                                              + type->getName().str());
@@ -2049,7 +2049,7 @@ namespace {
       auto ty = llvm::FunctionType::get(IGM.TypeMetadataPtrTy,
                                         argTys, /*isVarArg*/ false);
       llvm::Function *f = llvm::Function::Create(ty,
-                                           llvm::GlobalValue::InternalLinkage,
+                                           llvm::GlobalValue::PrivateLinkage,
                                            "create_generic_metadata",
                                            &IGM.Module);
       
@@ -4267,7 +4267,7 @@ namespace {
       auto inheritedVar = new llvm::GlobalVariable(IGM.Module,
                                            inheritedInit->getType(),
                                            /*isConstant*/ true,
-                                           llvm::GlobalValue::InternalLinkage,
+                                           llvm::GlobalValue::PrivateLinkage,
                                            inheritedInit);
       
       llvm::Constant *inheritedVarPtr

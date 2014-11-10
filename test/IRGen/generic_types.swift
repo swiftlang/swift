@@ -75,7 +75,7 @@ import Swift
 // CHECK:   void (i64, [[D]]*)* @_TFC13generic_types1D3run
 // CHECK: }
 
-// CHECK: define internal %swift.type* [[A_METADATA_CREATE]](%swift.type_pattern*, i8**) {
+// CHECK: define private %swift.type* [[A_METADATA_CREATE]](%swift.type_pattern*, i8**) {
 // CHECK: entry:
 // CHECK:   [[T0:%.*]] = load i8** %1
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
@@ -88,7 +88,7 @@ import Swift
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
-// CHECK: define internal %swift.type* [[B_METADATA_CREATE]](%swift.type_pattern*, i8**) {
+// CHECK: define private %swift.type* [[B_METADATA_CREATE]](%swift.type_pattern*, i8**) {
 // CHECK: entry:
 // CHECK:   [[T0:%.*]] = load i8** %1
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*

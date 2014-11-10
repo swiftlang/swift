@@ -2,7 +2,7 @@
 
 // -- partial_apply context metadata
 
-// CHECK: [[METADATA:@.*]] = internal constant %swift.full_heapmetadata { void (%swift.refcounted*)* [[DESTROY:@objectdestroy1]], i8** null, %swift.type { i64 64 } }
+// CHECK: [[METADATA:@.*]] = private constant %swift.full_heapmetadata { void (%swift.refcounted*)* [[DESTROY:@objectdestroy1]], i8** null, %swift.type { i64 64 } }
 
 func a(var #i: Int) -> (Int) -> Int {
   return {x in i }

@@ -86,7 +86,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
                                     const HeapLayout &layout) {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DeallocatingDtorTy,
-                           llvm::Function::InternalLinkage,
+                           llvm::Function::PrivateLinkage,
                            "objectdestroy", &IGM.Module);
 
   IRGenFunction IGF(IGM, fn);
@@ -120,7 +120,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
 llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DeallocatingDtorTy,
-                           llvm::Function::InternalLinkage,
+                           llvm::Function::PrivateLinkage,
                            "objectsize", &IGM.Module);
 
   IRGenFunction IGF(IGM, fn);
@@ -152,7 +152,7 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
   llvm::GlobalVariable *var =
     new llvm::GlobalVariable(IGM.Module, IGM.FullHeapMetadataStructTy,
                              /*constant*/ true,
-                             llvm::GlobalVariable::InternalLinkage, init,
+                             llvm::GlobalVariable::PrivateLinkage, init,
                              "metadata");
 
   llvm::Constant *indices[] = {

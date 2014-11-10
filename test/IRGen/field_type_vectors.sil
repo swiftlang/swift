@@ -2,7 +2,7 @@
 
 import Swift
 
-// CHECK:       [[FOO_TYPE_VECTOR_SLOT:@.*]] = internal global %swift.type** null
+// CHECK:       [[FOO_TYPE_VECTOR_SLOT:@.*]] = private global %swift.type** null
 // CHECK-LABEL: @_TMnV18field_type_vectors3Foo = constant 
 // CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[^,]*]],
 struct Foo {
@@ -67,7 +67,7 @@ class StorageQualified {
   }
 }
 
-// CHECK: define internal %swift.type** [[FOO_TYPES_ACCESSOR]](%swift.type*)
+// CHECK: define private %swift.type** [[FOO_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[EXISTING:%.*]] = load %swift.type*** [[FOO_TYPE_VECTOR_SLOT]]
 // CHECK:   [[IS_NULL:%.*]] = icmp eq %swift.type** [[EXISTING]], null
 // CHECK:   br i1 [[IS_NULL]], label %[[BUILD_FIELD_TYPES:.*]], label %[[DONE:.*]]
@@ -75,7 +75,7 @@ class StorageQualified {
 // CHECK:   store {{.*}} @_TMdSi
 // CHECK:   cmpxchg {{.*}} [[FOO_TYPE_VECTOR_SLOT]]
 
-// CHECK: define internal %swift.type** [[BAR_TYPES_ACCESSOR]](%swift.type*)
+// CHECK: define private %swift.type** [[BAR_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
 // -- 5 words between the address point and the slot
 // CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type*** [[T0]], i32 5
@@ -84,7 +84,7 @@ class StorageQualified {
 // CHECK:   store {{.*}} @_TMdSi
 
 
-// CHECK: define internal %swift.type** [[BAS_TYPES_ACCESSOR]](%swift.type*)
+// CHECK: define private %swift.type** [[BAS_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
 // -- 7 words between the address point and the slot
 // CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type*** [[T0]], i32 7
@@ -94,13 +94,13 @@ class StorageQualified {
 // CHECK:   [[T:%.*]] = bitcast %swift.type* %T to i8*
 // CHECK:   call %swift.type* @swift_getGenericMetadata1({{.*}} @_TMPdV18field_type_vectors3Bar {{.*}}, i8* [[T]])
 
-// CHECK: define internal %swift.type** [[ZIM_TYPES_ACCESSOR]](%swift.type*)
+// CHECK: define private %swift.type** [[ZIM_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
 // -- 14 words between the address point and the slot
 // CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type*** [[T0]], i32 15
 // CHECK:   load %swift.type*** [[SLOT]], align 8
 
-// CHECK: define internal %swift.type** [[ZANG_TYPES_ACCESSOR]](%swift.type*)
+// CHECK: define private %swift.type** [[ZANG_TYPES_ACCESSOR]](%swift.type*)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
 // -- 16 words between the address point and the slot
 // CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type*** [[T0]], i32 17
