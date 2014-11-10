@@ -235,9 +235,13 @@ func _slowPath<C: BooleanType>(x: C) -> Bool {
 
 /// Returns `true` iff the class indicated by `theClass` is non-\ `@objc`.
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
+#if _runtime(_ObjC)
   return _swift_usesNativeSwiftReferenceCounting_class(
     unsafeAddressOf(theClass)
   ) != 0
+#else
+  return true
+#endif
 }
 
 /// Returns: `class_getInstanceSize(theClass)`

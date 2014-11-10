@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if _runtime(_ObjC)
 /// A Swift Array or Dictionary of types conforming to
 /// `_ObjectiveCBridgeable` can be passed to ObjectiveC as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray
@@ -364,3 +365,4 @@ public func == <T> (
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
+#endif

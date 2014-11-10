@@ -396,6 +396,7 @@ func _rawPointerToString(value: Builtin.RawPointer) -> String {
   return "0x" + result
 }
 
+#if _runtime(_ObjC)
 // These classes are derived from `_SwiftNativeNSXXXBase` (through runtime magic),
 // which are derived from `NSXXX`.
 //
@@ -442,4 +443,4 @@ public func _stdlib_initializeReturnAutoreleased() {
   _stdlib_ReturnAutoreleasedDummy().initializeReturnAutoreleased()
 #endif
 }
-
+#endif

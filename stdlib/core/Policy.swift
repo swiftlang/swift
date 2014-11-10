@@ -108,6 +108,11 @@ public typealias Any = protocol<>
 ///
 /// See also: `AnyClass`
 @objc public protocol AnyObject {}
+// FIXME: AnyObject should have an alternate version for non-objc without
+// the @objc attribute, but AnyObject needs to be not be an address-only
+// type to be able to be the target of castToNativeObject and an empty
+// non-objc protocol appears not to be. There needs to be another way to make
+// this the right kind of object.
 
 /// The protocol to which all class types implicitly conform.
 ///

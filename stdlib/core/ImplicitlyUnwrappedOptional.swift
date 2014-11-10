@@ -114,6 +114,7 @@ func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
   return .None
 }
 
+#if _runtime(_ObjC)
 extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
     return Swift._getBridgedObjectiveCType(T.self)!
@@ -152,3 +153,4 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
     return Swift._isBridgedToObjectiveC(T.self)
   }
 }
+#endif

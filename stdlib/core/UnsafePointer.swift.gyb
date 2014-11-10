@@ -336,6 +336,7 @@ public struct ${Self}<T>
     }
   }
 
+#if _runtime(_ObjC)
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
   /// of a T which is written into buffer before this method returns
@@ -345,6 +346,7 @@ public struct ${Self}<T>
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
+#endif
 
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
