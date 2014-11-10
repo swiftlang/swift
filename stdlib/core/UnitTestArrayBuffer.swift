@@ -30,9 +30,11 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
         realMinimumCapacity)
 
       var bridged = false
+#if _runtime(_ObjC)
       if _canBeClass(T.self) != 0 {
         bridged = _isBridgedVerbatimToObjectiveC(T.self)
       }
+#endif
 
       _base.value = _ArrayBody(
         count: count, capacity: _base._capacity(),
@@ -231,6 +233,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     return true
   }
 
+#if _runtime(_ObjC)
   /// Convert to an NSArray.
   /// Precondition: T is bridged to Objective-C
   /// O(1).
@@ -244,6 +247,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     }
     return _SwiftDeferredNSArray(_nativeStorage: _storage!)
   }
+#endif
 
   /// An object that keeps the elements stored in this buffer alive
   public var owner: AnyObject {

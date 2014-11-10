@@ -112,10 +112,12 @@ public struct Unmanaged<T: AnyObject> {
     Builtin.release(_value)
   }
 
+#if _runtime(_ObjC)
   /// Perform an unbalanced autorelease of the object.
   @transparent public
   func autorelease() -> Unmanaged {
     Builtin.autorelease(_value)
     return self
   }
+#endif
 }

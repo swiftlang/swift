@@ -27,6 +27,7 @@ internal final class _EmptyArrayStorage
   
   var countAndCapacity: _ArrayBody
 
+#if _runtime(_ObjC)
   override func _withVerbatimBridgedUnsafeBuffer<R>(
     body: (UnsafeBufferPointer<AnyObject>)->R
   ) -> R? {
@@ -43,6 +44,7 @@ internal final class _EmptyArrayStorage
     return _HeapBuffer<Int, AnyObject>(
       _HeapBufferStorage<Int, AnyObject>.self, 0, 0)
   }
+#endif
 
   override func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
     return false
@@ -67,6 +69,7 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
 // _withVerbatimBridgedUnsafeBuffer directly in
 // _ContiguousArrayStorage<T>.
 class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
+#if _runtime(_ObjC)
   /// If the `T` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
@@ -88,6 +91,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
     _sanityCheckFailure(
       "Must override _withVerbatimBridgedUnsafeBufferImpl in derived classes")
   }
+#endif
 }
 
 // The class that implements the storage for a ContiguousArray<T>
@@ -99,6 +103,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
     _fixLifetime(__manager)
   }
 
+#if _runtime(_ObjC)
   /// If `T` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
   internal final override func _withVerbatimBridgedUnsafeBufferImpl(
@@ -141,6 +146,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
     _fixLifetime(__manager)
     return result
   }
+#endif
 
   /// Return true if the `proposedElementType` is `T` or a subclass of
   /// `T`.  We can't store anything else without violating type
@@ -149,7 +155,13 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
   override func canStoreElementsOfDynamicType(
     proposedElementType: Any.Type
   ) -> Bool {
+#if _runtime(_ObjC)
     return proposedElementType is T.Type
+#else
+    // FIXME: Dynamic casts don't currently work without objc. 
+    // rdar://problem/18801510
+    return false
+#endif
   }
 
   /// A type that every element in the array is.
@@ -181,12 +193,18 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       __bufferPointer = ManagedBufferPointer(
         bufferClass: _ContiguousArrayStorage<T>.self,
         minimumCapacity: realMinimumCapacity)
-      
+
+#if _runtime(_ObjC)
+      let verbatim = _isBridgedVerbatimToObjectiveC(T.self)
+#else
+      let verbatim = false
+#endif
+
       __bufferPointer._valuePointer.initialize(
         _ArrayBody(
           count: count,
           capacity: __bufferPointer.allocatedElementCount,
-          elementTypeIsBridgedVerbatim: _isBridgedVerbatimToObjectiveC(T.self)))
+          elementTypeIsBridgedVerbatim: verbatim))
       
       _fixLifetime(__bufferPointer)
     }
@@ -369,6 +387,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return true
   }
 
+#if _runtime(_ObjC)
   /// Convert to an NSArray.
   /// Precondition: T is bridged to Objective-C
   /// O(1).
@@ -382,6 +401,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
     return _SwiftDeferredNSArray(_nativeStorage: _storage)
   }
+#endif
 
   /// An object that keeps the elements stored in this buffer alive
   public var owner: AnyObject {

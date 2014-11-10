@@ -336,6 +336,7 @@ public struct ${Self}<T>
     }
   }
 
+#if _runtime(_ObjC)
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
   /// of a T which is written into buffer before this method returns
@@ -345,6 +346,7 @@ public struct ${Self}<T>
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
+#endif
 
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
@@ -495,6 +497,96 @@ extension UnsafeMutablePointer : SinkType {
 /// you just want to do bytewise pointer arithmetic.
 public struct RawByte {
   let _inaccessible: UInt8
+}
+
+/// Invokes `body` with an `UnsafeMutablePointer` to `arg` and returns the
+/// result. Useful for calling Objective-C APIs that take "in/out"
+/// parameters (and default-constructible "out" parameters) by pointer
+public func withUnsafeMutablePointer<T, Result>(
+  inout arg: T,
+  body: (UnsafeMutablePointer<T>)->Result
+) -> Result
+{
+  return body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
+}
+
+/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
+public func withUnsafeMutablePointers<A0, A1, Result>(
+  inout arg0: A0,
+  inout arg1: A1,
+  body: (UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>)->Result
+) -> Result {
+  return withUnsafeMutablePointer(&arg0) {
+    arg0 in withUnsafeMutablePointer(&arg1) {
+      arg1 in body(arg0, arg1)
+    }
+  }
+}
+
+/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
+/// and `arg2`.
+public func withUnsafeMutablePointers<A0, A1, A2, Result>(
+  inout arg0: A0,
+  inout arg1: A1,
+  inout arg2: A2,
+  body: (
+    UnsafeMutablePointer<A0>,
+    UnsafeMutablePointer<A1>,
+    UnsafeMutablePointer<A2>
+  )->Result
+) -> Result {
+  return withUnsafeMutablePointer(&arg0) {
+    arg0 in withUnsafeMutablePointer(&arg1) {
+      arg1 in withUnsafeMutablePointer(&arg2) {
+        arg2 in body(arg0, arg1, arg2)
+      }
+    }
+  }
+}
+
+/// Invokes `body` with an `UnsafePointer` to `arg` and returns the
+/// result. Useful for calling Objective-C APIs that take "in/out"
+/// parameters (and default-constructible "out" parameters) by pointer
+public func withUnsafePointer<T, Result>(
+  inout arg: T,
+  body: (UnsafePointer<T>)->Result
+) -> Result
+{
+  return body(UnsafePointer<T>(Builtin.addressof(&arg)))
+}
+
+/// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
+public func withUnsafePointers<A0, A1, Result>(
+  inout arg0: A0,
+  inout arg1: A1,
+  body: (UnsafePointer<A0>, UnsafePointer<A1>)->Result
+) -> Result {
+  return withUnsafePointer(&arg0) {
+    arg0 in withUnsafePointer(&arg1) {
+      arg1 in body(arg0, arg1)
+    }
+  }
+}
+
+/// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
+/// and `arg2`.
+public func withUnsafePointers<A0, A1, A2, Result>(
+  inout arg0: A0,
+  inout arg1: A1,
+  inout arg2: A2,
+  body: (
+    UnsafePointer<A0>,
+    UnsafePointer<A1>,
+    UnsafePointer<A2>
+  )->Result
+) -> Result {
+  return withUnsafePointer(&arg0) {
+    arg0 in withUnsafePointer(&arg1) {
+      arg1 in withUnsafePointer(&arg2) {
+        arg2 in body(arg0, arg1, arg2)
+      }
+    }
+  }
 }
 
 // ${'Local Variables'}:

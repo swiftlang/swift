@@ -19,6 +19,7 @@
 //  type, when it becomes available.
 //
 //===----------------------------------------------------------------------===//
+#if _runtime(_ObjC)
 import SwiftShims
 
 public // @testable
@@ -105,3 +106,4 @@ case Native2(Native)
 case Cocoa0(CocoaType)
 }
 
+#endif

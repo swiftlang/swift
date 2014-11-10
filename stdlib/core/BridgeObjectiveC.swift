@@ -10,96 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Invokes `body` with an `UnsafeMutablePointer` to `arg` and returns the
-/// result. Useful for calling Objective-C APIs that take "in/out"
-/// parameters (and default-constructible "out" parameters) by pointer
-public func withUnsafeMutablePointer<T, Result>(
-  inout arg: T,
-  body: (UnsafeMutablePointer<T>)->Result
-) -> Result
-{
-  return body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
-}
-
-/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
-public func withUnsafeMutablePointers<A0, A1, Result>(
-  inout arg0: A0,
-  inout arg1: A1,
-  body: (UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>)->Result
-) -> Result {
-  return withUnsafeMutablePointer(&arg0) {
-    arg0 in withUnsafeMutablePointer(&arg1) {
-      arg1 in body(arg0, arg1)
-    }
-  }
-}
-
-/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
-/// and `arg2`.
-public func withUnsafeMutablePointers<A0, A1, A2, Result>(
-  inout arg0: A0,
-  inout arg1: A1,
-  inout arg2: A2,
-  body: (
-    UnsafeMutablePointer<A0>,
-    UnsafeMutablePointer<A1>,
-    UnsafeMutablePointer<A2>
-  )->Result
-) -> Result {
-  return withUnsafeMutablePointer(&arg0) {
-    arg0 in withUnsafeMutablePointer(&arg1) {
-      arg1 in withUnsafeMutablePointer(&arg2) {
-        arg2 in body(arg0, arg1, arg2)
-      }
-    }
-  }
-}
-
-/// Invokes `body` with an `UnsafePointer` to `arg` and returns the
-/// result. Useful for calling Objective-C APIs that take "in/out"
-/// parameters (and default-constructible "out" parameters) by pointer
-public func withUnsafePointer<T, Result>(
-  inout arg: T,
-  body: (UnsafePointer<T>)->Result
-) -> Result
-{
-  return body(UnsafePointer<T>(Builtin.addressof(&arg)))
-}
-
-/// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
-public func withUnsafePointers<A0, A1, Result>(
-  inout arg0: A0,
-  inout arg1: A1,
-  body: (UnsafePointer<A0>, UnsafePointer<A1>)->Result
-) -> Result {
-  return withUnsafePointer(&arg0) {
-    arg0 in withUnsafePointer(&arg1) {
-      arg1 in body(arg0, arg1)
-    }
-  }
-}
-
-/// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
-/// and `arg2`.
-public func withUnsafePointers<A0, A1, A2, Result>(
-  inout arg0: A0,
-  inout arg1: A1,
-  inout arg2: A2,
-  body: (
-    UnsafePointer<A0>,
-    UnsafePointer<A1>,
-    UnsafePointer<A2>
-  )->Result
-) -> Result {
-  return withUnsafePointer(&arg0) {
-    arg0 in withUnsafePointer(&arg1) {
-      arg1 in withUnsafePointer(&arg2) {
-        arg2 in body(arg0, arg1, arg2)
-      }
-    }
-  }
-}
-
+#if _runtime(_ObjC)
 /// A Swift Array or Dictionary of types conforming to
 /// `_ObjectiveCBridgeable` can be passed to ObjectiveC as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray
@@ -321,10 +232,6 @@ func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 internal var _nilNativeObject: AnyObject? {
   return nil
 }
-@transparent
-internal var _nilRawPointer: Builtin.RawPointer {
-  return Builtin.inttoptr_Word(0.value)
-}
 
 /// A mutable pointer-to-ObjC-pointer argument.
 ///
@@ -457,4 +364,4 @@ public func == <T> (
 ) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
-
+#endif

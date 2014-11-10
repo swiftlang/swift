@@ -419,8 +419,10 @@ func _getClassCount(_MagicMirrorData) -> Int
 @asmname("swift_ClassMirror_subscript")
 func _getClassChild(Int, _MagicMirrorData) -> (String, MirrorType)
 
+#if _runtime(_ObjC)
 @asmname("swift_ClassMirror_quickLookObject")public
 func _getClassQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
+#endif
 
 struct _ClassMirror: MirrorType {
   let data: _MagicMirrorData
@@ -440,7 +442,11 @@ struct _ClassMirror: MirrorType {
     return _stdlib_getDemangledTypeName(value)
   }
   var quickLookObject: QuickLookObject? {
+#if _runtime(_ObjC)
     return _getClassQuickLookObject(data)
+#else
+    return .None
+#endif
   }
   var disposition: MirrorDisposition { return .Class }
 }

@@ -44,10 +44,12 @@ func _isPowerOf2(x: Int) -> Bool {
   return x & (x &- 1) == 0
 }
 
+#if _runtime(_ObjC)
 @transparent public func _autorelease(x: AnyObject) {
   Builtin.retain(x)
   Builtin.autorelease(x)
 }
+#endif
 
 /// Invoke `body` with an allocated, but uninitialized memory suitable for a
 /// `String` value.

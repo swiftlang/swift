@@ -51,8 +51,10 @@ public struct _StringCore {
     _sanityCheck(count >= 0)
     
     if _baseAddress == .null() {
+#if _runtime(_ObjC)
       _sanityCheck(cocoaBuffer != nil,
         "Only opaque cocoa strings may have a null base pointer")
+#endif
       _sanityCheck(elementWidth == 2,
         "Opaque cocoa strings should have an elementWidth of 2")
     }
@@ -198,7 +200,11 @@ public struct _StringCore {
   }
 
   public var hasContiguousStorage: Bool {
+#if _runtime(_ObjC)
     return _fastPath(_baseAddress != .null())
+#else
+    return true
+#endif
   }
 
   /// are we using an NSString for storage?
@@ -228,6 +234,7 @@ public struct _StringCore {
     return nil
   }
 
+#if _runtime(_ObjC)
   /// the Cocoa String buffer, if any, or .None.
   public var cocoaBuffer: _CocoaStringType? {
     if hasCocoaBuffer {
@@ -237,6 +244,7 @@ public struct _StringCore {
     }
     return nil
   }
+#endif
   
   //===--------------------------------------------------------------------===//
   // slicing
@@ -260,7 +268,11 @@ public struct _StringCore {
         _countAndFlags: (_countAndFlags & _flagMask) | UWord(newCount),
         owner: _owner)
     }
+#if _runtime(_ObjC)
     return _cocoaStringSlice(target: self, subRange: subRange)
+#else
+    _sanityCheckFailure("subscript: non-native string without objc runtime")
+#endif
   }
 
   /// Get the Nth UTF-16 Code Unit stored
@@ -286,8 +298,11 @@ public struct _StringCore {
     if _fastPath(_baseAddress != .null()) {
       return _nthContiguous(position)
     }
-    
+#if _runtime(_ObjC)
     return _cocoaStringSubscript(target: self, position: position)
+#else
+    _sanityCheckFailure("subscript: non-native string without objc runtime")
+#endif
   }
 
   /// Write the string, in the given encoding, to output.
@@ -320,10 +335,14 @@ public struct _StringCore {
       }
     }
     else if (hasCocoaBuffer) {
+#if _runtime(_ObjC)
       _StringCore(
         _cocoaStringToContiguous(source: cocoaBuffer!, range: 0..<count,
                                  minimumCapacity: 0)
       ).encode(encoding, output: &output)
+#else
+      _sanityCheckFailure("encode: non-native string without objc runtime")
+#endif
     }
   }
 
@@ -418,6 +437,7 @@ public struct _StringCore {
         dstElementWidth: newElementWidth, count: oldCount)
     }
     else {
+#if _runtime(_ObjC)
       // Opaque cocoa buffers might not store ASCII, so assert that
       // we've allocated for 2-byte elements.
       // FIXME: can we get Cocoa to tell us quickly that an opaque
@@ -425,6 +445,9 @@ public struct _StringCore {
       _sanityCheck(newStorage.elementShift == 1)
       _cocoaStringReadAll(source: cocoaBuffer!, 
                           destination: UnsafeMutablePointer(newStorage.start))
+#else
+      _sanityCheckFailure("_copyInPlace: non-native string without objc runtime")
+#endif
     }
     
     self = _StringCore(newStorage)
@@ -492,9 +515,13 @@ public struct _StringCore {
         dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
     }
     else {
+#if _runtime(_ObjC)
       _sanityCheck(elementWidth == 2)
       _cocoaStringReadAll(source: rhs.cocoaBuffer!, 
                           destination: UnsafeMutablePointer(destination))
+#else
+      _sanityCheckFailure("subscript: non-native string without objc runtime")
+#endif
     }
     _invariantCheck()
   }

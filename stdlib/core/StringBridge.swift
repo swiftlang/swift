@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if _runtime(_ObjC)
 // Swift's String bridges NSString via this protocol and these
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
@@ -185,4 +186,4 @@ extension String {
     return _NSContiguousString(_core)
   }
 }
-
+#endif

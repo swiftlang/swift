@@ -46,7 +46,11 @@ extension _StringCore {
     } else if _fastPath(!_baseAddress._isNull) {
       return _encodeSomeContiguousUTF16AsUTF8(i)
     } else {
+#if _runtime(_ObjC)
       return _encodeSomeNonContiguousUTF16AsUTF8(i)
+#else
+      _sanityCheckFailure("_encodeSomeUTF8: Unexpected cocoa string")
+#endif
     }
   }
 
@@ -60,6 +64,7 @@ extension _StringCore {
     return _transcodeSomeUTF16AsUTF8(storage, i)
   }
 
+#if _runtime(_ObjC)
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is non-contiguous UTF-16.
   func _encodeSomeNonContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
@@ -73,6 +78,7 @@ extension _StringCore {
     }
     return _transcodeSomeUTF16AsUTF8(storage, i)
   }
+#endif
 }
 
 extension String {
