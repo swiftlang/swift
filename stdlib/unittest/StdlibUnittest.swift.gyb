@@ -222,6 +222,8 @@ public func expectGE(
 
 public func expectType<T>(_: T.Type, inout x: T) {}
 
+public func isSequenceType<X : SequenceType>(x: X) -> X { return x }
+
 public struct AssertionResult : Printable, BooleanType {
   init(isPass: Bool) {
     self._isPass = isPass
@@ -1389,6 +1391,28 @@ public func expectEqualSequence<
     if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
+}
+
+public func expectEqualsUnordered<
+    Expected : SequenceType,
+    Actual : SequenceType
+    where Expected.Generator.Element == Actual.Generator.Element,
+      Expected.Generator.Element == AnyObject
+>(
+    expected: Expected, actual: Actual,
+    sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool,
+    stackTrace: SourceLocStack? = nil,
+    collectMoreInfo: (()->String)? = nil,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  let f = { (x, y) -> Bool in
+      ObjectIdentifier(x) < ObjectIdentifier(y)
+  }
+  let x: [Expected.Generator.Element] = sorted(Array(expected), f)
+  let y: [Actual.Generator.Element] = sorted(Array(actual), f)
+  expectEqualSequence(
+    x, y, sameValue, stackTrace: stackTrace, collectMoreInfo: collectMoreInfo,
+    file: file, line:  line)
 }
 
 public func expectEqualUnicodeScalars(
