@@ -1155,6 +1155,9 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
 /// Return the mangled name of any nominal type, including the global
 /// _Tt prefix, which marks the Swift namespace for types in DWARF.
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
+  if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
+    return BumpAllocatedString(DbgTy.getDecl()->getName().str());
+
   llvm::SmallString<160> Buffer;
   {
     llvm::raw_svector_ostream S(Buffer);
@@ -1747,7 +1750,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Optional:
   case TypeKind::ImplicitlyUnwrappedOptional: {
     auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
-    auto *CanTy = SyntaxSugarTy->getDesugaredType();
+    auto *CanTy = SyntaxSugarTy->getSinglyDesugaredType();
     return getOrCreateDesugaredType(CanTy, DbgTy);
   }
 

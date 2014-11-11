@@ -115,7 +115,7 @@ public:
                          BindGenerics shouldBind,
                          const GenericParamList *extGenericParams = nullptr);
   void mangleProtocolDecl(const ProtocolDecl *protocol);
-  void mangleType(CanType type, ResilienceExpansion expansion,
+  void mangleType(Type type, ResilienceExpansion expansion,
                   unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(const ProtocolDecl *protocol);
@@ -142,18 +142,27 @@ public:
   void mangleGlobalInit(const VarDecl *decl, int counter, bool isInitFunc);
 
 private:
-  void mangleFunctionType(CanAnyFunctionType fn, ResilienceExpansion expansion,
+  void mangleFunctionType(AnyFunctionType *fn, ResilienceExpansion expansion,
                           unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
   void mangleProtocolList(ArrayRef<Type> protocols);
   void mangleIdentifier(Identifier ident,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
-  void manglePolymorphicType(const GenericParamList *genericParams, CanType T,
+  void manglePolymorphicType(const GenericParamList *genericParams, Type T,
                              ResilienceExpansion expansion,
                              unsigned uncurryLevel,
                              bool mangleAsFunction);
   bool tryMangleStandardSubstitution(const NominalTypeDecl *type);
   bool tryMangleSubstitution(const void *ptr);
+
+  /// \brief Mangles a sugared type iff we are mangling for the debugger.
+  template <class T> void mangleSugaredType(Type type) {
+    assert(DWARFMangling &&
+           "sugared types are only legal when mangling for the debugger");
+    auto *BlandTy = cast<T>(type.getPointer())->getSinglyDesugaredType();
+    mangleType(BlandTy, ResilienceExpansion::Minimal, 0);
+  }
+
 };
   
 } // end namespace Mangle

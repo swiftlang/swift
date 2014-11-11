@@ -393,14 +393,18 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
 }
 
 void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
-                                    CanType T, ResilienceExpansion explosion,
+                                    Type T, ResilienceExpansion explosion,
                                     unsigned uncurryLevel,
                                     bool mangleAsFunction) {
+  assert((DWARFMangling || CanType(T)) &&
+         "expecting canonical types when not mangling for the debugger");
+
   // FIXME: Prefix?
   bindGenericParameters(genericParams, /*mangle*/ true);
 
   if (mangleAsFunction)
-    mangleFunctionType(cast<AnyFunctionType>(T), explosion, uncurryLevel);
+    mangleFunctionType(dyn_cast<AnyFunctionType>(T.getPointer()), explosion,
+                       uncurryLevel);
   else
     mangleType(T, explosion, uncurryLevel);
 }
@@ -478,29 +482,7 @@ static void bindAllGenericParameters(Mangler &mangler,
 }
 
 void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
-  assert(DWARFMangling);
-
-  if (auto NameAliasTy = dyn_cast<NameAliasType>(Ty.getPointer())) {
-    TypeAliasDecl *decl = NameAliasTy->getDecl();
-    assert(decl);
-
-    if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
-      // It's not possible to mangle the context of the builtin module.
-      Buffer << decl->getName().str();
-    } else {
-      // For the DWARF output we want to mangle the type alias + context,
-      // unless the type alias references a builtin type.
-      assert(decl->getModuleContext() !=
-             decl->getASTContext().TheBuiltinModule);
-      ContextStack context(*this);
-      Buffer << "_Tta";
-      while (DC && !DC->isInnermostContextGeneric()) DC = DC->getParent();
-      DeclCtx = DC;
-      mangleContextOf(decl, BindGenerics::None);
-      mangleIdentifier(decl->getName());
-    }
-    return;
-  }
+  assert(DWARFMangling && "DWARFMangling expected whn mangling for debugger");
 
   // Polymorphic function types carry their own generic parameters and
   // manglePolymorphicType will bind them.
@@ -514,11 +496,11 @@ void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
     bindAllGenericParameters(*this, DC->getGenericParamsOfContext());
   DeclCtx = DC;
 
-  mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal, /*uncurry*/ 0);
+  mangleType(Ty, ResilienceExpansion::Minimal, /*uncurry*/ 0);
 }
 
 void Mangler::mangleDeclTypeForDebugger(const ValueDecl *decl) {
-  assert(DWARFMangling);
+  assert(DWARFMangling && "DWARFMangling expected");
   Buffer << "_Tt";
 
   typedef std::pair<bool, BindGenerics> result_t;
@@ -700,8 +682,11 @@ static void mangleMetatypeRepresentation(raw_ostream &Buffer,
 /// <index> ::= <natural> _          # N+1
 ///
 /// <tuple-element> ::= <identifier>? <type>
-void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
+void Mangler::mangleType(Type type, ResilienceExpansion explosion,
                          unsigned uncurryLevel) {
+  assert((DWARFMangling || CanType(type)) &&
+         "expecting canonical types when not mangling for the debugger");
+  TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
   case TypeKind::TypeVariable:
     llvm_unreachable("mangling type variable");
@@ -716,7 +701,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
   case TypeKind::BuiltinFloat:
-    switch (cast<BuiltinFloatType>(type)->getFPKind()) {
+    switch (cast<BuiltinFloatType>(tybase)->getFPKind()) {
     case BuiltinFloatType::IEEE16: Buffer << "Bf16_"; return;
     case BuiltinFloatType::IEEE32: Buffer << "Bf32_"; return;
     case BuiltinFloatType::IEEE64: Buffer << "Bf64_"; return;
@@ -726,7 +711,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     }
     llvm_unreachable("bad floating-point kind");
   case TypeKind::BuiltinInteger: {
-    auto width = cast<BuiltinIntegerType>(type)->getWidth();
+    auto width = cast<BuiltinIntegerType>(tybase)->getWidth();
     if (width.isFixedWidth())
       Buffer << "Bi" << width.getFixedWidth() << '_';
     else if (width.isPointerWidth())
@@ -748,63 +733,99 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     Buffer << "BO";
     return;
   case TypeKind::BuiltinVector:
-    Buffer << "Bv" << cast<BuiltinVectorType>(type)->getNumElements();
-    mangleType(cast<BuiltinVectorType>(type).getElementType(), explosion,
+    Buffer << "Bv" << cast<BuiltinVectorType>(tybase)->getNumElements();
+    mangleType(cast<BuiltinVectorType>(tybase)->getElementType(), explosion,
                uncurryLevel);
     return;
 
-#define SUGARED_TYPE(id, parent) \
-  case TypeKind::id: \
-    llvm_unreachable("expect canonical type");
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
+  case TypeKind::NameAlias: {
+    assert(DWARFMangling && "sugared types are only legal for the debugger");
+    auto NameAliasTy = cast<NameAliasType>(tybase);
+    TypeAliasDecl *decl = NameAliasTy->getDecl();
+    Buffer << "a";
+    if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
+      // It's not possible to mangle the context of the builtin module.
+      Buffer << decl->getName().str();
+    } else {
+      // For the DWARF output we want to mangle the type alias + context,
+      // unless the type alias references a builtin type.
+      assert(decl->getModuleContext() !=
+             decl->getASTContext().TheBuiltinModule);
+      ContextStack context(*this);
+      while (DeclCtx && !DeclCtx->isInnermostContextGeneric())
+        DeclCtx = DeclCtx->getParent();
+      mangleContextOf(decl, BindGenerics::None);
+      mangleIdentifier(decl->getName());
+    }
+    return;
+  }
+
+  case TypeKind::Paren:
+    return mangleSugaredType<ParenType>(type);
+  case TypeKind::AssociatedType:
+    return mangleSugaredType<AssociatedTypeType>(type);
+  case TypeKind::Substituted:
+    return mangleSugaredType<SubstitutedType>(type);
+  case TypeKind::ArraySlice: /* fallthrough */
+  case TypeKind::Optional:
+    return mangleSugaredType<SyntaxSugarType>(type);
+  case TypeKind::Dictionary:
+    return mangleSugaredType<DictionaryType>(type);
+
+  case TypeKind::ImplicitlyUnwrappedOptional: {
+    assert(DWARFMangling && "sugared types are only legal for the debugger");
+    auto *IUO = cast<ImplicitlyUnwrappedOptionalType>(tybase);
+    auto implDecl = tybase->getASTContext().getImplicitlyUnwrappedOptionalDecl();
+    auto GenTy = BoundGenericType::get(implDecl, Type(), IUO->getBaseType());
+    return mangleType(GenTy, ResilienceExpansion::Minimal, 0);
+  }
 
   case TypeKind::ExistentialMetatype: {
-    CanExistentialMetatypeType EMT = cast<ExistentialMetatypeType>(type);
+    ExistentialMetatypeType *EMT = cast<ExistentialMetatypeType>(tybase);
     if (EMT->hasRepresentation()) {
       Buffer << 'X' << 'P' << 'M';
       mangleMetatypeRepresentation(Buffer, EMT->getRepresentation());
     } else {
       Buffer << 'P' << 'M';
     }
-    return mangleType(EMT.getInstanceType(),
+    return mangleType(EMT->getInstanceType(),
                       ResilienceExpansion::Minimal, 0);
   }
   case TypeKind::Metatype: {
-    CanMetatypeType MT = cast<MetatypeType>(type);
+    MetatypeType *MT = cast<MetatypeType>(tybase);
     if (MT->hasRepresentation()) {
       Buffer << 'X' << 'M';
       mangleMetatypeRepresentation(Buffer, MT->getRepresentation());
     } else {
       Buffer << 'M';
     }
-    return mangleType(MT.getInstanceType(),
+    return mangleType(MT->getInstanceType(),
                       ResilienceExpansion::Minimal, 0);
   }
   case TypeKind::LValue:
     assert(0 && "@lvalue types should not occur in function interfaces");
   case TypeKind::InOut:
     Buffer << 'R';
-    return mangleType(cast<InOutType>(type).getObjectType(),
+    return mangleType(cast<InOutType>(tybase)->getObjectType(),
                       ResilienceExpansion::Minimal, 0);
 
   case TypeKind::UnmanagedStorage:
     Buffer << "Xu";
-    return mangleType(cast<UnmanagedStorageType>(type).getReferentType(),
+    return mangleType(cast<UnmanagedStorageType>(tybase)->getReferentType(),
                       ResilienceExpansion::Minimal, 0);
 
   case TypeKind::UnownedStorage:
     Buffer << "Xo";
-    return mangleType(cast<UnownedStorageType>(type).getReferentType(),
+    return mangleType(cast<UnownedStorageType>(tybase)->getReferentType(),
                       ResilienceExpansion::Minimal, 0);
 
   case TypeKind::WeakStorage:
     Buffer << "Xw";
-    return mangleType(cast<WeakStorageType>(type).getReferentType(),
+    return mangleType(cast<WeakStorageType>(tybase)->getReferentType(),
                       ResilienceExpansion::Minimal, 0);
 
   case TypeKind::Tuple: {
-    auto tuple = cast<TupleType>(type);
+    auto tuple = cast<TupleType>(tybase);
     // type ::= 'T' tuple-field+ '_'  // tuple
     // type ::= 't' tuple-field+ '_'  // variadic tuple
     // tuple-field ::= identifier? type
@@ -816,7 +837,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     for (auto &field : tuple->getFields()) {
       if (field.hasName())
         mangleIdentifier(field.getName());
-      mangleType(CanType(field.getType()), explosion, 0);
+      mangleType(field.getType(), explosion, 0);
     }
     Buffer << '_';
     return;
@@ -836,7 +857,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     // are several occasions in which we'd like to mangle them in the
     // abstract.
     ContextStack context(*this);
-    mangleNominalType(cast<UnboundGenericType>(type)->getDecl(), explosion,
+    mangleNominalType(cast<UnboundGenericType>(tybase)->getDecl(), explosion,
                       BindGenerics::None);
     return;
   }
@@ -845,7 +866,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
   case TypeKind::Enum:
   case TypeKind::Struct: {
     ContextStack context(*this);
-    return mangleNominalType(cast<NominalType>(type)->getDecl(), explosion,
+    return mangleNominalType(cast<NominalType>(tybase)->getDecl(), explosion,
                              BindGenerics::None);
   }
 
@@ -853,13 +874,13 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
     // type ::= 'G' <type> <type>+ '_'
-    auto boundType = cast<BoundGenericType>(type);
+    auto *boundType = cast<BoundGenericType>(tybase);
     Buffer << 'G';
     {
       ContextStack context(*this);
       mangleNominalType(boundType->getDecl(), explosion, BindGenerics::None);
     }
-    for (auto arg : boundType.getGenericArgs()) {
+    for (auto arg : boundType->getGenericArgs()) {
       mangleType(arg, ResilienceExpansion::Minimal, /*uncurry*/ 0);
     }
     Buffer << '_';
@@ -870,7 +891,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     // <type> ::= U <generic-parameter>+ _ <type>
     // 'U' is for "universal qualification".
     // The nested type is always a function type.
-    auto fn = cast<PolymorphicFunctionType>(type);
+    auto fn = cast<PolymorphicFunctionType>(tybase);
     Buffer << 'U';
     manglePolymorphicType(&fn->getGenericParams(), fn, explosion, uncurryLevel,
                           /*mangleAsFunction=*/true);
@@ -898,7 +919,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     // <impl-function-attribute> ::= 'G'              // generic
     // <impl-parameter> ::= <impl-convention> <type>
     // <impl-result> ::= <impl-convention> <type>
-    auto fn = cast<SILFunctionType>(type);
+    auto fn = cast<SILFunctionType>(tybase);
     Buffer << "XF";
 
     auto mangleParameterConvention = [](ParameterConvention conv) {
@@ -973,12 +994,12 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
 
   // type ::= archetype
   case TypeKind::Archetype: {
-    auto archetype = cast<ArchetypeType>(type);
+    auto *archetype = cast<ArchetypeType>(tybase);
     
     // archetype ::= associated-type
     
     // associated-type ::= substitution
-    if (tryMangleSubstitution(archetype.getPointer()))
+    if (tryMangleSubstitution(archetype))
       return;
 
     Buffer << 'Q';
@@ -989,9 +1010,9 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
       assert(archetype->getAssocType()
              && "child archetype has no associated type?!");
 
-      mangleType(CanType(parent), explosion, 0);
+      mangleType(parent, explosion, 0);
       mangleIdentifier(archetype->getName());
-      addSubstitution(archetype.getPointer());
+      addSubstitution(archetype);
       return;
     }
     
@@ -1000,7 +1021,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     if (auto proto = archetype->getSelfProtocol()) {
       Buffer << 'P';
       mangleProtocolName(proto);
-      addSubstitution(archetype.getPointer());
+      addSubstitution(archetype);
       return;
     }
     
@@ -1059,13 +1080,13 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
   }
 
   case TypeKind::DynamicSelf: {
-    auto dynamicSelf = cast<DynamicSelfType>(type);
+    auto dynamicSelf = cast<DynamicSelfType>(tybase);
     if (dynamicSelf->getSelfType()->getAnyNominal()) {
       Buffer << 'D';
-      mangleType(dynamicSelf.getSelfType(), explosion, uncurryLevel);
+      mangleType(dynamicSelf->getSelfType(), explosion, uncurryLevel);
     } else {
       // Mangle DynamicSelf as Self within a protocol.
-      mangleType(dynamicSelf.getSelfType(), explosion, uncurryLevel);
+      mangleType(dynamicSelf->getSelfType(), explosion, uncurryLevel);
     }
     return;
   }
@@ -1077,7 +1098,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
   case TypeKind::GenericTypeParam: {
     Buffer << 'q';
     // FIXME: Notion of depth is reversed from that for archetypes.
-    auto paramTy = cast<GenericTypeParamType>(type);
+    auto paramTy = cast<GenericTypeParamType>(tybase);
     if (paramTy->getDepth() > 0) {
       Buffer << 'd';
       Buffer << Index(paramTy->getDepth() - 1);
@@ -1089,14 +1110,14 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
   case TypeKind::DependentMember: {
     Buffer << 'q';
 
-    auto memTy = cast<DependentMemberType>(type);
-    mangleType(memTy.getBase(), explosion, 0);
+    auto memTy = cast<DependentMemberType>(tybase);
+    mangleType(memTy->getBase(), explosion, 0);
     mangleIdentifier(memTy->getName());
     return;
   }
 
   case TypeKind::Function:
-    mangleFunctionType(cast<FunctionType>(type), explosion, uncurryLevel);
+    mangleFunctionType(cast<FunctionType>(tybase), explosion, uncurryLevel);
     return;
 
   case TypeKind::ProtocolComposition: {
@@ -1104,7 +1125,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     // same production:
     //   <type> ::= P <protocol-list> _
 
-    auto protocols = cast<ProtocolCompositionType>(type)->getProtocols();
+    auto protocols = cast<ProtocolCompositionType>(tybase)->getProtocols();
     Buffer << 'P';
     mangleProtocolList(protocols);
     Buffer << '_';
@@ -1252,9 +1273,12 @@ bool Mangler::tryMangleStandardSubstitution(const NominalTypeDecl *decl) {
   }
 }
 
-void Mangler::mangleFunctionType(CanAnyFunctionType fn,
+void Mangler::mangleFunctionType(AnyFunctionType *fn,
                                  ResilienceExpansion explosion,
                                  unsigned uncurryLevel) {
+  assert((DWARFMangling || CanType(fn)) &&
+         "expecting canonical types when not mangling for the debugger");
+
   // type ::= 'F' type type (curried)
   // type ::= 'f' type type (uncurried)
   // type ::= 'b' type type (objc block)
@@ -1265,8 +1289,8 @@ void Mangler::mangleFunctionType(CanAnyFunctionType fn,
     Buffer << 'K';
   else
     Buffer << (uncurryLevel > 0 ? 'f' : 'F');
-  mangleType(fn.getInput(), explosion, 0);
-  mangleType(fn.getResult(), explosion,
+  mangleType(fn->getInput(), explosion, 0);
+  mangleType(fn->getResult(), explosion,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
 }
 
