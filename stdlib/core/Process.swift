@@ -10,27 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct _Process {
-  // Use lazy initialization of static properties to safely initialize the
-  // public 'arguments' property on first use.
-  static var _arguments: [String] = {
-    map(0..<Int(C_ARGC)) { i in 
-      if let s = String.fromCStringRepairingIllFormedUTF8(C_ARGV[i]).0 {
-          return s
-      }
-      return ""
-    }
-  }()
-
+public enum Process {
   /// The list of command-line arguments with which the current
   /// process was invoked.
-  public var arguments : [String] {
-    return _Process._arguments
-  }
+  public static let arguments: [String] = {
+    // Use lazy initialization of static properties to safely initialize the
+    // public 'arguments' property on first use.
+    map(0..<Int(C_ARGC)) { i in 
+      String.fromCStringRepairingIllFormedUTF8(C_ARGV[i]).0 ?? ""
+    }
+  }()
 }
-
-/// An instance that exposes API for interaction with processes
-public let Process = _Process()
 
 /// Intrinsic entry point invoked on entry to a standalone program's "main".
 @transparent
@@ -43,4 +33,3 @@ func _didEnterMain(
   C_ARGC = CInt(argc)
   C_ARGV = UnsafeMutablePointer(argv)
 }
-
