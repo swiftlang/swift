@@ -31,6 +31,7 @@
 #include <type_traits>
 
 using namespace swift;
+using namespace swift::arc;
 
 STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
@@ -73,10 +74,6 @@ class FunctionAnalyzer {
   /// The function that we are analyzing.
   SILFunction *F;
 
-  /// The rc identity analysis we are using to find rc identity roots of arc
-  /// values.
-  RCIdentityAnalysis *RCIA;
-
   /// Did we ascertain that we can optimize this function?
   bool ShouldOptimize;
 
@@ -88,26 +85,18 @@ class FunctionAnalyzer {
   /// information that we learn early on but need later deep in the analysis
   llvm::SmallVector<unsigned, 8> DeadArgIndices;
 
-  using ArgIndexInstMapTy =
-    llvm::MapVector<unsigned, SILInstruction *,
-                    llvm::SmallDenseMap<unsigned, unsigned, 8>,
-                    llvm::SmallVector<std::pair<unsigned,
-                                                SILInstruction *>, 8>>;
   /// A map from consumed SILArguments to the release associated with the
   /// argument.
-  ///
-  /// We purposefully use a map vector here since we want to ensure that we can
-  /// reoutput the instructions in the same order in the callers which we see
-  /// them in the callee. This is the key property preserved by the map vector.
-  ArgIndexInstMapTy ConsumedArgumentIndexToReleaseMap;
+  ConsumedArgToEpilogueReleaseMatcher ArgToEpilogueReleaseMap;
 
 public:
   FunctionAnalyzer() = delete;
   FunctionAnalyzer(const FunctionAnalyzer &) = delete;
   FunctionAnalyzer(FunctionAnalyzer &&) = delete;
 
-  FunctionAnalyzer(SILFunction *F, RCIdentityAnalysis *RCIA)
-    : F(F), RCIA(RCIA), ShouldOptimize(false) {}
+  FunctionAnalyzer(RCIdentityAnalysis *RCIA, SILFunction *F)
+    : F(F), ShouldOptimize(false), ArgDescList(), DeadArgIndices(),
+      ArgToEpilogueReleaseMap(RCIA, F) {}
 
   /// Analyze the given function.
   bool analyze();
@@ -125,9 +114,9 @@ public:
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
   ArrayRef<unsigned> getDeadArgIndices() const { return DeadArgIndices; }
 
-  Range<ArgIndexInstMapTy::reverse_iterator>
+  Range<ConsumedArgToEpilogueReleaseMatcher::reverse_iterator>
   getConsumedArgumentIndexReleasePairs() {
-    return reversed(ConsumedArgumentIndexToReleaseMap);
+    return reversed(ArgToEpilogueReleaseMap);
   }
 
 private:
@@ -137,59 +126,9 @@ private:
 
   /// Compute the CanSILFunctionType for the optimized function.
   CanSILFunctionType createOptimizedSILFunctionType();
-
-  /// Populate ConsumedArgumentReleases with all releases associated with a
-  /// consumed function argument.
-  void findConsumedArgumentReleases();
 };
 
 } // end anonymous namespace
-
-void
-FunctionAnalyzer::findConsumedArgumentReleases() {
-  // Find the return BB of F. If we fail, then bail.
-  auto ReturnBB = F->findReturnBB();
-  if (ReturnBB == F->end())
-    return;
-
-  for (auto II = std::next(ReturnBB->rbegin()), IE = ReturnBB->rend();
-       II != IE; ++II) {
-    // If we do not have a release_value or strong_release...
-    if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
-      // And the object can not use values in a manner that will keep the object
-      // alive, continue. We may be able to find additional releases.
-      if (arc::canNeverUseValues(&*II))
-        continue;
-
-      // Otherwise, we need to stop computing since we do not want to reduce the
-      // lifetime of objects.
-      return;
-    }
-
-    // Ok, we have a release_value or strong_release. Grab Target and find the
-    // RC identity root of its operand.
-    SILInstruction *Target = &*II;
-    SILValue Op = RCIA->getRCIdentityRoot(Target->getOperand(0));
-
-    // If Op is not a consumed argument, we must break since this is not an Op
-    // that is a part of a return sequence. We are being conservative here since
-    // we could make this more general by allowing for intervening non-arg
-    // releases in the sense that we do not allow for race conditions in between
-    // destructors.
-    auto *Arg = dyn_cast<SILArgument>(Op);
-    if (!Arg || !Arg->isFunctionArg() ||
-        !Arg->hasConvention(ParameterConvention::Direct_Owned))
-      return;
-
-    // Ok, we have a release on a SILArgument that is direct owned. Attempt to
-    // put it into our arc opts map. If we already have it, we have exited the
-    // return value sequence so break. Otherwise, continue looking for more arc
-    // operations.
-    if (!ConsumedArgumentIndexToReleaseMap.insert({Arg->getIndex(),
-                                                   Target}).second)
-      return;
-  }
-}
 
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
@@ -199,12 +138,6 @@ FunctionAnalyzer::analyze() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResult())
     return false;
-
-  // Search for all ARC sequence ops. This initializes the small map vector we
-  // are using to store instructions. We are using this data structure on
-  // purpose since it will allow us to easily recreate our arc opts in the same
-  // order in caller functions.
-  findConsumedArgumentReleases();
 
   ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
@@ -219,11 +152,8 @@ FunctionAnalyzer::analyze() {
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     if (A.hasConvention(ParameterConvention::Direct_Owned)) {
-      auto P = ConsumedArgumentIndexToReleaseMap.find(i);
-      if (P != ConsumedArgumentIndexToReleaseMap.end()) {
-        assert(A.Arg->getIndex() == i &&
-               "Make sure our argument index matches the current arg index.");
-        A.CalleeRelease = P->second;
+      if (auto *Release = ArgToEpilogueReleaseMap.releaseForArgument(A.Arg)) {
+        A.CalleeRelease = Release;
         ShouldOptimize = true;
         ++NumOwnedConvertedToGuaranteed;
       }
@@ -414,8 +344,10 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     // We iterate over the consumed argument index to release map backwards
     // since we inserted the instructions in reverse order.
     for (auto P : Analyzer.getConsumedArgumentIndexReleasePairs()) {
-      Builder.createFixLifetime(AI->getLoc(), AI->getArgument(P.first));
-      Builder.createReleaseValue(AI->getLoc(), AI->getArgument(P.first));
+      Builder.createFixLifetime(AI->getLoc(),
+                                NewAI->getArgument(P.first->getIndex()));
+      Builder.createReleaseValue(AI->getLoc(),
+                                 NewAI->getArgument(P.first->getIndex()));
     }
 
     // Erase the old apply.
@@ -458,9 +390,10 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   // If we have any arguments that were consumed but are now guaranteed,
   // insert a fix lifetime instruction and a release_value.
   for (auto P : Analyzer.getConsumedArgumentIndexReleasePairs()) {
-    SILValue Arg = BB->getBBArg(P.first);
-    Builder.createFixLifetime(Loc, Arg);
-    Builder.createReleaseValue(Loc, Arg);
+    // We use the index from the SILArgument since P.first's BB is now in the
+    // new optimized function.
+    Builder.createFixLifetime(Loc, BB->getBBArg(P.first->getIndex()));
+    Builder.createReleaseValue(Loc, BB->getBBArg(P.first->getIndex()));
   }
 
   Builder.createReturn(Loc, ReturnValue);
@@ -490,17 +423,16 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
     ThunkBody->createArgument(A->getType(), A->getDecl());
   }
 
+  // Create the new thunk body before we delete any arguments. This ensures that
+  // our argument -> release map is still accurate.
+  createThunkBody(ThunkBody, NewF, Analyzer);
+
   // Then erase the dead arguments from NewF using DeadArgs. We go backwards so
   // we remove arg elements by decreasing index so we don't invalidate our
   // indices.
   for (unsigned i : reversed(Analyzer.getDeadArgIndices())) {
     NewFEntryBB->eraseArgument(i);
   }
-
-  // Intrusively optimize the function signature of NewF.
-
-  // Then we create a new body for ThunkBody that calls NewF.
-  createThunkBody(ThunkBody, NewF, Analyzer);
 
   return NewF;
 }
@@ -523,7 +455,7 @@ optimizeFunctionSignature(SILFunction *F,
   llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  FunctionAnalyzer Analyzer(F, RCIA);
+  FunctionAnalyzer Analyzer(RCIA, F);
   if (!Analyzer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");

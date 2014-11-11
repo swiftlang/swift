@@ -16,6 +16,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 
 namespace swift {
@@ -108,6 +109,67 @@ destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx);
 /// Use the opaque context to recompute the matching set for the input function.
 bool computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
                            std::function<void (ARCMatchingSet&)> Fun);
+
+/// A class that attempts to match owned arguments and corresponding epilogue
+/// releases for a specific function.
+///
+/// TODO: This really needs a better name.
+class ConsumedArgToEpilogueReleaseMatcher {
+  using ArgInstMapTy =
+    llvm::MapVector<SILArgument *, SILInstruction *,
+                    llvm::SmallDenseMap<SILArgument *, unsigned, 8>,
+                    llvm::SmallVector<std::pair<SILArgument *,
+                                                SILInstruction *>, 8>>;
+  ArgInstMapTy ArgInstMap;
+
+public:
+  ConsumedArgToEpilogueReleaseMatcher(RCIdentityAnalysis *RCIA,
+                                      SILFunction *F);
+
+  bool argumentHasRelease(SILArgument *Arg) const {
+    return ArgInstMap.find(Arg) != ArgInstMap.end();
+  }
+
+  bool argumentHasRelease(SILValue V) const {
+    auto *Arg = dyn_cast<SILArgument>(V);
+    if (!Arg)
+      return false;
+    return argumentHasRelease(Arg);
+  }
+
+  SILInstruction *releaseForArgument(SILArgument *Arg) const {
+    auto I = ArgInstMap.find(Arg);
+    if (I == ArgInstMap.end())
+      return nullptr;
+    return I->second;
+  }
+
+  bool isReleaseMatchedToArgument(SILInstruction *Inst) const {
+    auto Pred = [&Inst](const std::pair<SILArgument *,
+                                        SILInstruction *> &P) -> bool {
+      return P.second == Inst;
+    };
+    return std::count_if(ArgInstMap.begin(), ArgInstMap.end(), Pred);
+  }
+
+  using iterator = decltype(ArgInstMap)::iterator;
+  using const_iterator = decltype(ArgInstMap)::const_iterator;
+  iterator begin() { return ArgInstMap.begin(); }
+  iterator end() { return ArgInstMap.end(); }
+  const_iterator begin() const { return ArgInstMap.begin(); }
+  const_iterator end() const { return ArgInstMap.end(); }
+
+  using reverse_iterator = decltype(ArgInstMap)::reverse_iterator;
+  using const_reverse_iterator = decltype(ArgInstMap)::const_reverse_iterator;
+  reverse_iterator rbegin() { return ArgInstMap.rbegin(); }
+  reverse_iterator rend() { return ArgInstMap.rend(); }
+  const_reverse_iterator rbegin() const { return ArgInstMap.rbegin(); }
+  const_reverse_iterator rend() const { return ArgInstMap.rend(); }
+
+  unsigned size() const { return ArgInstMap.size(); }
+
+  Range<iterator> getRange() { return swift::make_range(begin(), end()); }
+};
 
 } // end namespace arc
 } // end namespace swift

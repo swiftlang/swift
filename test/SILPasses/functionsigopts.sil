@@ -148,19 +148,23 @@ bb0(%0 : $Builtin.NativeObject):
   return %2 : $()
 }
 
-// We should be able to optimize this callee since the release is in the exit BB.
-// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
-sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+// We should be able to optimize this callee since the release is in the exit
+// BB. Additionally this test makes sure that we delete dead parameters before
+// invalidating the owned argument -> release map.
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> () {
+// CHECK: fix_lifetime %1 : $Builtin.NativeObject
+// CHECK: release_value %1 : $Builtin.NativeObject
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject):
   cond_br undef, bb1, bb2
 
 bb1:
   br bb2
 
 bb2:
-  strong_release %0 : $Builtin.NativeObject
-  %1 = tuple()
-  return %1 : $()
+  strong_release %1 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
 }
 
 // In this case the release is not in the exit, so we can not specialize.
@@ -243,10 +247,10 @@ bb2(%5 : $Builtin.NativeObject):
 // CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: [[MULTIBB_RELEASENOTINEXIT_CALLEE:%.*]] = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASENOTINEXIT_CALLEE]]([[INPUT_PTR_1]])
-// CHECK: [[MULTIBB_RELEASEINEXIT_CALLEE:%.*]] = function_ref @_TTOS_o2g_owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[MULTIBB_RELEASEINEXIT_CALLEE:%.*]] = function_ref @_TTOS_do2g_owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_CALLEE]]([[INPUT_PTR_1]])
-// CHECK: fix_lifetime [[INPUT_PTR_1]]
-// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK-NEXT: fix_lifetime [[INPUT_PTR_1]] : $Builtin.NativeObject
+// CHECK-NEXT: release_value [[INPUT_PTR_1]] : $Builtin.NativeObject
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTOS_o2go2g_owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@thin (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
 // CHECK: fix_lifetime [[INPUT_PTR_2]]
@@ -273,7 +277,6 @@ bb2(%5 : $Builtin.NativeObject):
 // CHECK: fix_lifetime [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_2]]
 
-
 sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %2 = function_ref @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
@@ -282,14 +285,15 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   apply %2(%3, %0, %4) : $@thin (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
   %5 = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@thin (@owned Builtin.NativeObject) -> ()
   apply %5(%0) : $@thin (@owned Builtin.NativeObject) -> ()
-  %6 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@owned Builtin.NativeObject) -> ()
-  apply %6(%0) : $@thin (@owned Builtin.NativeObject) -> ()
-  %7 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
-  apply %7(%0, %1) : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
-  apply %7(%1, %0) : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
-  %8 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
-  apply %8(%1, %0) : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  %6 = integer_literal $Builtin.Int1, 0
+  %7 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> ()
+  apply %7(%6, %0) : $@thin (Builtin.Int1, @owned Builtin.NativeObject) -> ()
+  %8 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
   apply %8(%0, %1) : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %8(%1, %0) : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  %9 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %9(%1, %0) : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %9(%0, %1) : $@thin (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
 
   %9999 = tuple()
   return %9999 : $()
@@ -317,7 +321,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil [fragile] @_TTOS_o2g_owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [fragile] @_TTOS_do2g_owned_to_guaranteed_multibb_callee_with_release_in_exit : $@thin (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(
 // CHECK-NEXT:  cond_br undef, bb1, bb2
 // CHECK: bb1:

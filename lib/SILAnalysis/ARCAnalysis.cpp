@@ -16,6 +16,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -463,4 +464,54 @@ bool swift::arc::isARCInertTrapBB(SILBasicBlock *BB) {
   }
 
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                          Owned Argument Utilities
+//===----------------------------------------------------------------------===//
+
+ConsumedArgToEpilogueReleaseMatcher::
+ConsumedArgToEpilogueReleaseMatcher(RCIdentityAnalysis *RCIA,
+                                    SILFunction *F) {
+  // Find the return BB of F. If we fail, then bail.
+  auto ReturnBB = F->findReturnBB();
+  if (ReturnBB == F->end())
+    return;
+
+  for (auto II = std::next(ReturnBB->rbegin()), IE = ReturnBB->rend();
+       II != IE; ++II) {
+    // If we do not have a release_value or strong_release...
+    if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
+      // And the object can not use values in a manner that will keep the object
+      // alive, continue. We may be able to find additional releases.
+      if (arc::canNeverUseValues(&*II))
+        continue;
+
+      // Otherwise, we need to stop computing since we do not want to reduce the
+      // lifetime of objects.
+      return;
+    }
+
+    // Ok, we have a release_value or strong_release. Grab Target and find the
+    // RC identity root of its operand.
+    SILInstruction *Target = &*II;
+    SILValue Op = RCIA->getRCIdentityRoot(Target->getOperand(0));
+
+    // If Op is not a consumed argument, we must break since this is not an Op
+    // that is a part of a return sequence. We are being conservative here since
+    // we could make this more general by allowing for intervening non-arg
+    // releases in the sense that we do not allow for race conditions in between
+    // destructors.
+    auto *Arg = dyn_cast<SILArgument>(Op);
+    if (!Arg || !Arg->isFunctionArg() ||
+        !Arg->hasConvention(ParameterConvention::Direct_Owned))
+      return;
+
+    // Ok, we have a release on a SILArgument that is direct owned. Attempt to
+    // put it into our arc opts map. If we already have it, we have exited the
+    // return value sequence so break. Otherwise, continue looking for more arc
+    // operations.
+    if (!ArgInstMap.insert({Arg, Target}).second)
+      return;
+  }
 }
