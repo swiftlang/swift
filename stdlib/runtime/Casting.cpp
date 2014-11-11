@@ -35,7 +35,6 @@
 #endif
 
 #include <dlfcn.h>
-
 #include <cstring>
 #include <deque>
 #include <mutex>
@@ -71,7 +70,7 @@ extern "C" const void *swift_dynamicCastObjCProtocolConditional(
 
 // Return a user-comprehensible name for the given type.
 // FIXME: this only works well for Class/Struct/Enum types. rdar://16392852
-static std::string nameForMetadata(const Metadata *type) {
+std::string swift::nameForMetadata(const Metadata *type) {
   auto descriptor = type->getNominalTypeDescriptor();
   if (descriptor && descriptor->Name) {
     auto mangled = std::string("_Tt") + descriptor->Name;

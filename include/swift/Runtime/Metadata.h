@@ -22,6 +22,7 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include "swift/Runtime/Config.h"
@@ -2396,6 +2397,10 @@ extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
 extern "C" bool
 swift_demangleSimpleClass(const char *mangledName, 
                           char **outModule, char **outClass);
+  
+
+/// Return the type name for a given type metadata.
+std::string nameForMetadata(const Metadata *type);
   
 } // end namespace swift
 

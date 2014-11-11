@@ -707,6 +707,98 @@ extern "C" bool swift::_swift_classConformsToObjCProtocol(const void *theClass,
   return [((Class) theClass) conformsToProtocol: (Protocol*) protocol];
 }
 
+extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
+                                                 const Metadata *type,
+                                                 size_t numProtocols,
+                                                 Protocol * const *protocols) {
+  Class classObject;
+  
+  switch (type->getKind()) {
+  case MetadataKind::Class:
+    // Native class metadata is also the class object.
+    classObject = (Class)type;
+    break;
+  case MetadataKind::ObjCClassWrapper:
+    // Unwrap to get the class object.
+    classObject = (Class)static_cast<const ObjCClassWrapperMetadata *>(type)
+      ->Class;
+    break;
+  
+  // Other kinds of type can never conform to ObjC protocols.
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::Tuple:
+  case MetadataKind::Function:
+  case MetadataKind::Existential:
+  case MetadataKind::Metatype:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::Block:
+    swift_dynamicCastFailure(type, nameForMetadata(type).c_str(),
+                             protocols[0], protocol_getName(protocols[0]));
+      
+  case MetadataKind::PolyFunction:
+  case MetadataKind::HeapLocalVariable:
+    assert(false && "not type metadata");
+    break;
+  }
+  
+  for (size_t i = 0; i < numProtocols; ++i) {
+    if (![classObject conformsToProtocol:protocols[i]]) {
+      swift_dynamicCastFailure(type, nameForMetadata(type).c_str(),
+                               protocols[i], protocol_getName(protocols[i]));
+    }
+  }
+  
+  return type;
+}
+
+extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
+                                                const Metadata *type,
+                                                size_t numProtocols,
+                                                Protocol * const *protocols) {
+  Class classObject;
+  
+  switch (type->getKind()) {
+  case MetadataKind::Class:
+    // Native class metadata is also the class object.
+    classObject = (Class)type;
+    break;
+  case MetadataKind::ObjCClassWrapper:
+    // Unwrap to get the class object.
+    classObject = (Class)static_cast<const ObjCClassWrapperMetadata *>(type)
+      ->Class;
+    break;
+  
+  // Other kinds of type can never conform to ObjC protocols.
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::Tuple:
+  case MetadataKind::Function:
+  case MetadataKind::Existential:
+  case MetadataKind::Metatype:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::Block:
+    return nullptr;
+      
+  case MetadataKind::PolyFunction:
+  case MetadataKind::HeapLocalVariable:
+    assert(false && "not type metadata");
+    break;
+  }
+  
+  for (size_t i = 0; i < numProtocols; ++i) {
+    if (![classObject conformsToProtocol:protocols[i]]) {
+      return nullptr;
+    }
+  }
+  
+  return type;
+}
+
 extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
                                                  size_t numProtocols,
                                                  Protocol * const *protocols) {

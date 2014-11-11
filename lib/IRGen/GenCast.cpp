@@ -379,10 +379,9 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       case MetatypeRepresentation::Thin:
         llvm_unreachable("can't cast to thin metatype");
       case MetatypeRepresentation::Thick: {
-        // Get the ObjC class from the type metadata reference.
-        objcObject =
-          emitClassHeapMetadataRefForMetatype(IGF, value,
-                                              srcType.getSwiftRValueType());
+        // The metadata might be for a non-class type, which wouldn't have
+        // an ObjC class object.
+        objcObject = nullptr;
         break;
       }
       case MetatypeRepresentation::ObjC:
@@ -394,18 +393,26 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       // Class instance is already an ObjC object.
       objcObject = value;
     }
-    objcObject = IGF.Builder.CreateBitCast(objcObject,
-                                           IGF.IGM.UnknownRefCountedPtrTy);
+    if (objcObject)
+      objcObject = IGF.Builder.CreateBitCast(objcObject,
+                                             IGF.IGM.UnknownRefCountedPtrTy);
     
+    // Pick the cast function based on the cast mode and on whether we're
+    // casting a Swift metatype or ObjC object.
     llvm::Value *castFn;
     switch (mode) {
     case CheckedCastMode::Unconditional:
-      castFn = IGF.IGM.getDynamicCastObjCProtocolUnconditionalFn();
+      castFn = objcObject
+        ? IGF.IGM.getDynamicCastObjCProtocolUnconditionalFn()
+        : IGF.IGM.getDynamicCastTypeToObjCProtocolUnconditionalFn();
       break;
     case CheckedCastMode::Conditional:
-      castFn = IGF.IGM.getDynamicCastObjCProtocolConditionalFn();
+      castFn = objcObject
+        ? IGF.IGM.getDynamicCastObjCProtocolConditionalFn()
+        : IGF.IGM.getDynamicCastTypeToObjCProtocolConditionalFn();
       break;
     }
+    llvm::Value *objcCastObject = objcObject ? objcObject : value;
     
     Address protoRefsBuf = IGF.createAlloca(
                                         llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
@@ -424,56 +431,17 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
 
     
-    objcCast = IGF.Builder.CreateCall3(castFn, objcObject,
+    objcCast = IGF.Builder.CreateCall3(castFn, objcCastObject,
                                        IGF.IGM.getSize(Size(objcProtos.size())),
                                        protoRefsBuf.getAddress());
   }
 
   // Add the value to the explosion.
   llvm::Value *resultValue;
-  if (metatypeKind) {
-    switch (*metatypeKind) {
-    case MetatypeRepresentation::Thin:
-      llvm_unreachable("can't cast to thin metatype");
-    case MetatypeRepresentation::Thick:
-      // Return the original value, not the ObjC class object.
-      switch (mode) {
-      case CheckedCastMode::Unconditional:
-        resultValue = value;
-        break;
-      case CheckedCastMode::Conditional:
-        // We still need to make the value nil if the result of the ObjC cast
-        // was.
-        if (objcCast) {
-          auto isNull = IGF.Builder.CreateICmpEQ(objcCast,
-                             llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy));
-          auto valueOrNull = IGF.Builder.CreateSelect(isNull,
-                      llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy),
-                      value);
-          resultValue = valueOrNull;
-        } else {
-          resultValue = value;
-        }
-        break;
-      }
-      break;
-    case MetatypeRepresentation::ObjC:
-      // Return the class object returned back from the call.
-      if (objcCast) {
-        auto objcClass = IGF.Builder.CreateBitCast(objcCast,
-                                             IGF.IGM.ObjCClassPtrTy);
-        resultValue = objcClass;
-      } else {
-        resultValue = value;
-      }
-      break;
-    }
-  } else {
-    if (objcCast)
-      resultValue = objcCast;
-    else
-      resultValue = value;
-  }
+  if (objcCast)
+    resultValue = IGF.Builder.CreateBitCast(objcCast, value->getType());
+  else
+    resultValue = value;
   ex.add(resultValue);
   
   // If we don't need to look up any witness tables, we're done.
@@ -492,7 +460,8 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       successBB = IGF.createBasicBlock("success");
       contBB = IGF.createBasicBlock("cont");
       auto isNull = IGF.Builder.CreateICmpEQ(objcCast,
-                             llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy));
+                               llvm::ConstantPointerNull::get(
+                                 cast<llvm::PointerType>(objcCast->getType())));
       IGF.Builder.CreateCondBr(isNull, contBB, successBB);
       IGF.Builder.emitBlock(successBB);
     }
