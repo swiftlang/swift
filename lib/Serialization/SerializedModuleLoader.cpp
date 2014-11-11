@@ -340,6 +340,20 @@ void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
+void SerializedModuleLoader::loadObjCMethods(
+       ClassDecl *classDecl,
+       ObjCSelector selector,
+       bool isInstanceMethod,
+       unsigned previousGeneration,
+       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+  for (auto &modulePair : LoadedModuleFiles) {
+    if (modulePair.second <= previousGeneration)
+      continue;
+    modulePair.first->loadObjCMethods(classDecl, selector, isInstanceMethod,
+                                      methods);
+  }
+}
+
 bool SerializedModuleLoader::isSerializedAST(StringRef data) {
   using serialization::MODULE_SIGNATURE;
   StringRef signatureStr(reinterpret_cast<const char *>(MODULE_SIGNATURE),

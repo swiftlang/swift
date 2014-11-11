@@ -40,6 +40,8 @@
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <vector>
+
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
@@ -334,6 +336,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, EXTENSIONS);
   BLOCK_RECORD(index_block, CLASS_MEMBERS);
   BLOCK_RECORD(index_block, OPERATOR_METHODS);
+  BLOCK_RECORD(index_block, OBJC_METHODS);
 
   BLOCK(SIL_BLOCK);
   BLOCK_RECORD(sil_block, SIL_FUNCTION);
@@ -2897,6 +2900,82 @@ static void writeDeclCommentTable(
   DeclCommentList.emit(scratch, tableOffset, hashTableBlob);
 }
 
+namespace {
+  /// Used to serialize the on-disk Objective-C method hash table.
+  class ObjCMethodTableInfo {
+  public:
+    using key_type = ObjCSelector;
+    using key_type_ref = key_type;
+    using data_type = Serializer::ObjCMethodTableData;
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      llvm::SmallString<32> scratch;
+      return llvm::HashString(key.getString(scratch));
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      llvm::SmallString<32> scratch;
+      uint32_t keyLength = key.getString(scratch).size();
+      uint32_t dataLength = (sizeof(TypeID) + 1 + sizeof(DeclID)) * data.size();
+
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      out << key;
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(sizeof(DeclID) <= 4, "DeclID too large");
+      endian::Writer<little> writer(out);
+      for (auto entry : data) {
+        writer.write<uint32_t>(std::get<0>(entry));
+        writer.write<uint8_t>(std::get<1>(entry));
+        writer.write<uint32_t>(std::get<2>(entry));
+      }
+    }
+  };
+} // end anonymous namespace
+
+static void writeObjCMethodTable(const index_block::ObjCMethodTableLayout &out,
+                                 Serializer::ObjCMethodTable &objcMethods) {
+  // Collect all of the Objective-C selectors in the method table.
+  std::vector<ObjCSelector> selectors;
+  for (const auto &entry : objcMethods) {
+    selectors.push_back(entry.first);
+  }
+
+  // Sort the Objective-C selectors so we emit them in a stable order.
+  llvm::array_pod_sort(selectors.begin(), selectors.end());
+
+  // Create the on-disk hash table.
+  llvm::OnDiskChainedHashTableGenerator<ObjCMethodTableInfo> generator;
+  llvm::SmallString<32> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    for (auto selector : selectors) {
+      generator.insert(selector, objcMethods[selector]);
+    }
+
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  SmallVector<uint64_t, 8> scratch;
+  out.emit(scratch, tableOffset, hashTableBlob);
+}
+
 /// Add operator methods from the given declaration type.
 ///
 /// Recursively walks the members and derived global decls of any nested
@@ -2905,6 +2984,7 @@ template<typename Range>
 static void addOperatorsAndTopLevel(Serializer &S, Range members,
                                     Serializer::DeclTable &operatorMethodDecls,
                                     Serializer::DeclTable &topLevelDecls,
+                                    Serializer::ObjCMethodTable &objcMethods,
                                     bool isDerivedTopLevel) {
   for (const Decl *member : members) {
     auto memberValue = dyn_cast<ValueDecl>(member);
@@ -2929,15 +3009,31 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
     // Recurse into nested types.
     if (auto nominal = dyn_cast<NominalTypeDecl>(member)) {
       addOperatorsAndTopLevel(S, nominal->getMembers(),
-                             operatorMethodDecls, topLevelDecls, false);
+                             operatorMethodDecls, topLevelDecls, objcMethods,
+                             false);
       addOperatorsAndTopLevel(S, nominal->getDerivedGlobalDecls(),
-                             operatorMethodDecls, topLevelDecls, true);
+                             operatorMethodDecls, topLevelDecls, objcMethods,
+                             true);
+    }
+
+    // Record Objective-C methods.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (func->isObjC()) {
+        TypeID owningTypeID
+          = S.addTypeRef(func->getDeclContext()->getDeclaredInterfaceType());
+        objcMethods[func->getObjCSelector()].push_back(
+          std::make_tuple(owningTypeID,
+                          func->isInstanceMember(),
+                          S.addDeclRef(memberValue)));
+      }
     }
   }
 }
 
 void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, extensionDecls, operatorDecls, operatorMethodDecls;
+  ObjCMethodTable objcMethods;
+
   ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
   for (auto nextFile : files) {
     // FIXME: Switch to a visitor interface?
@@ -2956,9 +3052,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         // Add operator methods from nominal types.
         if (auto nominal = dyn_cast<NominalTypeDecl>(VD)) {
           addOperatorsAndTopLevel(*this, nominal->getMembers(),
-                                 operatorMethodDecls, topLevelDecls, false);
+                                  operatorMethodDecls, topLevelDecls,
+                                  objcMethods, false);
           addOperatorsAndTopLevel(*this, nominal->getDerivedGlobalDecls(),
-                                 operatorMethodDecls, topLevelDecls, true);
+                                  operatorMethodDecls, topLevelDecls,
+                                  objcMethods, true);
         }
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         Type extendedTy = ED->getExtendedType();
@@ -2968,7 +3066,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
         // Add operator methods from extensions.
         addOperatorsAndTopLevel(*this, ED->getMembers(),
-                               operatorMethodDecls, topLevelDecls, false);
+                                operatorMethodDecls, topLevelDecls, objcMethods,
+                                false);
 
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
@@ -2994,6 +3093,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
     writeDeclTable(DeclList, index_block::CLASS_MEMBERS, ClassMembersByName);
     writeDeclTable(DeclList, index_block::OPERATOR_METHODS, operatorMethodDecls);
+
+    index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
+    writeObjCMethodTable(ObjCMethodTable, objcMethods);
   }
 }
 

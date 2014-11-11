@@ -20,9 +20,12 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
+class AbstractFunctionDecl;
+class ClassDecl;
 class Module;
 class NominalTypeDecl;
 
@@ -75,6 +78,32 @@ public:
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) { }
+
+  /// \brief Load the methods within the given class that that produce
+  /// Objective-C class or instance methods with the given selector.
+  ///
+  /// \param classDecl The class in which we are searching for @objc methods.
+  /// The search only considers this class and its extensions; not any
+  /// superclasses.
+  ///
+  /// \param selector The selector to search for.
+  ///
+  /// \param isInstanceMethod Whether we are looking for an instance method
+  /// (vs. a class method).
+  ///
+  /// \param previousGeneration The previous generation with which this
+  /// callback was invoked. The list of methods will already contain all of
+  /// the results from generations up and and including \c previousGeneration.
+  ///
+  /// \param methods The list of @objc methods in this class that have this
+  /// selector and are instance/class methods as requested. This list will be
+  /// extended with any methods found in subsequent generations.
+  virtual void loadObjCMethods(
+                 ClassDecl *classDecl,
+                 ObjCSelector selector,
+                 bool isInstanceMethod,
+                 unsigned previousGeneration,
+                 llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) { }
 
   /// \brief Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }

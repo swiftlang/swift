@@ -264,6 +264,65 @@ ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
                                                 base + sizeof(uint32_t), base));
 }
 
+/// Used to deserialize entries in the on-disk Objective-C method table.
+class ModuleFile::ObjCMethodTableInfo {
+public:
+  using internal_key_type = std::string;
+  using external_key_type = ObjCSelector;
+  using data_type = SmallVector<std::tuple<TypeID, bool, DeclID>, 8>;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) {
+    llvm::SmallString<32> scratch;
+    return ID.getString(scratch).str();
+  }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::HashString(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return std::string(reinterpret_cast<const char *>(data), length);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    data_type result;
+    while (length > 0) {
+      TypeID typeID = endian::readNext<uint32_t, little, unaligned>(data);
+      bool isInstanceMethod = *data++ != 0;
+      DeclID methodID = endian::readNext<uint32_t, little, unaligned>(data);
+      result.push_back(std::make_tuple(typeID, isInstanceMethod, methodID));
+      length -= sizeof(TypeID) + 1 + sizeof(DeclID);
+    }
+
+    return result;
+  }
+};
+
+std::unique_ptr<ModuleFile::SerializedObjCMethodTable>
+ModuleFile::readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData) {
+  uint32_t tableOffset;
+  index_block::ObjCMethodTableLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedObjCMethodTable>;
+  return OwnedTable(
+           SerializedObjCMethodTable::Create(base + tableOffset,
+                                             base + sizeof(uint32_t), base));
+}
+
 bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
   cursor.EnterSubBlock(INDEX_BLOCK_ID);
 
@@ -316,6 +375,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::OPERATOR_METHODS:
         OperatorMethodDecls = readDeclTable(scratch, blobData);
+        break;
+      case index_block::OBJC_METHODS:
+        ObjCMethods = readObjCMethodTable(scratch, blobData);
         break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
@@ -1009,6 +1071,40 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   for (auto item : *iter) {
     if (item.first == getKindForTable(nominal))
       (void)getDecl(item.second);
+  }
+}
+
+void ModuleFile::loadObjCMethods(
+       ClassDecl *classDecl,
+       ObjCSelector selector,
+       bool isInstanceMethod,
+       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+  // If we don't have an Objective-C method table, there's nothing to do.
+  if (!ObjCMethods)
+    return;
+
+  // Look for all methods in the module file with this selector.
+  auto known = ObjCMethods->find(selector);
+  if (known == ObjCMethods->end()) {
+    return;
+  }
+
+  auto results = *known;
+  for (const auto &result : results) {
+    // If the method is the wrong kind (instance vs. class), skip it.
+    if (isInstanceMethod != std::get<1>(result))
+      continue;
+
+    // If the method isn't defined in the requested class, skip it.
+    Type type = getType(std::get<0>(result));
+    if (type->getClassOrBoundGenericClass() != classDecl)
+      continue;
+
+    // Deserialize the method and add it to the list.
+    if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
+                      getDecl(std::get<2>(result)))) {
+      methods.push_back(func);
+    }
   }
 }
 

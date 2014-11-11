@@ -23,6 +23,7 @@
 #include "swift/Basic/LLVM.h"
 #include <array>
 #include <queue>
+#include <tuple>
 
 namespace swift {
   class SILModule;
@@ -103,6 +104,12 @@ public:
   /// Returns the declaration the given generic parameter list is associated
   /// with.
   const Decl *getGenericContext(const GenericParamList *paramList);
+
+  using ObjCMethodTableData = SmallVector<std::tuple<TypeID, bool, DeclID>, 4>;
+
+  // In-memory representation of what will eventually be an on-disk
+  // hash table of all defined Objective-C methods.
+  using ObjCMethodTable = llvm::DenseMap<ObjCSelector, ObjCMethodTableData>;
 
 private:
   /// A map from identifiers to methods and properties with the given name.

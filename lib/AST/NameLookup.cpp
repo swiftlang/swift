@@ -772,11 +772,23 @@ public:
   }
 };
 
+namespace {
+  /// Stores the set of Objective-C methods with a given selector within the
+  /// Objective-C method lookup table.
+  struct StoredObjCMethods {
+    /// The generation count at which this list was last updated.
+    unsigned Generation = 0;
+
+    /// The set of methods with the given selector.
+    llvm::TinyPtrVector<AbstractFunctionDecl *> Methods;
+  };
+}
+
 /// Class member lookup table, which is a member lookup table with a second
 /// table for lookup based on Objective-C selector.
-class swift::ObjCMethodLookupTable
+class ClassDecl::ObjCMethodLookupTable
         : public llvm::DenseMap<std::pair<ObjCSelector, char>,
-                                llvm::TinyPtrVector<AbstractFunctionDecl *>>
+                                StoredObjCMethods>
 {
 public:
   void destroy() {
@@ -1008,12 +1020,17 @@ ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
     createObjCMethodLookup();
   }
 
-  auto known = ObjCMethodLookup->find({selector, isInstance});
-  if (known != ObjCMethodLookup->end())
-    return { known->second.begin(), known->second.end() };
+  // If any modules have been loaded since we did the search last (or if we
+  // hadn't searched before), look in those modules, too.
+  auto &stored = (*ObjCMethodLookup)[{selector, isInstance}];
+  ASTContext &ctx = getASTContext();
+  if (ctx.getCurrentGeneration() > stored.Generation) {
+    ctx.loadObjCMethods(this, selector, isInstance, stored.Generation,
+                        stored.Methods);
+    stored.Generation = ctx.getCurrentGeneration();
+  }
 
-  // FIXME: Callback to perform lazy lookup of selectors.
-  return { };
+  return { stored.Methods.begin(), stored.Methods.end() };
 }
 
 void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
@@ -1027,7 +1044,7 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   bool isInstanceMethod
     = method->isInstanceMember() || isa<ConstructorDecl>(method);
   auto selector = method->getObjCSelector();
-  auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}];
+  auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
   // In a non-empty vector, we could have duplicates or conflicts.
   if (!vec.empty()) {

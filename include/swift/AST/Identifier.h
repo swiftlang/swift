@@ -441,11 +441,34 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use within the debugger");
 
+  /// Compare two Objective-C selectors, producing -1 if \c *this comes before
+  /// \c other,  1 if \c *this comes after \c other, and 0 if they are equal.
+  int compare(ObjCSelector other) const {
+    return Storage.compare(other.Storage);
+  }
+
   friend bool operator==(ObjCSelector lhs, ObjCSelector rhs) {
     return lhs.getOpaqueValue() == rhs.getOpaqueValue();
   }
+
   friend bool operator!=(ObjCSelector lhs, ObjCSelector rhs) {
     return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+  }
+
+  friend bool operator<(ObjCSelector lhs, ObjCSelector rhs) {
+    return lhs.compare(rhs) < 0;
+  }
+
+  friend bool operator<=(ObjCSelector lhs, ObjCSelector rhs) {
+    return lhs.compare(lhs) <= 0;
+  }
+
+  friend bool operator>(ObjCSelector lhs, ObjCSelector rhs) {
+    return lhs.compare(lhs) > 0;
+  }
+
+  friend bool operator>=(ObjCSelector lhs, ObjCSelector rhs) {
+    return lhs.compare(lhs) >= 0;
   }
 };
 

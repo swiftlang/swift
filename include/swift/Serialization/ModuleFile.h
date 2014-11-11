@@ -252,6 +252,12 @@ private:
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
 
+  class ObjCMethodTableInfo;
+  using SerializedObjCMethodTable =
+    llvm::OnDiskIterableChainedHashTable<ObjCMethodTableInfo>;
+
+  std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
+
   llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
 
   TinyPtrVector<Decl *> ImportDecls;
@@ -322,6 +328,11 @@ private:
   /// format.
   std::unique_ptr<SerializedDeclTable>
   readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk Objective-C method table stored in
+  /// index_block::ObjCMethodTableLayout format.
+  std::unique_ptr<ModuleFile::SerializedObjCMethodTable>
+  readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
   /// Reads the index block, which contains global tables.
   ///
@@ -449,6 +460,25 @@ public:
   ///
   /// Note that this may cause other decls to load as well.
   void loadExtensions(NominalTypeDecl *nominal);
+
+  /// \brief Load the methods within the given class that that produce
+  /// Objective-C class or instance methods with the given selector.
+  ///
+  /// \param classDecl The class in which we are searching for @objc methods.
+  /// The search only considers this class and its extensions; not any
+  /// superclasses.
+  ///
+  /// \param selector The selector to search for.
+  ///
+  /// \param isInstanceMethod Whether we are looking for an instance method
+  /// (vs. a class method).
+  ///
+  /// \param methods The list of @objc methods in this class that have this
+  /// selector and are instance/class methods as requested.
+  void loadObjCMethods(ClassDecl *classDecl,
+                       ObjCSelector selector,
+                       bool isInstanceMethod,
+                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
 
   /// Reports all class members in the module to the given consumer.
   ///

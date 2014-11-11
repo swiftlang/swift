@@ -2996,8 +2996,6 @@ public:
   }
 };
 
-class ObjCMethodLookupTable;
-
 /// ClassDecl - This is the declaration of a class, for example:
 ///
 ///    class Complex { var R : Double, I : Double }
@@ -3005,6 +3003,8 @@ class ObjCMethodLookupTable;
 /// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
 class ClassDecl : public NominalTypeDecl {
+  class ObjCMethodLookupTable;
+
   SourceLoc ClassLoc;
   Type Superclass;
   ObjCMethodLookupTable *ObjCMethodLookup = nullptr;

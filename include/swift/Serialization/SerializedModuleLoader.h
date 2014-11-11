@@ -113,6 +113,13 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 
+  virtual void loadObjCMethods(
+                 ClassDecl *classDecl,
+                 ObjCSelector selector,
+                 bool isInstanceMethod,
+                 unsigned previousGeneration,
+                 llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+
   /// Returns true if the data looks like it contains a serialized AST.
   static bool isSerializedAST(StringRef data);
 

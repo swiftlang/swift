@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 158; // Last change: objc decl attribute
+const uint16_t VERSION_MINOR = 159; // Last change: objc method3 table
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -328,7 +328,7 @@ enum BlockID {
   /// The comment block, which contains documentation comments.
   ///
   /// \sa comment_block
-  COMMENT_BLOCK_ID,
+  COMMENT_BLOCK_ID
 };
 
 /// The record types within the control block.
@@ -1210,7 +1210,12 @@ namespace index_block {
     OPERATORS,
     EXTENSIONS,
     CLASS_MEMBERS,
-    OPERATOR_METHODS
+    OPERATOR_METHODS,
+
+    /// The Objective-C method index, which contains a mapping from
+    /// Objective-C selectors to the methods/initializers/properties/etc. that
+    /// produce Objective-C methods.
+    OBJC_METHODS,
   };
 
   using OffsetsLayout = BCGenericRecordLayout<
@@ -1222,6 +1227,12 @@ namespace index_block {
     BCFixed<4>,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from identifier strings to decl kinds / decl IDs
+  >;
+
+  using ObjCMethodTableLayout = BCRecordLayout<
+    OBJC_METHODS,  // record ID
+    BCVBR<16>,     // table offset within the blob (see below)
+    BCBlob         // map from Objective-C selectors to methods with that selector
   >;
 }
 

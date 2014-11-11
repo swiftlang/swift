@@ -1049,6 +1049,18 @@ void ASTContext::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
+void ASTContext::loadObjCMethods(
+       ClassDecl *classDecl,
+       ObjCSelector selector,
+       bool isInstanceMethod,
+       unsigned previousGeneration,
+       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+  for (auto &loader : Impl.ModuleLoaders) {
+    loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
+                            previousGeneration, methods);
+  }
+}
+
 void ASTContext::verifyAllLoadedModules() const {
   for (auto &loader : Impl.ModuleLoaders)
     loader->verifyAllModules();
