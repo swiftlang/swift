@@ -1229,14 +1229,7 @@ extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
   public
   convenience init(objects elements: AnyObject...) {
-    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
-    // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
-    // Imported as:
-    // @objc(initWithObjects:count:)
-    // init(withObjects objects: UnsafePointer<AnyObject?>,
-    //      count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
-    _fixLifetime(x)
+    self.init(array: elements)
   }
 }
 
@@ -1244,13 +1237,7 @@ extension NSSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
   public
   convenience init(objects elements: AnyObject...) {
-    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
-    // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
-    // Imported as:
-    // @objc(initWithObjects:count:)
-    // init(withObjects objects: UnsafePointer<AnyObject?>, count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
-    _fixLifetime(x)
+    self.init(array: elements)
   }
 }
 
