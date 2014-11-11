@@ -1181,6 +1181,12 @@ extern "C" void swift_stdlib_getTypeName(OpaqueValue *value, String *result,
   T->vw_destroy(value);
 }
 
+extern "C" void
+swift_stdlib_getDemangledTypeName(const Metadata *type, String *outString) {
+  std::string name = nameForMetadata(type);
+  swift_stringFromUTF8InRawMemory(outString, name.data(), name.length());
+}
+
 extern "C" void swift_stdlib_demangleName(const char *mangledName,
                                           size_t mangledNameLength,
                                           String *demangledName) {

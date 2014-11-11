@@ -96,7 +96,19 @@ public func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
 ) -> DestType?
 
 @asmname("swift_stdlib_getTypeName")
-func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
+public func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
+
+@asmname("swift_stdlib_getDemangledTypeName")
+public func _stdlib_getDemangledTypeNameImpl(type: Any.Type, result: UnsafeMutablePointer<String>)
+
+/// Returns the demangled name of a metatype.
+public func _typeName(type: Any.Type) -> String {
+  var stringPtr = UnsafeMutablePointer<String>.alloc(1)
+  _stdlib_getDemangledTypeNameImpl(type, stringPtr)
+  let result = stringPtr.move()
+  stringPtr.dealloc(1)
+  return result
+}
 
 /// Returns the mangled type name for the given value.
 public func _stdlib_getTypeName<T>(value: T) -> String {

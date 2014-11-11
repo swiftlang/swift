@@ -860,6 +860,30 @@ public:
     assert(false && "not a metadata kind");
   }
   
+  /// Is this metadata for an existential type?
+  bool isAnyExistentialType() const {
+    switch (getKind()) {
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Existential:
+      return true;
+        
+    case MetadataKind::Metatype:
+    case MetadataKind::Class:
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass:
+    case MetadataKind::Block:
+    case MetadataKind::Struct:
+    case MetadataKind::Enum:
+    case MetadataKind::Opaque:
+    case MetadataKind::Tuple:
+    case MetadataKind::Function:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::HeapLocalVariable:
+      return false;
+    }
+    assert(false && "not a metadata kind");
+  }
+  
   /// Is this either type metadata or a class object for any kind of class?
   bool isAnyClass() const {
     return isAnyKindOfClass(getKind());
@@ -2401,7 +2425,7 @@ swift_demangleSimpleClass(const char *mangledName,
 
 /// Return the type name for a given type metadata.
 std::string nameForMetadata(const Metadata *type);
-  
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */

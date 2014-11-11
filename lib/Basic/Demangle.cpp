@@ -304,6 +304,13 @@ public:
     return true;
   }
 
+  bool demangleTypeName() {
+    NodePointer global = demangleType();
+    if (!global) return failure();
+    appendNode(std::move(global));
+    return true;
+  }
+  
   NodePointer getDemangled() { return RootNode; }
   
 private:
@@ -1858,6 +1865,15 @@ swift::Demangle::demangleSymbolAsNode(const char *MangledName,
   return demangler.getDemangled();
 }
 
+static NodePointer
+demangleTypeAsNode(const char *MangledName,
+                   size_t MangledNameLength,
+                   const DemangleOptions &Options) {
+  Demangler demangler(StringRef(MangledName, MangledNameLength));
+  demangler.demangleTypeName();
+  return demangler.getDemangled();
+}
+
 namespace {
 class NodePrinter {
 private:
@@ -2816,3 +2832,15 @@ std::string Demangle::demangleSymbolAsString(const char *MangledName,
   return demangling;
 }
 
+std::string Demangle::demangleTypeAsString(const char *MangledName,
+                                           size_t MangledNameLength,
+                                           const DemangleOptions &Options) {
+  auto mangled = StringRef(MangledName, MangledNameLength);
+  auto root = demangleTypeAsNode(MangledName, MangledNameLength, Options);
+  if (!root) return mangled.str();
+  
+  std::string demangling = nodeToString(std::move(root), Options);
+  if (demangling.empty())
+    return mangled.str();
+  return demangling;
+}

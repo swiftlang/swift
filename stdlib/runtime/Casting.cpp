@@ -68,53 +68,189 @@ extern "C" const void *swift_dynamicCastObjCProtocolConditional(
                          const ProtocolDescriptor * const *protocols);
 #endif
 
-// Return a user-comprehensible name for the given type.
-// FIXME: this only works well for Class/Struct/Enum types. rdar://16392852
-std::string swift::nameForMetadata(const Metadata *type) {
-  auto descriptor = type->getNominalTypeDescriptor();
-  if (descriptor && descriptor->Name) {
-    auto mangled = std::string("_Tt") + descriptor->Name;
-    return Demangle::demangleSymbolAsString(mangled);
-  }
+namespace {
+  enum class TypeSyntaxLevel {
+    /// Any type syntax is valid.
+    Type,
+    /// Function types must be parenthesized.
+    TypeSimple,
+  };
+}
 
-  switch (type->getKind()) {
-  case MetadataKind::Class: 
-#if SWIFT_OBJC_INTEROP
-    // Swift Objective-C classes have a NominalTypeDescriptor.
-    // Non-Swift Objective-C classes fall here.
-    return class_getName(static_cast<const ClassMetadata *>(type));
-#else
-    return "<unknown class type>";
-#endif
-  case MetadataKind::ObjCClassWrapper: 
-    return nameForMetadata(
-      static_cast<const ObjCClassWrapperMetadata*>(type)->Class);
-  case MetadataKind::ForeignClass:
-    return "<unknown foreign class type>";
-  case MetadataKind::Existential:
-    return "<unknown existential type>";
-  case MetadataKind::ExistentialMetatype:
-    return "<unknown existential metatype>";
-  case MetadataKind::Function:
-    return "<unknown function type>";
-  case MetadataKind::Block:
-    return "<unknown Objective-C block object type>";
-  case MetadataKind::HeapLocalVariable:
-    return "<unknown type>";
-  case MetadataKind::Metatype:
-    return "<unknown metatype>";
-  case MetadataKind::Enum:
-    return "<unknown enum type>";
-  case MetadataKind::Opaque:
-    return "<unknown type>";
-  case MetadataKind::PolyFunction:
-    return "<unknown polymorphic function type>";
-  case MetadataKind::Struct:
-    return "<unknown struct type>";
-  case MetadataKind::Tuple:
-    return "<unknown tuple type>";
+static void _buildNameForMetadata(const Metadata *type,
+                                  TypeSyntaxLevel level,
+                                  std::string &result);
+
+static void _buildNominalTypeName(const NominalTypeDescriptor *ntd,
+                                  const Metadata *type,
+                                  std::string &result) {
+  // Demangle the basic type name.
+  result += Demangle::demangleTypeAsString(ntd->Name, strlen(ntd->Name));
+  
+  // If generic, demangle the type parameters.
+  if (ntd->GenericParams.NumPrimaryParams > 0) {
+    result += "<";
+    
+    auto typeBytes = reinterpret_cast<const char *>(type);
+    auto genericParam = reinterpret_cast<const Metadata * const *>(
+                         typeBytes + sizeof(void*) * ntd->GenericParams.Offset);
+    for (unsigned i = 0, e = ntd->GenericParams.NumPrimaryParams;
+         i < e; ++i, ++genericParam) {
+      if (i > 0)
+        result += ", ";
+      _buildNameForMetadata(*genericParam, TypeSyntaxLevel::Type, result);
+    }
+    
+    result += ">";
   }
-  return "<unknown type>";
+}
+
+static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
+                                      std::string &result) {
+  // If there's only one protocol, the existential type name is the protocol
+  // name.
+  auto descriptors = protocols->getProtocols();
+  
+  if (protocols->NumProtocols == 1) {
+    result += Demangle::demangleTypeAsString(descriptors[0]->Name,
+                                               strlen(descriptors[0]->Name));
+    return;
+  }
+  
+  result += "protocol<";
+  for (unsigned i = 0, e = protocols->NumProtocols; i < e; ++i) {
+    if (i > 0)
+      result += ", ";
+    result += Demangle::demangleTypeAsString(descriptors[i]->Name,
+                                             strlen(descriptors[i]->Name));
+  }
+  result += ">";
+}
+
+static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
+                                   std::string &result) {
+  _buildNameForMetadata(func->ArgumentType, TypeSyntaxLevel::TypeSimple,
+                        result);
+  result += " -> ";
+  _buildNameForMetadata(func->ResultType, TypeSyntaxLevel::Type, result);
+}
+
+// Build a user-comprehensible name for a type.
+static void _buildNameForMetadata(const Metadata *type,
+                           TypeSyntaxLevel level,
+                           std::string &result) {
+  switch (type->getKind()) {
+  case MetadataKind::Class: {
+    auto classType = static_cast<const ClassMetadata *>(type);
+#if SWIFT_OBJC_INTEROP
+    // Ask the Objective-C runtime to name ObjC classes.
+    if (!classType->isTypeMetadata()) {
+      result += class_getName(classType);
+      return;
+    }
+#endif
+    return _buildNominalTypeName(classType->getDescription(),
+                                    classType,
+                                    result);
+  }
+  case MetadataKind::Enum:
+  case MetadataKind::Struct: {
+    auto structType = static_cast<const StructMetadata *>(type);
+    return _buildNominalTypeName(structType->Description,
+                                 type, result);
+  }
+  case MetadataKind::ObjCClassWrapper: {
+#if SWIFT_OBJC_INTEROP
+    auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
+    result += class_getName(objcWrapper->Class);
+#else
+    assert(false && "no ObjC interop");
+#endif
+    return;
+  }
+  case MetadataKind::ForeignClass: {
+    auto foreign = static_cast<const ForeignClassMetadata *>(type);
+    const char *name = foreign->getName();
+    size_t len = strlen(name);
+    result += Demangle::demangleTypeAsString(name, len);
+    return;
+  }
+  case MetadataKind::Existential: {
+    auto exis = static_cast<const ExistentialTypeMetadata *>(type);
+    _buildExistentialTypeName(&exis->Protocols, result);
+    return;
+  }
+  case MetadataKind::ExistentialMetatype: {
+    auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
+    _buildNameForMetadata(metatype->InstanceType, TypeSyntaxLevel::TypeSimple,
+                          result);
+    result += ".Type";
+    return;
+  }
+  case MetadataKind::Block: {
+    if (level >= TypeSyntaxLevel::TypeSimple)
+      result += "(";
+
+    result += "@objc_block ";
+    
+    auto func = static_cast<const FunctionTypeMetadata *>(type);
+    _buildFunctionTypeName(func, result);
+    
+    if (level >= TypeSyntaxLevel::TypeSimple)
+      result += ")";
+    return;
+  }
+  case MetadataKind::Function: {
+    if (level >= TypeSyntaxLevel::TypeSimple)
+      result += "(";
+    
+    auto func = static_cast<const FunctionTypeMetadata *>(type);
+    _buildFunctionTypeName(func, result);
+
+    if (level >= TypeSyntaxLevel::TypeSimple)
+      result += ")";
+    return;
+  }
+  case MetadataKind::Metatype: {
+    auto metatype = static_cast<const MetatypeMetadata *>(type);
+    _buildNameForMetadata(metatype->InstanceType, TypeSyntaxLevel::TypeSimple,
+                          result);
+    if (metatype->InstanceType->isAnyExistentialType())
+      result += ".Protocol";
+    else
+      result += ".Type";
+    return;
+  }
+  case MetadataKind::Tuple: {
+    auto tuple = static_cast<const TupleTypeMetadata *>(type);
+    result += "(";
+    auto elts = tuple->getElements();
+    for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
+      if (i > 0)
+        result += ", ";
+      _buildNameForMetadata(elts[i].Type, TypeSyntaxLevel::Type,
+                            result);
+    }
+    result += ")";
+    return;
+  }
+  case MetadataKind::Opaque: {
+    // TODO
+    result += "<<<opaque type>>>";
+    return;
+  }
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::PolyFunction:
+    break;
+  }
+  result += "<<<invalid type>>>";
+}
+
+// Return a user-comprehensible name for the given type.
+std::string swift::nameForMetadata(const Metadata *type) {
+  std::string result;
+  _buildNameForMetadata(type, TypeSyntaxLevel::Type, result);
+  return result;
 }
 
 /// Report a dynamic cast failure.

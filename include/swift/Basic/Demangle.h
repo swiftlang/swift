@@ -184,6 +184,17 @@ demangleSymbolAsString(std::string MangledName,
   return demangleSymbolAsString(MangledName.data(), MangledName.size());
 }
 
+/// \brief Demangle the given string as a Swift type name.
+///
+/// \param MangledName The mangled string.
+/// \param Options An object encapsulating options to use to perform this demangling.
+///
+///
+/// \returns A string representing the demangled name.
+std::string
+demangleTypeAsString(const char *MangledName, size_t MangledNameLength,
+                     const DemangleOptions &Options = DemangleOptions());
+
 } // end namespace Demangle
 } // end namespace swift
 
