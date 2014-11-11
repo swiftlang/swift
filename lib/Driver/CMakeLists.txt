@@ -1,6 +1,7 @@
 add_swift_library(swiftDriver
   Action.cpp
   Compilation.cpp
+  DependencyGraph.cpp
   Driver.cpp
   FrontendUtil.cpp
   Job.cpp
