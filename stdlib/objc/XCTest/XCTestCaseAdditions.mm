@@ -18,6 +18,10 @@
 // return the demangled name for a test case class. NSStringFromClass will still
 // return the mangled name.
 
+@interface XCTest (WarningAvoidance)
+@property (readonly, copy) NSString *className;
+@end
+
 @implementation XCTestCase (SwiftAdditions)
 
 - (NSString *)className
