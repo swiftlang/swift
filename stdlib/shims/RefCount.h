@@ -12,9 +12,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_REFCOUNT_H
 #define SWIFT_STDLIB_SHIMS_REFCOUNT_H
 
-
-#if !__cplusplus
-
+#if !defined(__cplusplus)
 
 // These definitions are placeholders for importing into Swift.
 // They provide size and alignment but cannot be manipulated safely there.
@@ -34,10 +32,8 @@ typedef struct {
 #else
 // __cplusplus
 
-
 #include <stdint.h>
 #include <assert.h>
-
 
 // Strong reference count.
 
