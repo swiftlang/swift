@@ -2757,7 +2757,7 @@ namespace {
     assert(subs.empty() && "cast should not have subs");
 
     SILType wordType = SILType::getBuiltinWordType(gen.getASTContext());
-    SILValue result = gen.B.createBridgeObjectToWord(loc, args[0].forward(gen),
+    SILValue result = gen.B.createBridgeObjectToWord(loc, args[0].getValue(),
                                                      wordType);
     return ManagedValue::forUnmanaged(result);
   }

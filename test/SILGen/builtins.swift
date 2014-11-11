@@ -406,10 +406,16 @@ func castToBridgeObject(c: C, w: Builtin.Word) -> Builtin.BridgeObject {
   return Builtin.castToBridgeObject(c, w)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20castFromBridgeObjectFBbTCS_1CBw_
+// CHECK-LABEL: sil hidden @_TF8builtins23castRefFromBridgeObjectFBbCS_1C
 // CHECK:         bridge_object_to_ref [[BO:%.*]] : $Builtin.BridgeObject to $C
-// CHECK:         bridge_object_to_word [[BO:%.*]] : $Builtin.BridgeObject to $Builtin.Word
-func castFromBridgeObject(bo: Builtin.BridgeObject) -> (C, Builtin.Word) {
-  return (Builtin.castReferenceFromBridgeObject(bo),
-          Builtin.castBitPatternFromBridgeObject(bo))
+func castRefFromBridgeObject(bo: Builtin.BridgeObject) -> C {
+  return Builtin.castReferenceFromBridgeObject(bo)
 }
+
+// CHECK-LABEL: sil hidden @_TF8builtins30castBitPatternFromBridgeObjectFBbBw
+// CHECK:         bridge_object_to_word [[BO:%.*]] : $Builtin.BridgeObject to $Builtin.Word
+// CHECK:         release [[BO]]
+func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
+  return Builtin.castBitPatternFromBridgeObject(bo)
+}
+
