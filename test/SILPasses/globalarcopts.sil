@@ -1486,3 +1486,30 @@ bb5:
   %43 = apply %39(%42, %42, %42) : $@thin @noreturn (StaticString, StaticString, StaticString) -> ()
   unreachable                                     // id: %44
 }
+
+// CHECK-LABEL: sil @propagate_postdominating_owned_release_info : $@thin (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK-NOT: retain
+// CHECK-NOT: release
+// CHECK: bb1:
+// CHECK-NOT: retain
+// CHECK-NOT: release
+// CHECK: bb2:
+// CHECK: strong_release
+sil @propagate_postdominating_owned_release_info : $@thin (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  cond_br undef, bb1, bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}

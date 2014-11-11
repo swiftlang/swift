@@ -570,10 +570,9 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
 ///
 /// NestingDetected will be set to indicate that the block needs to be
 /// reanalyzed if code motion occurs.
-static bool processBBBottomUp(
-    ARCBBState &BBState,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
-    AliasAnalysis *AA, RCIdentityAnalysis *RCIA) {
+bool
+swift::arc::ARCSequenceDataflowEvaluator::
+processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
   SILBasicBlock &BB = BBState.getBB();
 
@@ -591,8 +590,13 @@ static bool processBBBottomUp(
       continue;
     }
 
-    SILValue Op;
+    // If this instruction is a post dominating release, skip it so we don't
+    // pair it up with anything.
+    if (FreezeOwnedArgEpilogueReleases &&
+        ConsumedArgToReleaseMap.isReleaseMatchedToArgument(&I))
+      continue;
 
+    SILValue Op;
     // If I is a ref count decrement instruction...
     if (isRefCountDecrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
@@ -600,6 +604,11 @@ static bool processBBBottomUp(
       Op = RCIA->getRCIdentityRoot(I.getOperand(0));
       BottomUpRefCountState &State = BBState.getBottomUpRefCountState(Op);
       NestingDetected |= State.initWithInst(&I);
+
+      // If we know that this decrement is on the same SILValue.
+      if (FreezeOwnedArgEpilogueReleases) {
+        State.KnownSafe |= ConsumedArgToReleaseMap.argumentHasRelease(Op);
+      }
 
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT! Known Safe: "
                          << (State.isKnownSafe() ? "yes" : "no") << "\n");
@@ -727,7 +736,8 @@ swift::arc::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
   }
 }
 
-bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
+bool swift::arc::ARCSequenceDataflowEvaluator::
+processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
   bool NestingDetected = false;
 
   DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
@@ -744,7 +754,8 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
     mergeSuccessors(BBState, BB);
 
     // Then perform the basic block optimization.
-    NestingDetected |= processBBBottomUp(BBState, IncToDecStateMap, AA, RCIA);
+    NestingDetected |= processBBBottomUp(BBState,
+                                         FreezeOwnedArgEpilogueReleases);
   }
 
   return NestingDetected;
@@ -759,7 +770,7 @@ void swift::arc::ARCSequenceDataflowEvaluator::init() {
 #ifndef NDEBUG
   unsigned Count = 0;
   for (auto &BB : F) {
-    BBToBBID[&BB] = Count++;      
+    BBToBBID[&BB] = Count++;
   }
 #endif
 
@@ -786,10 +797,9 @@ void swift::arc::ARCSequenceDataflowEvaluator::init() {
   TopDownBBStates.sort();
 }
 
-bool swift::arc::ARCSequenceDataflowEvaluator::run() {
-  bool NestingDetected = processBottomUp();
+bool swift::arc::ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
+  bool NestingDetected = processBottomUp(FreezeOwnedReleases);
   NestingDetected |= processTopDown();
-
   return NestingDetected;
 }
 

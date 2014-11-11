@@ -402,12 +402,13 @@ destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx) {
 
 bool swift::arc::
 computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
+                      bool FreezePostDomReleases,
                       std::function<void (ARCMatchingSet&)> Fun) {
 
   DEBUG(llvm::dbgs() << "**** Performing ARC Dataflow for "
         << Ctx->Evaluator.getFunction()->getName() << " ****\n");
 
-  bool NestingDetected = Ctx->Evaluator.run();
+  bool NestingDetected = Ctx->Evaluator.run(FreezePostDomReleases);
   Ctx->Evaluator.clear();
   bool MatchedPair = false;
 

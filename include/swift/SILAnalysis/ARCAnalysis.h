@@ -107,7 +107,14 @@ void
 destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx);
 
 /// Use the opaque context to recompute the matching set for the input function.
+///
+/// \param Ctx The opaque context for the computation.
+/// \param FreezeOwningPtrEpiloqueReleases Should we not attempt to move, remove
+/// epilogue release pointers and instead use them as post dominating releases
+/// for other pointers.
+/// \param Fun The function to call with the ARC matching
 bool computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
+                           bool FreezeOwningPtrEpiloqueReleases,
                            std::function<void (ARCMatchingSet&)> Fun);
 
 /// A class that attempts to match owned arguments and corresponding epilogue

@@ -146,7 +146,8 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static bool processFunction(SILFunction &F, AliasAnalysis *AA,
+static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
+                            AliasAnalysis *AA,
                             PostOrderAnalysis *POTA,
                             RCIdentityAnalysis *RCIA) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
@@ -183,7 +184,7 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA,
     // We need to blot pointers we remove after processing an individual pointer
     // so we don't process pairs after we have paired them up. Thus we pass in a
     // lambda that performs the work for us.
-    bool ShouldRunAgain = computeARCMatchingSet(Ctx,
+    bool ShouldRunAgain = computeARCMatchingSet(Ctx, FreezePostDomRelease,
       // Remove the increments, decrements and insert new increments, decrements
       // at the insertion points associated with a specific pointer.
       [&Changed, &InstructionsToDelete](ARCMatchingSet &Set) {
@@ -227,8 +228,10 @@ class GlobalARCOpts : public SILFunctionTransform {
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
-    if (processFunction(*getFunction(), AA, POTA, RCIA))
+    if (processFunction(*getFunction(), false, AA, POTA, RCIA)) {
+      processFunction(*getFunction(), true, AA, POTA, RCIA);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 
   StringRef getName() override { return "Global ARC Optimization"; }

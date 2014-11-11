@@ -14,6 +14,7 @@
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/PreallocatedMap.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace swift {
 
@@ -195,6 +196,8 @@ class ARCSequenceDataflowEvaluator {
   /// Map from basic block to its top down dataflow state.
   BBToARCStateMapTy TopDownBBStates;
 
+  ConsumedArgToEpilogueReleaseMatcher ConsumedArgToReleaseMap;
+
 public:
   ARCSequenceDataflowEvaluator(
       SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
@@ -216,13 +219,14 @@ public:
                         [](const BBToARCStateMapTy::PairTy &P1,
                            const BBToARCStateMapTy::PairTy &P2) {
                           return P1.first < P2.first;
-                        }) {}
+                        }),
+    ConsumedArgToReleaseMap(RCIA, &F) {}
 
   /// Initialize the dataflow evaluator state.
   void init();
 
   /// Run the dataflow evaluator.
-  bool run();
+  bool run(bool FreezePostDomReleases);
 
   /// Clear all of the states we are tracking for the various basic blocks.
   void clear() {
@@ -239,7 +243,7 @@ public:
 
 private:
   /// Perform the bottom up data flow.
-  bool processBottomUp();
+  bool processBottomUp(bool freezePostDomReleases);
 
   /// Perform the top down dataflow.
   bool processTopDown();
@@ -251,6 +255,11 @@ private:
   /// Merge in the top down state for any predecessors of BB into BBState. This
   /// is a stub currently.
   void mergePredecessors(ARCBBState &BBState, SILBasicBlock *BB);
+
+  bool processBBBottomUp(ARCBBState &BBState,
+                         bool FreezeOwnedArgEpilogueReleases);
+
+  void computePostDominatingConsumedArgMap();
 };
 
 } // end arc namespace
