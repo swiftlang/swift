@@ -42,13 +42,13 @@ typedef struct {
 // Strong reference count.
 
 // Barriers
-// 
+//
 // Strong refcount increment is unordered with respect to other memory locations
-// 
-// Strong refcount decrement is a release operation with respect to other 
-// memory locations. When an object's reference count becomes zero, 
-// an acquire fence is performed before beginning Swift deinit or ObjC 
-// dealloc code. This ensures that the deinit code sees all modifications 
+//
+// Strong refcount decrement is a release operation with respect to other
+// memory locations. When an object's reference count becomes zero,
+// an acquire fence is performed before beginning Swift deinit or ObjC
+// dealloc code. This ensures that the deinit code sees all modifications
 // of the object's contents that were made before the object was released.
 
 class StrongRefCount {
@@ -58,26 +58,26 @@ class StrongRefCount {
   // The remaining bits are the reference count.
   // refCount == RC_ONE means reference count == 1.
   enum : uint32_t {
-    RC_DEALLOCATING_FLAG = 1, 
+    RC_DEALLOCATING_FLAG = 1,
 
-    RC_FLAGS_COUNT = 1, 
-    RC_FLAGS_MASK = 1, 
-    RC_COUNT_MASK = ~RC_FLAGS_MASK, 
+    RC_FLAGS_COUNT = 1,
+    RC_FLAGS_MASK = 1,
+    RC_COUNT_MASK = ~RC_FLAGS_MASK,
 
     RC_ONE = RC_FLAGS_MASK + 1
   };
 
-  static_assert(RC_ONE == RC_DEALLOCATING_FLAG << 1, 
+  static_assert(RC_ONE == RC_DEALLOCATING_FLAG << 1,
                 "deallocating bit must be adjacent to refcount bits");
-  static_assert(RC_ONE == 1 << RC_FLAGS_COUNT, 
+  static_assert(RC_ONE == 1 << RC_FLAGS_COUNT,
                 "inconsistent refcount flags");
-  static_assert(RC_ONE == 1 + RC_FLAGS_MASK, 
+  static_assert(RC_ONE == 1 + RC_FLAGS_MASK,
                 "inconsistent refcount flags");
 
  public:
 
   // Refcount of a new object is 1.
-  constexpr StrongRefCount() 
+  constexpr StrongRefCount()
     : refCount(RC_ONE) { }
 
   void init() {
@@ -103,7 +103,7 @@ class StrongRefCount {
   }
 
 
-  // Decrement the reference count. 
+  // Decrement the reference count.
   // Return true if the caller should now deallocate the object.
   bool decrementShouldDeallocate() {
     uint32_t newval = __atomic_sub_fetch(&refCount, RC_ONE, __ATOMIC_RELEASE);
@@ -115,11 +115,11 @@ class StrongRefCount {
     // Refcount is now 0 and is not already deallocating.
     // Try to set the deallocating flag.
     // This also performs the before-deinit acquire barrier if we set the flag.
-    static_assert(RC_FLAGS_COUNT == 1, 
+    static_assert(RC_FLAGS_COUNT == 1,
                   "fix decrementShouldDeallocate() if you add more flags");
     uint32_t oldval = 0;
     newval = RC_DEALLOCATING_FLAG;
-    return __atomic_compare_exchange(&refCount, &oldval, &newval, 0, 
+    return __atomic_compare_exchange(&refCount, &oldval, &newval, 0,
                                      __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
   }
 
@@ -130,7 +130,7 @@ class StrongRefCount {
     return __atomic_load_n(&refCount, __ATOMIC_RELAXED) >> RC_FLAGS_COUNT;
   }
 
-  
+
   // Return true if the object is inside deallocation.
   bool isDeallocating() const {
     return __atomic_load_n(&refCount, __ATOMIC_RELAXED) & RC_DEALLOCATING_FLAG;
@@ -144,27 +144,27 @@ class WeakRefCount {
   uint32_t refCount;
 
   enum : uint32_t {
-    // There isn't really a flag here. 
-    // Making weak RC_ONE == strong RC_ONE saves an 
+    // There isn't really a flag here.
+    // Making weak RC_ONE == strong RC_ONE saves an
     // instruction in allocation on arm64.
-    RC_UNUSED_FLAG = 1, 
+    RC_UNUSED_FLAG = 1,
 
-    RC_FLAGS_COUNT = 1, 
-    RC_FLAGS_MASK = 1, 
-    RC_COUNT_MASK = ~RC_FLAGS_MASK, 
-    
+    RC_FLAGS_COUNT = 1,
+    RC_FLAGS_MASK = 1,
+    RC_COUNT_MASK = ~RC_FLAGS_MASK,
+
     RC_ONE = RC_FLAGS_MASK + 1
   };
 
-  static_assert(RC_ONE == 1 << RC_FLAGS_COUNT, 
+  static_assert(RC_ONE == 1 << RC_FLAGS_COUNT,
                 "inconsistent refcount flags");
-  static_assert(RC_ONE == 1 + RC_FLAGS_MASK, 
+  static_assert(RC_ONE == 1 + RC_FLAGS_MASK,
                 "inconsistent refcount flags");
 
  public:
 
   // Weak refcount of a new object is 1.
-  constexpr WeakRefCount() 
+  constexpr WeakRefCount()
     : refCount(RC_ONE) { }
 
   void init() {
@@ -179,7 +179,7 @@ class WeakRefCount {
   }
 
 
-  // Decrement the weak reference count. 
+  // Decrement the weak reference count.
   // Return true if the caller should deallocate the object.
   bool decrementShouldDeallocate() {
     uint32_t oldval = __atomic_fetch_sub(&refCount, RC_ONE, __ATOMIC_RELAXED);
@@ -190,7 +190,7 @@ class WeakRefCount {
   }
 
 
-  // Return weak reference count. 
+  // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getCount() const {
     return __atomic_load_n(&refCount, __ATOMIC_RELAXED) >> RC_FLAGS_COUNT;
