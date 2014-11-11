@@ -46,12 +46,10 @@ namespace json {
   template<>
   struct ScalarEnumerationTraits<types::ID> {
     static void enumeration(Output &out, types::ID &value) {
-      for (int i = (types::ID::TY_INVALID + 1), j = types::ID::TY_LAST;
-           i < j; ++i) {
-        types::ID id = (types::ID)i;
-        std::string typeName = types::getTypeName(id);
-        out.enumCase(value, typeName.c_str(), id);
-      }
+      types::forAllTypes([&](types::ID ty) {
+        std::string typeName = types::getTypeName(ty);
+        out.enumCase(value, typeName.c_str(), ty);
+      });
     }
   };
 
@@ -126,12 +124,12 @@ public:
       Outputs.push_back(OutputPair(PrimaryOutputType,
                            Cmd.getOutput().getPrimaryOutputFilename()));
     }
-    for (unsigned i = (types::TY_INVALID+1), e = types::TY_LAST; i!=e; i++) {
+    types::forAllTypes([&](types::ID Ty) {
       const std::string &Output =
-          Cmd.getOutput().getAdditionalOutputForType((types::ID)i);
+          Cmd.getOutput().getAdditionalOutputForType(Ty);
       if (!Output.empty())
-        Outputs.push_back(OutputPair((types::ID)i, Output));
-    }
+        Outputs.push_back(OutputPair(Ty, Output));
+    });
   }
 
   virtual void provideMapping(swift::json::Output &out) {

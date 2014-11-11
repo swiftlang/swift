@@ -16,16 +16,16 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
+#include <functional>
 
 namespace swift {
 namespace driver {
 namespace types {
-  enum ID {
-    TY_INVALID,
+  enum ID : uint8_t {
 #define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) TY_##ID,
 #include "swift/Driver/Types.def"
 #undef TYPE
-    TY_LAST
+    TY_INVALID
   };
 
   /// Return the name of the type for \p Id.
@@ -44,6 +44,8 @@ namespace types {
   /// Returns true if the type represents textual data.
   bool isTextual(ID Id);
 
+  template <typename Fn>
+  void forAllTypes(const Fn &fn);
 } // end namespace types
 } // end namespace driver
 } // end namespace swift
@@ -51,20 +53,28 @@ namespace types {
 namespace llvm {
   template<>
   struct DenseMapInfo<swift::driver::types::ID> {
-    static inline swift::driver::types::ID getEmptyKey() {
-      return swift::driver::types::ID::TY_INVALID;
+    using ID = swift::driver::types::ID;
+    static inline ID getEmptyKey() {
+      return ID::TY_INVALID;
     }
-    static inline swift::driver::types::ID getTombstoneKey() {
-      return swift::driver::types::ID::TY_LAST;
+    static inline ID getTombstoneKey() {
+      return static_cast<ID>(ID::TY_INVALID + 1);
     }
-    static unsigned getHashValue(const swift::driver::types::ID &Val) {
+    static unsigned getHashValue(ID Val) {
       return (unsigned)Val * 37U;
     }
-    static bool isEqual(const swift::driver::types::ID &LHS,
-                        const swift::driver::types::ID &RHS) {
+    static bool isEqual(ID LHS, ID RHS) {
       return LHS == RHS;
     }
   };
+}
+
+template <typename Fn>
+void swift::driver::types::forAllTypes(const Fn &fn)  {
+  static_assert(std::is_constructible<std::function<void(types::ID)>,Fn>::value,
+                "must have the signature 'void(types::ID)'");
+  for (uint8_t i = 0; i < static_cast<uint8_t>(TY_INVALID); ++i)
+    fn(static_cast<ID>(i));
 }
 
 #endif

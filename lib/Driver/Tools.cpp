@@ -195,7 +195,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     case types::TY_SwiftDeps:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
-    case types::TY_LAST:
       llvm_unreachable("Invalid type ID");
     }
     break;

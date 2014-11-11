@@ -31,11 +31,10 @@ static const TypeInfo TypeInfos[] = {
   { NAME, FLAGS, TEMP_SUFFIX },
 #include "swift/Driver/Types.def"
 };
-static const unsigned numTypes = llvm::array_lengthof(TypeInfos);
 
 static const TypeInfo &getInfo(unsigned Id) {
-  assert(Id > 0 && Id - 1 < numTypes && "Invalid Type ID.");
-  return TypeInfos[Id - 1];
+  assert(Id >= 0 && Id < TY_INVALID && "Invalid Type ID.");
+  return TypeInfos[Id];
 }
 
 StringRef types::getTypeName(ID Id) {
@@ -58,12 +57,11 @@ ID types::lookupTypeForExtension(StringRef Ext) {
 }
 
 ID types::lookupTypeForName(StringRef Name) {
-  for (int i = 0, e = numTypes; i != e; ++i) {
-    const struct TypeInfo &TI = TypeInfos[i];
-    if (Name == TI.Name)
-      return (ID)(i + 1);
-  }
-  return TY_INVALID;
+  return llvm::StringSwitch<types::ID>(Name)
+#define TYPE(NAME, ID, SUFFIX, FLAGS) \
+           .Case(NAME, TY_##ID)
+#include "swift/Driver/Types.def"
+           .Default(TY_INVALID);
 }
 
 bool types::isTextual(ID Id) {
@@ -88,7 +86,6 @@ bool types::isTextual(ID Id) {
   case types::TY_Nothing:
     return false;
   case types::TY_INVALID:
-  case types::TY_LAST:
     llvm_unreachable("Invalid type ID.");
   }
 }

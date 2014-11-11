@@ -819,7 +819,6 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_RawSIL:
       case types::TY_Nothing:
       case types::TY_INVALID:
-      case types::TY_LAST:
         llvm_unreachable("these types should never be inferred");
       }
 
@@ -1431,14 +1430,14 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       << types::getTypeName(J->getOutput().getPrimaryOutputType())
       << ": \"" << J->getOutput().getPrimaryOutputFilename() << '"';
 
-    for (unsigned i = (types::TY_INVALID + 1), e = types::TY_LAST; i != e; ++i){
+    types::forAllTypes([J](types::ID Ty) {
       StringRef AdditionalOutput =
-        J->getOutput().getAdditionalOutputForType((types::ID)i);
+        J->getOutput().getAdditionalOutputForType(Ty);
       if (!AdditionalOutput.empty()) {
-        llvm::outs() << ", " << types::getTypeName((types::ID)i) << ": \""
+        llvm::outs() << ", " << types::getTypeName(Ty) << ": \""
           << AdditionalOutput << '"';
       }
-    }
+    });
     llvm::outs() << '}';
 
     switch (J->getCondition()) {
