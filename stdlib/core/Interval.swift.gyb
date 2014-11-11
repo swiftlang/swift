@@ -39,15 +39,12 @@ public protocol IntervalType {
 %   Self = Kind + 'Interval'
 
 %   if Kind == 'HalfOpen':
-selfDocComment = """
 /// A half-open `IntervalType`, which contains its `start` but not its
-/// `end`.  Can represent an empty interval."""
+/// `end`.  Can represent an empty interval.
 %   else:
-selfDocComment = """
 /// A closed `IntervalType`, which contains both its `start` and its
-/// `end`.  Cannot represent an empty interval."""
+/// `end`.  Cannot represent an empty interval.
 %   end
-${selfDocComment}
 public struct ${Self}<T: Comparable>
   : IntervalType, Equatable, Printable, DebugPrintable, Reflectable {
 
