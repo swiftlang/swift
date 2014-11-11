@@ -18,6 +18,7 @@
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Option/Option.h"
@@ -101,11 +102,19 @@ public:
 };
 
 class Job {
+public:
+  enum class Condition {
+    Always,
+    CheckDependencies
+  };
+
+private:
   /// The action which caused the creation of this Job.
   const Action &Source;
 
-  /// The tool which created this Job.
-  const Tool &Creator;
+  /// The tool which created this Job, and the conditions under which it must
+  /// be run.
+  llvm::PointerIntPair<const Tool *, 1, Condition> CreatorAndCondition;
 
   /// The list of other Jobs which are inputs to this Job.
   std::unique_ptr<JobList> Inputs;
@@ -124,18 +133,25 @@ public:
   Job(const Action &Source, const Tool &Creator,
       std::unique_ptr<JobList> Inputs, std::unique_ptr<CommandOutput> Output,
       const char *Executable, llvm::opt::ArgStringList &Arguments)
-      : Source(Source), Creator(Creator),
+      : Source(Source), CreatorAndCondition(&Creator, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(Arguments) {}
 
   const Action &getSource() const { return Source; }
-  const Tool &getCreator() const { return Creator; }
+  const Tool &getCreator() const { return *CreatorAndCondition.getPointer(); }
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
 
   const JobList &getInputs() const { return *Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
+
+  Condition getCondition() const {
+    return CreatorAndCondition.getInt();
+  }
+  void setCondition(Condition Cond) {
+    CreatorAndCondition.setInt(Cond);
+  }
 
   /// Print the command line for this Job to the given \p stream,
   /// terminating output with the given \p terminator.

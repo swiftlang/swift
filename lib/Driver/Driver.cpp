@@ -1180,6 +1180,24 @@ static void addAuxiliaryOutput(CommandOutput &output, types::ID outputType,
   }
 }
 
+/// Returns whether the file at \p input has not been modified more recently
+/// than the file at \p output.
+///
+/// If there is any error (such as either file not existing), returns false.
+static bool inputIsOlderThanOutput(StringRef input, StringRef output) {
+  if (input.empty() || output.empty())
+    return false;
+
+  llvm::sys::fs::file_status inputStatus, outputStatus;
+  if (llvm::sys::fs::status(input, inputStatus) ||
+      llvm::sys::fs::status(output, outputStatus)) {
+    return false;
+  }
+
+  return inputStatus.getLastModificationTime() <
+  outputStatus.getLastModificationTime();
+}
+
 Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                                 const OutputInfo &OI,
                                 const OutputFileMap *OFM,
@@ -1371,47 +1389,67 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     }
   }
 
-  if (DriverPrintBindings) {
-    llvm::outs() << "# \"" << T->getToolChain().getTripleString() << '"'
-                 << " - \"" << T->getName()
-                 << "\", inputs: [";
-    // print inputs
-    for (unsigned i = 0, e = InputActions.size(); i != e; ++i) {
-      const InputAction *IA = cast<InputAction>(InputActions[i]);
-      llvm::outs() << '"' << IA->getInputArg().getValue() << '"';
-      if (i+1 != e || !InputJobs->empty())
-        llvm::outs() << ", ";
-    }
-    interleave(InputJobs->begin(), InputJobs->end(),
-               [](const Job *J) {
-                 llvm::outs()
-                    << '"' << J->getOutput().getPrimaryOutputFilename() << '"';
-               },
-               [] { llvm::outs() << ", "; });
-    llvm::outs() << "], output: {"
-                 << types::getTypeName(Output->getPrimaryOutputType())
-                 << ": \"" << Output->getPrimaryOutputFilename() << '"';
-
-    for (unsigned i = (types::TY_INVALID + 1), e = types::TY_LAST; i != e; ++i){
-      StringRef AdditionalOutput =
-        Output->getAdditionalOutputForType((types::ID)i);
-      if (!AdditionalOutput.empty()) {
-        llvm::outs() << ", " << types::getTypeName((types::ID)i) << ": \""
-                     << AdditionalOutput << '"';
-      }
-    }
-
-    llvm::outs() << "}\n";
-  }
-
   // 5. Construct a Job which produces the right CommandOutput.
   Job *J = T->constructJob(*JA, std::move(InputJobs), std::move(Output),
                            InputActions, C.getArgs(), OI);
   collectTemporaryFilesForAction(*JA, *J, OI, OFM, callback);
 
+  // If we track dependencies for this job, we may be able to avoid running it.
+  if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
+    if (A->getInputs().size() == 1 &&
+        inputIsOlderThanOutput(BaseInput, OutputFile)) {
+      J->setCondition(Job::Condition::CheckDependencies);
+    }
+  }
+
   // 6. Add it to the JobCache, so we don't construct the same Job multiple
   // times.
   JobCache[Key] = J;
+
+  if (DriverPrintBindings) {
+    llvm::outs() << "# \"" << T->getToolChain().getTripleString()
+      << "\" - \"" << T->getName()
+      << "\", inputs: [";
+
+    interleave(InputActions.begin(), InputActions.end(),
+               [](const Action *A) {
+                 auto Input = cast<InputAction>(A);
+                 llvm::outs() << '"' << Input->getInputArg().getValue() << '"';
+               },
+               [] { llvm::outs() << ", "; });
+    if (!InputActions.empty() && !J->getInputs().empty())
+      llvm::outs() << ", ";
+    interleave(J->getInputs().begin(), J->getInputs().end(),
+               [](const Job *Input) {
+                 llvm::outs()
+                   << '"' << Input->getOutput().getPrimaryOutputFilename()
+                   << '"';
+               },
+               [] { llvm::outs() << ", "; });
+
+    llvm::outs() << "], output: {"
+      << types::getTypeName(J->getOutput().getPrimaryOutputType())
+      << ": \"" << J->getOutput().getPrimaryOutputFilename() << '"';
+
+    for (unsigned i = (types::TY_INVALID + 1), e = types::TY_LAST; i != e; ++i){
+      StringRef AdditionalOutput =
+        J->getOutput().getAdditionalOutputForType((types::ID)i);
+      if (!AdditionalOutput.empty()) {
+        llvm::outs() << ", " << types::getTypeName((types::ID)i) << ": \""
+          << AdditionalOutput << '"';
+      }
+    }
+    llvm::outs() << '}';
+
+    switch (J->getCondition()) {
+    case Job::Condition::Always:
+      break;
+    case Job::Condition::CheckDependencies:
+      llvm::outs() << ", condition: check-dependencies";
+    }
+
+    llvm::outs() << '\n';
+  }
 
   return J;
 }
