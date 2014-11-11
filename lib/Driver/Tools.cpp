@@ -192,6 +192,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     case types::TY_SerializedDiagnostics:
     case types::TY_ObjCHeader:
     case types::TY_Image:
+    case types::TY_SwiftDeps:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
     case types::TY_LAST:
@@ -303,6 +304,13 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   if (!DependenciesPath.empty()) {
     Arguments.push_back("-emit-dependencies-path");
     Arguments.push_back(DependenciesPath.c_str());
+  }
+
+  const std::string &ReferenceDependenciesPath =
+    Output->getAdditionalOutputForType(types::TY_SwiftDeps);
+  if (!ReferenceDependenciesPath.empty()) {
+    Arguments.push_back("-emit-reference-dependencies-path");
+    Arguments.push_back(ReferenceDependenciesPath.c_str());
   }
 
   // Add the output file argument if necessary.

@@ -52,6 +52,7 @@ TYPE("llvm-ir",         LLVM_IR,            "ir",              "")
 TYPE("llvm-bc",         LLVM_BC,            "bc",              "")
 TYPE("diagnostics",     SerializedDiagnostics, "dia",          "")
 TYPE("objc-header",     ObjCHeader,         "h",               "")
+TYPE("swift-dependencies", SwiftDeps,       "swiftdeps",       "")
 
 // Misc types
 TYPE("pcm",             ClangModuleFile,    "pcm",             "")

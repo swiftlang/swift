@@ -84,6 +84,7 @@ bool types::isTextual(ID Id) {
   case types::TY_LLVM_BC:
   case types::TY_SerializedDiagnostics:
   case types::TY_ClangModuleFile:
+  case types::TY_SwiftDeps:
   case types::TY_Nothing:
     return false;
   case types::TY_INVALID:

@@ -146,6 +146,11 @@ def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
 
+// FIXME: Unhide this once it's solid.
+def emit_reference_dependencies : Flag<["-"], "emit-reference-dependencies">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Emit Swift-style dependencies files">;
+
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Serialize diagnostics in a binary format">;

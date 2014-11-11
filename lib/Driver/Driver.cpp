@@ -810,6 +810,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_SerializedDiagnostics:
       case types::TY_ObjCHeader:
       case types::TY_ClangModuleFile:
+      case types::TY_SwiftDeps:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unknown_file_type,
@@ -1328,6 +1329,9 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     // Choose the dependencies file output path.
     if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
       addAuxiliaryOutput(*Output, types::TY_Dependencies, OI, OutputMap);
+    }
+    if (C.getArgs().hasArg(options::OPT_emit_reference_dependencies)) {
+      addAuxiliaryOutput(*Output, types::TY_SwiftDeps, OI, OutputMap);
     }
   }
 
