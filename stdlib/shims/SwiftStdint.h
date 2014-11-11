@@ -18,17 +18,36 @@
 // libc).  This creates a dependency cycle, so we can't use stdint.h in
 // SwiftShims.
 
+// Clang has been defining __INTxx_TYPE__ macros for a long time.
+// __UINTxx_TYPE__ are defined only since Clang 3.5.
+
 typedef __INT64_TYPE__ __swift_int64_t;
+#ifdef __UINT64_TYPE__
 typedef __UINT64_TYPE__ __swift_uint64_t;
+#else
+typedef unsigned __INT64_TYPE__ __swift_uint64_t;
+#endif
 
 typedef __INT32_TYPE__ __swift_int32_t;
+#ifdef __UINT32_TYPE__
 typedef __UINT32_TYPE__ __swift_uint32_t;
+#else
+typedef unsigned __INT32_TYPE__ __swift_uint32_t;
+#endif
 
 typedef __INT16_TYPE__ __swift_int16_t;
+#ifdef __UINT16_TYPE__
 typedef __UINT16_TYPE__ __swift_uint16_t;
+#else
+typedef unsigned __INT16_TYPE__ __swift_uint16_t;
+#endif
 
 typedef __INT8_TYPE__ __swift_int8_t;
+#ifdef __UINT8_TYPE__
 typedef __UINT8_TYPE__ __swift_uint8_t;
+#else
+typedef unsigned __INT8_TYPE__ __swift_uint8_t;
+#endif
 
 #define __swift_join3(a,b,c) a ## b ## c
 
