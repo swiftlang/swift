@@ -210,7 +210,7 @@ set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
 
 set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
 if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
-  message(ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
+  message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
 endif()
 
 option(SWIFT_SPLIT_OBJC_SELECTORS 
