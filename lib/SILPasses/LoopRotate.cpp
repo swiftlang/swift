@@ -83,18 +83,20 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
                               SmallVectorImpl<SILInstruction *> &Move) {
   llvm::DenseSet<SILInstruction *> Invariant;
   for (auto &I : *Blk) {
-    if (!I.isTriviallyDuplicatable())
-      return false;
     auto *Inst = &I;
-    if (isa<FunctionRefInst>(Inst)) {
+    if (auto *MI = dyn_cast<MethodInst>(Inst)) {
+      if (MI->getMember().isForeign && MI->isVolatile())
+        return false;
+      if (MI->isVolatile() || !hasLoopInvariantOperands(Inst, L, Invariant))
+        continue;
+      Move.push_back(Inst);
+      Invariant.insert(Inst);
+    } else if (!I.isTriviallyDuplicatable())
+      return false;
+    else if (isa<FunctionRefInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
     } else if (isa<IntegerLiteralInst>(Inst)) {
-      Move.push_back(Inst);
-      Invariant.insert(Inst);
-    } else if (auto MI = dyn_cast<MethodInst>(Inst)) {
-      if (MI->isVolatile() || !hasLoopInvariantOperands(Inst, L, Invariant))
-        continue;
       Move.push_back(Inst);
       Invariant.insert(Inst);
     } else if (!Inst->mayHaveSideEffects() &&

@@ -682,6 +682,10 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     // reuse the same archetype uuid which would only work if we used a
     // cloner.
     return false;
+  } else if (auto *MI = dyn_cast<MethodInst>(this)) {
+    // We can't build SSA for method values that lower to objc methods.
+    if (MI->getMember().isForeign)
+      return false;
   }
   return true;
 }
