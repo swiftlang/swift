@@ -18,6 +18,7 @@
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/DestructorAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/IVAnalysis.h"
@@ -107,19 +108,21 @@ static bool isArrayEltStore(StoreInst *SI) {
   return false;
 }
 
-static bool isArrayReference(SILValue Ref, ArraySet &ArrayReferences,
-                             RCIdentityAnalysis *RCIA) {
+static bool isReleaseSafeArrayReference(SILValue Ref,
+                                        ArraySet &ReleaseSafeArrayReferences,
+                                        RCIdentityAnalysis *RCIA) {
   auto RefRoot = RCIA->getRCIdentityRoot(Ref);
-  if (ArrayReferences.count(RefRoot))
+  if (ReleaseSafeArrayReferences.count(RefRoot))
     return true;
   RefRoot = getArrayStructPointer(ArrayCallKind::kCheckIndex, RefRoot);
-  return ArrayReferences.count(RefRoot);
+  return ReleaseSafeArrayReferences.count(RefRoot);
 }
 
 /// Determines the kind of array bounds effect the instruction can have.
 static ArrayBoundsEffect
 mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
-                   ArraySet &ArrayReferences, RCIdentityAnalysis *RCIA) {
+                   ArraySet &ReleaseSafeArrayReferences,
+                   RCIdentityAnalysis *RCIA) {
   Array = SILValue();
   Kind = ArrayCallKind::kNone;
 
@@ -132,12 +135,14 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   // A retain on an arbitrary class can have sideeffects because of the deinit
   // function.
   if (auto SR = dyn_cast<StrongReleaseInst>(I))
-    return isArrayReference(SR->getOperand(), ArrayReferences, RCIA)
+    return isReleaseSafeArrayReference(SR->getOperand(),
+                                       ReleaseSafeArrayReferences, RCIA)
                ? ArrayBoundsEffect::kNone
                : ArrayBoundsEffect::kMayChangeAny;
 
   if (auto RV = dyn_cast<ReleaseValueInst>(I))
-    return isArrayReference(RV->getOperand(), ArrayReferences, RCIA)
+    return isReleaseSafeArrayReference(RV->getOperand(),
+                                       ReleaseSafeArrayReferences, RCIA)
                ? ArrayBoundsEffect::kNone
                : ArrayBoundsEffect::kMayChangeAny;
 
@@ -212,13 +217,14 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
 class ABCAnalysis {
   ArraySet SafeArrays;
   ArraySet UnsafeArrays;
-  ArraySet &ArrayReferences;
+  ArraySet &ReleaseSafeArrayReferences;
   RCIdentityAnalysis *RCIA;
   bool LoopMode;
 
 public:
-  ABCAnalysis(bool loopMode, ArraySet &Arrays, RCIdentityAnalysis *rcia)
-      : ArrayReferences(Arrays), RCIA(rcia), LoopMode(loopMode) {}
+  ABCAnalysis(bool loopMode, ArraySet &ReleaseSafe, RCIdentityAnalysis *rcia)
+      : ReleaseSafeArrayReferences(ReleaseSafe), RCIA(rcia),
+        LoopMode(loopMode) {}
 
   ABCAnalysis(const ABCAnalysis &) = delete;
   ABCAnalysis &operator=(const ABCAnalysis &) = delete;
@@ -261,7 +267,7 @@ private:
     SILValue Array;
     ArrayCallKind K;
     auto BoundsEffect =
-        mayChangeArraySize(Inst, K, Array, ArrayReferences, RCIA);
+        mayChangeArraySize(Inst, K, Array, ReleaseSafeArrayReferences, RCIA);
     assert(Array || K == ArrayCallKind::kNone);
 
     if (BoundsEffect == ArrayBoundsEffect::kMayChangeAny) {
@@ -1090,21 +1096,27 @@ public:
     assert(DT);
     IVInfo &IVs = IVA->getIVInfo(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    auto DestAnalysis = PM->getAnalysis<DestructorAnalysis>();
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
     // Collect all arrays in this function. A release is only 'safe' if we know
     // its deinitializer does not have sideeffects that could cause memory
     // safety issues. A deinit could deallocate array or put a different array
     // in its location.
-    ArraySet Arrays;
+    ArraySet ReleaseSafeArrays;
     for (auto &BB : *F)
       for (auto &Inst : BB) {
         ArraySemanticsCall Call(&Inst);
         if (Call) {
           DEBUG(llvm::dbgs() << "Gathering " << *(ApplyInst*)Call);
           auto rcRoot = RCIA->getRCIdentityRoot(Call.getSelf());
-          Arrays.insert(rcRoot);
-          Arrays.insert(
+          // Check the type of the array. We need to have an array element type
+          // that is not calling a deinit function.
+          if (DestAnalysis->mayStoreToMemoryOnDestruction(rcRoot.getType()))
+            continue;
+
+          ReleaseSafeArrays.insert(rcRoot);
+          ReleaseSafeArrays.insert(
               getArrayStructPointer(ArrayCallKind::kCheckIndex, rcRoot));
         }
       }
@@ -1112,7 +1124,7 @@ public:
     // Remove redundant checks on a per basic block basis.
     bool Changed = false;
     for (auto &BB : *F)
-      Changed |= removeRedundantChecksInBlock(BB, Arrays, RCIA);
+      Changed |= removeRedundantChecksInBlock(BB, ReleaseSafeArrays, RCIA);
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
 
@@ -1136,7 +1148,7 @@ public:
 
         while (!Worklist.empty()) {
           Changed |= hoistBoundsChecks(Worklist.pop_back_val(), DT, LI, IVs,
-                                       Arrays, RCIA, ShouldVerify);
+                                       ReleaseSafeArrays, RCIA, ShouldVerify);
         }
       }
 
