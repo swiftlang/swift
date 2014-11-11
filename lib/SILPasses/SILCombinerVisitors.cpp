@@ -1208,6 +1208,13 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   return nullptr;
 }
 
+static bool validInstBetweenStoreAndInjectEnum(SILInstruction *I) {
+  if (isa<StrongRetainInst>(I))
+    return true;
+  if (I->getMemoryBehavior() == SILInstruction::MemoryBehavior::None)
+    return true;
+  return false;
+}
 
 /// Simplify the following two frontend patterns:
 ///
@@ -1251,17 +1258,22 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   // Ok, we have a payload enum, make sure that we have a store previous to
   // us...
   SILBasicBlock::iterator II = IEAI;
-  if (II == IEAI->getParent()->begin())
-    return nullptr;
-  --II;
-  auto *SI = dyn_cast<StoreInst>(&*II);
-  if (!SI)
-    return nullptr;
-
+  StoreInst *SI = nullptr;
+  for (;;) {
+    if (II == IEAI->getParent()->begin())
+      return nullptr;
+    --II;
+    SI = dyn_cast<StoreInst>(&*II);
+    if (SI)
+      break;
+    // Allow all instructions inbetween, which don't have any dependency to the
+    // store.
+    if (!validInstBetweenStoreAndInjectEnum(II))
+      return nullptr;
+  }
+  
   // ... whose destination is taken from an init_enum_data_addr whose only user
-  // is the store that points to the same allocation as our inject_enum_addr. We
-  // enforce such a strong condition as being directly previously since we want
-  // to avoid any flow issues.
+  // is the store that points to the same allocation as our inject_enum_addr.
   auto *IEDAI = dyn_cast<InitEnumDataAddrInst>(SI->getDest().getDef());
   if (!IEDAI || IEDAI->getOperand() != IEAI->getOperand() ||
       !IEDAI->hasOneUse())
