@@ -104,3 +104,60 @@ if let bar2 = foo2 as? Barrable {
 } else {
   println("not barrable") // CHECK-NEXT: not barrable
 }
+
+protocol Runcible: class {
+  func runce()
+}
+
+@objc protocol Fungible: class {
+  func funge()
+}
+
+extension C: Runcible {
+  func runce() { println("C") }
+}
+
+extension D: Fungible {
+  func funge() { println("D") }
+}
+
+let c1: AnyObject = C()
+let c2: Any = C()
+if let fruncible = c1 as? protocol<Fooable, Runcible> {
+  fruncible.foo() // CHECK-NEXT: C
+  fruncible.runce() // CHECK-NEXT: C
+} else {
+  println("not fooable and runcible")
+}
+if let fruncible = c2 as? protocol<Fooable, Runcible> {
+  fruncible.foo() // CHECK-NEXT: C
+  fruncible.runce() // CHECK-NEXT: C
+} else {
+  println("not fooable and runcible")
+}
+
+let d1: AnyObject = D()
+let d2: Any = D()
+if let frungible = d1 as? protocol<Fooable, Runcible, Fungible> {
+  frungible.foo() // CHECK-NEXT: D
+  frungible.runce() // CHECK-NEXT: C
+  frungible.funge() // CHECK-NEXT: D
+} else {
+  println("not fooable, runcible, and fungible")
+}
+
+/*
+let inttype: Any.Type = Int.self
+if let frungibleType = inttype as? protocol<Fooable, Runcible, Fungible>.Type {
+  println("is fooable, runcible, and fungible")
+} else {
+  println("not fooable, runcible, and fungible") // TODO-NEXT: not
+}
+
+let dtype: Any.Type = D.self
+if let frungibleType = dtype as? protocol<Fooable, Runcible, Fungible>.Type {
+  println("is fooable, runcible, and fungible") // TODO-NEXT: is
+} else {
+  println("not fooable, runcible, and fungible")
+}
+ */
