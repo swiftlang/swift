@@ -396,7 +396,7 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
                                     Type T, ResilienceExpansion explosion,
                                     unsigned uncurryLevel,
                                     bool mangleAsFunction) {
-  assert((DWARFMangling || CanType(T)) &&
+  assert((DWARFMangling || T->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
 
   // FIXME: Prefix?
@@ -684,7 +684,7 @@ static void mangleMetatypeRepresentation(raw_ostream &Buffer,
 /// <tuple-element> ::= <identifier>? <type>
 void Mangler::mangleType(Type type, ResilienceExpansion explosion,
                          unsigned uncurryLevel) {
-  assert((DWARFMangling || CanType(type)) &&
+  assert((DWARFMangling || type->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
   TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
@@ -1276,7 +1276,7 @@ bool Mangler::tryMangleStandardSubstitution(const NominalTypeDecl *decl) {
 void Mangler::mangleFunctionType(AnyFunctionType *fn,
                                  ResilienceExpansion explosion,
                                  unsigned uncurryLevel) {
-  assert((DWARFMangling || CanType(fn)) &&
+  assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
 
   // type ::= 'F' type type (curried)
