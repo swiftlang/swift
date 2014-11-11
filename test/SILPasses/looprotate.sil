@@ -26,12 +26,15 @@ import Swift
 
 class Bar {
   func foo()
+  @objc func foo_objc()
 }
 
 sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@owned Bar) -> ()
+sil @_TFC4main3Bar3foo_objcfS0_FT_T_ : $@cc(objc_method) @thin (Bar) -> ()
 
 sil_vtable Bar {
   #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
+  #Bar.foo_objc!1: _TFC4main3Bar3foofS0_FT_T_
 }
 
 sil @looprotate : $@thin (Int, @owned Bar) -> Int {
@@ -156,4 +159,46 @@ bb9:                                              // Preds: bb4
 bb10:                                             // Preds: bb1
   %34 = tuple ()                                  // user: %35
   return %34 : $()                                // id: %35
+}
+
+// CHECK-LABEL: dont_looprotate_objc
+// CHECK: bb0{{.*}}:
+// CHECK:  br bb1
+// CHECK: bb1{{.*}}:
+// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK: bb2:
+// CHECK:   br bb1
+// CHECK: bb3:
+// CHECK:   return
+
+sil @dont_looprotate_objc : $@thin (Int, @owned Bar) -> Int {
+bb0(%0 : $Int, %25: $Bar):
+  %100 = alloc_ref $Bar
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  br bb1(%1 : $Builtin.Word, %2 : $Builtin.Word, %25: $Bar)
+
+bb1(%4 : $Builtin.Word, %5 : $Builtin.Word, %26: $Bar):
+  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : Bar -> () -> () , $@cc(objc_method) @thin (Bar) -> ()
+  %6 = struct $Int (%5 : $Builtin.Word)
+  %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+  cond_br %8, bb3, bb2
+
+bb2:
+  %102 = apply %101(%100) : $@cc(objc_method) @thin (Bar) -> ()
+  %10 = integer_literal $Builtin.Word, 1
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Word, %10 : $Builtin.Word, %12 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 0
+  %15 = enum $Optional<Int>, #Optional.Some!enumelt.1, %6 : $Int
+  %16 = unchecked_enum_data %15 : $Optional<Int>, #Optional.Some!enumelt.1
+  %17 = struct_extract %16 : $Int, #Int.value
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %17 : $Builtin.Word, %19 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Word, %14 : $Builtin.Word, %26: $Bar)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
 }
