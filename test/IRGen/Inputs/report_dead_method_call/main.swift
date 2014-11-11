@@ -12,7 +12,7 @@ func testClass(c: ClassContainer) {
 	c.p.def()
 }
 
-if C_ARGC == 1 {
+if Process.argc == 1 {
 	callProto()
 } else {
 	callClass()

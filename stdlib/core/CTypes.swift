@@ -247,13 +247,6 @@ extension CVaListPointer : DebugPrintable {
   }
 }
 
-/// Access to the raw argc value from C.
-public var C_ARGC : CInt = CInt()
-
-/// Access to the raw argv value from C. Accessing the argument vector
-/// through this pointer is unsafe.
-public var C_ARGV: UnsafeMutablePointer<UnsafeMutablePointer<Int8>> = nil
-
 func _memcpy(
   #dest: UnsafeMutablePointer<Void>,
   #src: UnsafeMutablePointer<Void>,

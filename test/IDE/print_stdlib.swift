@@ -8,7 +8,7 @@
 // RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -accessibility-filter-public -skip-private-stdlib-decls -fully-qualified-types-if-ambiguous -synthesize-sugar-on-types -print-regular-comments | FileCheck -check-prefix=NO-FIXMES %s
 // RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -module-print-submodules | FileCheck -check-prefix=CHECK-ARGC %s
 
-// CHECK-ARGC: var C_ARGC: CInt
+// CHECK-ARGC: static var argc: CInt { get }
 
 // CHECK-NOT: {{^}}import
 // CHECK-NOT: _Double

@@ -13,7 +13,7 @@ var arg = Process.arguments[1]
 if arg == "env" {
   setlocale(LC_ALL, "")
 } else {
-  setlocale(LC_ALL, C_ARGV[1])
+  setlocale(LC_ALL, arg)
 }
 
 func stdlibTypesHaveDescription() {

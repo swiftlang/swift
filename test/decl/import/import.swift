@@ -37,7 +37,7 @@ import class Swift.ManagedBuffer
 import typealias Swift.Bool
 import struct Swift.Bool
 import protocol Swift.GeneratorType
-import var Swift.C_ARGC
+import var import_builtin.x
 import func Swift.min
 
 import var x // expected-error {{expected module name}}

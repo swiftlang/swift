@@ -2,4 +2,4 @@
 // REQUIRES: OS=macosx
 
 import AppKit
-NSApplicationMain(C_ARGC, C_ARGV)
+NSApplicationMain(Process.argc, Process.unsafeArgv)

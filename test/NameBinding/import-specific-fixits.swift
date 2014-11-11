@@ -5,6 +5,7 @@
 // RUN: %swift -emit-module -o %t %S/Inputs/ambiguous_right.swift
 // RUN: %swift -emit-module -o %t -I %t %S/Inputs/ambiguous.swift
 
+// RUN: echo "public var x = Int()" | %swift -target x86_64-apple-macosx10.9 -module-name FooBar -emit-module -o %t -
 // RUN: %swift -parse -I=%t -serialize-diagnostics-path %t.dia %s -verify
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
 // RUN: FileCheck --input-file=%t.deserialized_diagnostics.txt %s
@@ -29,7 +30,7 @@ import class Swift.Int64 // expected-error {{'Int64' was imported as 'class', bu
 
 import class Swift.Bool // expected-error {{'Bool' was imported as 'class', but is a struct}} {{8-13=struct}}
 
-import struct Swift.C_ARGC // expected-error {{'C_ARGC' was imported as 'struct', but is a variable}} {{8-14=var}}
+import struct FooBar.x // expected-error {{'x' was imported as 'struct', but is a variable}} {{8-14=var}}
 
 import struct Swift.println // expected-error {{'println' was imported as 'struct', but is a function}} {{8-14=func}}
 

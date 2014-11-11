@@ -1,5 +1,9 @@
-// RUN: %swift -parse-stdlib -emit-silgen %s -enable-character-literals -disable-access-control | FileCheck %s
+// RUN: rm -rf %t
+// RUN: mkdir %t
+// RUN: echo "public var x = Int()" | %swift -target x86_64-apple-macosx10.9 -module-name FooBar -emit-module -o %t -
+// RUN: %swift -parse-stdlib -emit-silgen %s -I%t -enable-character-literals -disable-access-control | FileCheck %s
 import Swift
+import FooBar
 
 typealias CharacterLiteralType = SillyCharacter
 
@@ -172,10 +176,10 @@ func calls() {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions11module_path
-func module_path() -> CInt {
-  return Swift.C_ARGC
-  // CHECK: [[C_ARGC_GET:%[0-9]+]] = function_ref @_TFSsa6C_ARGCV
-  // CHECK-NEXT: apply [[C_ARGC_GET]]()
+func module_path() -> Int {
+  return FooBar.x
+  // CHECK: [[x_GET:%[0-9]+]] = function_ref @_TF6FooBara1xSi
+  // CHECK-NEXT: apply [[x_GET]]()
 }
 
 func default_args(x: Int, y: Int = 219, z: Int = 20721) {}
