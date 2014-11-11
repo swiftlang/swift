@@ -56,6 +56,7 @@ static void registerAnalysisPasses(SILPassManager &PM) {
   PM.registerAnalysis(createPostOrderAnalysis(Mod));
   PM.registerAnalysis(createClassHierarchyAnalysis(Mod));
   PM.registerAnalysis(createRCIdentityAnalysis(Mod, &PM));
+  PM.registerAnalysis(createDestructorAnalysis(Mod));
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module,

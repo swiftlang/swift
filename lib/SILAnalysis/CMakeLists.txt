@@ -12,4 +12,5 @@ add_swift_library(swiftSILAnalysis
   CallGraphAnalysis.cpp
   SimplifyInstruction.cpp
   RCIdentityAnalysis.cpp
+  DestructorAnalysis.cpp
   DEPENDS swiftSILPassesUtils)

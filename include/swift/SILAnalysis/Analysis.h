@@ -49,6 +49,7 @@ namespace swift {
       PostOrder,
       ClassHierarchyAnalysis,
       RCIdentity,
+      Destructor
     };
 
     /// Stores the kind of derived class.
@@ -126,6 +127,7 @@ namespace swift {
   SILAnalysis *createPostOrderAnalysis(SILModule *M);
   SILAnalysis *createClassHierarchyAnalysis(SILModule *M);
   SILAnalysis *createRCIdentityAnalysis(SILModule *M, SILPassManager *PM);
+  SILAnalysis *createDestructorAnalysis(SILModule *M);
 } // end namespace swift
 
 #endif
