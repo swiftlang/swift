@@ -514,19 +514,8 @@ bool Lexer::isIdentifier(StringRef string) {
   return p == end;
 }
 
-/// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
-void Lexer::lexIdentifier() {
-  const char *TokStart = CurPtr-1;
-  CurPtr = TokStart;
-  bool didStart = advanceIfValidStartOfIdentifier(CurPtr, BufferEnd);
-  assert(didStart && "Unexpected start");
-  (void) didStart;
-
-  // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
-  while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-
-  tok Kind =
-  llvm::StringSwitch<tok>(StringRef(TokStart, CurPtr-TokStart))
+tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
+  tok Kind = llvm::StringSwitch<tok>(Str)
 #define KEYWORD(kw) \
     .Case(#kw, tok::kw_##kw)
 #include "swift/Parse/Tokens.def"
@@ -538,7 +527,21 @@ void Lexer::lexIdentifier() {
        Kind == tok::kw_sil_witness_table || Kind == tok::kw_undef) &&
       !InSILMode)
     Kind = tok::identifier;
-  
+  return Kind;
+}
+
+/// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
+void Lexer::lexIdentifier() {
+  const char *TokStart = CurPtr-1;
+  CurPtr = TokStart;
+  bool didStart = advanceIfValidStartOfIdentifier(CurPtr, BufferEnd);
+  assert(didStart && "Unexpected start");
+  (void) didStart;
+
+  // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
+  while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+
+  tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart), InSILMode);
   return formToken(Kind, TokStart);
 }
 

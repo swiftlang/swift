@@ -282,6 +282,11 @@ public:
   /// identifier, without escaping characters.
   static bool isIdentifier(StringRef identifier);
 
+  /// \brief Determine the token kind of the string, given that it is a valid
+  /// non-operator identifier. Return tok::identifier if the string is not a
+  /// reserved word.
+  static tok kindOfIdentifier(StringRef Str, bool InSILMode);
+
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
   }

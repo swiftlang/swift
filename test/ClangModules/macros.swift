@@ -45,10 +45,14 @@ func subThree(x: CInt) -> CInt {
   return x + MINUS_THREE
 }
 
-// We skip importing true/false, because we want the Swift definitions
+// true/false are keywords, so they shouldn't conflict with the true/false in
+// the C header.
 func testTrueFalse() {
   var x : Bool = true
   var y : Bool = false
+
+  _ = true // should not result in ambiguous use error
+  _ = false
 
   _ = TRUE // expected-error {{use of unresolved identifier 'TRUE'}}
   _ = FALSE // expected-error {{use of unresolved identifier 'FALSE'}}

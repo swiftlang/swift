@@ -490,3 +490,7 @@ extern NSString * const NSConnectionDidDieNotification;
 extern void NSSetZoneName(NSZone *zone, NSString *name);
 extern NSString *NSZoneName(NSZone *zone);
 extern NSZone *NSCreateZone(NSUInteger startSize, NSUInteger granularity, BOOL canFree);
+
+@interface NSXPCInterface : NSObject
++ (NSXPCInterface *)interfaceWithProtocol:(Protocol *)protocol;
+@end

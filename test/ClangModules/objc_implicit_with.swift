@@ -55,3 +55,9 @@ func testUseOfFactoryMethod(queen: B) {
 func testNonsplittableFactoryMethod() {
   var of5 = NSObjectFactory.factoryBuildingWidgets()
 }
+
+// rdar://problem/18797808
+func testFactoryMethodWithKeywordArgument() {
+  var prot = NSCoding.self
+  var obj = NSXPCInterface(withProtocol: prot) // not "protocol:"
+}

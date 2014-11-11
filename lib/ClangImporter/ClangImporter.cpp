@@ -31,6 +31,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
+#include "swift/Parse/Lexer.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -952,10 +953,8 @@ ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
 
 /// \brief Determine whether the given name is reserved for Swift.
 static bool isSwiftReservedName(StringRef name) {
-  /// FIXME: Check Swift keywords.
-  return llvm::StringSwitch<bool>(name)
-           .Cases("true", "false", true)
-           .Default(false);
+  tok kind = Lexer::kindOfIdentifier(name, /*InSILMode=*/false);
+  return (kind != tok::identifier);
 }
 
 clang::DeclarationName
@@ -991,9 +990,6 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
 
   // Get the Swift identifier.
   if (suffix.empty()) {
-    if (isSwiftReservedName(nameStr))
-      return Identifier();
-
     return SwiftContext.getIdentifier(nameStr);
   }
 
@@ -1001,9 +997,6 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
   llvm::SmallString<64> nameBuf;
   nameBuf += nameStr;
   nameBuf += suffix;
-
-  if (isSwiftReservedName(nameBuf))
-    return Identifier();
 
   return SwiftContext.getIdentifier(nameBuf);
 }
@@ -1117,6 +1110,10 @@ static Identifier importArgName(ASTContext &ctx, StringRef name, bool dropWith){
       ++iter;
 
       argName = name.substr(iter.getPosition());
+      // Don't drop "with" if the resulting arg is a reserved name.
+      if (isSwiftReservedName(camel_case::toLowercaseWord(argName, scratch))) {
+        argName = name;
+      }
     } else {
       // If we're tracking statistics, check whether the name starts with
       // a preposition.

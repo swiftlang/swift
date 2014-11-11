@@ -64,6 +64,10 @@
 
 @property int overriddenProp;
 
+@property Protocol *protocol;
+- (void)doThing:(id)thing protocol:(Protocol *)protocol;
+- (BOOL)protocol:(Protocol *)protocol hasThing:(id)thing;
+
 - initWithInt:(int)i;
 - initWithInt:(int)i andDouble:(double)d;
 - initWithDouble:(double)d1 :(double)d2;

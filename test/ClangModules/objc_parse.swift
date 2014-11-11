@@ -48,6 +48,11 @@ func instanceMethods(b: B) {
   b.instanceTakesObjectClassTakesFloat(b)
   b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{type 'Double' does not conform to protocol 'AnyObject'}}
 
+  // Instance methods with keyword components
+  var obj = NSObject()
+  var prot = NSObjectProtocol.self
+  b.`protocol`(prot, hasThing:obj)
+  b.doThing(obj, `protocol`: prot)
 }
 
 func testNSArrayMethods(a: NSArray, b: B) {
@@ -126,6 +131,9 @@ func properties(b: B) {
   if optStr != nil {
     var s : String = optStr!
   }
+
+  // Properties that are Swift keywords
+  var prot = b.`protocol`
 }
 
 // Construction.
