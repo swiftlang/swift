@@ -28,6 +28,8 @@ namespace Lowering {
 /// JumpDest for a continuation block.
 ///
 /// You *must* call exit() at some point.
+///
+/// This scope is also exposed to the debug info.
 class LLVM_LIBRARY_VISIBILITY ExitableFullExpr {
   SILGenFunction &SGF;
   FullExpr Scope;
@@ -36,7 +38,14 @@ public:
   explicit ExitableFullExpr(SILGenFunction &SGF, CleanupLocation loc)
     : SGF(SGF), Scope(SGF.Cleanups, loc),
       ExitDest(SGF.B.splitBlockForFallthrough(),
-               SGF.Cleanups.getCleanupsDepth(), loc) {}
+               SGF.Cleanups.getCleanupsDepth(), loc) {
+        SGF.enterDebugScope(new (SGF.SGM.M)
+                            SILDebugScope(loc, SGF.getFunction()));
+  }
+  ~ExitableFullExpr() {
+    SGF.leaveDebugScope();
+  }
+
 
   JumpDest getExitDest() const { return ExitDest; }
 

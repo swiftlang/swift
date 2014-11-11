@@ -1,4 +1,6 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o %t
+// RUN: cat %t | FileCheck %s
+// RUN: cat %t | FileCheck --check-prefix=CHECK-SCOPES %s
 // RUN: %swift -emit-sil -emit-verbose-sil -primary-file %s -o - | FileCheck %s --check-prefix=SIL-CHECK
 func classifyPoint2(p: (Double, Double)) {
     func return_same (var input : Double) -> Double
@@ -13,9 +15,6 @@ func classifyPoint2(p: (Double, Double)) {
         case (0, _):
           println("on the Y axis")
           println("(0, \(p.1)) is on the y-axis")
-          // FIXME: Verify that all variables end up in the appropriate scopes.
-          // FIXME: metadata !{{{.*}}, metadata ![[SCOPEA:.*]], metadata !"x", {{.*}}} ; [ DW_TAG_auto_variable ] [x] [line [[@LINE+2]]]
-          // FIXME: ![[SCOPEA]] = metadata !{{{.*}}, i32 [[@LINE+1]], {{.*}}} ; [ DW_TAG_lexical_block]
         case (_, 0):
           println("on the X axis")
         case (var x, var y) where
@@ -31,12 +30,18 @@ func classifyPoint2(p: (Double, Double)) {
           // Verify that the branch has a location >= the cleanup.
           // SIL-CHECK-NEXT:  br{{.*}}line:[[@LINE-3]]:54:cleanup
         case (var x, var y) where x == -y:
+          // Verify that all variables end up in the appropriate scopes.
+          // CHECK-SCOPES: ", metadata ![[SCOPE1:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-2]]
+          // CHECK-SCOPES: ![[SCOPE1]] = {{.*}}; [ DW_TAG_lexical_block ]
           println("on the - diagonal")
         case (var x, var y) where x >= -10 && x < 10 && y >= -10 && y < 10:
+          // CHECK-SCOPES: ", metadata ![[SCOPE2:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-1]]
+          // CHECK-SCOPES: ![[SCOPE2]] = {{.*}}; [ DW_TAG_lexical_block ]
           println("near the origin")
         case (var x, var y):
+          // CHECK-SCOPES: ", metadata ![[SCOPE3:[0-9]+]], {{.*}} ; [ DW_TAG_auto_variable ] [x] {{.}}line [[@LINE-1]]
+          // CHECK-SCOPES: ![[SCOPE3]] = {{.*}} ; [ DW_TAG_lexical_block ]
           println("sqrt(\(x*x + y*y)) units from the origin")
-          // CHECK-FIXME: metadata !{i32 [[@LINE+1]], i32
         }
   // CHECK: metadata !{i32 [[@LINE+1]], i32
     }
