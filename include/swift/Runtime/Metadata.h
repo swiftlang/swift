@@ -1369,14 +1369,16 @@ struct ForeignTypeMetadata : public Metadata {
     // enough to eliminate it when it's not needed).
     if (!hasInitializationFunction())
       return asFullMetadata(this)->Unique.load(std::memory_order_relaxed);
-#elif __arm64__
+#endif
+#if __arm64__
     // FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
     // a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
     // is formally UB by C++11 language rules, we should be OK because neither
     // the processor model nor the optimizer can realistically reorder this.
     return asFullMetadata(this)->Unique.load(std::memory_order_relaxed);
-#endif
+#else
     return asFullMetadata(this)->Unique.load(std::memory_order_consume);
+#endif
   }
   
   void setCachedUniqueMetadata(const ForeignTypeMetadata *unique) const {
