@@ -15,11 +15,9 @@
 //  declarations as part of SwiftShims.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_STDLIB_SHIMS_FOUNDATIONSHIMS_H_
-#define SWIFT_STDLIB_SHIMS_FOUNDATIONSHIMS_H_
 
-#include <stddef.h>        // for size_t
-#include <stdint.h>        // for intptr_t
+#ifndef SWIFT_STDLIB_SHIMS_FOUNDATIONSHIMS_H
+#define SWIFT_STDLIB_SHIMS_FOUNDATIONSHIMS_H
 
 //===--- Layout-compatible clones of Foundation structs -------------------===//
 // Ideally we would declare the same names as Foundation does, but
@@ -29,9 +27,11 @@
 // and then do horrible unsafeBitCast trix to make them usable where required.
 //===----------------------------------------------------------------------===//
 
+#include "SwiftStdint.h"
+
 typedef struct {
-  intptr_t location;
-  intptr_t length;
+  __swift_intptr_t location;
+  __swift_intptr_t length;
 } _SwiftNSRange;
 
 #ifdef __OBJC2__
@@ -45,11 +45,12 @@ typedef struct {
 
 // This struct is layout-compatible with NSOperatingSystemVersion.
 typedef struct {
-  intptr_t majorVersion;
-  intptr_t minorVersion;
-  intptr_t patchVersion;
+  __swift_intptr_t majorVersion;
+  __swift_intptr_t minorVersion;
+  __swift_intptr_t patchVersion;
 } _SwiftNSOperatingSystemVersion;
 
 _SwiftNSOperatingSystemVersion _swift_stdlib_operatingSystemVersion();
 
-#endif
+#endif // SWIFT_STDLIB_SHIMS_FOUNDATIONSHIMS_H
+

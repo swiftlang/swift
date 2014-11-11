@@ -15,15 +15,17 @@
 //  SwiftShims
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_STDLIB_SHIMS_DARWINSHIMS_H_
-#define SWIFT_STDLIB_SHIMS_DARWINSHIMS_H_
 
-#include <stddef.h> // for size_t
+#ifndef SWIFT_STDLIB_SHIMS_DARWINSHIMS_H
+#define SWIFT_STDLIB_SHIMS_DARWINSHIMS_H
 
-size_t swift_malloc_size(const void *ptr);
-size_t strlen(const char *s);
+#include "SwiftStddef.h"
+
+__swift_size_t swift_malloc_size(const void *ptr);
+__swift_size_t strlen(const char *s);
 char *strcpy(char *restrict dst, const char *restrict src);
 int strcmp(const char *s1, const char *s2);
 int putchar(int c);
 
-#endif
+#endif // SWIFT_STDLIB_SHIMS_DARWINSHIMS_H
+

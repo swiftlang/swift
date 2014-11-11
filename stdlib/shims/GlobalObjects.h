@@ -17,16 +17,17 @@
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_STDLIB_SHIMS_GLOBALOBJECTS_H_
 #define SWIFT_STDLIB_SHIMS_GLOBALOBJECTS_H_
+
+#include "SwiftStdint.h"
 #include "HeapObject.h"
-#include <stdint.h>
 
 #ifdef __cplusplus
 namespace swift { extern "C" {
 #endif
 
 struct _SwiftArrayBodyStorage {
-  intptr_t count;
-  uintptr_t _capacityAndFlags;
+  __swift_intptr_t count;
+  __swift_uintptr_t _capacityAndFlags;
 };
 
 struct _SwiftEmptyArrayStorage {

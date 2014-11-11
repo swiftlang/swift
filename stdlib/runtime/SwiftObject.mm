@@ -865,7 +865,7 @@ unsigned char swift::_swift_isUniquelyReferencedNonObjC(
 /// a payload, return true iff the object's strong reference count is
 /// 1.
 unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
-  std::uintptr_t bits
+  __swift_uintptr_t bits
 ) {
   const auto object = reinterpret_cast<HeapObject*>(
     bits & ~heap_object_abi::SwiftSpareBitsMask);

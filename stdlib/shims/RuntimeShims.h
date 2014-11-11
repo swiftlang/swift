@@ -14,27 +14,30 @@
 //  declared here.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_STDLIB_SHIMS_RUNTIMESHIMS_H_
-#define SWIFT_STDLIB_SHIMS_RUNTIMESHIMS_H_
 
-#include <stddef.h>
+#ifndef SWIFT_STDLIB_SHIMS_RUNTIMESHIMS_H
+#define SWIFT_STDLIB_SHIMS_RUNTIMESHIMS_H
+
+#include "SwiftStddef.h"
+#include "SwiftStdint.h"
 
 #ifdef __cplusplus
 namespace swift { extern "C" {
 #endif
 
-unsigned char _swift_isUniquelyReferencedNonObjC(const void*);
-unsigned char _swift_isUniquelyReferencedNonObjC_nonNull(const void*);
-unsigned char _swift_usesNativeSwiftReferenceCounting_nonNull(const void*);
-unsigned char _swift_usesNativeSwiftReferenceCounting_class(const void*);
-unsigned char _swift_isUniquelyReferenced_native_spareBits(uintptr_t bits);
-unsigned char _swift_isUniquelyReferenced_nonNull_native(
-  const struct HeapObject*);
-unsigned char _swift_isUniquelyReferenced_native(const struct HeapObject*);
-size_t _swift_class_getInstanceSize_class(const void*);
-    
+unsigned char _swift_isUniquelyReferencedNonObjC(const void *);
+unsigned char _swift_isUniquelyReferencedNonObjC_nonNull(const void *);
+unsigned char _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
+unsigned char _swift_usesNativeSwiftReferenceCounting_class(const void *);
+unsigned char _swift_isUniquelyReferenced_native_spareBits(__swift_uintptr_t bits);
+unsigned char
+_swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
+unsigned char _swift_isUniquelyReferenced_native(const struct HeapObject *);
+__swift_size_t _swift_class_getInstanceSize_class(const void *);
+
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif
 
-#endif
+#endif // SWIFT_STDLIB_SHIMS_RUNTIMESHIMS_H
+

@@ -17,7 +17,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 #define SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 
-extern const uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie;
+extern const __swift_uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie;
 
 struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy {
   unsigned BMPFirstLevelIndexBits;
@@ -44,7 +44,7 @@ struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy {
 extern const struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy
 _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata;
 
-extern const uint16_t *
+extern const __swift_uint16_t *
 _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
 
 #endif

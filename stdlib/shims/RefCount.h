@@ -17,16 +17,15 @@
 // These definitions are placeholders for importing into Swift.
 // They provide size and alignment but cannot be manipulated safely there.
 
-#include <stdint.h>
+#include "SwiftStdint.h"
 
 typedef struct {
-  uint32_t refCount __attribute__((unavailable));
+  __swift_uint32_t refCount __attribute__((unavailable));
 } StrongRefCount;
 
 typedef struct {
-  uint32_t weakRefCount __attribute__((unavailable));
+  __swift_uint32_t weakRefCount __attribute__((unavailable));
 } WeakRefCount;
-
 
 // not __cplusplus
 #else
