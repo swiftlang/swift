@@ -79,11 +79,11 @@ Reflection.test("Set") {
 #if arch(i386) || arch(arm)
   var expected = ""
   expected += "▿ 5 members\n"
-  expected += "  - [0]: 4\n"
+  expected += "  - [0]: 3\n"
   expected += "  - [1]: 1\n"
-  expected += "  - [2]: 2\n"
-  expected += "  - [3]: 5\n"
-  expected += "  - [4]: 3\n"
+  expected += "  - [2]: 5\n"
+  expected += "  - [3]: 2\n"
+  expected += "  - [4]: 4\n"
 #elseif arch(x86_64) || arch(arm64)
   var expected = ""
   expected += "▿ 5 members\n"
