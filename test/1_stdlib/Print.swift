@@ -756,6 +756,24 @@ func test_DictionaryPrinting() {
 test_DictionaryPrinting()
 // CHECK: test_DictionaryPrinting done
 
+func test_SetPrinting() {
+  var sI = Set<Int>()
+  printedIs(sI, "{}")
+  debugPrintedIs(sI, "{}")
+
+  sI = Set<Int>([11, 22])
+  printedIs(sI, "{11, 22}", expected2: "{22, 11}")
+  debugPrintedIs(sI, "{11, 22}", expected2: "{22, 11}")
+
+  let sS = Set<String>(["Hello", "world"])
+  printedIs(sS, "{Hello, world}", expected2: "{world, Hello}")
+  debugPrintedIs(sS, "{\"Hello\", \"world\"}", expected2: "{\"world\", \"Hello\"}")
+
+  println("test_SetPrinting done")
+}
+test_SetPrinting()
+// CHECK: test_SetPrinting done
+
 func test_TuplePrinting() {
   var tuple1 = (42, ())
   printedIs(tuple1, "(42, ())")

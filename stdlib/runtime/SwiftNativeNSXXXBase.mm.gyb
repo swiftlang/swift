@@ -18,6 +18,8 @@
 // We can only do this trick with objc classes that are known not to
 // use the storage where Swift places its native object header.  This
 // takes care of how the classes are handled from Objective-C code.
+//    _NSSwiftArrayBase, _NSSwiftDictionaryBase, _NSSwiftSetBase
+//    _NSSwiftSetBase, _NSSwiftStringBase
 //
 // To trick Swift into using its fast refcounting and allocation
 // directly (rather than going through objc_msgSend to arrive at the
@@ -48,7 +50,7 @@ extern "C" id _objc_rootAutorelease(id);
 
 using namespace swift;
 
-% for Class in ('Array', 'Dictionary', 'String', 'Enumerator'):
+% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
 @interface _SwiftNativeNS${Class}Base : NS${Class}
 {
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
@@ -104,7 +106,7 @@ using namespace swift;
 % end
 
 extern "C" bool swift_stdlib_NSObject_isEqual(NSObject *lhs, NSObject *rhs) {
-  bool Result = [lhs isEqual:rhs];
+  bool Result = (lhs == rhs) || [lhs isEqual:rhs];
   swift_unknownRelease(lhs);
   swift_unknownRelease(rhs);
   return Result;

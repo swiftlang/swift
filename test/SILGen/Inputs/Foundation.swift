@@ -31,6 +31,15 @@ func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
   return Dictionary<K, V>()
 }
 
+// NSSet bridging entry points
+func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
+  return NSSet()
+}
+
+func _convertNSSetToSet<T: NSObject>(s: NSSet) -> Set<T> {
+  return Set<T>()
+}
+
 extension String : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true

@@ -114,4 +114,46 @@ public protocol _NSDictionaryType : _NSDictionaryCoreType {
   func getObjects(objects: UnsafeMutablePointer<AnyObject>,
       andKeys keys: UnsafeMutablePointer<AnyObject>)
 }
+
+/// A shadow for the "core operations" of NSSet.
+///
+/// Covers a set of operations everyone needs to implement in order to
+/// be a useful `NSSet` subclass.
+@objc
+public protocol _NSSetCoreType :
+    _NSCopyingType, _NSFastEnumerationType {
+
+  // The following methods should be overridden when implementing an
+  // NSSet subclass.
+
+  // The designated initializer of `NSSet`.
+  init(objects: UnsafePointer<AnyObject?>, count: Int)
+
+  var count: Int { get }
+  func member(member: AnyObject?) -> AnyObject?
+  func objectEnumerator() -> _NSEnumeratorType?
+
+  // We also override the following methods for efficiency.
+
+  func copyWithZone(zone: _SwiftNSZone) -> AnyObject
+
+  func countByEnumeratingWithState(
+    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  ) -> Int
+}
+
+/// A shadow for the API of NSSet we will use in the core
+/// stdlib
+///
+/// `NSSet` operations, in addition to those on
+/// `_NSSetCoreType`, that we need to use from the core stdlib.
+/// Distinct from `_NSSetCoreType` because we don't want to be
+/// forced to implement operations that `NSSet` already
+/// supplies.
+@unsafe_no_objc_tagged_pointer @objc
+public protocol _NSSetType : _NSSetCoreType {
+  func copyObjectPointers(objects: UnsafeMutablePointer<AnyObject>)
+}
+
 #endif

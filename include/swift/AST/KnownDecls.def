@@ -31,6 +31,13 @@ FUNC_DECL(DictionaryBridgeFromObjectiveC,
 FUNC_DECL(DictionaryBridgeFromObjectiveCConditional, 
           "_dictionaryBridgeFromObjectiveCConditional")
 
+FUNC_DECL(SetUpCast, "_setUpCast")
+FUNC_DECL(SetBridgeToObjectiveC, "_setBridgeToObjectiveC")
+FUNC_DECL(SetDownCast, "_setDownCast")
+FUNC_DECL(SetDownCastConditional, "_setDownCastConditional")
+FUNC_DECL(SetBridgeFromObjectiveC, "_setBridgeFromObjectiveC")
+FUNC_DECL(SetBridgeFromObjectiveCConditional, "_setBridgeFromObjectiveCConditional")
+
 FUNC_DECL(ConvertPointerToPointerArgument,
           "_convertPointerToPointerArgument")
 FUNC_DECL(ConvertInOutToPointerArgument,

@@ -949,12 +949,105 @@ extension NSArray : Swift.CollectionType {
 }
 */
 
+extension Set {
+  /// Private initializer used for bridging.
+  ///
+  /// The provided `NSSet` will be copied to ensure that the copy can
+  /// not be mutated by other code.
+  public init(_cocoaSet: _NSSetType) {
+    let cfValue = unsafeBitCast(_cocoaSet, CFSet.self)
+    let copy = CFSetCreateCopy(nil, cfValue)
+    self = Set(_immutableCocoaSet: unsafeBitCast(copy, _NSSetType.self))
+  }
+}
+
 extension NSSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
+  }
+}
+
+// FIXME: right now the following is O(n), not O(1).
+
+/// The entry point for bridging `Set` to `NSSet` in bridge
+/// thunks.  Used, for example, to expose ::
+///
+///   func f() -> Set<String> {}
+///
+/// to Objective-C code as a method that returns an `NSSet`.
+///
+/// This is a forced downcast.  This operation should have O(1) complexity.
+///
+/// The cast can fail if bridging fails.  The actual checks and bridging can be
+/// deferred.
+public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
+  return s._bridgeToObjectiveC()
+}
+
+/// The entry point for bridging `NSSet` to `Set` in bridge
+/// thunks.  Used, for example, to expose ::
+///
+///   func f(Set<String>) {}
+///
+/// to Objective-C code as a method that accepts an `NSSet`.
+///
+/// This is a forced downcast.  This operation should have O(1) complexity
+/// when `T` is bridged verbatim.
+///
+/// The cast can fail if bridging fails.  The actual checks and bridging can be
+/// deferred.
+public func _convertNSSetToSet<T: Hashable>(s: NSSet) -> Set<T> {
+  var result: Set<T>?
+  Set._forceBridgeFromObjectiveC(s, result: &result)
+  return result!
+}
+
+// Set<T> is conditionally bridged to NSSet
+extension Set : _ObjectiveCBridgeable {
+  public static func _getObjectiveCType() -> Any.Type {
+    return NSSet.self
+  }
+
+  public func _bridgeToObjectiveC() -> NSSet {
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSSet.self)
+  }
+
+  public static func _forceBridgeFromObjectiveC(s: NSSet, inout result: Set?) {
+    if let native = Set<T>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
+      result = native
+      return
+    }
+
+    if _isBridgedVerbatimToObjectiveC(T.self) {
+      result = Set<T>(_cocoaSet: unsafeBitCast(s, _NSSetType.self))
+      return
+    }
+
+    // `Set<T>` where `T` is a value type may not be backed by an NSSet.
+    var builder = _SetBuilder<T>(count: s.count)
+    s.enumerateObjectsUsingBlock {
+      (anyObjectMember: AnyObject!, stop: UnsafeMutablePointer<ObjCBool>) in
+      builder.add(member: Swift._forceBridgeFromObjectiveC(anyObjectMember, T.self))
+    }
+    result = builder.take()
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(x: NSSet, inout result: Set?) -> Bool {
+    let anySet = x as Set<NSObject>
+    if _isBridgedVerbatimToObjectiveC(T.self) {
+      result = Swift._setDownCastConditional(anySet)
+      return result != nil
+    }
+
+    result = Swift._setBridgeFromObjectiveCConditional(anySet)
+    return result != nil
+  }
+
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return Swift._isBridgedToObjectiveC(T.self)
   }
 }
 
@@ -1238,6 +1331,14 @@ extension NSSet {
   public
   convenience init(objects elements: AnyObject...) {
     self.init(array: elements)
+  }
+
+  // Using the actual `getObjects` causes an infinite recursion
+  // because NSSet calls CFSetGetValues but NSSet.getObjects
+  // isn't exposed as public API.
+  func copyObjectPointers(buffer: UnsafeMutablePointer<AnyObject>) {
+    CFSetGetValues(self as CFSet,
+      unsafeBitCast(buffer, UnsafeMutablePointer<UnsafePointer<Void>>.self))
   }
 }
 

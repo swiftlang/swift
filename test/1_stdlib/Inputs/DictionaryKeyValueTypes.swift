@@ -3,6 +3,8 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
+func acceptsAnySet<T : Hashable>(s: Set<T>) {}
+
 func acceptsAnyDictionary<KeyTy : Hashable, ValueTy>(
   d: Dictionary<KeyTy, ValueTy>) {
 }
@@ -195,6 +197,7 @@ class TestObjCKeyTy : NSObject, NSCopying, Printable {
     serial = _objcKeySerial.addAndFetch(1)
     self.value = value
     self._hashValue = value
+    super.init()
   }
 
   convenience init(value: Int, hashValue: Int) {
@@ -385,6 +388,10 @@ struct TestBridgedKeyTy
 }
 
 func == (lhs: TestBridgedKeyTy, rhs: TestBridgedKeyTy) -> Bool {
+  return lhs.value == rhs.value
+}
+
+func == (lhs: TestBridgedKeyTy, rhs: TestKeyTy) -> Bool {
   return lhs.value == rhs.value
 }
 
@@ -869,6 +876,207 @@ func checkArrayEnumeratorPartialFastEnumerationFromSwift(
     },
     convertValue)
 }
+
+struct ExpectedSetElement : Comparable, Printable {
+  var value: Int
+  var valueIdentity: UWord
+
+  init(value: Int, valueIdentity: UWord = 0) {
+    self.value = value
+    self.valueIdentity = valueIdentity
+  }
+
+  var description: String {
+    return "(\(value), \(valueIdentity))"
+  }
+}
+
+func == (
+  lhs: ExpectedSetElement,
+  rhs: ExpectedSetElement
+) -> Bool {
+  return
+    lhs.value == rhs.value &&
+    lhs.valueIdentity == rhs.valueIdentity
+}
+
+func < (
+  lhs: ExpectedSetElement,
+  rhs: ExpectedSetElement
+) -> Bool {
+  return lexicographicalCompare(
+    [ lhs.value, Int(bitPattern: lhs.valueIdentity) ],
+    [ rhs.value, Int(bitPattern: rhs.valueIdentity) ])
+}
+
+func _makeExpectedSetContents(
+  expected: [Int]
+) -> [ExpectedSetElement] {
+  var result = [ExpectedSetElement]()
+  for value in expected {
+    result.append(ExpectedSetElement(value: value))
+  }
+  return result
+}
+
+func _equalsUnorderedWithoutElementIdentity(
+  lhs: [ExpectedSetElement], rhs: [ExpectedSetElement]
+) -> Bool {
+  func stripIdentity(
+    list: [ExpectedSetElement]
+  ) -> [ExpectedSetElement] {
+    return list.map { ExpectedSetElement(value: $0.value) }
+  }
+
+  return equalsUnordered(stripIdentity(lhs), stripIdentity(rhs))
+}
+
+func _checkSetFastEnumerationImpl(
+  expected: [Int],
+  s: NSSet,
+  makeEnumerator: () -> NSFastEnumeration,
+  useEnumerator: (NSSet, NSFastEnumeration, (AnyObject)->()) -> (),
+  convertMember: (AnyObject) -> Int
+) {
+  var expectedContentsWithoutIdentity =
+    _makeExpectedSetContents(expected)
+  var expectedContents = [ExpectedSetElement]()
+
+  for i in 0..<3 {
+    var actualContents = [ExpectedSetElement]()
+    var sink = SinkOf<AnyObject> {
+      (value) in
+      actualContents.append(ExpectedSetElement(
+        value: convertMember(value),
+        valueIdentity: unsafeBitCast(value, UWord.self)))
+    }
+
+    useEnumerator(s, makeEnumerator(), { sink.put($0) })
+
+    expectTrue(_equalsUnorderedWithoutElementIdentity(
+      expectedContentsWithoutIdentity, actualContents)) {
+      "expected: \(expectedContentsWithoutIdentity)\n" +
+      "actual: \(actualContents)\n"
+    }
+
+    if i == 0 {
+      expectedContents = actualContents
+    }
+    expectTrue(equalsUnordered(expectedContents, actualContents))
+  }
+}
+
+func slurpFastEnumerationFromObjC<
+  S : SinkType where S.Element == AnyObject
+>(
+  s: NSSet, fe: NSFastEnumeration, inout sink: S
+) {
+  let objcValues = NSMutableArray()
+  slurpFastEnumerationOfArrayFromObjCImpl(s, fe, objcValues)
+  for value in objcValues {
+    sink.put(value)
+  }
+}
+
+func slurpFastEnumerationOfNSEnumeratorFromSwift<
+  S : SinkType where S.Element == AnyObject
+>(
+  s: NSSet, enumerator: NSEnumerator, inout sink: S,
+  #maxFastEnumerationItems: Int
+) {
+  slurpFastEnumerationFromSwift(
+    s, enumerator, &sink, maxItems: maxFastEnumerationItems)
+  while let value: AnyObject = enumerator.nextObject() {
+    sink.put(value)
+  }
+}
+
+func slurpFastEnumerationFromSwift<
+  S : SinkType where S.Element == AnyObject
+>(
+  s: NSSet, fe: NSFastEnumeration, inout sink: S, maxItems: Int? = nil
+) {
+  var state = NSFastEnumerationState()
+
+  let stackBufLength = 3
+  var stackBuf = _HeapBuffer<(), AnyObject?>(
+    _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
+
+  var itemsReturned = 0
+  while true {
+    var returnedCount = fe.countByEnumeratingWithState(
+      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      count: stackBufLength)
+    expectNotEqual(0, state.state)
+    expectNotEqual(.null(), state.mutationsPtr)
+    if returnedCount == 0 {
+      break
+    }
+    for i in 0..<returnedCount {
+      let value: AnyObject = state.itemsPtr[i]!
+      sink.put(value)
+      ++itemsReturned
+    }
+    if maxItems != nil && itemsReturned >= maxItems! {
+      return
+    }
+  }
+
+  for i in 0..<3 {
+    let returnedCount = fe.countByEnumeratingWithState(
+      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      count: stackBufLength)
+    expectNotEqual(0, state.state)
+    expectNotEqual(.null(), state.mutationsPtr)
+    expectEqual(0, returnedCount)
+  }
+}
+
+func checkSetFastEnumerationFromSwift(
+  expected: [Int],
+  s: NSSet, makeEnumerator: () -> NSFastEnumeration,
+  convertMember: (AnyObject) -> Int
+) {
+  _checkSetFastEnumerationImpl(
+    expected, s, makeEnumerator,
+    { (s, fe, sinkFunction) in
+      var sink = SinkOf<AnyObject> { sinkFunction($0) }
+      slurpFastEnumerationFromSwift(s, fe, &sink)
+    },
+    convertMember)
+}
+
+func checkSetFastEnumerationFromObjC(
+  expected: [Int],
+  s: NSSet, makeEnumerator: () -> NSFastEnumeration,
+  convertMember: (AnyObject) -> Int
+) {
+  _checkSetFastEnumerationImpl(
+    expected, s, makeEnumerator,
+    { (s, fe, sinkFunction) in
+      var sink = SinkOf<AnyObject> { sinkFunction($0) }
+      slurpFastEnumerationFromObjC(s, fe, &sink)
+    },
+    convertMember)
+}
+
+func checkSetEnumeratorPartialFastEnumerationFromSwift(
+  expected: [Int],
+  s: NSSet,
+  #maxFastEnumerationItems: Int,
+  convertMember: (AnyObject) -> Int
+) {
+  _checkSetFastEnumerationImpl(
+    expected, s, { s.objectEnumerator() },
+    { (s, fe, sinkFunction) in
+      var sink = SinkOf<AnyObject> { sinkFunction($0) }
+      slurpFastEnumerationOfNSEnumeratorFromSwift(
+        s, fe as NSEnumerator, &sink,
+        maxFastEnumerationItems: maxFastEnumerationItems)
+    },
+    convertMember)
+}
+
 
 func slurpFastEnumerationFromObjC<
   S : SinkType where S.Element == AnyObjectTuple2

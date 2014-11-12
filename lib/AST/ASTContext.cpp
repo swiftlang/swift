@@ -72,6 +72,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Array<T>.
   NominalTypeDecl *ArrayDecl = nullptr;
 
+  /// The declaration of Swift.Set<T>.
+  NominalTypeDecl *SetDecl = nullptr;
+
   /// The declaration of Swift.Dictionary<T>.
   NominalTypeDecl *DictionaryDecl = nullptr;
 
@@ -429,8 +432,7 @@ NominalTypeDecl *ASTContext::getStringDecl() const {
 
 /// Find the generic implementation declaration for the named syntactic-sugar
 /// type.
-static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,
-                                            StringRef name) {
+static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name) {
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
   ctx.lookupInSwiftModule(name, results);
@@ -450,9 +452,16 @@ static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,
 
 NominalTypeDecl *ASTContext::getArrayDecl() const {
   if (!Impl.ArrayDecl)
-    Impl.ArrayDecl = findSyntaxSugarImpl(*this, "Array");
+    Impl.ArrayDecl = findStdlibType(*this, "Array");
 
   return Impl.ArrayDecl;
+}
+
+NominalTypeDecl *ASTContext::getSetDecl() const {
+  if (!Impl.SetDecl)
+    Impl.SetDecl = findStdlibType(*this, "Set");
+
+  return Impl.SetDecl;
 }
 
 NominalTypeDecl *ASTContext::getDictionaryDecl() const {
@@ -479,7 +488,7 @@ NominalTypeDecl *ASTContext::getDictionaryDecl() const {
 EnumDecl *ASTContext::getOptionalDecl() const {
   if (!Impl.OptionalDecl)
     Impl.OptionalDecl
-      = dyn_cast_or_null<EnumDecl>(findSyntaxSugarImpl(*this, "Optional"));
+      = dyn_cast_or_null<EnumDecl>(findStdlibType(*this, "Optional"));
 
   return Impl.OptionalDecl;
 }
@@ -533,8 +542,8 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
 EnumDecl *ASTContext::getImplicitlyUnwrappedOptionalDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalDecl)
     Impl.ImplicitlyUnwrappedOptionalDecl
-      = dyn_cast_or_null<EnumDecl>(findSyntaxSugarImpl(*this,
-                                                       "ImplicitlyUnwrappedOptional"));
+      = dyn_cast_or_null<EnumDecl>(
+          findStdlibType(*this, "ImplicitlyUnwrappedOptional"));
 
   return Impl.ImplicitlyUnwrappedOptionalDecl;
 }
@@ -555,7 +564,7 @@ EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
 
 NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
   if (!Impl.UnsafeMutablePointerDecl)
-    Impl.UnsafeMutablePointerDecl = findSyntaxSugarImpl(
+    Impl.UnsafeMutablePointerDecl = findStdlibType(
       *this, "UnsafeMutablePointer");
   
   return Impl.UnsafeMutablePointerDecl;
@@ -564,7 +573,7 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
 NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
   if (!Impl.UnsafePointerDecl)
     Impl.UnsafePointerDecl
-      = findSyntaxSugarImpl(*this, "UnsafePointer");
+      = findStdlibType(*this, "UnsafePointer");
   
   return Impl.UnsafePointerDecl;
 }
@@ -572,14 +581,14 @@ NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
 NominalTypeDecl *ASTContext::getAutoreleasingUnsafeMutablePointerDecl() const {
   if (!Impl.AutoreleasingUnsafeMutablePointerDecl)
     Impl.AutoreleasingUnsafeMutablePointerDecl
-      = findSyntaxSugarImpl(*this, "AutoreleasingUnsafeMutablePointer");
+      = findStdlibType(*this, "AutoreleasingUnsafeMutablePointer");
   
   return Impl.AutoreleasingUnsafeMutablePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getCFunctionPointerDecl() const {
   if (!Impl.CFunctionPointerDecl)
-    Impl.CFunctionPointerDecl = findSyntaxSugarImpl(*this, "CFunctionPointer");
+    Impl.CFunctionPointerDecl = findStdlibType(*this, "CFunctionPointer");
   
   return Impl.CFunctionPointerDecl;
 }

@@ -404,6 +404,7 @@ func _rawPointerToString(value: Builtin.RawPointer) -> String {
 // memory allocator.
 @objc class _SwiftNativeNSArray {}
 @objc class _SwiftNativeNSDictionary {}
+@objc class _SwiftNativeNSSet {}
 @objc class _SwiftNativeNSEnumerator {}
 
 //===----------------------------------------------------------------------===//

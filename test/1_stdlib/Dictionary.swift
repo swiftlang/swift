@@ -45,7 +45,7 @@ DictionaryTestSuite.test("COW.Smoke") {
   d1[TestKeyTy(30)] = TestValueTy(1030)
 
   var d2 = d1
-  acceptsAnyDictionary(d2)
+  _fixLifetime(d2)
   assert(identity1 == unsafeBitCast(d2, Word.self))
 
   d2[TestKeyTy(40)] = TestValueTy(2040)
@@ -55,8 +55,8 @@ DictionaryTestSuite.test("COW.Smoke") {
   assert(identity1 == unsafeBitCast(d1, Word.self))
 
   // Keep variables alive.
-  acceptsAnyDictionary(d1)
-  acceptsAnyDictionary(d2)
+  _fixLifetime(d1)
+  _fixLifetime(d2)
 }
 
 func getCOWFastDictionary() -> Dictionary<Int, Int> {
@@ -103,8 +103,8 @@ DictionaryTestSuite.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
-  withExtendedLifetime(startIndex) { () }
-  withExtendedLifetime(endIndex) { () }
+  _fixLifetime(startIndex)
+  _fixLifetime(endIndex)
 }
 
 DictionaryTestSuite.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
@@ -124,8 +124,8 @@ DictionaryTestSuite.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
-  withExtendedLifetime(startIndex) { () }
-  withExtendedLifetime(endIndex) { () }
+  _fixLifetime(startIndex)
+  _fixLifetime(endIndex)
 }
 
 
@@ -289,8 +289,8 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
     assert(d2[40]! == 2040)
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 
   if true {
@@ -317,8 +317,8 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
     assert(d2[30]! == 1030)
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 }
 
@@ -366,8 +366,8 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
     assert(d2[TestKeyTy(40)]!.value == 2040)
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 
   if true {
@@ -394,8 +394,8 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
     assert(d2[TestKeyTy(30)]!.value == 1030)
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 }
 
@@ -538,7 +538,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
     assert(identity1 == unsafeBitCast(d1, Word.self))
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
+    _fixLifetime(d1)
   }
 
   if true {
@@ -557,8 +557,8 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
     assert(identity1 != unsafeBitCast(d2, Word.self))
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 }
 
@@ -576,7 +576,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
     assert(identity1 == unsafeBitCast(d1, Word.self))
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
+    _fixLifetime(d1)
   }
 
   if true {
@@ -595,8 +595,8 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
     assert(identity1 != unsafeBitCast(d2, Word.self))
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 }
 
@@ -659,8 +659,8 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(d2[10] == nil)
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 
   if true {
@@ -682,8 +682,8 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(d2[10] == nil)
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 }
 
@@ -745,8 +745,8 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(d2[TestKeyTy(10)] == nil)
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 
   if true {
@@ -768,8 +768,8 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(d2[TestKeyTy(10)] == nil)
 
     // Keep variables alive.
-    acceptsAnyDictionary(d1)
-    acceptsAnyDictionary(d2)
+    _fixLifetime(d1)
+    _fixLifetime(d2)
   }
 }
 
@@ -1335,8 +1335,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
-  withExtendedLifetime(startIndex) { () }
-  withExtendedLifetime(endIndex) { () }
+  _fixLifetime(startIndex)
+  _fixLifetime(endIndex)
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
@@ -1363,8 +1363,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
-  withExtendedLifetime(startIndex) { () }
-  withExtendedLifetime(endIndex) { () }
+  _fixLifetime(startIndex)
+  _fixLifetime(endIndex)
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
@@ -1382,8 +1382,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
-  withExtendedLifetime(startIndex) { () }
-  withExtendedLifetime(endIndex) { () }
+  _fixLifetime(startIndex)
+  _fixLifetime(endIndex)
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
@@ -1401,8 +1401,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty")
   assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
-  withExtendedLifetime(startIndex) { () }
-  withExtendedLifetime(endIndex) { () }
+  _fixLifetime(startIndex)
+  _fixLifetime(endIndex)
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
@@ -1514,7 +1514,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
   v = d[TestBridgedKeyTy(40)]
   assert(v!.value == 2040)
 }
-
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   // Insert a new key-value pair.

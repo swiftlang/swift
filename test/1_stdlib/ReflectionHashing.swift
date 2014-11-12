@@ -70,5 +70,34 @@ Reflection.test("Dictionary") {
   expectEqual(expected, output)
 }
 
+Reflection.test("Set") {
+  let s = Set(1...5)
+
+  var output = ""
+  dump(s, &output)
+
+#if arch(i386) || arch(arm)
+  var expected = ""
+  expected += "▿ 5 members\n"
+  expected += "  - [0]: 4\n"
+  expected += "  - [1]: 1\n"
+  expected += "  - [2]: 2\n"
+  expected += "  - [3]: 5\n"
+  expected += "  - [4]: 3\n"
+#elseif arch(x86_64) || arch(arm64)
+  var expected = ""
+  expected += "▿ 5 members\n"
+  expected += "  - [0]: 5\n"
+  expected += "  - [1]: 2\n"
+  expected += "  - [2]: 3\n"
+  expected += "  - [3]: 1\n"
+  expected += "  - [4]: 4\n"
+#else
+  fatalError("unimplemented")
+#endif
+
+  expectEqual(expected, output)
+}
+
 runAllTests()
 

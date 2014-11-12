@@ -365,4 +365,50 @@ public func == <T> (
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
+internal struct _CocoaFastEnumerationStackBuf {
+  // Clang uses 16 pointers.  So do we.
+  var item0: Builtin.RawPointer
+  var item1: Builtin.RawPointer
+  var item2: Builtin.RawPointer
+  var item3: Builtin.RawPointer
+  var item4: Builtin.RawPointer
+  var item5: Builtin.RawPointer
+  var item6: Builtin.RawPointer
+  var item7: Builtin.RawPointer
+  var item8: Builtin.RawPointer
+  var item9: Builtin.RawPointer
+  var item10: Builtin.RawPointer
+  var item11: Builtin.RawPointer
+  var item12: Builtin.RawPointer
+  var item13: Builtin.RawPointer
+  var item14: Builtin.RawPointer
+  var item15: Builtin.RawPointer
+
+  @transparent
+  var length: Int {
+    return 16
+  }
+
+  init() {
+    item0 = UnsafeMutablePointer<RawByte>.null()._rawValue
+    item1 = item0
+    item2 = item0
+    item3 = item0
+    item4 = item0
+    item5 = item0
+    item6 = item0
+    item7 = item0
+    item8 = item0
+    item9 = item0
+    item10 = item0
+    item11 = item0
+    item12 = item0
+    item13 = item0
+    item14 = item0
+    item15 = item0
+
+    _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * length)
+  }
+}
+
 #endif

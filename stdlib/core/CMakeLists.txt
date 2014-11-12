@@ -40,13 +40,13 @@ set(SWIFTLIB_ESSENTIAL
   CompilerProtocols.swift
   Concatenate.swift.gyb
   ContiguousArrayBuffer.swift
-  Dictionary.swift
   EmptyCollection.swift
   Existential.swift
   Filter.swift.gyb
   FixedPoint.swift.gyb
   FloatingPoint.swift.gyb
   FloatingPointOperations.swift.gyb
+  HashedCollections.swift.gyb
   Hashing.swift
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift

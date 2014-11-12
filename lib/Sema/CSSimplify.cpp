@@ -3903,7 +3903,18 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                         ->getDeclaredType(),
                       getConstraintLocator(
                         locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(1))));        
+                          LocatorPathElt::getGenericArgument(1))));
+      } else if (bgt1->getDecl() == TC.Context.getSetDecl()) {
+        auto NSObjectType = TC.getNSObjectType(DC);
+        if (!NSObjectType) {
+          // Not a bridging case. Should we detect this earlier?
+          return SolutionKind::Error;
+        }
+        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
+                      NSObjectType,
+                      getConstraintLocator(
+                        locator.withPathElement(
+                          LocatorPathElt::getGenericArgument(0))));
       } else {
         llvm_unreachable("unhandled generic bridged type");
       }
