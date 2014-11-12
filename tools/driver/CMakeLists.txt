@@ -14,6 +14,8 @@ if(SWIFT_PATH_TO_CLANG_BUILD STREQUAL ${CMAKE_BINARY_DIR})
   add_dependencies(swift clang-headers)
 endif()
 
+# Platforms that have a REPL need extra libraries to be linked into the 'swift'
+# binary.
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   # Link in CoreFoundation on Darwin.
   find_library(CORE_FOUNDATION NAMES CoreFoundation)
