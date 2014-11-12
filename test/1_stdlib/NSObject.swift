@@ -216,3 +216,36 @@ println("done ValueLike hashValue")
 // CHECK-NEXT: sh2 20
 // CHECK-NEXT: sh3 10
 // CHECK-NEXT: done ValueLike hashValue
+
+// Native Swift objects should not have nontrivial structors from ObjC's point
+// of view.
+class NativeSwift {}
+class GenericNativeSwift<T> {}
+
+var native: AnyObject = NativeSwift()
+
+if native.respondsToSelector(".cxx_construct") {
+  println("SwiftObject has nontrivial constructor")
+} else {
+  println("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
+}
+if native.respondsToSelector(".cxx_destruct") {
+  println("SwiftObject has nontrivial destructor")
+} else {
+  println("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
+}
+
+native = GenericNativeSwift<Int>()
+
+if native.respondsToSelector(".cxx_construct") {
+  println("SwiftObject has nontrivial constructor")
+} else {
+  println("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
+}
+if native.respondsToSelector(".cxx_destruct") {
+  println("SwiftObject has nontrivial destructor")
+} else {
+  println("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
+}
+
+
