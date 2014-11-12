@@ -103,7 +103,7 @@ public:
                  ObjCSelector selector,
                  bool isInstanceMethod,
                  unsigned previousGeneration,
-                 llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) { }
+                 llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) = 0;
 
   /// \brief Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }

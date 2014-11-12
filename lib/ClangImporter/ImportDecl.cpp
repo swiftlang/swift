@@ -2087,8 +2087,19 @@ namespace {
       if (!classDecl)
         return false;
 
+      // Make sure we don't search in Clang modules for this method.
+      ++Impl.ActiveSelectors[{selector, isInstance}];
+
       // Look for a matching member.
-      return !classDecl->lookupDirect(selector, isInstance).empty();
+      auto result = !classDecl->lookupDirect(selector, isInstance).empty();
+
+      // Restore the previous active count in the active-selector mapping.
+      auto activeCount = Impl.ActiveSelectors.find({selector, isInstance});
+      --activeCount->second;
+      if (activeCount->second == 0)
+        Impl.ActiveSelectors.erase(activeCount);
+
+      return result;
     }
 
     /// If the given method is a factory method, import it as a constructor

@@ -65,6 +65,16 @@ public:
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
+
+  virtual void loadObjCMethods(
+                 ClassDecl *classDecl,
+                 ObjCSelector selector,
+                 bool isInstanceMethod,
+                 unsigned previousGeneration,
+                 llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) override
+  {
+    // Parsing populates the Objective-C method tables.
+  }
 };
 
 }

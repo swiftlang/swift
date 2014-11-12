@@ -364,6 +364,12 @@ public:
   /// \brief Mapping of already-imported macros.
   llvm::DenseMap<clang::MacroInfo *, ValueDecl *> ImportedMacros;
 
+  /// Keeps track of active selector-basde lookups, so that we don't infinitely
+  /// recurse when checking whether a method with a given selector has already
+  /// been imported.
+  llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
+    ActiveSelectors;
+
   // FIXME: An extra level of caching of visible decls, since lookup needs to
   // be filtered by module after the fact.
   SmallVector<ValueDecl *, 0> CachedVisibleDecls;
@@ -603,6 +609,9 @@ public:
 
   /// Import a Swift name as a Clang selector.
   clang::Selector importSelector(DeclName name, bool allowSimpleName = true);
+
+  /// Export a Swift Objective-C selector as a Clang Objective-C selector.
+  clang::Selector exportSelector(ObjCSelector selector);
 
   /// Map the given selector to a declaration name.
   ///

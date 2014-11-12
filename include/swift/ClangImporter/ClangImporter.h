@@ -122,6 +122,13 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 
+  virtual void loadObjCMethods(
+                 ClassDecl *classDecl,
+                 ObjCSelector selector,
+                 bool isInstanceMethod,
+                 unsigned previousGeneration,
+                 llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) override;
+
   /// Imports an Objective-C header file into the shared imported header module.
   ///
   /// \param header A header name or full path, to be used in a \#import
