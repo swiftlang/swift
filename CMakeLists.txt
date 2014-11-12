@@ -839,8 +839,13 @@ macro(add_swift_library_single target name)
   if (SWIFTLIB_SINGLE_API_NOTES_NON_OVERLAY)
     # Adopt all of the non-overlay API notes.
     foreach(next_notes_input ${SWIFT_API_NOTES_INPUTS})
-      if (NOT IS_DIRECTORY "${SWIFT_SOURCE_DIR}/stdlib/objc/${next_notes_input}")
-        list(APPEND SWIFTLIB_SINGLE_API_NOTES "${next_notes_input}")
+      if (${next_notes_input} STREQUAL "WatchKit" AND
+          ${SWIFT_DEPLOYMENT_OS} MATCHES "^macosx")
+        # Don't build WatchKit API notes for OS X.
+      else()
+        if (NOT IS_DIRECTORY "${SWIFT_SOURCE_DIR}/stdlib/objc/${next_notes_input}")
+          list(APPEND SWIFTLIB_SINGLE_API_NOTES "${next_notes_input}")
+        endif()
       endif()
     endforeach()
   endif()
