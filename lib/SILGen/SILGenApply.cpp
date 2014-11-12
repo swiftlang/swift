@@ -971,11 +971,6 @@ public:
         if (ctor->isRequired() &&
             thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
             !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
-          // We hack some "final required" initializers into framework overlays
-          // to provide literal conversions for NSString, NSArray, etc. Don't
-          // introduce dynamic dispatch where there was none.
-          isDynamicallyDispatched &= true;
-
           if (gen.SGM.requiresObjCDispatch(afd)) {
             // When we're performing Objective-C dispatch, we don't have an
             // allocating constructor to call. So, perform an alloc_ref_dynamic
