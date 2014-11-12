@@ -516,8 +516,8 @@ public:
   //===--------------------------------------------------------------------===//
 
   void visitSILBasicBlock(SILBasicBlock *BB);
-  void getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
-                          SILArgument *Arg, StringRef Name);
+  IndirectionKind getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
+                                     SILArgument *Arg, StringRef Name);
 
   void emitFunctionArgDebugInfo(SILBasicBlock *BB);
 
@@ -1219,18 +1219,22 @@ void IRGenSILFunction::emitSILFunction() {
       LoweredBBs[&bb].bb->eraseFromParent();
 }
 
-void IRGenSILFunction::
+/// Store the lowered IR representation of Arg in the array
+/// Vals. Returns true if Arg is a byref argument.
+IndirectionKind IRGenSILFunction::
 getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
                    SILArgument *Arg, StringRef Name) {
   const LoweredValue &LoweredArg = getLoweredValue(Arg);
-  if (LoweredArg.isAddress())
+  if (LoweredArg.isAddress()) {
     Vals.push_back(LoweredArg.getAddress().getAddress());
-  else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
+    return IndirectValue;
+  } else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
     Explosion e = LoweredArg.getExplosion(*this);
     auto vals = e.claimAll();
     for (auto val : vals)
       Vals.push_back(val);
   }
+  return DirectValue;
 }
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
@@ -1263,7 +1267,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
                       getTypeInfo(Arg->getType()));
 
     llvm::SmallVector<llvm::Value *, 8> Vals, Copy;
-    getLoweredArgValue(Vals, Arg, Name);
+    bool Deref = getLoweredArgValue(Vals, Arg, Name);
     // Don't bother emitting swift.refcounted* for now.
     if (Vals.size() && Vals.back()->getType() == IGM.RefCountedPtrTy)
       Vals.pop_back();
@@ -1272,15 +1276,18 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     for (auto Next = I+1; Next != E; ++Next, ++I) {
       if ((*Next)->getDecl() != Arg->getDecl())
         break;
-      getLoweredArgValue(Vals, *Next, Name);
+
+      Deref |= getLoweredArgValue(Vals, *Next, Name);
     }
+    assert((Deref ? Vals.size() == 1 : true)
+           && "indirect argument found inside of an explosion");
 
     // Emit -O0 shadow copies for by-value parameters to ensure they
     // are visible until the end of the function.
     emitShadowCopy(Vals, Name, Copy);
     IGM.DebugInfo->emitArgVariableDeclaration
       (Builder, Copy, DTI, getDebugScope(), Name, N,
-       DirectValue, RealValue);
+       IndirectionKind(Deref), RealValue);
 
     DidEmitDebugInfoForArg.set(N);
   }
