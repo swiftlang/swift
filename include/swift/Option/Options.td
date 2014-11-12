@@ -76,6 +76,9 @@ def _HASH_HASH_HASH : Flag<["-"], "###">, Alias<driver_print_jobs>;
 def driver_skip_execution : Flag<["-"], "driver-skip-execution">,
   InternalDebugOpt,
   HelpText<"Skip execution of subtasks when performing compilation">;
+def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
+  InternalDebugOpt,
+  HelpText<"Use the given executable to perform compilations">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;

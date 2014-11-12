@@ -923,6 +923,9 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     SuppressNoInputFilesError = true;
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_driver_use_frontend_path))
+    DriverExecutable = A->getValue();
+
   return true;
 }
 
