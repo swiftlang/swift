@@ -1281,6 +1281,19 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     }
     assert((Deref ? Vals.size() == 1 : true)
            && "indirect argument found inside of an explosion");
+    if (DTI.getType()->getKind() == TypeKind::InOut) {
+      if (!Deref) {
+        // If the value was promoted, unwrap the type.
+        DTI = DebugTypeInfo(DTI.getType()->castTo<InOutType>()->getObjectType(),
+                            DTI.StorageType, DTI.size, DTI.align,
+                            DTI.getDeclContext());
+      }
+
+      // In contrast to by-value captures, inout arguments are encoded
+      // as reference types, so there is no need to emit a deref
+      // operation.
+      Deref = DirectValue;
+    }
 
     // Emit -O0 shadow copies for by-value parameters to ensure they
     // are visible until the end of the function.

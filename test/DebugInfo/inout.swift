@@ -10,11 +10,22 @@ typealias MyFloat = Float
 // CHECK: %[[ALLOCABOX:.*]] = alloca
 // CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCB]]}, metadata ![[B:.*]], metadata !{{[0-9]+}})
 // CHECK:  call void @llvm.dbg.declare(metadata !{{{.*}} %[[ALLOCA]]}, metadata
-// CHECK: ![[REFINT:.*]] = {{.*}}[ DW_TAG_structure_type ] [_TtRSi]
-// CHECK: ![[B]] = {{.*}}metadata ![[MYFLOAT:.*]]} ; [ DW_TAG_arg_variable ] [b] [line [[@LINE+4]]]
-// CHECK: ![[MYFLOAT]] = {{.*}}[ DW_TAG_typedef ] [_Tta5inout7MyFloat] {{.*}} [from _TtSf]
-// CHECK: ![[A:[0-9]+]] = {{.*}}metadata !"_TtRSi"} ; [ DW_TAG_arg_variable ] [a] [line [[@LINE+1]]]
+
+// Closure with promoted capture.
+// CHECK: define {{.*}}@_TFF5inout13modifyFooHeapFTRSiSf_T_U_FT_Si_promote0
+// CHECK: call void @llvm.dbg.declare(metadata !{i64* %{{.*}}}, metadata ![[A1:[0-9]+]], metadata ![[EMPTY_EXPR:[0-9]+]])
+
+// Inout reference type.
+// CHECK: define {{.*}}@_TF5inout9modifyFooFTRSiSf_T_
+// CHECK: call void @llvm.dbg.declare(metadata !{%Si** %{{.*}}}, metadata ![[U:[0-9]+]], metadata ![[EMPTY_EXPR]])
+
+// CHECK-DAG: ![[EMPTY_EXPR]] = metadata !{metadata !"0x102"} ; [ DW_TAG_expression ]
+// CHECK-DAG: ![[REFINT:.*]] = {{.*}}[ DW_TAG_structure_type ] [_TtRSi]
+// CHECK-DAG: ![[A1]] = {{.*}}metadata !"_TtSi"} ; [ DW_TAG_arg_variable ] [a]
 func modifyFooHeap(inout a: Int,
+// CHECK-DAG: ![[A:[0-9]+]] = {{.*}}metadata !"_TtRSi"} ; [ DW_TAG_arg_variable ] [a] [line [[@LINE-1]]]
+// CHECK-DAG: ![[B]] = {{.*}}metadata ![[MYFLOAT:.*]]} ; [ DW_TAG_arg_variable ] [b] [line [[@LINE+2]]]
+// CHECK-DAG: ![[MYFLOAT]] = {{.*}}[ DW_TAG_typedef ] [_Tta5inout7MyFloat] {{.*}} [from _TtSf]
                    var b: MyFloat)
 {
     if (b > 2.71) {
@@ -26,8 +37,8 @@ func modifyFooHeap(inout a: Int,
 }
 
 func modifyFoo(inout u: Int,
-// CHECK: metadata ![[MYFLOAT]]} ; [ DW_TAG_arg_variable ] [v] [line [[@LINE+2]]]
-// CHECK: metadata !"_TtRSi"} ; [ DW_TAG_arg_variable ] [u] [line [[@LINE-2]]]
+// CHECK-DAG: metadata ![[MYFLOAT]]} ; [ DW_TAG_arg_variable ] [v] [line [[@LINE+2]]]
+// CHECK-DAG: [[U]] = {{.*}}metadata !"_TtRSi"} ; [ DW_TAG_arg_variable ] [u] [line [[@LINE-2]]]
                var v: MyFloat)
 {
     if (v > 2.71) {
