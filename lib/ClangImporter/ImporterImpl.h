@@ -281,7 +281,7 @@ public:
   llvm::DenseMap<std::pair<ObjCSelector, char>, DeclName> SelectorMappings;
 
   /// Translation API nullability from an API note into an optional kind.
-  static OptionalTypeKind translateNullability(clang::Nullability kind);
+  static OptionalTypeKind translateNullability(api_notes::NullableKind kind);
 
   /// Retrieve the API notes readers that may contain information for the
   /// given Objective-C container.
