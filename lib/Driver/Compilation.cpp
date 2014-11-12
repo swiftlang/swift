@@ -17,6 +17,7 @@
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Action.h"
+#include "swift/Driver/DependencyGraph.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
@@ -88,6 +89,10 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   else
     TQ.reset(new TaskQueue(NumberOfParallelCommands));
 
+  DependencyGraph<const Job *> DepGraph;
+  SmallPtrSet<const Job *, 16> DeferredCommands;
+  bool NeedToRunEverything = false;
+
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
   // and if all of its inputs are in FinishedCommands.
@@ -106,20 +111,6 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
                 (void *)Cmd);
   };
 
-  // Set up handleCommandWhichDoesNotNeedToExecute.
-  // This will mark the command as both scheduled and finished, which meets the
-  // definitions of commands which should be in those sets.
-  auto handleCommandWhichDoesNotNeedToExecute = [&] (const Job *Cmd) {
-    if (Level == OutputLevel::Parseable) {
-      // Provide output indicating this command was skipped if parseable output
-      // was requested.
-      parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
-    }
-
-    State.ScheduledCommands.insert(Cmd);
-    State.FinishedCommands.insert(Cmd);
-  };
-
   // Perform all inputs to the Jobs in our JobList, and schedule any commands
   // which we know need to execute.
   for (const Job *Cmd : JL) {
@@ -127,12 +118,39 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     if (res != 0)
       return res;
 
-    // TODO: replace with a real check once available.
-    bool needsToExecute = true;
-    if (needsToExecute)
+    if (NeedToRunEverything) {
       scheduleCommandIfNecessaryAndPossible(Cmd);
-    else
-      handleCommandWhichDoesNotNeedToExecute(Cmd);
+      continue;
+    }
+
+    // Try to load the dependencies file for this job. If there isn't one, we
+    // always have to run the job, but it doesn't affect any other jobs. If
+    // there should be one but it's not present or can't be loaded, we have to
+    // run all the jobs.
+    Job::Condition Condition = Job::Condition::Always;
+    StringRef DependenciesFile =
+      Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+    if (!DependenciesFile.empty()) {
+      if (DepGraph.loadFromPath(Cmd, DependenciesFile))
+        NeedToRunEverything = true;
+      else
+        Condition = Cmd->getCondition();
+    }
+
+    switch (Condition) {
+    case Job::Condition::Always:
+      scheduleCommandIfNecessaryAndPossible(Cmd);
+      break;
+    case Job::Condition::CheckDependencies:
+      DeferredCommands.insert(Cmd);
+      break;
+    }
+  }
+
+  if (NeedToRunEverything) {
+    for (const Job *Cmd : DeferredCommands)
+      scheduleCommandIfNecessaryAndPossible(Cmd);
+    DeferredCommands.clear();
   }
 
   int Result = 0;
@@ -191,7 +209,6 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     // When a task finishes, we need to reevaluate the other commands in our
     // JobList.
 
-    // TODO: use the command which just finished to evaluate other commands.
     State.FinishedCommands.insert(FinishedCmd);
 
     auto BlockedIter = State.BlockingCommands.find(FinishedCmd);
@@ -199,6 +216,32 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
       for (auto *Blocked : BlockedIter->second)
         scheduleCommandIfNecessaryAndPossible(Blocked);
       State.BlockingCommands.erase(BlockedIter);
+    }
+
+    // In order to handle both old dependencies that have disappeared and new
+    // dependencies that have arisen, we need to reload the dependency file.
+    if (!NeedToRunEverything) {
+      const CommandOutput &Output = FinishedCmd->getOutput();
+      StringRef DependenciesFile =
+        Output.getAdditionalOutputForType(types::TY_SwiftDeps);
+      if (!DependenciesFile.empty()) {
+        SmallVector<const Job *, 16> Dependents;
+        DepGraph.markTransitive(Dependents, FinishedCmd);
+
+        if (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+          NeedToRunEverything = true;
+          for (const Job *Cmd : DeferredCommands)
+            scheduleCommandIfNecessaryAndPossible(Cmd);
+          DeferredCommands.clear();
+
+        } else {
+          DepGraph.markTransitive(Dependents, FinishedCmd);
+          for (const Job *Cmd : Dependents) {
+            DeferredCommands.erase(Cmd);
+            scheduleCommandIfNecessaryAndPossible(Cmd);
+          }
+        }
+      }
     }
 
     return TaskFinishedResponse::ContinueExecution;
@@ -235,6 +278,18 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   // Ask the TaskQueue to execute.
   TQ->execute(taskBegan, taskFinished, taskSignalled);
 
+  // Mark all remaining deferred commands as skipped.
+  for (const Job *Cmd : DeferredCommands) {
+    if (Level == OutputLevel::Parseable) {
+      // Provide output indicating this command was skipped if parseable output
+      // was requested.
+      parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
+    }
+
+    State.ScheduledCommands.insert(Cmd);
+    State.FinishedCommands.insert(Cmd);
+  };
+
   if (Result == 0) {
     assert(State.BlockingCommands.empty() &&
            "some blocking commands never finished properly");
@@ -256,6 +311,13 @@ static const Job *getOnlyCommandInList(const JobList *List) {
 int Compilation::performSingleCommand(const Job *Cmd) {
   assert(Cmd->getInputs().empty() &&
          "This can only be used to run a single command with no inputs");
+
+  switch (Cmd->getCondition()) {
+  case Job::Condition::CheckDependencies:
+    return 0;
+  case Job::Condition::Always:
+    break;
+  }
 
   if (Level == OutputLevel::Verbose)
     Cmd->printCommandLine(llvm::errs());

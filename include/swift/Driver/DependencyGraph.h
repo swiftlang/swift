@@ -106,6 +106,8 @@ public:
   /// ("depends") are not cleared; new dependencies are considered additive.
   ///
   /// If \p node has already been marked, only its outgoing edges are updated.
+  ///
+  /// \returns true if an error occurred
   bool loadFromPath(T node, StringRef path) {
     return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
                                              path);

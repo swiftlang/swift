@@ -43,12 +43,12 @@ parseDependencyFileImpl(llvm::MemoryBuffer &buffer, bool providesOnly,
   llvm::SourceMgr SM;
   yaml::Stream stream(buffer.getMemBufferRef(), SM);
   auto I = stream.begin();
-  if (I == stream.end())
+  if (I == stream.end() || !I->getRoot())
     return true;
 
-  auto *topLevelMap = dyn_cast_or_null<yaml::MappingNode>(I->getRoot());
+  auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
   if (!topLevelMap)
-    return true;
+    return !isa<yaml::NullNode>(I->getRoot());
 
   SmallString<64> scratch;
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
