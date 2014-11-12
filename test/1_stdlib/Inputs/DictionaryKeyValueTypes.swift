@@ -3,7 +3,7 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
-func acceptsAnySet<T : Hashable>(s: Set<T>) {}
+func acceptsAnySet<T : Hashable>(s: _Set<T>) {}
 
 func acceptsAnyDictionary<KeyTy : Hashable, ValueTy>(
   d: Dictionary<KeyTy, ValueTy>) {

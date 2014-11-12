@@ -193,7 +193,7 @@ import SwiftShims
 // Bridging `NSSet` to `Set` and vice versa
 // ----------------------------------------
 //
-// Bridging guarantees for `Set<T>` are the same as for `Dictionary<T, ()>`.
+// Bridging guarantees for `_Set<T>` are the same as for `Dictionary<T, ()>`.
 //
 
 /// This protocol is only used for compile-time checks that
@@ -259,7 +259,7 @@ internal struct _UnmanagedAnyObjectArray {
   }
 }
 
-//===--- APIs unique to Set<T> --------------------------------------------===//
+//===--- APIs unique to _Set<T> --------------------------------------------===//
 
 /// Header part of the native storage for `Set`.
 internal struct _SetBody {
@@ -282,10 +282,10 @@ internal struct _SetElement<T> {
 }
 
 /// A collection of unique `T` instances with no defined ordering.
-public struct Set<T : Hashable> :
+public struct _Set<T : Hashable> :
   Hashable, CollectionType, Comparable, ArrayLiteralConvertible {
 
-  typealias _Self = Set<T>
+  typealias _Self = _Set<T>
   typealias _VariantStorage = _VariantSetStorage<T>
   typealias _NativeStorage = _NativeSetStorage<T>
   public typealias Element = T
@@ -430,7 +430,7 @@ public struct Set<T : Hashable> :
 
   /// Create an empty Set.
   public init() {
-    self = Set<T>(minimumCapacity: 0)
+    self = _Set<T>(minimumCapacity: 0)
   }
 
   /// Create a set from a sequence of items.
@@ -448,29 +448,29 @@ public struct Set<T : Hashable> :
   }
 
   /// Returns true if this set is a subset of another one.
-  public func isSubset(other: Set<T>) -> Bool {
+  public func isSubset(other: _Set<T>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
 
   /// Returns true if this set is a subset of another one but not equal.
-  public func isStrictSubset(other: Set<T>) -> Bool {
+  public func isStrictSubset(other: _Set<T>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset && !isEqual
   }
 
   /// Returns true if this set is a superset of another one.
-  public func isSuperset(other: Set<T>) -> Bool {
+  public func isSuperset(other: _Set<T>) -> Bool {
     return other.isSubset(self)
   }
 
   /// Returns true if this set is a superset of another one but not equal.
-  public func isStrictSuperset(other: Set<T>) -> Bool {
+  public func isStrictSuperset(other: _Set<T>) -> Bool {
     return other.isStrictSubset(self)
   }
 
   /// Returns true if no members in this set are in another.
-  public func isDisjoint(other: Set<T>) -> Bool {
+  public func isDisjoint(other: _Set<T>) -> Bool {
     for member in self {
       if other.contains(member) {
         return false
@@ -493,7 +493,7 @@ public struct Set<T : Hashable> :
   }
 
   /// Return a new set with elements in both this set and another.
-  public func union(other: Set<T>) -> Set<T> {
+  public func union(other: _Set<T>) -> _Set<T> {
     var newSet = self
     for member in other {
       newSet.add(member)
@@ -502,8 +502,8 @@ public struct Set<T : Hashable> :
   }
 
   /// Return a new set with elements in this set but not another.
-  public func difference(other: Set<T>) -> Set<T> {
-    var newSet = Set<T>()
+  public func difference(other: _Set<T>) -> _Set<T> {
+    var newSet = _Set<T>()
     for member in self {
       if !other.contains(member) {
         newSet.add(member)
@@ -513,15 +513,15 @@ public struct Set<T : Hashable> :
   }
 
   /// Remove all members in another set from this one.
-  public mutating func subtract(other: Set<T>) {
+  public mutating func subtract(other: _Set<T>) {
     for member in other {
       remove(member)
     }
   }
 
   /// Return a new set with elements common to this set and another.
-  public func intersection(other: Set<T>) -> Set<T> {
-    var newSet = Set<T>()
+  public func intersection(other: _Set<T>) -> _Set<T> {
+    var newSet = _Set<T>()
     for member in self {
       if other.contains(member) {
         newSet.add(member)
@@ -532,7 +532,7 @@ public struct Set<T : Hashable> :
 
 
   /// Remove any members of this set that aren't also in another set.
-  public mutating func intersect(other: Set<T>) {
+  public mutating func intersect(other: _Set<T>) {
     for member in self {
       if !other.contains(member) {
         remove(member)
@@ -546,7 +546,7 @@ public struct Set<T : Hashable> :
   }
 
   public var hashValue: Int {
-    // FIXME: <rdar://problem/18915294> Cache Set<T> hashValue
+    // FIXME: <rdar://problem/18915294> Cache _Set<T> hashValue
     var result: Int = _mixInt(0)
     for member in self {
        result ^= _mixInt(member.hashValue)
@@ -555,15 +555,15 @@ public struct Set<T : Hashable> :
   }
 }
 
-public func + <T>(lhs: Set<T>, rhs: Set<T>) -> Set<T> {
+public func + <T>(lhs: _Set<T>, rhs: _Set<T>) -> _Set<T> {
   return lhs.union(rhs)
 }
 
-public func - <T>(lhs: Set<T>, rhs: Set<T>) -> Set<T> {
+public func - <T>(lhs: _Set<T>, rhs: _Set<T>) -> _Set<T> {
   return lhs.difference(rhs)
 }
 
-public func & <T>(lhs: Set<T>, rhs: Set<T>) -> Set<T> {
+public func & <T>(lhs: _Set<T>, rhs: _Set<T>) -> _Set<T> {
   return lhs.intersection(rhs)
 }
 
@@ -571,7 +571,7 @@ public func & <T>(lhs: Set<T>, rhs: Set<T>) -> Set<T> {
 /// two sets.
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
-internal func _compareSets<T>(lhs: Set<T>, rhs: Set<T>) ->
+internal func _compareSets<T>(lhs: _Set<T>, rhs: _Set<T>) ->
   (isSubset: Bool, isEqual: Bool) {
   for member in lhs {
     if !rhs.contains(member) {
@@ -581,7 +581,7 @@ internal func _compareSets<T>(lhs: Set<T>, rhs: Set<T>) ->
   return (true, lhs.count == rhs.count)
 }
 
-public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
+public func == <T : Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
   switch (lhs._variantStorage, rhs._variantStorage) {
   case (.Native(let lhsNativeOwner), .Native(let rhsNativeOwner)):
     let lhsNative = lhsNativeOwner.nativeStorage
@@ -635,27 +635,27 @@ public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
   }
 }
 
-public func != <T: Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
+public func != <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
   return !(lhs == rhs)
 }
 
-public func < <T: Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
+public func < <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
   return lhs.isStrictSubset(rhs)
 }
 
-public func > <T: Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
+public func > <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
   return lhs.isStrictSuperset(rhs)
 }
 
-public func <= <T: Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
+public func <= <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
   return lhs.isSubset(rhs)
 }
 
-public func >= <T: Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
+public func >= <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
   return lhs.isSuperset(rhs)
 }
 
-extension Set: Printable, DebugPrintable {
+extension _Set: Printable, DebugPrintable {
   internal func _makeDescription(#isDebug: Bool) -> String {
     if count == 0 {
       return "{}"
@@ -708,8 +708,8 @@ internal func _stdlib_NSSet_allObjects(nss: _NSSetType) ->
 ///
 /// Requires: `BaseValue` is a base class or base @objc
 /// protocol (such as `AnyObject`) of `DerivedValue`.
-public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>) ->
-  Set<BaseValue> {
+public func _setUpCast<DerivedValue, BaseValue>(source: _Set<DerivedValue>) ->
+  _Set<BaseValue> {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
@@ -727,11 +727,11 @@ public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>) ->
 /// Precondition: `SwiftValue` is bridged to Objective-C
 /// and requires non-trivial bridging.
 public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
-source: Set<SwiftValue>) -> Set<ObjCValue> {
+source: _Set<SwiftValue>) -> _Set<ObjCValue> {
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
-  var result = Set<ObjCValue>(minimumCapacity: source.count)
+  var result = _Set<ObjCValue>(minimumCapacity: source.count)
   let valueBridgesDirectly =
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
     _isBridgedVerbatimToObjectiveC(ObjCValue.self)
@@ -757,20 +757,20 @@ source: Set<SwiftValue>) -> Set<ObjCValue> {
 ///
 /// Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 /// are reference types.
-public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>) ->
-Set<DerivedValue> {
+public func _setDownCast<BaseValue, DerivedValue>(source: _Set<BaseValue>) ->
+  _Set<DerivedValue> {
 
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
   switch source._variantStorage {
   case _VariantSetStorage.Native(let nativeOwner):
-    return Set(
+    return _Set(
     _immutableCocoaSet:
     unsafeBitCast(nativeOwner, _NSSetType.self))
 
   case _VariantSetStorage.Cocoa(let cocoaStorage):
-    return Set(
+    return _Set(
     _immutableCocoaSet:
     unsafeBitCast(cocoaStorage, _NSSetType.self))
   }
@@ -784,11 +784,11 @@ Set<DerivedValue> {
 /// Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 /// are reference types.
 public func _setDownCastConditional<BaseValue, DerivedValue>(
-  source: Set<BaseValue>) -> Set<DerivedValue>? {
+  source: _Set<BaseValue>) -> _Set<DerivedValue>? {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  var result = Set<DerivedValue>(minimumCapacity: source.count)
+  var result = _Set<DerivedValue>(minimumCapacity: source.count)
   for member in source {
     if let derivedMember = member as? DerivedValue {
       result.add(derivedMember)
@@ -804,8 +804,8 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
 /// Precondition: at least one of `SwiftValue` is a bridged value
 /// type, and the corresponding `ObjCValue` is a reference type.
 public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
-  source: Set<ObjCValue>) -> Set<SwiftValue> {
-  let result: Set<SwiftValue>? = _setBridgeFromObjectiveCConditional(source)
+  source: _Set<ObjCValue>) -> _Set<SwiftValue> {
+  let result: _Set<SwiftValue>? = _setBridgeFromObjectiveCConditional(source)
   _precondition(result != nil, "This set cannot be bridged from Objective-C")
   return result!
 }
@@ -820,8 +820,8 @@ public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
 public func _setBridgeFromObjectiveCConditional<
   ObjCValue, SwiftValue
 >(
-  source: Set<ObjCValue>
-) -> Set<SwiftValue>? {
+  source: _Set<ObjCValue>
+) -> _Set<SwiftValue>? {
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
@@ -829,7 +829,7 @@ public func _setBridgeFromObjectiveCConditional<
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCValue.self)
 
-  var result = Set<SwiftValue>(minimumCapacity: source.count)
+  var result = _Set<SwiftValue>(minimumCapacity: source.count)
   for value in source {
     // Downcast the value.
     var resultValue: SwiftValue
@@ -3116,7 +3116,7 @@ internal enum ${_Self}IndexRepresentation<${TypeParametersDecl}> {
 %{
 if Self == 'Set':
   SubscriptingWithIndexDoc = """\
-/// Used to access the members in an instance of `Set<T>`."""
+/// Used to access the members in an instance of `_Set<T>`."""
 elif Self == 'Dictionary':
   SubscriptingWithIndexDoc = """\
 /// Used to access the key-value pairs in an instance of
@@ -3403,7 +3403,12 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
 }
 
 internal struct ${_Self}MirrorPosition<${TypeParametersDecl}> {
+  // FIXME: Remove when un-underscoring _Set
+%if Self == 'Set':
+  internal typealias MirroredType = ${_Self}<${TypeParameters}>
+%elif Self == 'Dictionary':
   internal typealias MirroredType = ${Self}<${TypeParameters}>
+%end
 
   internal var _intPos: Int
   internal var ${_Self}Pos: MirroredType.Index
@@ -3443,7 +3448,12 @@ internal func < <${TypeParametersDecl}> (
 }
 
 internal class ${_Self}Mirror<${TypeParametersDecl}> : MirrorType {
+  // FIXME: Remove when un-underscoring Set.
+%if Self == 'Set':
+  typealias MirroredType = ${_Self}<${TypeParameters}>
+%elif Self == 'Dictionary':
   typealias MirroredType = ${Self}<${TypeParameters}>
+%end
   internal let _mirror : MirroredType
   internal var _pos : ${_Self}MirrorPosition<${TypeParameters}>
 
@@ -3495,7 +3505,12 @@ internal class ${_Self}Mirror<${TypeParametersDecl}> : MirrorType {
   internal var disposition: MirrorDisposition { return .KeyContainer }
 }
 
+%if Self == 'Set':
+// FIXME: Remove after un-underscoring Set
+extension ${_Self} : Reflectable {
+%elif Self == 'Dictionary':
 extension ${Self} : Reflectable {
+%end
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return ${_Self}Mirror(self)
@@ -3511,7 +3526,13 @@ public struct ${_Self}Builder<${TypeParametersDecl}> {
   typealias Key = ${TypeParameters}
   typealias Value = ${TypeParameters}
 %end
+
+  // FIXME: Remove when un-underscoring Set
+%if Self == 'Set':
+  internal var _result: ${_Self}<${TypeParameters}>
+%elif Self == 'Dictionary':
   internal var _result: ${Self}<${TypeParameters}>
+%end
   internal var _nativeStorage: _Native${Self}Storage<${TypeParameters}>
   internal let _requestedCount: Int
   internal var _actualCount: Int
@@ -3520,7 +3541,12 @@ public struct ${_Self}Builder<${TypeParametersDecl}> {
     let requiredCapacity =
       _Native${Self}Storage<${TypeParameters}>.getMinCapacity(
         count, _hashContainerDefaultMaxLoadFactorInverse)
+    // FIXME: Remove when un-underscoring Set
+%if Self == 'Set':
+    _result = ${_Self}<${TypeParameters}>(minimumCapacity: requiredCapacity)
+%elif Self == 'Dictionary':
     _result = ${Self}<${TypeParameters}>(minimumCapacity: requiredCapacity)
+%end
     _nativeStorage = _result._variantStorage.native
     _requestedCount = count
     _actualCount = 0
@@ -3536,7 +3562,12 @@ public struct ${_Self}Builder<${TypeParametersDecl}> {
     _actualCount++
   }
 
+  // FIXME: Remove when un-underscoring Set.
+%if Self == 'Set':
+  public mutating func take() -> ${_Self}<${TypeParameters}> {
+%elif Self == 'Dictionary':
   public mutating func take() -> ${Self}<${TypeParameters}> {
+%end
     _precondition(_actualCount >= 0,
       "can not take the result twice")
     _precondition(_actualCount == _requestedCount,
@@ -3553,7 +3584,12 @@ public struct ${_Self}Builder<${TypeParametersDecl}> {
 
 //===--- Bridging ---------------------------------------------------------===//
 
+%if Self == 'Set':
+// FIXME: Remove after un-underscoring Set
+extension ${_Self} {
+%elif Self == 'Dictionary':
 extension ${Self} {
+%end
   public func _bridgeToObjectiveCImpl()
     -> _NS${Self}CoreType {
     switch _variantStorage {
@@ -3574,13 +3610,23 @@ extension ${Self} {
 
   public static func _bridgeFromObjectiveCAdoptingNativeStorage(
       s: AnyObject
+// FIXME: Remove when un-underscoring Set
+%if Self == 'Set':
+  ) -> ${_Self}<${TypeParameters}>? {
+%elif Self == 'Dictionary':
   ) -> ${Self}<${TypeParameters}>? {
+%end
     if let nativeOwner =
         s as AnyObject as? _Native${Self}StorageOwner<${TypeParameters}> {
       // If `NS${Self}` is actually native storage of `${Self}` with key
       // and value types that the requested ones match exactly, then just
       // re-wrap the native storage.
+// FIXME: Remove when un-underscoring Set
+%if Self == 'Set':
+      return ${_Self}<${TypeParameters}>(_nativeStorageOwner: nativeOwner)
+%elif Self == 'Dictionary':
       return ${Self}<${TypeParameters}>(_nativeStorageOwner: nativeOwner)
+%end
     }
     // FIXME: what if `s` is native storage, but for different key/value type?
     return .None

@@ -67,48 +67,48 @@ assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
 if true {
   // Sanity checks.  This code should not trap.
-  var s = Set<BridgedVerbatimRefTy>()
+  var s = _Set<BridgedVerbatimRefTy>()
   var nss: NSSet = s
 }
 
 if arg == "DuplicateKeys1" {
   println("OK")
-  let s: Set<Int> = [10, 20, 30, 10]
+  let s: _Set<Int> = [10, 20, 30, 10]
 }
 
 if arg == "DuplicateKeys2" {
   println("OK")
-  let s: Set<Int> = [10, 20, 30, 10]
+  let s: _Set<Int> = [10, 20, 30, 10]
 }
 
 if arg == "DuplicateKeys3" {
   println("OK")
-  var s: Set<Int> = [10, 10]
+  var s: _Set<Int> = [10, 10]
 }
 
 if arg == "RemoveInvalidIndex1" {
-  var s = Set<Int>()
+  var s = _Set<Int>()
   let index = s.startIndex
   println("OK")
   s.removeAtIndex(index)
 }
 
 if arg == "RemoveInvalidIndex2" {
-  var s = Set<Int>()
+  var s = _Set<Int>()
   let index = s.endIndex
   println("OK")
   s.removeAtIndex(index)
 }
 
 if arg == "RemoveInvalidIndex3" {
-  var s: Set<Int> = [ 10, 20, 30 ]
+  var s: _Set<Int> = [ 10, 20, 30 ]
   let index = s.endIndex
   println("OK")
   s.removeAtIndex(index)
 }
 
 if arg == "RemoveInvalidIndex4" {
-  var s: Set<Int> = [ 10 ]
+  var s: _Set<Int> = [ 10 ]
   let index = s.indexForMember(10)!
   s.removeAtIndex(index)
   assert(!s.contains(10))

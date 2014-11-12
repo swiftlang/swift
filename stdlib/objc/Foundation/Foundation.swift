@@ -949,7 +949,7 @@ extension NSArray : Swift.CollectionType {
 }
 */
 
-extension Set {
+extension _Set {
   /// Private initializer used for bridging.
   ///
   /// The provided `NSSet` will be copied to ensure that the copy can
@@ -957,7 +957,7 @@ extension Set {
   public init(_cocoaSet: _NSSetType) {
     let cfValue = unsafeBitCast(_cocoaSet, CFSet.self)
     let copy = CFSetCreateCopy(nil, cfValue)
-    self = Set(_immutableCocoaSet: unsafeBitCast(copy, _NSSetType.self))
+    self = _Set(_immutableCocoaSet: unsafeBitCast(copy, _NSSetType.self))
   }
 }
 
@@ -983,7 +983,7 @@ extension NSSet : SequenceType {
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
-public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
+public func _convertSetToNSSet<T>(s: _Set<T>) -> NSSet {
   return s._bridgeToObjectiveC()
 }
 
@@ -999,14 +999,14 @@ public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
-public func _convertNSSetToSet<T: Hashable>(s: NSSet) -> Set<T> {
-  var result: Set<T>?
-  Set._forceBridgeFromObjectiveC(s, result: &result)
+public func _convertNSSetToSet<T: Hashable>(s: NSSet) -> _Set<T> {
+  var result: _Set<T>?
+  _Set._forceBridgeFromObjectiveC(s, result: &result)
   return result!
 }
 
 // Set<T> is conditionally bridged to NSSet
-extension Set : _ObjectiveCBridgeable {
+extension _Set : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
     return NSSet.self
   }
@@ -1015,14 +1015,14 @@ extension Set : _ObjectiveCBridgeable {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), NSSet.self)
   }
 
-  public static func _forceBridgeFromObjectiveC(s: NSSet, inout result: Set?) {
-    if let native = Set<T>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
+  public static func _forceBridgeFromObjectiveC(s: NSSet, inout result: _Set?) {
+    if let native = _Set<T>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
       result = native
       return
     }
 
     if _isBridgedVerbatimToObjectiveC(T.self) {
-      result = Set<T>(_cocoaSet: unsafeBitCast(s, _NSSetType.self))
+      result = _Set<T>(_cocoaSet: unsafeBitCast(s, _NSSetType.self))
       return
     }
 
@@ -1035,8 +1035,8 @@ extension Set : _ObjectiveCBridgeable {
     result = builder.take()
   }
 
-  public static func _conditionallyBridgeFromObjectiveC(x: NSSet, inout result: Set?) -> Bool {
-    let anySet = x as Set<NSObject>
+  public static func _conditionallyBridgeFromObjectiveC(x: NSSet, inout result: _Set?) -> Bool {
+    let anySet = x as _Set<NSObject>
     if _isBridgedVerbatimToObjectiveC(T.self) {
       result = Swift._setDownCastConditional(anySet)
       return result != nil

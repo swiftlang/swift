@@ -459,7 +459,7 @@ NominalTypeDecl *ASTContext::getArrayDecl() const {
 
 NominalTypeDecl *ASTContext::getSetDecl() const {
   if (!Impl.SetDecl)
-    Impl.SetDecl = findStdlibType(*this, "Set");
+    Impl.SetDecl = findStdlibType(*this, "_Set");
 
   return Impl.SetDecl;
 }
