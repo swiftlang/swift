@@ -981,6 +981,25 @@ unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
   return _swift_isUniquelyReferenced_native(object);
 }
 
+/// Return true if the given bits of a Builtin.BridgeObject refer to a
+/// native swift object whose strong reference count is 1.
+unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
+  __swift_uintptr_t bits
+) {
+  if (isObjCTaggedPointer(reinterpret_cast<const void*>(bits)))
+    return false;
+
+  const auto maskedBits = bits & ~heap_object_abi::SwiftSpareBitsMask;
+  const auto object = reinterpret_cast<HeapObject*>(maskedBits);
+
+  // Note: we could just return false if the "native" bit isn't set,
+  // but in that case the cost of a deeper check for a unique native
+  // object is going to be a negligible cost for a possible big win.
+  return (bits & heap_object_abi::SwiftReservedBitPatternValue)
+    ? _swift_isUniquelyReferenced_nonNull_native(object)
+    : _swift_isUniquelyReferencedNonObjC_nonNull(object);
+}
+
 /// Returns class_getInstanceSize(c)
 ///
 /// That function is otherwise unavailable to the core stdlib.

@@ -30,6 +30,8 @@ unsigned char _swift_isUniquelyReferencedNonObjC_nonNull(const void *);
 unsigned char _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
 unsigned char _swift_usesNativeSwiftReferenceCounting_class(const void *);
 unsigned char _swift_isUniquelyReferenced_native_spareBits(__swift_uintptr_t bits);
+unsigned char _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
+  __swift_uintptr_t bits);
 unsigned char
 _swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
 unsigned char _swift_isUniquelyReferenced_native(const struct HeapObject *);
