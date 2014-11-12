@@ -993,6 +993,9 @@ size_t swift::_swift_class_getInstanceSize_class(const void* c) {
 #endif
 }
 
+#if SWIFT_OBJC_INTEROP
 const ClassMetadata *swift::getRootSuperclass() {
   return (const ClassMetadata *)[SwiftObject class];
 }
+#endif
+

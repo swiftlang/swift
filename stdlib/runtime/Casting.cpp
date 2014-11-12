@@ -1932,7 +1932,7 @@ recur_inside_cache_lock:
 
 #else // if !__APPLE__
 
-const void *swift::swift_conformsToProtocol(const Metadata *type,
+const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
                                             const ProtocolDescriptor *protocol){
   // Not implemented for non-Apple platforms.
   return nullptr;
