@@ -28,6 +28,8 @@
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
 
+#include "llvm/Support/RandomNumberGenerator.h"
+
 #include <forward_list>
 
 using namespace swift;
@@ -40,6 +42,7 @@ namespace {
 
 class Instrumenter {
 private:
+  llvm::RandomNumberGenerator &RNG;
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
@@ -149,8 +152,8 @@ private:
   ClosureFinder CF;
 
 public:
-  Instrumenter (ASTContext &C, DeclContext *DC) :
-    Context(C), TypeCheckDC(DC), CF(*this) { }
+  Instrumenter (ASTContext &C, DeclContext *DC, llvm::RandomNumberGenerator &_RNG) :
+    RNG(_RNG), Context(C), TypeCheckDC(DC), CF(*this) { }
     
   Stmt *transformStmt(Stmt *S) { 
     switch (S->getKind()) {
@@ -697,13 +700,21 @@ public:
     Expr *NameExpr = new (Context) StringLiteralExpr(NameInContext->c_str(),
                                                      SourceRange());
     NameExpr->setImplicit(true);
-      
+
+    const size_t buf_size = 11;
+    char * const id_buf = (char*)Context.Allocate(buf_size, 1);
+    const unsigned int id_num = (unsigned int)RNG.next(0x100000000ull);
+    ::snprintf(id_buf, buf_size, "%u", id_num);
+    Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf, 
+                                                    SR.End, true);
+    
     Expr *LoggerArgExprs[] = {
         E,
-        NameExpr
+        NameExpr,
+        IDExpr
       };
 
-    return buildLoggerCallWithArgs("$builtin_log", 
+    return buildLoggerCallWithArgs("$builtin_log_with_id", 
                                    MutableArrayRef<Expr *>(LoggerArgExprs),
                                    SR);
   }
@@ -811,12 +822,16 @@ public:
 
 void swift::performPlaygroundTransform(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
+  private:
+    llvm::RandomNumberGenerator RNG;
   public:
+    ExpressionFinder() : ASTWalker(), RNG("PlaygroundTransform") {
+    }
     virtual bool walkToDeclPre(Decl *D) {
       if (AbstractFunctionDecl *FD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
-            Instrumenter I(FD->getASTContext(), FD);
+            Instrumenter I(FD->getASTContext(), FD, RNG);
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
               FD->setBody(NewBody);
@@ -827,7 +842,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
       } else if (TopLevelCodeDecl *TLCD = llvm::dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
-            Instrumenter I(((Decl*)TLCD)->getASTContext(), TLCD);
+            Instrumenter I(((Decl*)TLCD)->getASTContext(), TLCD, RNG);
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);

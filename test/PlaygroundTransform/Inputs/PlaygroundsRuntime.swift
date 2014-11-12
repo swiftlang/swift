@@ -1,5 +1,10 @@
 class LogRecord {
   let text : String
+  init(api : String, object : Any, name : String, id : Int) {
+    var object_description : String = ""
+    print(object, &object_description)
+    text = api + "[" + name + "='" + object_description + "']"
+  }
   init(api : String, object : Any, name : String) {
     var object_description : String = ""
     print(object, &object_description)
@@ -17,6 +22,10 @@ class LogRecord {
 
 func $builtin_log<T>(object : T, name : String) -> AnyObject? {
   return LogRecord(api:"$builtin_log", object:object, name:name)
+}
+
+func $builtin_log_with_id<T>(object : T, name : String, id : Int) -> AnyObject? {
+  return LogRecord(api:"$builtin_log", object:object, name:name, id:id)
 }
 
 func $builtin_log_scope_entry() -> AnyObject? {
