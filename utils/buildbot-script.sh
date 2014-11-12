@@ -18,7 +18,7 @@ CMAKE_DEFAULT="$(which cmake || echo /usr/local/bin/cmake)"
 KNOWN_SETTINGS=(
     # name                      default          description
     build-args                  ""               "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
-    build-dir                   ""               "out-of-tree build directory; default is in-tree"
+    build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
     build-type                  Debug            "the CMake build variant: Debug, RelWithDebInfo, Release, etc."
     llvm-build-dir              ""               "out-of-tree build directory for llvm; default is BUILD_DIR/llvm, where BUILD_DIR is given by --build-dir"
     llvm-build-type             "$BUILD_TYPE"    "the CMake build variant for clang and llvm: Debug, RelWithDebInfo, Release, etc.  defaults to BUILD_TYPE, where BUILD_TYPE is given by --build-type"
@@ -180,7 +180,10 @@ case "${WORKSPACE}" in
 esac
 case "${BUILD_DIR}" in
   /*) ;;
-  "") ;;
+  "") echo "the --build-dir option is required"
+        usage
+        exit 1
+        ;;
    *) echo "build-dir must be an absolute path (was '${BUILD_DIR}')" ; exit 1 ;;
 esac
 
@@ -259,12 +262,7 @@ for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
     product_build_dir_var="${PRODUCT}_BUILD_DIR"
     eval "product_build_dir=\${${product_build_dir_var}}"
     if [[ ! "${product_build_dir}" ]] ; then
-        if [[ "${BUILD_DIR}" ]] ; then
-            product_build_dir="${BUILD_DIR}/${product}"
-        else
-            product_build_dir="${source_dir}/build"
-        fi
-        eval "${PRODUCT}_BUILD_DIR=\$product_build_dir"
+        eval "${PRODUCT}_BUILD_DIR=\"\${BUILD_DIR}/${product}\""
     fi
 done
 
@@ -272,11 +270,7 @@ done
 # subdirectories of swift's build directory if BUILD_DIR is not set.
 for product in "${IOS_BUILD_PRODUCTS[@]}" "${IOS_TEST_PRODUCTS[@]}" ; do
     _PRODUCT_BUILD_DIR="$(toupper "${product}")"_BUILD_DIR
-    if [[ "${BUILD_DIR}" ]] ; then
-        eval ${_PRODUCT_BUILD_DIR}="${BUILD_DIR}/${product}"
-    else
-        eval ${_PRODUCT_BUILD_DIR}="${SWIFT_BUILD_DIR}/${product}"
-    fi
+    eval ${_PRODUCT_BUILD_DIR}="${BUILD_DIR}/${product}"
 done
 
 
