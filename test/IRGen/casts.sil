@@ -194,3 +194,14 @@ yea(%p : $@thick protocol<CP, OP, CP2>.Type):
 nay:
   unreachable
 }
+
+// CHECK-LABEL: define %objc_object* @checked_upcast(%C5casts1A*) {
+// CHECK:         phi %objc_object*
+sil @checked_upcast : $@thin (@owned A) -> @owned AnyObject {
+entry(%a : $A):
+  checked_cast_br %a : $A to $AnyObject, yea, nay
+yea(%o : $AnyObject):
+  return %o : $AnyObject
+nay:
+  unreachable
+}

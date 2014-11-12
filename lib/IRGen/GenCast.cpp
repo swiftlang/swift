@@ -437,9 +437,26 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   }
 
   // Add the value to the explosion.
+  llvm::Type *resultType;
+  if (metatypeKind) {
+    switch (*metatypeKind) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("can't cast to thin metatype");
+    case MetatypeRepresentation::Thick:
+      resultType = IGF.IGM.TypeMetadataPtrTy;
+      break;
+    case MetatypeRepresentation::ObjC:
+      resultType = IGF.IGM.ObjCClassPtrTy;
+      break;
+    }
+  } else {
+    auto schema = IGF.getTypeInfo(destType).getSchema();
+    resultType = schema[0].getScalarType();
+  }
+  
   llvm::Value *resultValue;
   if (objcCast)
-    resultValue = IGF.Builder.CreateBitCast(objcCast, value->getType());
+    resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);
   else
     resultValue = value;
   ex.add(resultValue);
