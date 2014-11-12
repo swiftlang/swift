@@ -96,3 +96,18 @@ println("-----Constructing C()-----")
 // CHECK: B.deinit
 // CHECK: A.deinit
 C()
+
+// rdar://problem/18877135
+
+class Foo: FloatLiteralConvertible {
+  required init(floatLiteral: Float) { }
+
+  func identify() { println("Foo") }
+}
+
+class Bar: Foo {
+  override func identify() { println("Bar") }
+}
+
+let x: Bar = 1.0
+x.identify() // CHECK-LABEL: Bar

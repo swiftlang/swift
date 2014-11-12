@@ -142,20 +142,6 @@ bool Expr::isStaticallyDerivedMetatype() const {
       continue;
     }
 
-    // A synthesized metatype.
-    if (auto metatype = dyn_cast<DynamicTypeExpr>(expr)) {
-      // Recurse into the base.
-      expr = metatype->getBase();
-      continue;
-    }
-
-    // Skip through metatype conversions.
-    if (auto conv = dyn_cast<MetatypeConversionExpr>(expr)) {
-      // Recursive into the base.
-      expr = conv->getSubExpr();
-      continue;
-    }
-    
     // Anything else is not statically derived.
     return false;
   } while (true);
