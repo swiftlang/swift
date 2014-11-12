@@ -107,11 +107,11 @@ struct RawValueKey {
       const uint64_t *data = bits.getRawData();
       if (bits.getBitWidth() == 80) {
         kind = Kind::Float;
-        floatValue = FloatValueTy{ data[0], 0 };
+        floatValue = FloatValueTy{ data[0], data[1] };
       } else {
         assert(bits.getBitWidth() == 64);
         kind = Kind::Float;
-        floatValue = FloatValueTy{ data[0], data[1] };
+        floatValue = FloatValueTy{ data[0], 0 };
       }
       return;
     }

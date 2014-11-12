@@ -235,6 +235,12 @@ enum RawTypeWithRepeatValues7 : Double {
   case Wilson = 340282366920938463463374607431768211455.0
 }
 
+enum RawTypeWithNonRepeatValues : Double {
+  case Vaughn = 3.7
+  case Wilson = 7.4
+}
+
+
 enum RawTypeWithRepeatValuesAutoInc : Double {
   case Vaughn = 22 // expected-note {{raw value auto-incremented from here}}
   case Wilson    // expected-note {{raw value previously used here}}
