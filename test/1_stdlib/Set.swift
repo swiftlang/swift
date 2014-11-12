@@ -129,15 +129,6 @@ func equalsUnorderedPairs(lhs: [(Int, Int)], rhs: [(Int, Int)]) -> Bool {
   }
 }
 
-func equalsUnordered(lhs: [NSObject], rhs: [NSObject]) -> Bool {
-  func NSObjectLessThan(a: NSObject, b: NSObject) -> Bool {
-    return a.isLessThan(b)
-  }
-  return equal(sorted(lhs, NSObjectLessThan), sorted(rhs, NSObjectLessThan)) {
-    $0 == $1
-  }
-}
-
 /// Get an NSSet of TestObjCKeyTy values
 func getAsNSSet(_ members: [Int] = [1010, 2020, 3030]) -> NSSet {
   let nsArray = NSMutableArray()
