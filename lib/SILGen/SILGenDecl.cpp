@@ -1217,8 +1217,18 @@ public:
     if (cd->hasStubImplementation())
       return;
     
-    // Abstract constructors have their allocating entry point in the vtable.
-    if (cd->isRequired()) {
+    // Required constructors (or overrides thereof) have their allocating entry
+    // point in the vtable.
+    bool isRequired = false;
+    auto override = cd;
+    while (override) {
+      if (override->isRequired()) {
+        isRequired = true;
+        break;
+      }
+      override = override->getOverriddenDecl();
+    }
+    if (isRequired) {
       addEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
     }
 
