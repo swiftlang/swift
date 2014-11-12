@@ -1444,18 +1444,18 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
 /// Translate the "nullability" notion from API notes into an optional type
 /// kind.
 OptionalTypeKind ClangImporter::Implementation::translateNullability(
-                   api_notes::NullableKind kind) {
+                   clang::Nullability kind) {
   switch (kind) {
-  case api_notes::NullableKind::NonNullable:
+  case clang::Nullability::NonNull:
     return OptionalTypeKind::OTK_None;
 
-  case api_notes::NullableKind::Nullable:
+  case clang::Nullability::Nullable:
     return OptionalTypeKind::OTK_Optional;
 
-  case api_notes::NullableKind::Unknown:
+  case clang::Nullability::ExplicitUnspecified:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
 
-  case api_notes::NullableKind::Absent:
+  case clang::Nullability::Absent:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
   }
 }
