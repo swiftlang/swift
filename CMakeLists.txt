@@ -129,7 +129,7 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   set(LLVM_BINARY_DIR ${CMAKE_BINARY_DIR})
 
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
-  include_directories("${PATH_TO_LLVM_BUILD}/include" 
+  include_directories("${PATH_TO_LLVM_BUILD}/include"
                       "${LLVM_MAIN_INCLUDE_DIR}"
                       "${CLANG_BUILD_INCLUDE_DIR}"
                       "${CLANG_MAIN_INCLUDE_DIR}")
@@ -212,10 +212,10 @@ if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
 endif()
 
-option(SWIFT_SPLIT_OBJC_SELECTORS 
+option(SWIFT_SPLIT_OBJC_SELECTORS
        "Split Objective-C selectors when building the standard library" NO)
 
-option(SWIFT_BUILD_STATIC 
+option(SWIFT_BUILD_STATIC
        "Build static variants of the Swift runtime and SDK overlays"
        ${ENABLE_SWIFT_STATIC_RUNTIME})
 
@@ -232,7 +232,7 @@ set(SWIFT_DISTCC "" CACHE PATH
 
 # Suppress a warning that this variable is unused in case the user
 # doesn't ask for an iOS build
-if(SWIFT_DISTCC) 
+if(SWIFT_DISTCC)
 endif()
 
 # Find the 'clang' executable for compiling API notes.
@@ -293,7 +293,7 @@ if ( XCODE )
   set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_CPP_RTTI "NO")
 
   # Disable exceptions
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_CPP_EXCEPTIONS "NO") 
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_CPP_EXCEPTIONS "NO")
 endif ()
 
 # Add additional warnings.
@@ -325,7 +325,7 @@ if (CMAKE_CROSSCOMPILING AND NOT CMAKE_SIZEOF_VOID_P)
 endif()
 
 # Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
-# CMake refuses to use `uname -m` on OS X 
+# CMake refuses to use `uname -m` on OS X
 # http://public.kitware.com/Bug/view.php?id=10326
 if (NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
   execute_process(COMMAND uname -m
@@ -341,7 +341,7 @@ endif()
 #     FLAGS -module-name foo            # Flags to add to the compilation
 #     [SDK sdk]                         # SDK to build for
 #     [ARCHITECTURE architecture]       # Architecture to build for
-#     [DEPENDS cmake_target...]         # CMake targets on which the object 
+#     [DEPENDS cmake_target...]         # CMake targets on which the object
 #                                       # file depends.
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB_CORE]                  # This is the core standard library
@@ -356,17 +356,17 @@ function(compile_swift_files)
     "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR"
     "IS_MAIN;IS_STDLIB_CORE;STATIC;INSTALL"
     ${ARGN})
-  
+
   if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB_CORE)
     error(SEND_ERROR "Cannot set both IS_MAIN and IS_STDLIB_CORE")
   endif()
-  
+
   set(swift_flags ${SWIFTFILE_FLAGS})
 
   set(source_files)
   foreach(file ${SWIFTFILE_SOURCES})
     # Determine where this file is.
-    get_filename_component(file_path ${file} PATH) 
+    get_filename_component(file_path ${file} PATH)
     if(IS_ABSOLUTE "${file_path}")
       list(APPEND source_files "${file}")
     else()
@@ -420,7 +420,7 @@ function(compile_swift_files)
   if(CMAKE_BUILD_TYPE MATCHES "Debug|.*DebInfo.*")
     list(APPEND swift_flags "-g")
   endif()
-  
+
   if (SWIFTFILE_SDK)
     # If we have an SDK, we're building for a target.
     list(APPEND swift_flags "-sdk" "${SWIFT_SDK_${SWIFTFILE_SDK}_PATH}")
@@ -562,16 +562,16 @@ function(compile_swift_files)
     OUTPUT ${objfile} ${module_file} ${module_doc_file} ${apinote_files}
     ${create_module_dir}
     ${create_apinotes}
-    COMMAND "${line_directive_tool}" ${source_files} -- 
+    COMMAND "${line_directive_tool}" ${source_files} --
       "${swift_compiler_path}" "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
     DEPENDS "${SWIFT_EXEC}" ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS} ${swift_ide_test_dependency}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
-  
+
   # Make sure the build system knows the file is a generated object file.
   set_source_files_properties(${objfile}
-    PROPERTIES 
-    GENERATED true 
+    PROPERTIES
+    GENERATED true
     EXTERNAL_OBJECT true
     LANGUAGE C
     OBJECT_DEPENDS "${source_files}")
@@ -596,7 +596,7 @@ endfunction(compute_library_subdir)
 # Usage:
 #   handle_swift_sources(sourcesvar externalvar)
 function(handle_swift_sources sourcesvar externalvar name)
-  parse_arguments(SWIFTSOURCES  
+  parse_arguments(SWIFTSOURCES
     "DEPENDS;SDK;ARCHITECTURE;API_NOTES;COMPILE_FLAGS;OPT_FLAGS"
     "IS_MAIN;IS_STDLIB_CORE;STATIC;INSTALL"
     ${ARGN})
@@ -648,7 +648,7 @@ function(handle_swift_sources sourcesvar externalvar name)
 
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
 
-    set(swift_obj 
+    set(swift_obj
         "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
 
     compile_swift_files(OUTPUT ${swift_obj}
@@ -771,7 +771,7 @@ endfunction()
 #     [C_COMPILE_FLAGS flag1...]     # Extra compile flags (C/C++/ObjC)
 #     [SWIFT_COMPILE_FLAGS flag1...] # Extra compile flags (Swift)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
-#     [API_NOTES_NON_OVERLAY]        # Generate API notes for non-overlayed 
+#     [API_NOTES_NON_OVERLAY]        # Generate API notes for non-overlayed
 #                                    # modules with this target.
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
 #     [INSTALL]                      # Install library to lib/swift
@@ -855,7 +855,7 @@ macro(add_swift_library_single target name)
 
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_DEPENDS,
   # just any swiftmodule files that are associated with them.
-  handle_swift_sources(SWIFTLIB_SINGLE_SOURCES 
+  handle_swift_sources(SWIFTLIB_SINGLE_SOURCES
     SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
     DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS} ${SWIFTLIB_SINGLE_DEPENDS}
     SDK ${SWIFTLIB_SINGLE_SDK}
@@ -872,7 +872,7 @@ macro(add_swift_library_single target name)
   set_source_files_properties(
     ${SWIFTLIB_SINGLE_SOURCES}
     PROPERTIES OBJECT_DEPENDS "${SWIFTLIB_SINGLE_FILE_DEPENDS}")
-  
+
   set_output_directory(${target} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   # Collect compile and link flags for the static and non-static targets.
@@ -948,7 +948,7 @@ macro(add_swift_library_single target name)
       INSTALL_NAME_DIR "@rpath"
       BUILD_WITH_INSTALL_RPATH YES)
   endif()
-  
+
   # Configure plist creation for OS X.
   set (PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
   if (APPLE AND SHARED_LIBRARY)
@@ -979,7 +979,7 @@ macro(add_swift_library_single target name)
   set_target_properties(${target} PROPERTIES FOLDER "Swift libraries")
 
   # Configure the static library target.
-  # Set compile and link flags for the non-static target. 
+  # Set compile and link flags for the non-static target.
   # Do these LAST.
 
   # FIXME: Should check whether this is a target library. It has nothing to
@@ -1024,7 +1024,7 @@ macro(add_swift_library_single target name)
         LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
         ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
     endforeach()
-    
+
     install(TARGETS ${target_static}
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR})
@@ -1067,7 +1067,7 @@ macro(add_swift_library_single target name)
     if (target_static AND LLVM_COMMON_LIBS)
       add_dependencies( ${target_static} ${LLVM_COMMON_LIBS} )
     endif()
-  endif() 
+  endif()
 
   # Set compilation and link flags.
   set_property(TARGET ${target} APPEND_STRING PROPERTY
@@ -1231,13 +1231,13 @@ macro(add_swift_library name)
               set(SWIFTLIB_CURRENT_C_COMPILE_FLAGS "-momit-leaf-frame-pointer")
             endif()
           endif()
-        
+
           # Use 16K segment alignment on 32-bit arm.
-          # The linker does this by default for iOS 8+ deployment, 
+          # The linker does this by default for iOS 8+ deployment,
           # but we deploy to iOS 7.
           set(SWIFTLIB_CURRENT_LINK_FLAGS)
           if (ARCH MATCHES "^armv7")
-            set(SWIFTLIB_CURRENT_LINK_FLAGS 
+            set(SWIFTLIB_CURRENT_LINK_FLAGS
                 "-Xlinker -segalign -Xlinker 0x4000")
           endif()
 
@@ -1264,7 +1264,7 @@ macro(add_swift_library name)
           # Add dependencies on the (not-yet-created) custom lipo
           # target.
           foreach(DEP ${SWIFTLIB_DEPENDS})
-            add_dependencies(${VARIANT_NAME} 
+            add_dependencies(${VARIANT_NAME}
               "${DEP}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
           endforeach()
 
@@ -1272,7 +1272,7 @@ macro(add_swift_library name)
             # Add dependencies on the (not-yet-created) custom lipo
             # target.
             foreach(DEP ${SWIFTLIB_DEPENDS})
-              add_dependencies("${VARIANT_NAME}-static" 
+              add_dependencies("${VARIANT_NAME}-static"
                 "${DEP}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-static")
             endforeach()
           endif()
@@ -1286,10 +1286,10 @@ macro(add_swift_library name)
       if (THIN_INPUT_TARGETS)
         # Determine the name of the universal library.
         if (SHARED_LIBRARY)
-          set(UNIVERSAL_LIBRARY_NAME 
+          set(UNIVERSAL_LIBRARY_NAME
             "${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
         else()
-          set(UNIVERSAL_LIBRARY_NAME 
+          set(UNIVERSAL_LIBRARY_NAME
             "${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
         endif()
 
@@ -1312,7 +1312,7 @@ macro(add_swift_library name)
             ${THIN_INPUT_TARGETS_STATIC})
         endif()
       endif()
-    endforeach(SDK)      
+    endforeach(SDK)
   else()
     # Pass through to build the default configuration.
     add_swift_library_single(
@@ -1430,11 +1430,11 @@ macro(manpage PODFILE DESC MANFILE SECTION)
         ARGS --section ${SECTION} --center ${DESC} --release --stderr --name ${MANFILE}
         ${PODFILE} > ${CMAKE_CURRENT_BINARY_DIR}/${MANFILE}.${SECTION}
     )
-  
+
     set(MANPAGE_TARGET "man-${MANFILE}")
-  
+
     add_custom_target(${MANPAGE_TARGET} ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${MANFILE}.${SECTION})
-  
+
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${MANFILE}.${SECTION}
             DESTINATION share/man/man${SECTION} )
   else()
@@ -1462,7 +1462,7 @@ set(SWIFT_SDKS)
 #     architectures      # A list of architectures this SDK supports
 #     internal           # Whether the prefer the internal SDK, if present
 #   )
-#     
+#
 # This macro attempts to configure a given SDK. When successful, it
 # defines a number of variables:
 #
@@ -1500,7 +1500,7 @@ macro(configure_sdk PREFIX NAME DEPLOYMENT_VERSION XCRUN_NAME
            SCRATCH ${SWIFT_SDK_${PREFIX}_PATH})
     string(REGEX MATCH "[0-9]+\\.[0-9]+"
            SWIFT_SDK_${PREFIX}_VERSION ${SCRATCH})
-         
+
     # Set other variables.
     set(SWIFT_SDK_${PREFIX}_NAME ${NAME})
     set(SWIFT_SDK_${PREFIX}_DEPLOYMENT_VERSION ${DEPLOYMENT_VERSION})
