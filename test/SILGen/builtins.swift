@@ -388,6 +388,14 @@ func reinterpretAddrOnly<T, U>(t: T) -> U {
   return Builtin.reinterpretCast(t)
 }
 
+// CHECK-LABEL: sil hidden @_TF8builtins28reinterpretAddrOnlyToTrivialU__FQ_Si
+func reinterpretAddrOnlyToTrivial<T>(t: T) -> Int {
+  // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT:%.*]] : $*T to $*Int
+  // CHECK: [[VALUE:%.*]] = load [[ADDR]]
+  // CHECK: destroy_addr [[INPUT]]
+  return Builtin.reinterpretCast(t)
+}
+
 // CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadableU__FTSiQ__TQ_Si_
 func reinterpretAddrOnlyLoadable<T>(a: Int, b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int

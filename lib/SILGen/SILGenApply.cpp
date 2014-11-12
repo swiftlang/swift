@@ -2655,11 +2655,12 @@ namespace {
       // Forward it along with the original cleanup.
       // TODO: Could try to pick which of the original or destination types has
       // a cheaper cleanup.
+      if (toTL.isTrivial())
+        return ManagedValue::forUnmanaged(toValue);
+      
       return ManagedValue(toValue, args[0].getCleanup());
     }
     
-    // If casting from an address-only type, load the result
-
     // If the destination is trivial, do a trivial bitcast, leaving the cleanup
     // on the original value intact.
     // TODO: Could try to pick which of the original or destination types has
