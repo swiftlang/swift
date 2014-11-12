@@ -756,12 +756,11 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
   switch (pattern->getKind()) {
   case PatternKind::Tuple:
     for (auto &field : cast<TuplePattern>(pattern)->getFields()) {
-      if (field.getPattern()->hasType() &&
-          field.getPattern()->getType()->is<ErrorType>())
-        continue;
-      
       unsigned curArgIndex = nextArgIndex++;
-      if (field.getInit()) {
+      if (field.getInit() &&
+          field.getPattern()->hasType() &&
+          !field.getPattern()->getType()->is<ErrorType>()) {
+
         Expr *e = field.getInit()->getExpr();
 
         // Re-use an existing initializer context if possible.

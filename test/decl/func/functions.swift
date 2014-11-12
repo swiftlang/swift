@@ -85,6 +85,8 @@ func parseError6(a: unknown_type, b: ) {} // expected-error {{use of undeclared 
 
 func parseError7(a: Int, goo b: unknown_type) {} // expected-error {{use of undeclared type 'unknown_type'}}
 
+public func foo(a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error {{use of undeclared type 'Bar'}}
+
 func parenPatternInArg((a): Int) -> Int { // expected-error {{use of undeclared type 'a'}} expected-error 2{{expected ',' separator}} expected-error {{expected parameter type following ':'}}
   return a
 }
