@@ -38,7 +38,7 @@ func base_class_archetype_casts<T : B>(t: T) {
 
   var b_is_t:Bool = B() is T
   var b_is_t_2:Bool = b is T
-  var bad_t_is_b:Bool = t is B // expected-error{{}}
+  var bad_t_is_b:Bool = t is B // expected-warning{{always true}}
 
   var t_as_d = t as D
 }
@@ -80,14 +80,14 @@ func protocol_archetype_casts<T : P1>(t: T, p1: P1, p2: P2, p12: protocol<P1, P2
   var t_as_c1 = t as C1
   var t_as_d1 = t as D1
 
-  var t_as_s2 = t as S2 // expected-error{{}}
+  var t_as_s2 = t as S2
 
   var s1_as_t = S1() as T
   var s12_as_t = S12() as T
   var c1_as_t = C1() as T
   var d1_as_t = D1() as T
 
-  var s2_as_t = S2() as T // expected-error{{}}
+  var s2_as_t = S2() as T
 
   // Type queries.
   var p1_is_t:Bool = p1 is T
@@ -99,7 +99,7 @@ func protocol_archetype_casts<T : P1>(t: T, p1: P1, p2: P2, p12: protocol<P1, P2
   var t_is_c1:Bool = t is C1
   var t_is_d1:Bool = t is D1
 
-  var t_is_s2:Bool = t is S2 // expected-error{{}}
+  var t_is_s2:Bool = t is S2
 }
 
 func protocol_concrete_casts(p1: P1, p2: P2, p12: protocol<P1, P2>) {
@@ -111,12 +111,12 @@ func protocol_concrete_casts(p1: P1, p2: P2, p12: protocol<P1, P2>) {
 
   var p1_as_p12 = p1 as protocol<P1, P2>
 
-  var p2_as_s1 = p2 as S1  // expected-error{{}}
+  var p2_as_s1 = p2 as S1
 
-  var p12_as_s1 = p12 as S1 // expected-error{{}}
-  var p12_as_s2 = p12 as S2 // expected-error{{}}
+  var p12_as_s1 = p12 as S1
+  var p12_as_s2 = p12 as S2
   var p12_as_s12 = p12 as S12
-  var p12_as_s3 = p12 as S3 // expected-error{{}}
+  var p12_as_s3 = p12 as S3
 
   // Type queries.
   var p1_is_s1:Bool = p1 is S1
@@ -126,12 +126,12 @@ func protocol_concrete_casts(p1: P1, p2: P2, p12: protocol<P1, P2>) {
 
   var p1_is_p12:Bool = p1 is protocol<P1, P2>
 
-  var p2_is_s1:Bool = p2 is S1  // expected-error{{}}
+  var p2_is_s1:Bool = p2 is S1
 
-  var p12_is_s1:Bool = p12 is S1 // expected-error{{}}
-  var p12_is_s2:Bool = p12 is S2 // expected-error{{}}
+  var p12_is_s1:Bool = p12 is S1
+  var p12_is_s2:Bool = p12 is S2
   var p12_is_s12:Bool = p12 is S12
-  var p12_is_s3:Bool = p12 is S3 // expected-error{{}}
+  var p12_is_s3:Bool = p12 is S3
 }
 
 func conditional_cast(b: B) -> D? {

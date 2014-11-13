@@ -53,7 +53,7 @@ case is B,
      is D,
      is S:
   ()
-case is E: // expected-error {{cannot cast from protocol type 'P' to non-conforming type 'E'}}
+case is E:
   ()
 }
 
@@ -65,7 +65,7 @@ case let d as D:
   d.d()
 case let s as S:
   s.s()
-case let e as E: // expected-error {{cannot cast from protocol type 'P' to non-conforming type 'E'}}
+case let e as E:
   e.e()
 }
 
@@ -74,7 +74,7 @@ var db : B = D()
 switch db {
 case is D:
   ()
-case is E: // expected-error {{downcast from 'B' to unrelated type 'E'}}
+case is E: // expected-warning {{always fails}}
   ()
 }
 

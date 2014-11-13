@@ -939,7 +939,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       diagnose(IP->getLoc(), diag::isa_is_always_true,
                type,
                IP->getCastTypeLoc().getType());
-      return nullptr;
+      IP->setCastKind(castKind);
+      break;
 
     // Valid checks.
     case CheckedCastKind::ArrayDowncast:

@@ -1961,8 +1961,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool toExistentialMetatype = false;
   bool fromExistentialMetatype = false;
   if (auto toMetatype = toType->getAs<AnyMetatypeType>()) {
+    toExistentialMetatype = toMetatype->is<ExistentialMetatypeType>();
     if (auto fromMetatype = fromType->getAs<AnyMetatypeType>()) {
-      toExistentialMetatype = toMetatype->is<ExistentialMetatypeType>();
       fromExistentialMetatype = fromMetatype->is<ExistentialMetatypeType>();
       toType = toMetatype->getInstanceType();
       fromType = fromMetatype->getInstanceType();
@@ -1986,86 +1986,17 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     fromExistential &= fromExistentialMetatype;
   }
   
-  // Any type can be cast to an existential to check for protocol conformance.
-  if (toExistential) {
+  // Casts to or from generic types can't be statically constrained in most
+  // cases, because there may be protocol conformances we don't statically
+  // know about.
+  //
+  // TODO: There are cases we could statically warn about, such as casting
+  // from a non-class to a class-constrained archetype or existential.
+  if (toExistential || fromExistential || fromArchetype || toArchetype)
     return CheckedCastKind::ValueCast;
-  }
-  
-  // A downcast can:
-  //   - convert an archetype to a (different) archetype type.
-  if (fromArchetype && toArchetype) {
-    return CheckedCastKind::ValueCast;
-  }
 
-  //   - convert from an existential to an archetype or conforming concrete
-  //     type.
-  if (fromExistential) {
-    if (toArchetype) {
-      return CheckedCastKind::ValueCast;
-    } 
+  // Sanity check casts between concrete types.
 
-    if (isSubtypeOf(toType, fromType, dc)) {
-      return CheckedCastKind::ValueCast;
-    } 
-
-    if (Type objCClass 
-               = getDynamicBridgedThroughObjCClass(dc, fromType, toType)) {
-      if (isSubtypeOf(objCClass, fromType, dc))
-        return CheckedCastKind::ValueCast;
-    }
-    
-    diagnose(diagLoc,
-             diag::downcast_from_existential_to_unrelated,
-             origFromType, origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
-    return CheckedCastKind::Unresolved;
-  }
-  
-  //   - convert an archetype to a concrete type fulfilling its constraints.
-  if (fromArchetype) {
-    if (!isSubstitutableFor(toType, fromType->castTo<ArchetypeType>(), dc)) {
-      diagnose(diagLoc,
-               diag::downcast_from_archetype_to_unrelated,
-               origFromType, origToType)
-        .highlight(diagFromRange)
-        .highlight(diagToRange);
-      return CheckedCastKind::Unresolved;
-    }
-    return CheckedCastKind::ValueCast;
-  }
-  
-  if (toArchetype) {
-    //   - convert from a superclass to an archetype.
-    if (auto toSuperType = toType->castTo<ArchetypeType>()->getSuperclass()) {
-      // Coerce to the supertype of the archetype.
-      if (convertToType(toSuperType))
-        return CheckedCastKind::Unresolved;
-      
-      return CheckedCastKind::ValueCast;
-    }
-    
-    //  - convert a concrete type to an archetype for which it fulfills
-    //    constraints.
-    if (isSubstitutableFor(fromType, toType->castTo<ArchetypeType>(), dc)) {
-      return CheckedCastKind::ValueCast;
-    }
-    
-    diagnose(diagLoc,
-             diag::downcast_from_concrete_to_unrelated_archetype,
-             origFromType, origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
-    return CheckedCastKind::Unresolved;
-  }
-
-  // The remaining case is a class downcast.
-
-  assert(!fromArchetype && "archetypes should have been handled above");
-  assert(!toArchetype && "archetypes should have been handled above");
-  assert(!fromExistential && "existentials should have been handled above");
-  assert(!toExistential && "existentials should have been handled above");
-  
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   
   if (cs.isArrayType(toType) && cs.isArrayType(fromType)) {
@@ -2099,7 +2030,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
     .highlight(diagFromRange)
     .highlight(diagToRange);
-  return CheckedCastKind::Unresolved;
+  return CheckedCastKind::ValueCast;
 }
 
 /// If the expression is a an implicit call to _forceBridgeFromObjectiveC or
