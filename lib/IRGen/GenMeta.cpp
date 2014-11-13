@@ -3555,7 +3555,7 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
   auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectClassFn(),
                                          object,
                                          object->getName() + ".Type");
-  metadata->setCallingConv(IGF.IGM.RuntimeCC);
+  metadata->setCallingConv(llvm::CallingConv::C);
   metadata->setDoesNotThrow();
   metadata->addAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::ReadOnly);
