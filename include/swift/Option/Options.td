@@ -132,6 +132,11 @@ def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Implicitly imports an Objective-C header file">;
 
+// FIXME: Unhide this once it's solid.
+def incremental : Flag<["-"], "incremental">,
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Perform an incremental build if possible">;
+
 def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;
 
@@ -148,11 +153,6 @@ def save_temps : Flag<["-"], "save-temps">, Flags<[NoInteractiveOption]>,
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
-
-// FIXME: Unhide this once it's solid.
-def emit_reference_dependencies : Flag<["-"], "emit-reference-dependencies">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Emit Swift-style dependencies files">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption]>,

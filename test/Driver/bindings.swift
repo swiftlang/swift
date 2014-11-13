@@ -27,7 +27,7 @@
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -emit-ir %S/Inputs/empty.sil 2>&1 | FileCheck %s -check-prefix=SIL-INPUT
 // SIL-INPUT: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}empty.sil"], output: {llvm-ir: "-"}
 
-// RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -c -emit-reference-dependencies %s 2>&1 | FileCheck %s -check-prefix=OBJ-AND-DEPS
+// RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -c -incremental %s 2>&1 | FileCheck %s -check-prefix=OBJ-AND-DEPS
 // OBJ-AND-DEPS: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}bindings.swift"], output: {
 // OBJ-AND-DEPS-DAG: swift-dependencies: "bindings.swiftdeps"
 // OBJ-AND-DEPS-DAG: object: "bindings.o"

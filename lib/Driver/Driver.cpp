@@ -1350,7 +1350,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
       addAuxiliaryOutput(*Output, types::TY_Dependencies, OI, OutputMap);
     }
-    if (C.getArgs().hasArg(options::OPT_emit_reference_dependencies)) {
+    if (C.getArgs().hasArg(options::OPT_incremental)) {
       addAuxiliaryOutput(*Output, types::TY_SwiftDeps, OI, OutputMap);
     }
   }

@@ -39,6 +39,8 @@ def emit_dependencies_path
   : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output basic Make-compatible dependencies file to <path>">;
 
+def emit_reference_dependencies : Flag<["-"], "emit-reference-dependencies">,
+  HelpText<"Emit a Swift-style dependencies file">;
 def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
