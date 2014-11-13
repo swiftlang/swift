@@ -453,6 +453,12 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
     auto *User = UI->getUser();
     if (isa<SwitchEnumInst>(User) || isa<SelectEnumInst>(User))
       return true;
+    
+    // Also allow enum of enum, which usually can be combined to a single
+    // instruction. This helps to simplify the creation of an enum from an
+    // integer raw value.
+    if (isa<EnumInst>(User))
+      return true;
   }
   return false;
 }
