@@ -52,13 +52,10 @@ func _didEnterMain(
 }
 
 /// Access to the raw argc value from C.
-public var C_ARGC: CInt {
-  return Process.argc
-}
+@availability(*, unavailable, renamed="Process.argc")
+public var C_ARGC: CInt = CInt()
 
 /// Access to the raw argv value from C. Accessing the argument vector
 /// through this pointer is unsafe.
-public var C_ARGV: UnsafeMutablePointer<UnsafeMutablePointer<Int8>> {
-  return Process.unsafeArgv
-}
-
+@availability(*, unavailable, renamed="Process.unsafeArgv")
+public var C_ARGV: UnsafeMutablePointer<UnsafeMutablePointer<Int8>> = nil
