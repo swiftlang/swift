@@ -2027,9 +2027,15 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       return CheckedCastKind::BridgeFromObjectiveC;
   }
 
-  diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
-    .highlight(diagFromRange)
-    .highlight(diagToRange);
+  // The runtime doesn't support casts to CF types and always lets them succeed.
+  // This "always fails" diagnosis makes no sense when paired with the CF
+  // one.
+  auto clas = toType->getClassOrBoundGenericClass();
+  if (!clas || !clas->isForeign()) {
+    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+      .highlight(diagFromRange)
+      .highlight(diagToRange);
+  }
   return CheckedCastKind::ValueCast;
 }
 

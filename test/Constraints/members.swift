@@ -174,7 +174,7 @@ class InstanceOrClassMethod {
 func testPreferClassMethodToCurriedInstanceMethod(obj: InstanceOrClassMethod) {
   let result = InstanceOrClassMethod.method(obj)
   let resultChecked: Bool = result // no-warning
-  let curried = InstanceOrClassMethod.method(obj) as () -> Bool
+  let curried: () -> Bool = InstanceOrClassMethod.method(obj)
 }
 
 protocol Numeric {

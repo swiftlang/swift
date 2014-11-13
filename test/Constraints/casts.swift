@@ -25,7 +25,7 @@ var b_as_d_2 = b as D
 
 var b_is_d:Bool = B() is D
 // FIXME: Poor diagnostic below.
-var bad_d_is_b:Bool = D() is B // expected-error{{'B' is not a subtype of 'D'}}
+var bad_d_is_b:Bool = D() is B // expected-warning{{always true}}
 
 func base_class_archetype_casts<T : B>(t: T) {
   var t_as_b : B = t
@@ -187,8 +187,8 @@ func metatype_casts<T, U>(b: B.Type) {
   let x1 = b is D.Type
   let x2 = T.self is U.Type
   let x3 = T.self.dynamicType is U.Type.Type
-  let x4 = b.dynamicType is D.Type // expected-error{{'D' is not a subtype of 'B.Type'}}
-  let x5 = b is D.Type.Type // expected-error{{'D.Type' is not a subtype of 'B'}}
+  let x4 = b.dynamicType is D.Type // expected-warning{{always fails}}
+  let x5 = b is D.Type.Type // expected-warning{{always fails}}
 
 }
 

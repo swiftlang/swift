@@ -4,7 +4,7 @@ import CoreGraphics
 
 var roomName : String? = nil
 
-if let realRoomName = roomName as NSString { // expected-error{{cannot convert the expression's type 'String?' to type 'NSString'}}
+if let realRoomName = roomName as NSString { // expected-warning{{always fails}} expected-error{{use 'as?'}}
 			
 }
 

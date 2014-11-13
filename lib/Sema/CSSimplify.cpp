@@ -2227,16 +2227,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 /// succeed; that's the caller's responsibility.
 static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
                                           Type fromType,
-                                          Type toType,
-                                          // FIXME
-                                          bool &isDowncast) {
-  isDowncast = false;
-  // Classify the from/to types.
-  bool toArchetype = toType->is<ArchetypeType>();
-  bool fromArchetype = fromType->is<ArchetypeType>();
-  bool toExistential = toType->isExistentialType();
-  bool fromExistential = fromType->isExistentialType();
-  
+                                          Type toType) {
   // Array downcasts are handled specially.
   if (cs->isArrayType(fromType) && cs->isArrayType(toType)) {
     return CheckedCastKind::ArrayDowncast;
@@ -2252,11 +2243,6 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
   if (tc.getDynamicBridgedThroughObjCClass(cs->DC, fromType, toType)) {
     return CheckedCastKind::BridgeFromObjectiveC;
   }
-
-  // If the cast is between concrete types, we want to introduce a subtype
-  // constraint to catch trivially impossible casts such as 'int as String'.
-  isDowncast
-    = !(toExistential || fromExistential || toArchetype || fromArchetype);
 
   return CheckedCastKind::ValueCast;
 }
@@ -2316,8 +2302,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       break;
   } while (true);
 
-  bool isDowncast;
-  auto kind = getCheckedCastKind(this, fromType, toType, isDowncast);
+  auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
   case CheckedCastKind::ArrayDowncast: {
     auto fromBaseType = getBaseTypeForArrayType(fromType.getPointer());
@@ -2385,12 +2370,19 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     }
   }
       
-  case CheckedCastKind::ValueCast:
-    if (isDowncast) {
+  case CheckedCastKind::ValueCast: {
+    // If casting among classes, and there are open
+    // type variables remaining, introduce a subtype constraint to help resolve
+    // them.
+    if (fromType->getClassOrBoundGenericClass()
+        && toType->getClassOrBoundGenericClass()
+        && (fromType->hasTypeVariable() || toType->hasTypeVariable())) {
       addConstraint(ConstraintKind::Subtype, toType, fromType,
-              getConstraintLocator(locator));
+                    getConstraintLocator(locator));
     }
+      
     return SolutionKind::Solved;
+  }
 
   case CheckedCastKind::BridgeFromObjectiveC: {
     // This existential-to-concrete cast might bridge through an Objective-C
