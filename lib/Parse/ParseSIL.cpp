@@ -2943,9 +2943,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue DefaultValue;
     if (DefaultResultName)
       DefaultValue = getLocalValue(*DefaultResultName, ResultType, InstLoc);
+    SILType ValType = Val.getType();
     for (auto &caseName : CaseValueAndResultNames)
       CaseValues.push_back(std::make_pair(
-                           getLocalValue(caseName.first, ResultType, InstLoc),
+                           getLocalValue(caseName.first, ValType, InstLoc),
                            getLocalValue(caseName.second, ResultType, InstLoc)));
 
     ResultVal = B.createSelectValue(InstLoc, Val, ResultType,

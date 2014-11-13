@@ -1342,15 +1342,12 @@ SelectValueInst::SelectValueInst(SILLocation Loc, SILValue Operand, SILType Type
     OperandBitWidth = OperandTy->getGreatestWidth();
   }
 
-  for (unsigned i = 0, size = CaseValuesAndResults.size(); i < size; i += 2) {
-    auto *IL = dyn_cast<IntegerLiteralInst>(CaseValuesAndResults[i]);
+  for (unsigned i = 0; i < NumCases; ++i) {
+    auto *IL = dyn_cast<IntegerLiteralInst>(CaseValuesAndResults[i * 2]);
     assert(IL && "select_value case value should be of an integer type");
     assert(IL->getValue().getBitWidth() == OperandBitWidth &&
            "select_value case value is not same bit width as operand");
   }
-
-  if (HasDefault)
-    getCaseBuf()[NumCases * 2] = DefaultResult;
 }
 
 SelectValueInst::~SelectValueInst() {
