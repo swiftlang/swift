@@ -562,6 +562,9 @@ StringRef IRGenDebugInfo::getName(SILLocation L) {
   if (L.isASTNode<ConstructorDecl>())
     return "init";
 
+  if (L.isASTNode<DestructorDecl>())
+    return "deinit";
+
   return StringRef();
 }
 
@@ -680,14 +683,6 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   if (cached != ScopeCache.end())
     return llvm::DIDescriptor(cast<llvm::MDNode>(cached->second));
 
-  StringRef Name;
-  if (DS) {
-    if (DS->Loc.getKind() == SILLocation::SILFileKind)
-      Name = DS->SILFn->getName();
-    else
-      Name = getName(DS->Loc);
-  }
-
   StringRef LinkageName;
   if (Fn)
     LinkageName = Fn->getName();
@@ -695,6 +690,14 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
     LinkageName = DS->SILFn->getName();
   else
     llvm_unreachable("function has no mangled name");
+
+  StringRef Name = LinkageName;
+  if (DS) {
+    if (DS->Loc.getKind() == SILLocation::SILFileKind)
+      Name = DS->SILFn->getName();
+    else
+      Name = getName(DS->Loc);
+  }
 
   Location L = {};
   unsigned ScopeLine = 0; /// The source line used for the function prologue.
