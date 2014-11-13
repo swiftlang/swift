@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -369,11 +370,11 @@ public:
   ///         due to the callback.
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
                             bool includePrivateTopLevelImports,
-                            std::function<bool(ImportedModule)> fn);
+                            llvm::function_ref<bool(ImportedModule)> fn);
 
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
                             bool includePrivateTopLevelImports,
-                            std::function<void(ImportedModule)> fn) {
+                            llvm::function_ref<void(ImportedModule)> fn) {
     return forAllVisibleModules(topLevelAccessPath,
                                 includePrivateTopLevelImports,
                                 [=](const ImportedModule &import) -> bool {
@@ -385,37 +386,27 @@ public:
   template <typename Fn>
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
                             bool includePrivateTopLevelImports,
-                            const Fn &fn) {
-    using RetTy = typename as_function<Fn>::type::result_type;
-    std::function<RetTy(ImportedModule)> wrapped = std::cref(fn);
+                            Fn &&fn) {
+    using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
+    llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
     return forAllVisibleModules(topLevelAccessPath,
                                 includePrivateTopLevelImports,
                                 wrapped);
   }
 
   template <typename Fn>
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            const Fn &fn) {
-    return forAllVisibleModules(topLevelAccessPath, false, fn);
+  bool forAllVisibleModules(AccessPathTy topLevelAccessPath, Fn &&fn) {
+    return forAllVisibleModules(topLevelAccessPath, false,
+                                std::forward<Fn>(fn));
   }
 
   /// @}
 
-  using LinkLibraryCallback = std::function<void(LinkLibrary)>;
-
-  /// @{
+  using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
   /// Generate the list of libraries needed to link this module, based on its
   /// imports.
   void collectLinkLibraries(LinkLibraryCallback callback);
-
-  template <typename Fn>
-  void collectLinkLibraries(const Fn &fn) {
-    LinkLibraryCallback wrapped = std::cref(fn);
-    collectLinkLibraries(wrapped);
-  }
-
-  /// @}
 
   /// Returns true if the two access paths contain the same chain of
   /// identifiers.
@@ -578,20 +569,23 @@ public:
   ///
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
-  bool forAllVisibleModules(std::function<bool(Module::ImportedModule)> fn);
+  bool
+  forAllVisibleModules(llvm::function_ref<bool(Module::ImportedModule)> fn);
 
-  bool forAllVisibleModules(std::function<void(Module::ImportedModule)> fn) {
-    forAllVisibleModules([=](const Module::ImportedModule &import) -> bool {
+  bool
+  forAllVisibleModules(llvm::function_ref<void(Module::ImportedModule)> fn) {
+    return forAllVisibleModules([=](Module::ImportedModule import) -> bool {
       fn(import);
       return true;
     });
-    return true;
   }
   
   template <typename Fn>
-  bool forAllVisibleModules(const Fn &fn) {
-    using RetTy = typename as_function<Fn>::type::result_type;
-    std::function<RetTy(Module::ImportedModule)> wrapped = std::cref(fn);
+  bool forAllVisibleModules(Fn &&fn) {
+    using RetTy = typename std::result_of<Fn(Module::ImportedModule)>::type;
+    llvm::function_ref<RetTy(Module::ImportedModule)> wrapped{
+      std::forward<Fn>(fn)
+    };
     return forAllVisibleModules(wrapped);
   }
 

@@ -18,18 +18,18 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Frontend/DiagnosticRenderer.h"
 #include "clang/Lex/LexDiagnostic.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
 namespace {
   class ClangDiagRenderer final : public clang::DiagnosticNoteRenderer {
-    const std::function<void(clang::FullSourceLoc,
-                             clang::DiagnosticsEngine::Level,
-                             StringRef)> callback;
+    const llvm::function_ref<void(clang::FullSourceLoc,
+                                  clang::DiagnosticsEngine::Level,
+                                  StringRef)> callback;
 
   public:
-    template <typename Fn>
-    ClangDiagRenderer(const clang::ASTContext &ctx, const Fn &fn)
+    ClangDiagRenderer(const clang::ASTContext &ctx, decltype(callback) fn)
        : DiagnosticNoteRenderer(ctx.getLangOpts(),
                                 &ctx.getDiagnostics().getDiagnosticOptions()),
          callback(fn) {}
@@ -219,8 +219,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
   } else {
     assert(clangDiag.hasSourceManager());
-    ClangDiagRenderer renderer(ImporterImpl.getClangASTContext(),
-                               std::cref(emitDiag));
+    ClangDiagRenderer renderer(ImporterImpl.getClangASTContext(), emitDiag);
     renderer.emitDiagnostic(clangDiag.getLocation(), clangDiagLevel, message,
                             clangDiag.getRanges(), clangDiag.getFixItHints(),
                             &clangDiag.getSourceManager());

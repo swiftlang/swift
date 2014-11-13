@@ -13,6 +13,7 @@
 #include "swift/Driver/DependencyGraph.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -34,9 +35,9 @@ namespace {
 } // end anonymous namespace
 
 static bool
-parseDependencyFileImpl(llvm::MemoryBuffer &buffer, bool providesOnly,
-                        std::function<void(StringRef, DependencyKind,
-                                           DependencyDirection)> callback) {
+parseDependencyFile(llvm::MemoryBuffer &buffer, bool providesOnly,
+                    llvm::function_ref<void(StringRef, DependencyKind,
+                                            DependencyDirection)> callback) {
   using namespace llvm;
 
   // FIXME: Switch to a format other than YAML.
@@ -79,12 +80,6 @@ parseDependencyFileImpl(llvm::MemoryBuffer &buffer, bool providesOnly,
   }
   
   return false;
-}
-
-template <typename Fn>
-static bool parseDependencyFile(llvm::MemoryBuffer &buffer, bool providesOnly,
-                                Fn fn) {
-  return parseDependencyFileImpl(buffer, providesOnly, std::cref(fn));
 }
 
 bool DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {

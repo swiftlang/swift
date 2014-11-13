@@ -25,8 +25,9 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/Support/Path.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -723,9 +724,9 @@ private:
 class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
   friend TypeVisitor;
 
-  std::function<void(ReferencedTypeFinder &, const TypeDecl *)> Callback;
+  llvm::function_ref<void(ReferencedTypeFinder &, const TypeDecl *)> Callback;
 
-  ReferencedTypeFinder(decltype(Callback) &&callback) : Callback(callback) {}
+  ReferencedTypeFinder(decltype(Callback) callback) : Callback(callback) {}
 
   void visitType(TypeBase *base) {
     assert(base->getDesugaredType() == base && "unhandled sugared type");
@@ -795,9 +796,8 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
 public:
   using TypeVisitor::visit;
 
-  template<typename Fn>
-  static void walk(Type ty, const Fn &callback) {
-    ReferencedTypeFinder(std::cref(callback)).visit(ty);
+  static void walk(Type ty, decltype(Callback) callback) {
+    ReferencedTypeFinder(callback).visit(ty);
   }
 };
 

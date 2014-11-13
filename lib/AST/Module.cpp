@@ -1328,13 +1328,13 @@ static bool forAllImportedModules(Module *topLevel,
 
 bool Module::forAllVisibleModules(AccessPathTy thisPath,
                                   bool includePrivateTopLevelImports,
-                                  std::function<bool(ImportedModule)> fn) {
+                                  llvm::function_ref<bool(ImportedModule)> fn) {
   return forAllImportedModules<true>(this, thisPath,
                                      includePrivateTopLevelImports, fn);
 }
 
-bool
-FileUnit::forAllVisibleModules(std::function<bool(Module::ImportedModule)> fn) {
+bool FileUnit::forAllVisibleModules(
+    llvm::function_ref<bool(Module::ImportedModule)> fn) {
   if (!getParentModule()->forAllVisibleModules(Module::AccessPathTy(), fn))
     return false;
 
