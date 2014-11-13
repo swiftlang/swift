@@ -1364,8 +1364,10 @@ Expr *Parser::parseExprStringLiteral() {
       ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
-        
-        assert(Tok.is(tok::eof) && "segment did not end at close paren");
+
+        if (!Tok.is(tok::eof)) {
+          diagnose(Tok, diag::string_interpolation_extra);
+        }
       }
       break;
     }

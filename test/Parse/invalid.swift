@@ -28,6 +28,13 @@ switch state { // expected-error {{use of unresolved identifier 'state'}}
                          // expected-error {{expected expression}}
 }
 
+// rdar://18926814
+func test4() {
+  let abc = 123
+  let x = " >> \( abc } ) << "   // expected-note {{to match this opening '('}}  expected-error {{expected ')' in expression list}}  expected-error 2 {{expected ',' separator}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
+
+}
+
 // rdar://problem/18507467
 func d(b: String -> <T>() -> T) {} // expected-error {{expected type for function result}} \
                                    // expected-error 2 {{expected ',' separator}} \

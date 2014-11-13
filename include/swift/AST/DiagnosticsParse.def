@@ -902,6 +902,10 @@ ERROR(expected_type_after_is,expr_parsing,none,
 ERROR(expected_type_after_as,expr_parsing,none,
       "expected type after 'as'", ())
 
+// Extra tokens in string interpolation like in " >> \( $0 } ) << "
+ERROR(string_interpolation_extra,expr_parsing,none,
+      "extra tokens after interpolated string expression", ())
+
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
