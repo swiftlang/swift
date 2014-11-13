@@ -146,18 +146,16 @@ if let frungible = d1 as? protocol<Fooable, Runcible, Fungible> {
   println("not fooable, runcible, and fungible")
 }
 
-/*
 let inttype: Any.Type = Int.self
 if let frungibleType = inttype as? protocol<Fooable, Runcible, Fungible>.Type {
   println("is fooable, runcible, and fungible")
 } else {
-  println("not fooable, runcible, and fungible") // TODO-NEXT: not
+  println("not fooable, runcible, and fungible") // CHECK-NEXT: not
 }
 
 let dtype: Any.Type = D.self
-if let frungibleType = dtype as? protocol<Fooable, Runcible, Fungible>.Type {
-  println("is fooable, runcible, and fungible") // TODO-NEXT: is
+if let frungibleType = dtype as? protocol<Fooable, Runcible/*TODO , Fungible*/>.Type {
+  println("is fooable, runcible, and fungible") // CHECK-NEXT: is
 } else {
   println("not fooable, runcible, and fungible")
 }
- */

@@ -1802,11 +1802,11 @@ struct ExistentialTypeMetadata : public Metadata {
 struct ExistentialMetatypeContainer {
   const Metadata *Value;
 
-  const void **getWitnessTables() {
-    return reinterpret_cast<const void**>(this + 1);
+  const WitnessTable **getWitnessTables() {
+    return reinterpret_cast<const WitnessTable**>(this + 1);
   }
-  const void * const *getWitnessTables() const {
-    return reinterpret_cast<const void* const *>(this + 1);
+  const WitnessTable * const *getWitnessTables() const {
+    return reinterpret_cast<const WitnessTable* const *>(this + 1);
   }
 
   void copyTypeInto(ExistentialMetatypeContainer *dest,

@@ -440,7 +440,8 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     auto witness = swift_conformsToProtocol(type, protocol);
     if (!witness)
       return false;
-    *conformance = witness;
+    if (conformance)
+      *conformance = witness;
     return true;
   }
 
@@ -1246,12 +1247,13 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
 
 /// Perform a dynamic cast of a metatype to an existential metatype type.
 static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
-                                               const Metadata *srcMetatype,
-                           const ExistentialMetatypeMetadata *targetType,
-                                              DynamicCastFlags flags,
-                                                      bool writeDestMetatype = true) {
+                                 const Metadata *srcMetatype,
+                                 const ExistentialMetatypeMetadata *targetType,
+                                 DynamicCastFlags flags,
+                                 bool writeDestMetatype = true) {
   // The instance type of an existential metatype must be either an
   // existential or an existential metatype.
+  auto destMetatype = reinterpret_cast<ExistentialMetatypeContainer*>(dest);
 
   // If it's an existential, we need to check for conformances.
   auto targetInstanceType = targetType->InstanceType;
@@ -1260,17 +1262,21 @@ static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
     // Check for conformance to all the protocols.
     // TODO: collect the witness tables.
     auto &protocols = targetInstanceTypeAsExistential->Protocols;
+    const WitnessTable **conformance
+      = writeDestMetatype ? destMetatype->getWitnessTables() : nullptr;
     for (unsigned i = 0, n = protocols.NumProtocols; i != n; ++i) {
       const ProtocolDescriptor *protocol = protocols[i];
-      if (!_conformsToProtocol(nullptr, srcMetatype, protocol, nullptr)) {
+      if (!_conformsToProtocol(nullptr, srcMetatype, protocol, conformance)) {
         if (flags & DynamicCastFlags::Unconditional)
           swift_dynamicCastFailure(srcMetatype, targetType);
         return false;
       }
+      if (conformance && protocol->Flags.needsWitnessTable())
+        ++conformance;
     }
 
     if (writeDestMetatype)
-      *((const Metadata **) dest) = srcMetatype;
+      destMetatype->Value = srcMetatype;
     return true;
   }
 
