@@ -109,8 +109,11 @@ static void configureARM(IRGenModule &IGM, const llvm::Triple &triple,
 }
 
 /// Configure a default target.
-SwiftTargetInfo::SwiftTargetInfo(unsigned numPointerBits)
-  : PointerSpareBits(numPointerBits, false),
+SwiftTargetInfo::SwiftTargetInfo(
+  llvm::Triple::ObjectFormatType outputObjectFormat,
+  unsigned numPointerBits)
+  : OutputObjectFormat(outputObjectFormat),
+    PointerSpareBits(numPointerBits, false),
     ObjCPointerReservedBits(numPointerBits, true),
     HeapObjectAlignment(numPointerBits / 8),
     LeastValidPointerValue(SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER)
@@ -126,7 +129,7 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   auto pointerSize = IGM.DataLayout.getPointerSizeInBits();
 
   /// Prepare generic target information.
-  SwiftTargetInfo target(pointerSize);
+  SwiftTargetInfo target(triple.getObjectFormat(), pointerSize);
   
   switch (triple.getArch()) {
   case llvm::Triple::x86_64:

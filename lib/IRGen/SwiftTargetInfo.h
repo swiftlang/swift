@@ -19,6 +19,7 @@
 #define __SWIFT_IRGEN_TARGET_INFO_H__
 
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/Triple.h"
 #include "IRGen.h"
 
 namespace swift {
@@ -26,7 +27,8 @@ namespace irgen {
   class IRGenModule;
 
 class SwiftTargetInfo {
-  explicit SwiftTargetInfo(unsigned numPointerBits);
+  explicit SwiftTargetInfo(llvm::Triple::ObjectFormatType outputObjectFormat,
+                           unsigned numPointerBits);
 
 public:
 
@@ -40,6 +42,9 @@ public:
   bool hasISAMasking() const {
     return ObjCUseISAMask;
   }
+
+  /// The target's object format type.
+  llvm::Triple::ObjectFormatType OutputObjectFormat;
   
   /// The spare bit mask for pointers. Bits set in this mask are unused by
   /// pointers of any alignment.
