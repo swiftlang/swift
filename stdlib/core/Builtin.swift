@@ -249,3 +249,6 @@ internal func _class_getInstanceSize(theClass: AnyClass) -> Int {
   return Int(_swift_class_getInstanceSize_class(
       unsafeAddressOf(theClass)))
 }
+
+@asmname("_swift_isClass")
+public func _swift_isClass(x: Any) -> Bool
