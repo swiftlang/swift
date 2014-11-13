@@ -3516,14 +3516,13 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      CanType objectType,
                                                      bool suppressCast) {
   ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
-  if (isKnownNotTaggedPointer(IGF.IGM, theClass))
+  if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass))
     return emitLoadOfHeapMetadataRef(IGF, object,
                                      getIsaEncodingForType(IGF.IGM, objectType),
                                      suppressCast);
 
-  // OK, ask the runtime for the class pointer of this
-  // potentially-ObjC object.
-  return emitLoadOfObjCHeapMetadataRef(IGF, object);
+  // OK, ask the runtime for the class pointer of this potentially-ObjC object.
+  return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
 }
 
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
@@ -3546,6 +3545,20 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
   metadata->setCallingConv(IGF.IGM.RuntimeCC);
   metadata->setDoesNotThrow();
   metadata->setDoesNotAccessMemory();
+  return metadata;
+}
+
+llvm::Value *irgen::
+emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
+                                        llvm::Value *object) {
+  object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
+  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectClassFn(),
+                                         object,
+                                         object->getName() + ".Type");
+  metadata->setCallingConv(IGF.IGM.RuntimeCC);
+  metadata->setDoesNotThrow();
+  metadata->addAttribute(llvm::AttributeSet::FunctionIndex,
+                         llvm::Attribute::ReadOnly);
   return metadata;
 }
 

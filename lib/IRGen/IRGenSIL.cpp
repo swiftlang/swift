@@ -1521,9 +1521,10 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
                                             swift::ExistentialMetatypeInst *i) {
   Explosion result;
   if (i->getOperand().getType().isClassExistentialType()) {
-    Explosion existential = getLoweredExplosion(i->getOperand());
-    emitMetatypeOfClassExistential(*this, existential,
-                                   i->getOperand().getType(), result);
+    SILValue op = i->getOperand();
+    Explosion existential = getLoweredExplosion(op);
+    emitMetatypeOfClassExistential(*this, existential, i->getType(),
+                                   op.getType(), result);
   } else {
     Address existential = getLoweredAddress(i->getOperand());
     emitMetatypeOfOpaqueExistential(*this, existential,

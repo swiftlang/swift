@@ -167,6 +167,11 @@ namespace irgen {
                                            SILType objectType,
                                            bool suppressCast = false);
 
+  /// Given a heap-object instance, with some heap-object type, produce a
+  /// reference to its heap metadata by dynamically asking the runtime for it.
+  llvm::Value *emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
+                                                       llvm::Value *object);
+
   /// Given a heap-object instance, with some heap-object type,
   /// produce a reference to its heap metadata.
   llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
