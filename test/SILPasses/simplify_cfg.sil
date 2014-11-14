@@ -1088,3 +1088,62 @@ bb7:
   %9999 = tuple()
   return %9999 : $()
 }
+
+enum IntEnum : Int {
+  case E0
+  case E1
+  case E2
+}
+
+// CHECK-LABEL: sil @create_select_value : $@thin (Builtin.Word) -> Optional<IntEnum> {
+// CHECK-DAG: [[X2:%[0-9]+]] = integer_literal $Builtin.Word, 0
+// CHECK-DAG: [[X5:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.None!enumelt
+// CHECK-DAG: [[X6:%[0-9]+]] = integer_literal $Builtin.Word, 2
+// CHECK-DAG: [[X7:%[0-9]+]] = enum $IntEnum, #IntEnum.E2!enumelt
+// CHECK-DAG: [[X8:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, [[X7]] : $IntEnum
+// CHECK-DAG: [[X9:%[0-9]+]] = integer_literal $Builtin.Word, 1
+// CHECK-DAG: [[X10:%[0-9]+]] = enum $IntEnum, #IntEnum.E1!enumelt
+// CHECK-DAG: [[X11:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, [[X10]] : $IntEnum
+// CHECK-DAG: [[X12:%[0-9]+]] = enum $IntEnum, #IntEnum.E0!enumelt
+// CHECK-DAG: [[X13:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, [[X12]] : $IntEnum
+// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Word, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum> 
+// CHECK-DAG: return [[X14]] : $Optional<IntEnum>
+sil @create_select_value : $@thin (Builtin.Word) -> Optional<IntEnum> {
+bb0(%0 : $Builtin.Word):
+  %2 = integer_literal $Builtin.Word, 0
+  %4 = builtin "cmp_eq_Word"(%2 : $Builtin.Word, %0 : $Builtin.Word) : $Builtin.Int1
+  cond_br %4, bb1, bb2
+
+bb1:
+  %6 = enum $IntEnum, #IntEnum.E0!enumelt
+  %7 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %6 : $IntEnum
+  br bb7(%7 : $Optional<IntEnum>)
+
+bb2:
+  %9 = integer_literal $Builtin.Word, 1
+  %10 = builtin "cmp_eq_Word"(%9 : $Builtin.Word, %0 : $Builtin.Word) : $Builtin.Int1
+  cond_br %10, bb3, bb4
+
+bb3:
+  %12 = enum $IntEnum, #IntEnum.E1!enumelt
+  %13 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %12 : $IntEnum
+  br bb7(%13 : $Optional<IntEnum>)
+
+bb4:
+  %15 = integer_literal $Builtin.Word, 2
+  %16 = builtin "cmp_eq_Word"(%15 : $Builtin.Word, %0 : $Builtin.Word) : $Builtin.Int1
+  cond_br %16, bb5, bb6
+
+bb5:
+  %18 = enum $IntEnum, #IntEnum.E2!enumelt
+  %19 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %18 : $IntEnum
+  br bb7(%19 : $Optional<IntEnum>)
+
+bb6:
+  %21 = enum $Optional<IntEnum>, #Optional.None!enumelt
+  br bb7(%21 : $Optional<IntEnum>)
+
+bb7(%23 : $Optional<IntEnum>):
+  return %23 : $Optional<IntEnum>
+}
+
