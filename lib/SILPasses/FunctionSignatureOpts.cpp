@@ -263,9 +263,16 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
     // 'o2g' => Was an @owned argument, but we changed it to be a guaranteed
     //          parameter.
     // 's'   => Was a loadable value that we exploded into multiple arguments.
+    // 'a2s' => Was a loadable address and we promoted it to a value which we
+    //          exploded into multiple arguments.
     //
-    // Currently we only use 'n' and 'd' since we do not perform the other
-    // optimizations.
+    // Currently we only emit functions that use:
+    //
+    // 1. 'n',
+    // 2. 'd',
+    // 3. 'o2g'
+    //
+    // since we do not perform any other of the optimizations.
     //
     // *NOTE* The guaranteed optimization requires knowledge to be taught to the
     // ARC optimizer among other passes in order to guarantee safety. That or
