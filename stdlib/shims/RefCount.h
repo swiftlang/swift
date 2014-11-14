@@ -31,6 +31,7 @@ typedef struct {
 #else
 // __cplusplus
 
+#include <type_traits>
 #include <stdint.h>
 #include <assert.h>
 
@@ -70,9 +71,15 @@ class StrongRefCount {
                 "inconsistent refcount flags");
 
  public:
+  enum Initialized_t { Initialized };
 
+  // StrongRefCount must be trivially constructible to avoid ObjC++
+  // destruction overhead at runtime. Use StrongRefCount(Initialized) to produce
+  // an initialized instance.
+  StrongRefCount() = default;
+  
   // Refcount of a new object is 1.
-  constexpr StrongRefCount()
+  constexpr StrongRefCount(Initialized_t)
     : refCount(RC_ONE) { }
 
   void init() {
@@ -157,9 +164,15 @@ class WeakRefCount {
                 "inconsistent refcount flags");
 
  public:
+  enum Initialized_t { Initialized };
 
+  // WeakRefCount must be trivially constructible to avoid ObjC++
+  // destruction overhead at runtime. Use WeakRefCount(Initialized) to produce
+  // an initialized instance.
+  WeakRefCount() = default;
+  
   // Weak refcount of a new object is 1.
-  constexpr WeakRefCount()
+  constexpr WeakRefCount(Initialized_t)
     : refCount(RC_ONE) { }
 
   void init() {
@@ -192,6 +205,14 @@ class WeakRefCount {
   }
 };
 
+static_assert(std::is_trivially_constructible<StrongRefCount>::value,
+              "StrongRefCount must be trivially initializable");
+static_assert(std::is_trivially_constructible<WeakRefCount>::value,
+              "WeakRefCount must be trivially initializable");
+static_assert(std::is_trivially_destructible<StrongRefCount>::value,
+              "StrongRefCount must be trivially destructible");
+static_assert(std::is_trivially_destructible<WeakRefCount>::value,
+              "WeakRefCount must be trivially destructible");
 
 // __cplusplus
 #endif

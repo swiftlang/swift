@@ -15,6 +15,8 @@
 #include "RefCount.h"
 
 #ifdef __cplusplus
+#include <type_traits>
+
 namespace swift {
 #endif 
 
@@ -35,16 +37,23 @@ struct HeapObject {
   // FIXME: allocate two words of metadata on 32-bit platforms
 
 #ifdef __cplusplus
+  HeapObject() = default;
+
   // Initialize a HeapObject header as appropriate for a newly-allocated object.
   constexpr HeapObject(HeapMetadata const *newMetadata) 
     : metadata(newMetadata)
-    , refCount()
-    , weakRefCount() 
+    , refCount(StrongRefCount::Initialized)
+    , weakRefCount(WeakRefCount::Initialized)
   { }
 #endif
 };
 
 #ifdef __cplusplus
+static_assert(std::is_trivially_constructible<HeapObject>::value,
+              "HeapObject must be trivially initializable");
+static_assert(std::is_trivially_destructible<HeapObject>::value,
+              "HeapObject must be trivially destructible");
+
 }
 #endif 
 
