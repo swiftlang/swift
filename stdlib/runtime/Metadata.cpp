@@ -20,6 +20,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
+#include "Locks.h"
 #include <algorithm>
 #include <condition_variable>
 #include <new>
@@ -32,89 +33,6 @@
 #include "Lazy.h"
 #include "Debug.h"
 #include "Private.h"
-
-// FIXME: Can't use llvm's RWMutex because it isn't a header-only implementation
-
-class RWMutex {
-  pthread_rwlock_t rwlock;
-
-public:
-
-  RWMutex() {
-#ifdef __APPLE__
-    // Workaround a bug/mis-feature in Darwin's pthread_rwlock_init.
-    bzero(&rwlock, sizeof(pthread_rwlock_t));
-#endif
-    int errorcode = pthread_rwlock_init(&rwlock, nullptr);
-    (void)errorcode;
-    assert(errorcode == 0);
-  }
-
-  ~RWMutex() {
-    pthread_rwlock_destroy(&rwlock);
-  }
-
-  bool reader_acquire() {
-    int errorcode = pthread_rwlock_rdlock(&rwlock);
-    return errorcode == 0;
-  }
-
-  bool reader_release() {
-    int errorcode = pthread_rwlock_unlock(&rwlock);
-    return errorcode == 0;
-  }
-
-  bool writer_acquire() {
-    int errorcode = pthread_rwlock_wrlock(&rwlock);
-    return errorcode == 0;
-  }
-
-  bool writer_release() {
-    int errorcode = pthread_rwlock_unlock(&rwlock);
-    return errorcode == 0;
-  }
-};
-
-class ScopedReader {
-  RWMutex& mutex;
-  
-public:
-
-  explicit ScopedReader(RWMutex& m) : mutex(m) {
-    bool ok = mutex.reader_acquire();
-    assert(ok);
-    (void)ok;
-  }
-
-  ~ScopedReader() {
-    bool ok = mutex.reader_release();
-    assert(ok);
-    (void)ok;
-  }
-
-  ScopedReader(const ScopedReader& rhs) = delete;
-};
-
-class ScopedWriter {
-  RWMutex& mutex;
-  
-public:
-
-  explicit ScopedWriter(RWMutex& m) : mutex(m) {
-    bool ok = mutex.writer_acquire();
-    assert(ok);
-    (void)ok;
-  }
-
-  ~ScopedWriter() {
-    bool ok = mutex.writer_release();
-    assert(ok);
-    (void)ok;
-  }
-
-  ScopedWriter(const ScopedWriter& rhs) = delete;
-};
-
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
