@@ -69,10 +69,14 @@ namespace swift {
     return reinterpret_cast<const ClassMetadata *>(bits);
   }
 
-#if SWIFT_OBJC_INTEROP
   /// Is the given value an Objective-C tagged pointer?
   static inline bool isObjCTaggedPointer(const void *object) {
+#if SWIFT_OBJC_INTEROP
     return (((uintptr_t) object) & heap_object_abi::ObjCReservedBitsMask);
+#else
+    assert(!(((uintptr_t) object) & heap_object_abi::ObjCReservedBitsMask));
+    return false;
+#endif
   }
 
   static inline bool isObjCTaggedPointerOrNull(const void *object) {
@@ -81,15 +85,6 @@ namespace swift {
 
   LLVM_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);
-#else
-  static inline bool isObjCTaggedPointerOrNull(const void *object) {
-    return object == nullptr;
-  }
-
-  static inline const ClassMetadata *_swift_getClass(const void *object) {
-    return _swift_getClassOfAllocated(object);
-  }  
-#endif
 
   static inline
   const ClassMetadata *_swift_getSuperclass(const ClassMetadata *theClass) {
@@ -99,12 +94,10 @@ namespace swift {
   LLVM_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
-  // Get the superclass pointer value used for Swift root classes.
+  /// Get the superclass pointer value used for Swift root classes.
+  /// Note that this function may return a nullptr on non-objc platforms,
+  /// where there is no common root class. rdar://problem/18987058
   const ClassMetadata *getRootSuperclass();
-  
-#if !SWIFT_OBJC_INTEROP
-  inline const ClassMetadata *getRootSuperclass() { return nullptr; }
-#endif
   
 } // end namespace swift
 

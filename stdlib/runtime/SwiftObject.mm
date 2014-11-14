@@ -71,13 +71,17 @@ static uintptr_t computeISAMask() {
 uintptr_t swift::swift_isaMask = computeISAMask();
 #endif
 
-#if SWIFT_OBJC_INTEROP
 const ClassMetadata *swift::_swift_getClass(const void *object) {
+#if SWIFT_OBJC_INTEROP
   if (!isObjCTaggedPointer(object))
     return _swift_getClassOfAllocated(object);
   return reinterpret_cast<const ClassMetadata*>(object_getClass((id) object));
+#else
+  return _swift_getClassOfAllocated(object);
+#endif
 }
 
+#if SWIFT_OBJC_INTEROP
 struct SwiftObject_s {
   void *isa  __attribute__((unavailable));
   long refCount  __attribute__((unavailable));
@@ -1023,9 +1027,10 @@ size_t swift::_swift_class_getInstanceSize_class(const void* c) {
 #endif
 }
 
-#if SWIFT_OBJC_INTEROP
 const ClassMetadata *swift::getRootSuperclass() {
+#if SWIFT_OBJC_INTEROP
   return (const ClassMetadata *)[SwiftObject class];
-}
+#else
+  return nullptr;
 #endif
-
+}
