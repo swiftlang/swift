@@ -889,7 +889,7 @@ void Driver::buildActions(const ToolChain &TC,
         Actions.push_back(MergeModuleAction.release());
     }
     Actions.push_back(LinkAction);
-    if (OI.ShouldGenerateDebugInfo) {
+    if (TC.getTriple().isOSDarwin() && OI.ShouldGenerateDebugInfo) {
       Action *dSYMAction = new GenerateDSYMJobAction(LinkAction);
       dSYMAction->setOwnsInputs(false);
       Actions.push_back(dSYMAction);
