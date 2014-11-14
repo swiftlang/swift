@@ -154,7 +154,7 @@ if let frungibleType = inttype as? protocol<Fooable, Runcible, Fungible>.Type {
 }
 
 let dtype: Any.Type = D.self
-if let frungibleType = dtype as? protocol<Fooable, Runcible/*TODO , Fungible*/>.Type {
+if let frungibleType = dtype as? protocol<Fooable, Runcible, Fungible>.Type {
   println("is fooable, runcible, and fungible") // CHECK-NEXT: is
 } else {
   println("not fooable, runcible, and fungible")

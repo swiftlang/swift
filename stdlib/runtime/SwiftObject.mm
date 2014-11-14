@@ -321,6 +321,11 @@ static NSString *_getDescription(SwiftObject *obj) {
   return class_conformsToProtocol((Class) _swift_getClassOfAllocated(self), proto);
 }
 
++ (BOOL)conformsToProtocol:(Protocol*)proto {
+  if (!proto) return NO;
+  return class_conformsToProtocol(self, proto);
+}
+
 - (NSUInteger)hash {
   return (NSUInteger)self;
 }

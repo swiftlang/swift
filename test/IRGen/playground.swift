@@ -8,7 +8,11 @@ import Swift
 println()
 
 // CHECK-LABEL: define i32 @main
-// CHECK:         call void @swift_instantiateObjCClass({{.*}} @_TMdC10playground1C
+// CHECK:         call void @runtime_registration
 // CHECK:         call void @_TFSs7printlnFT_T_
 // CHECK:         ret void
 // CHECK:       }
+
+// CHECK-LABEL: define private void @runtime_registration
+// CHECK:         call void @swift_instantiateObjCClass({{.*}} @_TMdC10playground1C
+

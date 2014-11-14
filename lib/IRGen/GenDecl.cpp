@@ -31,6 +31,7 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/TypeBuilder.h"
+#include "llvm/IR/Value.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -69,11 +70,17 @@ static bool isTypeMetadataEmittedLazily(CanType type) {
 
 namespace {
   
+/// Add methods, properties, and protocol conformances from a JITed extension
+/// to an ObjC class using the ObjC runtime.
+///
+/// This must happen after ObjCProtocolInitializerVisitor if any @objc protocols
+/// were defined in the TU.
 class CategoryInitializerVisitor
   : public ClassMemberVisitor<CategoryInitializerVisitor>
 {
-  IRGenModule &IGM;
-  IRBuilder &Builder;
+  IRGenFunction &IGF;
+  IRGenModule &IGM = IGF.IGM;
+  IRBuilder &Builder = IGF.Builder;
   
   llvm::Constant *class_replaceMethod;
   llvm::Constant *class_addProtocol;
@@ -82,8 +89,8 @@ class CategoryInitializerVisitor
   llvm::Constant *metaclassMetadata;
   
 public:
-  CategoryInitializerVisitor(IRGenModule &I, IRBuilder &B, ExtensionDecl *ext)
-    : IGM(I), Builder(B)
+  CategoryInitializerVisitor(IRGenFunction &IGF, ExtensionDecl *ext)
+    : IGF(IGF)
   {
     class_replaceMethod = IGM.getClassReplaceMethodFn();
     class_addProtocol = IGM.getClassAddProtocolFn();
@@ -111,7 +118,8 @@ public:
       if (!p->isObjC())
         continue;
       
-      auto proto = IGM.getAddrOfObjCProtocolRecord(p, NotForDefinition);
+      llvm::Value *protoRef = IGM.getAddrOfObjCProtocolRef(p, NotForDefinition);
+      auto proto = Builder.CreateLoad(protoRef, IGM.getPointerAlignment());
       Builder.CreateCall2(class_addProtocol, classMetadata, proto);
     }
   }
@@ -124,7 +132,10 @@ public:
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
     llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGM, method, name, types, imp);
+    emitObjCMethodDescriptorParts(IGM, method,
+                                  /*extended*/false,
+                                  /*concrete*/true,
+                                  name, types, imp);
     
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
@@ -144,7 +155,9 @@ public:
   void visitConstructorDecl(ConstructorDecl *constructor) {
     if (!requiresObjCMethodDescriptor(constructor)) return;
     llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGM, constructor, name, types, imp);
+    emitObjCMethodDescriptorParts(IGM, constructor, /*extended*/false,
+                                  /*concrete*/true,
+                                  name, types, imp);
 
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
@@ -216,6 +229,157 @@ public:
   }
 };
 
+/// Create a descriptor for JITed @objc protocol using the ObjC runtime.
+class ObjCProtocolInitializerVisitor
+  : public TypeMemberVisitor<ObjCProtocolInitializerVisitor>
+{
+  IRGenFunction &IGF;
+  IRGenModule &IGM = IGF.IGM;
+  IRBuilder &Builder = IGF.Builder;
+
+  llvm::Constant *objc_getProtocol,
+                 *objc_allocateProtocol,
+                 *objc_registerProtocol,
+                 *protocol_addMethodDescription,
+                 *protocol_addProtocol;
+  
+  llvm::Value *NewProto = nullptr;
+  
+public:
+  ObjCProtocolInitializerVisitor(IRGenFunction &IGF)
+    : IGF(IGF)
+  {
+    objc_getProtocol = IGM.getGetObjCProtocolFn();
+    objc_allocateProtocol = IGM.getAllocateObjCProtocolFn();
+    objc_registerProtocol = IGM.getRegisterObjCProtocolFn();
+    protocol_addMethodDescription = IGM.getProtocolAddMethodDescriptionFn();
+    protocol_addProtocol = IGM.getProtocolAddProtocolFn();
+  }
+  
+  void visitMembers(ProtocolDecl *proto) {
+    // Check if the ObjC runtime already has a descriptor for this
+    // protocol. If so, use it.
+    SmallString<32> buf;
+    auto protocolName
+      = IGM.getAddrOfGlobalString(proto->getObjCRuntimeName(buf));
+    
+    auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
+    auto isNull = Builder.CreateICmpEQ(existing,
+                   llvm::ConstantPointerNull::get(IGM.ProtocolDescriptorPtrTy));
+
+    auto existingBB = IGF.createBasicBlock("existing_protocol");
+    auto newBB = IGF.createBasicBlock("new_protocol");
+    auto contBB = IGF.createBasicBlock("cont");
+    Builder.CreateCondBr(isNull, newBB, existingBB);
+    
+    // Nothing to do if there's already a descriptor.
+    Builder.emitBlock(existingBB);
+    Builder.CreateBr(contBB);
+    
+    Builder.emitBlock(newBB);
+    
+    // Allocate the protocol descriptor.
+    NewProto = Builder.CreateCall(objc_allocateProtocol, protocolName);
+    
+    // Add the parent protocols.
+    for (auto inherited : proto->getInherited()) {
+      SmallVector<ProtocolDecl*, 4> protocols;
+      if (!inherited.getType()->isAnyExistentialType(protocols))
+        continue;
+      for (auto parentProto : protocols) {
+        if (!parentProto->isObjC())
+          continue;
+        llvm::Value *parentRef
+          = IGM.getAddrOfObjCProtocolRef(parentProto, NotForDefinition);
+        parentRef = IGF.Builder.CreateBitCast(parentRef,
+                                   IGM.ProtocolDescriptorPtrTy->getPointerTo());
+        auto parent = Builder.CreateLoad(parentRef,
+                                             IGM.getPointerAlignment());
+        Builder.CreateCall2(protocol_addProtocol, NewProto, parent);
+      }
+    }
+    
+    // Add the members.
+    for (Decl *member : proto->getMembers())
+      visit(member);
+    
+    // Register it.
+    Builder.CreateCall(objc_registerProtocol, NewProto);
+    Builder.CreateBr(contBB);
+    
+    // Store the reference to the runtime's idea of the protocol descriptor.
+    Builder.emitBlock(contBB);
+    auto result = Builder.CreatePHI(IGM.ProtocolDescriptorPtrTy, 2);
+    result->addIncoming(existing, existingBB);
+    result->addIncoming(NewProto, newBB);
+    
+    llvm::Value *ref = IGM.getAddrOfObjCProtocolRef(proto, NotForDefinition);
+    ref = IGF.Builder.CreateBitCast(ref,
+                                  IGM.ProtocolDescriptorPtrTy->getPointerTo());
+
+    Builder.CreateStore(result, ref, IGM.getPointerAlignment());
+  }
+  
+  void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
+    llvm::Constant *name, *imp, *types;
+    emitObjCMethodDescriptorParts(IGM, method, /*extended*/true,
+                                  /*concrete*/false,
+                                  name, types, imp);
+    
+    // When generating JIT'd code, we need to call sel_registerName() to force
+    // the runtime to unique the selector.
+    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
+
+    llvm::Value *args[] = {
+      NewProto, sel, types,
+      // required?
+      llvm::ConstantInt::get(IGM.ObjCBoolTy,
+                             !method->getAttrs().hasAttribute<OptionalAttr>()),
+      // instance?
+      llvm::ConstantInt::get(IGM.ObjCBoolTy,
+                   isa<ConstructorDecl>(method) || method->isInstanceMember()),
+    };
+    
+    Builder.CreateCall(protocol_addMethodDescription, args);
+  }
+  
+  void visitAbstractStorageDecl(AbstractStorageDecl *prop) {
+    // TODO: Add properties to protocol.
+    
+    llvm::Constant *name, *imp, *types;
+    emitObjCGetterDescriptorParts(IGM, prop,
+                                  name, types, imp);
+    // When generating JIT'd code, we need to call sel_registerName() to force
+    // the runtime to unique the selector.
+    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
+    llvm::Value *getterArgs[] = {
+      NewProto, sel, types,
+      // required?
+      llvm::ConstantInt::get(IGM.ObjCBoolTy,
+                             !prop->getAttrs().hasAttribute<OptionalAttr>()),
+      // instance?
+      llvm::ConstantInt::get(IGM.ObjCBoolTy,
+                             prop->isInstanceMember()),
+    };
+    Builder.CreateCall(protocol_addMethodDescription, getterArgs);
+    
+    if (prop->isSettable(nullptr)) {
+      emitObjCSetterDescriptorParts(IGM, prop, name, types, imp);
+      sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn());
+      llvm::Value *setterArgs[] = {
+        NewProto, sel, types,
+        // required?
+        llvm::ConstantInt::get(IGM.ObjCBoolTy,
+                               !prop->getAttrs().hasAttribute<OptionalAttr>()),
+        // instance?
+        llvm::ConstantInt::get(IGM.ObjCBoolTy,
+                               prop->isInstanceMember()),
+      };
+      Builder.CreateCall(protocol_addMethodDescription, setterArgs);
+    }
+  }
+};
+
 } // end anonymous namespace
 
 namespace {
@@ -247,27 +411,6 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
       this->addLinkLibrary(linkLib);
     });
   });
-
-  // Library files have no entry point.
-  if (!SF.hasEntryPoint()) {
-    return;
-  }
-  
-  // In JIT mode, we need to inject additional setup into the entry point for
-  // ObjC interop.
-  if (!ObjCInterop || !Opts.UseJIT)
-    return;
-  
-  // Look for an entrypoint function in the SIL module.
-  llvm::Function *mainFn = nullptr;
-  if (auto mainSILFn =
-        SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
-    mainFn = getAddrOfSILFunction(mainSILFn, NotForDefinition);
-  }
-  assert(mainFn && "no entry point for source file?!");
-
-  IRBuilder B(getLLVMContext());
-  B.SetInsertPoint(mainFn->begin(), mainFn->begin()->begin());  
 }
 
 /// Emit a global list, i.e. a global constant array holding all of a
@@ -314,7 +457,9 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
 void IRGenModule::emitRuntimeRegistration() {
   // Duck out early if we have nothing to register.
   if (ProtocolConformanceRecords.empty()
-      && (!ObjCInterop || (ObjCClasses.empty() && ObjCCategoryDecls.empty())))
+      && (!ObjCInterop || (ObjCProtocols.empty() &&
+                           ObjCClasses.empty() &&
+                           ObjCCategoryDecls.empty())))
     return;
   
   // Find the entry point.
@@ -344,22 +489,74 @@ void IRGenModule::emitRuntimeRegistration() {
   if (!EntryFunction)
     return;
   
-  llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
-  llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-  IRBuilder Builder(getLLVMContext());
-  Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+  // Create a new function to contain our logic.
+  auto fnTy = llvm::FunctionType::get(VoidTy, /*varArg*/ false);
+  auto RegistrationFunction = llvm::Function::Create(fnTy,
+                                           llvm::GlobalValue::PrivateLinkage,
+                                           "runtime_registration",
+                                           getModule());
   
-  // Register ObjC classes and extensions we added.
+  // Insert a call into the entry function.
+  {
+    llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
+    llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
+    IRBuilder Builder(getLLVMContext());
+    Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    Builder.CreateCall(RegistrationFunction);
+  }
+  
+  IRGenFunction RegIGF(*this, RegistrationFunction);
+  
+  // Register ObjC protocols, classes, and extensions we added.
   if (ObjCInterop) {
+    if (!ObjCProtocols.empty()) {
+      // We need to initialize ObjC protocols in inheritance order, parents
+      // first.
+      
+      llvm::DenseSet<ProtocolDecl*> protos;
+      for (auto &proto : ObjCProtocols)
+        protos.insert(proto.first);
+      
+      llvm::SmallVector<ProtocolDecl*, 4> protoInitOrder;
+      
+      std::function<void(ProtocolDecl*)> orderProtocol
+        = [&](ProtocolDecl *proto) {
+          // Recursively put parents first.
+          for (auto &inherited : proto->getInherited()) {
+            SmallVector<ProtocolDecl*, 4> parents;
+            if (!inherited.getType()->isAnyExistentialType(parents))
+              continue;
+            for (auto parent : parents)
+              orderProtocol(parent);
+          }
+          // Skip if we don't need to reify this protocol.
+          auto found = protos.find(proto);
+          if (found == protos.end())
+            return;
+          protos.erase(found);
+          protoInitOrder.push_back(proto);
+        };
+      
+      while (!protos.empty()) {
+        orderProtocol(*protos.begin());
+      }
+
+      // Visit the protocols in the order we established.
+      for (auto *proto : protoInitOrder) {
+        ObjCProtocolInitializerVisitor(RegIGF)
+          .visitMembers(proto);
+      }
+    }
+    
     for (llvm::WeakVH &ObjCClass : ObjCClasses) {
-      Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
+      RegIGF.Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
     }
       
     for (ExtensionDecl *ext : ObjCCategoryDecls) {
-      CategoryInitializerVisitor(*this, Builder, ext).visitMembers(ext);
+      CategoryInitializerVisitor(RegIGF, ext).visitMembers(ext);
     }
   }
-  // Register protocol conformances if we added any.
+  // Register Swift protocol conformances if we added any.
   if (!ProtocolConformanceRecords.empty()) {
     llvm::Constant *conformances
     = emitGlobalList(*this, ProtocolConformanceRecords,
@@ -380,8 +577,9 @@ void IRGenModule::emitRuntimeRegistration() {
     };
     auto end = llvm::ConstantExpr::getGetElementPtr(conformances, endIndices);
     
-    Builder.CreateCall2(getRegisterProtocolConformancesFn(), begin, end);
+    RegIGF.Builder.CreateCall2(getRegisterProtocolConformancesFn(), begin, end);
   }
+  RegIGF.Builder.CreateRetVoid();
 }
 
 /// Add the given global value to @llvm.used.

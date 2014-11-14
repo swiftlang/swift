@@ -4349,6 +4349,11 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   // If the protocol is Objective-C-compatible, go through the path that
   // produces an ObjC-compatible protocol_t.
   if (protocol->isObjC()) {
+    // In JIT mode, we need to create protocol descriptors using the ObjC
+    // runtime in JITted code.
+    if (Opts.UseJIT)
+      return;
+    
     // Native ObjC protocols are emitted on-demand in ObjC and uniqued by the
     // runtime; we don't need to try to emit a unique descriptor symbol for them.
     if (protocol->hasClangNode())

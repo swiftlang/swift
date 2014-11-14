@@ -106,6 +106,8 @@ IRGenModule::IRGenModule(ASTContext &Context,
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
+  ObjCBoolTy = llvm::IntegerType::get(getLLVMContext(),
+                                      TargetInfo.ObjCBoolTypeSize);
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);

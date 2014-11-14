@@ -676,6 +676,28 @@ FUNCTION(ObjCClassGetName, class_getName, C_CC,
          ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(GetObjCProtocol, objc_getProtocol, C_CC,
+         RETURNS(ProtocolDescriptorPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(AllocateObjCProtocol, objc_allocateProtocol, C_CC,
+         RETURNS(ProtocolDescriptorPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(RegisterObjCProtocol, objc_registerProtocol, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ProtocolAddMethodDescription, protocol_addMethodDescription, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolDescriptorPtrTy, Int8PtrTy, Int8PtrTy,
+              ObjCBoolTy, ObjCBoolTy),
+         ATTRS(NoUnwind))
+FUNCTION(ProtocolAddProtocol, protocol_addProtocol, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolDescriptorPtrTy, ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind))
+
 // void *_Block_copy(void *block);
 FUNCTION(BlockCopy, _Block_copy, C_CC,
          RETURNS(ObjCBlockPtrTy),

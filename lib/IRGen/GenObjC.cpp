@@ -1090,6 +1090,8 @@ static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
 /// type encoding, and IMP pointer.
 void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
                                           AbstractFunctionDecl *method,
+                                          bool extendedEncoding,
+                                          bool concrete,
                                           llvm::Constant *&selectorRef,
                                           llvm::Constant *&atEncoding,
                                           llvm::Constant *&impl) {
@@ -1106,9 +1108,14 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
     // Account for the 'self' pointer being curried.
     methodType = cast<AnyFunctionType>(methodType.getResult());
   }
-  atEncoding = GetObjCEncodingForMethodType(IGM, methodType, false);
+  atEncoding = GetObjCEncodingForMethodType(IGM, methodType, extendedEncoding);
   
   /// The third element is the method implementation pointer.
+  if (!concrete) {
+    impl = nullptr;
+    return;
+  }
+  
   if (auto func = dyn_cast<FuncDecl>(method))
     impl = getObjCMethodPointer(IGM, func);
   else if (auto ctor = dyn_cast<ConstructorDecl>(method))
@@ -1158,6 +1165,22 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
   atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   impl = getObjCGetterPointer(IGM, subscript);
+}
+
+void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
+                                          AbstractStorageDecl *decl,
+                                          llvm::Constant *&selectorRef,
+                                          llvm::Constant *&atEncoding,
+                                          llvm::Constant *&impl) {
+  if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+    return emitObjCGetterDescriptorParts(IGM, sub,
+                                         selectorRef, atEncoding, impl);
+  }
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    return emitObjCGetterDescriptorParts(IGM, var,
+                                         selectorRef, atEncoding, impl);
+  }
+  llvm_unreachable("unknown storage!");
 }
 
 /// Emit the components of an Objective-C method descriptor for a
@@ -1216,6 +1239,22 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   impl = getObjCSetterPointer(IGM, subscript);
 }
 
+void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                          AbstractStorageDecl *decl,
+                                          llvm::Constant *&selectorRef,
+                                          llvm::Constant *&atEncoding,
+                                          llvm::Constant *&impl) {
+  if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+    return emitObjCSetterDescriptorParts(IGM, sub,
+                                         selectorRef, atEncoding, impl);
+  }
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    return emitObjCSetterDescriptorParts(IGM, var,
+                                         selectorRef, atEncoding, impl);
+  }
+  llvm_unreachable("unknown storage!");
+}
+
 /// Emit an Objective-C method descriptor for the given method.
 /// struct method_t {
 ///   SEL name;
@@ -1226,6 +1265,8 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
                                                 AbstractFunctionDecl *method) {
   llvm::Constant *selectorRef, *atEncoding, *impl;
   emitObjCMethodDescriptorParts(IGM, method,
+                                /*extended*/ false,
+                                /*concrete*/ true,
                                 selectorRef, atEncoding, impl);
   
   llvm::Constant *fields[] = { selectorRef, atEncoding, impl };

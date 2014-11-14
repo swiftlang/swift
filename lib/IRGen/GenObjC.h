@@ -81,6 +81,8 @@ namespace irgen {
   /// method or constructor implementation.
   void emitObjCMethodDescriptorParts(IRGenModule &IGM,
                                      AbstractFunctionDecl *method,
+                                     bool extendedEncoding,
+                                     bool concrete,
                                      llvm::Constant *&selectorRef,
                                      llvm::Constant *&atEncoding,
                                      llvm::Constant *&impl);
@@ -101,6 +103,12 @@ namespace irgen {
                                      llvm::Constant *&atEncoding,
                                      llvm::Constant *&impl);
 
+  void emitObjCGetterDescriptorParts(IRGenModule &IGM,
+                                     AbstractStorageDecl *subscript,
+                                     llvm::Constant *&selectorRef,
+                                     llvm::Constant *&atEncoding,
+                                     llvm::Constant *&impl);
+
   /// Build the components of an Objective-C method descriptor for the given
   /// property's method implementations.
   void emitObjCSetterDescriptorParts(IRGenModule &IGM,
@@ -113,6 +121,12 @@ namespace irgen {
   /// subscript's method implementations.
   void emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                      SubscriptDecl *subscript,
+                                     llvm::Constant *&selectorRef,
+                                     llvm::Constant *&atEncoding,
+                                     llvm::Constant *&impl);
+
+  void emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                     AbstractStorageDecl *subscript,
                                      llvm::Constant *&selectorRef,
                                      llvm::Constant *&atEncoding,
                                      llvm::Constant *&impl);

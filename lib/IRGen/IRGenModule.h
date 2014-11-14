@@ -143,6 +143,7 @@ public:
     llvm::IntegerType *MetadataKindTy;
     llvm::IntegerType *OnceTy;
   };
+  llvm::IntegerType *ObjCBoolTy;       /// i8 or i1
   union {
     llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *WitnessTableTy;
