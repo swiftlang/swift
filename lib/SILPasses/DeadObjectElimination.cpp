@@ -199,7 +199,7 @@ static bool canZapInstruction(SILInstruction *Inst) {
 
   // If Inst does not read or write to memory, have side effects, and is not a
   // terminator, we can zap it.
-  if (Inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None &&
+  if (!Inst->mayHaveSideEffects() && !Inst->mayReadFromMemory() &&
       !isa<TermInst>(Inst))
     return true;
 

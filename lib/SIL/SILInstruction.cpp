@@ -625,6 +625,10 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
 }
 
 bool SILInstruction::mayHaveSideEffects() const {
+  // If this instruction traps then it must have side effects.
+  if (mayTrap())
+    return true;
+
   MemoryBehavior B = getMemoryBehavior();
   return B == MemoryBehavior::MayWrite ||
     B == MemoryBehavior::MayReadWrite ||
@@ -694,6 +698,18 @@ bool SILInstruction::isTriviallyDuplicatable() const {
 
   return true;
 }
+
+bool SILInstruction::mayTrap() const {
+  switch(getKind()) {
+  case ValueKind::CondFailInst:
+  case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UnconditionalCheckedCastAddrInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // SILInstruction Subclasses

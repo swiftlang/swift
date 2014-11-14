@@ -326,3 +326,16 @@ sil @trivial_destructor_on_stack : $@thin () -> () {
   %1 = tuple()
   return %1 : $()
 }
+
+// If we have an instruction that mayTrap that uses the alloc_ref, we can't
+// eliminate it.
+//
+// CHECK-LABEL: sil @trivial_destructor_may_trap : $@thin () -> () {
+// CHECK: alloc_ref
+sil @trivial_destructor_may_trap : $@thin () -> () {
+  %0 = alloc_ref $TrivialDestructor
+  %1 = unconditional_checked_cast %0 : $TrivialDestructor to $AnyObject
+  strong_release %0 : $TrivialDestructor
+  %4 = tuple()
+  return %4 : $()
+}

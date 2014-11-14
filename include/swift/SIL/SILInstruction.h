@@ -147,6 +147,9 @@ public:
 
   MemoryBehavior getMemoryBehavior() const;
 
+  /// Can this instruction abort the program in some manner?
+  bool mayTrap() const;
+
   /// Returns true if the given instruction is completely identical to RHS.
   bool isIdenticalTo(const SILInstruction *RHS) const;
 
