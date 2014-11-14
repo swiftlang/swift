@@ -47,6 +47,7 @@ namespace irgen {
   OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                  llvm::Value *base,
                                                  SILType baseType,
+                                                 SILType fieldType,
                                                  VarDecl *field);
 
   std::tuple<llvm::Constant * /*classData*/,

@@ -484,7 +484,14 @@ llvm::Constant *irgen::tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
+                                                      SILType fieldType,
                                                       VarDecl *field) {
+  // If the field is empty, its address doesn't matter.
+  auto &fieldTI = IGF.getTypeInfo(fieldType);
+  if (fieldTI.isKnownEmpty()) {
+    return OwnedAddress(fieldTI.getUndefAddress(), base);
+  }
+  
   auto &baseClassTI = IGF.getTypeInfo(baseType).as<ClassTypeInfo>();
   ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
   

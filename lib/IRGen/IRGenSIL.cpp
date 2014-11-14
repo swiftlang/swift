@@ -2665,6 +2665,7 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   Address field = projectPhysicalClassMemberAddress(*this,
                                                     value,
                                                     baseTy,
+                                                    i->getType(),
                                                     i->getField())
     .getAddress();
   setLoweredAddress(SILValue(i, 0), field);
