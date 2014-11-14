@@ -33,10 +33,6 @@
 #include "Debug.h"
 #include "Private.h"
 
-#ifndef SWIFT_DEBUG_RUNTIME
-#define SWIFT_DEBUG_RUNTIME 0
-#endif
-
 using namespace swift;
 using namespace metadataimpl;
 

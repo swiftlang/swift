@@ -18,6 +18,11 @@
 #include <mutex>
 #include <condition_variable>
 
+#ifndef SWIFT_DEBUG_RUNTIME
+#define SWIFT_DEBUG_RUNTIME 0
+#endif
+
+
 static void *permanentAlloc(size_t size) { return malloc(size); }
 
 // A wrapper around a pointer to a metadata cache entry that provides
