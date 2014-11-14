@@ -1,5 +1,6 @@
 // Check JIT mode
 // RUN: %swift -sdk %sdk -interpret %s | FileCheck %s
+// REQUIRES: swift_interpreter
 
 import Foundation
 
