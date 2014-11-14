@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "Locks.h"
+#include "llvm/ADT/Hashing.h"
 #include <mutex>
 #include <condition_variable>
 
@@ -299,5 +300,41 @@ public:
     return result;
   }
 };
+
+
+namespace llvm {
+template<class Entry>
+struct DenseMapInfo<EntryRef<Entry>> {
+  static inline EntryRef<Entry> getEmptyKey() {
+    // {nullptr, 0} is a legitimate "no arguments" representation.
+    return {(const void * const *)UINTPTR_MAX, 1};
+  }
+
+  static inline EntryRef<Entry> getTombstoneKey() {
+    return {(const void * const *)UINTPTR_MAX, 2};
+  }
+
+  static inline unsigned getHashValue(EntryRef<Entry> val) {
+    llvm::hash_code hash
+      = llvm::hash_combine_range(val.begin(), val.end());
+    return (unsigned)hash;
+  }
+
+  static inline bool isEqual(EntryRef<Entry> a, EntryRef<Entry> b) {
+    unsigned asize = a.size(), bsize = b.size();
+    if (asize != bsize)
+      return false;
+    auto abegin = a.begin(), bbegin = b.begin();
+    if (abegin == (const void * const *)UINTPTR_MAX
+        || bbegin == (const void * const *)UINTPTR_MAX)
+      return abegin == bbegin;
+    for (unsigned i = 0; i < asize; ++i) {
+      if (abegin[i] != bbegin[i])
+        return false;
+    }
+    return true;
+  }
+};
+}
 
 #endif // SWIFT_RUNTIME_METADATACACHE_H
