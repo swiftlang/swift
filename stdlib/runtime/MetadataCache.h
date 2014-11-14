@@ -13,7 +13,7 @@
 #define SWIFT_RUNTIME_METADATACACHE_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "locks.h"
+#include "Locks.h"
 #include <mutex>
 
 static void *permanentAlloc(size_t size) { return malloc(size); }
