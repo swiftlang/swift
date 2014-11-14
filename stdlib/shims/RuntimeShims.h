@@ -35,7 +35,7 @@ unsigned char _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
 unsigned char
 _swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
 unsigned char _swift_isUniquelyReferenced_native(const struct HeapObject *);
-__swift_size_t _swift_class_getInstanceSize_class(const void *);
+__swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

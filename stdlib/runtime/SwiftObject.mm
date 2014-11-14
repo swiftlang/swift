@@ -1018,12 +1018,12 @@ unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
 /// Returns class_getInstanceSize(c)
 ///
 /// That function is otherwise unavailable to the core stdlib.
-size_t swift::_swift_class_getInstanceSize_class(const void* c) {
+size_t swift::_swift_class_getInstancePositiveExtentSize(const void* c) {
 #if SWIFT_OBJC_INTEROP
   return class_getInstanceSize((Class)c);
 #else
   auto metaData = static_cast<const ClassMetadata*>(c);
-  return metaData->getInstanceSize() - metaData->getInstanceAlignMask();
+  return metaData->getInstanceSize() - metaData->getInstanceAddressPoint();
 #endif
 }
 

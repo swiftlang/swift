@@ -315,10 +315,10 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     // platform: <rdar://problem/18682097> Generic and non-generic
     // class instances have different sizes on armv7
     _debugPrecondition(
-      _class_getInstanceSize(bufferClass) == sizeof(_HeapObject.self)
+      _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
       || (
         !creating
-        && _class_getInstanceSize(bufferClass)
+        && _class_getInstancePositiveExtentSize(bufferClass)
           == _valueOffset + sizeof(Value.self)),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
