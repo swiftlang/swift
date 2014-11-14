@@ -3342,42 +3342,6 @@ namespace {
         addProtocols(inherited, protocols, known);
     }
 
-    /// Finish the given protocol conformance (for an imported type)
-    /// by filling in any missing witnesses.
-    void finishProtocolConformance(NormalProtocolConformance *conformance) {
-      // Create witnesses for requirements not already met.
-      for (auto req : conformance->getProtocol()->getMembers()) {
-        auto valueReq = dyn_cast<ValueDecl>(req);
-        if (!valueReq)
-          continue;
-
-        if (!conformance->hasWitness(valueReq)) {
-          if (auto func = dyn_cast<AbstractFunctionDecl>(valueReq)){
-            // For an optional requirement, record an empty witness:
-            // we'll end up querying this at runtime.
-            auto Attrs = func->getAttrs();
-            if (Attrs.hasAttribute<OptionalAttr>()) {
-              conformance->setWitness(valueReq, ConcreteDeclRef());
-              continue;
-            }
-          }
-
-          conformance->setWitness(valueReq, valueReq);
-        } else {
-          // An initializer that conforms to a requirement is required.
-          auto witness = conformance->getWitness(valueReq, nullptr).getDecl();
-          if (auto ctor = dyn_cast_or_null<ConstructorDecl>(witness)) {
-            if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
-              ctor->getAttrs().add(
-                new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
-            }
-          }
-        }
-      }
-
-      conformance->setState(ProtocolConformanceState::Complete);
-    }
-
     // Import the given Objective-C protocol list, along with any
     // implicitly-provided protocols, and attach them to the given
     // declaration.
@@ -3433,7 +3397,7 @@ namespace {
                                allProtocols[i], SourceLoc(),
                                dc,
                                ProtocolConformanceState::Incomplete);
-        finishProtocolConformance(conformance);
+        Impl.scheduleFinishProtocolConformance(conformance);
         allConformances[i] = conformance;
       }
 
@@ -4867,14 +4831,59 @@ void ClangImporter::Implementation::finishedImportingEntity() {
 }
 
 void ClangImporter::Implementation::finishPendingActions() {
-  while (!RegisteredExternalDecls.empty()) {
-    Decl *D = RegisteredExternalDecls.pop_back_val();
-    SwiftContext.addedExternalDecl(D);
-    if (auto typeResolver = getTypeResolver())
-      if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
-        if (!nominal->hasDelayedMembers())
-          typeResolver->resolveExternalDeclImplicitMembers(nominal);
+  while (true) {
+    if (!RegisteredExternalDecls.empty()) {
+      Decl *D = RegisteredExternalDecls.pop_back_val();
+      SwiftContext.addedExternalDecl(D);
+      if (auto typeResolver = getTypeResolver())
+        if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
+          if (!nominal->hasDelayedMembers())
+            typeResolver->resolveExternalDeclImplicitMembers(nominal);
+    } else if (!DelayedProtocolConformances.empty()) {
+      NormalProtocolConformance *conformance =
+          DelayedProtocolConformances.pop_back_val();
+      finishProtocolConformance(conformance);
+    } else {
+      break;
+    }
   }
+}
+
+/// Finish the given protocol conformance (for an imported type)
+/// by filling in any missing witnesses.
+void ClangImporter::Implementation::finishProtocolConformance(
+    NormalProtocolConformance *conformance) {
+  // Create witnesses for requirements not already met.
+  for (auto req : conformance->getProtocol()->getMembers()) {
+    auto valueReq = dyn_cast<ValueDecl>(req);
+    if (!valueReq)
+      continue;
+
+    if (!conformance->hasWitness(valueReq)) {
+      if (auto func = dyn_cast<AbstractFunctionDecl>(valueReq)){
+        // For an optional requirement, record an empty witness:
+        // we'll end up querying this at runtime.
+        auto Attrs = func->getAttrs();
+        if (Attrs.hasAttribute<OptionalAttr>()) {
+          conformance->setWitness(valueReq, ConcreteDeclRef());
+          continue;
+        }
+      }
+
+      conformance->setWitness(valueReq, valueReq);
+    } else {
+      // An initializer that conforms to a requirement is required.
+      auto witness = conformance->getWitness(valueReq, nullptr).getDecl();
+      if (auto ctor = dyn_cast_or_null<ConstructorDecl>(witness)) {
+        if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
+          ctor->getAttrs().add(
+            new (SwiftContext) RequiredAttr(/*implicit=*/true));
+        }
+      }
+    }
+  }
+
+  conformance->setState(ProtocolConformanceState::Complete);
 }
 
 Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
