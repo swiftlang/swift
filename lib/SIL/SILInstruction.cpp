@@ -377,7 +377,7 @@ namespace {
         return false;
       return X->getSubstitutions() == RHS->getSubstitutions();
     }
-      
+
     bool visitBuiltinInst(BuiltinInst *RHS) {
       auto *X = cast<BuiltinInst>(LHS);
       if (X->getName() != RHS->getName())
@@ -402,20 +402,20 @@ namespace {
     bool visitSelectEnumInstBase(const SelectEnumInstBase *RHS) {
       // Check that the instructions match cases in the same order.
       auto *X = cast<SelectEnumInstBase>(LHS);
-      
+
       if (X->getNumCases() != RHS->getNumCases())
         return false;
       if (X->hasDefault() != RHS->hasDefault())
         return false;
-      
+
       for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
         if (X->getCase(i).first != RHS->getCase(i).first)
           return false;
       }
-      
+
       return true;
     }
-      
+
     bool visitSelectEnumInst(const SelectEnumInst *RHS) {
       return visitSelectEnumInstBase(RHS);
     }
@@ -674,19 +674,24 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 bool SILInstruction::isTriviallyDuplicatable() const {
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
-  } else if (isa<OpenExistentialInst>(this) ||
-             isa<OpenExistentialRefInst>(this) ||
-             isa<OpenExistentialMetatypeInst>(this)) {
+  }
+
+  if (isa<OpenExistentialInst>(this) ||
+      isa<OpenExistentialRefInst>(this) ||
+      isa<OpenExistentialMetatypeInst>(this)) {
     // Don't know how to duplicate these properly yet. Inst.clone() per
     // instruction does not work. Because the follow-up instructions need to
     // reuse the same archetype uuid which would only work if we used a
     // cloner.
     return false;
-  } else if (auto *MI = dyn_cast<MethodInst>(this)) {
+  }
+
+  if (auto *MI = dyn_cast<MethodInst>(this)) {
     // We can't build SSA for method values that lower to objc methods.
     if (MI->getMember().isForeign)
       return false;
   }
+
   return true;
 }
 
@@ -777,7 +782,7 @@ BuiltinInst::BuiltinInst(SILLocation Loc,
   static_assert(IsTriviallyCopyable<Substitution>::value,
                 "assuming Substitution is trivially copyable");
   memcpy(getSubstitutionsStorage(), Subs.begin(),
-         sizeof(Substitution) * Subs.size());  
+         sizeof(Substitution) * Subs.size());
 }
 
 ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
@@ -1381,12 +1386,12 @@ static SmallVector<SILValue, 4>
 getCaseOperands(ArrayRef<std::pair<EnumElementDecl*, SILValue>> CaseValues,
                 SILValue DefaultValue) {
   SmallVector<SILValue, 4> result;
-  
+
   for (auto &pair : CaseValues)
     result.push_back(pair.second);
   if (DefaultValue)
     result.push_back(DefaultValue);
-  
+
   return result;
 }
 
@@ -1467,25 +1472,25 @@ namespace {
   getUniqueCaseForDefaultValue(Inst *inst, SILValue enumValue) {
     assert(inst->hasDefault() && "doesn't have a default");
     SILType enumType = enumValue.getType();
-    
+
     if (enumType.isResilient(inst->getParent()->getParent()->getModule()))
       return nullptr;
-    
+
     EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
     assert(decl && "switch_enum operand is not an enum");
-    
+
     llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
     for (auto elt : decl->getAllElements())
       unswitchedElts.insert(elt);
-    
+
     for (unsigned i = 0, e = inst->getNumCases(); i != e; ++i) {
       auto Entry = inst->getCase(i);
       unswitchedElts.erase(Entry.first);
     }
-    
+
     if (unswitchedElts.size() == 1)
       return *unswitchedElts.begin();
-    
+
     return nullptr;
   }
 }
@@ -1516,7 +1521,7 @@ SelectEnumInstBase::getSingleTrueElement() const {
       }
     }
   }
-  
+
   if (!TrueElement || !*TrueElement)
     return nullptr;
   return *TrueElement;
@@ -1630,10 +1635,10 @@ TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance 
   switch (C->getProtocol()->getAccessibility()) {
     case Accessibility::Private:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
-      
+
     case Accessibility::Internal:
       return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
-      
+
     default:
       return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
   }
