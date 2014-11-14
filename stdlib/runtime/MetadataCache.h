@@ -22,7 +22,6 @@
 #define SWIFT_DEBUG_RUNTIME 0
 #endif
 
-
 static void *permanentAlloc(size_t size) { return malloc(size); }
 
 // A wrapper around a pointer to a metadata cache entry that provides
@@ -36,11 +35,11 @@ class EntryRef {
   const void * const *args;
   unsigned length;
 
-  EntryRef(const void * const *args, unsigned length)
-    : args(args), length(length)
-  {}
+  EntryRef(const void * const *args, unsigned length) :
+    args(args), length(length) {}
 
   friend struct llvm::DenseMapInfo<EntryRef>;
+
 public:
   static EntryRef forEntry(const Entry *e, unsigned numArguments) {
     return EntryRef(e->getArgumentsBuffer(), numArguments);
@@ -59,7 +58,6 @@ public:
   const void * const *end() const { return args + length; }
   unsigned size() const { return length; }
 };
-
 
 template <class Impl>
 struct CacheEntryHeader {
@@ -99,6 +97,7 @@ public:
   void **getArgumentsBuffer() {
     return reinterpret_cast<void**>(this) - asImpl()->getNumArguments();
   }
+
   void * const *getArgumentsBuffer() const {
     return reinterpret_cast<void * const *>(this)
       - asImpl()->getNumArguments();
@@ -107,6 +106,7 @@ public:
   template <class T> T *getData() {
     return reinterpret_cast<T *>(asImpl() + 1);
   }
+
   template <class T> const T *getData() const {
     return const_cast<CacheEntry*>(this)->getData<T>();
   }
@@ -158,8 +158,7 @@ template <class Entry> class MetadataCache {
   EntriesMapType Entries;
 
 public:
-  MetadataCache() : Lock(new MetadataCacheLock()) {
-  }
+  MetadataCache() : Lock(new MetadataCacheLock()) {}
   ~MetadataCache() { delete Lock; }
 
   /// Caches are not copyable.
@@ -305,7 +304,6 @@ public:
     return result;
   }
 };
-
 
 namespace llvm {
 template<class Entry>
