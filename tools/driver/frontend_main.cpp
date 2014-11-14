@@ -432,10 +432,7 @@ static bool performCompile(CompilerInstance &Instance,
     IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
-    // FIXME: Debug info is temporarily disabled, because
-    // JITCodeEmitter doesn't support it. This can be fixed by
-    // migrating to MCJIT.
-    IRGenOpts.DebugInfo = false;
+    IRGenOpts.DebugInfo = true;
     const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
                                                    opts.ImmediateArgv.end());
     Instance.setSILModule(std::move(SM));
