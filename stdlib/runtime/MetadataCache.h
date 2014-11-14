@@ -15,6 +15,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "Locks.h"
 #include <mutex>
+#include <condition_variable>
 
 static void *permanentAlloc(size_t size) { return malloc(size); }
 
