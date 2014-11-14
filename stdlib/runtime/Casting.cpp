@@ -787,7 +787,7 @@ swift::swift_dynamicCastUnknownClass(const void *object,
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
-    swift_dynamicCastFailure(_swift_getClass(object), targetType);
+    return nullptr;
   }
   _failCorruptType(targetType);
 }

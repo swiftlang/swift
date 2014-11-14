@@ -136,6 +136,7 @@ if let fruncible = c2 as? protocol<Fooable, Runcible> {
   println("not fooable and runcible")
 }
 
+let d: D = D()
 let d1: AnyObject = D()
 let d2: Any = D()
 if let frungible = d1 as? protocol<Fooable, Runcible, Fungible> {
@@ -158,4 +159,15 @@ if let frungibleType = dtype as? protocol<Fooable, Runcible, Fungible>.Type {
   println("is fooable, runcible, and fungible") // CHECK-NEXT: is
 } else {
   println("not fooable, runcible, and fungible")
+}
+
+func genericCast<U: AnyObject>(x: AnyObject, _: U.Type) -> U? {
+  return x as? U
+}
+
+// FIXME
+if let fungible = genericCast(d, Fungible.self) {
+  fungible.funge() // TODO-NEXT: D
+} else {
+  println("not fungible") // TODO CHECK-NEXT: not fungible
 }
