@@ -20,11 +20,10 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
-#include "Locks.h"
+#include "MetadataCache.h"
 #include <algorithm>
 #include <condition_variable>
 #include <new>
-#include <mutex>
 #include <cctype>
 #include <pthread.h>
 #include "llvm/ADT/DenseMap.h"
@@ -41,105 +40,6 @@
 using namespace swift;
 using namespace metadataimpl;
 
-static void *permanentAlloc(size_t size) {
-  return malloc(size);
-}
-
-namespace {
-  template <class Entry> class MetadataCache;
-
-  template <class Impl>
-  struct CacheEntryHeader {
-    /// LLDB walks this list.
-    const Impl *Next;
-  };
-
-  /// A CRTP class for defining entries in a metadata cache.
-  template <class Impl, class Header = CacheEntryHeader<Impl> >
-  class alignas(void*) CacheEntry : public Header {
-
-    CacheEntry(const CacheEntry &other) = delete;
-    void operator=(const CacheEntry &other) = delete;
-
-    Impl *asImpl() { return static_cast<Impl*>(this); }
-    const Impl *asImpl() const { return static_cast<const Impl*>(this); }
-
-  protected:
-    CacheEntry() = default;
-
-  public:
-    static Impl *allocate(const void * const *arguments,
-                          size_t numArguments, size_t payloadSize) {
-      void *buffer = permanentAlloc(sizeof(Impl)  +
-                                    numArguments * sizeof(void*) +
-                                    payloadSize);
-      void *resultPtr = (char*)buffer + numArguments * sizeof(void*);
-      auto result = new (resultPtr) Impl(numArguments);
-
-      // Copy the arguments into the right place for the key.
-      memcpy(buffer, arguments,
-             numArguments * sizeof(void*));
-
-      return result;
-    }
-
-    void **getArgumentsBuffer() {
-      return reinterpret_cast<void**>(this) - asImpl()->getNumArguments();
-    }
-    void * const *getArgumentsBuffer() const {
-      return reinterpret_cast<void * const *>(this)
-               - asImpl()->getNumArguments();
-    }
-
-    template <class T> T *getData() {
-      return reinterpret_cast<T *>(asImpl() + 1);
-    }
-    template <class T> const T *getData() const {
-      return const_cast<CacheEntry*>(this)->getData<T>();
-    }
-    
-    static const Impl *fromArgumentsBuffer(const void * const *argsBuffer,
-                                           unsigned numArguments) {
-      return reinterpret_cast<const Impl *>(argsBuffer + numArguments);
-    }
-  };
-  
-  // A wrapper around a pointer to a metadata cache entry that provides
-  // DenseMap semantics that compare values in the key vector for the metadata
-  // instance.
-  //
-  // This is stored as a pointer to the arguments buffer, so that we can save
-  // an offset while looking for the matching argument given a key.
-  template<class Entry>
-  class EntryRef {
-    const void * const *args;
-    unsigned length;
-    
-    EntryRef(const void * const *args, unsigned length)
-    : args(args), length(length)
-    {}
-
-    friend struct llvm::DenseMapInfo<EntryRef>;
-  public:
-    static EntryRef forEntry(const Entry *e, unsigned numArguments) {
-      return EntryRef(e->getArgumentsBuffer(), numArguments);
-    }
-    
-    static EntryRef forArguments(const void * const *args,
-                                 unsigned numArguments) {
-      return EntryRef(args, numArguments);
-    }
-    
-    const Entry *getEntry() const {
-      return Entry::fromArgumentsBuffer(args, length);
-    }
-    
-    const void * const *begin() const { return args; }
-    const void * const *end() const { return args + length; }
-    unsigned size() const { return length; }
-  };
-}
-
 namespace llvm {
   template<class Entry>
   struct DenseMapInfo<EntryRef<Entry>> {
@@ -147,17 +47,17 @@ namespace llvm {
       // {nullptr, 0} is a legitimate "no arguments" representation.
       return {(const void * const *)UINTPTR_MAX, 1};
     }
-    
+
     static inline EntryRef<Entry> getTombstoneKey() {
       return {(const void * const *)UINTPTR_MAX, 2};
     }
-    
+
     static inline unsigned getHashValue(EntryRef<Entry> val) {
       llvm::hash_code hash
         = llvm::hash_combine_range(val.begin(), val.end());
       return (unsigned)hash;
     }
-    
+
     static inline bool isEqual(EntryRef<Entry> a, EntryRef<Entry> b) {
       unsigned asize = a.size(), bsize = b.size();
       if (asize != bsize)
@@ -174,196 +74,6 @@ namespace llvm {
     }
   };
 }
-
-namespace {
-  /// The implementation of a metadata cache.  Note that all-zero must
-  /// be a valid state for the cache.
-  template <class Entry> class MetadataCache {
-    /// Synchronization.
-    ///
-    /// Readers: acquire EntriesLock for reading.
-    /// 
-    /// Writers and waiters: Acquire InsertionLock first. 
-    /// Use InsertionWaiters to wait for another thread to complete an entry.
-    /// Acquire EntriesLock for writing second when modifying the Entries table.
-    /// 
-    /// We need a mutex in addition to the rwlock to make the 
-    /// condition variable work.
-    struct MetadataCacheLock {
-      RWMutex EntriesLock;
-      std::mutex InsertionLock;
-      std::condition_variable InsertionWaiters;
-    };
-    MetadataCacheLock *Lock;
-
-    /// The head of a linked list connecting all the metadata cache entries.
-    /// TODO: Remove this when LLDB is able to understand the final data
-    /// structure for the metadata cache.
-    const Entry *Head;
-
-    enum class EntryState : uint8_t { Complete, Building, BuildingWithWaiters };
-    
-    /// The lookup table for cached entries.
-    ///
-    /// The EntryRef may be to temporary memory lacking a full backing
-    /// Entry unless the value is Complete.  However, if there is an
-    /// entry with a non-Complete value, there will eventually be a
-    /// notification to the lock's wait list.
-    ///
-    /// TODO: Consider a more tuned hashtable implementation.
-    typedef llvm::DenseMap<EntryRef<Entry>, EntryState> EntriesMapType;
-    typedef typename EntriesMapType::iterator EntriesIteratorType;
-    EntriesMapType Entries;
-
-  public:
-    MetadataCache() : Lock(new MetadataCacheLock()) {
-    }
-    ~MetadataCache() { delete Lock; }
-
-    /// Caches are not copyable.
-    MetadataCache(const MetadataCache &other) = delete;
-    MetadataCache &operator=(const MetadataCache &other) = delete;
-
-    /// Look up a cached metadata entry.
-    /// If a cache match exists, return it.
-    /// Otherwise, call entryBuilder() and add that to the cache.
-    const Entry *findOrAdd(const void * const *arguments, 
-                           size_t numArguments, 
-                           std::function<Entry *()> entryBuilder) {
-
-#if SWIFT_DEBUG_RUNTIME
-      printf("%s(%p): looking for entry with %zu arguments:\n", 
-             Entry::getName(), this, numArguments);
-      for (size_t i = 0; i < numArguments; i++) {
-        printf("%s(%p):     %p\n", Entry::getName(), this, arguments[i]);
-      }
-#endif
-
-      auto key = EntryRef<Entry>::forArguments(arguments, numArguments);
-
-      // Look for an existing entry.
-      {
-        ScopedReader readGuard(Lock->EntriesLock);
-        auto found = Entries.find(key);
-        if (found != Entries.end()  &&  found->second == EntryState::Complete) {
-#if SWIFT_DEBUG_RUNTIME
-          printf("%s(%p): found %p already in cache\n", 
-                 Entry::getName(), this, found->first.getEntry());
-#endif
-          return found->first.getEntry();
-        }
-      }
-
-      // No complete entry found. Insert a new entry or wait for the 
-      // existing one to complete.
-
-      {
-        std::unique_lock<std::mutex> insertionGuard(Lock->InsertionLock);
-
-        // Try to insert a placeholder so other threads know a new entry 
-        // is under construction.
-        std::pair<typename decltype(Entries)::iterator, bool> found;
-        {
-          ScopedWriter writeGuard(Lock->EntriesLock);
-          found = Entries.insert({key, EntryState::Building});
-        }
-        // We no longer hold EntriesLock but `found` remains valid 
-        // while we still hold InsertionLock.
-
-        auto it = found.first;
-        bool inserted = found.second;
-
-        if (it->second == EntryState::Complete) {
-          // Some other thread built the entry already. Return it.
-#if SWIFT_DEBUG_RUNTIME
-          printf("%s(%p): found %p already in cache after losing writer race\n",
-                 Entry::getName(), this, it->first.getEntry());
-#endif
-          return it->first.getEntry();
-        }
-        
-        if (!inserted) {
-          // Some other thread is currently building the entry. 
-          // Wait for it to complete, then return it.
-
-          // Tell the builder that we're here.
-          it->second = EntryState::BuildingWithWaiters;
-
-          // Wait until the entry's state goes to Complete.
-          while (it->second != EntryState::Complete) {          
-            Lock->InsertionWaiters.wait(insertionGuard);
-
-            // We dropped InsertionLock so don't trust the existing iterator.
-            it = Entries.find(key);
-            assert(it != Entries.end());
-          }
-
-#if SWIFT_DEBUG_RUNTIME
-          printf("%s(%p): found %p already in cache after waiting\n", 
-                 Entry::getName(), this, it->first.getEntry());
-#endif
-          return it->first.getEntry();
-        }
-      }
-
-      // Placeholder insertion successful. 
-
-      // Build the new cache entry.
-      // For some cache types this call may re-entrantly perform additional 
-      // cache lookups.
-      Entry *entry = entryBuilder();
-      assert(entry);
-
-      // Insert the new cache entry.
-      bool shouldNotify;
-      const Entry *result;
-      {
-        std::unique_lock<std::mutex> insertionGuard(Lock->InsertionLock);
-
-        // Update the linked list.
-        entry->Next = Head;
-        Head = entry;
-
-        // Find our placeholder.
-        // We hold InsertionLock so nobody can modify the table underneath us.
-        auto it = Entries.find(key);
-        assert(it != Entries.end());
-
-        // Replace the placeholder entry with the real data.
-        {
-          // Acquire EntriesLock to keep readers out while we update.
-          ScopedWriter writeGuard(Lock->EntriesLock);
-
-          // The existing key is a reference to the (probably stack-based)
-          // arguments array, so overwrite it.  Maps don't normally allow
-          // their keys to be overwritten, and doing so isn't officially
-          // allowed, but supposedly it is unofficially guaranteed to
-          // work, at least with the standard containers.
-          key = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
-          assert(it == Entries.find(key));
-          const_cast<EntryRef<Entry>&>(it->first) = key;
-
-          // Mark the entry as Complete.
-          assert(it->second != EntryState::Complete);
-          shouldNotify = (it->second == EntryState::BuildingWithWaiters);
-          it->second = EntryState::Complete;
-          result = it->first.getEntry();
-        }
-      }
-
-      // Notify any threads that might be waiting for the entry we just built.
-      if (shouldNotify) {
-        Lock->InsertionWaiters.notify_all();
-      }
-
-#if SWIFT_DEBUG_RUNTIME
-      printf("%s(%p): created %p %p\n", 
-             Entry::getName(), this, entry, result);
-#endif
-      return result;
-    }
-  };
-} // unnamed namespace
 
 namespace {
   struct GenericCacheEntry;
@@ -493,7 +203,7 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
   auto genericArgs = (const void * const *) arguments;
   size_t numGenericArgs = pattern->NumKeyArguments;
 
-  auto entry = getCache(pattern).findOrAdd(genericArgs, numGenericArgs, 
+  auto entry = getCache(pattern).findOrAdd(genericArgs, numGenericArgs,
     [&]() -> GenericCacheEntry* {
       // Create new metadata to cache.
       auto metadata = pattern->CreateFunction(pattern, arguments);
@@ -501,7 +211,7 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
       entry->Value = metadata;
       return entry;
     });
-  
+
   return entry->Value;
 }
 
@@ -574,7 +284,7 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 
   const size_t numGenericArgs = 1;
   const void *args[] = { theClass };
-  auto entry = ObjCClassWrappers.findOrAdd(args, numGenericArgs, 
+  auto entry = ObjCClassWrappers.findOrAdd(args, numGenericArgs,
     [&]() -> ObjCClassCacheEntry* {
       // Create a new entry for the cache.
       auto entry = ObjCClassCacheEntry::allocate(args, numGenericArgs, 0);
@@ -583,7 +293,7 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
       metadata->setKind(MetadataKind::ObjCClassWrapper);
       metadata->ValueWitnesses = &_TWVBO;
       metadata->Class = theClass;
-      
+
       return entry;
     });
 
@@ -604,7 +314,7 @@ namespace {
 
     static constexpr size_t getNumArguments() {
       return 2;
-    }    
+    }
 
     FullMetadata<FunctionTypeMetadata> *getData() {
       return &Metadata;
@@ -621,7 +331,7 @@ namespace {
 #if SWIFT_OBJC_INTEROP
   MetadataCache<FunctionCacheEntry> BlockTypes;
 #endif
-  
+
   const FunctionTypeMetadata *
   _getFunctionTypeMetadata(const Metadata *argMetadata,
                            const Metadata *resultMetadata,
@@ -632,7 +342,7 @@ namespace {
 
     const size_t numGenericArgs = 2;
     const void *args[] = { argMetadata, resultMetadata };
-    auto entry = Cache.findOrAdd(args, numGenericArgs, 
+    auto entry = Cache.findOrAdd(args, numGenericArgs,
       [&]() -> FunctionCacheEntry* {
         // Create a new entry for the cache.
         auto entry = FunctionCacheEntry::allocate(args, numGenericArgs, 0);
@@ -690,7 +400,7 @@ namespace {
     TupleCacheEntry(size_t numArguments) {
       NumArguments = numArguments;
     }
-    
+
     size_t getNumArguments() const {
       return Metadata.NumElements;
     }
@@ -783,12 +493,12 @@ static void tuple_destroyArray(OpaqueValue *array, size_t n,
   auto &metadata = *(const TupleTypeMetadata*) _metadata;
   assert(IsPOD == tuple_getValueWitnesses(&metadata)->isPOD());
   assert(IsInline == tuple_getValueWitnesses(&metadata)->isValueInline());
-  
+
   if (IsPOD) return;
-  
+
   size_t stride = tuple_getValueWitnesses(&metadata)->stride;
   char *bytes = (char*)array;
-  
+
   while (n--) {
     tuple_destroy<IsPOD, IsInline>((OpaqueValue*)bytes, _metadata);
     bytes += stride;
@@ -879,18 +589,18 @@ static OpaqueValue *tuple_initializeArrayWithCopy(OpaqueValue *dest,
   assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memcpy_array(dest, src, n, metatype);
-  
+
   char *destBytes = (char*)dest;
   char *srcBytes = (char*)src;
   size_t stride = tuple_getValueWitnesses(metatype)->stride;
-  
+
   while (n--) {
     tuple_initializeWithCopy<IsPOD, IsInline>((OpaqueValue*)destBytes,
                                               (OpaqueValue*)srcBytes,
                                               metatype);
     destBytes += stride; srcBytes += stride;
   }
-  
+
   return dest;
 }
 
@@ -918,18 +628,18 @@ static OpaqueValue *tuple_initializeArrayWithTakeFrontToBack(
   assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memmove_array(dest, src, n, metatype);
-  
+
   char *destBytes = (char*)dest;
   char *srcBytes = (char*)src;
   size_t stride = tuple_getValueWitnesses(metatype)->stride;
-  
+
   while (n--) {
     tuple_initializeWithTake<IsPOD, IsInline>((OpaqueValue*)destBytes,
                                               (OpaqueValue*)srcBytes,
                                               metatype);
     destBytes += stride; srcBytes += stride;
   }
-  
+
   return dest;
 }
 
@@ -944,18 +654,18 @@ static OpaqueValue *tuple_initializeArrayWithTakeBackToFront(
   assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memmove_array(dest, src, n, metatype);
-  
+
   size_t stride = tuple_getValueWitnesses(metatype)->stride;
   char *destBytes = (char*)dest + n * stride;
   char *srcBytes = (char*)src + n * stride;
-  
+
   while (n--) {
     destBytes -= stride; srcBytes -= stride;
     tuple_initializeWithTake<IsPOD, IsInline>((OpaqueValue*)destBytes,
                                               (OpaqueValue*)srcBytes,
                                               metatype);
   }
-  
+
   return dest;
 }
 
@@ -1105,11 +815,11 @@ struct BasicLayout {
   size_t size;
   ValueWitnessFlags flags;
   size_t stride;
-  
+
   static constexpr BasicLayout initialForValueType() {
     return {0, ValueWitnessFlags().withAlignment(1).withPOD(true), 0};
   }
-  
+
   static constexpr BasicLayout initialForHeapObject() {
     return {sizeof(HeapObject),
             ValueWitnessFlags().withAlignment(alignof(HeapObject)),
@@ -1120,7 +830,7 @@ struct BasicLayout {
 static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
   return (size + alignMask) & ~alignMask;
 }
-  
+
 /// Perform basic sequential layout given a vector of metadata pointers,
 /// calling a functor with the offset of each field, and returning the
 /// final layout characteristics of the type.
@@ -1137,14 +847,14 @@ void performBasicLayout(BasicLayout &layout,
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   for (unsigned i = 0; i != numElements; ++i) {
     auto elt = elements[i];
-    
+
     // Lay out this element.
     auto eltVWT = elt->getValueWitnesses();
     size = roundUpToAlignMask(size, eltVWT->getAlignmentMask());
 
     // Report this record to the functor.
     f(i, elt, size);
-    
+
     // Update the size and alignment of the aggregate..
     size += eltVWT->size;
     alignMask = std::max(alignMask, eltVWT->getAlignmentMask());
@@ -1152,7 +862,7 @@ void performBasicLayout(BasicLayout &layout,
     if (!eltVWT->isBitwiseTakable()) isBitwiseTakable = false;
   }
   bool isInline = ValueWitnessTable::isValueInline(size, alignMask + 1);
-  
+
   layout.size = size;
   layout.flags = ValueWitnessFlags().withAlignmentMask(alignMask)
                                     .withPOD(isPOD)
@@ -1167,7 +877,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const Metadata * const *elements,
                                   const char *labels,
                                   const ValueWitnessTable *proposedWitnesses) {
-  // Bypass the cache for the empty tuple. We might reasonably get called 
+  // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
   if (numElements == 0) return &_TMdT_;
 
@@ -1175,7 +885,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   // FIXME: include labels when uniquing!
   auto genericArgs = (const void * const *) elements;
-  auto entry = TupleTypes.findOrAdd(genericArgs, numElements, 
+  auto entry = TupleTypes.findOrAdd(genericArgs, numElements,
     [&]() -> TupleCacheEntry* {
       // Create a new entry for the cache.
 
@@ -1201,7 +911,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
           metadata->getElements()[i].Type = elt;
           metadata->getElements()[i].Offset = offset;
         });
-  
+
       witnesses->size = layout.size;
       witnesses->flags = layout.flags;
       witnesses->stride = layout.stride;
@@ -1286,7 +996,7 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
     [&](size_t i, const Metadata *fieldType, size_t offset) {
       fieldOffsets[i] = offset;
     });
-  
+
   vwtable->size = layout.size;
   vwtable->flags = layout.flags;
   vwtable->stride = layout.stride;
@@ -1429,7 +1139,7 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
     size = offset + fieldLayouts[i].Size;
     alignMask = std::max(alignMask, fieldLayouts[i].AlignMask);
   }
-  
+
   // Save the final size and alignment into the metadata record.
   assert(self->isTypeMetadata());
   self->setInstanceSize(size);
@@ -1490,7 +1200,7 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { instanceMetadata };
-  auto entry = MetatypeTypes.findOrAdd(args, numGenericArgs, 
+  auto entry = MetatypeTypes.findOrAdd(args, numGenericArgs,
     [&]() -> MetatypeCacheEntry* {
       // Create a new entry for the cache.
       auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
@@ -1561,10 +1271,10 @@ getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
   auto found = ExistentialMetatypeValueWitnessTables.find(numWitnessTables);
   if (found != ExistentialMetatypeValueWitnessTables.end())
     return found->second;
-  
+
   using Box = NonFixedExistentialMetatypeBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
-  
+
   auto *vwt = new ExtraInhabitantsValueWitnessTable;
 #define STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(WITNESS) \
   vwt->WITNESS = Witnesses::WITNESS;
@@ -1572,7 +1282,7 @@ getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
   STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(storeExtraInhabitant)
   STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(getExtraInhabitantIndex)
 #undef STORE_VAR_EXISTENTIAL_METATYPE_WITNESS
-  
+
   vwt->size = Box::Container::getSize(numWitnessTables);
   vwt->flags = ValueWitnessFlags()
     .withAlignment(Box::Container::getAlignment(numWitnessTables))
@@ -1583,9 +1293,9 @@ getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
   vwt->stride = Box::Container::getStride(numWitnessTables);
   vwt->extraInhabitantFlags = ExtraInhabitantFlags()
     .withNumExtraInhabitants(Witnesses::numExtraInhabitants);
-  
+
   ExistentialMetatypeValueWitnessTables.insert({numWitnessTables, vwt});
-  
+
   return vwt;
 }
 
@@ -1595,10 +1305,10 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { instanceMetadata };
-  auto entry = ExistentialMetatypeTypes.findOrAdd(args, numGenericArgs, 
+  auto entry = ExistentialMetatypeTypes.findOrAdd(args, numGenericArgs,
     [&]() -> ExistentialMetatypeCacheEntry* {
       // Create a new entry for the cache.
-      auto entry = 
+      auto entry =
         ExistentialMetatypeCacheEntry::allocate(args, numGenericArgs, 0);
 
       ExistentialTypeFlags flags;
@@ -1611,7 +1321,7 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
 
       auto metadata = entry->getData();
       metadata->setKind(MetadataKind::ExistentialMetatype);
-      metadata->ValueWitnesses = 
+      metadata->ValueWitnesses =
         getExistentialMetatypeValueWitnesses(flags.getNumWitnessTables());
       metadata->InstanceType = instanceMetadata;
       metadata->Flags = flags;
@@ -1674,17 +1384,17 @@ getOpaqueExistentialValueWitnesses(unsigned numWitnessTables) {
   auto found = OpaqueExistentialValueWitnessTables.find(numWitnessTables);
   if (found != OpaqueExistentialValueWitnessTables.end())
     return found->second;
-  
+
   using Box = NonFixedOpaqueExistentialBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
   static_assert(!Witnesses::hasExtraInhabitants, "no extra inhabitants");
-  
+
   auto *vwt = new ValueWitnessTable;
 #define STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS(WITNESS) \
   vwt->WITNESS = Witnesses::WITNESS;
   FOR_ALL_FUNCTION_VALUE_WITNESSES(STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS)
 #undef STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS
-  
+
   vwt->size = Box::Container::getSize(numWitnessTables);
   vwt->flags = ValueWitnessFlags()
     .withAlignment(Box::Container::getAlignment(numWitnessTables))
@@ -1695,7 +1405,7 @@ getOpaqueExistentialValueWitnesses(unsigned numWitnessTables) {
   vwt->stride = Box::Container::getStride(numWitnessTables);
 
   OpaqueExistentialValueWitnessTables.insert({numWitnessTables, vwt});
-  
+
   return vwt;
 }
 
@@ -1729,10 +1439,10 @@ getClassExistentialValueWitnesses(unsigned numWitnessTables) {
   auto found = ClassExistentialValueWitnessTables.find(numWitnessTables);
   if (found != ClassExistentialValueWitnessTables.end())
     return found->second;
-  
+
   using Box = NonFixedClassExistentialBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
-  
+
   auto *vwt = new ExtraInhabitantsValueWitnessTable;
 #define STORE_VAR_CLASS_EXISTENTIAL_WITNESS(WITNESS) \
   vwt->WITNESS = Witnesses::WITNESS;
@@ -1740,7 +1450,7 @@ getClassExistentialValueWitnesses(unsigned numWitnessTables) {
   STORE_VAR_CLASS_EXISTENTIAL_WITNESS(storeExtraInhabitant)
   STORE_VAR_CLASS_EXISTENTIAL_WITNESS(getExtraInhabitantIndex)
 #undef STORE_VAR_CLASS_EXISTENTIAL_WITNESS
-  
+
   vwt->size = Box::Container::getSize(numWitnessTables);
   vwt->flags = ValueWitnessFlags()
     .withAlignment(Box::Container::getAlignment(numWitnessTables))
@@ -1751,9 +1461,9 @@ getClassExistentialValueWitnesses(unsigned numWitnessTables) {
   vwt->stride = Box::Container::getStride(numWitnessTables);
   vwt->extraInhabitantFlags = ExtraInhabitantFlags()
     .withNumExtraInhabitants(Witnesses::numExtraInhabitants);
-  
+
   ClassExistentialValueWitnessTables.insert({numWitnessTables, vwt});
-  
+
   return vwt;
 }
 
@@ -1782,7 +1492,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
     return opaqueContainer->Type->vw_projectBuffer(
                          const_cast<ValueBuffer*>(&opaqueContainer->Buffer));
-  }  
+  }
 }
 
 const Metadata *
@@ -1830,7 +1540,7 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
                                         const ProtocolDescriptor **protocols) {
   // Sort the protocol set.
   std::sort(protocols, protocols + numProtocols);
-  
+
   // Calculate the class constraint and number of witness tables for the
   // protocol set.
   unsigned numWitnessTables = 0;
@@ -1844,10 +1554,10 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
   }
 
   // Search the cache.
-  
+
   auto protocolArgs = reinterpret_cast<const void * const *>(protocols);
-  
-  auto entry = ExistentialTypes.findOrAdd(protocolArgs, numProtocols, 
+
+  auto entry = ExistentialTypes.findOrAdd(protocolArgs, numProtocols,
     [&]() -> ExistentialCacheEntry* {
       // Create a new entry for the cache.
       auto entry = ExistentialCacheEntry::allocate(protocolArgs, numProtocols,
@@ -1862,7 +1572,7 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
       metadata->Protocols.NumProtocols = numProtocols;
       for (size_t i = 0; i < numProtocols; ++i)
         metadata->Protocols[i] = protocols[i];
-  
+
       return entry;
     });
   return entry->getData();
@@ -1939,7 +1649,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   if (auto unique = nonUnique->getCachedUniqueMetadata()) {
     return unique;
   }
-  
+
   // Okay, insert a new row.
   pthread_mutex_lock(&ForeignTypesLock);
   auto insertResult = ForeignTypes.insert({GlobalString(nonUnique->getName()),
@@ -1970,7 +1680,7 @@ Metadata::getNominalTypeDescriptor() const {
   switch (getKind()) {
   case MetadataKind::Class: {
     const ClassMetadata *cls = static_cast<const ClassMetadata *>(this);
-    if (!cls->isTypeMetadata()) 
+    if (!cls->isTypeMetadata())
       return nullptr;
     if (cls->isArtificialSubclass())
       return nullptr;
@@ -2040,7 +1750,7 @@ static char *scanIdentifier(const char *&mangled)
 
   {
     if (*mangled == '0') goto fail;  // length may not be zero
-    
+
     size_t length = 0;
     while (isdigit(*mangled)) {
       size_t oldlength = length;
@@ -2048,10 +1758,10 @@ static char *scanIdentifier(const char *&mangled)
       length += *mangled++ - '0';
       if (length <= oldlength) goto fail;  // integer overflow
     }
-    
+
     if (length == 0) goto fail;
     if (length > strlen(mangled)) goto fail;
-    
+
     char *result = strndup(mangled, length);
     assert(result);
     mangled += length;
@@ -2068,18 +1778,18 @@ fail:
 /// Returns true if the name was successfully decoded.
 /// On success, *outModule and *outClass must be freed with free().
 /// FIXME: this should be replaced by a real demangler
-bool swift::swift_demangleSimpleClass(const char *mangledName, 
+bool swift::swift_demangleSimpleClass(const char *mangledName,
                                       char **outModule, char **outClass) {
   char *moduleName = nullptr;
   char *className = nullptr;
 
-  {  
+  {
     // Prefix for a mangled class
     const char *m = mangledName;
-    if (0 != strncmp(m, "_TtC", 4)) 
+    if (0 != strncmp(m, "_TtC", 4))
       goto fail;
     m += 4;
-    
+
     // Module name
     if (strncmp(m, "Ss", 2) == 0) {
       moduleName = strdup(swift::STDLIB_NAME);
@@ -2087,19 +1797,19 @@ bool swift::swift_demangleSimpleClass(const char *mangledName,
       m += 2;
     } else {
       moduleName = scanIdentifier(m);
-      if (!moduleName) 
+      if (!moduleName)
         goto fail;
     }
-    
+
     // Class name
     className = scanIdentifier(m);
-    if (!className) 
+    if (!className)
       goto fail;
-    
+
     // Nothing else
-    if (strlen(m)) 
+    if (strlen(m))
       goto fail;
-    
+
     *outModule = moduleName;
     *outClass = className;
     return true;
@@ -2113,13 +1823,9 @@ fail:
   return false;
 }
 
-namespace llvm {
-namespace hashing {
-namespace detail {
+namespace llvm { namespace hashing { namespace detail {
   // An extern variable expected by LLVM's hashing templates. We don't link any
   // LLVM libs into the runtime, so define this here.
   size_t fixed_seed_override = 0;
-}
-}
-}
+} } }
 
