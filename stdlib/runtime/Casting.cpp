@@ -746,6 +746,27 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   }
 }
 
+static const void *
+_dynamicCastUnknownClassToExistential(const void *object,
+                                    const ExistentialTypeMetadata *targetType) {
+  for (unsigned i = 0, e = targetType->Protocols.NumProtocols; i < e; ++i) {
+    const ProtocolDescriptor *protocol = targetType->Protocols[i];
+    // If the target existential requires witness tables, we can't do this cast.
+    // The result type would not have a single-refcounted-pointer rep.
+    if (protocol->Flags.needsWitnessTable())
+      return nullptr;
+#if SWIFT_OBJC_INTEROP
+    if (!_swift_objectConformsToObjCProtocol(object, protocol))
+      return nullptr;
+#else
+    assert(false && "swift protocols should always require a witness table");
+    return nullptr;
+#endif
+  }
+  
+  return object;
+}
+
 /// Perform a dynamic class of some sort of class instance to some
 /// sort of class type.
 const void *
@@ -776,7 +797,10 @@ swift::swift_dynamicCastUnknownClass(const void *object,
 #endif
   }
 
-  case MetadataKind::Existential:
+  case MetadataKind::Existential: {
+    return _dynamicCastUnknownClassToExistential(object,
+                      static_cast<const ExistentialTypeMetadata *>(targetType));
+  }
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
@@ -822,7 +846,16 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
 #endif
   }
 
-  case MetadataKind::Existential:
+  case MetadataKind::Existential: {
+    // We can cast to ObjC existentials. Non-ObjC existentials don't have
+    // a single-refcounted-pointer representation.
+    if (auto result = _dynamicCastUnknownClassToExistential(object,
+                     static_cast<const ExistentialTypeMetadata *>(targetType)))
+      return result;
+    
+    swift_dynamicCastFailure(_swift_getClass(object), targetType);
+  }
+      
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:

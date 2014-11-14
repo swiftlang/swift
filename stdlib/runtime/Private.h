@@ -30,6 +30,10 @@ namespace swift {
 
 #if SWIFT_OBJC_INTEROP
   extern "C" LLVM_LIBRARY_VISIBILITY
+  bool _swift_objectConformsToObjCProtocol(const void *theObject,
+                                    const ProtocolDescriptor *theProtocol);
+  
+  extern "C" LLVM_LIBRARY_VISIBILITY
   bool _swift_classConformsToObjCProtocol(const void *theClass,
                                     const ProtocolDescriptor *theProtocol);
 #endif

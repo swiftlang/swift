@@ -165,9 +165,8 @@ func genericCast<U: AnyObject>(x: AnyObject, _: U.Type) -> U? {
   return x as? U
 }
 
-// FIXME
 if let fungible = genericCast(d, Fungible.self) {
-  fungible.funge() // TODO-NEXT: D
+  fungible.funge() // CHECK-NEXT: D
 } else {
-  println("not fungible") // TODO CHECK-NEXT: not fungible
+  println("not fungible")
 }
