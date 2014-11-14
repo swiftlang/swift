@@ -664,6 +664,8 @@ bool LSBBForwarder::tryToForwardLoad(LoadInst *LI, AliasAnalysis *AA,
   }
 
   startTrackingLoad(LI);
+  // No partial aliased loads were successfully forwarded. Return false to
+  // indicate no change.
   return false;
 }
 
