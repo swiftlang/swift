@@ -29,26 +29,26 @@ TEST(DependencyGraph, IndependentNodes) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_FALSE(graph.isMarked(1));
   EXPECT_FALSE(graph.isMarked(2));
 
   // Mark 0 again -- should be no change.
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_FALSE(graph.isMarked(1));
   EXPECT_FALSE(graph.isMarked(2));
 
   graph.markTransitive(marked, 2);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_FALSE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
 
   graph.markTransitive(marked, 1);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -63,7 +63,7 @@ TEST(DependencyGraph, IndependentDepKinds) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_FALSE(graph.isMarked(1));
 }
@@ -77,7 +77,7 @@ TEST(DependencyGraph, IndependentDepKinds2) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 1);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_FALSE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 }
@@ -91,14 +91,14 @@ TEST(DependencyGraph, SimpleDependent) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(1, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 }
@@ -112,14 +112,14 @@ TEST(DependencyGraph, SimpleDependentReverse) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 1);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(0, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(0u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 }
@@ -133,14 +133,14 @@ TEST(DependencyGraph, SimpleDependent2) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(1, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 }
@@ -154,14 +154,14 @@ TEST(DependencyGraph, SimpleDependent3) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(1, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 }
@@ -175,14 +175,14 @@ TEST(DependencyGraph, SimpleDependent4) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(1, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 }
@@ -196,14 +196,14 @@ TEST(DependencyGraph, SimpleDependent5) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(1, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 }
@@ -224,7 +224,7 @@ TEST(DependencyGraph, MultipleDependentsSame) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(2, marked.size());
+  EXPECT_EQ(2u, marked.size());
   EXPECT_TRUE(contains(marked, 1));
   EXPECT_TRUE(contains(marked, 2));
   EXPECT_TRUE(graph.isMarked(0));
@@ -233,7 +233,7 @@ TEST(DependencyGraph, MultipleDependentsSame) {
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -249,7 +249,7 @@ TEST(DependencyGraph, MultipleDependentsDifferent) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(2, marked.size());
+  EXPECT_EQ(2u, marked.size());
   EXPECT_TRUE(contains(marked, 1));
   EXPECT_TRUE(contains(marked, 2));
   EXPECT_TRUE(graph.isMarked(0));
@@ -258,7 +258,7 @@ TEST(DependencyGraph, MultipleDependentsDifferent) {
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -274,7 +274,7 @@ TEST(DependencyGraph, ChainedDependents) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(2, marked.size());
+  EXPECT_EQ(2u, marked.size());
   EXPECT_TRUE(contains(marked, 1));
   EXPECT_TRUE(contains(marked, 2));
   EXPECT_TRUE(graph.isMarked(0));
@@ -283,7 +283,7 @@ TEST(DependencyGraph, ChainedDependents) {
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -302,7 +302,7 @@ TEST(DependencyGraph, MarkTwoNodes) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(2, marked.size());
+  EXPECT_EQ(2u, marked.size());
   EXPECT_TRUE(contains(marked, 1));
   EXPECT_TRUE(contains(marked, 2));
   EXPECT_TRUE(graph.isMarked(0));
@@ -314,8 +314,8 @@ TEST(DependencyGraph, MarkTwoNodes) {
 
   marked.clear();
   graph.markTransitive(marked, 10);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(11, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(11u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -334,8 +334,8 @@ TEST(DependencyGraph, MarkOneNodeTwice) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(1, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_FALSE(graph.isMarked(2));
@@ -345,8 +345,8 @@ TEST(DependencyGraph, MarkOneNodeTwice) {
   marked.clear();
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(2, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(2u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -362,8 +362,8 @@ TEST(DependencyGraph, MarkOneNodeTwice2) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(1, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_FALSE(graph.isMarked(2));
@@ -373,8 +373,8 @@ TEST(DependencyGraph, MarkOneNodeTwice2) {
   marked.clear();
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(2, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(2u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -390,7 +390,7 @@ TEST(DependencyGraph, NotTransitiveOnceMarked) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 1);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_FALSE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_FALSE(graph.isMarked(2));
@@ -400,15 +400,15 @@ TEST(DependencyGraph, NotTransitiveOnceMarked) {
   marked.clear();
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_FALSE(graph.isMarked(2));
 
   // Re-mark 1.
   graph.markTransitive(marked, 1);
-  EXPECT_EQ(1, marked.size());
-  EXPECT_EQ(2, marked.front());
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(2u, marked.front());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -424,7 +424,7 @@ TEST(DependencyGraph, DependencyLoops) {
   SmallVector<uintptr_t, 4> marked;
 
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(2, marked.size());
+  EXPECT_EQ(2u, marked.size());
   EXPECT_TRUE(contains(marked, 1));
   EXPECT_TRUE(contains(marked, 2));
   EXPECT_TRUE(graph.isMarked(0));
@@ -433,7 +433,7 @@ TEST(DependencyGraph, DependencyLoops) {
 
   marked.clear();
   graph.markTransitive(marked, 0);
-  EXPECT_EQ(0, marked.size());
+  EXPECT_EQ(0u, marked.size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
