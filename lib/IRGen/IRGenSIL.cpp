@@ -2024,7 +2024,7 @@ getSwitchCaseValue(IRGenFunction &IGF, SILValue val) {
     return dyn_cast<llvm::ConstantInt>(getConstantInt(IGF.IGM, IL));
   }
   else {
-    assert(false && "Switch value cases should be integers");
+    llvm_unreachable("Switch value cases should be integers");
   }
 }
 

@@ -282,7 +282,7 @@ StringRef DeclAttribute::getAttrName() const {
 
   case DAK_Ownership:
     switch (cast<OwnershipAttr>(this)->get()) {
-    case Ownership::Strong:    llvm_unreachable("Never present in the attribute");
+    case Ownership::Strong: llvm_unreachable("Never present in the attribute");
     case Ownership::Weak:      return "weak";
     case Ownership::Unowned:   return "unowned";
     case Ownership::Unmanaged: return "unowned(unsafe)";

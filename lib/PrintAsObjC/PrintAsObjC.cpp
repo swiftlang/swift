@@ -640,7 +640,7 @@ private:
   void visitFunctionType(FunctionType *FT) {
     switch (FT->getRepresentation()) {
     case AnyFunctionType::Representation::Thin:
-      assert(false && "can't handle thin functions yet");
+      llvm_unreachable("can't handle thin functions yet");
     // Native Swift function types bridge to block types.
     case AnyFunctionType::Representation::Thick:
     case AnyFunctionType::Representation::Block:
