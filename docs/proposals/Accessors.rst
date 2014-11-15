@@ -675,30 +675,49 @@ Storage access involves a tension between four goals:
   * Avoiding memory safety holes when accessing storage that's been
     implemented with memory.
 
-As discussed above, reprojection is good at preserving changes, but it
-introduces extra copies, and it's less intuitive about how many times
-getters and setters will be called.  There may be a place for it
-anyway, if we're willing to accept the extra conceptual complexity for
-computed storage, but it's not a reasonable primary basis for
-optimizing the performance of storage backed by memory.
+Reprojection_ is good at preserving changes, but it introduces extra
+copies, and it's less intuitive about how many times getters and
+setters will be called.  There may be a place for it anyway, if we're
+willing to accept the extra conceptual complexity for computed
+storage, but it's not a reasonable primary basis for optimizing the
+performance of storage backed by memory.
 
 Solutions permitting in-place modification are more efficient, but
 they do have the inherent disadvantage of having to vend the address
 of a value before arbitrary interleaving code.  Even if the address
 remains valid, and the solution to that avoids subobject clobbering,
 there's an unavoidable issue that the write can be lost because the
-address went nowhere.  So, for any in-place solution to be acceptable,
-there does need to be some rule specifying when it's okay to "lose
-track" of a change.
+address became dissociated from the storage.  For example, if your
+code passes ``&array[i]`` to a function, you might plausibly argue
+that changes to that argument should show up in the ``i``th element of
+``array`` even if you completely reassign ``array``.  Reprojection_
+could make this work, but in-place solutions cannot efficiently do so.
+So, for any in-place solution to be acceptable, there does need to be
+some rule specifying when it's okay to "lose track" of a change.
 
 Furthermore, the basic behavior of COW means that it's possible to
 copy an array with an element under modification and end up sharing
 the same buffer, so that the modification will be reflected in a value
-that was technically copied beforehand.  Nor can this be fixed by
-temporarily moving the modified array aside, because that would
-prevent simultaneous modifications to different elements (and, in
-fact, likely cause them to assert).  So the rule will also have to
-allow this.
+that was technically copied beforehand.  For example::
+
+  var array = [1,2,3]
+  var oldArray : [Int] = []
+
+  // This function copies array before modifying it, but because that
+  // copy is of an value undergoing modification, the copy will use
+  // the same buffer and therefore observe updates to the element.
+  func foo(inout element: Int) {
+    oldArray = array
+    element = 4
+  }
+
+  // Therefore, oldArray[2] will be 4 after this call.
+  foo(&array[2])
+
+Nor can this be fixed by temporarily moving the modified array aside,
+because that would prevent simultaneous modifications to different
+elements (and, in fact, likely cause them to assert).  So the rule
+will also have to allow this.
 
 However, both of these possibilities already come up in the design of
 both the library and the optimizer.  The optimizer makes a number of
@@ -722,21 +741,84 @@ depend on how the l-value is used:
   * An l-value which is simply loaded from creates an instantaneous FA
     at the time of the load.  The DSN set is empty.
 
+    Example::
+
+      foo(array)
+      // instantaneous FA reading array
+
   * An l-value which is assigned to with ``=`` creates an
     instantaneous FA at the time of the primitive assignment.  The DSN
     set is empty.
 
+    Example::
+
+      array = []
+      // instantaneous FA assigning array
+
     Note that the primitive assignment strictly follows the evaluation
     of both the l-value and r-value expressions of the assignment.
+    For example, the following code::
+
+      // object is a variable of class type
+      object.array = object.array + [1,2,3]
+
+    produces this sequence of formal accesses::
+      
+      // instantaneous FA reading object (in the left-hand side)
+      // instantaneous FA reading object (in the right-hand side)
+      // instantaneous FA reading object.array (in the right-hand side)
+      // evaluation of [1,2,3]
+      // evaluation of +
+      // instantaneous FA assigning object.array
 
   * An l-value which is passed as an ``inout`` argument to a call
-    (including an assignment operator) creates an FA beginning
-    immediately before the call and ending immediately after the call.
-    The DSN set contains the ``inout`` argument within the call.
-    
+    creates an FA beginning immediately before the call and ending
+    immediately after the call.  (This includes calls where an
+    argument is implicitly passed ``inout``, such as to mutating
+    methods or user-defined assignment operators such as ``+=`` or
+    ``++``.) The DSN set contains the ``inout`` argument within the
+    call.
+
+    Example::
+
+      func swap<T>(inout lhs: T, inout rhs: T) {}
+
+      // object is a variable of class type
+      swap(&leftObject.array, &rightObject.array)
+
+    This results in the following sequence of formal accesses::
+
+      // instantaneous FA reading leftObject
+      // instantaneous FA reading rightObject
+      // begin FA for inout argument leftObject.array (DSN={lhs})
+      // begin FA for inout argument rightObject.array (DSN={rhs})
+      // evaluation of swap
+      // end FA for inout argument rightObject.array
+      // end FA for inout argument leftObject.array
+
   * An l-value which is used as the base of a member storage access
-    begins an FA whose duration is contemporaneous with the duration
-    of the FA of the subobject l-value.  The DSN set is empty.
+    begins an FA whose duration is the same as the duration of the FA
+    for the subobject l-value.  The DSN set is empty.
+
+    Example::
+
+      swap(&leftObject.array[i], &rightObject.array[j])
+
+    This results in the following sequence of formal accesses::
+
+      // instantaneous FA reading leftObject
+      // instantaneous FA reading i
+      // instantaneous FA reading rightObject
+      // instantaneous FA reading j
+      // begin FA for inout argument leftObject.array (DSN={})
+      // begin FA for inout argument leftObject.array[i] (DSN={lhs})
+      // begin FA for inout argument rightObject.array (DSN={})
+      // begin FA for inout argument rightObject.array[j] (DSN={rhs})
+      // evaluation of swap
+      // end FA for inout argument rightObject.array[j]
+      // end FA for inout argument rightObject.array
+      // end FA for inout argument leftObject.array[i]
+      // end FA for inout argument leftObject.array
 
 The FAs for all ``inout`` arguments to a call begin simultaneously at
 a point strictly following the evaluation of all the argument
@@ -753,45 +835,97 @@ requires changes in SILGen's current code generation patterns.
 Disjoint and non-disjoint formal accesses
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Two FAs ``x`` and ``y`` are said to be *disjoint* if:
-  * they refer to non-overlapping storage or
+I'm almost ready to state the core rule about formal accesses, but
+first I need to build up a few more definitions.
+
+An *abstract storage location* (ASL) is:
+  
+  * a global variable declaration;
+
+  * an ``inout`` parameter declaration, along with a reference
+    to a specific execution record for that function;
+
+  * a local variable declaration, along with a reference to a
+    specific execution record for that declaration statement;
+
+  * a static/class property declaration, along with a type having
+    that property;
+      
+  * a struct/enum instance property declaration, along with an
+    ASL for the base;
+      
+  * a struct/enum subscript declaration, along with a concrete index
+    value and an ASL for the base;
+      
+  * a class instance property declaration, along with an instance of
+    that class; or
+      
+  * a class instance subscript declaration, along with a concrete
+    index value and an instance of that class.
+
+Two abstract storage locations may be said to *overlap*.  Overlap
+corresponds to the imprecise intuition that a modification of one
+location directly alters the value of another location.  Overlap
+is an "open" property of the language: every new declaration may
+introduce its own overlap behavior.  However, the language and
+library make certain assertions about the overlap of some locations:
+
+  * An ``inout`` parameter declaration overlaps exactly the set
+    of ASLs overlapped by the ASL which was passed as an argument.
+
+  * If two ASLs are both implemented with memory, then they overlap
+    only if they have the same kind in the above list and the
+    corresponding data match:
+      * execution records must represent the same execution
+      * types must be the same
+      * class instances must be the same
+      * ASLs must overlap
+
+  * For the purposes of the above rule, the subscript of a standard
+    library array type is implemented with memory, and the two
+    indexes match if they have the same integer value.
+
+  * For the purposes of the above rule, the subscript of a standard
+    library dictionary type is implemented with memory, and the two
+    indexes match if they compare equal with ``==``.
+
+Because this definition is open, it is impossible to completely
+statically or dynamically decided it.  However, it would still be
+possible to write a dynamic analysis which decided it for common
+location kinds.  Such a tool would be useful as part of, say, an
+ASan-like dynamic tool to diagnose violations of the
+unspecified-behavior rule below.
+
+The overlap rule is vague about computed storage partly because
+computed storage can have non-obvious aliasing behavior and partly
+because the subobject clobbering caused by the full-value accesses
+required by computed storage can introduce unexpected results that can
+be reasonably glossed as unspecified values.
+
+This notion of abstract storage location overlap can be applied to
+formal accesses as well.  Two FAs ``x`` and ``y`` are said to be
+*disjoint* if:
+
+  * they refer to non-overlapping abstract storage locations or
+
   * they are the base FAs of two disjoint member storage accesses
     ``x.a`` and ``y.b``.
 
-The overlap rules for certain kinds of primitive l-values are
-guaranteed by the language.  An ``inout`` argument overlaps the
-abstract storage to which it was bound.  A stored variable only
-overlaps itself.  A stored property only overlaps itself, and only
-when the bases overlap.
+Given these definitions, the core unspecified-behavior rule is:
 
-For all other storage, what the storage overlaps is up to the
-implementation of the storage.  For example, the standard library
-array types guarantee that the subscript storage never overlaps at
-different indices, and the standard library dictionary type guarantees
-that the subscript storage never overlaps for keys that compare
-unequal.  But, in general, this is a user-defined characteristic, and
-this proposal cannot rely on being able to decide overlapping either
-statically or dynamically.  (It would still be possible to write a
-dynamic checker to detect overlap violations in common cases involving
-stored properties and library collections, though.)
+  If two non-disjoint FAs have intersecting durations, and neither FA
+  is derived from a DSN for the other, then the program has
+  unspecified behavior in the following way: if the second FA is a
+  load, it yields an unspecified value; otherwise, both FAs store an
+  unspecified value in the storage.
 
-If two non-disjoint FAs have intersecting durations, and neither FA is
-derived from a DSN for the other, then the program has unspecified
-behavior in the following way: if the second FA is a load, it yields
-an unspecified value; otherwise, both FAs store an unspecified value
-in the storage.  (Note that you cannot have conflict between two
-loads, because the FAs for loads are instantaneous.)
+Note that you cannot have two loads with intersecting durations,
+because the FAs for loads are instantaneous.
 
-The rule that non-overlapping subobject accesses make the base
-accesses disjoint is designed to permit things like ``swap(&a[0],
-&a[1])``.  Otherwise, this would create two intersecting FAs on the
-same object, which would lead to unspecified behavior.
-
-The overlapping-subobject rule is vague about computed storage partly
-because computed storage can have non-obvious aliasing behavior and
-partly because the subobject clobbering caused by the full-value
-accesses required by computed storage can introduce unexpected results
-that can reasonably be glossed as unspecified values.
+Non-overlapping subobject accesses make the base accesses disjoint
+because otherwise code like ``swap(&a[0], &a[1])`` would have
+unspecified behavior, because the two base FAs are to clearly
+overlapping locations and have intersecting durations.
 
 Note that the optimizer's aliasing rule falls out from this rule.  If
 storage has been bound as an ``inout`` argument, accesses to it
