@@ -10,11 +10,11 @@ An abstract storage declaration is a language construct that declares
 a means of accessing some sort of abstract entity.  I'll just say
 "storage" hereafter.
 
-Swift provides three storage declarations::
+Swift provides three storage declarations:
 
-  * a single named entity, called a *variable* and declared with ``var``
-  * a single named entity which can never be reassigned, called a *constant* and declared with ``let``
-  * a compound unnamed entity accessed with an index, called a *subscript* and declared with ``subscript``
+* a single named entity, called a *variable* and declared with ``var``
+* a single named entity which can never be reassigned, called a *constant* and declared with ``let``
+* a compound unnamed entity accessed with an index, called a *subscript* and declared with ``subscript``
 
 These features are similar to those in other languages.  Swift notably
 lacks compound named entities, such as C#'s indexed properties; the
@@ -39,9 +39,9 @@ Full-value accesses
 All accesses to storage, no matter the implementation, can be performed
 with two primitive operations:
 
-  * a full-value load, which creates a new copy of the current value
-  * a full-value store, which overwrites the current value with a
-    different, independent value
+* a full-value load, which creates a new copy of the current value
+* a full-value store, which overwrites the current value with a
+  different, independent value
 
 A function which implements a full-value load is called a *getter*;
 a full-value store, a *setter*.
@@ -98,10 +98,10 @@ reliant on doing local analysis to recognize two accesses which
 obviously alias (like the two references to ``point`` in the above
 example).  Once you've done this, you can either:
 
-  * Emit an error, outlawing such code.  This is what Swift currently
-    does (but only when the aliasing access must be implemented with
-    full-value loads and stores).
-  * Use a single temporary, potentially changing the semantics.
+* Emit an error, outlawing such code.  This is what Swift currently
+  does (but only when the aliasing access must be implemented with
+  full-value loads and stores).
+* Use a single temporary, potentially changing the semantics.
 
 It's impossible to guarantee the absence of subobject clobbering with
 this analysis without extremely heavy-handed languages changes.
@@ -242,15 +242,15 @@ When you know how storage is implemented, it's straightforward to
 generate an optimal access to it.  There are several major reasons why
 you might not know how a storage declaration is implemented, though:
 
-  * It might be an abstract declaration, not a concrete declaration.
-    Currently this means a protocol member, but Swift may someday add
-    abstract class members.
+* It might be an abstract declaration, not a concrete declaration.
+  Currently this means a protocol member, but Swift may someday add
+  abstract class members.
 
-  * It might be a non-final class member, where the implementation you
-    can see is potentially overridable by a subclass.
-    
-  * It might be a resilient declaration, where you know only that the
-    entity exists and know nothing statically about its implementation.
+* It might be a non-final class member, where the implementation you
+  can see is potentially overridable by a subclass.
+
+* It might be a resilient declaration, where you know only that the
+  entity exists and know nothing statically about its implementation.
 
 In all of these cases, you must generate code that will handle the
 worst possible case, which is that the entity is implemented with a
@@ -407,11 +407,11 @@ Memory unsafety of addressors
 The semantics and memory safety of operations on COW types rely on a
 pair of simple rules:
 
-  * A non-mutating operation must own a reference to the buffer for
-    the full course of the read.
+* A non-mutating operation must own a reference to the buffer for
+  the full course of the read.
 
-  * A mutating operation must own a unique reference to the buffer
-    for the full course of the mutation.
+* A mutating operation must own a unique reference to the buffer
+  for the full course of the mutation.
 
 Both rules tend to be naturally satisfied by the way that operations
 are organized into methods.  A value must own a reference to its
@@ -562,45 +562,45 @@ General philosophy
 
 For any given language problem, a perfect solution would be one which:
 
-  * guarantees that all operations complete without crashing or
-    corrupting the program state,
+* guarantees that all operations complete without crashing or
+  corrupting the program state,
 
-  * guarantees that all operations produce results according to
-    consistent, reliable, and intuitive rules,
+* guarantees that all operations produce results according to
+  consistent, reliable, and intuitive rules,
 
-  * does not limit or require complex interactions with the remainder
-    of the language, and
+* does not limit or require complex interactions with the remainder
+  of the language, and
 
-  * imposes no performance cost.
+* imposes no performance cost.
 
 These goals are, however, not all simultaneously achievable, and
 different languages reach different balances.  Swift's particular
 philosophy is as follows:
 
-  * The language should be as dynamically safe as possible.
-    Straightforward uses of ordinary language features may cause
-    dynamic failure, but the should never corrupt the program state.
-    Any unsafe language or library features (other than simply calling
-    into C code) should be explicitly labeled as unsafe.
+* The language should be as dynamically safe as possible.
+  Straightforward uses of ordinary language features may cause
+  dynamic failure, but the should never corrupt the program state.
+  Any unsafe language or library features (other than simply calling
+  into C code) should be explicitly labeled as unsafe.
 
-    A dynamic failure should mean that the program reliably halts,
-    ideally with a message clearly describing the source of the
-    failure.  In the future, the language may allow for emergency
-    recovery from such failures.
+  A dynamic failure should mean that the program reliably halts,
+  ideally with a message clearly describing the source of the
+  failure.  In the future, the language may allow for emergency
+  recovery from such failures.
 
-  * The language should sit on top of C, relying only on a relatively
-    unobtrusive runtime.  Accordingly, the language's interactions
-    with C-based technologies should be efficient and obvious.
+* The language should sit on top of C, relying only on a relatively
+  unobtrusive runtime.  Accordingly, the language's interactions
+  with C-based technologies should be efficient and obvious.
 
-  * The language should allow a static compiler to produce efficient
-    code without dynamic instrumentation.  Accordingly, static
-    analysis should only be blocked by incomplete information when
-    the code uses an obviously abstract language feature (such as
-    calling a class method or an unknown function), and the language
-    should provide tools to allow programmers to limit such cases.
+* The language should allow a static compiler to produce efficient
+  code without dynamic instrumentation.  Accordingly, static
+  analysis should only be blocked by incomplete information when
+  the code uses an obviously abstract language feature (such as
+  calling a class method or an unknown function), and the language
+  should provide tools to allow programmers to limit such cases.
 
-    (Dynamic instrumentation can, of course, still help, but it
-    shouldn't be required for excellent performance.)
+  (Dynamic instrumentation can, of course, still help, but it
+  shouldn't be required for excellent performance.)
 
 General solutions
 ~~~~~~~~~~~~~~~~~
@@ -609,28 +609,28 @@ A language generally has six tools for dealing with code it considers
 undesireable.  Some of this terminology is taken from existing
 standards, others not.
 
-  * The language may nonetheless take steps to ensure that the code
-    executes with a reliable result.  Such code is said to have
-    *guaranteed behavior*.
+* The language may nonetheless take steps to ensure that the code
+  executes with a reliable result.  Such code is said to have
+  *guaranteed behavior*.
 
-  * The language may report the code as erroneous before it executes.
-    Such code is said to be *ill formed*.
+* The language may report the code as erroneous before it executes.
+  Such code is said to be *ill formed*.
 
-  * The language may reliably report the code as having performed an
-    illegal operation when it executes.  Such code is said to be
-    *asserting* or *aborting*.
+* The language may reliably report the code as having performed an
+  illegal operation when it executes.  Such code is said to be
+  *asserting* or *aborting*.
 
-  * The language may allow the code to produce an arbitrary-but-sound
-    result.  Such code is said to have *unspecified behavior* or to
-    have produced an *unspecified value*.
+* The language may allow the code to produce an arbitrary-but-sound
+  result.  Such code is said to have *unspecified behavior* or to
+  have produced an *unspecified value*.
 
-  * The language may allow the code to produce an unsound result which
-    will result in another of these behaviors, but only if used.
-    Such code is said to have produced a *trap value*.
+* The language may allow the code to produce an unsound result which
+  will result in another of these behaviors, but only if used.
+  Such code is said to have produced a *trap value*.
 
-  * The language may declare the code to be completely outside of the
-    guarantees of the language.  Such code is said to have
-    *undefined behavior*.
+* The language may declare the code to be completely outside of the
+  guarantees of the language.  Such code is said to have
+  *undefined behavior*.
 
 In keeping with its design philosophy, Swift has generally limited
 itself to the first four solutions, with two significant exceptions.
@@ -645,16 +645,16 @@ programs in the presence of race conditions.  It is extremely
 difficult to make even weak statements about the behavior of a program
 with a race condition without either:
 
-  * heavily restricting shared mutable state on a language level, which
-    would require invasive changes to how the language interacts with C;
+* heavily restricting shared mutable state on a language level, which
+  would require invasive changes to how the language interacts with C;
 
-  * forcing implicit synchronization when making any change to
-    potentially shared memory, which would cripple performance and
-    greatly complicate library implementation; or
+* forcing implicit synchronization when making any change to
+  potentially shared memory, which would cripple performance and
+  greatly complicate library implementation; or
 
-  * using a garbage collector to manage all accessible memory, which
-    would impose a very large burden on almost all of Swift's language
-    goals.
+* using a garbage collector to manage all accessible memory, which
+  would impose a very large burden on almost all of Swift's language
+  goals.
 
 Therefore, Swift does surrender safety in the presence of races.
 
@@ -663,17 +663,17 @@ Acceptability conditions for storage accesses
 
 Storage access involves a tension between four goals:
 
-  * Preserving all changes when making simultaneous modifications to
-    distinct subobjects; in other words, avoiding subobject clobbering
+* Preserving all changes when making simultaneous modifications to
+  distinct subobjects; in other words, avoiding subobject clobbering
 
-  * Performing a predictable and intuitive sequence of operations when
-    modifying storage that's implemented with a getter and setter
+* Performing a predictable and intuitive sequence of operations when
+  modifying storage that's implemented with a getter and setter
 
-  * Avoiding unnecessary copies of a value during a modification,
-    especially when this forces a structural copy of a COW value
+* Avoiding unnecessary copies of a value during a modification,
+  especially when this forces a structural copy of a COW value
 
-  * Avoiding memory safety holes when accessing storage that's been
-    implemented with memory.
+* Avoiding memory safety holes when accessing storage that's been
+  implemented with memory.
 
 Reprojection_ is good at preserving changes, but it introduces extra
 copies, and it's less intuitive about how many times getters and
@@ -689,7 +689,7 @@ remains valid, and the solution to that avoids subobject clobbering,
 there's an unavoidable issue that the write can be lost because the
 address became dissociated from the storage.  For example, if your
 code passes ``&array[i]`` to a function, you might plausibly argue
-that changes to that argument should show up in the ``i``th element of
+that changes to that argument should show up in the ``i``\ th element of
 ``array`` even if you completely reassign ``array``.  Reprojection_
 could make this work, but in-place solutions cannot efficiently do so.
 So, for any in-place solution to be acceptable, there does need to be
@@ -738,87 +738,87 @@ FA is also associated with zero or more *designated storage names*
 An FA arises from an l-value expression, and its duration and DSN set
 depend on how the l-value is used:
 
-  * An l-value which is simply loaded from creates an instantaneous FA
-    at the time of the load.  The DSN set is empty.
+* An l-value which is simply loaded from creates an instantaneous FA
+  at the time of the load.  The DSN set is empty.
 
-    Example::
+  Example::
 
-      foo(array)
-      // instantaneous FA reading array
+    foo(array)
+    // instantaneous FA reading array
 
-  * An l-value which is assigned to with ``=`` creates an
-    instantaneous FA at the time of the primitive assignment.  The DSN
-    set is empty.
+* An l-value which is assigned to with ``=`` creates an
+  instantaneous FA at the time of the primitive assignment.  The DSN
+  set is empty.
 
-    Example::
+  Example::
 
-      array = []
-      // instantaneous FA assigning array
+    array = []
+    // instantaneous FA assigning array
 
-    Note that the primitive assignment strictly follows the evaluation
-    of both the l-value and r-value expressions of the assignment.
-    For example, the following code::
+  Note that the primitive assignment strictly follows the evaluation
+  of both the l-value and r-value expressions of the assignment.
+  For example, the following code::
 
-      // object is a variable of class type
-      object.array = object.array + [1,2,3]
+    // object is a variable of class type
+    object.array = object.array + [1,2,3]
 
-    produces this sequence of formal accesses::
-      
-      // instantaneous FA reading object (in the left-hand side)
-      // instantaneous FA reading object (in the right-hand side)
-      // instantaneous FA reading object.array (in the right-hand side)
-      // evaluation of [1,2,3]
-      // evaluation of +
-      // instantaneous FA assigning object.array
+  produces this sequence of formal accesses::
 
-  * An l-value which is passed as an ``inout`` argument to a call
-    creates an FA beginning immediately before the call and ending
-    immediately after the call.  (This includes calls where an
-    argument is implicitly passed ``inout``, such as to mutating
-    methods or user-defined assignment operators such as ``+=`` or
-    ``++``.) The DSN set contains the ``inout`` argument within the
-    call.
+    // instantaneous FA reading object (in the left-hand side)
+    // instantaneous FA reading object (in the right-hand side)
+    // instantaneous FA reading object.array (in the right-hand side)
+    // evaluation of [1,2,3]
+    // evaluation of +
+    // instantaneous FA assigning object.array
 
-    Example::
+* An l-value which is passed as an ``inout`` argument to a call
+  creates an FA beginning immediately before the call and ending
+  immediately after the call.  (This includes calls where an
+  argument is implicitly passed ``inout``, such as to mutating
+  methods or user-defined assignment operators such as ``+=`` or
+  ``++``.) The DSN set contains the ``inout`` argument within the
+  call.
 
-      func swap<T>(inout lhs: T, inout rhs: T) {}
+  Example::
 
-      // object is a variable of class type
-      swap(&leftObject.array, &rightObject.array)
+    func swap<T>(inout lhs: T, inout rhs: T) {}
 
-    This results in the following sequence of formal accesses::
+    // object is a variable of class type
+    swap(&leftObject.array, &rightObject.array)
 
-      // instantaneous FA reading leftObject
-      // instantaneous FA reading rightObject
-      // begin FA for inout argument leftObject.array (DSN={lhs})
-      // begin FA for inout argument rightObject.array (DSN={rhs})
-      // evaluation of swap
-      // end FA for inout argument rightObject.array
-      // end FA for inout argument leftObject.array
+  This results in the following sequence of formal accesses::
 
-  * An l-value which is used as the base of a member storage access
-    begins an FA whose duration is the same as the duration of the FA
-    for the subobject l-value.  The DSN set is empty.
+    // instantaneous FA reading leftObject
+    // instantaneous FA reading rightObject
+    // begin FA for inout argument leftObject.array (DSN={lhs})
+    // begin FA for inout argument rightObject.array (DSN={rhs})
+    // evaluation of swap
+    // end FA for inout argument rightObject.array
+    // end FA for inout argument leftObject.array
 
-    Example::
+* An l-value which is used as the base of a member storage access
+  begins an FA whose duration is the same as the duration of the FA
+  for the subobject l-value.  The DSN set is empty.
 
-      swap(&leftObject.array[i], &rightObject.array[j])
+  Example::
 
-    This results in the following sequence of formal accesses::
+    swap(&leftObject.array[i], &rightObject.array[j])
 
-      // instantaneous FA reading leftObject
-      // instantaneous FA reading i
-      // instantaneous FA reading rightObject
-      // instantaneous FA reading j
-      // begin FA for inout argument leftObject.array (DSN={})
-      // begin FA for inout argument leftObject.array[i] (DSN={lhs})
-      // begin FA for inout argument rightObject.array (DSN={})
-      // begin FA for inout argument rightObject.array[j] (DSN={rhs})
-      // evaluation of swap
-      // end FA for inout argument rightObject.array[j]
-      // end FA for inout argument rightObject.array
-      // end FA for inout argument leftObject.array[i]
-      // end FA for inout argument leftObject.array
+  This results in the following sequence of formal accesses::
+
+    // instantaneous FA reading leftObject
+    // instantaneous FA reading i
+    // instantaneous FA reading rightObject
+    // instantaneous FA reading j
+    // begin FA for inout argument leftObject.array (DSN={})
+    // begin FA for inout argument leftObject.array[i] (DSN={lhs})
+    // begin FA for inout argument rightObject.array (DSN={})
+    // begin FA for inout argument rightObject.array[j] (DSN={rhs})
+    // evaluation of swap
+    // end FA for inout argument rightObject.array[j]
+    // end FA for inout argument rightObject.array
+    // end FA for inout argument leftObject.array[i]
+    // end FA for inout argument leftObject.array
 
 The FAs for all ``inout`` arguments to a call begin simultaneously at
 a point strictly following the evaluation of all the argument
@@ -840,28 +840,28 @@ first I need to build up a few more definitions.
 
 An *abstract storage location* (ASL) is:
   
-  * a global variable declaration;
+* a global variable declaration;
 
-  * an ``inout`` parameter declaration, along with a reference
-    to a specific execution record for that function;
+* an ``inout`` parameter declaration, along with a reference
+  to a specific execution record for that function;
 
-  * a local variable declaration, along with a reference to a
-    specific execution record for that declaration statement;
+* a local variable declaration, along with a reference to a
+  specific execution record for that declaration statement;
 
-  * a static/class property declaration, along with a type having
-    that property;
-      
-  * a struct/enum instance property declaration, along with an
-    ASL for the base;
-      
-  * a struct/enum subscript declaration, along with a concrete index
-    value and an ASL for the base;
-      
-  * a class instance property declaration, along with an instance of
-    that class; or
-      
-  * a class instance subscript declaration, along with a concrete
-    index value and an instance of that class.
+* a static/class property declaration, along with a type having
+  that property;
+
+* a struct/enum instance property declaration, along with an
+  ASL for the base;
+
+* a struct/enum subscript declaration, along with a concrete index
+  value and an ASL for the base;
+
+* a class instance property declaration, along with an instance of
+  that class; or
+
+* a class instance subscript declaration, along with a concrete
+  index value and an instance of that class.
 
 Two abstract storage locations may be said to *overlap*.  Overlap
 corresponds to the imprecise intuition that a modification of one
@@ -870,25 +870,25 @@ is an "open" property of the language: every new declaration may
 introduce its own overlap behavior.  However, the language and
 library make certain assertions about the overlap of some locations:
 
-  * An ``inout`` parameter declaration overlaps exactly the set
-    of ASLs overlapped by the ASL which was passed as an argument.
+* An ``inout`` parameter declaration overlaps exactly the set
+  of ASLs overlapped by the ASL which was passed as an argument.
 
-  * If two ASLs are both implemented with memory, then they overlap
-    only if they have the same kind in the above list and the
-    corresponding data match:
+* If two ASLs are both implemented with memory, then they overlap
+  only if they have the same kind in the above list and the
+  corresponding data match:
 
-      * execution records must represent the same execution
-      * types must be the same
-      * class instances must be the same
-      * ASLs must overlap
+    * execution records must represent the same execution
+    * types must be the same
+    * class instances must be the same
+    * ASLs must overlap
 
-  * For the purposes of the above rule, the subscript of a standard
-    library array type is implemented with memory, and the two
-    indexes match if they have the same integer value.
+* For the purposes of the above rule, the subscript of a standard
+  library array type is implemented with memory, and the two
+  indexes match if they have the same integer value.
 
-  * For the purposes of the above rule, the subscript of a standard
-    library dictionary type is implemented with memory, and the two
-    indexes match if they compare equal with ``==``.
+* For the purposes of the above rule, the subscript of a standard
+  library dictionary type is implemented with memory, and the two
+  indexes match if they compare equal with ``==``.
 
 Because this definition is open, it is impossible to completely
 statically or dynamically decided it.  However, it would still be
@@ -907,10 +907,10 @@ This notion of abstract storage location overlap can be applied to
 formal accesses as well.  Two FAs ``x`` and ``y`` are said to be
 *disjoint* if:
 
-  * they refer to non-overlapping abstract storage locations or
+* they refer to non-overlapping abstract storage locations or
 
-  * they are the base FAs of two disjoint member storage accesses
-    ``x.a`` and ``y.b``.
+* they are the base FAs of two disjoint member storage accesses
+  ``x.a`` and ``y.b``.
 
 Given these definitions, the core unspecified-behavior rule is:
 
@@ -1001,21 +1001,21 @@ expected to be independent.  The code wasn't rejected by the compiler,
 nor did it dynamically assert; it simply seems to misbehave.  But
 there are limits to the misbehavior:
 
-  * By general COW rules, there's no way to change the structure of an
-    existing buffer unless the retain count is 1.  For the purposes of
-    this analysis, that means that, as long as the retain count is
-    above 1, there's no way to invalidate the address returned by the
-    addressor.
+* By general COW rules, there's no way to change the structure of an
+  existing buffer unless the retain count is 1.  For the purposes of
+  this analysis, that means that, as long as the retain count is
+  above 1, there's no way to invalidate the address returned by the
+  addressor.
 
-  * The buffer will be retained for as long as the returned address
-    is being modified.  This retain is independent of any storage
-    which might hold the aggregate value (and thus also retain the buffer).
+* The buffer will be retained for as long as the returned address
+  is being modified.  This retain is independent of any storage
+  which might hold the aggregate value (and thus also retain the buffer).
 
-  * Because of this retain, the only way for the retain count to drop
-    to 1 is for no storage to continue to refer to the buffer.
+* Because of this retain, the only way for the retain count to drop
+  to 1 is for no storage to continue to refer to the buffer.
 
-  * But if no storage refers to the buffer, there is no way to
-    initiate an operation which would change the buffer structure.
+* But if no storage refers to the buffer, there is no way to
+  initiate an operation which would change the buffer structure.
 
 Thus the address will remain valid, and there's no danger of memory
 corruption.  The only thing is that the program no longer makes useful
@@ -1117,18 +1117,18 @@ into the strong reference count.  There is no need to support this
 operation on non-Swift objects.  The runtime should provide three new
 functions:
 
-  * A function to test whether an object is either uniquely referenced
-    or NSM-active.  Call this ``swift_isUniquelyReferencedForNSM``.
+* A function to test whether an object is either uniquely referenced
+  or NSM-active.  Call this ``swift_isUniquelyReferencedForNSM``.
 
-  * A function to perform the above test and, if the test passes and
-    the NSM bit is not set, atomically retain the object and set
-    the NSM bit.  It should return both the result of the test and an
-    object to later set as NSM-inactive.  That object will be nil if
-    the test failed or the NSM bit was already set.  Call this
-    ``swift_tryRetainForNSM``.
+* A function to perform the above test and, if the test passes and
+  the NSM bit is not set, atomically retain the object and set
+  the NSM bit.  It should return both the result of the test and an
+  object to later set as NSM-inactive.  That object will be nil if
+  the test failed or the NSM bit was already set.  Call this
+  ``swift_tryRetainForNSM``.
 
-  * A function to atomically clear the NSM bit and release the object.
-    Call this ``swift_releaseForNSM``.
+* A function to atomically clear the NSM bit and release the object.
+  Call this ``swift_releaseForNSM``.
 
 These operations should also be reflected in SIL.
 
@@ -1151,51 +1151,51 @@ COW aggregate without causing races; but that such code is extremely
 fraught, and moreover it is extremely fraught regardless of whether
 NSM-activeness is tracked with a single bit or a wider count.  Consider:
 
-  * If the shared aggregate value is ever non-uniquely referenced, two
-    threads concurrently modifying it will race to unique the array.
-    This unavoidably has undefined behavior, because uniquing the
-    array requires the previous value to eventually be released, and a
-    race may cause an over-release.
+* If the shared aggregate value is ever non-uniquely referenced, two
+  threads concurrently modifying it will race to unique the array.
+  This unavoidably has undefined behavior, because uniquing the
+  array requires the previous value to eventually be released, and a
+  race may cause an over-release.
 
-  * Assume that it's possible to guarantee that the aggregate value's
-    buffer is uniquely referenced before any threads concurrently
-    access it.  Now, all of the threads are performing different
-    concurrent accesses.
+* Assume that it's possible to guarantee that the aggregate value's
+  buffer is uniquely referenced before any threads concurrently
+  access it.  Now, all of the threads are performing different
+  concurrent accesses.
 
-    * If any of the accesses is a structural modification, there will
-      be a race to re-unique the buffer.
+  * If any of the accesses is a structural modification, there will
+    be a race to re-unique the buffer.
 
-    * If all of the accesses are non-structural modifications, then
-      there will be no races as long as the retain-and-set and
-      release-and-clear operations are atomic: when starting any
-      particular operation, the buffer will always either be uniquely
-      referenced or have the bit set.
+  * If all of the accesses are non-structural modifications, then
+    there will be no races as long as the retain-and-set and
+    release-and-clear operations are atomic: when starting any
+    particular operation, the buffer will always either be uniquely
+    referenced or have the bit set.
 
-    * If any of the accesses is a read, and that read does not occur
-      during a non-structural modification, then the buffer may
-      briefly become non-uniquely referenced and there will be a
-      race from concurrent modifications to re-unique it.
+  * If any of the accesses is a read, and that read does not occur
+    during a non-structural modification, then the buffer may
+    briefly become non-uniquely referenced and there will be a
+    race from concurrent modifications to re-unique it.
 
-    * If any of the accesses is a read, and that read occurs during a
-      non-structural modification, and the optimizer does not re-order
-      the read's retain/release around the retainForNSM/releaseForNSM
-      operations, then it matters how NSM-activeness is tracked.
+  * If any of the accesses is a read, and that read occurs during a
+    non-structural modification, and the optimizer does not re-order
+    the read's retain/release around the retainForNSM/releaseForNSM
+    operations, then it matters how NSM-activeness is tracked.
 
-      If there is complete tracking (i.e. a count, not just a single
-      bit), the retain for the read will only occur while the buffer
-      is flagged as NSM-active, and so it will have no effect.
+    If there is complete tracking (i.e. a count, not just a single
+    bit), the retain for the read will only occur while the buffer
+    is flagged as NSM-active, and so it will have no effect.
 
-      If there is incomplete tracking (i.e. just a single NSM bit),
-      then there is a potential for undefined behavior.  Suppose two
-      threads race to set the NSM bit.  The loser then initiates a
-      read and retains the buffer.  Before the loser releases the
-      buffer, the winner clears the NSM bit.  Now another thread might
-      see that the buffer is non-uniquely referenced and not
-      NSM-active, and so it will attempt to unique the buffer.
+    If there is incomplete tracking (i.e. just a single NSM bit),
+    then there is a potential for undefined behavior.  Suppose two
+    threads race to set the NSM bit.  The loser then initiates a
+    read and retains the buffer.  Before the loser releases the
+    buffer, the winner clears the NSM bit.  Now another thread might
+    see that the buffer is non-uniquely referenced and not
+    NSM-active, and so it will attempt to unique the buffer.
 
-      It is probably unreasonable to require the optimizer to never
-      reorder ordinary retains and releases past retainForNSM and
-      releaseForNSM operations.
+    It is probably unreasonable to require the optimizer to never
+    reorder ordinary retains and releases past retainForNSM and
+    releaseForNSM operations.
 
 More importantly, the use case here (many threads concurrently
 accessing different elements of a shared data structure) just
@@ -1253,44 +1253,44 @@ Summary of proposal and plan
 
 Let me summarize what I'm proposing:
 
-  * Swift's core approach to optimizing accesses should be based
-    around providing direct access to memory, either statically or
-    dynamically.  In other words, Swift should adopt addressors on
-    core data structures as much as possible.
+* Swift's core approach to optimizing accesses should be based
+  around providing direct access to memory, either statically or
+  dynamically.  In other words, Swift should adopt addressors on
+  core data structures as much as possible.
 
-  * Swift should fix the current memory hole with addressors by
-    retaining for the duration of the access and, for modifications,
-    flagging the buffer as NSM-active.  The implementation plan
-    follows:
+* Swift should fix the current memory hole with addressors by
+  retaining for the duration of the access and, for modifications,
+  flagging the buffer as NSM-active.  The implementation plan
+  follows:
 
-    * The runtime implements the NSM-bit and its entrypoints.
+  * The runtime implements the NSM-bit and its entrypoints.
 
-    * SIL provides operations for manipulating and querying the NSM
-      bit.  IRGen implements these operations using the runtime
-      functions.  Builtins are exposed.
+  * SIL provides operations for manipulating and querying the NSM
+    bit.  IRGen implements these operations using the runtime
+    functions.  Builtins are exposed.
 
-    * The standard library changes data structures to do different
-      uniquing for structural and non-structural modifications.  This
-      patch is not yet committed.
+  * The standard library changes data structures to do different
+    uniquing for structural and non-structural modifications.  This
+    patch is not yet committed.
 
-    * The optimizer reacts to the above.  When both are settled, they
-      can be committed.
+  * The optimizer reacts to the above.  When both are settled, they
+    can be committed.
 
-    * SILGen changes the emission patterns for l-values so that
-      addresses and writebacks are live only during the formal
-      access.
+  * SILGen changes the emission patterns for l-values so that
+    addresses and writebacks are live only during the formal
+    access.
 
-    * Sema changes the signature of ``address``, ``mutableAddress``,
-      and ``materializeForSet`` to return an optional owner reference.
-      Sema changes ``materializeForSet`` synthesis to return the
-      owner correctly.  SILGen implements the desired code patterns.
+  * Sema changes the signature of ``address``, ``mutableAddress``,
+    and ``materializeForSet`` to return an optional owner reference.
+    Sema changes ``materializeForSet`` synthesis to return the
+    owner correctly.  SILGen implements the desired code patterns.
 
-      The standard library changes its addressor implementations
-      to continue to compile, but for staging purposes, it only uses
-      nil owners.
+    The standard library changes its addressor implementations
+    to continue to compile, but for staging purposes, it only uses
+    nil owners.
 
-    * The standard library changes addressor implementations to
-      use meaningful owners.  This patch is not yet committed.
+  * The standard library changes addressor implementations to
+    use meaningful owners.  This patch is not yet committed.
 
-    * The optimizer reacts to the above.  When both are settled, they
-      can be committed.
+  * The optimizer reacts to the above.  When both are settled, they
+    can be committed.
