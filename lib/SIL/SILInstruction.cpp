@@ -1302,6 +1302,7 @@ SwitchValueInst::SwitchValueInst(SILLocation Loc, SILValue Operand,
       assert(IL && "switch_value case value should be of an integer type");
       assert(IL->getValue().getBitWidth() == OperandBitWidth &&
              "switch_value case value is not same bit width as operand");
+      (void)IL;
     } else {
       auto *FR = dyn_cast<FunctionRefInst>(Cases[i]);
       if (!FR) {
@@ -1368,6 +1369,7 @@ SelectValueInst::SelectValueInst(SILLocation Loc, SILValue Operand, SILType Type
     assert(IL && "select_value case value should be of an integer type");
     assert(IL->getValue().getBitWidth() == OperandBitWidth &&
            "select_value case value is not same bit width as operand");
+    (void)IL;
   }
 }
 
@@ -1580,6 +1582,7 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
   SILType enumType = value.getType();
   EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
   assert(decl && "switch_enum operand is not an enum");
+  (void)decl;
 
   EnumElementDecl *D = nullptr;
   for (unsigned i = 0, e = getNumCases(); i != e; ++i) {

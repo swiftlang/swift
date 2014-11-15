@@ -184,6 +184,7 @@ class WeakRefCount {
   void increment() {
     uint32_t newval = __atomic_add_fetch(&refCount, RC_ONE, __ATOMIC_RELAXED);
     assert(newval >= RC_ONE  &&  "weak refcount overflow");
+    (void)newval;
   }
 
 
