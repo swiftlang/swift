@@ -90,6 +90,7 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
     auto ThinCallee = cast<ThinToThickFunctionInst>(Callee)->getOperand();
     // TODO: We want to see through these to the underlying function.
     assert(cast<FunctionRefInst>(ThinCallee) && "Expected function reference!");
+    (void)ThinCallee;
     ++NumCallSitesWithoutEdges;
     break;
   }

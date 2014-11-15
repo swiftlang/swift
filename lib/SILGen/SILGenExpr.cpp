@@ -1404,6 +1404,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
            ? convention == ResultConvention::Unowned
            : convention == ResultConvention::Owned)
          && "nonstandard conventions for return not implemented");
+  (void)convention;
+  (void)resultTL;
   
   auto r = result.forward(gen);
   scope.pop();

@@ -2447,6 +2447,7 @@ static bool existentialConformsToProtocol(TypeChecker &tc, Type type,
   SmallVector<ProtocolDecl *, 4> protocols;
   bool isExistential = type->isExistentialType(protocols);
   assert(isExistential && "Not existential?");
+  (void)isExistential;
 
   // An existential that must be a class trivially conforms to AnyObject.
   if (type->isClassExistentialType() &&
