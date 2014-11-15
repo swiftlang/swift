@@ -12,26 +12,17 @@ class C {
 #if arch(i386) || arch(arm)
 
 // We have no ObjC tagged pointers, and two low spare bits due to alignment.
-// 1 is used as the native/ObjC flag.
-let NATIVE_FLAG_BIT: UInt = 1
-let SOME_SPARE_BIT: UInt = 2
-let NON_POINTER_BITS: UInt = 3
+let NATIVE_SPARE_BITS: UInt = 0x0000_0003
 
 #elseif arch(x86_64)
 
-// We have ObjC tagged pointers in the lowest and highest bit. 2 is used as the
-// native/ObjC flag, leaving 0x7F00_0000_0000_0004 free.
-let NATIVE_FLAG_BIT: UInt = 2
-let SOME_SPARE_BIT: UInt = 4
-let NON_POINTER_BITS: UInt = 0x7F00_0000_0000_0006
+// We have ObjC tagged pointers in the lowest and highest bit
+let NATIVE_SPARE_BITS: UInt = 0x7F00_0000_0000_0006
 
 #elseif arch(arm64)
 
-// We have ObjC tagged pointers in the highest bit. 0x4000_0000_0000_0000 is
-// used as the native/ObjC flag, leaving 0x3F00_0000_0000_0007 free.
-let NATIVE_FLAG_BIT: UInt = 0x4000_0000_0000_0000
-let SOME_SPARE_BIT: UInt = 4
-let NON_POINTER_BITS: UInt = 0x7F00_0000_0000_0007
+// We have ObjC tagged pointers in the highest bit
+let NATIVE_SPARE_BITS: UInt = 0x7F00_0000_0000_0007
 
 #endif
 
@@ -40,7 +31,7 @@ func bitPattern(x: Builtin.BridgeObject) -> UInt {
 }
 
 func nonPointerBits(x: Builtin.BridgeObject) -> UInt {
-  return bitPattern(x) & NON_POINTER_BITS
+  return bitPattern(x) & NATIVE_SPARE_BITS
 }
 
 // Try without any bits set.
@@ -74,42 +65,10 @@ if true {
 // CHECK-NEXT: deallocated
 // CHECK-NEXT: deallocated
 
-// Try with the native flag bit set.
+// Try with all spare bits set.
 if true {
   let x = C()
-  let bo = Builtin.castToBridgeObject(x, NATIVE_FLAG_BIT.value)
-
-  let bo2 = bo
-  let x1: C = Builtin.castReferenceFromBridgeObject(bo)
-  let x2: C = Builtin.castReferenceFromBridgeObject(bo2)
-  // CHECK-NEXT: true
-  println(x === x1)
-  // CHECK-NEXT: true
-  println(x === x2)
-
-  println(nonPointerBits(bo) == NATIVE_FLAG_BIT)
-  // CHECK-NEXT: true
-  
-  var bo3 = Builtin.castToBridgeObject(C(), NATIVE_FLAG_BIT.value)
-  println(
-    _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      bitPattern(bo3)) != 0)
-  // CHECK-NEXT: true
-  let bo4 = bo3
-  println(
-    _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      bitPattern(bo3)) != 0)
-  // CHECK-NEXT: false
-  _fixLifetime(bo3)
-  _fixLifetime(bo4)
-}
-// CHECK-NEXT: deallocated
-// CHECK-NEXT: deallocated
-
-// Try with other spare bits set.
-if true {
-  let x = C()
-  let bo = Builtin.castToBridgeObject(x, SOME_SPARE_BIT.value)
+  let bo = Builtin.castToBridgeObject(x, NATIVE_SPARE_BITS.value)
 
   let bo2 = bo
   let x1: C = Builtin.castReferenceFromBridgeObject(bo)
@@ -119,10 +78,10 @@ if true {
   // CHECK-NEXT: true
   println(x === x2)
   
-  println(nonPointerBits(bo) == SOME_SPARE_BIT)
+  println(nonPointerBits(bo) == NATIVE_SPARE_BITS)
   // CHECK-NEXT: true
   
-  var bo3 = Builtin.castToBridgeObject(C(), SOME_SPARE_BIT.value)
+  var bo3 = Builtin.castToBridgeObject(C(), NATIVE_SPARE_BITS.value)
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
       bitPattern(bo3)) != 0)
@@ -142,8 +101,8 @@ if true {
 
 import Foundation
 
-// Try with a (probably) tagged pointer. No bits may be masked into a tagged
-// pointer.
+// Try with a (probably) tagged pointer. No bits may be masked into a
+// non-native object.
 if true {
   let x = NSNumber(integer: 22)
   let bo = Builtin.castToBridgeObject(x, 0.value)
@@ -170,7 +129,7 @@ var unTaggedString: NSString {
 // Try with an un-tagged pointer. 
 if true {
   let x = unTaggedString
-  let bo = Builtin.castToBridgeObject(x, SOME_SPARE_BIT.value)
+  let bo = Builtin.castToBridgeObject(x, 0.value)
   let bo2 = bo
   let x1: NSString = Builtin.castReferenceFromBridgeObject(bo)
   let x2: NSString = Builtin.castReferenceFromBridgeObject(bo2)
@@ -179,7 +138,7 @@ if true {
   // CHECK-NEXT: true
   println(x === x2)
   
-  println(nonPointerBits(bo) == SOME_SPARE_BIT)
+  println(nonPointerBits(bo) == 0)
   // CHECK-NEXT: true
   
   var bo3 = Builtin.castToBridgeObject(unTaggedString, 0.value)

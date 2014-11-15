@@ -487,9 +487,9 @@ void *swift::swift_bridgeObjectRetain(void *object) {
     & ~heap_object_abi::SwiftSpareBitsMask;
 
 #if SWIFT_OBJC_INTEROP
-  // BridgeObject uses the Swift-reserved bit to tag objects with native
+  // BridgeObject uses the spare bits to tag objects with native
   // refcounting.
-  if (uintptr_t(object) & heap_object_abi::SwiftReservedBitPatternValue)
+  if (objectRef != uintptr_t(object))
     return swift_retain((HeapObject*) objectRef);
   return objc_retain((id) objectRef);
 #else
@@ -510,7 +510,7 @@ void swift::swift_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP
   // BridgeObject uses the Swift-reserved bit to tag objects with native
   // refcounting.
-  if (uintptr_t(object) & heap_object_abi::SwiftReservedBitPatternValue)
+  if (objectRef != uintptr_t(object))
     return swift_release((HeapObject*) objectRef);
   return objc_release((id) objectRef);
 #else
@@ -1007,10 +1007,10 @@ unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   const auto maskedBits = bits & ~heap_object_abi::SwiftSpareBitsMask;
   const auto object = reinterpret_cast<HeapObject*>(maskedBits);
 
-  // Note: we could just return false if the "native" bit isn't set,
+  // Note: we could just return false if no spare bits are set,
   // but in that case the cost of a deeper check for a unique native
   // object is going to be a negligible cost for a possible big win.
-  return (bits & heap_object_abi::SwiftReservedBitPatternValue)
+  return (bits != maskedBits)
     ? _swift_isUniquelyReferenced_nonNull_native(object)
     : _swift_isUniquelyReferencedNonObjC_nonNull(object);
 }

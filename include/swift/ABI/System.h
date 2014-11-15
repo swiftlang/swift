@@ -42,21 +42,16 @@
 #define SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK 0
 
 /// The bitmask of reserved bits in an Objective-C object pointer.
-/// Byt default we assume the ObjC runtime doesn't use tagged pointers.
-#define SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK 0
-
-/// The bitmask for the reserved "Swift usage" bit pattern.
-/// The ObjC runtime will not use pointer values for which
-/// ``pointer & SWIFT_RESERVED_BIT_PATTERN_MASK == SWIFT_RESERVED_BIT_PATTERN_VALUE``.
-/// By default we assume there isn't one.
-#define SWIFT_ABI_DEFAULT_SWIFT_RESERVED_BIT_PATTERN_MASK  0
-#define SWIFT_ABI_DEFAULT_SWIFT_RESERVED_BIT_PATTERN_VALUE 1
-
+/// By default we assume the ObjC runtime doesn't use tagged pointers.
 #define SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK 0
 
 /// The number of low bits in an Objective-C object pointer that
 /// are reserved by the Objective-C runtime.
 #define SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS 0
+
+/// The ObjC runtime will not use pointer values for which
+/// ``pointer & SWIFT_ABI_XXX_OBJC_RESERVED_BITS_MASK == 0 && 
+/// pointer & SWIFT_ABI_XXX_SWIFT_SPARE_BITS_MASK != 0``.
 
 /*********************************** i386 *************************************/
 
@@ -82,12 +77,6 @@
 #define SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK 0x8000000000000001ULL
 #define SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS 1
 
-// We've also reserved a bit pattern for Swift's use. The ObjC runtime will
-// never use a pointer value for which
-// ``pointer & SWIFT_RESERVED_BIT_PATTERN_MASK == SWIFT_RESERVED_BIT_PATTERN_VALUE``.
-#define SWIFT_ABI_X86_64_SWIFT_RESERVED_BIT_PATTERN_MASK  0x8000000000000003ULL
-#define SWIFT_ABI_X86_64_SWIFT_RESERVED_BIT_PATTERN_VALUE 0x0000000000000002ULL
-
 /*********************************** arm64 ************************************/
 
 /// Darwin reserves the low 4GB of address space.
@@ -100,11 +89,5 @@
 // Objective-C reserves just the high bit for tagged pointers.
 #define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL
 #define SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS 0
-
-// We've also reserved a bit pattern for Swift's use. The ObjC runtime will
-// never use a pointer value for which
-// ``pointer & SWIFT_RESERVED_BIT_PATTERN_MASK == SWIFT_RESERVED_BIT_PATTERN_VALUE``.
-#define SWIFT_ABI_ARM64_SWIFT_RESERVED_BIT_PATTERN_MASK  0xC000000000000000ULL
-#define SWIFT_ABI_ARM64_SWIFT_RESERVED_BIT_PATTERN_VALUE 0x4000000000000000ULL
 
 #endif /* SWIFT_ABI_SYSTEM_H */

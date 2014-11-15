@@ -746,10 +746,6 @@ static const uintptr_t SwiftSpareBitsMask =
   SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK;
 static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK;
-static const uintptr_t SwiftReservedBitPatternMask =
-  SWIFT_ABI_X86_64_SWIFT_RESERVED_BIT_PATTERN_MASK;
-static const uintptr_t SwiftReservedBitPatternValue =
-  SWIFT_ABI_X86_64_SWIFT_RESERVED_BIT_PATTERN_VALUE;
 static const unsigned ObjCReservedLowBits =
   SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS;
 
@@ -768,10 +764,6 @@ static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK;
 static const unsigned ObjCReservedLowBits =
   SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS;
-static const uintptr_t SwiftReservedBitPatternMask =
-  SWIFT_ABI_ARM64_SWIFT_RESERVED_BIT_PATTERN_MASK;
-static const uintptr_t SwiftReservedBitPatternValue =
-  SWIFT_ABI_ARM64_SWIFT_RESERVED_BIT_PATTERN_VALUE;
 
 #else
 
@@ -790,10 +782,6 @@ static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
 static const unsigned ObjCReservedLowBits =
   SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
-static const uintptr_t SwiftReservedBitPatternMask =
-  SWIFT_ABI_DEFAULT_SWIFT_RESERVED_BIT_PATTERN_MASK;
-static const uintptr_t SwiftReservedBitPatternValue =
-  SWIFT_ABI_DEFAULT_SWIFT_RESERVED_BIT_PATTERN_VALUE;
 
 #endif
 
