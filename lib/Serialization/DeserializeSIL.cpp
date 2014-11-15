@@ -641,7 +641,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   switch (RecordKind) {
   default:
-    assert(0 && "Record kind for a SIL instruction is not supported.");
+    llvm_unreachable("Record kind for a SIL instruction is not supported.");
   case SIL_ONE_VALUE_ONE_OPERAND:
     SILOneValueOneOperandLayout::readRecord(scratch, OpCode, Attr,
                                             ValID, ValResNum, TyID, TyCategory,
@@ -826,7 +826,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto ctxConformances = MF->getContext().AllocateCopy(conformances);
 
     switch ((ValueKind)OpCode) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::InitExistentialInst:
       ResultVal = Builder.createInitExistential(Loc, operand,
                                                 ConcreteTy,
@@ -1208,7 +1208,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     auto ResultTy = TT->getFields()[TyID].getType();
     switch ((ValueKind)OpCode) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::TupleElementAddrInst:
       ResultVal = Builder.createTupleElementAddr(Loc,
                       getLocalValue(ValID, ValResNum, ST),
@@ -1487,7 +1487,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     bool IsVolatile = ListOfValues[0] > 0;
 
     switch ((ValueKind)OpCode) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::ClassMethodInst:
       ResultVal = Builder.createClassMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex],

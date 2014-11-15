@@ -803,7 +803,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
                       ResilienceExpansion::Minimal, 0);
   }
   case TypeKind::LValue:
-    assert(0 && "@lvalue types should not occur in function interfaces");
+    llvm_unreachable("@lvalue types should not occur in function interfaces");
   case TypeKind::InOut:
     Buffer << 'R';
     return mangleType(cast<InOutType>(tybase)->getObjectType(),

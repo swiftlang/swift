@@ -110,8 +110,7 @@ static CanType getElementTypeRec(CanType T, unsigned EltNo,
         return getElementTypeRec(FieldType, EltNo, false);
       EltNo -= NumFieldElements;
     }
-    assert(0 && "invalid element number");
-    abort();
+    llvm::report_fatal_error("invalid element number");
   }
 
   // If this is the top level of a 'self' value, we flatten structs and classes.
@@ -126,8 +125,7 @@ static CanType getElementTypeRec(CanType T, unsigned EltNo,
         return getElementTypeRec(FieldType, EltNo, false);
       EltNo -= NumFieldElements;
     }
-    assert(0 && "invalid element number");
-    abort();
+    llvm::report_fatal_error("invalid element number");
   }
 
   // Otherwise, it is a leaf element.
@@ -226,7 +224,7 @@ static ValueDecl *getPathStringToElementRec(CanType T, unsigned EltNo,
       
       ++FieldNo;
     }
-    assert(0 && "Element number is out of range for this type!");
+    llvm_unreachable("Element number is out of range for this type!");
   }
 
   // If this is indexing into a field of 'self', look it up.

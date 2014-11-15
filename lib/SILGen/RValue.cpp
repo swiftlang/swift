@@ -688,7 +688,7 @@ void RValueSource::rewriteType(CanType newType) & {
   } else {
     Expr *expr = Storage.TheExpr;
     if (expr->getType()->isEqual(newType)) return;
-    assert(0 && "unimplemented! hope it doesn't happen");
+    llvm_unreachable("unimplemented! hope it doesn't happen");
   }
 }
 

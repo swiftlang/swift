@@ -669,7 +669,7 @@ namespace {
         OS << " type";
       if (auto *ASD = FD->getAccessorStorageDecl()) {
         switch (FD->getAccessorKind()) {
-        case AccessorKind::NotAccessor: assert(0 && "Isn't an accessor?");
+        case AccessorKind::NotAccessor: llvm_unreachable("Isn't an accessor?");
         case AccessorKind::IsGetter: OS << " getter"; break;
         case AccessorKind::IsSetter: OS << " setter"; break;
         case AccessorKind::IsWillSet: OS << " willset"; break;

@@ -320,7 +320,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   // Custom type checking.  We know the one or two types have been subjected to
   // the "isBuiltinTypeOverloaded" predicate successfully.
   switch (VK) {
-  default: assert(0 && "Not a cast operation");
+  default: llvm_unreachable("Not a cast operation");
 
   case BuiltinValueKind::Trunc:
     if (CheckOutput.isNull() ||
@@ -420,7 +420,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
           break;
 
     // FIXME: Implement bitcast typechecking.
-    assert(0 && "Bitcast not supported yet!");
+    llvm_unreachable("Bitcast not supported yet!");
     return nullptr;
   }
 
@@ -1255,7 +1255,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::Fence:
   case BuiltinValueKind::CmpXChg:
   case BuiltinValueKind::AtomicRMW:
-    assert(0 && "Handled above");
+    llvm_unreachable("Handled above");
   case BuiltinValueKind::None: return nullptr;
 
   case BuiltinValueKind::Gep:

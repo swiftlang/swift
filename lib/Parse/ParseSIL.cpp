@@ -1871,7 +1871,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     switch (Opcode) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::UncheckedRefCastInst:
       ResultVal = B.createUncheckedRefCast(InstLoc, Val, Ty);
       break;
@@ -2207,7 +2207,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseTypedValueRef(Val))
       return true;
     switch (Opcode) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::ValueMetatypeInst:
       ResultVal = B.createValueMetatype(InstLoc, Ty, Val);
       break;
@@ -2498,7 +2498,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     switch (Opcode) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::ClassMethodInst:
       ResultVal = B.createClassMethod(InstLoc, Val, Member, MethodTy,
                                       IsVolatile);
@@ -3144,7 +3144,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   auto ArgTys = substFTI->getParameterSILTypes();
 
   switch (Opcode) {
-  default: assert(0 && "Unexpected case");
+  default: llvm_unreachable("Unexpected case");
   case ValueKind::ApplyInst : {
     if (ArgTys.size() != ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,

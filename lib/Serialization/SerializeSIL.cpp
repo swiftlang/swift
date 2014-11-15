@@ -372,7 +372,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ArrayRef<ProtocolConformance*> conformances;
 
     switch (SI.getKind()) {
-    default: assert(0 && "out of sync with parent");
+    default: llvm_unreachable("out of sync with parent");
     case ValueKind::InitExistentialInst: {
       auto &IEI = cast<InitExistentialInst>(SI);
       operand = IEI.getOperand();
@@ -436,7 +436,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILValue operand;
     SILType Ty;
     switch (SI.getKind()) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::ValueMetatypeInst:
       operand = cast<ValueMetatypeInst>(&SI)->getOperand();
       Ty = cast<ValueMetatypeInst>(&SI)->getType();
@@ -872,7 +872,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     std::string Str;
     SILType Ty;
     switch (SI.getKind()) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::IntegerLiteralInst:
       Str = cast<IntegerLiteralInst>(&SI)->getValue().toString(10, true);
       Ty = cast<IntegerLiteralInst>(&SI)->getType();
@@ -1052,7 +1052,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILValue operand;
     Decl *tDecl;
     switch (SI.getKind()) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::RefElementAddrInst:
       operand = cast<RefElementAddrInst>(&SI)->getOperand();
       tDecl = cast<RefElementAddrInst>(&SI)->getField();
@@ -1114,7 +1114,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILValue operand;
     unsigned FieldNo;
     switch (SI.getKind()) {
-    default: assert(0 && "Out of sync with parent switch");
+    default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::TupleElementAddrInst:
       operand = cast<TupleElementAddrInst>(&SI)->getOperand();
       FieldNo = cast<TupleElementAddrInst>(&SI)->getFieldNo();

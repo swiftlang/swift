@@ -603,7 +603,7 @@ void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
       return;
     }
   }
-  assert(0 && "Break has available target block.");
+  llvm_unreachable("Break has available target block.");
 }
 
 void SILGenFunction::visitSwitchStmt(SwitchStmt *S) {

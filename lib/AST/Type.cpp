@@ -1235,8 +1235,7 @@ const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   case BuiltinFloatType::IEEE128: return APFloat::IEEEquad;
   case BuiltinFloatType::PPC128:  return APFloat::PPCDoubleDouble;
   }
-  assert(0 && "Unknown FP semantics");
-  return APFloat::IEEEhalf;
+  llvm::report_fatal_error("Unknown FP semantics");
 }
 
 bool TypeBase::isSpelledLike(Type other) {
