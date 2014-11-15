@@ -876,6 +876,7 @@ library make certain assertions about the overlap of some locations:
   * If two ASLs are both implemented with memory, then they overlap
     only if they have the same kind in the above list and the
     corresponding data match:
+
       * execution records must represent the same execution
       * types must be the same
       * class instances must be the same
