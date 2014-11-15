@@ -252,3 +252,67 @@ internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 
 @asmname("_swift_isClass")
 public func _swift_isClass(x: Any) -> Bool
+
+//===--- Builtin.BridgeObject ---------------------------------------------===//
+
+#if arch(i386) || arch(arm)
+internal let _objectPointerSpareBits: UInt = 0x0000_0003
+internal let _objectPointerLowSpareBitShift: UInt = 0
+#elseif arch(x86_64)
+internal let _objectPointerSpareBits: UInt = 0x7F00_0000_0000_0006
+internal let _objectPointerLowSpareBitShift: UInt = 1
+#elseif arch(arm64)
+internal let _objectPointerSpareBits: UInt = 0x7F00_0000_0000_0007
+internal let _objectPointerLowSpareBitShift: UInt = 0
+#endif
+
+/// Extract the raw bits of `x`
+internal func _bitPattern(x: Builtin.BridgeObject) -> UInt {
+  return UInt(Builtin.castBitPatternFromBridgeObject(x))
+}
+
+/// Extract the raw spare bits of `x`
+internal func _nonPointerBits(x: Builtin.BridgeObject) -> UInt {
+  return _bitPattern(x) & _objectPointerSpareBits
+}
+
+/// Create a `BridgeObject` around the given `nativeObject` with the
+/// given spare bits.  Reference-counting and other operations on this
+/// object will have access to the knowledge that it is native.
+///
+/// Requires: `bits != 0`, `bits & _objectPointerSpareBits == bits`
+internal func _makeNativeBridgeObject<NativeClass: AnyObject>(
+  nativeObject: NativeClass, bits: UInt
+) -> Builtin.BridgeObject {
+  _sanityCheck(
+    bits != 0,
+    "A BridgeObject marked as native must have non-zero spare bits"
+  )
+  return _makeBridgeObject(nativeObject, bits)
+}
+
+/// Create a `BridgeObject` around the given `objCObject`.
+internal func _makeObjCBridgeObject<ObjCClass: AnyObject>(
+  objCObject: ObjCClass
+) -> Builtin.BridgeObject {
+  return _makeBridgeObject(objCObject, 0)
+}
+
+/// Create a `BridgeObject` around the given `object` with the
+/// given spare bits.  
+///
+/// Requires: if `bits != 0`, `object` is a native object. `bits &
+/// _objectPointerSpareBits == bits`
+internal func _makeBridgeObject<Class: AnyObject>(
+  object: Class, bits: UInt
+) -> Builtin.BridgeObject {
+  _sanityCheck(
+    bits == 0 || _usesNativeSwiftReferenceCounting(Class.self),
+    "Can't store bits into non-native Builtin.BridgeObject"
+  )
+  _sanityCheck(
+    bits & _objectPointerSpareBits == bits,
+    "Can't store non-spare bits into Builtin.BridgeObject"
+  )
+  return Builtin.castToBridgeObject(object, bits.value)
+}

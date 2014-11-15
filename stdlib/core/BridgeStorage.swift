@@ -19,13 +19,12 @@
 //  type, when it becomes available.
 //
 //===----------------------------------------------------------------------===//
-#if _runtime(_ObjC)
 import SwiftShims
 
 public // @testable
-enum _BridgeStorage<
+struct _BridgeStorage<
   NativeType: AnyObject, CocoaType: AnyObject
-> {
+> {  
   public // @testable
   typealias Native = NativeType
   
@@ -36,74 +35,44 @@ enum _BridgeStorage<
   init(_ native: Native, bits: Int) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeType.self))
     _sanityCheck(!_usesNativeSwiftReferenceCounting(CocoaType.self))
-    
-    switch bits {
-    case 0: self = .Native0(native)
-    case 1: self = .Native1(native)
-    case 2: self = .Native2(native)
-    default:
-      // on i386, we have 2 spare bits.  Other platforms have more.
-      _sanityCheckFailure(
-        "BridgeStorage can't store bits outside the range 0-2")
-    }
+    _sanityCheck(0..<3 ~= bits,
+        "BridgeStorage can't store bits outside the range 0..<3")
+
+    rawValue = _makeNativeBridgeObject(
+      native, (UInt(bits) + 1) << _objectPointerLowSpareBitShift)
   }
   
   public // @testable
   init(_ cocoa: Cocoa) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeType.self))
     _sanityCheck(!_usesNativeSwiftReferenceCounting(CocoaType.self))
-    self = .Cocoa0(cocoa)
+    rawValue = _makeObjCBridgeObject(cocoa)
   }
   
   public // @testable
   var native: Native? {
-    switch self {
-    case Native0(let x):
-      return x
-    case Native1(let x):
-      return x
-    case Native2(let x):
-      return x
-    default:
-      return nil
-    }
+    return _nonPointerBits(rawValue) == 0
+      ? nil : Builtin.castReferenceFromBridgeObject(rawValue) as Native
   }
   
   public // @testable
   var cocoa: Cocoa? {
-    switch self {
-    case Cocoa0(let x):
-      return x
-    default:
-      return nil
-    }
+    return _nonPointerBits(rawValue) != 0
+      ? nil : Builtin.castReferenceFromBridgeObject(rawValue) as Cocoa
   }
   
   public // @testable
   var spareBits: Int {
-    switch self {
-    case Native1:
-      return 1
-    case Native2:
-      return 2
-    default:
-      return 0
-    }
+    return Int((_nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift) - 1)
   }
   
   public // @testable
   mutating func isUniquelyReferenced() -> Bool {
-    if let raw = native.map({ Builtin.bridgeToRawPointer($0) }) {
-      return _swift_isUniquelyReferenced_nonNull_native(UnsafePointer(raw)) != 0
-    }
-    return false
+    return _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
+      _bitPattern(rawValue)
+    ) != 0
   }
-  
-  //===--- private/internal -----------------------------------------------===//
-case Native0(Native)
-case Native1(Native)
-case Native2(Native)
-case Cocoa0(CocoaType)
-}
 
-#endif
+  //===--- private --------------------------------------------------------===//
+  internal let rawValue: Builtin.BridgeObject
+}
