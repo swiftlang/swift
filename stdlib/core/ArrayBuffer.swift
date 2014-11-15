@@ -213,15 +213,12 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(T.self) {
       return
     }
+    
     if _slowPath(indirect.needsElementTypeCheck) {
-      if _fastPath(_isNative) {
-        for x in _native[subRange] {
-          _precondition(
-            unsafeBitCast(x, AnyObject.self) is T,
-            "NSArray element failed to match the Swift Array Element type")
-        }
-      }
-      else if !subRange.isEmpty {
+      _sanityCheck(
+        !_isNative, "A native array that needs a type check?")
+
+      if !subRange.isEmpty {
         let ns = _nonNative
         // Could be sped up, e.g. by using
         // enumerateObjectsAtIndexes:options:usingBlock:
