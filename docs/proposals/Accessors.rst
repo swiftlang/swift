@@ -1,3 +1,5 @@
+:orphan:
+
 Optimizing Accessors in Swift
 =============================
 
