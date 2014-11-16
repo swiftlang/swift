@@ -237,7 +237,7 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
   // If V2 is also a gep instruction with a must-alias or not-aliasing base
   // pointer, figure out if the indices of the GEPs tell us anything about the
   // derived pointers.
-  if (Projection::isAddressProjection(V2)) {
+  if (Projection::isAddrProjection(V2)) {
     // Do the base pointers alias?
     AliasAnalysis::AliasResult BaseAlias = AA.alias(O1, O2);
 
@@ -520,15 +520,14 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
 
   // First if one instruction is a gep and the other is not, canonicalize our
   // inputs so that V1 always is the instruction containing the GEP.
-  if (!Projection::isAddressProjection(V1) &&
-      Projection::isAddressProjection(V2)) {
+  if (!Projection::isAddrProjection(V1) && Projection::isAddrProjection(V2)) {
     std::swap(V1, V2);
     std::swap(O1, O2);
   }
 
   // If V1 is an address projection, attempt to use information from the
   // aggregate type tree to disambiguate it from V2.
-  if (Projection::isAddressProjection(V1)) {
+  if (Projection::isAddrProjection(V1)) {
     AliasResult Result = aliasAddressProjection(*this, V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
       return AliasCache[Key] = Result;

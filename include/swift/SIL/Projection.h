@@ -26,8 +26,8 @@
 
 namespace swift {
 
-/// An abstract representation of a SIL Projection that allows one to refer to
-/// either nominal fields or tuple indices.
+/// An abstract representation of a SIL Projection that allows one to work with
+/// value projections and address projections at an abstract level.
 class Projection {
 public:
 
@@ -128,12 +128,23 @@ public:
   /// equals this projection.
   bool matchesExtract(SILInstruction *I) const;
 
-  static bool isAddressProjection(SILValue V) {
+  static bool isAddrProjection(SILValue V) {
     switch (V->getKind()) {
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static bool isValueProjection(SILValue V) {
+    switch (V->getKind()) {
+    case ValueKind::StructExtractInst:
+    case ValueKind::TupleExtractInst:
+    case ValueKind::UncheckedEnumDataInst:
       return true;
     default:
       return false;

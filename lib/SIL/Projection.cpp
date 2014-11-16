@@ -71,7 +71,7 @@ ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
   auto Iter = End;
   if (IgnoreCasts)
     Iter = Iter.stripCasts();
-  while (Projection::isAddressProjection(Iter) && Start != Iter) {
+  while (Projection::isAddrProjection(Iter) && Start != Iter) {
     if (auto *SEA = dyn_cast<StructElementAddrInst>(Iter))
       P.Path.push_back(Projection(SEA));
     else if (auto *TEA = dyn_cast<TupleElementAddrInst>(Iter))
