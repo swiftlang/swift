@@ -131,7 +131,7 @@ public:
 /// be a valid state for the cache.
 template <class Entry> class MetadataCache {
 
-  /// This pair ties an EntryRef Key and an Entry Value. 
+  /// This pair ties an EntryRef Key and an Entry Value.
   struct EntryPair {
     EntryPair(EntryRef<Entry> K, Entry* V) : Key(K), Value(V) {}
     EntryRef<Entry> Key;
@@ -145,7 +145,7 @@ template <class Entry> class MetadataCache {
   MDMapTy *Map;
 
   /// Synchronization of metadata creation.
-  std::mutex Lock;
+  std::mutex *Lock;
 
   /// The head of a linked list connecting all the metadata cache entries.
   /// TODO: Remove this when LLDB is able to understand the final data
@@ -153,8 +153,8 @@ template <class Entry> class MetadataCache {
   const Entry *Head;
 
 public:
-  MetadataCache() : Map(new MDMapTy()), Lock() {}
-  ~MetadataCache() { delete Map; }
+  MetadataCache() : Map(new MDMapTy()), Lock(new std::mutex()) {}
+  ~MetadataCache() { delete Map; delete Lock; }
 
   /// Caches are not copyable.
   MetadataCache(const MetadataCache &other) = delete;
@@ -191,7 +191,7 @@ public:
 
     // We did not find a key so we will need to create one and store it.
     {
-      std::unique_lock<std::mutex> ConstructionGuard(Lock);
+      std::unique_lock<std::mutex> ConstructionGuard(*Lock);
 
       // Some other thread may have setup the value we are about to construct
       // while we were asleep so do a search before constructing a new value.
