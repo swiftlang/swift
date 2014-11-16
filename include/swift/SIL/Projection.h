@@ -53,6 +53,90 @@ private:
   unsigned Index;
 
 public:
+  /// If I is representable as a projection, return the projection. Otherwise,
+  /// return None.
+  static llvm::Optional<Projection>
+  projectionForInstruction(SILInstruction *I);
+
+  /// If I is an address projection, return the projection. Otherwise return
+  /// None.
+  static llvm::Optional<Projection>
+  addressProjectionForInstruction(SILInstruction *I);
+
+  /// Helper method that returns None if V is not an instruction or not an
+  /// address projection. Otherwise, returns the address projection.
+  static llvm::Optional<Projection> addressProjectionForValue(SILValue V) {
+    auto *I = dyn_cast<SILInstruction>(V);
+    if (!I)
+      return llvm::NoneType::None;
+    return addressProjectionForInstruction(I);
+  }
+
+  /// If I is a value projection, return the projection. Otherwise return None.
+  static llvm::Optional<Projection>
+  valueProjectionForInstruction(SILInstruction *I);
+
+  SILType getType() const { return Type; }
+
+  ValueDecl *getDecl() const {
+    return Decl.getPointer();
+  }
+
+  unsigned getIndex() const { return Index; }
+  NominalType getNominalType() const { return NominalType(Decl.getInt()); }
+
+  bool operator==(const Projection &Other) const {
+    if (auto *D = getDecl())
+      return D == Other.getDecl();
+    else
+      return !Other.getDecl() && Index == Other.getIndex();
+  }
+
+  bool operator!=(const Projection &Other) const {
+    return !(*this == Other);
+  }
+
+  bool operator<(Projection Other) const {
+    auto *D1 = getDecl();
+    auto *D2 = Other.getDecl();
+
+    // Decl is sorted before non-decl. If they are both the same, just compare
+    // the indices.
+    if (D1 && !D2)
+      return D1;
+    else if (!D1 && D2)
+      return D2;
+    else
+      return Index < Other.Index;
+  }
+
+  /// Determine if I is a value projection instruction whose corresponding
+  /// projection equals this projection.
+  bool matchesValueProjection(SILInstruction *I) const;
+
+  static bool isAddrProjection(SILValue V) {
+    switch (V->getKind()) {
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::RefElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static bool isValueProjection(SILValue V) {
+    switch (V->getKind()) {
+    case ValueKind::StructExtractInst:
+    case ValueKind::TupleExtractInst:
+    case ValueKind::UncheckedEnumDataInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+private:
   Projection(SILType T, ValueDecl *D, NominalType NT)
       : Type(T), Decl(D, unsigned(NT)), Index(-1) {}
 
@@ -89,67 +173,6 @@ public:
   explicit Projection(UncheckedEnumDataInst *UEDAI) :
     Type(UEDAI->getType()),
     Decl(UEDAI->getElement(), unsigned(NominalType::Enum)), Index(0) {}
-
-  SILType getType() const { return Type; }
-
-  ValueDecl *getDecl() const {
-    return Decl.getPointer();
-  }
-
-  unsigned getIndex() const { return Index; }
-  NominalType getNominalType() const { return NominalType(Decl.getInt()); }
-
-  bool operator==(const Projection &Other) const {
-    if (auto *D = getDecl())
-      return D == Other.getDecl();
-    else
-      return !Other.getDecl() && Index == Other.getIndex();
-  }
-
-  bool operator!=(const Projection &Other) const {
-    return !(*this == Other);
-  }
-
-  bool operator<(Projection Other) const {
-    auto *D1 = getDecl();
-    auto *D2 = Other.getDecl();
-
-    // Decl is sorted before non-decl. If they are both the same, just compare
-    // the indices.
-    if (D1 && !D2)
-      return D1;
-    else if (!D1 && D2)
-      return D2;
-    else
-      return Index < Other.Index;
-  }
-
-  /// Determine if I is an extract instruction whose corresponding projection
-  /// equals this projection.
-  bool matchesExtract(SILInstruction *I) const;
-
-  static bool isAddrProjection(SILValue V) {
-    switch (V->getKind()) {
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::RefElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-      return true;
-    default:
-      return false;
-    }
-  }
-
-  static bool isValueProjection(SILValue V) {
-    switch (V->getKind()) {
-    case ValueKind::StructExtractInst:
-    case ValueKind::TupleExtractInst:
-    case ValueKind::UncheckedEnumDataInst:
-      return true;
-    default:
-      return false;
-    }
-  }
 };
 
 enum class SubSeqRelation_t : uint8_t {
@@ -217,10 +240,11 @@ public:
   /// subsequence of the other.
   SubSeqRelation_t computeSubSeqRelation(const ProjectionPath &RHS) const;
 
-  /// Find all extract paths from I that matches this projection path. Return
-  /// the tails of each extract path in Tails.
-  bool findMatchingExtractPaths(SILInstruction *I,
-                                SmallVectorImpl<SILInstruction *> &Tails) const;
+  /// Find all value projection paths from I that matches this projection
+  /// path. Return the tails of each extract path in T.
+  bool
+  findMatchingValueProjectionPaths(SILInstruction *I,
+                                   SmallVectorImpl<SILInstruction *> &T) const;
 
   /// Returns true if LHS and RHS have all the same projections in the same
   /// order.
@@ -254,6 +278,6 @@ public:
   const_reverse_iterator rend() const { return Path.rend(); }
 };
 
-} // end namespace swift
+} // end swift namespace
 
 #endif

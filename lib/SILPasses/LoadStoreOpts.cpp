@@ -553,7 +553,7 @@ bool LSBBForwarder::tryToSubstitutePartialAliasLoad(LoadInst *LI,
 
   llvm::SmallVector<SILInstruction *, 8> Tails;
   for (auto *Op : LI->getUses()) {
-    if (P->findMatchingExtractPaths(Op->getUser(), Tails)) {
+    if (P->findMatchingValueProjectionPaths(Op->getUser(), Tails)) {
       for (auto *FinalExt : Tails) {
         FinalExt->replaceAllUsesWith(PrevLI);
         NumForwardedLoads++;

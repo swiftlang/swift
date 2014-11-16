@@ -32,17 +32,57 @@ static bool areProjectionsToDifferentFields(const Projection &P1,
          P1 != P2;
 }
 
-bool Projection::matchesExtract(SILInstruction *I) const {
+bool Projection::matchesValueProjection(SILInstruction *I) const {
+  llvm::Optional<Projection> P = Projection::valueProjectionForInstruction(I);
+  if (!P)
+    return false;
+  return *this == P.getValue();
+}
+
+llvm::Optional<Projection>
+Projection::valueProjectionForInstruction(SILInstruction *I) {
   switch (I->getKind()) {
   case ValueKind::StructExtractInst:
-    return *this == Projection(cast<StructExtractInst>(I));
+    assert(isValueProjection(I) && "isValueProjection out of sync");
+    return Projection(cast<StructExtractInst>(I));
   case ValueKind::TupleExtractInst:
-    return *this == Projection(cast<TupleExtractInst>(I));
+    assert(isValueProjection(I) && "isValueProjection out of sync");
+    return Projection(cast<TupleExtractInst>(I));
   case ValueKind::UncheckedEnumDataInst:
-    return *this == Projection(cast<UncheckedEnumDataInst>(I));
+    assert(isValueProjection(I) && "isValueProjection out of sync");
+    return Projection(cast<UncheckedEnumDataInst>(I));
   default:
-    return false;
+    assert(!isValueProjection(I) && "isValueProjection out of sync");
+    return llvm::NoneType::None;
   }
+}
+
+llvm::Optional<Projection>
+Projection::addressProjectionForInstruction(SILInstruction *I) {
+  switch (I->getKind()) {
+  case ValueKind::StructElementAddrInst:
+    assert(isAddrProjection(I) && "isAddrProjection out of sync");
+    return Projection(cast<StructElementAddrInst>(I));
+  case ValueKind::TupleElementAddrInst:
+    assert(isAddrProjection(I) && "isAddrProjection out of sync");
+    return Projection(cast<TupleElementAddrInst>(I));
+  case ValueKind::RefElementAddrInst:
+    assert(isAddrProjection(I) && "isAddrProjection out of sync");
+    return Projection(cast<RefElementAddrInst>(I));
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+    assert(isAddrProjection(I) && "isAddrProjection out of sync");
+    return Projection(cast<UncheckedTakeEnumDataAddrInst>(I));
+  default:
+    assert(!isAddrProjection(I) && "isAddrProjection out of sync");
+    return llvm::NoneType::None;
+  }
+}
+
+llvm::Optional<Projection>
+Projection::projectionForInstruction(SILInstruction *I) {
+  if (auto P = addressProjectionForInstruction(I))
+    return P;
+  return valueProjectionForInstruction(I);
 }
 
 //===----------------------------------------------------------------------===//
@@ -72,14 +112,9 @@ ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
   if (IgnoreCasts)
     Iter = Iter.stripCasts();
   while (Projection::isAddrProjection(Iter) && Start != Iter) {
-    if (auto *SEA = dyn_cast<StructElementAddrInst>(Iter))
-      P.Path.push_back(Projection(SEA));
-    else if (auto *TEA = dyn_cast<TupleElementAddrInst>(Iter))
-      P.Path.push_back(Projection(TEA));
-    else if (auto *REA = dyn_cast<RefElementAddrInst>(Iter))
-      P.Path.push_back(Projection(REA));
-    else
-      P.Path.push_back(Projection(cast<UncheckedTakeEnumDataAddrInst>(Iter)));
+    Projection AP = *Projection::addressProjectionForValue(Iter);
+    P.Path.push_back(AP);
+
     Iter = cast<SILInstruction>(*Iter).getOperand(0);
     if (IgnoreCasts)
       Iter = Iter.stripCasts();
@@ -193,8 +228,8 @@ computeSubSeqRelation(const ProjectionPath &RHS) const {
 }
 
 bool ProjectionPath::
-findMatchingExtractPaths(SILInstruction *I,
-                         SmallVectorImpl<SILInstruction *> &Tails) const {
+findMatchingValueProjectionPaths(SILInstruction *I,
+                                 SmallVectorImpl<SILInstruction *> &T) const {
   // We maintain the head of our worklist so we can use our worklist as a queue
   // and work in breadth first order. This makes sense since we want to process
   // in levels so we can maintain one tail list and delete the tail list when we
@@ -205,8 +240,8 @@ findMatchingExtractPaths(SILInstruction *I,
 
   // Start at the root of the list.
   for (auto PI = rbegin(), PE = rend(); PI != PE; ++PI) {
-    // When we start a new level, clear Tails.
-    Tails.clear();
+    // When we start a new level, clear T.
+    T.clear();
 
     // If we have an empty worklist, return false. We have been unable to
     // complete the list.
@@ -220,13 +255,13 @@ findMatchingExtractPaths(SILInstruction *I,
 
       // If the current projection does not match I, continue and process the
       // next instruction.
-      if (!PI->matchesExtract(Ext)) {
+      if (!PI->matchesValueProjection(Ext)) {
         continue;
       }
 
       // Otherwise, we know that Ext matched this projection path and we should
       // visit all of its uses and add Ext itself to our tail list.
-      Tails.push_back(Ext);
+      T.push_back(Ext);
       for (auto *Op : Ext->getUses()) {
         WorkList.push_back(Op->getUser());
       }

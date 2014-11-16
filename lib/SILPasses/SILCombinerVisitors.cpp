@@ -245,18 +245,14 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // projection list.
   llvm::SmallVector<ProjInstPairTy, 8> Projections;
   for (auto *UI : LI->getUses()) {
-    if (auto *SEI = dyn_cast<StructExtractInst>(UI->getUser())) {
-      Projections.push_back({Projection(SEI), SEI});
-      continue;
-    }
-
-    if (auto *TEI = dyn_cast<TupleExtractInst>(UI->getUser())) {
-      Projections.push_back({Projection(TEI), TEI});
-      continue;
-    }
+    auto *User = UI->getUser();
 
     // If we have any non SEI, TEI instruction, don't do anything here.
-    return nullptr;
+    if (!isa<StructExtractInst>(User) && !isa<TupleExtractInst>(User))
+      return nullptr;
+
+    auto P = Projection::valueProjectionForInstruction(User);
+    Projections.push_back({P.getValue(), User});
   }
 
   // Sort the list.
