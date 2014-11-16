@@ -13,7 +13,6 @@
 #define SWIFT_RUNTIME_METADATACACHE_H
 
 #include "llvm/ADT/Hashing.h"
-#include "Locks.h"
 #include "Concurrent.h"
 #include <mutex>
 #include <condition_variable>
