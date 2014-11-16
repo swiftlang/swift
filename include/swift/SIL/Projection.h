@@ -196,6 +196,15 @@ inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
   }
 }
 
+/// A "path" of projections abstracting either value or aggregate projections
+/// upon a value.
+///
+/// The main purpose of this class is to enable one to reason about iterated
+/// chains of projections. Some example usages are:
+///
+/// 1. Converting value projections to aggregate projections or vis-a-versa.
+/// 2. Performing tuple operations on two paths (using the mathematical
+///    definition of tuples as ordered sets).
 class ProjectionPath {
 public:
   using PathTy = llvm::SmallVector<Projection, 8>;
