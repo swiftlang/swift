@@ -255,10 +255,10 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     Projections.push_back({P.getValue(), User});
   }
 
-  // Sort the list. The reason why we sort the list is so that we will process
-  // projections with the same value decl and tuples with the same indices
-  // together. This makes it easy to reuse the load from the first such
-  // projection for all subsequent projections on the same value decl or index.
+  // The reason why we sort the list is so that we will process projections with
+  // the same value decl and tuples with the same indices together. This makes
+  // it easy to reuse the load from the first such projection for all subsequent
+  // projections on the same value decl or index.
   std::sort(Projections.begin(), Projections.end());
 
   // Go through our sorted list creating new GEPs only when we need to.
