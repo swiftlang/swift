@@ -447,6 +447,109 @@ class Class2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
   var value: Array<T>
 }
 
+class ClassDoesNotConformToP1 : Q1 {}
+
+Runtime.test("dynamicCasting with as") {
+  var someP1Value = StructConformsToP1()
+  var someP1Value2 = Struct2ConformsToP1(true)
+  var someNotP1Value = StructDoesNotConformToP1()
+  var someP2Value = Struct3ConformsToP2()
+  var someP2Value2 = Struct4ConformsToP2(Struct3ConformsToP2())
+  var someP1Ref = ClassConformsToP1()
+  var someP1Ref2 = Class2ConformsToP1(true)
+  var someNotP1Ref = ClassDoesNotConformToP1()
+
+  expectTrue(_stdlib_conformsToProtocol(someP1Value, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Value2, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Value, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value2, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref2, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Ref, P1.self))
+
+  expectTrue(_stdlib_conformsToProtocol(someP1Value as P1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Value2 as P1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value as P2, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value2 as P2, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref as P1, P1.self))
+
+  expectTrue(_stdlib_conformsToProtocol(someP1Value as Q1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Value2 as Q1, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Value as Q1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value as Q1, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value2 as Q1, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref as Q1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref2 as Q1, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Ref as Q1, P1.self))
+
+  expectTrue(_stdlib_conformsToProtocol(someP1Value as Any, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Value2 as Any, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Value as Any, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value as Any, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value2 as Any, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref as Any, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref2 as Any, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Ref as Any, P1.self))
+
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref as AnyObject, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref2 as AnyObject, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Ref as AnyObject, P1.self))
+
+  expectTrue((someP1Value as P1).boolValue)
+  expectTrue((someP1Value2 as P1).boolValue)
+  expectEqual("10 20 30 40", (someP2Value as P2).description)
+  expectEqual("10 20 30 40 50 60 70 80", (someP2Value2 as P2).description)
+
+  expectTrue((someP1Ref as P1).boolValue)
+  expectTrue((someP1Ref2 as P1).boolValue)
+
+  expectTrue(((someP1Value as Q1) as P1).boolValue)
+  expectTrue(((someP1Value2 as Q1) as P1).boolValue)
+  expectEqual("10 20 30 40", ((someP2Value as Q1) as P2).description)
+  expectEqual("10 20 30 40 50 60 70 80",
+    ((someP2Value2 as Q1) as P2).description)
+  expectTrue(((someP1Ref as Q1) as P1).boolValue)
+  expectTrue(((someP1Ref2 as Q1) as P1).boolValue)
+
+  expectTrue(((someP1Value as Any) as P1).boolValue)
+  expectTrue(((someP1Value2 as Any) as P1).boolValue)
+  expectEqual("10 20 30 40", ((someP2Value as Any) as P2).description)
+  expectEqual("10 20 30 40 50 60 70 80",
+    ((someP2Value2 as Any) as P2).description)
+  expectTrue(((someP1Ref as Any) as P1).boolValue)
+  expectTrue(((someP1Ref2 as Any) as P1).boolValue)
+
+  expectTrue(((someP1Ref as AnyObject) as P1).boolValue)
+
+  expectEmpty((someNotP1Value as? P1))
+  expectEmpty((someNotP1Ref as? P1))
+
+  expectTrue(((someP1Value as Q1) as? P1)!.boolValue)
+  expectTrue(((someP1Value2 as Q1) as? P1)!.boolValue)
+  expectEmpty(((someNotP1Value as Q1) as? P1))
+  expectEqual("10 20 30 40", ((someP2Value as Q1) as? P2)!.description)
+  expectEqual("10 20 30 40 50 60 70 80",
+    ((someP2Value2 as Q1) as? P2)!.description)
+  expectTrue(((someP1Ref as Q1) as? P1)!.boolValue)
+  expectTrue(((someP1Ref2 as Q1) as? P1)!.boolValue)
+  expectEmpty(((someNotP1Ref as Q1) as? P1))
+
+  expectTrue(((someP1Value as Any) as? P1)!.boolValue)
+  expectTrue(((someP1Value2 as Any) as? P1)!.boolValue)
+  expectEmpty(((someNotP1Value as Any) as? P1))
+  expectEqual("10 20 30 40", ((someP2Value as Any) as? P2)!.description)
+  expectEqual("10 20 30 40 50 60 70 80",
+    ((someP2Value2 as Any) as? P2)!.description)
+  expectTrue(((someP1Ref as Any) as? P1)!.boolValue)
+  expectTrue(((someP1Ref2 as Any) as? P1)!.boolValue)
+  expectEmpty(((someNotP1Ref as Any) as? P1))
+
+  expectTrue(((someP1Ref as AnyObject) as? P1)!.boolValue)
+  expectTrue(((someP1Ref2 as AnyObject) as? P1)!.boolValue)
+  expectEmpty(((someNotP1Ref as AnyObject) as? P1))
+}
+
 extension Int {
   class ExtensionClassConformsToP2 : P2 {
     var description: String { return "abc" }
