@@ -23,7 +23,8 @@ import SwiftShims
 
 public // @testable
 struct _BridgeStorage<
-  NativeType: AnyObject, CocoaType: AnyObject
+  NativeType: AnyObject,
+  CocoaType/*: AnyObject*/ // FIXME: Workaround for <rdar://problem/18992875> Couldn't find conformance
 > {  
   public // @testable
   typealias Native = NativeType
@@ -34,7 +35,9 @@ struct _BridgeStorage<
   public // @testable
   init(_ native: Native, bits: Int) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeType.self))
-    _sanityCheck(!_usesNativeSwiftReferenceCounting(CocoaType.self))
+  
+    // FIXME: Workaround for <rdar://problem/18992875> Couldn't find conformance
+    // _sanityCheck(!_usesNativeSwiftReferenceCounting(CocoaType.self))
     _sanityCheck(0..<3 ~= bits,
         "BridgeStorage can't store bits outside the range 0..<3")
 
@@ -45,8 +48,10 @@ struct _BridgeStorage<
   public // @testable
   init(_ cocoa: Cocoa) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeType.self))
-    _sanityCheck(!_usesNativeSwiftReferenceCounting(CocoaType.self))
-    rawValue = _makeObjCBridgeObject(cocoa)
+    // FIXME: Workaround for <rdar://problem/18992875> Couldn't find conformance
+    // _sanityCheck(!_usesNativeSwiftReferenceCounting(CocoaType.self))
+    rawValue = _makeObjCBridgeObject(
+      Builtin.reinterpretCast(cocoa) as AnyObject)
   }
   
   public // @testable
@@ -58,7 +63,11 @@ struct _BridgeStorage<
   public // @testable
   var cocoa: Cocoa? {
     return _nonPointerBits(rawValue) != 0
-      ? nil : Builtin.castReferenceFromBridgeObject(rawValue) as Cocoa
+      ? nil
+    : Builtin.reinterpretCast(
+        Builtin.castReferenceFromBridgeObject(rawValue) as AnyObject)
+      as Cocoa // FIXME: Workaround for <rdar://problem/18992875>
+               // Couldn't find conformance
   }
   
   public // @testable
