@@ -1534,22 +1534,26 @@ static AbstractFunctionDecl *lookupObjCMethodInType(Type classType,
 }
 
 bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
-  /// Partition the set of Objective-C methods 
-  auto firstLocalMethod 
-    = std::partition(Impl.ObjCMethods.begin(), Impl.ObjCMethods.end(),
-                     [&](AbstractFunctionDecl *method) {
-                       return method->getDeclContext()->getParentSourceFile()
-                                != &sf;
-                     });
+  // Capture the methods in this source file.
+  llvm::SmallVector<AbstractFunctionDecl *, 4> methods;
+  auto captureMethodInSourceFile = [&](AbstractFunctionDecl *method) -> bool {
+    if (method->getDeclContext()->getParentSourceFile() == &sf) {
+      methods.push_back(method);
+      return true;
+    }
+
+    return false;
+  };
+  Impl.ObjCMethods.erase(std::remove_if(Impl.ObjCMethods.begin(),
+                                        Impl.ObjCMethods.end(),
+                                        captureMethodInSourceFile),
+                         Impl.ObjCMethods.end());
 
   // If no Objective-C methods were defined in this file, we're done.
-  unsigned numLocalMethods = Impl.ObjCMethods.end() - firstLocalMethod;
-  if (numLocalMethods == 0)
+  if (methods.empty())
     return false;
 
-  // Sort the Objective-C methods within this source file.
-  MutableArrayRef<AbstractFunctionDecl *> methods(&*firstLocalMethod,
-                                                  numLocalMethods);
+  // Sort the methods by declaration order.
   std::sort(methods.begin(), methods.end(), OrderDeclarations(SourceMgr));
 
   // For each Objective-C method declared in this file, check whether
@@ -1620,9 +1624,6 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
 
     diagnosedAny = true;
   }
-
-  // Remove all of the local methods from the list of Objective-C methods.
-  Impl.ObjCMethods.erase(firstLocalMethod, Impl.ObjCMethods.end());
 
   return diagnosedAny;
 }
