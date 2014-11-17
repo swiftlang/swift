@@ -59,9 +59,8 @@ class Foo {
   // armv7-ios: define hidden float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
   // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 4
-  // armv7-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { [4 x i32] }*
-  // armv7-ios: [[GEP:%.*]] = getelementptr inbounds { [4 x i32] }* [[CAST]], i32 0, i32 0
-  // armv7-ios: [[LOADED:%.*]] = load [4 x i32]* [[GEP]]
+  // armv7-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to [4 x i32]*
+  // armv7-ios: [[LOADED:%.*]] = load [4 x i32]* [[CAST]]
   // armv7-ios: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
   // armv7-ios: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x i32])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x i32] [[LOADED]])
   func getXFromRectSwift(r: MyRect) -> Float {
