@@ -782,7 +782,7 @@ void IRGenDebugInfo::eraseFunction(llvm::Function *Fn) {}
 ///
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
   // Imports are visited after SILFunctions.
-  llvm::DIScope Module = MainFile;
+  llvm::DIModule Module = MainModule;
   swift::Module *M = IGM.Context.getModule(D->getModulePath());
   if (!M && D->getModulePath()[0].first.str() == "Builtin")
     M = IGM.Context.TheBuiltinModule;
@@ -816,7 +816,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 
   StringRef Name = BumpAllocatedString(Printed);
   unsigned Line = getLoc(SM, D).Line;
-  createImportedModule(Name, Mangled, llvm::DIModule(Module), Line);
+  createImportedModule(Name, Mangled, Module, Line);
 }
 
 // Create an imported module and import declarations for all functions
