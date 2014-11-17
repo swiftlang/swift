@@ -664,9 +664,10 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
         case ConformanceKind::Conforms:
           conformances.push_back(conforms.getPointer());
           break;
-
-        case ConformanceKind::DoesNotConform:
         case ConformanceKind::UncheckedConforms:
+          conformances.push_back(nullptr);
+          break;
+        case ConformanceKind::DoesNotConform:
           llvm_unreachable("Couldn't find conformance");
         }
       }
