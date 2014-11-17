@@ -13,9 +13,81 @@
 #include "swift/Runtime/Metadata.h"
 #include "gtest/gtest.h"
 #include <vector>
+#include <functional>
 #include <pthread.h>
-#include <mach/mach.h>
-#include <mach/semaphore.h>
+
+#if !defined(_POSIX_BARRIERS) || _POSIX_BARRIERS < 0
+// Implement pthread_barrier_* for platforms that don't implement them (Darwin)
+
+#define PTHREAD_BARRIER_SERIAL_THREAD 1
+struct pthread_barrier_t {
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+
+  unsigned count;
+  unsigned numThreadsWaiting;
+};
+typedef void *pthread_barrierattr_t;
+
+static int pthread_barrier_init(pthread_barrier_t *barrier,
+                                pthread_barrierattr_t*, unsigned count) {
+  if (count == 0) {
+    errno = EINVAL;
+    return -1;
+  }
+  if (pthread_mutex_init(&barrier->mutex, nullptr) != 0) {
+    return -1;
+  }
+  if (pthread_cond_init(&barrier->cond, nullptr) != 0) {
+    pthread_mutex_destroy(&barrier->mutex);
+    return -1;
+  }
+  barrier->count = count;
+  barrier->numThreadsWaiting = 0;
+  return 0;
+}
+
+static int pthread_barrier_destroy(pthread_barrier_t *barrier) {
+  // want to destroy both even if destroying one fails.
+  int ret = 0;
+  if (pthread_cond_destroy(&barrier->cond) != 0) {
+    ret = -1;
+  }
+  if (pthread_mutex_destroy(&barrier->mutex) != 0) {
+    ret = -1;
+  }
+  return ret;
+}
+
+static int pthread_barrier_wait(pthread_barrier_t *barrier) {
+  if (pthread_mutex_lock(&barrier->mutex) != 0) {
+    return -1;
+  }
+  ++barrier->numThreadsWaiting;
+  if (barrier->numThreadsWaiting < barrier->count) {
+    // Put the thread to sleep.
+    if (pthread_cond_wait(&barrier->cond, &barrier->mutex) != 0) {
+      return -1;
+    }
+    if (pthread_mutex_unlock(&barrier->mutex) != 0) {
+      return -1;
+    }
+    return 0;
+  } else {
+    // Reset thread count.
+    barrier->numThreadsWaiting = 0;
+
+    // Wake up all threads.
+    if (pthread_cond_broadcast(&barrier->cond) != 0) {
+      return -1;
+    }
+    if (pthread_mutex_unlock(&barrier->mutex) != 0) {
+      return -1;
+    }
+    return PTHREAD_BARRIER_SERIAL_THREAD;
+  }
+}
+#endif
 
 using namespace swift;
 
@@ -24,14 +96,13 @@ using namespace swift;
 template <typename T>
 struct RaceArgs {
   std::function<T()> code;
-  semaphore_t ready;
-  semaphore_t go;
+  pthread_barrier_t *go;
 };
 
 void *RaceThunk(void *vargs) {
   RaceArgs<void*> *args = static_cast<RaceArgs<void*> *>(vargs);
   // Signal ready. Wait for go.
-  semaphore_wait_signal(args->go, args->ready);
+  pthread_barrier_wait(args->go);
   return args->code();
 }
 
@@ -43,26 +114,16 @@ RaceTest(std::function<T()> code)
 {
   const unsigned threadCount = 64;
 
-  semaphore_t ready;
-  semaphore_t go;
-  semaphore_create(mach_task_self(), &ready, SYNC_POLICY_FIFO, 0);
-  semaphore_create(mach_task_self(), &go, SYNC_POLICY_FIFO, 0);
+  pthread_barrier_t go;
+  pthread_barrier_init(&go, nullptr, threadCount);
 
   // Create the threads.
   pthread_t threads[threadCount];
-  std::vector<RaceArgs<T>> args(threadCount, {code, ready, go});
+  std::vector<RaceArgs<T>> args(threadCount, {code, &go});
 
   for (unsigned i = 0; i < threadCount; i++) {
     pthread_create(&threads[i], nullptr, &RaceThunk, &args[i]);
   }
-
-  // Wait for all test threads to reach ready.
-  for (unsigned i = 0; i < threadCount; i++) {
-    semaphore_wait(ready);
-  }
-
-  // Race!
-  semaphore_signal_all(go);
 
   // Collect results.
   std::vector<T> results;
@@ -72,8 +133,7 @@ RaceTest(std::function<T()> code)
     results.push_back(static_cast<T>(result));
   }
 
-  semaphore_destroy(mach_task_self(), ready);
-  semaphore_destroy(mach_task_self(), go);
+  pthread_barrier_destroy(&go);
 
   return results;
 }
@@ -388,7 +448,7 @@ struct {
     sizeof(HeapMetadataHeader), // address point
     {} // private data
   },
-  { { { &destroySubclass }, { &_TWVBO } },
+  { { { &destroySubclass }, { &_TWVBo } },
     { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
       0, 0, 0, sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
       sizeof(HeapMetadataHeader) } },
@@ -414,7 +474,7 @@ TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
 
       // Assert that we copied the shared prefix data from the subclass.
       EXPECT_EQ((void*) &destroySubclass, fields[-2]);
-      EXPECT_EQ(&_TWVBO, fields[-1]);
+      EXPECT_EQ(&_TWVBo, fields[-1]);
 
       // Assert that we set the superclass field.
       EXPECT_EQ(SuperclassWithPrefix_AddressPoint, fields[1]);
