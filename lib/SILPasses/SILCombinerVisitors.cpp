@@ -277,39 +277,11 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     }
 
     // Ok, we have started to visit the range of instructions associated with
-    // a new projection. If we have a VarDecl, create a struct_element_addr +
-    // load. Make sure to update LastProj, LastNewLoad.
-    if (Proj.isNominalKind()) {
-      ValueDecl *V = Proj.getDecl();
-      assert(isa<StructExtractInst>(Inst) && "A projection with a VarDecl "
-             "should be associated with a struct_extract.");
-      assert(Proj.getKind() == ProjectionKind::Struct &&
-             "Should only have struct projection kinds here");
-
-      LastProj = &Proj;
-      auto *SEA =
-        Builder->createStructElementAddr(LI->getLoc(), LI->getOperand(),
-                                         cast<VarDecl>(V),
-                                         Inst->getType(0).getAddressType());
-      SEA->setDebugScope(LI->getDebugScope());
-      LastNewLoad = Builder->createLoad(LI->getLoc(), SEA);
-      LastNewLoad->setDebugScope(LI->getDebugScope());
-      replaceInstUsesWith(*Inst, LastNewLoad, 0);
-      eraseInstFromFunction(*Inst);
-      continue;
-    }
-
-    // If we have an index, then create a new tuple_element_addr + load.
-    assert(isa<TupleExtractInst>(Inst) && "A projection with an integer "
-           "should be associated with a tuple_extract.");
-
+    // a new projection. Create the new address projection.
+    auto I = Proj.createAddrProjection(*Builder, LI->getLoc(), LI->getOperand());
     LastProj = &Proj;
-    auto *TEA =
-      Builder->createTupleElementAddr(LI->getLoc(), LI->getOperand(),
-                                      Proj.getIndex(),
-                                      Inst->getType(0).getAddressType());
-    TEA->setDebugScope(LI->getDebugScope());
-    LastNewLoad = Builder->createLoad(LI->getLoc(), TEA);
+    I.get()->setDebugScope(LI->getDebugScope());
+    LastNewLoad = Builder->createLoad(LI->getLoc(), I.get());
     LastNewLoad->setDebugScope(LI->getDebugScope());
     replaceInstUsesWith(*Inst, LastNewLoad, 0);
     eraseInstFromFunction(*Inst);

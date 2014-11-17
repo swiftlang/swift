@@ -496,16 +496,35 @@ public:
           new (F.getModule()) InitEnumDataAddrInst(Loc, Operand, Element, Ty));
   }
 
-  UncheckedEnumDataInst *createUncheckedEnumData(SILLocation Loc, SILValue Operand,
-                                       EnumElementDecl *Element, SILType Ty) {
+  UncheckedEnumDataInst *
+  createUncheckedEnumData(SILLocation Loc, SILValue Operand,
+                          EnumElementDecl *Element, SILType Ty) {
     return insert(
           new (F.getModule()) UncheckedEnumDataInst(Loc, Operand, Element, Ty));
   }
 
-  UncheckedTakeEnumDataAddrInst *createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
-                                       EnumElementDecl *Element, SILType Ty) {
+  UncheckedEnumDataInst *
+  createUncheckedEnumData(SILLocation Loc, SILValue Operand,
+                          EnumElementDecl *Element) {
+    SILType EltType = Operand.getType().getEnumElementType(Element,
+                                                           getModule());
+    return createUncheckedEnumData(Loc, Operand, Element, EltType);
+  }
+
+  UncheckedTakeEnumDataAddrInst *
+  createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
+                                  EnumElementDecl *Element, SILType Ty) {
     return insert(
-          new (F.getModule()) UncheckedTakeEnumDataAddrInst(Loc, Operand, Element, Ty));
+          new (F.getModule()) UncheckedTakeEnumDataAddrInst(Loc, Operand,
+                                                            Element, Ty));
+  }
+
+  UncheckedTakeEnumDataAddrInst *
+  createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
+                                  EnumElementDecl *Element) {
+    SILType EltType = Operand.getType().getEnumElementType(Element,
+                                                           getModule());
+    return createUncheckedTakeEnumDataAddr(Loc, Operand, Element, EltType);
   }
 
   InjectEnumAddrInst *createInjectEnumAddr(SILLocation Loc, SILValue Operand,

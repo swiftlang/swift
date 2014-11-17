@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-projection"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/None.h"
 #include "llvm/Support/Debug.h"
 
@@ -164,6 +165,76 @@ Projection::Projection(TupleExtractInst *TEI)
 Projection::Projection(UncheckedEnumDataInst *UEDAI)
   : Kind(ProjectionKind::Enum), Type(UEDAI->getType()),
     Decl(UEDAI->getElement()), Index(0) {}
+
+NullablePtr<SILInstruction>
+Projection::
+createValueProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
+  // Grab Base's type.
+  SILType BaseTy = Base.getType();
+
+  // If BaseTy is not an object type, bail.
+  if (!BaseTy.isObject())
+    return nullptr;
+
+  // If this projection is associated with an address type, convert its type to
+  // an object type.
+  SILType Ty = Type.isAddress()? Type.getObjectType() : Type;
+
+  if (!Ty.isObject())
+    return nullptr;
+
+  // Ok, we now know that the type of Base and the type represented by the base
+  // of this projection match and that this projection can be represented as
+  // value. Create the instruction if we can. Otherwise, return nullptr.
+  switch (getKind()) {
+  case ProjectionKind::Struct:
+    return B.createStructExtract(Loc, Base, cast<VarDecl>(getDecl()));
+  case ProjectionKind::Tuple:
+    return B.createTupleExtract(Loc, Base, getIndex());
+  case ProjectionKind::Enum:
+    return B.createUncheckedEnumData(Loc, Base,
+                                     cast<EnumElementDecl>(getDecl()));
+  case ProjectionKind::Class:
+    return nullptr;
+  }
+}
+
+NullablePtr<SILInstruction>
+Projection::
+createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
+  // Grab Base's type.
+  SILType BaseTy = Base.getType();
+
+  // If BaseTy is not an address type, bail.
+  if (!BaseTy.isAddress())
+    return nullptr;
+
+  // If this projection is associated with an object type, convert its type to
+  // an address type.
+  //
+  // *NOTE* We purposely do not handle local storage types here since we want to
+  // always fail in such a case. That is handled by comparing this type against
+  // Base which we know is not a local storage type.
+  SILType Ty = Type.isObject()? Type.getAddressType() : Type;
+
+  if (!Ty.isAddress())
+    return nullptr;
+
+  // Ok, we now know that the type of Base and the type represented by the base
+  // of this projection match and that this projection can be represented as
+  // value. Create the instruction if we can. Otherwise, return nullptr.
+  switch (getKind()) {
+  case ProjectionKind::Struct:
+    return B.createStructElementAddr(Loc, Base, cast<VarDecl>(getDecl()));
+  case ProjectionKind::Tuple:
+    return B.createTupleElementAddr(Loc, Base, getIndex());
+  case ProjectionKind::Enum:
+    return B.createUncheckedTakeEnumDataAddr(Loc, Base,
+                                             cast<EnumElementDecl>(getDecl()));
+  case ProjectionKind::Class:
+    return B.createRefElementAddr(Loc, Base, cast<VarDecl>(getDecl()));
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                              Projection Path

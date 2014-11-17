@@ -19,12 +19,15 @@
 #ifndef SWIFT_SIL_PROJECTION_H
 #define SWIFT_SIL_PROJECTION_H
 
+#include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/Optional.h"
 
 namespace swift {
+
+class SILBuilder;
 
 /// The kind of projection that we are representing.
 enum class ProjectionKind : uint8_t {
@@ -101,8 +104,15 @@ public:
   /// projection equals this projection.
   bool matchesValueProjection(SILInstruction *I) const;
 
+  /// Helper method that returns isAddrProjection(I->getKind());
   static bool isAddrProjection(SILValue V) {
-    switch (V->getKind()) {
+    return isAddrProjection(V->getKind());
+  }
+
+  /// Returns true if K is a ValueKind that Projection recognizes as an address
+  /// projection.
+  static bool isAddrProjection(ValueKind K) {
+    switch (K) {
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
@@ -113,8 +123,15 @@ public:
     }
   }
 
+  /// Helper method that returns isValueProjection(I->getKind());
   static bool isValueProjection(SILValue V) {
-    switch (V->getKind()) {
+    return isValueProjection(V->getKind());
+  }
+
+  /// Returns true if this is K is a value kind that the projection class
+  /// recognizes as a value projection.
+  static bool isValueProjection(ValueKind K) {
+    switch (K) {
     case ValueKind::StructExtractInst:
     case ValueKind::TupleExtractInst:
     case ValueKind::UncheckedEnumDataInst:
@@ -173,6 +190,19 @@ public:
       return false;
     }
   }
+
+  /// If Base's type matches this Projections type ignoring Address vs Object
+  /// type differences and this Projection is representable as a value
+  /// projection, create the relevant value projection and return it. Otherwise,
+  /// return nullptr.
+  NullablePtr<SILInstruction>
+  createValueProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const;
+
+  /// If Base's type matches this Projections type ignoring Address vs Object
+  /// type and this Projection is representable as an address projection, create
+  /// the relevant address projection and return it. Otherwise, return nullptr.
+  NullablePtr<SILInstruction>
+  createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const;
 
 private:
   explicit Projection(StructElementAddrInst *SEA);
