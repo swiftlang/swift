@@ -10,9 +10,9 @@
 // CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = {{.*}}[ DW_TAG_file_type ]{{.*}}Swift.swiftmodule
 // CHECK-DAG: ![[SWIFTMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Swift]
 // CHECK-DAG: metadata !{metadata !"0x3a\000\00", metadata ![[SWIFTFILE]], metadata ![[SWIFTMODULE]]} ; [ DW_TAG_imported_module ]
-// CHECK-DAG: metadata !{metadata !"0x3a\00[[@LINE+3]]\00", metadata ![[BASICFILE:[0-9]+]], metadata ![[BASICMODULE:[0-9]+]]} ; [ DW_TAG_imported_module ]
-// CHECK-DAG: ![[BASICFILE]] = {{.*}}basic.swift
-// CHECK-DAG: ![[BASICMODULE]] = {{.*}}[ DW_TAG_module ] [basic]
+// CHECK-DAG: ![[BASICFILE:[0-9]+]] = {{.*}}basic.swiftmodule
+// CHECK-DAG: ![[BASICMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [basic]
+// CHECK-DAG: metadata !{metadata !"0x3a\00[[@LINE+1]]\00", metadata ![[BASICFILE]], metadata ![[BASICMODULE]]} ; [ DW_TAG_imported_module ]
 import basic
 import typealias Swift.Optional
 

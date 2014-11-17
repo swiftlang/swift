@@ -54,8 +54,9 @@ using namespace irgen;
 
 /// Strdup a raw char array using the bump pointer.
 StringRef IRGenDebugInfo::BumpAllocatedString(const char *Data, size_t Length) {
-  char *Ptr = DebugInfoNames.Allocate<char>(Length);
+  char *Ptr = DebugInfoNames.Allocate<char>(Length+1);
   memcpy(Ptr, Data, Length);
+  *(Ptr+Length) = 0;
   return StringRef(Ptr, Length);
 }
 
@@ -823,12 +824,9 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
                                           llvm::DIModule Module,
                                           unsigned Line) {
-  llvm::DIScope File;
-  {
-    llvm::SmallString<512> Path(Module.getDirectory());
-    llvm::sys::path::append(Path, Module.getFilename());
-    File = getOrCreateFile(Path.c_str());
-  }
+  llvm::SmallString<512> Path(Module.getDirectory());
+  llvm::sys::path::append(Path, Module.getFilename());
+  auto File = getOrCreateFile(BumpAllocatedString(Path).data());
   DBuilder.createImportedModule(File, Module, Line);
 }
 
