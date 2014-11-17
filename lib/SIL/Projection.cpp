@@ -178,6 +178,9 @@ createValueProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
 
   // If this projection is associated with an address type, convert its type to
   // an object type.
+  //
+  // We explicitly do not convert Type to be an object if it is a local storage
+  // type since we want it to fail.
   SILType Ty = Type.isAddress()? Type.getObjectType() : Type;
 
   if (!Ty.isObject())
@@ -213,8 +216,8 @@ createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
   // an address type.
   //
   // *NOTE* We purposely do not handle local storage types here since we want to
-  // always fail in such a case. That is handled by comparing this type against
-  // Base which we know is not a local storage type.
+  // always fail in such a case. That is handled by checking that Ty is an
+  // address.
   SILType Ty = Type.isObject()? Type.getAddressType() : Type;
 
   if (!Ty.isAddress())
