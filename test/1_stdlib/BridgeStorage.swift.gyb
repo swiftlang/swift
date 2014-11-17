@@ -25,7 +25,8 @@ import SwiftShims
 
 protocol BridgeStorage {
   typealias Native : AnyObject
-  typealias Cocoa : AnyObject
+  // FIXME: Workaround for <rdar://problem/18992875> Couldn't find conformance
+  typealias Cocoa /* : AnyObject */ 
 
   init(_ native: Native, bits: Int)
   init(Cocoa)
