@@ -279,9 +279,12 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     // Ok, we have started to visit the range of instructions associated with
     // a new projection. If we have a VarDecl, create a struct_element_addr +
     // load. Make sure to update LastProj, LastNewLoad.
-    if (ValueDecl *V = Proj.getDecl()) {
+    if (Proj.isNominalKind()) {
+      ValueDecl *V = Proj.getDecl();
       assert(isa<StructExtractInst>(Inst) && "A projection with a VarDecl "
              "should be associated with a struct_extract.");
+      assert(Proj.getKind() == ProjectionKind::Struct &&
+             "Should only have struct projection kinds here");
 
       LastProj = &Proj;
       auto *SEA =

@@ -26,33 +26,44 @@
 
 namespace swift {
 
+/// The kind of projection that we are representing.
+enum class ProjectionKind : uint8_t {
+  Struct,
+  Tuple,
+  Class,
+  Enum,
+};
+
 /// An abstract representation of a SIL Projection that allows one to work with
 /// value projections and address projections at an abstract level.
 class Projection {
-public:
+  /// The kind of projection that we are processing.
+  ProjectionKind Kind;
 
-  /// The nominal type of the projection if representing a var decl. This allows
-  /// us to distinguish in between struct_element_addr, ref_element_addr,
-  /// unchecked_take_enum_data_addr in a manner independent of the two.
-  enum class NominalType : unsigned {
-    Struct,
-    Class,
-    Enum,
-  };
-
-private:
   /// The type of this projection.
   SILType Type;
 
-  /// The decl associated with this projection if the projection is representing
-  /// a nominal type.
-  llvm::PointerIntPair<ValueDecl *, 2> Decl;
+  /// The decl associated with this projection if the projection is
+  /// representing a nominal type.
+  ValueDecl *Decl;
 
   /// The index associated with the projection if the projection is representing
-  /// a tuple type.
+  /// a tuple type or the decl's index in its parent.
   unsigned Index;
 
 public:
+  Projection(const Projection &P)
+    : Kind(P.getKind()), Type(P.getType()), Index(0) {
+    if (P.isNominalKind()) {
+      Decl = P.getDecl();
+      Index = P.getDeclIndex();
+    } else {
+      Index = P.getIndex();
+    }
+  }
+
+  ~Projection() = default;
+
   /// If I is representable as a projection, return the projection. Otherwise,
   /// return None.
   static llvm::Optional<Projection>
@@ -76,39 +87,15 @@ public:
   static llvm::Optional<Projection>
   valueProjectionForInstruction(SILInstruction *I);
 
-  SILType getType() const { return Type; }
-
-  ValueDecl *getDecl() const {
-    return Decl.getPointer();
-  }
-
-  unsigned getIndex() const { return Index; }
-  NominalType getNominalType() const { return NominalType(Decl.getInt()); }
-
-  bool operator==(const Projection &Other) const {
-    if (auto *D = getDecl())
-      return D == Other.getDecl();
-    else
-      return !Other.getDecl() && Index == Other.getIndex();
-  }
+  bool operator==(const Projection &Other) const;
 
   bool operator!=(const Projection &Other) const {
     return !(*this == Other);
   }
 
-  bool operator<(Projection Other) const {
-    auto *D1 = getDecl();
-    auto *D2 = Other.getDecl();
-
-    // Decl is sorted before non-decl. If they are both the same, just compare
-    // the indices.
-    if (D1 && !D2)
-      return D1;
-    else if (!D1 && D2)
-      return D2;
-    else
-      return Index < Other.Index;
-  }
+  /// This is a weak ordering that does not have a real meaning beyond being
+  /// stable and keeping projections of the same type together.
+  bool operator<(Projection Other) const;
 
   /// Determine if I is a value projection instruction whose corresponding
   /// projection equals this projection.
@@ -136,43 +123,65 @@ public:
       return false;
     }
   }
+
+  /// Returns the ProjectionKind of this instruction.
+  ProjectionKind getKind() const { return Kind; }
+
+  /// Return the type of this projection.
+  SILType getType() const { return Type; }
+
+  /// If this is a nominal kind projection, return the value decl of the
+  /// projection.
+  ValueDecl *getDecl() const {
+    assert(isNominalKind() && "Must have a nominal kind to return a decl");
+    return Decl;
+  }
+
+  /// If this is a nominal decl, return the index of the decl in its parent.
+  unsigned getDeclIndex() const {
+    assert(isNominalKind() && "Must have a nominal kind to return a decl");
+    return Index;
+  }
+
+  /// If this is an indexed kind projection, return the index of the projection.
+  unsigned getIndex() const {
+    assert(isIndexedKind() && "Must have an indexed kind to return an index");
+    return Index;
+  }
+
+  /// Returns true if this projection is a nominal kind projection.
+  bool isNominalKind() const {
+    switch (Kind) {
+    case ProjectionKind::Struct:
+    case ProjectionKind::Class:
+    case ProjectionKind::Enum:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  /// Returns true if this projection is an indexed kind projection.
+  ///
+  /// This looks very sparse now, but in the future it will include type indexed
+  /// and byte indexed kinds for index_addr and index_raw_addr instructions.
+  bool isIndexedKind() const {
+    switch (Kind) {
+    case ProjectionKind::Tuple:
+      return true;
+    default:
+      return false;
+    }
+  }
+
 private:
-  Projection(SILType T, ValueDecl *D, NominalType NT)
-      : Type(T), Decl(D, unsigned(NT)), Index(-1) {}
-
-  Projection(SILType T, EnumElementDecl *D)
-      : Type(T), Decl(D, unsigned(NominalType::Enum)), Index(0) {}
-
-  Projection(SILType T, unsigned I) : Type(T), Decl(), Index(I) {}
-
-  explicit Projection(StructElementAddrInst *SEA)
-    : Type(SEA->getType()), Decl(SEA->getField(),
-                                 unsigned(NominalType::Struct)),
-      Index(SEA->getFieldNo()) { }
-
-  explicit Projection(TupleElementAddrInst *TEA) : Type(TEA->getType()),
-                                                   Decl(nullptr),
-                                                   Index(TEA->getFieldNo()) { }
-  explicit Projection(RefElementAddrInst *REA)
-    : Type(REA->getType()), Decl(REA->getField(), unsigned(NominalType::Class)),
-      Index(REA->getFieldNo()) { }
-
-  explicit Projection(UncheckedTakeEnumDataAddrInst *UTEDAI) :
-    Type(UTEDAI->getType()),
-    Decl(UTEDAI->getElement(), unsigned(NominalType::Enum)), Index(0) {}
-
-  explicit Projection(StructExtractInst *SEI)
-    : Type(SEI->getType()), Decl(SEI->getField(),
-                                 unsigned(NominalType::Struct)),
-      Index(SEI->getFieldNo()) { }
-
-  explicit Projection(TupleExtractInst *TEI) : Type(TEI->getType()),
-                                               Decl(nullptr),
-                                               Index(TEI->getFieldNo()) { }
-
-  explicit Projection(UncheckedEnumDataInst *UEDAI) :
-    Type(UEDAI->getType()),
-    Decl(UEDAI->getElement(), unsigned(NominalType::Enum)), Index(0) {}
+  explicit Projection(StructElementAddrInst *SEA);
+  explicit Projection(TupleElementAddrInst *TEA);
+  explicit Projection(RefElementAddrInst *REA);
+  explicit Projection(UncheckedTakeEnumDataAddrInst *UTEDAI);
+  explicit Projection(StructExtractInst *SEI);
+  explicit Projection(TupleExtractInst *TEI);
+  explicit Projection(UncheckedEnumDataInst *UEDAI);
 };
 
 enum class SubSeqRelation_t : uint8_t {

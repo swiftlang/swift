@@ -27,8 +27,10 @@ static bool areProjectionsToDifferentFields(const Projection &P1,
   // If operands have the same type and we are accessing different fields,
   // returns true. Operand's type is not saved in Projection. Instead we check
   // Decl's context.
-  return P1.getDecl() && P2.getDecl() &&
-         P1.getDecl()->getDeclContext() == P2.getDecl()->getDeclContext() &&
+  if (!P1.isNominalKind() || !P2.isNominalKind())
+    return false;
+
+  return P1.getDecl()->getDeclContext() == P2.getDecl()->getDeclContext() &&
          P1 != P2;
 }
 
@@ -84,6 +86,84 @@ Projection::projectionForInstruction(SILInstruction *I) {
     return P;
   return valueProjectionForInstruction(I);
 }
+
+bool
+Projection::operator==(const Projection &Other) const {
+  if (isNominalKind() && Other.isNominalKind()) {
+    return Other.getDecl() == Decl;
+  } else {
+    return !Other.isNominalKind() && Index == Other.getIndex();
+  }
+}
+
+bool
+Projection::operator<(Projection Other) const {
+  // If we have a nominal kind...
+  if (isNominalKind()) {
+    // And Other is also nominal...
+    if (Other.isNominalKind()) {
+      // Just compare the value decl pointers.
+      return getDeclIndex() < Other.getDeclIndex();
+    }
+
+    // Otherwise if Other is not nominal, return true since we always sort
+    // decls before indices.
+    return true;
+  } else {
+    // If this is not a nominal kind and Other is nominal, return
+    // false. Nominal kinds are always sorted before non-nominal kinds.
+    if (Other.isNominalKind())
+      return false;
+
+    // Otherwise, we are both index projections. Compare the indices.
+    return getIndex() < Other.getIndex();
+  }
+}
+
+static unsigned getIndexForValueDecl(ValueDecl *Decl) {
+  NominalTypeDecl *D = cast<NominalTypeDecl>(Decl->getDeclContext());
+
+  unsigned i = 0;
+  for (auto *V : D->getStoredProperties()) {
+    if (V == Decl)
+      return i;
+    ++i;
+  }
+
+  llvm_unreachable("Failed to find Decl in its decl context?!");
+}
+
+Projection::Projection(StructElementAddrInst *SEA)
+  : Kind(ProjectionKind::Struct), Type(SEA->getType()),
+    Decl(SEA->getField()), Index(getIndexForValueDecl(Decl)) {}
+
+Projection::Projection(TupleElementAddrInst *TEA)
+  : Kind(ProjectionKind::Tuple), Type(TEA->getType()),
+    Decl(nullptr), Index(TEA->getFieldNo()) {}
+
+Projection::Projection(RefElementAddrInst *REA)
+  : Kind(ProjectionKind::Class), Type(REA->getType()),
+    Decl(REA->getField()), Index(getIndexForValueDecl(Decl)) {}
+
+/// UncheckedTakeEnumDataAddrInst always have an index of 0 since enums only
+/// have one payload.
+Projection::Projection(UncheckedTakeEnumDataAddrInst *UTEDAI)
+  : Kind(ProjectionKind::Enum), Type(UTEDAI->getType()),
+    Decl(UTEDAI->getElement()), Index(0) {}
+
+Projection::Projection(StructExtractInst *SEI)
+  : Kind(ProjectionKind::Struct), Type(SEI->getType()),
+    Decl(SEI->getField()), Index(getIndexForValueDecl(Decl)) {}
+
+Projection::Projection(TupleExtractInst *TEI)
+  : Kind(ProjectionKind::Tuple), Type(TEI->getType()),
+    Decl(nullptr), Index(TEI->getFieldNo()) {}
+
+/// UncheckedEnumData always have an index of 0 since enums only have one
+/// payload.
+Projection::Projection(UncheckedEnumDataInst *UEDAI)
+  : Kind(ProjectionKind::Enum), Type(UEDAI->getType()),
+    Decl(UEDAI->getElement()), Index(0) {}
 
 //===----------------------------------------------------------------------===//
 //                              Projection Path

@@ -253,29 +253,30 @@ forwardAddrToLdWithExtractPath(SILValue Address, SILValue StoredValue,
   SILBuilderWithScope<16> Builder(Inst);
   for (auto II = Path->rbegin(), IE = Path->rend(); II != IE; ++II) {
     auto P = *II;
-    if (ValueDecl *D = P.getDecl()) {
-      if (P.getNominalType() == Projection::NominalType::Struct) {
-        LastExtract = Builder.createStructExtract(Inst->getLoc(), LastExtract,
-                                                  cast<VarDecl>(D),
-                                                  P.getType().getObjectType());
-        assert(cast<StructExtractInst>(*LastExtract).getStructDecl() &&
-               "Instruction must have a struct decl!");
-      } else {
-        assert(P.getNominalType() == Projection::NominalType::Enum &&
-               "Expected an enum decl here. Only other possibility is a "
-               "class which we do not support");
-        LastExtract = Builder.createUncheckedEnumData(
-            Inst->getLoc(), LastExtract, cast<EnumElementDecl>(D),
-            P.getType().getObjectType());
-        assert(cast<UncheckedEnumDataInst>(*LastExtract).getElement() &&
-               "Instruction must have an enum element decl!");
-      }
-    } else {
+    switch (P.getKind()) {
+    case ProjectionKind::Struct:
+      LastExtract = Builder.createStructExtract(Inst->getLoc(), LastExtract,
+                                                cast<VarDecl>(P.getDecl()),
+                                                P.getType().getObjectType());
+      assert(cast<StructExtractInst>(*LastExtract).getStructDecl() &&
+             "Instruction must have a struct decl!");
+      break;
+    case ProjectionKind::Enum:
+      LastExtract = Builder.createUncheckedEnumData(
+        Inst->getLoc(), LastExtract, cast<EnumElementDecl>(P.getDecl()),
+        P.getType().getObjectType());
+      assert(cast<UncheckedEnumDataInst>(*LastExtract).getElement() &&
+             "Instruction must have an enum element decl!");
+      break;
+    case ProjectionKind::Tuple:
       LastExtract = Builder.createTupleExtract(Inst->getLoc(), LastExtract,
                                                P.getIndex(),
                                                P.getType().getObjectType());
       assert(cast<TupleExtractInst>(*LastExtract).getTupleType() &&
              "Instruction must have a tuple type!");
+      break;
+    case ProjectionKind::Class:
+      llvm_unreachable("Can not handle classes here");
     }
   }
 
