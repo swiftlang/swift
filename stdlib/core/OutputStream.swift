@@ -104,20 +104,17 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 public func print<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
-  if let streamableObject =
-      _stdlib_dynamicCastToExistential1(object, Streamable.self) {
+  if let streamableObject = object as? Streamable {
     streamableObject.writeTo(&target)
     return
   }
 
-  if var printableObject =
-      _stdlib_dynamicCastToExistential1(object, Printable.self) {
+  if var printableObject = object as? Printable {
     printableObject.description.writeTo(&target)
     return
   }
 
-  if let debugPrintableObject =
-      _stdlib_dynamicCastToExistential1(object, DebugPrintable.self) {
+  if let debugPrintableObject = object as? DebugPrintable {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
@@ -222,27 +219,24 @@ public func toDebugString<T>(x: T) -> String {
 ///
 /// See also: `debugPrintln(x, &target)`
 public func debugPrint<T, TargetStream : OutputStreamType>(
-    x: T, inout target: TargetStream
+    object: T, inout target: TargetStream
 ) {
-  if let debugPrintableObject =
-      _stdlib_dynamicCastToExistential1(x, DebugPrintable.self) {
+  if let debugPrintableObject = object as? DebugPrintable {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
 
-  if var printableObject =
-      _stdlib_dynamicCastToExistential1(x, Printable.self) {
+  if var printableObject = object as? Printable {
     printableObject.description.writeTo(&target)
     return
   }
 
-  if let streamableObject =
-      _stdlib_dynamicCastToExistential1(x, Streamable.self) {
+  if let streamableObject = object as? Streamable {
     streamableObject.writeTo(&target)
     return
   }
 
-  _adHocPrint(x, &target)
+  _adHocPrint(object, &target)
 }
 
 /// Write to `target` the textual representation of `x` most suitable

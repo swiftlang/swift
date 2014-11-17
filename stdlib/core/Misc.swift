@@ -75,26 +75,6 @@ public func _stdlib_conformsToProtocol<SourceType, DestType>(
     value: SourceType, _: DestType.Type
 ) -> Bool
 
-/// Cast the given object (of value or reference type) to the given protocol
-/// type.  Traps if the object does not conform to the protocol.
-///
-/// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_dynamicCastToExistential1Unconditional")
-public func _stdlib_dynamicCastToExistential1Unconditional<
-    SourceType, DestType
->(
-    value: SourceType, _: DestType.Type
-) -> DestType
-
-/// Cast the given object (of value or reference type) to the given protocol
-/// type.  Returns `.None` if the object does not conform to the protocol.
-///
-/// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_dynamicCastToExistential1")
-public func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
-    value: SourceType, _: DestType.Type
-) -> DestType?
-
 @asmname("swift_stdlib_getTypeName")
 public func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
 
