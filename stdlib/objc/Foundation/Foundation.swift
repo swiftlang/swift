@@ -363,7 +363,7 @@ extension String : _ObjectiveCBridgeable {
     x: NSString,
     inout result: String?
   ) {
-    result = String(unsafeBitCast(x, NSString.self))
+    result = String(x)
   }
   
   public static func _conditionallyBridgeFromObjectiveC(
