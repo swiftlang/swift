@@ -297,7 +297,9 @@ else
 fi
 
 if [[ "$DISTCC" ]] ; then
-    DISTCC_PUMP="$(which pump || which distcc-pump)"
+    # On some platforms, pump may be unrelated to distcc, in which case it's
+    # called distcc-pump.
+    DISTCC_PUMP="$(which distcc-pump || which pump)"
     CMAKE_COMPILER_OPTIONS=(
         -DSWIFT_DISTCC="$(which distcc)"
         -DCMAKE_C_COMPILER="$(which distcc)"
