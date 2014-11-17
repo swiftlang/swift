@@ -206,10 +206,13 @@ class WeakRefCount {
   }
 };
 
+#if !defined(__GLIBCXX__)
+// Currently not implemented by libstdc++
 static_assert(std::is_trivially_constructible<StrongRefCount>::value,
               "StrongRefCount must be trivially initializable");
 static_assert(std::is_trivially_constructible<WeakRefCount>::value,
               "WeakRefCount must be trivially initializable");
+#endif
 static_assert(std::is_trivially_destructible<StrongRefCount>::value,
               "StrongRefCount must be trivially destructible");
 static_assert(std::is_trivially_destructible<WeakRefCount>::value,

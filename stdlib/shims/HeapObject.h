@@ -49,8 +49,11 @@ struct HeapObject {
 };
 
 #ifdef __cplusplus
+#if !defined(__GLIBCXX__)
+// Currently not implemented by libstdc++
 static_assert(std::is_trivially_constructible<HeapObject>::value,
               "HeapObject must be trivially initializable");
+#endif
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
 
