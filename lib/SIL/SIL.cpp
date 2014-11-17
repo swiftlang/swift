@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/FormalLinkage.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDeclRef.h"
