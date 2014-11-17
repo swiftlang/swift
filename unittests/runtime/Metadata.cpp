@@ -13,9 +13,9 @@
 #include "swift/Runtime/Metadata.h"
 #include "gtest/gtest.h"
 #include <vector>
-#include <functional>
 #include <pthread.h>
-#include <semaphore.h>
+#include <mach/mach.h>
+#include <mach/semaphore.h>
 
 using namespace swift;
 
@@ -24,15 +24,14 @@ using namespace swift;
 template <typename T>
 struct RaceArgs {
   std::function<T()> code;
-  sem_t *ready;
-  pthread_rwlock_t *go;
+  semaphore_t ready;
+  semaphore_t go;
 };
 
 void *RaceThunk(void *vargs) {
   RaceArgs<void*> *args = static_cast<RaceArgs<void*> *>(vargs);
   // Signal ready. Wait for go.
-  sem_post(args->ready);
-  pthread_rwlock_rdlock(args->go);
+  semaphore_wait_signal(args->go, args->ready);
   return args->code();
 }
 
@@ -44,15 +43,14 @@ RaceTest(std::function<T()> code)
 {
   const unsigned threadCount = 64;
 
-  sem_t ready;
-  pthread_rwlock_t go;
-  sem_init(&ready, 0, 0);
-  pthread_rwlock_init(&go, NULL);
-  pthread_rwlock_wrlock(&go);
+  semaphore_t ready;
+  semaphore_t go;
+  semaphore_create(mach_task_self(), &ready, SYNC_POLICY_FIFO, 0);
+  semaphore_create(mach_task_self(), &go, SYNC_POLICY_FIFO, 0);
 
   // Create the threads.
   pthread_t threads[threadCount];
-  std::vector<RaceArgs<T>> args(threadCount, {code, &ready, &go});
+  std::vector<RaceArgs<T>> args(threadCount, {code, ready, go});
 
   for (unsigned i = 0; i < threadCount; i++) {
     pthread_create(&threads[i], nullptr, &RaceThunk, &args[i]);
@@ -60,11 +58,11 @@ RaceTest(std::function<T()> code)
 
   // Wait for all test threads to reach ready.
   for (unsigned i = 0; i < threadCount; i++) {
-    sem_wait(&ready);
+    semaphore_wait(ready);
   }
 
   // Race!
-  pthread_rwlock_unlock(&go);
+  semaphore_signal_all(go);
 
   // Collect results.
   std::vector<T> results;
@@ -74,8 +72,8 @@ RaceTest(std::function<T()> code)
     results.push_back(static_cast<T>(result));
   }
 
-  sem_destroy(&ready);
-  pthread_rwlock_destroy(&go);
+  semaphore_destroy(mach_task_self(), ready);
+  semaphore_destroy(mach_task_self(), go);
 
   return results;
 }
@@ -390,7 +388,7 @@ struct {
     sizeof(HeapMetadataHeader), // address point
     {} // private data
   },
-  { { { &destroySubclass }, { &_TWVBo } },
+  { { { &destroySubclass }, { &_TWVBO } },
     { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
       0, 0, 0, sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
       sizeof(HeapMetadataHeader) } },
@@ -416,7 +414,7 @@ TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
 
       // Assert that we copied the shared prefix data from the subclass.
       EXPECT_EQ((void*) &destroySubclass, fields[-2]);
-      EXPECT_EQ(&_TWVBo, fields[-1]);
+      EXPECT_EQ(&_TWVBO, fields[-1]);
 
       // Assert that we set the superclass field.
       EXPECT_EQ(SuperclassWithPrefix_AddressPoint, fields[1]);
