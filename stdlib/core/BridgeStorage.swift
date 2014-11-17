@@ -76,7 +76,7 @@ struct _BridgeStorage<
   }
   
   public // @testable
-  mutating func isUniquelyReferenced() -> Bool {
+  mutating func isUniquelyReferencedNative() -> Bool {
     return _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
       _bitPattern(rawValue)
     ) != 0

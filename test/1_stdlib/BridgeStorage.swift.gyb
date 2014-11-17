@@ -30,7 +30,7 @@ protocol BridgeStorage {
   init(_ native: Native, bits: Int)
   init(Cocoa)
 
-  mutating func isUniquelyReferenced() -> Bool
+  mutating func isUniquelyReferencedNative() -> Bool
   var native: Native? {get}
   var cocoa: Cocoa? {get}
   var spareBits: Int {get}
@@ -59,7 +59,7 @@ struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject>
     self.bits = 0
   }
 
-  mutating func isUniquelyReferenced() -> Bool {
+  mutating func isUniquelyReferencedNative() -> Bool {
     return _swift_isUniquelyReferencedNonObjC_nonNull(
       UnsafePointer(rawObject)) != 0
   }
@@ -162,25 +162,25 @@ allTests.test("${Self}") {
     var b = B(C(), bits: i)
     expectEmpty(b.cocoa)
     expectNotEmpty(b.native)
-    expectTrue(b.isUniquelyReferenced())
+    expectTrue(b.isUniquelyReferencedNative())
     expectEqual(i, b.spareBits)
   }
   
   var b = B(C(), bits: 0)
-  expectTrue(b.isUniquelyReferenced())
+  expectTrue(b.isUniquelyReferencedNative())
   
   // Add a reference and verify that it's still native but no longer unique
   var c = b
-  expectFalse(b.isUniquelyReferenced())
+  expectFalse(b.isUniquelyReferencedNative())
   _fixLifetime(c) // make sure c is not killed early
   
   var d = B(taggedNSString)
-  expectFalse(d.isUniquelyReferenced())
+  expectFalse(d.isUniquelyReferencedNative())
   expectEmpty(d.native)
   expectNotEmpty(d.cocoa)
 
   d = B(unTaggedNSString)
-  expectFalse(d.isUniquelyReferenced())
+  expectFalse(d.isUniquelyReferencedNative())
   expectEmpty(d.native)
   expectNotEmpty(d.cocoa)
 }
