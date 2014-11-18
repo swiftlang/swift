@@ -33,8 +33,8 @@ var ch_0a = '\0a'   // expected-error {{invalid multiple-code-point character li
 var ch_01a = '\01a' // expected-error {{invalid multiple-code-point character literal}}
 var ch_0z = '\0z'   // expected-error {{invalid multiple-code-point character literal}}
 var ch_01z = '\01z' // expected-error {{invalid multiple-code-point character literal}}
-var ch_0a = '\0@'   // expected-error {{invalid multiple-code-point character literal}}
-var ch_01a = '\01@' // expected-error {{invalid multiple-code-point character literal}}
+var ch_0at = '\0@'   // expected-error {{invalid multiple-code-point character literal}}
+var ch_01at = '\01@' // expected-error {{invalid multiple-code-point character literal}}
 var ch_US = '🇺🇸'    // expected-error {{invalid multiple-code-point character literal}}
 
 var ch_Joker = '🃏'

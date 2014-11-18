@@ -3087,6 +3087,14 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     Bindings.All.push_back({PBD, topLevelDecl});
 
+    // Configure all vars with attributes, 'static' and parent pattern.
+    pattern.get()->forEachVariable([&](VarDecl *VD) {
+      VD->setStatic(StaticLoc.isValid());
+      VD->setParentPattern(PBD);
+      VD->getAttrs() = Attributes;
+      Decls.push_back(VD);
+    });
+
     // Parse an initializer if present.
     if (Tok.is(tok::equal)) {
       // Record the variables that we're trying to initialize.
@@ -3164,14 +3172,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     // Add all parsed vardecls to this scope.
     addPatternVariablesToScope(pattern.get());
-
-    // Configure them properly with attributes and 'static'.
-    pattern.get()->forEachVariable([&](VarDecl *VD) {
-      VD->setStatic(StaticLoc.isValid());
-      VD->setParentPattern(PBD);
-      VD->getAttrs() = Attributes;
-      Decls.push_back(VD);
-    });
     
     // Propagate back types for simple patterns, like "var A, B : T".
     if (TypedPattern *TP = dyn_cast<TypedPattern>(PBD->getPattern())) {

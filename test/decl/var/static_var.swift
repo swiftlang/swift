@@ -212,3 +212,12 @@ struct S2 {
   func xx() -> Int { return self.x + C2.x }
 }
 
+// rdar://18990358
+public struct Foo {
+  public static let S { a // expected-error{{computed property must have an explicit type}}
+    // expected-error@-1{{type annotation missing in pattern}}
+    // expected-error@-2{{'let' declarations cannot be computed properties}}
+    // expected-error@-3{{use of unresolved identifier 'a'}}
+}
+
+// expected-error{{expected declaration}}

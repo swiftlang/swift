@@ -1,9 +1,9 @@
 // RUN: %swift -parse-as-library -emit-ir -target x86_64-apple-macosx10.9 -primary-file %s | FileCheck %s
 
-// CHECK: @globalinit_[[T:.*]]_token0 = internal global i64 0, align 8
 // CHECK: @_Tv12lazy_globals1xSi = global %Si zeroinitializer, align 8
 // CHECK: @_Tv12lazy_globals1ySi = global %Si zeroinitializer, align 8
 // CHECK: @_Tv12lazy_globals1zSi = global %Si zeroinitializer, align 8
+// CHECK: @globalinit_[[T:.*]]_token0 = internal global i64 0, align 8
 
 // CHECK: define internal void @globalinit_[[T]]_func0() {
 // CHECK: entry:
