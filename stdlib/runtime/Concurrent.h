@@ -17,10 +17,10 @@
 
 /// This is a node in an concurrent linked list.
 template <class ElemTy> struct ConcurrentListNode {
-  /// C'tor.
   ConcurrentListNode(ElemTy Elem) : Payload(Elem), Next(nullptr) {}
-  /// D'tor.
-  ~ConcurrentListNode() {}
+  ConcurrentListNode(const ConcurrentListNode &) = delete;
+  ConcurrentListNode &operator=(const ConcurrentListNode &) = delete;
+
   /// The element.
   ElemTy Payload;
   /// Points to the next link in the chain.
@@ -30,9 +30,7 @@ template <class ElemTy> struct ConcurrentListNode {
 /// This is a concurrent linked list. It supports insertion at the beginning
 /// of the list and traversal using iterators.
 template <class ElemTy> struct ConcurrentList {
-  /// C'tor.
   ConcurrentList() : First(nullptr) {}
-  /// D'tor.
   ~ConcurrentList() {
     // Iterate over the list and delete all the nodes.
     auto Ptr = First.load();
@@ -42,6 +40,9 @@ template <class ElemTy> struct ConcurrentList {
       Ptr = N;
     }
   }
+
+  ConcurrentList(const ConcurrentList &) = delete;
+  ConcurrentList &operator=(const ConcurrentList &) = delete;
 
   /// A list iterator.
   struct ConcurrentListIterator {
@@ -74,8 +75,7 @@ template <class ElemTy> struct ConcurrentList {
   iterator end() const { return ConcurrentListIterator(nullptr); }
 
   /// Add a new item to the list.
-  /// \returns a reference to the inserted element.
-  ElemTy& push(ElemTy Elem) {
+  ElemTy &push_front(ElemTy Elem) {
     /// Allocate a new node.
     ConcurrentListNode<ElemTy> *N = new ConcurrentListNode<ElemTy>(Elem);
     // Point to the first element in the list.
@@ -94,15 +94,16 @@ template <class ElemTy> struct ConcurrentList {
 };
 
 template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
-  /// C'tor.
   ConcurrentMapNode(KeyTy H)
       : Payload(), Left(nullptr), Right(nullptr), Key(H) {}
 
-  // D'tor.
   ~ConcurrentMapNode() {
     delete Left.load();
     delete Right.load();
   }
+
+  ConcurrentMapNode(const ConcurrentMapNode &) = delete;
+  ConcurrentMapNode &operator=(const ConcurrentMapNode &) = delete;
 
   ValueTy Payload;
   typedef std::atomic<ConcurrentMapNode *> EdgeTy;
@@ -116,8 +117,11 @@ template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
 // the tree.
 template <class KeyTy, class ValueTy> class ConcurrentMap {
 public:
-  /// C'tor.
   ConcurrentMap() : Sentinel(0) {}
+
+  ConcurrentMap(const ConcurrentMap &) = delete;
+  ConcurrentMap &operator=(const ConcurrentMap &) = delete;
+
   /// A Sentinel root node that contains no elements.
   ConcurrentMapNode<KeyTy, ValueTy> Sentinel;
 

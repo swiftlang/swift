@@ -209,7 +209,7 @@ public:
       Head = entry;
 
       key = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
-      Bucket.push(EntryPair(key, entry));
+      Bucket.push_front(EntryPair(key, entry));
 
 #if SWIFT_DEBUG_RUNTIME
       printf("%s(%p): created %p\n",
