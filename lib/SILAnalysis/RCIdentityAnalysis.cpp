@@ -43,6 +43,8 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   case ValueKind::UncheckedRefBitCastInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::OpenExistentialRefInst:
+  case ValueKind::RefToBridgeObjectInst:
+  case ValueKind::BridgeObjectToRefInst:
     return true;
   default:
     return false;

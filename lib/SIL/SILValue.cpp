@@ -31,6 +31,8 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UnconditionalCheckedCastInst:
   case ValueKind::UncheckedRefBitCastInst:
+  case ValueKind::RefToBridgeObjectInst:
+  case ValueKind::BridgeObjectToRefInst:
     return true;
   default:
     return false;
@@ -46,6 +48,8 @@ static bool isUpcastPreservingCast(ValueKind Kind) {
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedRefBitCastInst:
+  case ValueKind::RefToBridgeObjectInst:
+  case ValueKind::BridgeObjectToRefInst:
     return true;
   default:
     return false;

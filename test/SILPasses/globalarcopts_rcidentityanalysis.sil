@@ -419,3 +419,20 @@ bb0(%0 : $C):
   %3 = tuple()
   return %3 : $()
 }
+
+// CHECK-LABEL: sil @strip_off_bridge_object
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+
+sil @strip_off_bridge_object : $@thin (Builtin.BridgeObject, C) -> () {
+bb0(%0 : $Builtin.BridgeObject, %5 : $C):
+  %1 = bridge_object_to_ref %0 : $Builtin.BridgeObject to $C
+  strong_retain %1 : $C
+  strong_release %0 : $Builtin.BridgeObject
+  %4 = integer_literal $Builtin.Word, 0
+  %2 = ref_to_bridge_object %5 : $C, %4 : $Builtin.Word
+  strong_retain %5 : $C
+  strong_release %2 : $Builtin.BridgeObject
+  %3 = tuple()
+  return %3 : $()
+}
