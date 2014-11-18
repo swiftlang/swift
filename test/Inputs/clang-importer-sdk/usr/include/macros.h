@@ -34,6 +34,7 @@
 
 // Should be suppressed during import.
 #define NS_BLOCKS_AVAILABLE 1
+#define CF_USE_OSBYTEORDER_H 1
 
 #define NULL_VIA_NAME (NULL)
 #define NULL_VIA_VALUE ((void *) 0)

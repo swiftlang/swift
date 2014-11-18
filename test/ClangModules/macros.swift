@@ -83,6 +83,7 @@ func testUsesMacroFromOtherModule() {
 
 func testSuppressed() {
   let m1 = NS_BLOCKS_AVAILABLE // expected-error {{use of unresolved identifier 'NS_BLOCKS_AVAILABLE'}}
+  let m2 = CF_USE_OSBYTEORDER_H // expected-error {{use of unresolved identifier 'CF_USE_OSBYTEORDER_H'}}
 }
 
 func testNil() {
