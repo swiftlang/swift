@@ -29,6 +29,13 @@ template <class ElemTy> struct ConcurrentListNode {
 
 /// This is a concurrent linked list. It supports insertion at the beginning
 /// of the list and traversal using iterators.
+/// This is a very simple implementation of a concurrent linked list
+/// using atomic operations. The 'push_front' method allocates a new link
+/// and attempts to compare and swap the old head pointer with pointer to
+/// the new link. This operation may fail many times if there are other
+/// contending threads, but eventually the head pointer is set to the new
+/// link that already points to the old head value.
+/// See 'push_front' for more details.
 template <class ElemTy> struct ConcurrentList {
   ConcurrentList() : First(nullptr) {}
   ~ConcurrentList() {
