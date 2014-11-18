@@ -141,7 +141,8 @@ public:
   ConcurrentMap &operator=(const ConcurrentMap &) = delete;
 
   /// A Sentinel root node that contains no elements.
-  ConcurrentMapNode<KeyTy, ValueTy> Sentinel;
+  typedef ConcurrentMapNode<KeyTy, ValueTy> NodeTy;
+  NodeTy Sentinel;
 
   /// Search a for a node with key value \p. If the node does not exist then
   /// allocate a new node and add it to the tree.
@@ -150,8 +151,7 @@ public:
   }
 
 private:
-  static ValueTy &findOrAllocateNode_rec(ConcurrentMapNode<KeyTy, ValueTy> *P,
-                                         KeyTy Key) {
+  static ValueTy &findOrAllocateNode_rec(NodeTy *P, KeyTy Key) {
     // Found the node we were looking for.
     if (P->Key == Key)
       return P->Payload;
