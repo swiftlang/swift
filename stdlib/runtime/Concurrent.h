@@ -41,7 +41,7 @@ template <class ElemTy> struct ConcurrentList {
   ConcurrentList() : First(nullptr) {}
   ~ConcurrentList() {
     // Iterate over the list and delete all the nodes.
-    auto Ptr = First.load();
+    auto Ptr = First.load(std::memory_order_acquire);
     while (Ptr) {
       auto N = Ptr->Next;
       delete Ptr;
@@ -78,7 +78,9 @@ template <class ElemTy> struct ConcurrentList {
   /// Iterator entry point.
   typedef ConcurrentListIterator iterator;
   /// Marks the beginning of the list.
-  iterator begin() const { return ConcurrentListIterator(First); }
+  iterator begin() const {
+    return ConcurrentListIterator(First.load(std::memory_order_acquire));
+  }
   /// Marks the end of the list.
   iterator end() const { return ConcurrentListIterator(nullptr); }
 
@@ -87,10 +89,12 @@ template <class ElemTy> struct ConcurrentList {
     /// Allocate a new node.
     ConcurrentListNode<ElemTy> *N = new ConcurrentListNode<ElemTy>(Elem);
     // Point to the first element in the list.
-    N->Next = First.load();
+    N->Next = First.load(std::memory_order_acquire);
     auto OldFirst = N->Next;
     // Try to replace the current First with the new node.
-    while (!std::atomic_compare_exchange_weak(&First, &OldFirst, N)) {
+    while (!std::atomic_compare_exchange_weak_explicit(&First, &OldFirst, N,
+                                               std::memory_order_release,
+                                               std::memory_order_relaxed)) {
       // If we fail, update the new node to point to the new head and try to
       // insert before the new
       // first element.
