@@ -107,6 +107,8 @@ struct SimpleValue {
     case ValueKind::ObjCExistentialMetatypeToObjectInst:
     case ValueKind::SelectEnumInst:
     case ValueKind::SelectValueInst:
+    case ValueKind::RefToBridgeObjectInst:
+    case ValueKind::BridgeObjectToRefInst:
         return true;
     default:
         return false;
@@ -135,6 +137,17 @@ class HashVisitor : public SILInstructionVisitor<HashVisitor, llvm::hash_code> {
 public:
   hash_code visitValueBase(ValueBase *) {
     llvm_unreachable("No hash implemented for the given type");
+  }
+
+  hash_code visitBridgeObjectToRefInst(BridgeObjectToRefInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+  }
+
+  hash_code visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(
+        X->getKind(), X->getType(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()));
   }
 
   hash_code visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *X) {

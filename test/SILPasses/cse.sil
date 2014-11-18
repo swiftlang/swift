@@ -920,3 +920,32 @@ bb0(%0 : $@objc_metatype XXX.Type):
   %3 = tuple (%1: $@thick XXX.Type, %2: $@thick XXX.Type)
   return %3: $(@thick XXX.Type, @thick XXX.Type)
 }
+
+// CHECK-LABEL: sil @cse_bridge_object_to_ref
+// CHECK: bridge_object_to_ref
+// CHECK-NOT: bridge_object_to_ref
+// CHECK: return
+sil @cse_bridge_object_to_ref : $@thin (Builtin.BridgeObject) -> () {
+bb0(%0 : $Builtin.BridgeObject):
+  %1 = bridge_object_to_ref %0 : $Builtin.BridgeObject to $B
+  %2 = bridge_object_to_ref %0 : $Builtin.BridgeObject to $B
+  strong_retain %1 : $B
+  strong_retain %2 : $B
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @cse_ref_to_bridge_object
+// CHECK: ref_to_bridge_object
+// CHECK-NOT: ref_to_bridge_object
+// CHECK: return
+sil @cse_ref_to_bridge_object : $@thin (B) -> () {
+bb0(%0 : $B):
+  %4 = integer_literal $Builtin.Word, 0
+  %1 = ref_to_bridge_object %0 : $B, %4 : $Builtin.Word
+  %2 = ref_to_bridge_object %0 : $B, %4 : $Builtin.Word
+  strong_retain %1 : $Builtin.BridgeObject
+  strong_retain %2 : $Builtin.BridgeObject
+  %3 = tuple ()
+  return %3 : $()
+}

@@ -528,6 +528,14 @@ namespace {
     bool visitIsNonnullInst(IsNonnullInst *RHS) {
       return true;
     }
+
+    bool visitBridgeObjectToRefInst(BridgeObjectToRefInst *X) {
+      return true;
+    }
+
+    bool  visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
+      return true;
+    }
   private:
     const SILInstruction *LHS;
   };
