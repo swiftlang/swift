@@ -1917,6 +1917,8 @@ SetTestSuite.test("BridgedToObjC.Verbatim.Contains") {
   expectNotEmpty(nss.member(TestObjCKeyTy(2020)))
   expectNotEmpty(nss.member(TestObjCKeyTy(3030)))
   expectEmpty(nss.member(TestObjCKeyTy(4040)))
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgingRoundtrip") {
@@ -1938,6 +1940,8 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFr
     [ 1010, 2020, 3030 ],
     s, { s.objectEnumerator() },
     { ($0 as TestObjCKeyTy).value })
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromObjC") {
@@ -1947,6 +1951,8 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFr
     [ 1010, 2020, 3030 ],
     s, { s.objectEnumerator() },
     { ($0 as TestObjCKeyTy).value })
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration_Empty") {
@@ -1968,6 +1974,8 @@ SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFrom
     [ 1010, 2020, 3030 ],
     s, { s.objectEnumerator() },
     { ($0 as TestObjCKeyTy).value })
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift") {
@@ -1977,6 +1985,8 @@ SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFrom
     [ 1010, 2020, 3030 ],
     s, { s.objectEnumerator() },
     { ($0 as TestObjCKeyTy).value })
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
@@ -2067,6 +2077,8 @@ SetTestSuite.test("BridgedToObjC.ObjectEnumerator.NextObject") {
   expectEmpty(enumerator.nextObject())
   expectEmpty(enumerator.nextObject())
   expectEmpty(enumerator.nextObject())
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.ObjectEnumerator.NextObject.Empty") {
@@ -2091,6 +2103,8 @@ SetTestSuite.test("BridgedToObjC.MemberTypesCustomBridged") {
     members.append((nextObject as TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([ 1010, 2020, 3030 ], members))
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 //
