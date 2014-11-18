@@ -2055,15 +2055,6 @@ SetTestSuite.test("BridgedToObjC.Count") {
   expectEqual(3, s.count)
 }
 
-SetTestSuite.test("BridgedToObjC.Contains") {
-  let nss = getBridgedNSSetOfRefTypesBridgedVerbatim()
-
-  expectNotEmpty(nss.member(TestObjCKeyTy(1010)))
-  expectNotEmpty(nss.member(TestObjCKeyTy(2020)))
-  expectNotEmpty(nss.member(TestObjCKeyTy(3030)))
-  expectEmpty(nss.member(TestObjCKeyTy(4040)))
-}
-
 SetTestSuite.test("BridgedToObjC.ObjectEnumerator.NextObject") {
   let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
   let enumerator = s.objectEnumerator()
