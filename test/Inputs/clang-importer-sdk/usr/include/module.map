@@ -67,3 +67,8 @@ module Security {
   header "SecItem.h"
   export *
 }
+
+module nullability {
+  header "nullability.h"
+  export *
+}

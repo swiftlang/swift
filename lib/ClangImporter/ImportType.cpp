@@ -80,6 +80,25 @@ namespace {
     Block,
   };
 
+  bool canImportAsOptional(ImportHint hint) {
+    switch (hint) {
+    case ImportHint::BOOL:
+    case ImportHint::None:
+    case ImportHint::NSUInteger:
+    case ImportHint::Reference:
+    case ImportHint::Void:
+      return false;
+
+    case ImportHint::Block:
+    case ImportHint::CFPointer:
+    case ImportHint::NSArray:
+    case ImportHint::NSDictionary:
+    case ImportHint::NSString:
+    case ImportHint::ObjCPointer:
+      return true;
+    }
+  }
+
   struct ImportResult {
     Type AbstractType;
     ImportHint Hint;
@@ -94,6 +113,25 @@ namespace {
 
     explicit operator bool() const { return (bool) AbstractType; }
   };
+
+  /// Wrap a type in the Optional type appropriate to the import kind.
+  static Type
+  getOptionalType(Type payloadType,
+                  ImportTypeKind kind,
+                  OptionalTypeKind OptKind = OTK_ImplicitlyUnwrappedOptional) {
+    // Import pointee types as true Optional.
+    if (kind == ImportTypeKind::Pointee)
+      return OptionalType::get(payloadType);
+
+    switch (OptKind) {
+      case OTK_ImplicitlyUnwrappedOptional:
+        return ImplicitlyUnwrappedOptionalType::get(payloadType);
+      case OTK_None:
+        return payloadType;
+      case OTK_Optional:
+        return OptionalType::get(payloadType);
+    }
+  }
 
   class SwiftTypeConverter :
     public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
@@ -435,12 +473,42 @@ namespace {
     SUGAR_TYPE(Decltype)
     SUGAR_TYPE(UnaryTransform)
     SUGAR_TYPE(Elaborated)
-    SUGAR_TYPE(Attributed)
     SUGAR_TYPE(SubstTemplateTypeParm)
     SUGAR_TYPE(TemplateSpecialization)
     SUGAR_TYPE(Auto)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(PackExpansion)
+
+    ImportResult VisitAttributedType(const clang::AttributedType *type) {
+      // If the type has a nullability specifier, translate that into an
+      // optional type.
+      if (auto nullability = type->getImmediateNullability()) {
+        clang::ASTContext &clangCtx = Impl.getClangASTContext();
+
+        // Strip off additional levels of nullability so we don't get
+        // extra nested optionals.
+        clang::QualType underlyingType(type, 0);
+        do {
+          if (auto attributed
+                = dyn_cast<clang::AttributedType>(underlyingType.getTypePtr()))
+            underlyingType = attributed->getModifiedType();
+          else
+            underlyingType = underlyingType.getDesugaredType(clangCtx);
+        } while (underlyingType->getNullability(clangCtx));
+          underlyingType = clangCtx.getCanonicalType(underlyingType);
+
+        ImportResult underlying = Visit(underlyingType);
+        if (canImportAsOptional(underlying.Hint)) {
+          return getOptionalType(underlying.AbstractType,
+                                 ImportTypeKind::Abstract,
+                                 Impl.translateNullability(*nullability));
+        }
+
+        return underlying;
+      }
+
+      return Visit(type->desugar());
+    }
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
@@ -618,25 +686,6 @@ static bool isCFAudited(ImportTypeKind importKind) {
   }
 }
 
-/// Wrap a type in the Optional type appropriate to the import kind.
-static Type
-getOptionalType(Type payloadType,
-                ImportTypeKind kind,
-                OptionalTypeKind OptKind = OTK_ImplicitlyUnwrappedOptional) {
-  // Import pointee types as true Optional.
-  if (kind == ImportTypeKind::Pointee)
-    return OptionalType::get(payloadType);
-
-  switch (OptKind) {
-  case OTK_ImplicitlyUnwrappedOptional:
-    return ImplicitlyUnwrappedOptionalType::get(payloadType);
-  case OTK_None:
-    return payloadType;
-  case OTK_Optional:
-    return OptionalType::get(payloadType);
-  }
-}
-
 /// Turn T into Unmanaged<T>.
 static Type getUnmanagedType(ClangImporter::Implementation &impl,
                              Type payloadType) {
@@ -785,12 +834,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
-  if (hint == ImportHint::NSString ||
-      hint == ImportHint::NSArray ||
-      hint == ImportHint::NSDictionary ||
-      hint == ImportHint::ObjCPointer ||
-      hint == ImportHint::CFPointer ||
-      hint == ImportHint::Block) {
+  if (canImportAsOptional(hint) &&
+      !clangType->getNullability(impl.getClangASTContext())) {
     importedType = getOptionalType(importedType, importKind, optKind);
   }
 

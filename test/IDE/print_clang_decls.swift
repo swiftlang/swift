@@ -21,6 +21,9 @@
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=ctypes.bits -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
 
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=nullability -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt
+
 // TAG_DECLS_AND_TYPEDEFS:      {{^}}struct FooStruct1 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
@@ -115,3 +118,15 @@
 // CTYPESBITS: {{^}}typealias DWORD = Int32{{$}}
 // CTYPESBITS-NEXT: {{^}}var MY_INT: Int32 { get }{{$}}
 // CTYPESBITS-NOT: FooStruct1
+
+// CHECK-NULLABILITY: typealias nonnull_id = AnyObject
+// CHECK-NULLABILITY: func getId1() -> AnyObject?
+// CHECK-NULLABILITY: func getId2() -> AnyObject?
+// CHECK-NULLABILITY: var global_id: AnyObject?
+// CHECK-NULLABILITY: class SomeClass {
+// CHECK-NULLABILITY:   class func methodA(obj: SomeClass?) -> AnyObject
+// CHECK-NULLABILITY:   func methodA(obj: SomeClass?) -> AnyObject
+// CHECK-NULLABILITY:   class func methodB(block: (@objc_block (Int32, Int32) -> Int32)?) -> AnyObject
+// CHECK-NULLABILITY:   func methodB(block: (@objc_block (Int32, Int32) -> Int32)?) -> AnyObject
+// CHECK-NULLABILITY:   var property: AnyObject?
+// CHECK-NULLABILITY: }
