@@ -132,8 +132,8 @@ public:
   }
 
 private:
-  ValueTy &findOrAllocateNode_rec(ConcurrentMapNode<KeyTy, ValueTy> *P,
-                                  KeyTy Key) {
+  static ValueTy &findOrAllocateNode_rec(ConcurrentMapNode<KeyTy, ValueTy> *P,
+                                         KeyTy Key) {
     // Found the node we were looking for.
     if (P->Key == Key)
       return P->Payload;
