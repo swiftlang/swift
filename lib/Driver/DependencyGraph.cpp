@@ -55,6 +55,9 @@ parseDependencyFile(llvm::MemoryBuffer &buffer, bool providesOnly,
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
   // for-range loops break.
   for (auto i = topLevelMap->begin(), e = topLevelMap->end(); i != e; ++i) {
+    if (isa<yaml::NullNode>(i->getValue()))
+      continue;
+
     auto *key = cast<yaml::ScalarNode>(i->getKey());
 
     using KindPair = std::pair<DependencyKind, DependencyDirection>;
