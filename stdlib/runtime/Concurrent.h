@@ -111,8 +111,8 @@ template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
       : Payload(), Left(nullptr), Right(nullptr), Key(H) {}
 
   ~ConcurrentMapNode() {
-    delete Left.load();
-    delete Right.load();
+    delete Left.load(std::memory_order_acquire);
+    delete Right.load(std::memory_order_acquire);
   }
 
   ConcurrentMapNode(const ConcurrentMapNode &) = delete;
@@ -170,7 +170,8 @@ private:
     }
 
     // Load the current edge value.
-    ConcurrentMapNode<KeyTy, ValueTy> *CurrentVal = Edge->load();
+    ConcurrentMapNode<KeyTy, ValueTy> *CurrentVal =
+      Edge->load(std::memory_order_acquire);
 
     // If the edge is populated the follow the edge.
     if (CurrentVal)
@@ -181,7 +182,9 @@ private:
         new ConcurrentMapNode<KeyTy, ValueTy>(Key);
 
     // Try to set a new node:
-    if (std::atomic_compare_exchange_weak(Edge, &CurrentVal, New)) {
+    if (std::atomic_compare_exchange_weak_explicit(Edge, &CurrentVal, New,
+                                                   std::memory_order_release,
+                                                   std::memory_order_relaxed)){
       // On success return the new node.
       return New->Payload;
     }
