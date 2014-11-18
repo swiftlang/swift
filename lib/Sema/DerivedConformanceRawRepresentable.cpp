@@ -61,8 +61,10 @@ static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
   } else if (auto stringLit = dyn_cast<StringLiteralExpr>(expr)) {
     clone = new (C) StringLiteralExpr(stringLit->getValue(), SourceLoc());
   } else if (auto floatLit = dyn_cast<FloatLiteralExpr>(expr)) {
-    clone = new (C) FloatLiteralExpr(floatLit->getText(), SourceLoc(),
+    clone = new (C) FloatLiteralExpr(floatLit->getDigitsText(), SourceLoc(),
                                      /*implicit*/ true);
+    if (floatLit->isNegative())
+      cast<FloatLiteralExpr>(clone)->setNegative(SourceLoc());
   } else {
     llvm_unreachable("invalid raw literal expr");
   }

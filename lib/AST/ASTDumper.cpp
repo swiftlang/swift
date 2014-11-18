@@ -1190,7 +1190,7 @@ public:
     OS << ')';
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
-    printCommon(E, "float_literal_expr") << " value=" << E->getText() << ')';
+    printCommon(E, "float_literal_expr") << " value=" << E->getDigitsText() << ')';
   }
 
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E) {

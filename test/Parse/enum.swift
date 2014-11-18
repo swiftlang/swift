@@ -236,8 +236,10 @@ enum RawTypeWithRepeatValues7 : Double {
 }
 
 enum RawTypeWithNonRepeatValues : Double {
-  case Vaughn = 3.7
-  case Wilson = 7.4
+  case SantaClara = 3.7
+  case SanFernando = 7.4
+  case SanAntonio = -3.7
+  case SanCarlos = -7.4
 }
 
 

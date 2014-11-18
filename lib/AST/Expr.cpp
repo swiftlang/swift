@@ -220,20 +220,33 @@ APInt IntegerLiteralExpr::getValue() const {
       getType()->castTo<BuiltinIntegerType>()->getGreatestWidth());
 }
 
-APFloat FloatLiteralExpr::getValue(StringRef Text,
-                                   const llvm::fltSemantics &Semantics) {
+static APFloat getFloatLiteralValue(bool IsNegative, StringRef Text,
+                                    const llvm::fltSemantics &Semantics) {
   APFloat Val(Semantics);
   APFloat::opStatus Res =
-    Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
+  Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
   assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
   (void)Res;
+  if (IsNegative) {
+    auto NegVal = APFloat::getZero(Semantics, /*negative*/ true);
+    Res = NegVal.subtract(Val, llvm::APFloat::rmNearestTiesToEven);
+    assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
+    (void)Res;
+    return NegVal;
+  }
   return Val;
+}
+
+APFloat FloatLiteralExpr::getValue(StringRef Text,
+                                   const llvm::fltSemantics &Semantics) {
+  return getFloatLiteralValue(/*IsNegative*/false, Text, Semantics);
 }
 
 llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
-  
-  return getValue(getText(),
+  assert(!getType()->is<ErrorType>() && "Should have a valid type");
+
+  return getFloatLiteralValue(isNegative(), getDigitsText(),
                   getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 

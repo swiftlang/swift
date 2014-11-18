@@ -403,9 +403,9 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (SubExpr.isNull())
     return nullptr;
 
-  // Check if we have an unary '-' with integer literal sub-expression, for
-  // example, "-42".
-  if (auto *ILE = dyn_cast<IntegerLiteralExpr>(SubExpr.get())) {
+  // Check if we have an unary '-' with number literal sub-expression, for
+  // example, "-42" or "-1.25".
+  if (auto *ILE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
     if (Operator->hasName() && Operator->getName().str() == "-") {
       ILE->setNegative(Operator->getLoc());
       return makeParserResult(ILE);

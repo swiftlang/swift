@@ -125,14 +125,14 @@ class alignas(8) Expr {
   enum { NumLiteralExprBits = NumExprBits + 0 };
   static_assert(NumLiteralExprBits <= 32, "fits in an unsigned");
 
-  class IntegerLiteralExprBitfields {
-    friend class IntegerLiteralExpr;
+  class NumberLiteralExprBitfields {
+    friend class NumberLiteralExpr;
     unsigned : NumLiteralExprBits;
 
     unsigned IsNegative : 1;
   };
-  enum { NumIntegerLiteralExprBits = NumLiteralExprBits + 1 };
-  static_assert(NumIntegerLiteralExprBits <= 32, "fits in an unsigned");
+  enum { NumNumberLiteralExprBits = NumLiteralExprBits + 1 };
+  static_assert(NumNumberLiteralExprBits <= 32, "fits in an unsigned");
 
   class StringLiteralExprBitfields {
     friend class StringLiteralExpr;
@@ -261,7 +261,7 @@ protected:
   union {
     ExprBitfields ExprBits;
     LiteralExprBitfields LiteralExprBits;
-    IntegerLiteralExprBitfields IntegerLiteralExprBits;
+    NumberLiteralExprBitfields NumberLiteralExprBits;
     StringLiteralExprBitfields StringLiteralExprBits;
     DeclRefExprBitfields DeclRefExprBits;
     TupleExprBitfields TupleExprBits;
@@ -440,33 +440,26 @@ public:
   }
 };
 
-  
-/// \brief Integer literal with a '+' or '-' sign, like '+4' or '- 2'.
-///
-/// After semantic analysis assigns types, this is guaranteed to only have
-/// a BuiltinIntegerType.
-class IntegerLiteralExpr : public LiteralExpr {
+/// \brief Abstract base class for numeric literals, potentially with a sign.
+class NumberLiteralExpr : public LiteralExpr {
   /// The value of the literal as an ASTContext-owned string. Underscores must
   /// be stripped.
-  StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
+  StringRef Val;  // Use StringRef instead of APInt or APFloat, which leak.
   SourceLoc MinusLoc;
   SourceLoc DigitsLoc;
-
+  
 public:
-  IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit)
-      : LiteralExpr(ExprKind::IntegerLiteral, Implicit), Val(Val),
-        DigitsLoc(DigitsLoc) {
-    IntegerLiteralExprBits.IsNegative = false;
-  }
-
-  APInt getValue() const;
-
-  static APInt getValue(StringRef Text, unsigned BitWidth);
-
-  bool isNegative() const { return IntegerLiteralExprBits.IsNegative; }
+   NumberLiteralExpr(ExprKind Kind,
+                     StringRef Val, SourceLoc DigitsLoc, bool Implicit)
+       : LiteralExpr(Kind, Implicit), Val(Val), DigitsLoc(DigitsLoc)
+   {
+     NumberLiteralExprBits.IsNegative = false;
+   }
+  
+  bool isNegative() const { return NumberLiteralExprBits.IsNegative; }
   void setNegative(SourceLoc Loc) {
     MinusLoc = Loc;
-    IntegerLiteralExprBits.IsNegative = true;
+    NumberLiteralExprBits.IsNegative = true;
   }
 
   StringRef getDigitsText() const { return Val; }
@@ -479,6 +472,27 @@ public:
   }
 
   static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_NumberLiteralExpr
+      && E->getKind() <= ExprKind::Last_NumberLiteralExpr;
+  }
+};
+
+  
+/// \brief Integer literal with a '+' or '-' sign, like '+4' or '- 2'.
+///
+/// After semantic analysis assigns types, this is guaranteed to only have
+/// a BuiltinIntegerType.
+class IntegerLiteralExpr : public NumberLiteralExpr {
+public:
+  IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit)
+      : NumberLiteralExpr(ExprKind::IntegerLiteral,
+                          Val, DigitsLoc, Implicit)
+  {}
+
+  APInt getValue() const;
+  static APInt getValue(StringRef Text, unsigned BitWidth);
+
+  static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IntegerLiteral;
   }
 };
@@ -486,22 +500,14 @@ public:
 /// FloatLiteralExpr - Floating point literal, like '4.0'.  After semantic
 /// analysis assigns types, this is guaranteed to only have a
 /// BuiltinFloatingPointType.
-class FloatLiteralExpr : public LiteralExpr {
-  /// The value of the literal as an ASTContext-owned string. Underscores must
-  /// be stripped.
-  StringRef Val; // Use StringRef instead of APFloat, APFloat leaks.
-  SourceLoc Loc;
-
+class FloatLiteralExpr : public NumberLiteralExpr {
 public:
   FloatLiteralExpr(StringRef Val, SourceLoc Loc, bool Implicit)
-    : LiteralExpr(ExprKind::FloatLiteral, Implicit), Val(Val), Loc(Loc) {}
-
-  APFloat getValue() const;
+    : NumberLiteralExpr(ExprKind::FloatLiteral, Val, Loc, Implicit)
+  {}
   
+  APFloat getValue() const;
   static APFloat getValue(StringRef Text, const llvm::fltSemantics &Semantics);
-
-  StringRef getText() const { return Val; }
-  SourceRange getSourceRange() const { return Loc; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FloatLiteral;
