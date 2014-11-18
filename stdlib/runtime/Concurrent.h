@@ -34,7 +34,8 @@ template <class ElemTy> struct ConcurrentListNode {
 /// and attempts to compare and swap the old head pointer with pointer to
 /// the new link. This operation may fail many times if there are other
 /// contending threads, but eventually the head pointer is set to the new
-/// link that already points to the old head value.
+/// link that already points to the old head value. Notice that the more
+/// difficult feature of removing links is not supported.
 /// See 'push_front' for more details.
 template <class ElemTy> struct ConcurrentList {
   ConcurrentList() : First(nullptr) {}
@@ -97,6 +98,8 @@ template <class ElemTy> struct ConcurrentList {
     }
     return N->Payload;
   }
+
+  /// Points to the first link in the list.
   std::atomic<ConcurrentListNode<ElemTy> *> First;
 };
 
@@ -119,9 +122,17 @@ template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
   KeyTy Key;
 };
 
-// A concurrent map that is implemented using a binary tree. It supports
-// concurrent insertions but does not support removals or rebalancing of
-// the tree.
+/// A concurrent map that is implemented using a binary tree. It supports
+/// concurrent insertions but does not support removals or rebalancing of
+/// the tree. Much like the concurrent linked list this data structure
+/// does not support the removal of nodes, which is more difficult.
+/// The method findOrAllocateNode searches the binary tree in search of the
+/// exact Key value. If it finds an edge that points to NULL that should
+/// contain the value then it tries to compare and swap the new node into
+/// place. If it looses the race to a different thread it de-allocates
+/// the node and starts the search again since the new node should
+/// be placed (or found) on the new link. See findOrAllocateNode for more
+/// details.
 template <class KeyTy, class ValueTy> class ConcurrentMap {
 public:
   ConcurrentMap() : Sentinel(0) {}
