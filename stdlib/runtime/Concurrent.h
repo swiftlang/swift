@@ -83,7 +83,7 @@ template <class ElemTy> struct ConcurrentList {
   iterator end() const { return ConcurrentListIterator(nullptr); }
 
   /// Add a new item to the list.
-  ElemTy &push_front(ElemTy Elem) {
+  void push_front(ElemTy Elem) {
     /// Allocate a new node.
     ConcurrentListNode<ElemTy> *N = new ConcurrentListNode<ElemTy>(Elem);
     // Point to the first element in the list.
@@ -96,7 +96,6 @@ template <class ElemTy> struct ConcurrentList {
       // first element.
       N->Next = OldFirst;
     }
-    return N->Payload;
   }
 
   /// Points to the first link in the list.
