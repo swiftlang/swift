@@ -11,6 +11,7 @@
 // CHECK-NEXT: "Subclass"
 // CHECK-NEXT: "MyArray"
 // CHECK-NEXT: "someGlobal"
+// CHECK-NEXT: "ExtraFloatLiteralConvertible"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
 // CHECK-NEXT: "eof"
 
@@ -64,6 +65,11 @@ extension Int {
   struct InnerToInt {}
 }
 
+// CHECK-DAG: "OtherFileAliasForFloatLiteralConvertible"
+protocol ExtraFloatLiteralConvertible
+    : OtherFileAliasForFloatLiteralConvertible {
+}
+
 func lookUpManyTopLevelNames() {
   // CHECK-DAG: "Dictionary"
   let _: Dictionary = [1:1]
@@ -104,9 +110,11 @@ private func privateFunc() {}
 
 // CHECK-LABEL: {{^member-access:$}}
 // CHECK-DAG: "V4main10IntWrapper"
+// CHECK-DAG: "PSs10Comparable"
 // CHECK-DAG: "C4main18ClassFromOtherFile"
 // CHECK-DAG: "C4main8Subclass"
 // CHECK-DAG: "Si"
+// CHECK-DAG: "PSs23FloatLiteralConvertible"
 // CHECK-DAG: "PSs10Strideable"
 // CHECK-DAG: "V4main18OtherFileOuterType"
 // CHECK-DAG: "VV4main18OtherFileOuterType9InnerType"
@@ -114,7 +122,9 @@ private func privateFunc() {}
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
-// Int16 is used by the other file in this module, but not by this one.
+// NEGATIVE-NOT: "SS"
+// These are used by the other file in this module, but not by this one.
+// NEGATIVE-NOT: "FloatLiteralConvertible"
 // NEGATIVE-NOT: "Int16"
 
 // OtherFileSecretTypeWrapper is never used directly in this file.

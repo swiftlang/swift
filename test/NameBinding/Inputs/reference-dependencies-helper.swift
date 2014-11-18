@@ -21,3 +21,4 @@ typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
 
 prefix operator *** {}
 
+typealias OtherFileAliasForFloatLiteralConvertible = FloatLiteralConvertible

@@ -26,6 +26,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
@@ -3581,6 +3582,10 @@ public:
   template<typename DeclType>
   void checkExplicitConformance(DeclType *D, Type T) {
     SmallVector<ProtocolConformance *, 4> conformances;
+    ReferencedNameTracker *tracker = nullptr;
+    if (SourceFile *SF = D->getParentSourceFile())
+      tracker = SF->getReferencedNameTracker();
+
     // Don't force delayed protocols to be created if they haven't already been
     // resolved.
     for (auto proto : D->getProtocols(false)) {
@@ -3589,6 +3594,9 @@ public:
       (void)TC.conformsToProtocol(T, proto, D, &conformance,
                                   D->getStartLoc(), D);
       conformances.push_back(conformance);
+
+      if (tracker)
+        tracker->addUsedNominal(proto);
     }
 
     D->setConformances(D->getASTContext().AllocateCopy(conformances));
@@ -4700,6 +4708,13 @@ public:
 
       // Make sure the parent protocols have been fully validated.
       validateAncestorProtocols(PD->getProtocols());
+
+      if (auto *SF = PD->getParentSourceFile()) {
+        if (auto *tracker = SF->getReferencedNameTracker()) {
+          for (auto *parentProto : PD->getProtocols())
+            tracker->addUsedNominal(parentProto);
+        }
+      }
     }
 
     // Check the members.
