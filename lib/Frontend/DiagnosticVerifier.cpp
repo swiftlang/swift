@@ -204,7 +204,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     }
 
     if (TextStartIdx > 0) {
-      StringRef CountStr = MatchStart.substr(0, TextStartIdx).rtrim();
+      StringRef CountStr = MatchStart.substr(0, TextStartIdx).trim();
       if (CountStr == "+") {
         // Rely on wraparound to bring this to UINT_MAX after the first match,
         // thus continuing to search for diagnostics until we've matched all
