@@ -224,7 +224,7 @@ static APFloat getFloatLiteralValue(bool IsNegative, StringRef Text,
                                     const llvm::fltSemantics &Semantics) {
   APFloat Val(Semantics);
   APFloat::opStatus Res =
-  Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
+    Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
   assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
   (void)Res;
   if (IsNegative) {

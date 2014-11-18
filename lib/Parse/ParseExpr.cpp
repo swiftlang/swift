@@ -405,10 +405,10 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   // Check if we have an unary '-' with number literal sub-expression, for
   // example, "-42" or "-1.25".
-  if (auto *ILE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
+  if (auto *LE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
     if (Operator->hasName() && Operator->getName().str() == "-") {
-      ILE->setNegative(Operator->getLoc());
-      return makeParserResult(ILE);
+      LE->setNegative(Operator->getLoc());
+      return makeParserResult(LE);
     }
   }
 
