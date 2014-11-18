@@ -2498,64 +2498,66 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 }
 
 
-/// lazy properties get a storage variable synthesized for them.
-static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
+void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
+  assert(VD->getAttrs().hasAttribute<LazyAttr>());
   assert(VD->getStorageKind() == AbstractStorageDecl::Computed &&
          "variable not validated yet");
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
-  auto &Ctx = VD->getASTContext();
 
   // Create the storage property as an optional of VD's type.
-  auto StorageName = Ctx.getIdentifier((VD->getName().str()+".storage").str());
+  SmallString<64> NameBuf = VD->getName().str();
+  NameBuf += ".storage";
+  auto StorageName = Context.getIdentifier(NameBuf);
   auto StorageTy = OptionalType::get(VD->getType());
 
-  auto *Storage = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/false,
-                                    VD->getLoc(), StorageName, StorageTy,
-                                    VD->getDeclContext());
-  
+  auto *Storage = new (Context) VarDecl(/*isStatic*/false, /*isLet*/false,
+                                        VD->getLoc(), StorageName, StorageTy,
+                                        VD->getDeclContext());
+
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
-  Pattern *PBDPattern = new (Ctx) NamedPattern(Storage, /*implicit*/true);
-  PBDPattern = new (Ctx) TypedPattern(PBDPattern,
-                                      TypeLoc::withoutLoc(StorageTy),
-                                      /*implicit*/true);
-  auto *PBD = new (Ctx) PatternBindingDecl(/*staticloc*/SourceLoc(),
-                                           StaticSpellingKind::None,
-                                           /*varloc*/VD->getLoc(),
-                                           PBDPattern, /*init*/nullptr,
-                                           /*isConditional*/false,
-                                           VD->getDeclContext());
+  Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
+  PBDPattern = new (Context) TypedPattern(PBDPattern,
+                                          TypeLoc::withoutLoc(StorageTy),
+                                          /*implicit*/true);
+  auto *PBD = new (Context) PatternBindingDecl(/*staticloc*/SourceLoc(),
+                                               StaticSpellingKind::None,
+                                               /*varloc*/VD->getLoc(),
+                                               PBDPattern, /*init*/nullptr,
+                                               /*isConditional*/false,
+                                               VD->getDeclContext());
+  PBD->setImplicit();
   addMemberToContextIfNeeded(PBD, VD->getDeclContext());
 
 
   // Now that we've got the storage squared away, synthesize the getter.
-  auto *Get = completeLazyPropertyGetter(VD, Storage, TC);
+  auto *Get = completeLazyPropertyGetter(VD, Storage, *this);
 
   // The setter just forwards on to storage without materializing the initial
   // value.
   auto *Set = VD->getSetter();
-  TC.validateDecl(Set);
+  validateDecl(Set);
   VarDecl *SetValueDecl = getFirstParamDecl(Set);
   // FIXME: This is wrong for observed properties.
-  synthesizeTrivialSetter(Set, Storage, SetValueDecl, TC);
+  synthesizeTrivialSetter(Set, Storage, SetValueDecl, *this);
 
   // Mark the vardecl to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.  Note that we do this after
   // the accessors are set up, because we don't want the setter for the lazy
   // property to inherit these properties from the storage.
   if (VD->getDeclContext()->isClassOrClassExtensionContext())
-    makeFinal(Ctx, Storage);
+    makeFinal(Context, Storage);
   Storage->setImplicit();
   Storage->setAccessibility(Accessibility::Private);
   Storage->setSetterAccessibility(Accessibility::Private);
 
-  TC.typeCheckDecl(Get, true);
-  TC.typeCheckDecl(Get, false);
+  typeCheckDecl(Get, true);
+  typeCheckDecl(Get, false);
 
-  TC.typeCheckDecl(Set, true);
-  TC.typeCheckDecl(Set, false);
+  typeCheckDecl(Set, true);
+  typeCheckDecl(Set, false);
 }
 
 
@@ -3661,7 +3663,7 @@ public:
     // Synthesize accessors for lazy, all checking already been performed.
     if (VD->getAttrs().hasAttribute<LazyAttr>() && !VD->isStatic() &&
         !VD->getGetter()->hasBody())
-      completeLazyVarImplementation(VD, TC);
+      TC.completeLazyVarImplementation(VD);
 
     // If this is a willSet/didSet property, synthesize the getter and setter
     // decl.
@@ -7816,8 +7818,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
     }
 
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-      if (pbd->hasStorage() && !pbd->isStatic() && !isDefaultInitializable(pbd))
+      if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit() &&
+          !isDefaultInitializable(pbd)) {
         FoundUninitializedVars = true;
+      }
       continue;
     }
   }

@@ -647,12 +647,16 @@ public:
   /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
   /// enum with a raw type.
   void addImplicitEnumConformances(EnumDecl *ED);
-  
+
   /// The specified AbstractStorageDecl was just found to satisfy a
   /// protocol property requirement.  Ensure that it has the full
   /// complement of accessors.
   void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *storage);
-  
+
+  /// Provide storage and accessor implementations for the given property,
+  /// which must be lazy.
+  void completeLazyVarImplementation(VarDecl *lazyVar);
+
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.

@@ -368,9 +368,40 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     while (!TC.ValidatedTypes.empty()) {
       auto nominal = TC.ValidatedTypes.pop_back_val();
 
+      Optional<bool> lazyVarsAlreadyHaveImplementation;
+
       for (auto *D : nominal->getMembers()) {
-        if (auto VD = dyn_cast<ValueDecl>(D))
-          TC.validateDecl(VD);
+        auto VD = dyn_cast<ValueDecl>(D);
+        if (!VD)
+          continue;
+        TC.validateDecl(VD);
+
+        // The only thing left to do is synthesize storage for lazy variables.
+        // We only have to do that if it's a type from another file, though.
+        // In NDEBUG builds, bail out as soon as we can.
+#ifdef NDEBUG
+        if (lazyVarsAlreadyHaveImplementation.hasValue() &&
+            lazyVarsAlreadyHaveImplementation.getValue())
+          continue;
+#endif
+        auto *prop = dyn_cast<VarDecl>(D);
+        if (!prop)
+          continue;
+
+        if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()) {
+          bool hasImplementation = prop->getGetter()->hasBody();
+
+          if (lazyVarsAlreadyHaveImplementation.hasValue()) {
+            assert(lazyVarsAlreadyHaveImplementation.getValue() ==
+                     hasImplementation &&
+                   "only some lazy vars already have implementations");
+          } else {
+            lazyVarsAlreadyHaveImplementation = hasImplementation;
+          }
+
+          if (!hasImplementation)
+            TC.completeLazyVarImplementation(prop);
+        }
       }
 
       if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
