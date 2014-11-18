@@ -25,26 +25,27 @@ import SwiftShims
 
 protocol BridgeStorage {
   typealias Native : AnyObject
-  // FIXME: Workaround for <rdar://problem/18992875> Couldn't find conformance
-  typealias Cocoa /* : AnyObject */ 
+  typealias ObjC : AnyObject
 
   init(_ native: Native, bits: Int)
-  init(Cocoa)
+  init(ObjC)
 
   mutating func isUniquelyReferencedNative() -> Bool
-  var native: Native? {get}
-  var cocoa: Cocoa? {get}
+  var isNative: Bool {get}
+  var isObjC: Bool {get}
+  var nativeInstance: Native {get}
+  var objCInstance: ObjC {get}
   var spareBits: Int {get}
 }
 
 extension _BridgeStorage : BridgeStorage {}
 
 
-struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject>
+struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
   : BridgeStorage {
   
   typealias Native = NativeType
-  typealias Cocoa = CocoaType
+  typealias ObjC = ObjCType
 
   init(_ native: Native, bits: Int) {
     _sanityCheck(
@@ -55,8 +56,8 @@ struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject>
     self.bits = UInt8(truncatingBitPattern: bits)
   }
   
-  init(_ cocoa: Cocoa) {
-    self.object = cocoa
+  init(_ objC: ObjC) {
+    self.object = objC
     self.bits = 0
   }
 
@@ -64,18 +65,24 @@ struct BridgeObject<NativeType: AnyObject, CocoaType: AnyObject>
     return _swift_isUniquelyReferencedNonObjC_nonNull(
       UnsafePointer(rawObject)) != 0
   }
-  
-  var native: Native? {
+
+  var isNative: Bool {
     return _swift_usesNativeSwiftReferenceCounting_nonNull(
       UnsafePointer(rawObject)) != 0
-    ? .Some(Builtin.bridgeFromRawPointer(rawObject)) 
-    : nil
+  }
+
+  var isObjC: Bool {
+    return !isNative
+  }
+  
+  var nativeInstance: Native {
+    precondition(isNative)
+    return Builtin.bridgeFromRawPointer(rawObject)
   }
     
-  var cocoa: Cocoa? {
-    return _swift_usesNativeSwiftReferenceCounting_nonNull(
-      UnsafePointer(rawObject)) != 0
-    ? nil : .Some(Builtin.bridgeFromRawPointer(rawObject))
+  var objCInstance: ObjC {
+    precondition(isObjC)
+    return Builtin.bridgeFromRawPointer(rawObject)
   }
     
   var spareBits: Int {
@@ -161,8 +168,8 @@ allTests.test("${Self}") {
   
   for i in 0..<3 {
     var b = B(C(), bits: i)
-    expectEmpty(b.cocoa)
-    expectNotEmpty(b.native)
+    expectEmpty(b.objCInstance)
+    expectNotEmpty(b.nativeInstance)
     expectTrue(b.isUniquelyReferencedNative())
     expectEqual(i, b.spareBits)
   }
@@ -177,13 +184,13 @@ allTests.test("${Self}") {
   
   var d = B(taggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
-  expectEmpty(d.native)
-  expectNotEmpty(d.cocoa)
+  expectEmpty(d.nativeInstance)
+  expectNotEmpty(d.objCInstance)
 
   d = B(unTaggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
-  expectEmpty(d.native)
-  expectNotEmpty(d.cocoa)
+  expectEmpty(d.nativeInstance)
+  expectNotEmpty(d.objCInstance)
 }
 % end
 

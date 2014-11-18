@@ -23,47 +23,34 @@ import SwiftShims
 
 public // @testable
 struct _BridgeStorage<
-  NativeType: AnyObject, CocoaType: AnyObject
-> {  
+  NativeClass: AnyObject, ObjCClass: AnyObject
+> {
   public // @testable
-  typealias Native = NativeType
+  typealias Native = NativeClass
   
   public // @testable
-  typealias Cocoa = CocoaType
+  typealias ObjC = ObjCClass
   
   public // @testable
   init(_ native: Native, bits: Int) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeType.self))
-    _sanityCheck(!_usesNativeSwiftReferenceCounting(CocoaType.self))
+    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     _sanityCheck(0..<3 ~= bits,
         "BridgeStorage can't store bits outside the range 0..<3")
 
     rawValue = _makeNativeBridgeObject(
-      native, (UInt(bits) + 1) << _objectPointerLowSpareBitShift)
+      native, (UInt(bits) &+ 1) << _objectPointerLowSpareBitShift)
   }
   
   public // @testable
-  init(_ cocoa: Cocoa) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeType.self))
-    _sanityCheck(!_usesNativeSwiftReferenceCounting(CocoaType.self))
-    rawValue = _makeObjCBridgeObject(cocoa)
-  }
-  
-  public // @testable
-  var native: Native? {
-    return _nonPointerBits(rawValue) == 0
-      ? nil : Builtin.castReferenceFromBridgeObject(rawValue) as Native
-  }
-  
-  public // @testable
-  var cocoa: Cocoa? {
-    return _nonPointerBits(rawValue) != 0
-      ? nil : Builtin.castReferenceFromBridgeObject(rawValue) as Cocoa
+  init(_ objC: ObjC) {
+    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    rawValue = _makeObjCBridgeObject(objC)
   }
   
   public // @testable
   var spareBits: Int {
-    return Int((_nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift) - 1)
+    return Int(
+      (_nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift) &- 1)
   }
   
   public // @testable
@@ -73,6 +60,28 @@ struct _BridgeStorage<
     ) != 0
   }
 
+  public // @testable
+  var isNative: Bool {
+    return _nonPointerBits(rawValue) != 0
+  }
+  
+  public // @testable
+  var isObjC: Bool {
+    return _nonPointerBits(rawValue) == 0
+  }
+  
+  public // @testable
+  var nativeInstance: Native {
+    _sanityCheck(isNative)
+    return Builtin.castReferenceFromBridgeObject(rawValue)
+  }
+  
+  public // @testable
+  var objCInstance: ObjC {
+    _sanityCheck(isObjC)
+    return Builtin.castReferenceFromBridgeObject(rawValue) 
+  }
+  
   //===--- private --------------------------------------------------------===//
   internal let rawValue: Builtin.BridgeObject
 }
