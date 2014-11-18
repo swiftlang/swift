@@ -23,6 +23,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
@@ -2534,7 +2535,14 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       return false;
     }
 
-    Module *M = DC->getParentModule();
+    const DeclContext *topLevelContext = DC->getModuleScopeContext();
+    if (auto *constSF = dyn_cast<SourceFile>(topLevelContext)) {
+      auto *SF = const_cast<SourceFile *>(constSF);
+      if (auto *tracker = SF->getReferencedNameTracker())
+        tracker->addUsedNominal(nominal);
+    }
+
+    Module *M = topLevelContext->getParentModule();
     auto lookupResult = M->lookupConformance(T, Proto, this);
     switch (lookupResult.getInt()) {
     case ConformanceKind::Conforms:

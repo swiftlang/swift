@@ -103,6 +103,14 @@ func lookUpManyTopLevelNames() {
 
   // CHECK-DAG: "OtherFileAliasForSecret"
   _ = OtherFileAliasForSecret.constant
+
+  // CHECK-DAG: otherFileUse
+  // CHECK-DAG: otherFileGetImpl
+  otherFileUse(otherFileGetImpl())
+
+  // CHECK-DAG: otherFileUse
+  // CHECK-DAG: otherFileGetImpl
+  otherFileUseGeneric(otherFileGetImpl2())
 }
 
 // NEGATIVE-NOT: "privateFunc"
@@ -119,13 +127,18 @@ private func privateFunc() {}
 // CHECK-DAG: "V4main18OtherFileOuterType"
 // CHECK-DAG: "VV4main18OtherFileOuterType9InnerType"
 // CHECK-DAG: "VV4main26OtherFileSecretTypeWrapper10SecretType"
+// CHECK-DAG: "V4main25OtherFileProtoImplementor"
+// CHECK-DAG: "V4main26OtherFileProtoImplementor2"
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
-// NEGATIVE-NOT: "SS"
 // These are used by the other file in this module, but not by this one.
 // NEGATIVE-NOT: "FloatLiteralConvertible"
 // NEGATIVE-NOT: "Int16"
+// NEGATIVE-NOT: "OtherFileProto"
+// NEGATIVE-NOT: "OtherFileProtoImplementor"
+// NEGATIVE-NOT: "OtherFileProto2"
+// NEGATIVE-NOT: "OtherFileProtoImplementor2"
 
 // OtherFileSecretTypeWrapper is never used directly in this file.
 // NEGATIVE-NOT: "OtherFileSecretTypeWrapper"

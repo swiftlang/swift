@@ -22,3 +22,14 @@ typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
 prefix operator *** {}
 
 typealias OtherFileAliasForFloatLiteralConvertible = FloatLiteralConvertible
+
+
+protocol OtherFileProto {}
+struct OtherFileProtoImplementor : OtherFileProto {}
+func otherFileGetImpl() -> OtherFileProtoImplementor {}
+func otherFileUse(_: OtherFileProto) {}
+
+protocol OtherFileProto2 {}
+struct OtherFileProtoImplementor2 : OtherFileProto2 {}
+func otherFileGetImpl2() -> OtherFileProtoImplementor2 {}
+func otherFileUseGeneric<T: OtherFileProto2>(_: T) {}
