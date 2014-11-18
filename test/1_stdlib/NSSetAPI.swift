@@ -12,8 +12,13 @@ NSSetAPI.test("SequenceType") {
 
 NSSetAPI.test("initWithObjects") {
   let result = NSSet(objects: 1, "two")
+  // using the descriptions of 1 and "two" are fine for this test.
   expectEqualsUnordered([1, "two"], result) {
-    ($0 as NSObject) == ($1 as NSObject)
+    switch ($0.description < $1.description, $0.description == $1.description) {
+    case (true, _): return .LT
+    case (_, true): return .EQ
+    case _: return .GT
+    }
   }
 }
 

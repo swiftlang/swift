@@ -1396,23 +1396,22 @@ public func expectEqualSequence<
 public func expectEqualsUnordered<
     Expected : SequenceType,
     Actual : SequenceType
-    where Expected.Generator.Element == Actual.Generator.Element,
-      Expected.Generator.Element == AnyObject
+    where Expected.Generator.Element == Actual.Generator.Element
 >(
     expected: Expected, actual: Actual,
-    sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool,
+    compare: (Expected.Generator.Element, Expected.Generator.Element)
+      -> ExpectedComparisonResult,
     stackTrace: SourceLocStack? = nil,
     collectMoreInfo: (()->String)? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
-  let f = { (x, y) -> Bool in
-      ObjectIdentifier(x) < ObjectIdentifier(y)
-  }
-  let x: [Expected.Generator.Element] = sorted(Array(expected), f)
-  let y: [Actual.Generator.Element] = sorted(Array(actual), f)
+  let x: [Expected.Generator.Element] = sorted(
+    Array(expected), compose(compare, { $0.isLT() }))
+  let y: [Actual.Generator.Element] = sorted(
+    Array(actual), compose(compare, { $0.isLT() }))
   expectEqualSequence(
-    x, y, sameValue, stackTrace: stackTrace, collectMoreInfo: collectMoreInfo,
-    file: file, line:  line)
+    x, y, compose(compare, { $0.isEQ() }), stackTrace: stackTrace,
+    collectMoreInfo: collectMoreInfo, file: file, line:  line)
 }
 
 public func expectEqualUnicodeScalars(
@@ -1474,6 +1473,12 @@ public func expectDebugPrinted<T>(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   expectDebugPrinted(expectedOneOf: [expected], object, file: file, line: line)
+}
+
+func compose<A, B, C>(f: A -> B, g: B -> C) -> A -> C {
+  return { a in
+    return g(f(a))
+  }
 }
 
 // ${'Local Variables'}:
