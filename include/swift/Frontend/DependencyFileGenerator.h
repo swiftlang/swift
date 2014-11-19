@@ -22,8 +22,7 @@
 namespace swift {
   class DependencyFileGenerator : public DependencyTracker {
     std::vector<std::string> targets;
-    llvm::SetVector<std::string, std::vector<std::string>,
-                    llvm::StringSet<>> paths;
+    llvm::SetVector<std::string, std::vector<std::string>> paths;
   public:
     virtual void addDependency(StringRef file) override;
 
