@@ -142,7 +142,7 @@ template <class Entry> class MetadataCache {
   };
 
   /// This collection maps hash codes to a list of entry pairs.
-  typedef ConcurrentMap<llvm::hash_code, ConcurrentList<EntryPair>> MDMapTy;
+  typedef ConcurrentMap<llvm::hash_code, EntryPair> MDMapTy;
 
   /// This map hash codes of entry refs to a list of entry pairs.
   MDMapTy *Map;

@@ -144,7 +144,7 @@ public:
   ConcurrentMap &operator=(const ConcurrentMap &) = delete;
 
   /// A Sentinel root node that contains no elements.
-  typedef ConcurrentMapNode<KeyTy, ValueTy> NodeTy;
+  typedef ConcurrentMapNode<KeyTy, ConcurrentList<ValueTy>> NodeTy;
   NodeTy Sentinel;
 
   /// This value stores the last node that we searched. This is useful for
@@ -152,8 +152,8 @@ public:
   std::atomic<NodeTy *> LastSearch;
 
   /// Search a for a node with key value \p. If the node does not exist then
-  /// allocate a new node and add it to the tree.
-  ValueTy &findOrAllocateNode(KeyTy Key) {
+  /// allocate a new bucket and add it to the tree.
+  ConcurrentList<ValueTy> &findOrAllocateNode(KeyTy Key) {
     // Try looking at the last node we searched.
     NodeTy *Last = LastSearch.load(std::memory_order_acquire);
     if (Last->Key == Key)
