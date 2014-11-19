@@ -12,8 +12,10 @@ import BaseUser
 useBaseClass(getBaseClass())
 useBaseClassObjC(getBaseClassObjC())
 useBaseProtoObjC(getBaseProtoObjC())
-useBaseEnum(getBaseEnum())
-useBaseEnumObjC(getBaseEnumObjC())
+var be: BaseEnum = getBaseEnum()
+useBaseEnum(be)
+var beo: BaseEnumObjC = getBaseEnumObjC()
+useBaseEnumObjC(beo)
 
 // Check type resolution.
 useBaseClass(getBaseClassObjC())
@@ -26,15 +28,15 @@ useBaseProtoObjC(p)
 
 getBaseClass().extensionMethod()
 
-var be: BaseEnum = .Zim
-be = .Zang
-be = .Zung
+be = BaseEnum.Zim
+be = BaseEnum.Zang
+be = BaseEnum.Zung
 
 var beRaw: CShort = be.rawValue
 
-var beo: BaseEnumObjC = .Zippity
-beo = .Doo
-beo = .Dah
+beo = BaseEnumObjC.Zippity
+beo = BaseEnumObjC.Doo
+beo = BaseEnumObjC.Dah
 
 var beoRaw: CUnsignedChar = beo.rawValue
 

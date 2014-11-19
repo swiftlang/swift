@@ -4919,7 +4919,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 
   if (TypedefIsSuperfluous) {
     SuperfluousTypedefs.insert(Canon);
-    if (auto tagDecl = dyn_cast<clang::TagDecl>(Result->getClangDecl()))
+    if (auto tagDecl = dyn_cast_or_null<clang::TagDecl>(Result->getClangDecl()))
       DeclsWithSuperfluousTypedefs.insert(tagDecl);
   }
 

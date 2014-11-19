@@ -1147,7 +1147,8 @@ public:
            "#endif\n"
            "#if !defined(SWIFT_ENUM)\n"
            "# define SWIFT_ENUM(_type, _name) "
-             "enum _name : _type _name; SWIFT_ENUM_EXTRA enum _name : _type\n"
+             "enum _name : _type _name; "
+             "enum SWIFT_ENUM_EXTRA _name : _type\n"
            "#endif\n";
   }
 
