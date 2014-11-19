@@ -162,20 +162,19 @@ private:
     // Point to the edge we want to replace.
     typename ConcurrentMapNode<KeyTy, ValueTy>::EdgeTy *Edge = nullptr;
 
+    // The current edge value.
+    ConcurrentMapNode<KeyTy, ValueTy> *CurrentVal;
+
     // Select the edge to follow.
     if (P->Key > Key) {
+      CurrentVal = P->Left.load(std::memory_order_acquire);
+      if (CurrentVal) return findOrAllocateNode_rec(CurrentVal, Key);
       Edge = &P->Left;
     } else {
+      CurrentVal = P->Right.load(std::memory_order_acquire);
+      if (CurrentVal) return findOrAllocateNode_rec(CurrentVal, Key);
       Edge = &P->Right;
     }
-
-    // Load the current edge value.
-    ConcurrentMapNode<KeyTy, ValueTy> *CurrentVal =
-      Edge->load(std::memory_order_acquire);
-
-    // If the edge is populated the follow the edge.
-    if (CurrentVal)
-      return findOrAllocateNode_rec(CurrentVal, Key);
 
     // Allocate a new node.
     ConcurrentMapNode<KeyTy, ValueTy> *New =
