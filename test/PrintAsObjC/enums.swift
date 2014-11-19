@@ -8,7 +8,7 @@
 
 import Foundation
 
-// CHECK-LABEL: typedef SWIFT_ENUM(ExplicitValues, unsigned int) {
+// CHECK-LABEL: typedef SWIFT_ENUM(unsigned int, ExplicitValues) {
 // CHECK-LABEL:   ExplicitValuesZim = 0,
 // CHECK-LABEL:   ExplicitValuesZang = 219,
 // CHECK-LABEL:   ExplicitValuesZung = 220,
@@ -21,7 +21,7 @@ import Foundation
 }
 
 // CHECK-LABEL: /// Foo: A feer, a female feer.
-// CHECK-LABEL: typedef SWIFT_ENUM(FooComments, NSInteger) {
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, FooComments) {
 // CHECK-LABEL:   /// Zim: A zeer, a female zeer.
 // CHECK-LABEL:   FooCommentsZim = 0,
 // CHECK-LABEL:   FooCommentsZang = 1,
@@ -35,7 +35,7 @@ import Foundation
   case Zang, Zung
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM(NegativeValues, int16_t) {
+// CHECK-LABEL: typedef SWIFT_ENUM(int16_t, NegativeValues) {
 // CHECK-LABEL:   Zang = -219,
 // CHECK-LABEL:   Zung = -218,
 // CHECK-LABEL: };

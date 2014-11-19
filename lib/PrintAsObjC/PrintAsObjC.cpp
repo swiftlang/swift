@@ -164,9 +164,9 @@ private:
   void visitEnumDecl(EnumDecl *ED) {
     printDocumentationComment(ED);
     llvm::SmallString<32> scratch;
-    os << "typedef SWIFT_ENUM(" << ED->getName() << ", ";
+    os << "typedef SWIFT_ENUM(";
     print(ED->getRawType());
-    os << ") {\n";
+    os << ", " << ED->getName() << ") {\n";
     for (auto Elt : ED->getAllElements()) {
       printDocumentationComment(Elt);
 
@@ -1112,6 +1112,9 @@ public:
            "#if !defined(SWIFT_PROTOCOL_EXTRA)\n"
            "# define SWIFT_PROTOCOL_EXTRA\n"
            "#endif\n"
+           "#if !defined(SWIFT_ENUM_EXTRA)\n"
+           "# define SWIFT_ENUM_EXTRA\n"
+           "#endif\n"
            "#if !defined(SWIFT_CLASS)\n"
            "# if defined(__has_attribute) && "
              "__has_attribute(objc_subclassing_restricted) \n"
@@ -1143,8 +1146,8 @@ public:
            "# endif\n"
            "#endif\n"
            "#if !defined(SWIFT_ENUM)\n"
-           "# define SWIFT_ENUM(_name, _type) "
-             "enum _name : _type _name; enum _name : _type\n"
+           "# define SWIFT_ENUM(_type, _name) "
+             "enum _name : _type _name; SWIFT_ENUM_EXTRA enum _name : _type\n"
            "#endif\n";
   }
 
