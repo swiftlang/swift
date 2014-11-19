@@ -220,11 +220,13 @@ protected:
 
     // We already subst so getOpConformance is not needed.
     SILBuilder &Builder = getBuilder();
-    doPostProcess(Inst, Builder.createWitnessMethod(
-                            getOpLocation(Inst->getLoc()),
-                            newLookupType,
-                            Conformance, Inst->getMember(),
-                            getOpType(Inst->getType()), Inst->isVolatile()));
+    doPostProcess(
+        Inst,
+        Builder.createWitnessMethod(
+            getOpLocation(Inst->getLoc()), newLookupType, Conformance,
+            Inst->getMember(), getOpType(Inst->getType()),
+            Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
+            Inst->isVolatile()));
   }
 
   /// Attempt to simplify an unconditional checked cast.

@@ -1058,13 +1058,15 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   auto conformance =
     getOpConformance(Inst->getLookupProtocol()->getSelf()->getArchetype(),
                      Inst->getLookupType(), Inst->getConformance());
-  doPostProcess(Inst,
-    getBuilder().createWitnessMethod(getOpLocation(Inst->getLoc()),
-                                     getOpASTType(Inst->getLookupType()),
-                                     conformance,
-                                     Inst->getMember(),
-                                     getOpType(Inst->getType()),
-                                     Inst->isVolatile()));
+  doPostProcess(
+      Inst,
+      getBuilder()
+          .createWitnessMethod(
+              getOpLocation(Inst->getLoc()),
+              getOpASTType(Inst->getLookupType()), conformance,
+              Inst->getMember(), getOpType(Inst->getType()),
+              Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
+              Inst->isVolatile()));
 }
 
 template<typename ImplClass>

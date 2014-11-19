@@ -627,11 +627,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   SmallVector<SILInstruction*, 1> InsertedInsn;
   SILBuilder Builder(BB, &InsertedInsn);
-  unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, ValResNum = 0,
-           ValResNum2 = 0, Attr = 0,
-           IsTransparent = 0, NumSubs = 0;
-  ValueID ValID, ValID2;
-  TypeID TyID, TyID2;
+  unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
+           ValResNum = 0, ValResNum2 = 0, Attr = 0, IsTransparent = 0,
+           NumSubs = 0;
+  ValueID ValID, ValID2, ValID3;
+  TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
   DeclID ProtoID;
   ModuleID OwningModuleID;
@@ -707,11 +707,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILInstNoOperandLayout::readRecord(scratch, OpCode);
     break;
   case SIL_INST_WITNESS_METHOD:
-    SILInstWitnessMethodLayout::readRecord(scratch, TyID, TyCategory, Attr,
-                                           TyID2, TyCategory2,
-                                           ProtoID, ConcreteTyID,
-                                           OwningModuleID,
-                                           ListOfValues);
+    SILInstWitnessMethodLayout::readRecord(
+        scratch, TyID, TyCategory, Attr, TyID2, TyCategory2, ProtoID,
+        ConcreteTyID, OwningModuleID, TyID3, TyCategory3, ValID3, ListOfValues);
     OpCode = (unsigned)ValueKind::WitnessMethodInst;
     break;
   }
@@ -1523,8 +1521,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto *Conformance = MF->readReferencedConformance(Proto, ConcreteTyID,
                                                       OwningModuleID,
                                                       SILCursor);
-    ResultVal = Builder.createWitnessMethod(Loc, Ty, Conformance, DRef,
-                                            OperandTy, Attr);
+    // Read the optional opened existential.
+    SILValue ExistentialOperand;
+    if (TyID3) {
+      SILType ExistentialOperandTy =
+          getSILType(MF->getType(TyID3), (SILValueCategory)TyCategory3);
+      if (ValID3)
+        ExistentialOperand = getLocalValue(ValID3, 0, ExistentialOperandTy);
+    }
+    ResultVal = Builder.createWitnessMethod(
+        Loc, Ty, Conformance, DRef, OperandTy, ExistentialOperand, Attr);
     break;
   }
   case ValueKind::DynamicMethodBranchInst: {

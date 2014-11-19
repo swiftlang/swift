@@ -1196,13 +1196,24 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ConformanceProto = S.addDeclRef(nullptr);
     }
 
-    SILInstWitnessMethodLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstWitnessMethodLayout::Code],
-        S.addTypeRef(Ty), 0,
-        AMI->isVolatile(),
+    // Add an optional operand.
+    TypeID OperandTy =
+        AMI->hasOperand()
+            ? S.addTypeRef(AMI->getOperand().getType().getSwiftRValueType())
+            : (TypeID)0;
+    unsigned OperandTyCategory =
+        AMI->hasOperand() ? (unsigned)AMI->getOperand().getType().getCategory()
+                          : 0;
+    SILValue OptionalOpenedExistential =
+        AMI->hasOperand() ? AMI->getOperand() : SILValue();
+    auto OperandValueId = addValueRef(OptionalOpenedExistential);
+
+    SILInstWitnessMethodLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstWitnessMethodLayout::Code],
+        S.addTypeRef(Ty), 0, AMI->isVolatile(),
         S.addTypeRef(Ty2.getSwiftRValueType()), (unsigned)Ty2.getCategory(),
-        ConformanceProto, AdopterTy, ConformanceModule,
-        ListOfValues);
+        ConformanceProto, AdopterTy, ConformanceModule, OperandTy,
+        OperandTyCategory, OperandValueId, ListOfValues);
 
     if (WriteConformance) {
       S.writeConformance(AMI->getConformance()->getProtocol(),

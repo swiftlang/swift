@@ -1029,6 +1029,10 @@ public:
     AMI->getLookupType().print(OS);
     OS << ", ";
     AMI->getMember().print(OS);
+    if (AMI->hasOperand()) {
+      OS << ", ";
+      OS << getIDAndType(AMI->getOperand());
+    }
     OS << " : " << AMI->getType(0);
   }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {

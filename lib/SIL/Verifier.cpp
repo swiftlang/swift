@@ -1143,6 +1143,8 @@ public:
             "method's Self parameter should be constrained by protocol");
 
     auto lookupType = AMI->getLookupType();
+    if (lookupType->isAnyExistentialType())
+      require(AMI->hasOperand(), "Must have a opened existential operand");
     if (isa<ArchetypeType>(lookupType) || lookupType->isAnyExistentialType()) {
       require(AMI->getConformance() == nullptr,
               "archetype or existential lookup should have null conformance");

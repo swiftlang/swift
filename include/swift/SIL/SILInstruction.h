@@ -2297,24 +2297,29 @@ public:
 /// WitnessMethodInst - Given a type, a protocol conformance,
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.
+/// If this witness_method is on an opened existential type it needs the opened
+/// value as operand.
 class WitnessMethodInst : public MethodInst {
   CanType LookupType;
   ProtocolConformance *Conformance;
+  Optional<FixedOperandList<1>> OptionalOperand;
 
   WitnessMethodInst(SILLocation Loc, CanType LookupType,
-                    ProtocolConformance *Conformance,
-                    SILDeclRef Member,
-                    SILType Ty, bool Volatile = false)
-    : MethodInst(ValueKind::WitnessMethodInst, Loc, Ty, Member, Volatile),
-      LookupType(LookupType), Conformance(Conformance)
-  {}
+                    ProtocolConformance *Conformance, SILDeclRef Member,
+                    SILType Ty, SILValue OpenedExistential,
+                    bool Volatile = false)
+      : MethodInst(ValueKind::WitnessMethodInst, Loc, Ty, Member, Volatile),
+        LookupType(LookupType), Conformance(Conformance) {
+    if (OpenedExistential)
+      OptionalOperand.emplace(this, OpenedExistential);
+  }
 
 public:
-  static WitnessMethodInst *create(SILLocation Loc, CanType LookupType,
-                                   ProtocolConformance *Conformance,
-                                   SILDeclRef Member,
-                                   SILType Ty, SILFunction *Parent,
-                                   bool Volatile=false);
+
+  static WitnessMethodInst *
+  create(SILLocation Loc, CanType LookupType, ProtocolConformance *Conformance,
+         SILDeclRef Member, SILType Ty, SILFunction *Parent,
+         SILValue OpenedExistential, bool Volatile = false);
 
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
@@ -2330,8 +2335,20 @@ public:
                         Conformance};
   }
 
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
+  bool hasOperand() const { return OptionalOperand.hasValue(); }
+  SILValue getOperand() const {
+    assert(hasOperand() && "Missing operand");
+    return OptionalOperand->asValueArray()[0];
+  }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return OptionalOperand ? OptionalOperand->asArray() : ArrayRef<Operand>{};
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return OptionalOperand ? OptionalOperand->asArray()
+                           : MutableArrayRef<Operand>{};
+  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::WitnessMethodInst;

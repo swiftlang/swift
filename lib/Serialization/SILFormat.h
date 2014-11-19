@@ -366,6 +366,9 @@ namespace sil_block {
     DeclIDField,           // conformance proto
     TypeIDField,           // conformance type
     ModuleIDField,         // conformance module
+    TypeIDField,           // Optional
+    SILTypeCategoryField,  // opened
+    ValueIDField,          // existential
     BCArray<ValueIDField>  // SILDeclRef
     // may be trailed by an inline protocol conformance
   >;

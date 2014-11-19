@@ -659,11 +659,18 @@ public:
       // Look up the witness for the archetype.
       auto selfType = getProtocolSelfType(gen.SGM);
       auto archetype = getArchetypeForSelf(selfType);
+      // Get the openend existential value if the archetype is an opened
+      // existential type.
+      SILValue OpenedExistential;
+      if (!archetype->getOpenedExistentialType().isNull())
+        OpenedExistential = method.selfValue;
+
       SILValue fn = gen.B.createWitnessMethod(Loc,
                                   archetype,
                                   /*conformance*/ nullptr,
                                   constant,
                                   constantInfo.getSILType(),
+                                  OpenedExistential,
                                   constant.isForeign);
       mv = ManagedValue::forUnmanaged(fn);
       break;

@@ -2525,10 +2525,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
         parseASTType(LookupTy) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILDeclRef(Member) ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(MethodTy, TyLoc)
-       )
+        parseSILDeclRef(Member))
+      return true;
+    // Optional operand.
+    SILValue Operand;
+    if (P.Tok.is(tok::comma)) {
+      P.consumeToken(tok::comma);
+      if (parseTypedValueRef(Operand))
+        return true;
+    }
+    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(MethodTy, TyLoc))
       return true;
 
     // If LookupTy is a non-archetype, look up its conformance.
@@ -2550,7 +2557,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     
     ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
-                                        MethodTy, IsVolatile);
+                                        MethodTy, Operand, IsVolatile);
     break;
   }
   case ValueKind::CopyAddrInst: {

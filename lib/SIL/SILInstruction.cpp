@@ -1691,14 +1691,15 @@ static void declareWitnessTable(SILModule &Mod,
 WitnessMethodInst *
 WitnessMethodInst::create(SILLocation Loc, CanType LookupType,
                           ProtocolConformance *Conformance, SILDeclRef Member,
-                          SILType Ty, SILFunction *F, bool Volatile) {
+                          SILType Ty, SILFunction *F,
+                          SILValue OpenedExistential, bool Volatile) {
   SILModule &Mod = F->getModule();
-  void *Buffer = Mod.allocate(sizeof(WitnessMethodInst),
-                              alignof(WitnessMethodInst));
+  void *Buffer =
+      Mod.allocate(sizeof(WitnessMethodInst), alignof(WitnessMethodInst));
 
   declareWitnessTable(Mod, Conformance);
   return ::new (Buffer) WitnessMethodInst(Loc, LookupType, Conformance, Member,
-                                          Ty, Volatile);
+                                          Ty, OpenedExistential, Volatile);
 }
 
 InitExistentialInst *

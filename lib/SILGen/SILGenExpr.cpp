@@ -4436,10 +4436,12 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
       constantInfo.SILFnType->getAbstractCC() == AbstractCC::WitnessMethod) {
     auto thisType = curriedSubs[0].getReplacement()->getCanonicalType();
     assert(isa<ArchetypeType>(thisType) && "no archetype for witness?!");
-    return gen.B.createWitnessMethod(loc,
-                                     thisType,
-                                     nullptr,
-                                     next, constantInfo.getSILType());
+    SILValue OpenedExistential;
+    if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
+      OpenedExistential = thisArg;
+    return gen.B.createWitnessMethod(loc, thisType, nullptr, next,
+                                     constantInfo.getSILType(),
+                                     OpenedExistential);
   }
 
   // Otherwise, emit a direct call.

@@ -645,12 +645,14 @@ public:
                                          ProtocolConformance *Conformance,
                                          SILDeclRef Member,
                                          SILType MethodTy,
+                                         SILValue OptionalOpenedExistential,
                                          bool Volatile = false)
   {
-    return insert(WitnessMethodInst::create(Loc, LookupTy, Conformance, Member,
-                                            MethodTy, &F, Volatile));
+    return insert(
+        WitnessMethodInst::create(Loc, LookupTy, Conformance, Member, MethodTy,
+                                  &F, OptionalOpenedExistential, Volatile));
   }
-  
+
   DynamicMethodInst *createDynamicMethod(SILLocation Loc, SILValue Operand,
                                          SILDeclRef Member, SILType MethodTy,
                                          bool Volatile = false) {
