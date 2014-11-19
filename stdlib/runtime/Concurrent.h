@@ -174,10 +174,10 @@ private:
       return P;
 
     // Point to the edge we want to replace.
-    typename ConcurrentMapNode<KeyTy, ValueTy>::EdgeTy *Edge = nullptr;
+    typename NodeTy::EdgeTy *Edge = nullptr;
 
     // The current edge value.
-    ConcurrentMapNode<KeyTy, ValueTy> *CurrentVal;
+    NodeTy *CurrentVal;
 
     // Select the edge to follow.
     if (P->Key > Key) {
@@ -191,8 +191,7 @@ private:
     }
 
     // Allocate a new node.
-    ConcurrentMapNode<KeyTy, ValueTy> *New =
-        new ConcurrentMapNode<KeyTy, ValueTy>(Key);
+    NodeTy *New = new NodeTy(Key);
 
     // Try to set a new node:
     if (std::atomic_compare_exchange_weak_explicit(Edge, &CurrentVal, New,
