@@ -1653,17 +1653,6 @@ Type TypeResolver::resolveProtocolCompositionType(
       continue;
     }
 
-    // The special AnyObject protocol can't be part of a protocol
-    // composition.
-    if (auto protoTy = ty->getAs<ProtocolType>()){
-      if (protoTy->getDecl()->isSpecificProtocol(
-              KnownProtocolKind::AnyObject)) {
-        TC.diagnose(tyR->getStartLoc(),
-                    diag::protocol_composition_dynamic_lookup);
-        continue;
-      }
-    }
-
     ProtocolTypes.push_back(ty);
   }
   return ProtocolCompositionType::get(Context, ProtocolTypes);

@@ -349,23 +349,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
       SmallVector<ProtocolDecl *, 4> protocols;
       inheritedTy->isExistentialType(protocols);
 
-      // AnyObject cannot be used in a type's inheritance clause.
-      if (isa<NominalTypeDecl>(decl) && !decl->isImplicit()) {
-        bool hasAnyObject = false;
-        for (auto proto : protocols) {
-          if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-            hasAnyObject = true;
-            break;
-          }
-        }
-        if (hasAnyObject) {
-          diagnose(inheritedClause[i].getSourceRange().Start,
-                   diag::dynamic_lookup_conformance);
-          inherited.setInvalidType(Context);
-          continue;
-        }
-      }
-
       allProtocols.insert(protocols.begin(), protocols.end());
       continue;
     }

@@ -191,10 +191,9 @@ var prop3ResultB : (() -> Int)? = obj.prop3
 var prop3ResultC = obj.prop3
 let prop3ResultCChecked: Int? = prop3ResultC
 
-// Restrictions on AnyObject.
-var obj2 : protocol<AnyObject, P> = Y() // expected-error{{'AnyObject' cannot be part of a protocol composition}}
+var obj2 : protocol<AnyObject, P> = Y()
 
-class Z2 : AnyObject { } // expected-error{{cannot declare explicit conformance to the 'AnyObject' protocol}}
+class Z2 : AnyObject { }
 class Z3<T : AnyObject> { }
 class Z4<T where T : AnyObject> { }
 

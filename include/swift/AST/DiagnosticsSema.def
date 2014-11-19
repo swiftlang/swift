@@ -708,11 +708,6 @@ ERROR(protocol_composition_not_protocol,sema_tcd,none,
 ERROR(objc_protocol_inherits_non_objc_protocol,sema_tcd,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 
-ERROR(protocol_composition_dynamic_lookup,sema_tcd,none,
-      "'AnyObject' cannot be part of a protocol composition", ())
-ERROR(dynamic_lookup_conformance,sema_tcd,none,
-      "cannot declare explicit conformance to the 'AnyObject' protocol", ())
-
 ERROR(requires_conformance_nonprotocol,sema_tcd,none,
       "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
 ERROR(requires_not_suitable_archetype,sema_tcd,none,
