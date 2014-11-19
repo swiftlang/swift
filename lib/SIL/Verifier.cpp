@@ -2543,7 +2543,7 @@ void SILModule::verify() const {
 
   // Check all functions.
   for (const SILFunction &f : *this) {
-    if (!symbolNames.insert(f.getName())) {
+    if (!symbolNames.insert(f.getName()).second) {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
@@ -2552,7 +2552,7 @@ void SILModule::verify() const {
 
   // Check all globals.
   for (const SILGlobalVariable &g : getSILGlobals()) {
-    if (!symbolNames.insert(g.getName())) {
+    if (!symbolNames.insert(g.getName()).second) {
       llvm::errs() << "Symbol redefined: " << g.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
