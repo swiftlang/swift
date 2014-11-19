@@ -862,7 +862,7 @@ static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
   llvm::SmallPtrSet<void *, 4> uniqueChoices;
   unsigned result = 0;
   for (auto choice : choices) {
-    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()))
+    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()).second)
       ++result;
   }
   return result;
@@ -949,7 +949,7 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         // FIXME: show deduced types, etc, etc.
-        if (EmittedDecls.insert(choice.getDecl()))
+        if (EmittedDecls.insert(choice.getDecl()).second)
           tc.diagnose(choice.getDecl(), diag::found_candidate);
         break;
 

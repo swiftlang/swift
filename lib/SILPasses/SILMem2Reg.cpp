@@ -560,7 +560,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
           continue;
 
         // Ignore visited nodes.
-        if (!Visited.insert(SuccNode))
+        if (!Visited.insert(SuccNode).second)
           continue;
 
         // If the new PHInode is not dominated by the allocation then it's dead.

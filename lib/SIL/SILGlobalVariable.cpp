@@ -25,7 +25,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILGlobalVariable*> *entry = nullptr;
   if (!name.empty()) {
-    entry = &M.GlobalVariableTable.GetOrCreateValue(name);
+    entry = &*M.GlobalVariableTable.insert(std::make_pair(name, nullptr)).first;
     assert(!entry->getValue() && "global variable already exists");
     name = entry->getKey();
   }

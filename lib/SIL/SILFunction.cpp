@@ -40,7 +40,7 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
   if (!name.empty()) {
-    entry = &M.FunctionTable.GetOrCreateValue(name);
+    entry = &*M.FunctionTable.insert(std::make_pair(name, nullptr)).first;
     assert(!entry->getValue() && "function already exists");
     name = entry->getKey();
   }

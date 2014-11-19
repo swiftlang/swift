@@ -609,7 +609,7 @@ void SimplifyCFG::findLoopHeaders() {
     } else {
       // Visit the next successor.
       SILBasicBlock *NextSucc = *(D.second);
-      if (Visited.insert(NextSucc)) {
+      if (Visited.insert(NextSucc).second) {
         InDFSStack.insert(NextSucc);
         DFSStack.push_back(std::make_pair(NextSucc, NextSucc->succ_begin()));
       } else if (InDFSStack.count(NextSucc)) {
@@ -1354,7 +1354,7 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
 }
 
 void RemoveUnreachable::visit(SILBasicBlock *BB) {
-  if (!Visited.insert(BB))
+  if (!Visited.insert(BB).second)
     return;
 
   for (auto &Succ : BB->getSuccs())

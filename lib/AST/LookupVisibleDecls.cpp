@@ -351,7 +351,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 
     while (!Worklist.empty()) {
       auto Proto = Worklist.pop_back_val();
-      if(!ProtocolsWithConformances.insert(Proto))
+      if(!ProtocolsWithConformances.insert(Proto).second)
         continue;
 
       auto Protocols = Proto->getProtocols();
@@ -369,7 +369,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 
   while (!Worklist.empty()) {
     auto Proto = Worklist.pop_back_val();
-    if (!Visited.insert(Proto))
+    if (!Visited.insert(Proto).second)
       continue;
     if (TypeResolver)
       TypeResolver->resolveDeclSignature(Proto);
@@ -451,7 +451,7 @@ static void lookupVisibleMemberDeclsImpl(
       doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
       return;
     }
-    if (!Visited.insert(PT->getDecl()))
+    if (!Visited.insert(PT->getDecl()).second)
       return;
 
     for (auto Proto : PT->getDecl()->getProtocols())

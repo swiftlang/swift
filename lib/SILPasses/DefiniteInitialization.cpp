@@ -461,7 +461,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(SILBasicBlock *BB) {
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
       for (auto &Succ : BB->getSuccs()) {
-        if (BlocksReachableFromEntry.insert(Succ))
+        if (BlocksReachableFromEntry.insert(Succ).second)
           Worklist.push_back(Succ);
       }
     }

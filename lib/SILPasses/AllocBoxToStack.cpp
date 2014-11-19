@@ -56,7 +56,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
 
     // If it's already in the set, then we've already queued and/or
     // processed the predecessors.
-    if (BB == DefBB || !LiveIn.insert(BB))
+    if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
     for (auto Pred : BB->getPreds())

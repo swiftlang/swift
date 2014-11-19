@@ -512,7 +512,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   fixed->getTypeVariables(typeVars);
   auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
-    if (knownTypeVars.insert(otherTypeVar)) {
+    if (knownTypeVars.insert(otherTypeVar).second) {
       (*this)[otherTypeVar].addFixedBinding(typeVar);
       node.addFixedBinding(otherTypeVar);
     }
@@ -535,7 +535,7 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   fixed->getTypeVariables(typeVars);
   auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
-    if (knownTypeVars.insert(otherTypeVar)) {
+    if (knownTypeVars.insert(otherTypeVar).second) {
       (*this)[otherTypeVar].removeFixedBinding(typeVar);
       node.removeFixedBinding(otherTypeVar);
     }
@@ -549,7 +549,7 @@ void ConstraintGraph::gatherConstraints(
   auto equivClass = node.getEquivalenceClass();
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
   for (auto typeVar : equivClass) {
-    if (!typeVars.insert(typeVar))
+    if (!typeVars.insert(typeVar).second)
       continue;
 
     for (auto constraint : (*this)[typeVar].getConstraints())
@@ -561,7 +561,7 @@ void ConstraintGraph::gatherConstraints(
     if (!node.getAdjacency(typeVar).FixedBinding)
       continue;
 
-    if (!typeVars.insert(typeVar))
+    if (!typeVars.insert(typeVar).second)
       continue;
 
     for (auto constraint : (*this)[typeVar].getConstraints())

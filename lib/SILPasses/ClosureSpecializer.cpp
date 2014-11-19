@@ -329,7 +329,7 @@ gatherCallSites(SILFunction *Caller,
       // Check if we have already associated this apply inst with a closure to
       // be specialized. We do not handle applies that take in multiple
       // closures at this time.
-      if (!VisitedAI.insert(AI)) {
+      if (!VisitedAI.insert(AI).second) {
         MultipleClosureAI.insert(AI);
         continue;
       }

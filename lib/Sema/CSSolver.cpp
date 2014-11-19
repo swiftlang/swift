@@ -177,7 +177,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     knownTypeVariables(TypeVariables.begin(), TypeVariables.end());
   for (auto binding : solution.typeBindings) {
     // If we haven't seen this type variable before, record it now.
-    if (knownTypeVariables.insert(binding.first))
+    if (knownTypeVariables.insert(binding.first).second)
       TypeVariables.push_back(binding.first);
 
     // If we don't already have a fixed type for this type variable,
@@ -620,7 +620,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   auto &tc = cs.getTypeChecker();
   for (auto constraint : constraints) {
     // Only visit each constraint once.
-    if (!visitedConstraints.insert(constraint))
+    if (!visitedConstraints.insert(constraint).second)
       continue;
 
     switch (constraint->getKind()) {
@@ -679,7 +679,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
       // Handle unspecialized types directly.
       if (!defaultType->isUnspecializedGeneric()) {
-        if (!exactTypes.insert(defaultType->getCanonicalType()))
+        if (!exactTypes.insert(defaultType->getCanonicalType()).second)
           continue;
 
         result.foundLiteralBinding(constraint->getProtocol());
@@ -814,7 +814,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
         continue;
     }
 
-    if (exactTypes.insert(type->getCanonicalType()))
+    if (exactTypes.insert(type->getCanonicalType()).second)
       result.Bindings.push_back({type, kind, None});
   }
 
@@ -1009,7 +1009,7 @@ static bool tryTypeVariableBindings(
         KnownProtocolKind knownKind 
           = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
         for (auto altType : cs.getAlternativeLiteralTypes(knownKind)) {
-          if (exploredTypes.insert(altType->getCanonicalType()))
+          if (exploredTypes.insert(altType->getCanonicalType()).second)
             newBindings.push_back({altType, AllowedBindingKind::Subtypes, 
                                    binding.DefaultedProtocol});
         }
@@ -1022,7 +1022,7 @@ static bool tryTypeVariableBindings(
           !type->is<InOutType>()) {
         // Try lvalue qualification in addition to rvalue qualification.
         auto subtype = LValueType::get(type);
-        if (exploredTypes.insert(subtype->getCanonicalType()))
+        if (exploredTypes.insert(subtype->getCanonicalType()).second)
           newBindings.push_back({subtype, binding.Kind, None});
       }
 
@@ -1031,7 +1031,7 @@ static bool tryTypeVariableBindings(
           int scalarIdx = tupleTy->getFieldForScalarInit();
           if (scalarIdx >= 0) {
             auto eltType = tupleTy->getElementType(scalarIdx);
-            if (exploredTypes.insert(eltType->getCanonicalType()))
+            if (exploredTypes.insert(eltType->getCanonicalType()).second)
               newBindings.push_back({eltType, binding.Kind, None});
           }
         }
@@ -1048,7 +1048,7 @@ static bool tryTypeVariableBindings(
           continue;
 
         // If we haven't seen this supertype, add it.
-        if (exploredTypes.insert((*simpleSuper)->getCanonicalType()))
+        if (exploredTypes.insert((*simpleSuper)->getCanonicalType()).second)
           newBindings.push_back({*simpleSuper, binding.Kind, None});
       }
     }

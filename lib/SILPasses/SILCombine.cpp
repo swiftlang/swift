@@ -58,7 +58,7 @@ static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &SC) {
     BB = Worklist.pop_back_val();
 
     // We have now visited this block!  If we've already been here, ignore it.
-    if (!Visited.insert(BB)) continue;
+    if (!Visited.insert(BB).second) continue;
 
     for (SILBasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
       SILInstruction *Inst = BBI++;

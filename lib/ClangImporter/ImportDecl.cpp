@@ -3339,7 +3339,7 @@ namespace {
     static void addProtocols(ProtocolDecl *protocol,
                              SmallVectorImpl<ProtocolDecl *> &protocols,
                              llvm::SmallPtrSet<ProtocolDecl *, 4> &known) {
-      if (!known.insert(protocol))
+      if (!known.insert(protocol).second)
         return;
 
       protocols.push_back(protocol);
@@ -3575,7 +3575,7 @@ namespace {
           // If there is a special declaration associated with this member,
           // add it now.
           if (auto special = importSpecialMethod(member, swiftContext)) {
-            if (knownMembers.insert(special))
+            if (knownMembers.insert(special).second)
               members.push_back(special);
           }
 

@@ -167,7 +167,7 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &newlyMarked,
 
   while (!worklist.empty()) {
     const void *next = worklist.pop_back_val();
-    if (!Marked.insert(next))
+    if (!Marked.insert(next).second)
       continue;
     newlyMarked.push_back(next);
     addDependentsToWorklist(next);

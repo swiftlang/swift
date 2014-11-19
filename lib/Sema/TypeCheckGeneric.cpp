@@ -708,7 +708,7 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
   // stack.
   for (const auto &sub : Substitutions) {
     if (auto archetype = sub.first->getAs<ArchetypeType>()) {
-      if (archetype->isPrimary() && knownArchetypes.insert(archetype))
+      if (archetype->isPrimary() && knownArchetypes.insert(archetype).second)
         archetypeStack.push_back(archetype);
     }
   }
@@ -759,7 +759,7 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
       auto NestedArch = Nested.second.dyn_cast<ArchetypeType*>();
       if (!NestedArch)
         continue;
-      if (knownArchetypes.insert(NestedArch))
+      if (knownArchetypes.insert(NestedArch).second)
         archetypeStack.push_back(NestedArch);
     }
   }

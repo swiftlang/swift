@@ -1340,7 +1340,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
       if (PA->isPrimary()) {
         auto Archetype = PA->getType(*this).get<ArchetypeType *>();
         assert(Archetype->isPrimary() && "isPrimary mismatch");
-        if (KnownArchetypes.insert(Archetype))
+        if (KnownArchetypes.insert(Archetype).second)
           Impl->AllArchetypes.push_back(Archetype);
       }
     }
@@ -1372,7 +1372,7 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
 
   // Add top-level potential archetypes to the stack.
   for (const auto &pa : Impl->PotentialArchetypes) {
-    if (visited.insert(pa.second))
+    if (visited.insert(pa.second).second)
       stack.push_back(pa.second);
   }
 
@@ -1385,7 +1385,7 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
     // Visit nested potential archetypes.
     for (const auto &nested : pa->getNestedTypes()) {
       for (auto nestedPA : nested.second) {
-        if (visited.insert(nestedPA)) {
+        if (visited.insert(nestedPA).second) {
           stack.push_back(nestedPA);
         }
       }
@@ -1447,7 +1447,7 @@ void ArchetypeBuilder::enumerateRequirements(bool canonicalize, F f) {
       return;
 
     // If we have already visited the representative, we're done.
-    if (!visitedPAs.insert(archetype))
+    if (!visitedPAs.insert(archetype).second)
       return;
 
     // If we have a concrete type, produce a same-type requirement.
@@ -1501,7 +1501,7 @@ void ArchetypeBuilder::enumerateRequirements(bool canonicalize, F f) {
     = [&](PotentialArchetype *archetype) {
     // Make sure we don't visit the nested archetypes of an archetype
     // twice.
-    if (!visitedNested.insert(archetype))
+    if (!visitedNested.insert(archetype).second)
       return;
 
     // Collect the nested types, sorted by name.

@@ -2336,7 +2336,7 @@ void ClangImporter::loadObjCMethods(
   llvm::SmallPtrSet<AbstractFunctionDecl *, 4> known;
   known.insert(methods.begin(), methods.end());
   for (auto method : foundMethods) {
-    if (known.insert(method))
+    if (known.insert(method).second)
       methods.push_back(method);
   }
 }
@@ -2382,7 +2382,7 @@ void ClangModuleUnit::getImportedModules(
       imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
       imported.erase(std::remove_if(imported.begin(), imported.end(),
                                     [&](clang::Module *mod) -> bool {
-                                      return !knownModules.insert(mod);
+                                      return !knownModules.insert(mod).second;
                                     }),
                      imported.end());
     } else {

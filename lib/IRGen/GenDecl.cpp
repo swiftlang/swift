@@ -1482,7 +1482,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // trigger lazy emission of the metadata.
   if (!definitionType && isTypeMetadataEmittedLazily(concreteType)) {
     // Add it to the queue if it hasn't already been put there.
-    if (LazilyEmittedTypeMetadata.insert(concreteType))
+    if (LazilyEmittedTypeMetadata.insert(concreteType).second)
       LazyTypeMetadata.push_back(concreteType);
   }
 

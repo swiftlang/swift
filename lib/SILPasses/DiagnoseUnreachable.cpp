@@ -617,7 +617,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
   do {
     SILBasicBlock *BB = Worklist.pop_back_val();
     for (auto SI = BB->succ_begin(), SE = BB->succ_end(); SI != SE; ++SI) {
-      if (Reachable.insert(*SI))
+      if (Reachable.insert(*SI).second)
         Worklist.push_back(*SI);
     }
   } while (!Worklist.empty());

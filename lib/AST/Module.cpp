@@ -722,7 +722,7 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
           return true;
         }
 
-        if (visitedProtocols.insert(testProto)) {
+        if (visitedProtocols.insert(testProto).second) {
           NominalOrConformance next = {};
           if (i < nominalConformances.size())
             next = nominalConformances[i];
@@ -780,7 +780,7 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
           break;
         }
 
-        if (visitedProtocols.insert(inherited.first))
+        if (visitedProtocols.insert(inherited.first).second)
           stack.push_back({inherited.second, currentOwner});
       }
     }
@@ -1316,7 +1316,7 @@ static bool forAllImportedModules(Module *topLevel,
       continue;
     }
 
-    if (!visited.insert(next))
+    if (!visited.insert(next).second)
       continue;
 
     if (!fn(next))

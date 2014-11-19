@@ -511,7 +511,7 @@ void IRGenModule::emitAutolinkInfo() {
                                        AutolinkEntries.end(),
                                        [&](llvm::Value *entry) -> bool {
                                          return !knownAutolinkEntries.insert(
-                                                   entry);
+                                                   entry).second;
                                        }),
                         AutolinkEntries.end());
 

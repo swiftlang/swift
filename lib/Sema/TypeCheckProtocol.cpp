@@ -2318,7 +2318,7 @@ existentialConformsToItself(TypeChecker &tc,
   // Check that all inherited protocols conform to themselves.
   for (auto inheritedProto : proto->getProtocols()) {
     // If we're already checking this protocol, assume it's fine.
-    if (!checking.insert(inheritedProto))
+    if (!checking.insert(inheritedProto).second)
       continue;
 
     // Check whether the inherited protocol conforms to itself.

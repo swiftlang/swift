@@ -379,7 +379,8 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
   // Make sure null pointers stay null.
   if (Str.data() == nullptr) return Identifier(0);
 
-  return Identifier(Impl.IdentifierTable.GetOrCreateValue(Str).getKeyData());
+  auto I = Impl.IdentifierTable.insert(std::make_pair(Str, char())).first;
+  return Identifier(I->getKeyData());
 }
 
 void ASTContext::lookupInSwiftModule(

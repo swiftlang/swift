@@ -669,7 +669,7 @@ namespace {
           CaptureLoc.isValid() && DRE->getDecl()->getLoc().isValid() &&
           TC.Context.SourceMgr.isBeforeInBuffer(CaptureLoc,
                                                 DRE->getDecl()->getLoc())) {
-        if (Diagnosed.insert(DRE->getDecl())) {
+        if (Diagnosed.insert(DRE->getDecl()).second) {
           TC.diagnose(DRE->getLoc(), diag::capture_before_declaration,
                       DRE->getDecl()->getName());
           TC.diagnose(DRE->getDecl()->getLoc(), diag::decl_declared_here,

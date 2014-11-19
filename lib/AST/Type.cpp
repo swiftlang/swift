@@ -766,7 +766,7 @@ static void addMinimumProtocols(Type T,
       ZappedAny = true;
     }
 
-    if (Visited.insert(Proto->getDecl())) {
+    if (Visited.insert(Proto->getDecl()).second) {
       for (auto Inherited : Proto->getDecl()->getProtocols())
         addProtocols(Inherited->getDeclaredType(), Stack);
     }

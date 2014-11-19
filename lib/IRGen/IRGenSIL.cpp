@@ -1207,7 +1207,7 @@ void IRGenSILFunction::emitSILFunction() {
     // queue them up if we haven't already visited them.
     for (auto &succ : bb->getSuccs()) {
       auto succBB = succ.getBB();
-      if (visitedBlocks.insert(succBB))
+      if (visitedBlocks.insert(succBB).second)
         workQueue.push_back(succBB);
     }
   }

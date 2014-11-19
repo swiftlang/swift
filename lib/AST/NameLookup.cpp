@@ -1148,7 +1148,7 @@ bool DeclContext::lookupQualified(Type type,
     llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
     decls.erase(std::remove_if(decls.begin(), decls.end(),
                                [&](ValueDecl *vd) -> bool {
-                                 return !knownDecls.insert(vd);
+                                 return !knownDecls.insert(vd).second;
                                }),
                 decls.end());
 
@@ -1189,14 +1189,14 @@ bool DeclContext::lookupQualified(Type type,
   else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
     // Look in the protocols to which the archetype conforms (always).
     for (auto proto : archetypeTy->getConformsTo())
-      if (visited.insert(proto))
+      if (visited.insert(proto).second)
         stack.push_back(proto);
 
     // If requested, look into the superclasses of this archetype.
     if (options & NL_VisitSupertypes) {
       if (auto superclassTy = archetypeTy->getSuperclass()) {
         if (auto superclassDecl = superclassTy->getAnyNominal()) {
-          if (visited.insert(superclassDecl)) {
+          if (visited.insert(superclassDecl).second) {
             stack.push_back(superclassDecl);
 
             wantProtocolMembers = (options & NL_ProtocolMembers) &&
@@ -1211,7 +1211,7 @@ bool DeclContext::lookupQualified(Type type,
     SmallVector<ProtocolDecl *, 4> protocols;
     if (compositionTy->isExistentialType(protocols)) {
       for (auto proto : protocols) {
-        if (visited.insert(proto)) {
+        if (visited.insert(proto).second) {
           stack.push_back(proto);
 
           // If we want dynamic lookup and this is the AnyObject
@@ -1303,7 +1303,7 @@ bool DeclContext::lookupQualified(Type type,
 
       if (auto superclassType = classDecl->getSuperclass())
         if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
-          if (visited.insert(superclassDecl))
+          if (visited.insert(superclassDecl).second)
             stack.push_back(superclassDecl);
     }
 
@@ -1315,7 +1315,7 @@ bool DeclContext::lookupQualified(Type type,
     // Local function object used to add protocols to the stack.
     auto addProtocols = [&](ArrayRef<ProtocolDecl *> protocols) {
       for (auto proto : protocols) {
-        if (visited.insert(proto)) {
+        if (visited.insert(proto).second) {
           stack.push_back(proto);
         }
       }
@@ -1361,7 +1361,7 @@ bool DeclContext::lookupQualified(Type type,
 
       // If we didn't visit this nominal type above, add this
       // declaration to the list.
-      if (!visited.count(nominal) && knownDecls.insert(decl))
+      if (!visited.count(nominal) && knownDecls.insert(decl).second)
         decls.push_back(decl);
     }
   }

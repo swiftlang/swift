@@ -232,7 +232,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
   decls.erase(std::remove_if(decls.begin() + initialCount, decls.end(),
                              [&](ValueDecl *d) -> bool { 
-                               return !knownDecls.insert(d);
+                               return !knownDecls.insert(d).second;
                              }),
               decls.end());
 

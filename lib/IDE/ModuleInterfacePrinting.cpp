@@ -169,7 +169,7 @@ void swift::ide::printSubmoduleInterface(
         if (TraversalOptions & ModuleTraversal::VisitSubmodules) {
           for (auto Sub = CM->submodule_begin(), SubEnd = CM->submodule_end();
                Sub != SubEnd; ++Sub) {
-            if (Visited.insert(*Sub))
+            if (Visited.insert(*Sub).second)
               Worklist.push_back(*Sub);
           }
         }

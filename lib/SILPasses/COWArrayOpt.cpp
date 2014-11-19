@@ -127,7 +127,7 @@ public:
     // Collect all uses of the Struct value.
     for (auto *DefInst : StructLoads) {
       for (auto DefUI : DefInst->getUses()) {
-        if (!Visited.insert(&*DefUI))
+        if (!Visited.insert(&*DefUI).second)
           continue;
         StructValueUsers.push_back(DefUI->getUser());
       }
@@ -135,7 +135,7 @@ public:
     // Collect all users of element values.
     for (auto &Pair : ElementLoads) {
       for (auto DefUI : Pair.first->getUses()) {
-        if (!Visited.insert(&*DefUI))
+        if (!Visited.insert(&*DefUI).second)
           continue;
         ElementValueUsers.push_back(
           std::make_pair(DefUI->getUser(), Pair.second));
@@ -154,7 +154,7 @@ protected:
     for (auto UI : V->getUses()) {
       // Keep the operand, not the instruction in the visited set. The same
       // instruction may theoretically have different types of uses.
-      if (!Visited.insert(&*UI))
+      if (!Visited.insert(&*UI).second)
         continue;
 
       SILInstruction *UseInst = UI->getUser();
@@ -345,7 +345,7 @@ SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
       for (auto PI = BB->pred_begin(), PE = BB->pred_end(); PI != PE; ++PI) {
-        if (ReachingBlocks.insert(*PI))
+        if (ReachingBlocks.insert(*PI).second)
           Worklist.push_back(*PI);
       }
     }

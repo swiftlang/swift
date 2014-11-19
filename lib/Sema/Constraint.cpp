@@ -518,7 +518,7 @@ static void uniqueTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVars) {
   llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
   typeVars.erase(std::remove_if(typeVars.begin(), typeVars.end(),
                                 [&](TypeVariableType *typeVar) {
-                                  return !knownTypeVars.insert(typeVar);
+                                  return !knownTypeVars.insert(typeVar).second;
                                 }),
                  typeVars.end());
 }

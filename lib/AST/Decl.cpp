@@ -587,7 +587,7 @@ void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
     auto nestedArch = nested.second.dyn_cast<ArchetypeType*>();
     if (!nestedArch)
       continue;
-    if (known.insert(nestedArch)) {
+    if (known.insert(nestedArch).second) {
       assert(!nestedArch->isPrimary() && "Unexpected primary archetype");
       all.push_back(nestedArch);
       addNestedArchetypes(nestedArch, known, all);
@@ -606,7 +606,7 @@ GenericParamList::deriveAllArchetypes(ArrayRef<GenericTypeParamDecl *> params,
   // Collect all the primary archetypes.
   for (auto param : params) {
     auto archetype = param->getArchetype();
-    if (archetype->isPrimary() && known.insert(archetype))
+    if (archetype->isPrimary() && known.insert(archetype).second)
       all.push_back(archetype);
   }
 
@@ -2046,7 +2046,7 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {
       if (InheritedProto == Super)
         return true;
 
-      if (Visited.insert(InheritedProto))
+      if (Visited.insert(InheritedProto).second)
         Stack.push_back(InheritedProto);
     }
   }
@@ -2064,7 +2064,7 @@ void ProtocolDecl::collectInherited(
     Stack.pop_back();
 
     for (auto InheritedProto : Current->getProtocols()) {
-      if (Inherited.insert(InheritedProto))
+      if (Inherited.insert(InheritedProto).second)
         Stack.push_back(InheritedProto);
     }
   }

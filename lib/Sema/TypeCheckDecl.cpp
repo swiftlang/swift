@@ -4686,7 +4686,7 @@ public:
 
     while (!queue.empty()) {
       ProtocolDecl *proto = queue.pop_back_val();
-      if (!seenProtos.insert(proto))
+      if (!seenProtos.insert(proto).second)
         continue;
 
       queue.append(proto->getProtocols().begin(), proto->getProtocols().end());
@@ -7890,7 +7890,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
       // If we have already introduced an initializer with this parameter type,
       // don't add one now.
       if (!initializerParamTypes.insert(
-             getInitializerParamType(superclassCtor)))
+             getInitializerParamType(superclassCtor)).second)
         continue;
 
       // We have a designated initializer. Create an override of it.

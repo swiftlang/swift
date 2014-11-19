@@ -222,7 +222,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
         if (Count++ >= Threshold)
           return true;
 
-        if (Visited.insert(UI)) {
+        if (Visited.insert(UI).second) {
           Worklist.push_back(UI);
         }
       }

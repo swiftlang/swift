@@ -1173,7 +1173,7 @@ public:
           includeUnderlying = true;
           continue;
         }
-        if (seenImports.insert(Name))
+        if (seenImports.insert(Name).second)
           out << "@import " << Name.str() << ";\n";
       } else {
         const auto *clangModule = import.get<const clang::Module *>();

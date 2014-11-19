@@ -922,7 +922,7 @@ private:
     // For example, we emit an error for #os(OSX >= 10.10, OSX >= 10.11)
     llvm::SmallSet<PlatformKind, 2> Platforms;
     for (auto *Spec : E->getQueries()) {
-      bool Inserted = Platforms.insert(Spec->getPlatform());
+      bool Inserted = Platforms.insert(Spec->getPlatform()).second;
       if (!Inserted) {
         PlatformKind Platform = Spec->getPlatform();
         AC.Diags.diagnose(Spec->getPlatformLoc(),

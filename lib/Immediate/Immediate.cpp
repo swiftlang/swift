@@ -323,7 +323,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
   // expensive, because it's not properly being limited to new things right now.
   for (auto &entry : CI.getASTContext().LoadedModules) {
     swift::Module *import = entry.second;
-    if (!ImportedModules.insert(import))
+    if (!ImportedModules.insert(import).second)
       continue;
 
     std::unique_ptr<SILModule> SILMod = performSILGeneration(import);

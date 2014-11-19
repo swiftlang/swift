@@ -148,7 +148,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
       continue;
 
     // If we haven't seen this type result yet, add it to the result set.
-    if (types.insert(memberType->getCanonicalType()))
+    if (types.insert(memberType->getCanonicalType()).second)
       result.Results.push_back({typeDecl, memberType});
   }
 
@@ -175,7 +175,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
       assert(memberType && "Missing type witness?");
 
       // If we haven't seen this type result yet, add it to the result set.
-      if (types.insert(memberType->getCanonicalType()))
+      if (types.insert(memberType->getCanonicalType()).second)
         result.Results.push_back({assocType, memberType});
     }
   }
