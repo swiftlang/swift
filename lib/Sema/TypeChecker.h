@@ -310,6 +310,9 @@ private:
   /// A set of types that can be trivially mapped to Objective-C types.
   llvm::DenseSet<CanType> ObjCMappedTypes;
 
+  /// A set of types that can be mapped to C integer types.
+  llvm::DenseSet<CanType> CIntegerTypes;
+
   /// A set of types that are representable in Objective-C, but require
   /// non-trivial bridging.
   ///
@@ -1101,6 +1104,7 @@ public:
   virtual Type resolveMemberType(DeclContext *dc, Type type,
                                  Identifier name) override;
 
+  bool isCIntegerType(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                              ObjCReason Reason);
   bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);

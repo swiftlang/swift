@@ -926,6 +926,10 @@ ERROR(enum_with_raw_type_case_with_argument,sema_tcd,none,
       "enum with raw type cannot have cases with arguments", ())
 NOTE(enum_raw_type_here,sema_tcd,none,
      "declared raw type %0 here", (Type))
+ERROR(objc_enum_no_raw_type,sema_tcd,none,
+      "'@objc' enum must declare an integer raw type", ())
+ERROR(objc_enum_raw_type_not_integer,sema_tcd,none,
+      "'@objc' enum raw type %0 is not an integer type", (Type))
 ERROR(enum_non_integer_raw_value_auto_increment,sema_tcd,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,sema_tcd,none,
@@ -1590,9 +1594,12 @@ ERROR(objc_setter_for_nonobjc_property,sema_tcd,none,
       "'@objc' setter for non-'@objc' property", ())
 ERROR(objc_setter_for_nonobjc_subscript,sema_tcd,none,
       "'@objc' setter for non-'@objc' subscript", ())
-
+ERROR(objc_enum_generic,sema_tcd,none,
+      "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,sema_objc,none,
       "'@objc' %select{class|protocol|property}0 must have a simple name", (int))
+ERROR(objc_name_enum,sema_objc,none,
+      "'@objc' enum cannot have a name", ())
 ERROR(objc_name_subscript,sema_objc,none,
       "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())
@@ -1629,7 +1636,7 @@ NOTE(not_objc_swift_class,sema_objc,none,
 NOTE(not_objc_swift_struct,sema_objc,none,
       "Swift structs cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_enum,sema_objc,none,
-      "Swift enums cannot be represented in Objective-C", ())
+      "non-'@objc' enums cannot be represented in Objective-C", ())
 NOTE(not_objc_generic_type_param,sema_objc,none,
      "generic type parameters cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_param,sema_objc,none,

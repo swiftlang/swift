@@ -163,21 +163,6 @@ class subject_genericClass<T> { // no-error
   func subject_instanceFunc() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
 }
 
-@objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
-enum subject_enum {
-  @objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
-  case subject_enumElement1
-
-  @objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
-  case subject_enumElement2(Int) 
-
-  @objc   
-  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
-
-  @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
-}
-
 @objc
 protocol subject_protocol1 {
   @objc
@@ -515,7 +500,7 @@ class infer_instanceFunc1 {
 
   @objc func func11_(a: PlainEnum) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2 {{Swift enums cannot be represented in Objective-C}}
+  // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
 
   func func12(a: PlainProtocol) {}
 // CHECK-LABEL: {{^}} func func12(a: PlainProtocol) {
@@ -644,7 +629,7 @@ class infer_instanceFunc1 {
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter 1 cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-error@-3 {{method cannot be marked @objc because the type of the parameter 2 cannot be represented in Objective-C}}
-  // expected-note@-4 {{Swift enums cannot be represented in Objective-C}}
+  // expected-note@-4 {{non-'@objc' enums cannot be represented in Objective-C}}
   // expected-error@-5 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-6 {{'protocol<>' is not considered '@objc'; use 'AnyObject' instead}}
 
@@ -830,7 +815,7 @@ class infer_instanceVar1 {
 
   @objc var var_PlainEnum_: PlainEnum
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{Swift enums cannot be represented in Objective-C}}
+  // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
 
   var var_PlainProtocol: PlainProtocol
 // CHECK-LABEL: {{^}}  var var_PlainProtocol: PlainProtocol

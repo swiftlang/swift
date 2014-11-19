@@ -4180,6 +4180,21 @@ public:
     }
 
     if (!IsFirstPass) {
+      if (ED->isObjC()) {
+        if (rawTy) {
+          // @objc enums must have a raw type that's an ObjC-representable
+          // integer type.
+          if (!TC.isCIntegerType(ED, rawTy))
+            TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                        diag::objc_en
+                        um_raw_type_not_integer,
+                        rawTy);
+        } else {
+          // @objc enums must have a raw type.
+          TC.diagnose(ED->getNameLoc(), diag::objc_enum_no_raw_type);
+        }
+      }
+    
       if (rawTy) {
         // Check the raw values of the cases.
         LiteralExpr *prevValue = nullptr;
@@ -8079,6 +8094,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         error = diag::invalid_objc_decl;
     } else if (isa<ProtocolDecl>(D)) {
       /* ok */
+    } else if (auto ED = dyn_cast<EnumDecl>(D)) {
+      if (ED->isGenericContext())
+        error = diag::objc_enum_generic;
     } else {
       error = diag::invalid_objc_decl;
     }
@@ -8093,7 +8111,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // appropriate.
     if (auto objcName = objcAttr->getName()) {
       if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)) {
-        // Protocols, classes, and properties can only have nullary
+        // Types and properties can only have nullary
         // names. Complain and recover by chopping off everything
         // after the first name.
         if (objcName->getNumArgs() > 0) {
@@ -8109,8 +8127,12 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
             ObjCSelector(TC.Context, 0, objcName->getSelectorPieces()[0]),
             /*implicit=*/false);
         }
+      } else if (isa<EnumDecl>(D)) {
+        // Enums don't have runtime names.
+        TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_enum);
+        const_cast<ObjCAttr *>(objcAttr)->clearName();
       } else if (isa<SubscriptDecl>(D)) {
-      // Subscripts can never have names.
+        // Subscripts can never have names.
         TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_subscript);
         const_cast<ObjCAttr *>(objcAttr)->clearName();
       } else {

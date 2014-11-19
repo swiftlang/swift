@@ -1985,6 +1985,12 @@ static bool isForeignClassContext(DeclContext *DC) {
   return clas->isForeign();
 }
 
+bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {
+  if (CIntegerTypes.empty())
+    fillObjCRepresentableTypeCache(DC);
+  return CIntegerTypes.count(T->getCanonicalType());
+}
+
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                                         ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
@@ -2229,6 +2235,10 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   if (auto NTD = T->getAnyNominal()) {
     // If the type was imported from Clang, it is representable in Objective-C.
     if (NTD->hasClangNode())
+      return true;
+    
+    // If the type is @objc, it is representable in Objective-C.
+    if (NTD->isObjC())
       return true;
 
     // Pointers may be representable in ObjC.
@@ -2478,6 +2488,13 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
 
   Module *Stdlib = getStdlibModule(DC);
   lookupLibraryTypes(*this, Stdlib, StdlibTypeNames, ObjCMappedTypes);
+
+  StdlibTypeNames.clear();
+#define MAP_BUILTIN_TYPE(_, __)
+#define MAP_BUILTIN_INTEGER_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
+  StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+  lookupLibraryTypes(*this, Stdlib, StdlibTypeNames, CIntegerTypes);
 
 #define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                          \
                     NATIVE_MODULE, NATIVE_TYPE, OPTIONAL_IS_BRIDGED)       \

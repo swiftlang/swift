@@ -84,7 +84,7 @@ SIMPLE_DECL_ATTR(final, Final,
 
 DECL_ATTR(objc, ObjC,
           OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
-          OnConstructor | OnDestructor, 3)
+          OnConstructor | OnDestructor | OnEnum, 3)
 
 SIMPLE_DECL_ATTR(required, Required,
                  OnConstructor|DeclModifier, 4)
