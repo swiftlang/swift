@@ -977,24 +977,93 @@ static bool recursivelyCollectArrayWritesInstr(UserListTy &Uses,
   return true;
 }
 
+/// Optimize builtins which receive the same value in their first and second
+/// operand.
+static SILInstruction *optimizeBuiltinWithSameOperands(BuiltinInst *I,
+                                                       SILCombiner *C) {
+  SILFunction &F = *I->getFunction();
+
+  // Handle all builtins which can be optimized.
+  // We have to take special care about floating point operations because of
+  // potential NaN values. E.g. ordered equal FCMP_OEQ(Nan, Nan) is not true.
+  switch (I->getBuiltinInfo().ID) {
+      
+  // Replace the uses with one of the (identical) operands.
+  case BuiltinValueKind::And:
+  case BuiltinValueKind::Or: {
+    // We cannot just _return_ the operand because it is not necessarily an
+    // instruction. It can be an argument.
+    SILValue Op = I->getOperand(0);
+    C->replaceInstUsesWith(*I, Op.getDef(), 0, Op.getResultNumber());
+    break;
+  }
+
+  // Return 0 or false.
+  case BuiltinValueKind::Sub:
+  case BuiltinValueKind::SRem:
+  case BuiltinValueKind::URem:
+  case BuiltinValueKind::Xor:
+  case BuiltinValueKind::ICMP_NE:
+  case BuiltinValueKind::FCMP_ONE:
+    if (auto Ty = I->getType().getAs<BuiltinIntegerType>()) {
+      return IntegerLiteralInst::create(I->getLoc(), I->getType(),
+                                        APInt(Ty->getGreatestWidth(), 0), F);
+    }
+    break;
+      
+  // Return 1 or true.
+  case BuiltinValueKind::ICMP_EQ:
+  case BuiltinValueKind::ICMP_SLE:
+  case BuiltinValueKind::ICMP_SGE:
+  case BuiltinValueKind::ICMP_ULE:
+  case BuiltinValueKind::ICMP_UGE:
+  case BuiltinValueKind::FCMP_UEQ:
+  case BuiltinValueKind::FCMP_UGE:
+  case BuiltinValueKind::FCMP_ULE:
+  case BuiltinValueKind::SDiv:
+  case BuiltinValueKind::UDiv:
+    if (auto Ty = I->getType().getAs<BuiltinIntegerType>()) {
+      return IntegerLiteralInst::create(I->getLoc(), I->getType(),
+                                        APInt(Ty->getGreatestWidth(), 1), F);
+    }
+    break;
+
+  // Return 0 in a tuple.
+  case BuiltinValueKind::SSubOver:
+  case BuiltinValueKind::USubOver: {
+    SILType Ty = I->getType();
+    SILType IntTy = Ty.getTupleElementType(0);
+    SILType BoolTy = Ty.getTupleElementType(1);
+    SILBuilderWithScope<4> B(I);
+    SILValue Elements[] = {
+      B.createIntegerLiteral(I->getLoc(), IntTy, /* Result */ 0),
+      B.createIntegerLiteral(I->getLoc(), BoolTy, /* Overflow */ 0)
+    };
+    return TupleInst::create(I->getLoc(), Ty, Elements, F);
+  }
+      
+  default:
+    break;
+  }
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
 
+  if (I->getNumOperands() >= 2 && I->getOperand(0) == I->getOperand(1)) {
+    // It's a builtin which has the same value in its first and second operand.
+    SILInstruction *Replacement = optimizeBuiltinWithSameOperands(I, this);
+    if (Replacement)
+      return Replacement;
+  }
+  
   if (I->getBuiltinInfo().ID == BuiltinValueKind::ICMP_EQ)
     return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ false);
 
   if (I->getBuiltinInfo().ID == BuiltinValueKind::ICMP_NE)
     return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ true);
-
-  // Optimize sub(x - x) -> 0.
-  if (I->getNumOperands() == 2 &&
-      match(I, m_ApplyInst(BuiltinValueKind::Sub, m_ValueBase())) &&
-      I->getOperand(0) == I->getOperand(1))
-    if (auto DestTy = I->getType().getAs<BuiltinIntegerType>())
-      return IntegerLiteralInst::create(I->getLoc(), I->getType(),
-                                        APInt(DestTy->getGreatestWidth(), 0),
-                                        *I->getFunction());
 
   // Optimize sub(ptrtoint(index_raw_pointer(v, x)), ptrtoint(v)) -> x.
   BuiltinInst *Bytes2;

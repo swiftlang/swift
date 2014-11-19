@@ -111,8 +111,9 @@ bb0(%0 : $Builtin.Int64):
 
 sil @test3_sub_leaf : $@thin (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 1
   %2 = integer_literal $Builtin.Int1, 0
-  %3 = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %3 = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
@@ -145,7 +146,8 @@ bb0(%0 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @test3 : $@thin (Builtin.Int64) -> Builtin.Int64
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
-// CHECK: [[USUB_RESULT_TUPLE:%[0-9]+]] = builtin "usub_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]] : {{.*}}
+// CHECK: [[LITERAL1:%[0-9]+]] = integer_literal {{.*}}, 1
+// CHECK: [[USUB_RESULT_TUPLE:%[0-9]+]] = builtin "usub_with_overflow_Int64"([[INPUT]] : {{.*}}, [[LITERAL1]] : {{.*}}
 // CHECK: [[USUB_RESULT:%[0-9]+]] = tuple_extract [[USUB_RESULT_TUPLE]]
 // CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[USUB_RESULT]] : {{.*}}, [[USUB_RESULT]]
 // CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
