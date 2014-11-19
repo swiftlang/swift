@@ -36,7 +36,7 @@ import CoreFoundation
 @objc class B1 : A1 {}
 
 // CHECK-LABEL: @interface BridgedTypes
-// CHECK-NEXT: - (NSDictionary *)dictBridge:(NSDictionary *)x;
+// CHECK-NEXT: - (NSDictionary * __nonnull)dictBridge:(NSDictionary * __nonnull)x;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class BridgedTypes {
@@ -54,7 +54,7 @@ class ClassWithNSObjectProtocol : NSObject, NSObjectProtocol {}
 // CHECK-NEXT: - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (instancetype)initWithInt:(NSInteger)_;
 // CHECK-NEXT: - (instancetype)initWithFloat:(float)f;
-// CHECK-NEXT: - (instancetype)initWithString:(NSString *)s boolean:(BOOL)b;
+// CHECK-NEXT: - (instancetype)initWithString:(NSString * __nonnull)s boolean:(BOOL)b;
 // CHECK-NEXT: @end
 @objc class Initializers {
   init() {}
@@ -71,8 +71,8 @@ class NotObjC {}
 // CHECK-LABEL: @interface Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void *)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
-// CHECK-NEXT: - (void)testString:(NSString *)s;
+// CHECK-NEXT: - (void * __null_unspecified)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
+// CHECK-NEXT: - (void)testString:(NSString * __nonnull)s;
 // CHECK-NEXT: - (void)testSelector:(SEL)sel boolean:(BOOL)b;
 // CHECK-NEXT: - (void)testCSignedTypes:(signed char)a b:(short)b c:(int)c d:(long)d e:(long long)e;
 // CHECK-NEXT: - (void)testCUnsignedTypes:(unsigned char)a b:(unsigned short)b c:(unsigned int)c d:(unsigned long)d e:(unsigned long long)e;
@@ -83,21 +83,21 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSizedUnsignedTypes:(uint8_t)a b:(uint16_t)b c:(uint32_t)c d:(uint64_t)d;
 // CHECK-NEXT: - (void)testSizedFloats:(float)a b:(double)b;
 // CHECK-NEXT: - (instancetype)getDynamicSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(Methods))getSelf;
-// CHECK-NEXT: - (Methods *)maybeGetSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(Methods))maybeGetSelf;
-// CHECK-NEXT: - (Methods *)uncheckedGetSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(Methods))uncheckedGetSelf;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nonnull)getSelf;
+// CHECK-NEXT: - (Methods * __nullable)maybeGetSelf;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nullable)maybeGetSelf;
+// CHECK-NEXT: - (Methods * __null_unspecified)uncheckedGetSelf;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods) __null_unspecified)uncheckedGetSelf;
 // CHECK-NEXT: - (void)testParens:(NSInteger)a;
 // CHECK-NEXT: - (void)testIgnoredParam:(NSInteger)_;
 // CHECK-NEXT: - (void)testIgnoredParams:(NSInteger)_ again:(NSInteger)_;
-// CHECK-NEXT: - (void)testArrayBridging:(NSArray *)a;
-// CHECK-NEXT: - (void)testArrayBridging2:(NSArray *)a;
-// CHECK-NEXT: - (void)testArrayBridging3:(NSArray *)a;
-// CHECK-NEXT: - (void)testDictionaryBridging:(NSDictionary *)a;
-// CHECK-NEXT: - (void)testDictionaryBridging2:(NSDictionary *)a;
-// CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary *)a;
-// CHECK-NEXT: - (IBAction)actionMethod:(id)_;
+// CHECK-NEXT: - (void)testArrayBridging:(NSArray * __nonnull)a;
+// CHECK-NEXT: - (void)testArrayBridging2:(NSArray * __nonnull)a;
+// CHECK-NEXT: - (void)testArrayBridging3:(NSArray * __nonnull)a;
+// CHECK-NEXT: - (void)testDictionaryBridging:(NSDictionary * __nonnull)a;
+// CHECK-NEXT: - (void)testDictionaryBridging2:(NSDictionary * __nonnull)a;
+// CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary * __nonnull)a;
+// CHECK-NEXT: - (IBAction)actionMethod:(id __nonnull)_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -151,16 +151,16 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSPoint)getOrigin:(NSRect)r;
 // CHECK-NEXT: - (CGFloat)getOriginX:(NSRect)r;
 // CHECK-NEXT: - (CGFloat)getOriginY:(CGRect)r;
-// CHECK-NEXT: - (NSArray *)emptyArray;
-// CHECK-NEXT: - (NSArray *)maybeArray;
+// CHECK-NEXT: - (NSArray * __nonnull)emptyArray;
+// CHECK-NEXT: - (NSArray * __nullable)maybeArray;
 // CHECK-NEXT: - (NSRuncingMode)someEnum;
-// CHECK-NEXT: - (NSZone *)zone;
+// CHECK-NEXT: - (NSZone * __null_unspecified)zone;
 // CHECK-NEXT: - (struct FooStruct1)tagStruct;
 // CHECK-NEXT: - (enum Tribool)tagEnum;
 // CHECK-NEXT: - (FooStructTypedef2)anonStructTypedef;
 // CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2;
 // CHECK-NEXT: - (void)appKitInImplementation;
-// CHECK-NEXT: - (NSURL *)returnsURL;
+// CHECK-NEXT: - (NSURL * __nullable)returnsURL;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithImports {
@@ -189,10 +189,10 @@ typealias AliasForNSRect = NSRect
 }
 
 // CHECK-LABEL: @interface MethodsWithPointers
-// CHECK-NEXT: - (id *)test:(NSInteger *)a;
-// CHECK-NEXT: - (void)testNested:(NSInteger * *)a;
-// CHECK-NEXT: - (void)testBridging:(NSInteger const *)a b:(NSInteger *)b c:(Methods * *)c;
-// CHECK-NEXT: - (void)testBridgingVoid:(void *)a b:(void const *)b;
+// CHECK-NEXT: - (id __nonnull * __null_unspecified)test:(NSInteger * __null_unspecified)a;
+// CHECK-NEXT: - (void)testNested:(NSInteger * __null_unspecified * __null_unspecified)a;
+// CHECK-NEXT: - (void)testBridging:(NSInteger const * __null_unspecified)a b:(NSInteger * __null_unspecified)b c:(Methods * __nonnull * __null_unspecified)c;
+// CHECK-NEXT: - (void)testBridgingVoid:(void * __null_unspecified)a b:(void const * __null_unspecified)b;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
@@ -242,14 +242,14 @@ class MyObject : NSObject {}
 
 // CHECK-LABEL: @class Inner2;
 // CHECK-LABEL: @interface NestedMembers
-// CHECK-NEXT: @property (nonatomic) Inner2 * ref2;
-// CHECK-NEXT: @property (nonatomic) Inner3 * ref3;
+// CHECK-NEXT: @property (nonatomic) Inner2 * __nullable ref2;
+// CHECK-NEXT: @property (nonatomic) Inner3 * __nullable ref3;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class NestedMembers {
   // NEGATIVE-NOT: @class NestedMembers;
   // CHECK-LABEL: @interface Inner2
-  // CHECK-NEXT: @property (nonatomic) NestedMembers * ref;
+  // CHECK-NEXT: @property (nonatomic) NestedMembers * __nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner2 {
@@ -260,7 +260,7 @@ class MyObject : NSObject {}
   var ref3: Inner3? = nil
 
   // CHECK-LABEL: @interface Inner3
-  // CHECK-NEXT: @property (nonatomic) NestedMembers * ref;
+  // CHECK-NEXT: @property (nonatomic) NestedMembers * __nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner3 {
@@ -292,26 +292,26 @@ private class Private : A1 {}
 
 // CHECK-LABEL: @interface Properties
 // CHECK-NEXT: @property (nonatomic) NSInteger i;
-// CHECK-NEXT: @property (nonatomic, readonly) Properties * this;
+// CHECK-NEXT: @property (nonatomic, readonly) Properties * __nonnull this;
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
-// CHECK-NEXT: + (Properties *)shared;
-// CHECK-NEXT: + (void)setShared:(Properties *)newValue;
-// CHECK-NEXT: @property (nonatomic, weak) Properties * weakOther;
-// CHECK-NEXT: @property (nonatomic, assign) Properties * unownedOther;
-// CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * unmanagedOther;
-// CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> weakProto;
+// CHECK-NEXT: + (Properties * __nonnull)shared;
+// CHECK-NEXT: + (void)setShared:(Properties * __nonnull)newValue;
+// CHECK-NEXT: @property (nonatomic, weak) Properties * __nullable weakOther;
+// CHECK-NEXT: @property (nonatomic, assign) Properties * __nonnull unownedOther;
+// CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * __nonnull unmanagedOther;
+// CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> __nullable weakProto;
 // CHECK-NEXT: @property (nonatomic) CFTypeRef weakCF;
 // CHECK-NEXT: @property (nonatomic) CFStringRef weakCFString;
-// CHECK-NEXT: @property (nonatomic, weak) IBOutlet id outlet;
-// CHECK-NEXT: @property (nonatomic) IBOutlet Properties * typedOutlet;
-// CHECK-NEXT: @property (nonatomic, copy) NSString * string;
-// CHECK-NEXT: @property (nonatomic, copy) NSArray * array;
-// CHECK-NEXT: @property (nonatomic, copy) NSDictionary * dictionary;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollection;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollectionOptional;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * outletCollectionAnyObject;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * outletCollectionProto;
+// CHECK-NEXT: @property (nonatomic, weak) IBOutlet id __null_unspecified outlet;
+// CHECK-NEXT: @property (nonatomic) IBOutlet Properties * __null_unspecified typedOutlet;
+// CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
+// CHECK-NEXT: @property (nonatomic, copy) NSDictionary * __nonnull dictionary;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __null_unspecified outletCollection;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __nullable outletCollectionOptional;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionProto;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -356,7 +356,7 @@ private class Private : A1 {}
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
-// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * bees;
+// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * __null_unspecified bees;
 // CHECK-NEXT: - (instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
@@ -382,8 +382,8 @@ private class Private : A1 {}
 
 
 // CHECK-LABEL: @interface Subscripts1
-// CHECK-NEXT: - (Subscripts1 *)objectAtIndexedSubscript:(NSInteger)i;
-// CHECK-NEXT: - (Subscripts1 *)objectForKeyedSubscript:(Subscripts1 *)o;
+// CHECK-NEXT: - (Subscripts1 * __nonnull)objectAtIndexedSubscript:(NSInteger)i;
+// CHECK-NEXT: - (Subscripts1 * __nonnull)objectForKeyedSubscript:(Subscripts1 * __nonnull)o;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts1 {
@@ -397,11 +397,11 @@ private class Private : A1 {}
 }
 
 // CHECK-LABEL: @interface Subscripts2
-// CHECK-NEXT: - (Subscripts2 *)objectAtIndexedSubscript:(int16_t)i;
-// CHECK-NEXT: - (void)setObject:(Subscripts2 *)newValue atIndexedSubscript:(int16_t)i;
-// CHECK-NEXT: - (NSObject *)objectForKeyedSubscript:(NSObject *)o;
-// CHECK-NEXT: - (void)setObject:(NSObject *)newValue forKeyedSubscript:(NSObject *)o;
-// CHECK-NEXT: @property (nonatomic, copy) NSArray * cardPaths;
+// CHECK-NEXT: - (Subscripts2 * __nonnull)objectAtIndexedSubscript:(int16_t)i;
+// CHECK-NEXT: - (void)setObject:(Subscripts2 * __nonnull)newValue atIndexedSubscript:(int16_t)i;
+// CHECK-NEXT: - (NSObject * __nonnull)objectForKeyedSubscript:(NSObject * __nonnull)o;
+// CHECK-NEXT: - (void)setObject:(NSObject * __nonnull)newValue forKeyedSubscript:(NSObject * __nonnull)o;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull cardPaths;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts2 {
@@ -428,7 +428,7 @@ private class Private : A1 {}
 }
 
 // CHECK-LABEL: @interface Subscripts3
-// CHECK-NEXT: - (Subscripts3 *)objectAtIndexedSubscript:(unsigned long)_;
+// CHECK-NEXT: - (Subscripts3 * __nonnull)objectAtIndexedSubscript:(unsigned long)_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts3 {

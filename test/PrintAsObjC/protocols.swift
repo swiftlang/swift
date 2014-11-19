@@ -20,7 +20,7 @@ import Foundation
 
 // CHECK-LABEL: @protocol Initializers{{$}}
 // CHECK-NEXT: - (instancetype)init;
-// CHECK-NEXT: - (instancetype)initWithObject:(id)any;
+// CHECK-NEXT: - (instancetype)initWithObject:(id __nonnull)any;
 // CHECK-NEXT: @end
 @objc protocol Initializers {
   init()
@@ -30,11 +30,11 @@ import Foundation
 // CHECK-LABEL: @protocol Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void)testRawAnyTypes:(id)any other:(Class)other;
-// CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A>)a aAgain:(id <A>)a2 b:(id <B>)b bAgain:(id <B>)b2 both:(id <B>)both;
-// CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A>)a aAgain:(Class <A>)a2 b:(Class <B>)b bAgain:(Class <B>)b2 both:(Class <B>)both;
-// CHECK-NEXT: - (void)testComposition:(id <A, ZZZ>)x meta:(Class <A, ZZZ>)xClass;
-// CHECK-NEXT: - (void)testOptional:(id <A>)opt meta:(Class <A>)m;
+// CHECK-NEXT: - (void)testRawAnyTypes:(id __nonnull)any other:(Class __nonnull)other;
+// CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A> __nonnull)a aAgain:(id <A> __nonnull)a2 b:(id <B> __nonnull)b bAgain:(id <B> __nonnull)b2 both:(id <B> __nonnull)both;
+// CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A> __nonnull)a aAgain:(Class <A> __nonnull)a2 b:(Class <B> __nonnull)b bAgain:(Class <B> __nonnull)b2 both:(Class <B> __nonnull)both;
+// CHECK-NEXT: - (void)testComposition:(id <A, ZZZ> __nonnull)x meta:(Class <A, ZZZ> __nonnull)xClass;
+// CHECK-NEXT: - (void)testOptional:(id <A> __nullable)opt meta:(Class <A> __nullable)m;
 // CHECK-NEXT: @end
 @objc protocol Methods {
   func test()
@@ -108,9 +108,9 @@ extension NSString : A, ZZZ {}
 
 // CHECK-LABEL: @protocol Properties
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
-// CHECK-NEXT: @property (nonatomic) id <Properties> b;
+// CHECK-NEXT: @property (nonatomic) id <Properties> __nullable b;
 // CHECK-NEXT: @optional
-// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * c;
+// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull c;
 // CHECK-NEXT: @end
 @objc protocol Properties {
   var a: Int { get }

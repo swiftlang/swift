@@ -34,11 +34,12 @@ using namespace swift;
 
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
-                    private TypeVisitor<ObjCPrinter> {
+                    private TypeVisitor<ObjCPrinter, void, OptionalTypeKind> {
   friend ASTVisitor;
   friend TypeVisitor;
 
-  llvm::DenseMap<std::pair<Identifier, Identifier>, StringRef> specialNames;
+  llvm::DenseMap<std::pair<Identifier, Identifier>, std::pair<StringRef, bool>>
+    specialNames;
   Identifier ID_CFTypeRef;
 
   ASTContext &ctx;
@@ -165,7 +166,7 @@ private:
     printDocumentationComment(ED);
     llvm::SmallString<32> scratch;
     os << "typedef SWIFT_ENUM(";
-    print(ED->getRawType());
+    print(ED->getRawType(), OTK_None);
     os << ", " << ED->getName() << ") {\n";
     for (auto Elt : ED->getAllElements()) {
       printDocumentationComment(Elt);
@@ -190,7 +191,7 @@ private:
     StringRef firstPiece, restOfSelector;
     std::tie(firstPiece, restOfSelector) = selectorString.split(':');
     os << firstPiece << ":(";
-    this->print(param->getType());
+    this->print(param->getType(), OTK_None);
     os << ")";
 
     if (isa<AnyPattern>(param))
@@ -220,7 +221,7 @@ private:
                AFD->getAttrs().hasAttribute<IBActionAttr>()) {
       os << "IBAction";
     } else {
-      print(methodTy->getResult());
+      print(methodTy->getResult(), OTK_None);
     }
 
     os << ")";
@@ -347,15 +348,16 @@ private:
     } else if (ty->is<UnmanagedStorageType>()) {
       os << ", unsafe_unretained";
     } else {
-      if (auto unwrappedTy = ty->getAnyOptionalObjectType())
-        ty = unwrappedTy;
-      if (auto nominal = ty->getStructOrBoundGenericStruct()) {
+      Type copyTy = ty;
+      if (auto unwrappedTy = copyTy->getAnyOptionalObjectType())
+        copyTy = unwrappedTy;
+      if (auto nominal = copyTy->getStructOrBoundGenericStruct()) {
         if (nominal == ctx.getArrayDecl() ||
             nominal == ctx.getDictionaryDecl() ||
             nominal == ctx.getStringDecl()) {
           os << ", copy";
         }
-      } else if (ty->is<FunctionType>()) {
+      } else if (copyTy->is<FunctionType>()) {
         os << ", copy";
       }
     }
@@ -387,7 +389,7 @@ private:
       if (!maybePrintIBOutletCollection(ty))
         os << "IBOutlet ";
     }
-    print(ty, VD->getName().str());
+    print(ty, OTK_None, VD->getName().str());
     os << ";\n";
   }
 
@@ -401,8 +403,24 @@ private:
   /// Visit part of a type, such as the base of a pointer type.
   ///
   /// If a full type is being printed, use print() instead.
-  void visitPart(Type ty) {
-    TypeVisitor::visit(ty);
+  void visitPart(Type ty, OptionalTypeKind optionalKind) {
+    TypeVisitor::visit(ty, optionalKind);
+  }
+
+  void printNullability(OptionalTypeKind kind) {
+    switch (kind) {
+    case OTK_None:
+      os << " __nonnull";
+      break;
+
+    case OTK_Optional:
+      os << " __nullable";
+      break;
+
+    case OTK_ImplicitlyUnwrappedOptional:
+      os << " __null_unspecified";
+      break;
+    }
   }
 
   /// If "name" is one of the standard library types used to map in Clang
@@ -411,80 +429,89 @@ private:
   ///
   /// This handles typealiases and structs provided by the standard library
   /// for interfacing with C and Objective-C.
-  bool printIfKnownTypeName(Identifier moduleName, Identifier name) {
+  bool printIfKnownTypeName(Identifier moduleName, Identifier name,
+                            OptionalTypeKind optionalKind) {
     if (specialNames.empty()) {
-#define MAP(SWIFT_NAME, CLANG_REPR) \
+#define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                       \
       specialNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = \
-        CLANG_REPR
+        { CLANG_REPR, NEEDS_NULLABILITY}
 
-      MAP(CBool, "bool");
+      MAP(CBool, "bool", false);
 
-      MAP(CChar, "char");
-      MAP(CWideChar, "wchar_t");
-      MAP(CChar16, "char16_t");
-      MAP(CChar32, "char32_t");
+      MAP(CChar, "char", false);
+      MAP(CWideChar, "wchar_t", false);
+      MAP(CChar16, "char16_t", false);
+      MAP(CChar32, "char32_t", false);
 
-      MAP(CSignedChar, "signed char");
-      MAP(CShort, "short");
-      MAP(CInt, "int");
-      MAP(CLong, "long");
-      MAP(CLongLong, "long long");
+      MAP(CSignedChar, "signed char", false);
+      MAP(CShort, "short", false);
+      MAP(CInt, "int", false);
+      MAP(CLong, "long", false);
+      MAP(CLongLong, "long long", false);
 
-      MAP(CUnsignedChar, "unsigned char");
-      MAP(CUnsignedShort, "unsigned short");
-      MAP(CUnsignedInt, "unsigned int");
-      MAP(CUnsignedLong, "unsigned long");
-      MAP(CUnsignedLongLong, "unsigned long long");
+      MAP(CUnsignedChar, "unsigned char", false);
+      MAP(CUnsignedShort, "unsigned short", false);
+      MAP(CUnsignedInt, "unsigned int", false);
+      MAP(CUnsignedLong, "unsigned long", false);
+      MAP(CUnsignedLongLong, "unsigned long long", false);
 
-      MAP(CFloat, "float");
-      MAP(CDouble, "double");
+      MAP(CFloat, "float", false);
+      MAP(CDouble, "double", false);
 
-      MAP(Int8, "int8_t");
-      MAP(Int16, "int16_t");
-      MAP(Int32, "int32_t");
-      MAP(Int64, "int64_t");
-      MAP(UInt8, "uint8_t");
-      MAP(UInt16, "uint16_t");
-      MAP(UInt32, "uint32_t");
-      MAP(UInt64, "uint64_t");
+      MAP(Int8, "int8_t", false);
+      MAP(Int16, "int16_t", false);
+      MAP(Int32, "int32_t", false);
+      MAP(Int64, "int64_t", false);
+      MAP(UInt8, "uint8_t", false);
+      MAP(UInt16, "uint16_t", false);
+      MAP(UInt32, "uint32_t", false);
+      MAP(UInt64, "uint64_t", false);
 
-      MAP(Float, "float");
-      MAP(Double, "double");
-      MAP(Float32, "float");
-      MAP(Float64, "double");
+      MAP(Float, "float", false);
+      MAP(Double, "double", false);
+      MAP(Float32, "float", false);
+      MAP(Float64, "double", false);
 
-      MAP(Int, "NSInteger");
-      MAP(UInt, "NSUInteger");
-      MAP(Bool, "BOOL");
-      MAP(String, "NSString *");
+      MAP(Int, "NSInteger", false);
+      MAP(UInt, "NSUInteger", false);
+      MAP(Bool, "BOOL", false);
+      MAP(String, "NSString *", true);
 
-      MAP(COpaquePointer, "void *");
-      MAP(CMutableVoidPointer, "void *");
-      MAP(CConstVoidPointer, "void const *");
+      MAP(COpaquePointer, "void * __null_unspecified", false);
+      MAP(CMutableVoidPointer, "void * __null_unspecified", false);
+      MAP(CConstVoidPointer, "void const * __null_unspecified", false);
 
       Identifier ID_ObjectiveC = ctx.getIdentifier(OBJC_MODULE_NAME);
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] = "BOOL";
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = "SEL";
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] = "NSZone *";
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 
+        = { "BOOL", false};
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
+        = { "SEL", false };
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
+        = { "NSZone * __null_unspecified", false };
     }
 
     auto iter = specialNames.find({moduleName, name});
     if (iter == specialNames.end())
       return false;
-    os << iter->second;
+
+    os << iter->second.first;
+    if (iter->second.second)
+      printNullability(optionalKind);
     return true;
   }
 
-  void visitType(TypeBase *Ty) {
+  void visitType(TypeBase *Ty, OptionalTypeKind optionalKind) {
     assert(Ty->getDesugaredType() == Ty && "unhandled sugared type");
     os << "/* ";
     Ty->print(os);
     os << " */";
   }
 
-  void visitNameAliasType(NameAliasType *aliasTy) {
+  void visitNameAliasType(NameAliasType *aliasTy,
+                          OptionalTypeKind optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (printIfKnownTypeName(alias->getModuleContext()->Name, alias->getName()))
+    if (printIfKnownTypeName(alias->getModuleContext()->Name, alias->getName(),
+                             optionalKind))
       return;
 
     if (alias->hasClangNode() || alias->isObjC()) {
@@ -492,7 +519,7 @@ private:
       return;
     }
 
-    visitPart(alias->getUnderlyingType());
+    visitPart(alias->getUnderlyingType(), optionalKind);
   }
 
   void maybePrintTagKeyword(const NominalTypeDecl *NTD) {
@@ -510,9 +537,10 @@ private:
     os << clangDecl->getKindName() << " ";
   }
 
-  void visitStructType(StructType *ST) {
+  void visitStructType(StructType *ST, OptionalTypeKind optionalKind) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
-    if (printIfKnownTypeName(SD->getModuleContext()->Name, SD->getName()))
+    if (printIfKnownTypeName(SD->getModuleContext()->Name, SD->getName(),
+                             optionalKind))
       return;
 
     maybePrintTagKeyword(SD);
@@ -521,7 +549,8 @@ private:
 
   /// If \p BGT represents a generic struct used to import Clang types, print
   /// it out.
-  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT) {
+  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+                                 OptionalTypeKind optionalKind) {
     StructDecl *SD = BGT->getDecl();
     if (!SD->getModuleContext()->isStdlibModule())
       return false;
@@ -529,19 +558,21 @@ private:
     if (SD == ctx.getArrayDecl()) {
       // FIXME: It'd be nice to put the element type here as well.
       os << "NSArray *";
+      printNullability(optionalKind);
       return true;
     }
 
     if (SD == ctx.getDictionaryDecl()) {
       // FIXME: IT'd be nice to put the element type here as well.
       os << "NSDictionary *";
+      printNullability(optionalKind);
       return true;
     }
 
     if (SD == ctx.getCFunctionPointerDecl()) {
       assert(BGT->getGenericArgs().size() == 1);
       auto FT = BGT->getGenericArgs()[0]->castTo<FunctionType>();
-      printFunctionType(FT, '*');
+      printFunctionType(FT, '*', OTK_ImplicitlyUnwrappedOptional);
       return true;
     }
 
@@ -559,65 +590,75 @@ private:
 
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
-    visitPart(args.front());
+    visitPart(args.front(), OTK_None);
     if (isConst)
       os << " const";
-    os << " *";
+    os << " * __null_unspecified";
     return true;
   }
 
-  void visitBoundGenericStructType(BoundGenericStructType *BGT) {
-    if (printIfKnownGenericStruct(BGT))
+  void visitBoundGenericStructType(BoundGenericStructType *BGT,
+                                   OptionalTypeKind optionalKind) {
+    if (printIfKnownGenericStruct(BGT, optionalKind))
       return;
-    visitBoundGenericType(BGT);
+    visitBoundGenericType(BGT, optionalKind);
   }
 
-  void visitBoundGenericType(BoundGenericType *BGT) {
-    if (auto underlying = BGT->getAnyOptionalObjectType())
-      visitPart(underlying);
-    else
-      visitType(BGT);
+  void visitBoundGenericType(BoundGenericType *BGT,
+                             OptionalTypeKind optionalKind) {
+    if (auto underlying = BGT->getAnyOptionalObjectType(optionalKind)) {
+      visitPart(underlying, optionalKind);
+    } else
+      visitType(BGT, optionalKind);
   }
 
-  void visitEnumType(EnumType *ET) {
+  void visitEnumType(EnumType *ET, OptionalTypeKind optionalKind) {
     const EnumDecl *ED = ET->getDecl();
     maybePrintTagKeyword(ED);
     os << ED->getName();
   }
 
-  void visitClassType(ClassType *CT) {
+  void visitClassType(ClassType *CT, OptionalTypeKind optionalKind) {
     const ClassDecl *CD = CT->getClassOrBoundGenericClass();
     assert(CD->isObjC());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
     if (clangDecl) {
       if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
         os << clangDecl->getName() << " *";
+        printNullability(optionalKind);
       } else {
         maybePrintTagKeyword(CD);
         os << clangDecl->getName();
       }
     } else {
       os << CD->getName() << " *";
+      printNullability(optionalKind);
     }
   }
 
-  void visitProtocolType(ProtocolType *PT, bool isMetatype = false) {
+  void visitProtocolType(ProtocolType *PT, OptionalTypeKind optionalKind, 
+                         bool isMetatype = false) {
     os << (isMetatype ? "Class" : "id");
 
     auto proto = PT->getDecl();
     assert(proto->isObjC());
-    if (auto knownKind = proto->getKnownProtocolKind())
-      if (*knownKind == KnownProtocolKind::AnyObject)
+    if (auto knownKind = proto->getKnownProtocolKind()) {
+      if (*knownKind == KnownProtocolKind::AnyObject) {
+        printNullability(optionalKind);
         return;
+      }
+    }
 
     printProtocols(proto);
+    printNullability(optionalKind);
   }
 
-  void visitProtocolCompositionType(ProtocolCompositionType *PCT,
+  void visitProtocolCompositionType(ProtocolCompositionType *PCT, 
+                                    OptionalTypeKind optionalKind,
                                     bool isMetatype = false) {
     CanType canonicalComposition = PCT->getCanonicalType();
     if (auto singleProto = dyn_cast<ProtocolType>(canonicalComposition))
-      return visitProtocolType(singleProto, isMetatype);
+      return visitProtocolType(singleProto, optionalKind, isMetatype);
     PCT = cast<ProtocolCompositionType>(canonicalComposition);
 
     os << (isMetatype ? "Class" : "id");
@@ -629,20 +670,22 @@ private:
       return ty->castTo<ProtocolType>()->getDecl();
     });
     printProtocols(protos);
+    printNullability(optionalKind);
   }
 
-  void visitExistentialMetatypeType(ExistentialMetatypeType *MT) {
+  void visitExistentialMetatypeType(ExistentialMetatypeType *MT, 
+                                    OptionalTypeKind optionalKind) {
     Type instanceTy = MT->getInstanceType();
     if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
-      visitProtocolType(protoTy, /*isMetatype=*/true);
+      visitProtocolType(protoTy, optionalKind, /*isMetatype=*/true);
     } else if (auto compTy = instanceTy->getAs<ProtocolCompositionType>()) {
-      visitProtocolCompositionType(compTy, /*isMetatype=*/true);
+      visitProtocolCompositionType(compTy, optionalKind, /*isMetatype=*/true);
     } else {
-      visitType(MT);
+      visitType(MT, optionalKind);
     }
   }
 
-  void visitMetatypeType(MetatypeType *MT) {
+  void visitMetatypeType(MetatypeType *MT, OptionalTypeKind optionalKind) {
     Type instanceTy = MT->getInstanceType();
     if (auto classTy = instanceTy->getAs<ClassType>()) {
       const ClassDecl *CD = classTy->getDecl();
@@ -650,25 +693,28 @@ private:
         os << "SWIFT_METATYPE(" << CD->getName() << ")";
       else
         os << "Class";
+      printNullability(optionalKind);
     } else {
-      visitType(MT);
+      visitType(MT, optionalKind);
     }
   }
                       
-  void printFunctionType(FunctionType *FT, char pointerSigil) {
-    visitPart(FT->getResult());
+  void printFunctionType(FunctionType *FT, char pointerSigil,
+                         OptionalTypeKind optionalKind) {
+    visitPart(FT->getResult(), OTK_None);
     os << " (" << pointerSigil;
+    printNullability(optionalKind);
     openFunctionTypes.push_back(FT);
   }
 
-  void visitFunctionType(FunctionType *FT) {
+  void visitFunctionType(FunctionType *FT, OptionalTypeKind optionalKind) {
     switch (FT->getRepresentation()) {
     case AnyFunctionType::Representation::Thin:
       llvm_unreachable("can't handle thin functions yet");
     // Native Swift function types bridge to block types.
     case AnyFunctionType::Representation::Thick:
     case AnyFunctionType::Representation::Block:
-      printFunctionType(FT, '^');
+      printFunctionType(FT, '^', optionalKind);
       break;
     }
   }
@@ -686,42 +732,45 @@ private:
         os << "void";
       } else {
         interleave(tupleTy->getElementTypes(),
-                   [this](Type ty) { print(ty); },
+                   [this](Type ty) { print(ty, OTK_None); },
                    [this] { os << ", "; });
       }
     } else {
-      print(paramsTy);
+      print(paramsTy, OTK_None);
     }
     os << ")";
   }
 
-  void visitTupleType(TupleType *TT) {
+  void visitTupleType(TupleType *TT, OptionalTypeKind optionalKind) {
     assert(TT->getNumElements() == 0);
     os << "void";
   }
 
-  void visitParenType(ParenType *PT) {
-    visitPart(PT->getSinglyDesugaredType());
+  void visitParenType(ParenType *PT, OptionalTypeKind optionalKind) {
+    visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSubstitutedType(SubstitutedType *ST) {
-    visitPart(ST->getSinglyDesugaredType());
+  void visitSubstitutedType(SubstitutedType *ST, OptionalTypeKind optionalKind) {
+    visitPart(ST->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSyntaxSugarType(SyntaxSugarType *SST) {
-    visitPart(SST->getSinglyDesugaredType());
+  void visitSyntaxSugarType(SyntaxSugarType *SST, 
+                            OptionalTypeKind optionalKind) {
+    visitPart(SST->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitDictionaryType(DictionaryType *DT) {
-    visitPart(DT->getSinglyDesugaredType());
+  void visitDictionaryType(DictionaryType *DT, OptionalTypeKind optionalKind) {
+    visitPart(DT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitDynamicSelfType(DynamicSelfType *DST) {
+  void visitDynamicSelfType(DynamicSelfType *DST, 
+                            OptionalTypeKind optionalKind) {
     os << "instancetype";
   }
 
-  void visitReferenceStorageType(ReferenceStorageType *RST) {
-    visitPart(RST->getReferentType());
+  void visitReferenceStorageType(ReferenceStorageType *RST, 
+                                 OptionalTypeKind optionalKind) {
+    visitPart(RST->getReferentType(), optionalKind);
   }
 
   /// Print a full type, optionally declaring the given \p name.
@@ -729,11 +778,11 @@ private:
   /// This will properly handle nested function types (see
   /// finishFunctionType()). If only a part of a type is being printed, use
   /// visitPart().
-  void print(Type ty, StringRef name = "") {
+  void print(Type ty, OptionalTypeKind optionalKind, StringRef name = "") {
     decltype(openFunctionTypes) savedFunctionTypes;
     savedFunctionTypes.swap(openFunctionTypes);
 
-    visitPart(ty);
+    visitPart(ty, optionalKind);
     if (!name.empty())
       os << ' ' << name;
     while (!openFunctionTypes.empty()) {
@@ -1149,6 +1198,17 @@ public:
            "# define SWIFT_ENUM(_type, _name) "
              "enum _name : _type _name; "
              "enum SWIFT_ENUM_EXTRA _name : _type\n"
+           "#endif\n"
+           "#if !__has_feature(nullability)\n"
+           "# if !defined(__nonnull)\n"
+           "#  define __nonnull\n"
+           "# endif\n"
+           "# if !defined(__nullable)\n"
+           "#  define __nullable\n"
+           "# endif\n"
+           "# if !defined(__null_unspecified)\n"
+           "#  define __null_unspecified\n"
+           "# endif\n"
            "#endif\n";
   }
 
