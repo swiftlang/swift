@@ -164,6 +164,18 @@ class subject_genericClass<T> { // no-error
 }
 
 @objc
+enum subject_enum: Int {
+  @objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
+  case subject_enumElement1
+
+  @objc   
+  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+
+  @objc
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+}
+
+@objc
 protocol subject_protocol1 {
   @objc
   var subject_instanceVar: Int { get }
