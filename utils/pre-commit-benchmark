@@ -196,9 +196,9 @@ def compareScores(key, score1, score2, runs):
         row.append("0.0")
 
     row.append("%.2f" % abs(bestscore1-bestscore2))
-    Num=bestscore1
-    Den=bestscore2
-    row.append("%.1f%%"%(((Num/Den)-1)*100) if Den > 0 else "*")
+    Num=float(bestscore1)
+    Den=float(bestscore2)
+    row.append(("%.2f" % (Num/Den)) if Den > 0 else "*")
     return row
 
 def compareTimingsFiles(file1, file2):
