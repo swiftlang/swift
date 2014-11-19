@@ -8,6 +8,17 @@
 
 import Foundation
 
+// CHECK-LABEL: enum FooComments : NSInteger;
+// CHECK-LABEL: enum NegativeValues : int16_t;
+// CHECK-LABEL: @interface AnEnumMethod
+// CHECK-LABEL: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
+// CHECK-LABEL: @end
+@objc class AnEnumMethod {
+  @objc func takeAndReturnEnum(foo: FooComments) -> NegativeValues {
+    return .Zung
+  }
+}
+
 // CHECK-LABEL: typedef SWIFT_ENUM(unsigned int, ExplicitValues) {
 // CHECK-LABEL:   ExplicitValuesZim = 0,
 // CHECK-LABEL:   ExplicitValuesZang = 219,
@@ -43,5 +54,15 @@ import Foundation
   case Zang = -219, Zung
 
   func methodNotExportedToObjC() {}
+}
+
+// CHECK-NOT: enum {{[A-Z]+}}
+// CHECK-LABEL: @interface ZEnumMethod
+// CHECK-LABEL: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
+// CHECK-LABEL: @end
+@objc class ZEnumMethod {
+  @objc func takeAndReturnEnum(foo: FooComments) -> NegativeValues {
+    return .Zung
+  }
 }
 

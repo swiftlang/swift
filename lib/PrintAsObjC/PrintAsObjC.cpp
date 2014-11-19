@@ -615,7 +615,9 @@ private:
   void visitEnumType(EnumType *ET, OptionalTypeKind optionalKind) {
     const EnumDecl *ED = ET->getDecl();
     maybePrintTagKeyword(ED);
-    os << ED->getName();
+    
+    // Use the "enum" introducer to safely reference forward declarations.
+    os << "enum " << ED->getName();
   }
 
   void visitClassType(ClassType *CT, OptionalTypeKind optionalKind) {
@@ -778,6 +780,7 @@ private:
   /// This will properly handle nested function types (see
   /// finishFunctionType()). If only a part of a type is being printed, use
   /// visitPart().
+public:
   void print(Type ty, OptionalTypeKind optionalKind, StringRef name = "") {
     decltype(openFunctionTypes) savedFunctionTypes;
     savedFunctionTypes.swap(openFunctionTypes);
@@ -964,26 +967,37 @@ public:
     }
   }
 
-  void forwardDeclare(const NominalTypeDecl *NTD, StringRef introducer) {
+  void forwardDeclare(const NominalTypeDecl *NTD,
+                      std::function<void (void)> Printer) {
     if (NTD->getModuleContext()->isStdlibModule())
       return;
     auto &state = seenTypes[NTD];
     if (state.second)
       return;
-    os << introducer << ' ' << NTD->getName() << ";\n";
+    Printer();
     state.second = true;
   }
 
   void forwardDeclare(const ClassDecl *CD) {
     if (!CD->isObjC() || CD->isForeign())
       return;
-    forwardDeclare(CD, "@class");
+    forwardDeclare(CD, [&]{ os << "@class " << CD->getName() << ";\n"; });
   }
 
   void forwardDeclare(const ProtocolDecl *PD) {
     assert(PD->isObjC() ||
            *PD->getKnownProtocolKind() == KnownProtocolKind::AnyObject);
-    forwardDeclare(PD, "@protocol");
+    forwardDeclare(PD, [&]{ os << "@protocol " << PD->getName() << ";\n"; });
+  }
+  
+  void forwardDeclare(const EnumDecl *ED) {
+    assert(ED->isObjC() || ED->hasClangNode());
+    
+    forwardDeclare(ED, [&]{
+      os << "enum " << ED->getName() << " : ";
+      printer.print(ED->getRawType(), OTK_None);
+      os << ";\n";
+    });
   }
 
   void forwardDeclareMemberTypes(DeclRange members) {
@@ -1014,6 +1028,8 @@ public:
           forwardDeclare(CD);
         else if (auto PD = dyn_cast<ProtocolDecl>(TD))
           forwardDeclare(PD);
+        else if (auto ED = dyn_cast<EnumDecl>(TD))
+          forwardDeclare(ED);
         else if (addImport(TD))
           return;
         else if (auto TAD = dyn_cast<TypeAliasDecl>(TD))

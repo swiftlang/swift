@@ -153,7 +153,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (CGFloat)getOriginY:(CGRect)r;
 // CHECK-NEXT: - (NSArray * __nonnull)emptyArray;
 // CHECK-NEXT: - (NSArray * __nullable)maybeArray;
-// CHECK-NEXT: - (NSRuncingMode)someEnum;
+// CHECK-NEXT: - (enum NSRuncingMode)someEnum;
 // CHECK-NEXT: - (NSZone * __null_unspecified)zone;
 // CHECK-NEXT: - (struct FooStruct1)tagStruct;
 // CHECK-NEXT: - (enum Tribool)tagEnum;

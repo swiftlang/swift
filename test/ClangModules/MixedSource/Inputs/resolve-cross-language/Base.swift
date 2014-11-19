@@ -21,3 +21,7 @@ extension BaseClass {
   case Zung
 }
 
+@objc public class AnotherClass {
+  @objc public func getEnum() -> BaseEnum { return .Zung }
+  public init() {}
+}

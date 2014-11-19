@@ -12,6 +12,7 @@ void useBaseProtoObjC(id <BaseProto>);
 
 @interface BaseClass (ObjCExtensions)
 - (void)categoryMethod;
+- (BaseEnum)baseEnumMethod:(BaseEnum)be;
 @end
 
 typedef OBJC_ENUM(unsigned char, BaseEnumObjC) {
@@ -26,3 +27,9 @@ void useBaseEnum(BaseEnum);
 BaseEnumObjC getBaseEnumObjC();
 void useBaseEnumObjC(BaseEnumObjC);
 
+@protocol EnumProto
+- (BaseEnum)getEnum;
+@end
+
+@interface AnotherClass (EnumProtoConformance) <EnumProto>
+@end

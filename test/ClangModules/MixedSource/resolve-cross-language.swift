@@ -14,6 +14,8 @@ useBaseClassObjC(getBaseClassObjC())
 useBaseProtoObjC(getBaseProtoObjC())
 var be: BaseEnum = getBaseEnum()
 useBaseEnum(be)
+be = getBaseClass().baseEnumMethod(be)
+be = AnotherClass().getEnum()
 var beo: BaseEnumObjC = getBaseEnumObjC()
 useBaseEnumObjC(beo)
 
