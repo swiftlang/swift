@@ -320,14 +320,11 @@ internal func _makeObjCBridgeObject<ObjCClass: AnyObject>(
 internal func _makeBridgeObject<Class: AnyObject>(
   object: Class, bits: UInt
 ) -> Builtin.BridgeObject {
+  // FIXME: Workaround for 
   func preconditionTest(object: Class, bits: UInt) -> Bool {
-    if _isObjCTaggedPointer(object) {
-      return bits == 0
-    }
-    else {
-      return bits != _objectPointerSpareBits
+    return _isObjCTaggedPointer(object) ? bits == 0
+    : bits != _objectPointerSpareBits
       || _usesNativeSwiftReferenceCounting(Class.self)
-    }
   }
   _sanityCheck(preconditionTest(object, bits))
   
