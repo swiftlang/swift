@@ -82,4 +82,32 @@ func test_enum_without_name_Equatable(obj: TestThatEnumType) -> Bool {
 func use_metadata<T>(t:T){}
 use_metadata(NSRuncingOptions.Mince)
 
+@objc enum ExportedToObjC: Int {
+  case Foo = -1, Bar, Bas
+}
+
+// CHECK-LABEL: define hidden i64 @_TF12objc_ns_enum16objc_enum_injectFT_OS_14ExportedToObjC()
+// CHECK:         ret i64 -1
+func objc_enum_inject() -> ExportedToObjC {
+  return .Foo
+}
+
+// CHECK-LABEL: define hidden i64 @_TF12objc_ns_enum16objc_enum_switchFOS_14ExportedToObjCSi(i64)
+// CHECK:         switch i64 %0, label {{%.*}} [
+// CHECK:           i64 -1, label {{%.*}}
+// CHECK:           i64  0, label {{%.*}}
+// CHECK:           i64  1, label {{%.*}}
+func objc_enum_switch(x: ExportedToObjC) -> Int {
+  switch x {
+  case .Foo:
+    return 0
+  case .Bar:
+    return 1
+  case .Bas:
+    return 2
+  }
+}
+
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+
+

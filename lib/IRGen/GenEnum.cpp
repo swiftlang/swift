@@ -3537,8 +3537,8 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
            + elementsWithNoPayload.size()
          && "not all elements accounted for");
 
-  // Enums from Clang use C-compatible layout.
-  if (theEnum->hasClangNode()) {
+  // Enums imported from Clang or marked with @objc use C-compatible layout.
+  if (theEnum->hasClangNode() || theEnum->isObjC()) {
     assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
     return new CCompatibleEnumImplStrategy(TC.IGM, tik, numElements,
                                        std::move(elementsWithPayload),
@@ -3862,7 +3862,7 @@ namespace {
                                                       EnumDecl *theEnum,
                                                       llvm::StructType *enumTy){
     // The type should have come from Clang and should have a raw type.
-    assert(theEnum->hasClangNode()
+    assert((theEnum->hasClangNode() || theEnum->isObjC())
            && "c-compatible enum didn't come from clang!");
     assert(theEnum->hasRawType()
            && "c-compatible enum doesn't have raw type!");
