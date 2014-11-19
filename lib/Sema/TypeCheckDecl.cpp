@@ -4186,8 +4186,7 @@ public:
           // integer type.
           if (!TC.isCIntegerType(ED, rawTy))
             TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                        diag::objc_en
-                        um_raw_type_not_integer,
+                        diag::objc_enum_raw_type_not_integer,
                         rawTy);
         } else {
           // @objc enums must have a raw type.
