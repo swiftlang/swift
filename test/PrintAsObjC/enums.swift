@@ -9,9 +9,9 @@
 import Foundation
 
 // CHECK-LABEL: typedef SWIFT_ENUM(ExplicitValues, unsigned int) {
-// CHECK-LABEL:   ExplicitValuesZim,
-// CHECK-LABEL:   ExplicitValuesZang,
-// CHECK-LABEL:   ExplicitValuesZung,
+// CHECK-LABEL:   ExplicitValuesZim = 0,
+// CHECK-LABEL:   ExplicitValuesZang = 219,
+// CHECK-LABEL:   ExplicitValuesZung = 220,
 // CHECK-LABEL: };
 
 @objc enum ExplicitValues: CUnsignedInt {
@@ -23,9 +23,9 @@ import Foundation
 // CHECK-LABEL: /// Foo: A feer, a female feer.
 // CHECK-LABEL: typedef SWIFT_ENUM(FooComments, NSInteger) {
 // CHECK-LABEL:   /// Zim: A zeer, a female zeer.
-// CHECK-LABEL:   FooCommentsZim,
-// CHECK-LABEL:   FooCommentsZang,
-// CHECK-LABEL:   FooCommentsZung,
+// CHECK-LABEL:   FooCommentsZim = 0,
+// CHECK-LABEL:   FooCommentsZang = 1,
+// CHECK-LABEL:   FooCommentsZung = 2,
 // CHECK-LABEL: };
 
 /// Foo: A feer, a female feer.
@@ -33,5 +33,15 @@ import Foundation
   /// Zim: A zeer, a female zeer.
   case Zim
   case Zang, Zung
+}
+
+// CHECK-LABEL: typedef SWIFT_ENUM(NegativeValues, int16_t) {
+// CHECK-LABEL:   Zang = -219,
+// CHECK-LABEL:   Zung = -218,
+// CHECK-LABEL: };
+@objc enum NegativeValues: Int16 {
+  case Zang = -219, Zung
+
+  func methodNotExportedToObjC() {}
 }
 

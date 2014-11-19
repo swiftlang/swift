@@ -1949,6 +1949,19 @@ void Serializer::writeDecl(const Decl *D) {
     auto elem = cast<EnumElementDecl>(D);
     const Decl *DC = getDeclForContext(elem->getDeclContext());
 
+    // We only serialize the raw values of @objc enums, because they're part
+    // of the ABI. That isn't the case for Swift enums.
+    auto RawValueKind = EnumElementRawValueKind::None;
+    bool Negative = false;
+    StringRef RawValueText;
+    if (elem->getParentEnum()->isObjC()) {
+      // Currently ObjC enums always have integer raw values.
+      RawValueKind = EnumElementRawValueKind::IntegerLiteral;
+      auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
+      RawValueText = ILE->getDigitsText();
+      Negative = ILE->isNegative();
+    }
+
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addIdentifierRef(elem->getName()),
@@ -1956,7 +1969,10 @@ void Serializer::writeDecl(const Decl *D) {
                                   addTypeRef(elem->getArgumentType()),
                                   addTypeRef(elem->getType()),
                                   addTypeRef(elem->getInterfaceType()),
-                                  elem->isImplicit());
+                                  elem->isImplicit(),
+                                  (unsigned)RawValueKind,
+                                  Negative,
+                                  RawValueText);
     break;
   }
 

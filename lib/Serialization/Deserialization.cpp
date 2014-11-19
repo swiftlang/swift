@@ -13,6 +13,7 @@
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/BCReadingExtras.h"
@@ -2583,11 +2584,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclID contextID;
     TypeID argTypeID, ctorTypeID, interfaceTypeID;
-    bool isImplicit;
+    bool isImplicit; bool isNegative;
+    unsigned rawValueKindID;
 
     decls_block::EnumElementLayout::readRecord(scratch, nameID, contextID,
                                                 argTypeID, ctorTypeID,
-                                                interfaceTypeID, isImplicit);
+                                                interfaceTypeID, isImplicit,
+                                                rawValueKindID, isNegative);
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2597,7 +2600,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    // FIXME: Deserialize the literal raw value, if any.
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
                                             getIdentifier(nameID),
                                             TypeLoc::withoutLoc(argTy),
@@ -2605,6 +2607,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                             nullptr,
                                             DC);
     declOrOffset = elem;
+    
+    // Deserialize the literal raw value, if any.
+    switch ((EnumElementRawValueKind)rawValueKindID) {
+    case EnumElementRawValueKind::None:
+      break;
+    case EnumElementRawValueKind::IntegerLiteral: {
+      auto literalText = getContext().AllocateCopy(blobData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
+                                                           SourceLoc(),
+                                                           /*implicit*/ true);
+      if (isNegative)
+        literal->setNegative(SourceLoc());
+      elem->setRawValueExpr(literal);
+    }
+    }
 
     elem->setType(getType(ctorTypeID));
     if (auto interfaceType = getType(interfaceTypeID))

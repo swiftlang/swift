@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 159; // Last change: objc method3 table
+const uint16_t VERSION_MINOR = 160; // Last change: add raw value to EnumElementDecl
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -266,6 +266,17 @@ enum SpecialModuleID : uint8_t {
   NUM_SPECIAL_MODULES
 };
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class EnumElementRawValueKind : uint8_t {
+  /// No raw value serialized.
+  None = 0,
+  /// Integer literal.
+  IntegerLiteral,
+  /// TODO: Float, string, char, etc.
+};
+
+using EnumElementRawValueKindField = BCFixed<4>;
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
@@ -827,7 +838,10 @@ namespace decls_block {
     TypeIDField, // argument type
     TypeIDField, // constructor type
     TypeIDField, // interface type
-    BCFixed<1>   // implicit?
+    BCFixed<1>,  // implicit?
+    EnumElementRawValueKindField,  // raw value kind
+    BCFixed<1>,  // negative raw value?
+    BCBlob       // raw value
   >;
 
   using SubscriptLayout = BCRecordLayout<

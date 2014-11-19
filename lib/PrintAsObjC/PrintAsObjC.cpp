@@ -174,9 +174,11 @@ private:
       // name.
       os << "  " << ED->getName() << Elt->getName();
       
-      if (Elt->getRawValueExpr()) {
-        os << " = "
-           << cast<IntegerLiteralExpr>(Elt->getRawValueExpr())->getDigitsText();
+      if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
+        os << " = ";
+        if (ILE->isNegative())
+          os << "-";
+        os << ILE->getDigitsText();
       }
       os << ",\n";
     }
