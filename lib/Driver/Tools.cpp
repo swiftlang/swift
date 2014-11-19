@@ -227,15 +227,13 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
     for (const Arg *A : make_range(Args.filtered_begin(options::OPT_INPUT),
                                    Args.filtered_end())) {
-      Option Opt = A->getOption();
-      if (A->getOption().matches(options::OPT_INPUT)) {
-        // See if this input should be passed with -primary-file.
-        if (!FoundPrimaryInput && PrimaryInputArg.getIndex() == A->getIndex()) {
-          Arguments.push_back("-primary-file");
-          FoundPrimaryInput = true;
-        }
-        Arguments.push_back(A->getValue());
+      // See if this input should be passed with -primary-file.
+      // FIXME: This will pick up non-source inputs too, like .o files.
+      if (!FoundPrimaryInput && PrimaryInputArg.getIndex() == A->getIndex()) {
+        Arguments.push_back("-primary-file");
+        FoundPrimaryInput = true;
       }
+      Arguments.push_back(A->getValue());
     }
     break;
   }
