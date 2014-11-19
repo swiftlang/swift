@@ -138,7 +138,7 @@ template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
 /// details.
 template <class KeyTy, class ValueTy> class ConcurrentMap {
 public:
-  ConcurrentMap() : Sentinel(0) {}
+  ConcurrentMap() : Sentinel(0), LastSearch(&Sentinel) {}
 
   ConcurrentMap(const ConcurrentMap &) = delete;
   ConcurrentMap &operator=(const ConcurrentMap &) = delete;
@@ -147,17 +147,31 @@ public:
   typedef ConcurrentMapNode<KeyTy, ValueTy> NodeTy;
   NodeTy Sentinel;
 
+  /// This value stores the last node that we searched. This is useful for
+  /// accelerating the search of the same value again and again.
+  std::atomic<NodeTy *> LastSearch;
+
   /// Search a for a node with key value \p. If the node does not exist then
   /// allocate a new node and add it to the tree.
   ValueTy &findOrAllocateNode(KeyTy Key) {
-    return findOrAllocateNode_rec(&Sentinel, Key);
+    // Try looking at the last node we searched.
+    NodeTy *Last = LastSearch.load(std::memory_order_acquire);
+    if (Last->Key == Key)
+      return Last->Payload;
+
+    // Search the binary tree.
+    NodeTy *Found = findOrAllocateNode_rec(&Sentinel, Key);
+
+    // Save the node that we found, in case we look for the same value again.
+    LastSearch.store(Found,std:: memory_order_release);
+    return Found->Payload;
   }
 
 private:
-  static ValueTy &findOrAllocateNode_rec(NodeTy *P, KeyTy Key) {
+  static NodeTy *findOrAllocateNode_rec(NodeTy *P, KeyTy Key) {
     // Found the node we were looking for.
     if (P->Key == Key)
-      return P->Payload;
+      return P;
 
     // Point to the edge we want to replace.
     typename ConcurrentMapNode<KeyTy, ValueTy>::EdgeTy *Edge = nullptr;
@@ -185,7 +199,7 @@ private:
                                                    std::memory_order_release,
                                                    std::memory_order_relaxed)){
       // On success return the new node.
-      return New->Payload;
+      return New;
     }
 
     // If failed, deallocate the node and look for a new place in the
