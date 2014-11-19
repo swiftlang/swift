@@ -108,7 +108,7 @@ template <class ElemTy> struct ConcurrentList {
 
 template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
   ConcurrentMapNode(KeyTy H)
-      : Payload(), Left(nullptr), Right(nullptr), Key(H) {}
+      : Left(nullptr), Right(nullptr), Key(H), Payload() {}
 
   ~ConcurrentMapNode() {
     delete Left.load(std::memory_order_acquire);
@@ -118,11 +118,11 @@ template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
   ConcurrentMapNode(const ConcurrentMapNode &) = delete;
   ConcurrentMapNode &operator=(const ConcurrentMapNode &) = delete;
 
-  ValueTy Payload;
   typedef std::atomic<ConcurrentMapNode *> EdgeTy;
   EdgeTy Left;
   EdgeTy Right;
   KeyTy Key;
+  ValueTy Payload;
 };
 
 /// A concurrent map that is implemented using a binary tree. It supports
