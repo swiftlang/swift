@@ -257,17 +257,36 @@ public func _swift_isClass(x: Any) -> Bool
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
 #if arch(i386) || arch(arm)
-internal var _objectPointerSpareBits: UInt { return 0x0000_0003 }
-internal var _objectPointerLowSpareBitShift: UInt { return 0 }
-internal var _objCTaggedPointerBits: UInt { return 0 }
+@inline(__always)
+internal var _objectPointerSpareBits: UInt {
+    @inline(__always) get { return 0x0000_0003 }
+}
+internal var _objectPointerLowSpareBitShift: UInt {
+    @inline(__always) get { return 0 }
+}
+internal var _objCTaggedPointerBits: UInt {
+  @inline(__always) get { return 0 }
+}
 #elseif arch(x86_64)
-internal var _objectPointerSpareBits: UInt { return 0x7F00_0000_0000_0006 }
-internal var _objectPointerLowSpareBitShift: UInt { return 1 }
-internal var _objCTaggedPointerBits: UInt { return 0x8000_0000_0000_0001 }
+internal var _objectPointerSpareBits: UInt {
+  @inline(__always) get { return 0x7F00_0000_0000_0006 }
+}
+internal var _objectPointerLowSpareBitShift: UInt {
+  @inline(__always) get { return 1 }
+}
+internal var _objCTaggedPointerBits: UInt {
+  @inline(__always) get { return 0x8000_0000_0000_0001 }
+}
 #elseif arch(arm64)
-internal var _objectPointerSpareBits: UInt { return 0x7F00_0000_0000_0007 }
-internal var _objectPointerLowSpareBitShift: UInt { return 0 }
-internal var _objCTaggedPointerBits: UInt { return 0x8000_0000_0000_0000 }
+internal var _objectPointerSpareBits: UInt {
+  @inline(__always) get { return 0x7F00_0000_0000_0007 }
+}
+internal var _objectPointerLowSpareBitShift: UInt {
+    @inline(__always) get { return 0 }
+}
+internal var _objCTaggedPointerBits: UInt {
+    @inline(__always) get { return 0x8000_0000_0000_0000 }
+}
 #endif
 
 /// Extract the raw bits of `x`
