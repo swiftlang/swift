@@ -14,28 +14,29 @@
 #define SWIFT_REFERENCEDNAMETRACKER_H
 
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
+class NominalTypeDecl;
+
 class ReferencedNameTracker {
-  SmallPtrSet<Identifier, 1> TopLevelNames;
-  SmallPtrSet<const NominalTypeDecl *, 1> UsedNominals;
+  llvm::DenseMap<Identifier, bool> TopLevelNames;
+  llvm::DenseMap<const NominalTypeDecl *, bool> UsedNominals;
 public:
-  void addTopLevelName(Identifier name) {
-    TopLevelNames.insert(name);
+  void addTopLevelName(Identifier name, bool isNonPrivateUse) {
+    TopLevelNames[name] |= isNonPrivateUse;
   }
 
-  const SmallPtrSetImpl<Identifier> &getTopLevelNames() const {
+  const llvm::DenseMap<Identifier, bool> &getTopLevelNames() const {
     return TopLevelNames;
   }
 
-  void addUsedNominal(const NominalTypeDecl *nominal) {
-    UsedNominals.insert(nominal);
+  void addUsedNominal(const NominalTypeDecl *nominal, bool isNonPrivateUse) {
+    UsedNominals[nominal] |= isNonPrivateUse;
   }
 
-  const SmallPtrSetImpl<const NominalTypeDecl *> &getUsedNominals() const {
+  const llvm::DenseMap<const NominalTypeDecl *, bool> &getUsedNominals() const {
     return UsedNominals;
   }
 };

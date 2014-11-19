@@ -422,15 +422,64 @@ static void filterForDiscriminator(SmallVectorImpl<Result> &results,
   results.push_back(lastMatch);
 }
 
+static bool isPrivateContextForLookup(const DeclContext *DC,
+                                      bool functionsArePrivate) {
+  switch (DC->getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr:
+    break;
+
+  case DeclContextKind::Initializer:
+    // Default arguments still require a type.
+    if (isa<DefaultArgumentInitializer>(DC))
+      return true;
+    break;
+
+  case DeclContextKind::TopLevelCodeDecl:
+    // FIXME: Pattern initializers at top-level scope end up here.
+    return false;
+
+  case DeclContextKind::AbstractFunctionDecl:
+    if (functionsArePrivate)
+      return true;
+    break;
+
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+    return false;
+
+  case DeclContextKind::NominalTypeDecl: {
+    auto *nominal = cast<NominalTypeDecl>(DC);
+    if (nominal->hasAccessibility())
+      return nominal->getAccessibility() == Accessibility::Private;
+    break;
+  }
+
+  case DeclContextKind::ExtensionDecl: {
+    auto *extension = cast<ExtensionDecl>(DC);
+    if (extension->hasDefaultAccessibility())
+      return extension->getDefaultAccessibility() == Accessibility::Private;
+    // FIXME: duplicated from computeDefaultAccessibility in TypeCheckDecl.cpp.
+    if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
+      return AA->getAccess() == Accessibility::Private;
+    if (Type extendedTy = extension->getExtendedType())
+      return isPrivateContextForLookup(extendedTy->getAnyNominal(), true);
+    break;
+  }
+  }
+
+  return isPrivateContextForLookup(DC->getParent(), true);
+}
+
 static void recordLookupOfTopLevelName(DeclContext *topLevelContext,
-                                       DeclName name) {
+                                       DeclName name,
+                                       bool isNonPrivateUse) {
   auto SF = dyn_cast<SourceFile>(topLevelContext);
   if (!SF)
     return;
   auto *nameTracker = SF->getReferencedNameTracker();
   if (!nameTracker)
     return;
-  nameTracker->addTopLevelName(name.getBaseName());
+  nameTracker->addTopLevelName(name.getBaseName(), isNonPrivateUse);
 }
 
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
@@ -443,185 +492,201 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
+  bool isPrivateUse = false;
+
   // Never perform local lookup for operators.
-  if (Name.isOperator())
+  if (Name.isOperator()) {
+    isPrivateUse = isPrivateContextForLookup(DC, /*includeFunctions=*/true);
     DC = DC->getModuleScopeContext();
+  } else {
+    // If we are inside of a method, check to see if there are any ivars in
+    // scope, and if so, whether this is a reference to one of them.
+    // FIXME: We should persist this information between lookups.
+    while (!DC->isModuleScopeContext()) {
+      ValueDecl *BaseDecl = 0;
+      ValueDecl *MetaBaseDecl = 0;
+      GenericParamList *GenericParams = nullptr;
+      Type ExtendedType;
 
-  // If we are inside of a method, check to see if there are any ivars in scope,
-  // and if so, whether this is a reference to one of them.
-  while (!DC->isModuleScopeContext()) {
-    ValueDecl *BaseDecl = 0;
-    ValueDecl *MetaBaseDecl = 0;
-    GenericParamList *GenericParams = nullptr;
-    Type ExtendedType;
-
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-      // Look for local variables; normally, the parser resolves these
-      // for us, but it can't do the right thing inside local types.
-      // FIXME: when we can parse and typecheck the function body partially for
-      // code completion, AFD->getBody() check can be removed.
-      if (Loc.isValid() && AFD->getBody()) {
-        FindLocalVal localVal(SM, Loc, Name);
-        localVal.visit(AFD->getBody());
-        if (!localVal.MatchingValue) {
-          for (Pattern *P : AFD->getBodyParamPatterns())
-            localVal.checkPattern(P);
-        }
-        if (localVal.MatchingValue) {
-          Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
-          return;
-        }
-      }
-
-      if (AFD->getExtensionType()) {
-        ExtendedType = AFD->getExtensionType();
-        BaseDecl = AFD->getImplicitSelfDecl();
-        MetaBaseDecl = ExtendedType->getAnyNominal();
-        DC = DC->getParent();
-
-        if (auto *FD = dyn_cast<FuncDecl>(AFD))
-          if (FD->isStatic())
-            ExtendedType = MetatypeType::get(ExtendedType);
-
-        // If we're not in the body of the function, the base declaration
-        // is the nominal type, not 'self'.
-        if (Loc.isValid() &&
-            AFD->getBodySourceRange().isValid() &&
-            !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)) {
-          BaseDecl = MetaBaseDecl;
-        }
-      }
-
-      // Look in the generic parameters after checking our local declaration.
-      GenericParams = AFD->getGenericParams();
-    } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
-      // Look for local variables; normally, the parser resolves these
-      // for us, but it can't do the right thing inside local types.
-      if (Loc.isValid()) {
-        if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+        // Look for local variables; normally, the parser resolves these
+        // for us, but it can't do the right thing inside local types.
+        // FIXME: when we can parse and typecheck the function body partially for
+        // code completion, AFD->getBody() check can be removed.
+        if (Loc.isValid() && AFD->getBody()) {
+          isPrivateUse =
+              SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
           FindLocalVal localVal(SM, Loc, Name);
-          localVal.visit(CE->getBody());
+          localVal.visit(AFD->getBody());
           if (!localVal.MatchingValue) {
-            localVal.checkPattern(CE->getParams());
+            for (Pattern *P : AFD->getBodyParamPatterns())
+              localVal.checkPattern(P);
           }
           if (localVal.MatchingValue) {
             Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
             return;
           }
         }
-      }
-    } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
-      ExtendedType = ED->getExtendedType();
-      BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
-      MetaBaseDecl = BaseDecl;
-    } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
-      ExtendedType = ND->getDeclaredType();
-      BaseDecl = ND;
-      MetaBaseDecl = BaseDecl;
-    } else if (auto I = dyn_cast<DefaultArgumentInitializer>(DC)) {
-      // In a default argument, skip immediately out of both the
-      // initializer and the function.
-      DC = I->getParent()->getParent();
-      continue;
-    }
+        if (!isPrivateUse)
+          isPrivateUse = isPrivateContextForLookup(AFD, false);
 
-    // Check the generic parameters for something with the given name.
-    if (GenericParams) {
-      FindLocalVal localVal(SM, Loc, Name);
-      localVal.checkGenericParams(GenericParams);
+        if (AFD->getExtensionType()) {
+          ExtendedType = AFD->getExtensionType();
+          BaseDecl = AFD->getImplicitSelfDecl();
+          MetaBaseDecl = ExtendedType->getAnyNominal();
+          DC = DC->getParent();
 
-      if (localVal.MatchingValue) {
-        Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
-        return;
-      }
-    }
+          if (auto *FD = dyn_cast<FuncDecl>(AFD))
+            if (FD->isStatic())
+              ExtendedType = MetatypeType::get(ExtendedType);
 
-    if (BaseDecl) {
-      if (TypeResolver)
-        TypeResolver->resolveDeclSignature(BaseDecl);
-
-      SmallVector<ValueDecl *, 4> Lookup;
-      DC->lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault,
-                          TypeResolver, Lookup);
-      bool isMetatypeType = ExtendedType->is<AnyMetatypeType>();
-      bool FoundAny = false;
-      for (auto Result : Lookup) {
-        // If we're looking into an instance, skip static functions.
-        if (!isMetatypeType &&
-            isa<FuncDecl>(Result) &&
-            cast<FuncDecl>(Result)->isStatic())
-          continue;
-
-        // Classify this declaration.
-        FoundAny = true;
-
-        // Types are local or metatype members.
-        if (auto TD = dyn_cast<TypeDecl>(Result)) {
-          if (isa<GenericTypeParamDecl>(TD))
-            Results.push_back(Result::getLocalDecl(Result));
-          else
-            Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));
-          continue;
-        }
-
-        // Functions are either metatype members or member functions.
-        if (auto FD = dyn_cast<FuncDecl>(Result)) {
-          if (FD->isStatic()) {
-            if (isMetatypeType)
-              Results.push_back(Result::getMetatypeMember(BaseDecl, Result));
-          } else {
-            Results.push_back(Result::getMemberFunction(BaseDecl, Result));
+          // If we're not in the body of the function, the base declaration
+          // is the nominal type, not 'self'.
+          if (Loc.isValid() &&
+              AFD->getBodySourceRange().isValid() &&
+              !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)) {
+            BaseDecl = MetaBaseDecl;
           }
-          continue;
         }
 
-        if (isa<EnumElementDecl>(Result)) {
-          Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));
-          continue;
+        // Look in the generic parameters after checking our local declaration.
+        GenericParams = AFD->getGenericParams();
+      } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
+        // Look for local variables; normally, the parser resolves these
+        // for us, but it can't do the right thing inside local types.
+        if (Loc.isValid()) {
+          if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+            FindLocalVal localVal(SM, Loc, Name);
+            localVal.visit(CE->getBody());
+            if (!localVal.MatchingValue) {
+              localVal.checkPattern(CE->getParams());
+            }
+            if (localVal.MatchingValue) {
+              Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+              return;
+            }
+          }
         }
-
-        // Archetype members
-        if (ExtendedType->is<ArchetypeType>()) {
-          Results.push_back(Result::getArchetypeMember(BaseDecl, Result));
-          continue;
-        }
-
-        // Existential members.
-        if (ExtendedType->isExistentialType()) {
-          Results.push_back(Result::getExistentialMember(BaseDecl, Result));
-          continue;
-        }
-
-        // Everything else is a member property.
-        Results.push_back(Result::getMemberProperty(BaseDecl, Result));
+        isPrivateUse = isPrivateContextForLookup(ACE, false);
+      } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
+        ExtendedType = ED->getExtendedType();
+        BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
+        MetaBaseDecl = BaseDecl;
+        isPrivateUse = isPrivateContextForLookup(ED, false);
+      } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
+        ExtendedType = ND->getDeclaredType();
+        BaseDecl = ND;
+        MetaBaseDecl = BaseDecl;
+        isPrivateUse = isPrivateContextForLookup(ND, false);
+      } else if (auto I = dyn_cast<DefaultArgumentInitializer>(DC)) {
+        // In a default argument, skip immediately out of both the
+        // initializer and the function.
+        isPrivateUse = true;
+        DC = I->getParent()->getParent();
+        continue;
+      } else {
+        assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC));
+        isPrivateUse = isPrivateContextForLookup(DC, false);
       }
 
-      if (FoundAny) {
-        if (DebugClient)
-          filterForDiscriminator(Results, DebugClient);
-        return;
-      }
-
-      // Check the generic parameters if our context is a generic type or
-      // extension thereof.
-      GenericParamList *dcGenericParams = nullptr;
-      if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-        dcGenericParams = nominal->getGenericParams();
-      else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-        dcGenericParams = ext->getGenericParams();
-
-      if (dcGenericParams) {
+      // Check the generic parameters for something with the given name.
+      if (GenericParams) {
         FindLocalVal localVal(SM, Loc, Name);
-        localVal.checkGenericParams(dcGenericParams);
+        localVal.checkGenericParams(GenericParams);
 
         if (localVal.MatchingValue) {
           Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
           return;
         }
       }
-    }
 
-    DC = DC->getParent();
+      if (BaseDecl) {
+        if (TypeResolver)
+          TypeResolver->resolveDeclSignature(BaseDecl);
+
+        SmallVector<ValueDecl *, 4> Lookup;
+        DC->lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault,
+                            TypeResolver, Lookup);
+        bool isMetatypeType = ExtendedType->is<AnyMetatypeType>();
+        bool FoundAny = false;
+        for (auto Result : Lookup) {
+          // If we're looking into an instance, skip static functions.
+          if (!isMetatypeType &&
+              isa<FuncDecl>(Result) &&
+              cast<FuncDecl>(Result)->isStatic())
+            continue;
+
+          // Classify this declaration.
+          FoundAny = true;
+
+          // Types are local or metatype members.
+          if (auto TD = dyn_cast<TypeDecl>(Result)) {
+            if (isa<GenericTypeParamDecl>(TD))
+              Results.push_back(Result::getLocalDecl(Result));
+            else
+              Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));
+            continue;
+          }
+
+          // Functions are either metatype members or member functions.
+          if (auto FD = dyn_cast<FuncDecl>(Result)) {
+            if (FD->isStatic()) {
+              if (isMetatypeType)
+                Results.push_back(Result::getMetatypeMember(BaseDecl, Result));
+            } else {
+              Results.push_back(Result::getMemberFunction(BaseDecl, Result));
+            }
+            continue;
+          }
+
+          if (isa<EnumElementDecl>(Result)) {
+            Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));
+            continue;
+          }
+
+          // Archetype members
+          if (ExtendedType->is<ArchetypeType>()) {
+            Results.push_back(Result::getArchetypeMember(BaseDecl, Result));
+            continue;
+          }
+
+          // Existential members.
+          if (ExtendedType->isExistentialType()) {
+            Results.push_back(Result::getExistentialMember(BaseDecl, Result));
+            continue;
+          }
+
+          // Everything else is a member property.
+          Results.push_back(Result::getMemberProperty(BaseDecl, Result));
+        }
+
+        if (FoundAny) {
+          if (DebugClient)
+            filterForDiscriminator(Results, DebugClient);
+          return;
+        }
+
+        // Check the generic parameters if our context is a generic type or
+        // extension thereof.
+        GenericParamList *dcGenericParams = nullptr;
+        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+          dcGenericParams = nominal->getGenericParams();
+        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
+          dcGenericParams = ext->getGenericParams();
+
+        if (dcGenericParams) {
+          FindLocalVal localVal(SM, Loc, Name);
+          localVal.checkGenericParams(dcGenericParams);
+
+          if (localVal.MatchingValue) {
+            Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+            return;
+          }
+        }
+      }
+
+      DC = DC->getParent();
+    }
   }
 
   if (auto SF = dyn_cast<SourceFile>(DC)) {
@@ -644,7 +709,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                                    Loc, IsTypeLookup, Results))
     return;
 
-  recordLookupOfTopLevelName(DC, Name);
+  recordLookupOfTopLevelName(DC, Name, !isPrivateUse);
 
   // Add private imports to the extra search list.
   SmallVector<Module::ImportedModule, 8> extraImports;
@@ -1121,7 +1186,10 @@ bool DeclContext::lookupQualified(Type type,
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
-      recordLookupOfTopLevelName(topLevelScope, member);
+      // FIXME: We should be able to tell if this is part of a function body
+      // or not.
+      recordLookupOfTopLevelName(topLevelScope, member,
+                                 isPrivateContextForLookup(this, false));
       lookupInModule(module, /*accessPath=*/{}, member, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                      typeResolver, topLevelScope);
@@ -1262,8 +1330,10 @@ bool DeclContext::lookupQualified(Type type,
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
+
+    // FIXME: We should be able to tell if this is a local or non-local use.
     if (tracker)
-      tracker->addUsedNominal(current);
+      tracker->addUsedNominal(current, true);
 
     // Make sure we've resolved implicit constructors, if we need them.
     if (member.getBaseName() == ctx.Id_init && typeResolver)

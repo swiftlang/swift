@@ -2538,8 +2538,9 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     const DeclContext *topLevelContext = DC->getModuleScopeContext();
     if (auto *constSF = dyn_cast<SourceFile>(topLevelContext)) {
       auto *SF = const_cast<SourceFile *>(constSF);
+      // FIXME: Track whether this is a private use or not.
       if (auto *tracker = SF->getReferencedNameTracker())
-        tracker->addUsedNominal(nominal);
+        tracker->addUsedNominal(nominal, true);
     }
 
     Module *M = topLevelContext->getParentModule();

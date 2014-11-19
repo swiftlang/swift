@@ -1134,8 +1134,9 @@ SourceFile::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(*this, loc, name, true, \
                                           &SourceFile::Kind##Operators); \
   if (result.hasValue() && !result.getValue()) { \
+    /* FIXME: Track whether this is a private use or not. */ \
     if (ReferencedNames) \
-      ReferencedNames->addTopLevelName(name); \
+      ReferencedNames->addTopLevelName(name, true); \
     result = lookupOperatorDeclForName(getParentModule(), loc, name, \
                                        &SourceFile::Kind##Operators); \
   } \

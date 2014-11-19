@@ -187,20 +187,26 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
 
   // FIXME: Sort these?
   out << "top-level:\n";
-  for (Identifier name : tracker->getTopLevelNames()) {
-    out << "- \"" << name << "\"\n";
+  for (auto &entry : tracker->getTopLevelNames()) {
+    out << "- ";
+    if (!entry.second)
+      out << "!private ";
+    out << "\"" << entry.first << "\"\n";
   }
 
   // FIXME: Sort these?
   out << "member-access:\n";
-  for (auto usedNominal : tracker->getUsedNominals()) {
-    if (usedNominal->hasAccessibility() &&
-        usedNominal->getAccessibility() == Accessibility::Private)
+  for (auto &entry : tracker->getUsedNominals()) {
+    if (entry.first->hasAccessibility() &&
+        entry.first->getAccessibility() == Accessibility::Private)
       continue;
 
     Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
-    out << "- \"";
-    mangler.mangleContext(usedNominal, Mangle::Mangler::BindGenerics::None);
+    out << "- ";
+    if (!entry.second)
+      out << "!private ";
+    out << "\"";
+    mangler.mangleContext(entry.first, Mangle::Mangler::BindGenerics::None);
     out << "\"\n";
   }
 

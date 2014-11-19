@@ -1,4 +1,6 @@
-// RUN: %swift -parse -primary-file %s %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: rm -rf %t && mkdir %t
+// RUN: cp %s %t/main.swift
+// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 // RUN: FileCheck %s < %t.swiftdeps
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
@@ -13,7 +15,7 @@
 // CHECK-NEXT: "someGlobal"
 // CHECK-NEXT: "ExtraFloatLiteralConvertible"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
-// CHECK-NEXT: "eof"
+// CHECK: "eof"
 
 // CHECK-LABEL: {{^nominals:$}}
 // CHECK-NEXT: "V4main10IntWrapper"
@@ -74,22 +76,22 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: "Dictionary"
   let _: Dictionary = [1:1]
 
-  // CHECK-DAG: "UInt"
-  // CHECK-DAG: "reduce"
-  // CHECK-DAG: "+"
+  // CHECK-DAG: !private "UInt"
+  // CHECK-DAG: !private "reduce"
+  // CHECK-DAG: !private "+"
   let _: UInt = reduce([1,2], 0, +)
 
-  // CHECK-DAG: "AliasFromOtherFile"
+  // CHECK-DAG: !private "AliasFromOtherFile"
   let _: AliasFromOtherFile = 1
 
-  // CHECK-DAG: "funcFromOtherFile"
+  // CHECK-DAG: !private "funcFromOtherFile"
   funcFromOtherFile()
 
   // "CInt" is not used as a top-level name here.
   // CHECK-DAG: "StringLiteralType"
   // NEGATIVE-NOT: "CInt"
   let CInt = "abc"
-  // CHECK-DAG: "println"
+  // CHECK-DAG: !private "println"
   println(CInt)
 
   // NEGATIVE-NOT: "max"
@@ -98,23 +100,82 @@ func lookUpManyTopLevelNames() {
   // NEGATIVE-NOT: "Stride"
   let _: Int.Stride = 0
 
-  // CHECK-DAG: "OtherFileOuterType"
+  // CHECK-DAG: !private "OtherFileOuterType"
   _ = OtherFileOuterType.InnerType.sharedConstant
 
-  // CHECK-DAG: "OtherFileAliasForSecret"
+  // CHECK-DAG: !private "OtherFileAliasForSecret"
   _ = OtherFileAliasForSecret.constant
 
-  // CHECK-DAG: otherFileUse
-  // CHECK-DAG: otherFileGetImpl
+  // CHECK-DAG: !private "otherFileUse"
+  // CHECK-DAG: !private "otherFileGetImpl"
   otherFileUse(otherFileGetImpl())
 
-  // CHECK-DAG: otherFileUse
-  // CHECK-DAG: otherFileGetImpl
+  // CHECK-DAG: !private "otherFileUseGeneric"
+  // CHECK-DAG: !private "otherFileGetImpl2"
   otherFileUseGeneric(otherFileGetImpl2())
 }
 
 // NEGATIVE-NOT: "privateFunc"
 private func privateFunc() {}
+
+// CHECK-DAG: - "topLevel1"
+var use1 = topLevel1()
+// CHECK-DAG: - "topLevel2"
+var use2 = { topLevel2() }
+// CHECK-DAG: - "topLevel3"
+var use3 = { ({ topLevel3() })() }
+// CHECK-DAG: - "topLevel4"
+struct Use4 {
+  var use4 = topLevel4()
+}
+// CHECK-DAG: - "*"
+print(42 * 30)
+
+// FIXME: Incorrectly marked non-private dependencies
+// CHECK-DAG: - "topLevel6"
+print(topLevel6())
+// CHECK-DAG: - "topLevel7"
+private var use7 = topLevel7()
+// CHECK-DAG: - "topLevel8"
+var use8: Int = topLevel8()
+// CHECK-DAG: - "topLevel9"
+var use9 = { () -> Int in return topLevel9() }
+
+
+// CHECK-DAG: - "TopLevelTy1"
+func useTy1(x: TopLevelTy1) {}
+// CHECK-DAG: - "TopLevelTy2"
+func useTy2() -> TopLevelTy2 {}
+// CHECK-DAG: - "TopLevelTy3"
+extension Use4 {
+  var useTy3: TopLevelTy3? { return nil }
+}
+
+// CHECK-DAG: !private "privateTopLevel1"
+func private1(a: Int = privateTopLevel1()) {}
+// CHECK-DAG: !private "privateTopLevel2"
+private struct Private2 {
+  var private2 = privateTopLevel2()
+}
+// CHECK-DAG: !private "privateTopLevel3"
+func outerPrivate3() {
+  let private3 = { privateTopLevel3() }
+}
+
+// CHECK-DAG: !private "PrivateTopLevelTy1"
+private extension Use4 {
+  var privateTy1: PrivateTopLevelTy1? { return nil }
+} 
+// CHECK-DAG: !private "PrivateTopLevelTy2"
+extension Private2 {
+  var privateTy2: PrivateTopLevelTy2? { return nil }
+}
+// CHECK-DAG: !private "PrivateTopLevelTy3"
+func outerPrivateTy3() {
+  func inner(a: PrivateTopLevelTy3?) {}
+  inner(nil)
+}
+
 
 // CHECK-LABEL: {{^member-access:$}}
 // CHECK-DAG: "V4main10IntWrapper"

@@ -3580,8 +3580,9 @@ public:
                                   D->getStartLoc(), D);
       conformances.push_back(conformance);
 
+      // FIXME: We should be able to tell if this is a private use or not.
       if (tracker)
-        tracker->addUsedNominal(proto);
+        tracker->addUsedNominal(proto, true);
     }
 
     D->setConformances(D->getASTContext().AllocateCopy(conformances));
@@ -4710,8 +4711,9 @@ public:
 
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
+          // FIXME: Track whether this is a private use or not.
           for (auto *parentProto : PD->getProtocols())
-            tracker->addUsedNominal(parentProto);
+            tracker->addUsedNominal(parentProto, true);
         }
       }
     }
