@@ -1,0 +1,11 @@
+// RUN: not --crash %swift %s -parse
+
+// Distributed under the terms of the MIT license
+// Test case submitted to project by https://github.com/practicalswift (practicalswift)
+// Test case found by fuzzing
+
+enum A : A {
+private class A : AnyObject) {
+}
+}
+enum S<T where T.e : S
