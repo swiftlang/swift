@@ -320,7 +320,7 @@ internal func _makeObjCBridgeObject<ObjCClass: AnyObject>(
 internal func _makeBridgeObject<Class: AnyObject>(
   object: Class, bits: UInt
 ) -> Builtin.BridgeObject {
-  // FIXME: Workaround for 
+  // FIXME: Workaround for <rdar://19026605>
   func preconditionTest(object: Class, bits: UInt) -> Bool {
     return _isObjCTaggedPointer(object) ? bits == 0
     : bits != _objectPointerSpareBits
