@@ -478,18 +478,19 @@ void swift::swift_unknownRelease(void *object) {
 
 void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointerOrNull(object))
+  if (isObjCTaggedPointer(object))
     return object;
 #endif
 
+  auto const mask = heap_object_abi::SwiftSpareBitsMask;
+  
   // Mask out the spare bits, which may store arbitrary data.
-  uintptr_t objectRef = uintptr_t(object)
-    & ~heap_object_abi::SwiftSpareBitsMask;
+  uintptr_t objectRef = uintptr_t(object) & ~mask;
 
 #if SWIFT_OBJC_INTEROP
-  // BridgeObject uses the spare bits to tag objects with native
-  // refcounting.
-  if (objectRef != uintptr_t(object))
+  // When *all* spare bits are set, the object is not known to support
+  // native Swift reference counting (e.g. it might be an NSString).
+  if ((uintptr_t(object) & mask) != mask)
     return swift_retain((HeapObject*) objectRef);
   return objc_retain((id) objectRef);
 #else
@@ -499,18 +500,19 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 
 void swift::swift_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointerOrNull(object))
+  if (isObjCTaggedPointer(object))
     return;
 #endif
 
+  auto const mask = heap_object_abi::SwiftSpareBitsMask;
+  
   // Mask out the spare bits, which may store arbitrary data.
-  uintptr_t objectRef = uintptr_t(object)
-    & ~heap_object_abi::SwiftSpareBitsMask;
+  uintptr_t objectRef = uintptr_t(object) & ~mask;
 
 #if SWIFT_OBJC_INTEROP
-  // BridgeObject uses the Swift-reserved bit to tag objects with native
-  // refcounting.
-  if (objectRef != uintptr_t(object))
+  // When *all* spare bits are set, the object is not known to support
+  // native Swift reference counting (e.g. it might be an NSString).
+  if ((uintptr_t(object) & mask) != mask)
     return swift_release((HeapObject*) objectRef);
   return objc_release((id) objectRef);
 #else
@@ -1004,13 +1006,14 @@ unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   if (isObjCTaggedPointer(reinterpret_cast<const void*>(bits)))
     return false;
 
-  const auto maskedBits = bits & ~heap_object_abi::SwiftSpareBitsMask;
-  const auto object = reinterpret_cast<HeapObject*>(maskedBits);
+  auto const mask = heap_object_abi::SwiftSpareBitsMask;
+  
+  const auto object = reinterpret_cast<HeapObject*>(bits & ~mask);
 
   // Note: we could just return false if no spare bits are set,
   // but in that case the cost of a deeper check for a unique native
   // object is going to be a negligible cost for a possible big win.
-  return (bits != maskedBits)
+  return (bits & mask) == mask
     ? _swift_isUniquelyReferenced_nonNull_native(object)
     : _swift_isUniquelyReferencedNonObjC_nonNull(object);
 }

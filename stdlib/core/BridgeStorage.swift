@@ -38,7 +38,7 @@ struct _BridgeStorage<
         "BridgeStorage can't store bits outside the range 0..<3")
 
     rawValue = _makeNativeBridgeObject(
-      native, (UInt(bits) &+ 1) << _objectPointerLowSpareBitShift)
+      native, UInt(bits) << _objectPointerLowSpareBitShift)
   }
   
   public // @testable
@@ -50,7 +50,7 @@ struct _BridgeStorage<
   public // @testable
   var spareBits: Int {
     return Int(
-      (_nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift) &- 1)
+      _nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift)
   }
   
   public // @testable
@@ -62,12 +62,12 @@ struct _BridgeStorage<
 
   public // @testable
   var isNative: Bool {
-    return _nonPointerBits(rawValue) != 0
+    return _nonPointerBits(rawValue) != _objectPointerSpareBits
   }
   
   public // @testable
   var isObjC: Bool {
-    return _nonPointerBits(rawValue) == 0
+    return _nonPointerBits(rawValue) == _objectPointerSpareBits
   }
   
   public // @testable

@@ -256,14 +256,17 @@ public func _swift_isClass(x: Any) -> Bool
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
 #if arch(i386) || arch(arm)
-internal let _objectPointerSpareBits: UInt = 0x0000_0003
-internal let _objectPointerLowSpareBitShift: UInt = 0
+internal var _objectPointerSpareBits: UInt { return 0x0000_0003 }
+internal var _objectPointerLowSpareBitShift: UInt { return 0 }
+internal var _objCTaggedPointerBits: UInt { return 0 }
 #elseif arch(x86_64)
-internal let _objectPointerSpareBits: UInt = 0x7F00_0000_0000_0006
-internal let _objectPointerLowSpareBitShift: UInt = 1
+internal var _objectPointerSpareBits: UInt { return 0x7F00_0000_0000_0006 }
+internal var _objectPointerLowSpareBitShift: UInt { return 1 }
+internal var _objCTaggedPointerBits: UInt { return 0x8000_0000_0000_0001 }
 #elseif arch(arm64)
-internal let _objectPointerSpareBits: UInt = 0x7F00_0000_0000_0007
-internal let _objectPointerLowSpareBitShift: UInt = 0
+internal var _objectPointerSpareBits: UInt { return 0x7F00_0000_0000_0007 }
+internal var _objectPointerLowSpareBitShift: UInt { return 0 }
+internal var _objCTaggedPointerBits: UInt { return 0x8000_0000_0000_0000 }
 #endif
 
 /// Extract the raw bits of `x`
@@ -276,17 +279,22 @@ internal func _nonPointerBits(x: Builtin.BridgeObject) -> UInt {
   return _bitPattern(x) & _objectPointerSpareBits
 }
 
+internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
+  return (Builtin.reinterpretCast(x) & _objCTaggedPointerBits) != 0
+}
+
 /// Create a `BridgeObject` around the given `nativeObject` with the
 /// given spare bits.  Reference-counting and other operations on this
 /// object will have access to the knowledge that it is native.
 ///
-/// Requires: `bits != 0`, `bits & _objectPointerSpareBits == bits`
+/// Requires: `bits != _objectPointerSpareBits`, `bits &
+/// _objectPointerSpareBits == bits`
 internal func _makeNativeBridgeObject<NativeClass: AnyObject>(
   nativeObject: NativeClass, bits: UInt
 ) -> Builtin.BridgeObject {
   _sanityCheck(
-    bits != 0,
-    "A BridgeObject marked as native must have non-zero spare bits"
+    bits != _objectPointerSpareBits,
+    "BridgeObject is treated as non-native when all spare bits are set"
   )
   return _makeBridgeObject(nativeObject, bits)
 }
@@ -295,24 +303,39 @@ internal func _makeNativeBridgeObject<NativeClass: AnyObject>(
 internal func _makeObjCBridgeObject<ObjCClass: AnyObject>(
   objCObject: ObjCClass
 ) -> Builtin.BridgeObject {
-  return _makeBridgeObject(objCObject, 0)
+  return _makeBridgeObject(
+    objCObject,
+    _isObjCTaggedPointer(objCObject) ? 0 : _objectPointerSpareBits)
 }
 
 /// Create a `BridgeObject` around the given `object` with the
 /// given spare bits.  
 ///
-/// Requires: if `bits != 0`, `object` is a native object. `bits &
-/// _objectPointerSpareBits == bits`
+/// Requires:
+///
+/// 1. `bits & _objectPointerSpareBits == bits`
+/// 2. if `object` is a tagged pointer, `bits == 0`.  Otherwise, if
+///    `object` is not a native object, `bits ==
+///    _objectPointerSpareBits`.
 internal func _makeBridgeObject<Class: AnyObject>(
   object: Class, bits: UInt
 ) -> Builtin.BridgeObject {
-  _sanityCheck(
-    bits == 0 || _usesNativeSwiftReferenceCounting(Class.self),
-    "Can't store bits into non-native Builtin.BridgeObject"
-  )
+  func preconditionTest(object: Class, bits: UInt) -> Bool {
+    if _isObjCTaggedPointer(object) {
+      return bits == 0
+    }
+    else {
+      return bits != _objectPointerSpareBits
+      || _usesNativeSwiftReferenceCounting(Class.self)
+    }
+  }
+  _sanityCheck(preconditionTest(object, bits))
+  
   _sanityCheck(
     bits & _objectPointerSpareBits == bits,
-    "Can't store non-spare bits into Builtin.BridgeObject"
+    "Can't store non-spare bits into Builtin.BridgeObject")
+  
+  return Builtin.castToBridgeObject(
+    object, bits.value
   )
-  return Builtin.castToBridgeObject(object, bits.value)
 }
