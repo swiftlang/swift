@@ -1407,6 +1407,11 @@ namespace {
       }
 
       case EnumKind::Enum: {
+        EnumDecl *nativeDecl;
+        bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
+        if (declaredNative && nativeDecl)
+          return nativeDecl;
+
         // Compute the underlying type.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
                                               ImportTypeKind::Enum,
@@ -4481,14 +4486,16 @@ classifyEnum(const clang::EnumDecl *decl) {
   if (name.empty())
     return EnumKind::Constants;
   
-  // Was the enum declared using NS_ENUM or NS_OPTIONS?
+  // Was the enum declared using *_ENUM or *_OPTIONS?
   // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
   auto loc = decl->getLocStart();
   if (loc.isMacroID()) {
     StringRef MacroName = getClangPreprocessor().getImmediateMacroName(loc);
-    if (MacroName == "CF_ENUM" || MacroName == "OBJC_ENUM")
+    if (MacroName == "CF_ENUM" || MacroName == "OBJC_ENUM"
+        || MacroName == "SWIFT_ENUM")
       return EnumKind::Enum;
-    if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS")
+    if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS"
+        || MacroName == "SWIFT_OPTIONS")
       return EnumKind::Options;
   }
   

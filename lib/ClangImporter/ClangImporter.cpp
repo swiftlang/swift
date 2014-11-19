@@ -243,6 +243,8 @@ ClangImporter::create(ASTContext &ctx,
         SWIFT_NATIVE_ANNOTATION_STRING "\")))",
       "-DSWIFT_EXTENSION_EXTRA=__attribute__((annotate(\""
         SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+      "-DSWIFT_ENUM_EXTRA=__attribute__((annotate(\""
+        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
 
       // Tell CoreFoundation to mark toll-free bridged types with attributes.
       "-DCF_ENABLE_BRIDGED_TYPES_SO_YOU_CAN_FIX_BUILD_FAILURES",

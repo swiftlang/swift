@@ -14,3 +14,10 @@ public func useBaseProto(_: BaseProto) {}
 extension BaseClass {
   public func extensionMethod() {}
 }
+
+@objc public enum BaseEnum: CShort {
+  case Zim
+  case Zang
+  case Zung
+}
+

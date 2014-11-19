@@ -12,6 +12,8 @@ import BaseUser
 useBaseClass(getBaseClass())
 useBaseClassObjC(getBaseClassObjC())
 useBaseProtoObjC(getBaseProtoObjC())
+useBaseEnum(getBaseEnum())
+useBaseEnumObjC(getBaseEnumObjC())
 
 // Check type resolution.
 useBaseClass(getBaseClassObjC())
@@ -23,6 +25,18 @@ let p: BaseProto = UserClass()
 useBaseProtoObjC(p)
 
 getBaseClass().extensionMethod()
+
+var be: BaseEnum = .Zim
+be = .Zang
+be = .Zung
+
+var beRaw: CShort = be.rawValue
+
+var beo: BaseEnumObjC = .Zippity
+beo = .Doo
+beo = .Dah
+
+var beoRaw: CUnsignedChar = beo.rawValue
 
 // Make sure we're actually parsing stuff.
 useBaseClass() // expected-error{{missing argument for parameter #1}}
