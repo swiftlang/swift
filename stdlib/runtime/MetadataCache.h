@@ -63,6 +63,10 @@ public:
     return true;
   }
 
+  llvm::hash_code hash() {
+    return llvm::hash_combine_range(begin(), end());
+  }
+
   const void * const *begin() const { return args; }
   const void * const *end() const { return args + length; }
   unsigned size() const { return length; }
@@ -173,7 +177,7 @@ public:
 #endif
 
     EntryRef<Entry> key = EntryRef<Entry>::forArguments(arguments,numArguments);
-    llvm::hash_code hash = llvm::hash_combine_range(key.begin(), key.end());
+    llvm::hash_code hash = key.hash();
 
 #if SWIFT_DEBUG_RUNTIME
     printf("%s(%p): generated hash %llx\n",
