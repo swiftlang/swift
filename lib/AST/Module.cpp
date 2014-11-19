@@ -1133,14 +1133,20 @@ Kind##OperatorDecl * \
 SourceFile::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(*this, loc, name, true, \
                                           &SourceFile::Kind##Operators); \
-  if (result.hasValue() && !result.getValue()) { \
-    /* FIXME: Track whether this is a private use or not. */ \
-    if (ReferencedNames) \
+  /* FIXME: Track whether this is a private use or not. */ \
+  if (!result.hasValue()) \
+    return nullptr; \
+  if (ReferencedNames) {\
+    if (!result.getValue() || \
+        result.getValue()->getDeclContext()->getModuleScopeContext() != this) {\
       ReferencedNames->addTopLevelName(name, true); \
+    } \
+  } \
+  if (!result.getValue()) { \
     result = lookupOperatorDeclForName(getParentModule(), loc, name, \
                                        &SourceFile::Kind##Operators); \
   } \
-  return result ? *result : nullptr; \
+  return result.hasValue() ? result.getValue() : nullptr; \
 }
 
 LOOKUP_OPERATOR(Prefix)
