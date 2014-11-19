@@ -87,16 +87,27 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
                             StringRef moduleName, StringRef typeName) {
   if (!cacheSlot) {
     cacheSlot = ([&] {
-      Optional<UnqualifiedLookup> lookup
-        = UnqualifiedLookup::forModuleAndName(C, moduleName, typeName);
-      if (!lookup)
+      Module *mod = C.getLoadedModule(C.getIdentifier(moduleName));
+      if (!mod)
         return CanType();
-      if (TypeDecl *typeDecl = lookup->getSingleTypeResult()) {
-        assert(typeDecl->getDeclaredType() &&
-               "bridged type must be type-checked");
-        return typeDecl->getDeclaredType()->getCanonicalType();
-      }
-      return CanType();
+
+      // Do a general qualified lookup instead of a direct lookupValue because
+      // some of the types we want are reexported through overlays and
+      // lookupValue would only give us types actually declared in the overlays
+      // themselves.
+      SmallVector<ValueDecl *, 2> decls;
+      mod->lookupQualified(ModuleType::get(mod), C.getIdentifier(typeName),
+                           NL_QualifiedDefault, /*resolver=*/nullptr, decls);
+      if (decls.size() != 1)
+        return CanType();
+
+      const TypeDecl *typeDecl = dyn_cast<TypeDecl>(decls.front());
+      if (!typeDecl)
+        return CanType();
+
+      assert(typeDecl->getDeclaredType() &&
+             "bridged type must be type-checked");
+      return typeDecl->getDeclaredType()->getCanonicalType();
     })();
   }
   CanType t = *cacheSlot;

@@ -77,39 +77,31 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
   // when dealing with generic bridging functions.
 
   if (!cacheSlot) {
-    Optional<UnqualifiedLookup> lookup
-      = UnqualifiedLookup::forModuleAndName(SGM.M.getASTContext(),
-                                            moduleName,
-                                            functionName);
-    // Check that we can find the module and function.
-    // FIXME: Can we recover more gracefully?
-    if (!lookup) {
+    ASTContext &ctx = SGM.M.getASTContext();
+    Module *mod = ctx.getLoadedModule(ctx.getIdentifier(moduleName));
+    if (!mod) {
       SGM.diagnose(SourceLoc(), diag::bridging_module_missing,
                    moduleName, functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
-    if (lookup->Results.size() == 0) {
+
+    SmallVector<ValueDecl *, 2> decls;
+    mod->lookupValue(/*accessPath=*/{}, ctx.getIdentifier(functionName),
+                     NLKind::QualifiedLookup, decls);
+    if (decls.empty()) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_missing,
                    moduleName, functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
-    // FIXME: Resolve overloads.
-    if (lookup->Results.size() > 1) {
+    if (decls.size() != 1) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_overloaded,
                    moduleName, functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
-    auto &result = lookup->Results[0];
-    // Check that the bridging function is actually a function.
-    if (!result.hasValueDecl()) {
-      SGM.diagnose(SourceLoc(), diag::bridging_function_not_function,
-                   moduleName, functionName);
-      llvm::report_fatal_error("unable to set up the ObjC bridge!");
-    }
-    FuncDecl *fd = dyn_cast<FuncDecl>(result.getValueDecl());
+
+    auto *fd = dyn_cast<FuncDecl>(decls.front());
     if (!fd) {
-      SGM.diagnose(result.getValueDecl()->getLoc(),
-                   diag::bridging_function_not_function,
+      SGM.diagnose(SourceLoc(), diag::bridging_function_not_function,
                    moduleName, functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }

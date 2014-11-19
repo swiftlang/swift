@@ -194,16 +194,6 @@ public:
                     SourceLoc Loc = SourceLoc(),
                     bool IsTypeLookup = false);
 
-  /// \brief Look up an identifier \p Name in the module named \p Module.
-  ///
-  /// This should \em never be used for user-level name lookup, because it
-  /// does not take accessibility into account in a useful way.
-  ///
-  /// Note that this will not resolve types.
-  static Optional<UnqualifiedLookup> forModuleAndName(ASTContext &C,
-                                                      StringRef Module,
-                                                      StringRef Name);
-
   SmallVector<UnqualifiedLookupResult, 4> Results;
 
   /// \brief Return true if anything was found by the name lookup.
