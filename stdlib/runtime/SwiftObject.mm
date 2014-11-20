@@ -1025,9 +1025,13 @@ unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   // Note: we could just return false if all spare bits are set,
   // but in that case the cost of a deeper check for a unique native
   // object is going to be a negligible cost for a possible big win.
+#if SWIFT_OBJC_INTEROP
   return !isNonNative_unTagged_bridgeObject(bridgeObject)
     ? _swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object)
     : _swift_isUniquelyReferencedNonObjC_nonNull(object);
+#else
+  return _swift_isUniquelyReferencedNonObjC_nonNull(object);
+#endif
 }
 
 /// Returns class_getInstanceSize(c)
