@@ -15,6 +15,7 @@
 // CHECK-NEXT: "someGlobal"
 // CHECK-NEXT: "ExtraFloatLiteralConvertible"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
+// CHECK-NEXT: "Outer"
 // CHECK: "eof"
 
 // CHECK-LABEL: {{^nominals:$}}
@@ -119,6 +120,15 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: !private "otherFileUseGeneric"
   // CHECK-DAG: !private "otherFileGetImpl2"
   otherFileUseGeneric(otherFileGetImpl2())
+}
+
+struct Outer {
+  struct Inner {
+    func method() {
+      // CHECK-DAG: !private "CUnsignedInt"
+      let _: CUnsignedInt = 5
+    }
+  }
 }
 
 // NEGATIVE-NOT: "privateFunc"

@@ -492,7 +492,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
-  bool isPrivateUse = false;
+  Optional<bool> isPrivateUse;
 
   // Never perform local lookup for operators.
   if (Name.isOperator()) {
@@ -527,7 +527,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             return;
           }
         }
-        if (!isPrivateUse)
+        if (!isPrivateUse.hasValue() || !isPrivateUse.getValue())
           isPrivateUse = isPrivateContextForLookup(AFD, false);
 
         if (AFD->getExtensionType()) {
@@ -567,17 +567,20 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             }
           }
         }
-        isPrivateUse = isPrivateContextForLookup(ACE, false);
+        if (!isPrivateUse.hasValue())
+          isPrivateUse = isPrivateContextForLookup(ACE, false);
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
         ExtendedType = ED->getExtendedType();
         BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
         MetaBaseDecl = BaseDecl;
-        isPrivateUse = isPrivateContextForLookup(ED, false);
+        if (!isPrivateUse.hasValue())
+          isPrivateUse = isPrivateContextForLookup(ED, false);
       } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
         ExtendedType = ND->getDeclaredType();
         BaseDecl = ND;
         MetaBaseDecl = BaseDecl;
-        isPrivateUse = isPrivateContextForLookup(ND, false);
+        if (!isPrivateUse.hasValue())
+          isPrivateUse = isPrivateContextForLookup(ND, false);
       } else if (auto I = dyn_cast<DefaultArgumentInitializer>(DC)) {
         // In a default argument, skip immediately out of both the
         // initializer and the function.
@@ -586,7 +589,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         continue;
       } else {
         assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC));
-        isPrivateUse = isPrivateContextForLookup(DC, false);
+        if (!isPrivateUse.hasValue())
+          isPrivateUse = isPrivateContextForLookup(DC, false);
       }
 
       // Check the generic parameters for something with the given name.
@@ -687,6 +691,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
       DC = DC->getParent();
     }
+
+    if (!isPrivateUse.hasValue())
+      isPrivateUse = false;
   }
 
   if (auto SF = dyn_cast<SourceFile>(DC)) {
@@ -709,7 +716,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                                    Loc, IsTypeLookup, Results))
     return;
 
-  recordLookupOfTopLevelName(DC, Name, !isPrivateUse);
+  recordLookupOfTopLevelName(DC, Name, !isPrivateUse.getValue());
 
   // Add private imports to the extra search list.
   SmallVector<Module::ImportedModule, 8> extraImports;
