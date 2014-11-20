@@ -21,7 +21,7 @@ might be expressed as::
       Node *next;
     };
   
-    List *first;
+    Node *first;
   };
 
 where List<Int>, List<String>, and List<DataRecord> are all distinct types that
