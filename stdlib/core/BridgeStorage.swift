@@ -32,7 +32,7 @@ struct _BridgeStorage<
   typealias ObjC = ObjCClass
   
   public // @testable
-  init(_ native: Native, bits: Int) {
+  init(native: Native, bits: Int) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     _sanityCheck(0..<3 ~= bits,
         "BridgeStorage can't store bits outside the range 0..<3")
@@ -42,7 +42,7 @@ struct _BridgeStorage<
   }
   
   public // @testable
-  init(_ objC: ObjC) {
+  init(objC: ObjC) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = _makeObjCBridgeObject(objC)
   }

@@ -27,8 +27,8 @@ protocol BridgeStorage {
   typealias Native : AnyObject
   typealias ObjC : AnyObject
 
-  init(_ native: Native, bits: Int)
-  init(ObjC)
+  init(native: Native, bits: Int)
+  init(objC: ObjC)
 
   mutating func isUniquelyReferencedNative() -> Bool
   var isNative: Bool {get}
@@ -47,7 +47,7 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
   typealias Native = NativeType
   typealias ObjC = ObjCType
 
-  init(_ native: Native, bits: Int) {
+  init(native: Native, bits: Int) {
     _sanityCheck(
       bits >= 0 && bits < 3,
       "BridgeObject can't store bits outside the range 0-2")
@@ -56,7 +56,7 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
     self.bits = UInt8(truncatingBitPattern: bits)
   }
   
-  init(_ objC: ObjC) {
+  init(objC: ObjC) {
     self.object = objC
     self.bits = 0
   }
@@ -167,14 +167,14 @@ allTests.test("${Self}") {
   typealias B = ${Self}<C,NSString>
   
   for i in 0..<3 {
-    var b = B(C(), bits: i)
+    var b = B(native: C(), bits: i)
     expectEmpty(b.objCInstance)
     expectNotEmpty(b.nativeInstance)
     expectTrue(b.isUniquelyReferencedNative())
     expectEqual(i, b.spareBits)
   }
   
-  var b = B(C(), bits: 0)
+  var b = B(native: C(), bits: 0)
   expectTrue(b.isUniquelyReferencedNative())
   
   // Add a reference and verify that it's still native but no longer unique
@@ -182,12 +182,12 @@ allTests.test("${Self}") {
   expectFalse(b.isUniquelyReferencedNative())
   _fixLifetime(c) // make sure c is not killed early
   
-  var d = B(taggedNSString)
+  var d = B(objC: taggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
   expectEmpty(d.nativeInstance)
   expectNotEmpty(d.objCInstance)
 
-  d = B(unTaggedNSString)
+  d = B(objC: unTaggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
   expectEmpty(d.nativeInstance)
   expectNotEmpty(d.objCInstance)
