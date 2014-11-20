@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-swift-frontend %s -parse -verify
 
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // http://www.openradar.me/17986597

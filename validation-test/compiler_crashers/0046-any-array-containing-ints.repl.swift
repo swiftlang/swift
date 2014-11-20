@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-ir
+// RUN: %target-swift-frontend %s -emit-ir
 
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // http://www.openradar.me/17916262

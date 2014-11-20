@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil -verify
+// RUN: %target-swift-frontend %s -emit-sil -verify
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by http://github.com/valfer (Valerio Ferrucci)

@@ -1,4 +1,4 @@
-// RUN: %swift %s -parse -verify
+// RUN: %target-swift-frontend %s -parse -verify
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/jvasileff (John Vasileff)
