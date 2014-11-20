@@ -455,6 +455,11 @@ swift::_swift_usesNativeSwiftReferenceCounting_class(const void *theClass) {
 #endif
 }
 
+// These bits are all set in every non-tagged non-native BridgeObject
+static auto const unTaggedNonNativeBridgeObjectBits
+  = heap_object_abi::SwiftSpareBitsMask
+  & ~heap_object_abi::ObjCReservedBitsMask;
+
 #if SWIFT_OBJC_INTEROP
 static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   assert(!isObjCTaggedPointerOrNull(object));
@@ -474,7 +479,24 @@ void swift::swift_unknownRelease(void *object) {
     return swift_release((HeapObject*) object);
   return objc_release((id) object);
 }
+
+/// Return true iff the given BridgeObject is not known to use native
+/// reference-counting.
+///
+/// Requires: object does not encode a tagged pointer
+static bool isNonNative_unTagged_bridgeObject(void *object) {
+  return (uintptr_t(object) & unTaggedNonNativeBridgeObjectBits)
+    == unTaggedNonNativeBridgeObjectBits;
+}
 #endif
+
+// Mask out the spare bits in a bridgeObject, returning the object it
+// encodes.
+///
+/// Requires: object does not encode a tagged pointer
+static void* toPlainObject_unTagged_bridgeObject(void *object) {
+  return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
+}
 
 void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
@@ -482,15 +504,10 @@ void *swift::swift_bridgeObjectRetain(void *object) {
     return object;
 #endif
 
-  auto const mask = heap_object_abi::SwiftSpareBitsMask;
-  
-  // Mask out the spare bits, which may store arbitrary data.
-  uintptr_t objectRef = uintptr_t(object) & ~mask;
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  // When *all* spare bits are set, the object is not known to support
-  // native Swift reference counting (e.g. it might be an NSString).
-  if ((uintptr_t(object) & mask) != mask)
+  if (!isNonNative_unTagged_bridgeObject(object))
     return swift_retain((HeapObject*) objectRef);
   return objc_retain((id) objectRef);
 #else
@@ -504,15 +521,10 @@ void swift::swift_bridgeObjectRelease(void *object) {
     return;
 #endif
 
-  auto const mask = heap_object_abi::SwiftSpareBitsMask;
-  
-  // Mask out the spare bits, which may store arbitrary data.
-  uintptr_t objectRef = uintptr_t(object) & ~mask;
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  // When *all* spare bits are set, the object is not known to support
-  // native Swift reference counting (e.g. it might be an NSString).
-  if ((uintptr_t(object) & mask) != mask)
+  if (!isNonNative_unTagged_bridgeObject(object))
     return swift_release((HeapObject*) objectRef);
   return objc_release((id) objectRef);
 #else
@@ -1003,18 +1015,18 @@ unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
 unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   __swift_uintptr_t bits
 ) {
-  if (isObjCTaggedPointer(reinterpret_cast<const void*>(bits)))
+  auto bridgeObject = (void*)bits;
+  
+  if (isObjCTaggedPointer(bridgeObject))
     return false;
 
-  auto const mask = heap_object_abi::SwiftSpareBitsMask;
-  
-  const auto object = reinterpret_cast<HeapObject*>(bits & ~mask);
+  const auto object = toPlainObject_unTagged_bridgeObject(bridgeObject);
 
-  // Note: we could just return false if no spare bits are set,
+  // Note: we could just return false if all spare bits are set,
   // but in that case the cost of a deeper check for a unique native
   // object is going to be a negligible cost for a possible big win.
-  return (bits & mask) == mask
-    ? _swift_isUniquelyReferenced_nonNull_native(object)
+  return !isNonNative_unTagged_bridgeObject(bridgeObject)
+    ? _swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object)
     : _swift_isUniquelyReferencedNonObjC_nonNull(object);
 }
 
