@@ -45,3 +45,15 @@ bb0(%0 : $*protocol<>, %1 : $*protocol<>):
 // CHECK-NEXT:    [[INIT:%.*]] = bitcast i8* [[T1]] to %swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)*
 // CHECK-NEXT:    call %swift.opaque* [[INIT]]([24 x i8]* noalias [[DEST_BUF]], [24 x i8]* [[SRC_BUF]], %swift.type* [[TYPE]])
 // CHECK-NEXT:    ret void
+
+// rdar://problem/19035529
+@objc protocol OP {}
+@objc protocol OP2: OP {}
+
+// CHECK-DAG: define %objc_object* @init_existential_objc_to_objc(%objc_object*) {
+// CHECK:       ret %objc_object* %0
+sil @init_existential_objc_to_objc : $@thin (@owned OP2) -> @owned OP {
+entry(%o : $OP2):
+  %a = init_existential_ref %o : $OP2 : $OP2, $OP
+  return %a : $OP
+}

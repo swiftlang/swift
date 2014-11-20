@@ -1456,7 +1456,7 @@ public:
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand().getType();
-    require(concreteType.getSwiftType()->mayHaveSuperclass(),
+    require(concreteType.getSwiftType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
     require(IEI->getType().isClassExistentialType(),
             "init_existential_ref result must be a class existential type");
