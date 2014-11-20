@@ -140,6 +140,23 @@ namespace {
   };
 } // end anonymous namespace
 
+/// Return true if there are any users of V outside the specified block.
+static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
+  for (auto UI : V.getUses())
+    if (UI->getUser()->getParent() != BB)
+      return true;
+  return false;
+}
+
+/// We can not duplicate blocks with AllocStack instructions (they need to be
+/// FIFO). Other instructions can be duplicated.
+static bool canDuplicateBlock(SILBasicBlock *BB) {
+  for (auto &I : *BB) {
+    if (!I.isTriviallyDuplicatable())
+      return false;
+  }
+  return true;
+}
 
 namespace {
   /// Base class for BB cloners.
@@ -238,6 +255,60 @@ namespace {
   };
 } // end anonymous namespace
 
+/// Helper function to perform SSA updates in case of jump threading.
+static void updateSSAAfterCloning(BaseThreadingCloner &Cloner,
+                                  SILBasicBlock *SrcBB,
+                                  SILBasicBlock *DestBB) {
+  // We are updating SSA form. This means we need to be able to insert phi
+  // nodes. To make sure we can do this split all critical edges from
+  // instructions that don't support block arguments.
+  splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
+
+  SILSSAUpdater SSAUp;
+  for (auto AvailValPair : Cloner.AvailVals) {
+    ValueBase *Inst = AvailValPair.first;
+    if (Inst->use_empty())
+      continue;
+
+    for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
+      // Get the result index for the cloned instruction. This is going to be
+      // the result index stored in the available value for arguments (we look
+      // through the phi node) and the same index as the original value
+      // otherwise.
+      unsigned ResIdx = i;
+      if (isa<SILArgument>(Inst))
+        ResIdx = AvailValPair.second.getResultNumber();
+
+      SILValue Res(Inst, i);
+      SILValue NewRes(AvailValPair.second.getDef(), ResIdx);
+
+      SmallVector<UseWrapper, 16> UseList;
+      // Collect the uses of the value.
+      for (auto Use : Res.getUses())
+        UseList.push_back(UseWrapper(Use));
+
+      SSAUp.Initialize(Res.getType());
+      SSAUp.AddAvailableValue(DestBB, Res);
+      SSAUp.AddAvailableValue(SrcBB, NewRes);
+
+      if (UseList.empty())
+        continue;
+
+      // Update all the uses.
+      for (auto U : UseList) {
+        Operand *Use = U;
+        SILInstruction *User = Use->getUser();
+        assert(User && "Missing user");
+
+        // Ignore uses in the same basic block.
+        if (User->getParent() == DestBB)
+          continue;
+
+        SSAUp.RewriteUse(*Use);
+      }
+    }
+  }
+}
 
 static bool isConditional(TermInst *I) {
   switch (I->getKind()) {
@@ -523,16 +594,6 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
   return false;
 }
 
-
-
-/// Return true if there are any users of V outside the specified block.
-static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
-  for (auto UI : V.getUses())
-    if (UI->getUser()->getParent() != BB)
-      return true;
-  return false;
-}
-
 /// couldSimplifyUsers - Check to see if any simplifications are possible if
 /// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
 /// is possible, return false.
@@ -558,18 +619,6 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
       return true;
   }
   return false;
-}
-
-
-
-/// We can not duplicate blocks with AllocStack instructions (they need to be
-/// FIFO). Other instructions can be duplicated.
-static bool canDuplicateBlock(SILBasicBlock *BB) {
-  for (auto &I : *BB) {
-    if (!I.isTriviallyDuplicatable())
-      return false;
-  }
-  return true;
 }
 
 /// Check whether we can 'thread' through the switch_enum instruction by
@@ -667,61 +716,6 @@ void SimplifyCFG::findLoopHeaders() {
         LoopHeaders.insert(NextSucc);
       }
       ++D.second;
-    }
-  }
-}
-
-/// Helper function to perform SSA updates in case of jump threading.
-static void updateSSAAfterCloning(ThreadingCloner &Cloner,
-                                  SILBasicBlock *SrcBB,
-                                  SILBasicBlock *DestBB) {
-  // We are updating SSA form. This means we need to be able to insert phi
-  // nodes. To make sure we can do this split all critical edges from
-  // instructions that don't support block arguments.
-  splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
-
-  SILSSAUpdater SSAUp;
-  for (auto AvailValPair : Cloner.AvailVals) {
-    ValueBase *Inst = AvailValPair.first;
-    if (Inst->use_empty())
-      continue;
-
-    for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
-      // Get the result index for the cloned instruction. This is going to be
-      // the result index stored in the available value for arguments (we look
-      // through the phi node) and the same index as the original value
-      // otherwise.
-      unsigned ResIdx = i;
-      if (isa<SILArgument>(Inst))
-        ResIdx = AvailValPair.second.getResultNumber();
-
-      SILValue Res(Inst, i);
-      SILValue NewRes(AvailValPair.second.getDef(), ResIdx);
-
-      SmallVector<UseWrapper, 16> UseList;
-      // Collect the uses of the value.
-      for (auto Use : Res.getUses())
-        UseList.push_back(UseWrapper(Use));
-
-      SSAUp.Initialize(Res.getType());
-      SSAUp.AddAvailableValue(DestBB, Res);
-      SSAUp.AddAvailableValue(SrcBB, NewRes);
-
-      if (UseList.empty())
-        continue;
-
-      // Update all the uses.
-      for (auto U : UseList) {
-        Operand *Use = U;
-        SILInstruction *User = Use->getUser();
-        assert(User && "Missing user");
-
-        // Ignore uses in the same basic block.
-        if (User->getParent() == DestBB)
-          continue;
-
-        SSAUp.RewriteUse(*Use);
-      }
     }
   }
 }
