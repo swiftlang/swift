@@ -17,6 +17,12 @@ struct OtherFileSecretTypeWrapper {
   }
 }
 
+struct OtherFileIntArray : SequenceType {
+  var array: [Int] = []
+  func generate() -> Array<Int>.Generator { return array.generate() }
+}
+func getOtherFileIntArray() -> OtherFileIntArray { return OtherFileIntArray() }
+
 typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
 
 prefix operator *** {}

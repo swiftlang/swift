@@ -120,6 +120,9 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: !private "otherFileUseGeneric"
   // CHECK-DAG: !private "otherFileGetImpl2"
   otherFileUseGeneric(otherFileGetImpl2())
+  
+  // CHECK-DAG: !private "getOtherFileIntArray"
+  for _ in getOtherFileIntArray() {}
 }
 
 struct Outer {
@@ -211,6 +214,8 @@ func outerPrivateTy3() {
 // CHECK-DAG: "VV4main26OtherFileSecretTypeWrapper10SecretType"
 // CHECK-DAG: "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: "V4main26OtherFileProtoImplementor2"
+// CHECK-DAG: !private "VSs17IndexingGenerator"
+
 // CHECK-DAG: - "P4main14TopLevelProto1"
 // CHECK-DAG: - "P4main14TopLevelProto2"
 // CHECK-DAG: !private "P4main13PrivateProto1"

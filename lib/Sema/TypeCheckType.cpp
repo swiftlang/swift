@@ -654,6 +654,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         }
         
         // Look for member types with the given name.
+        // FIXME: This should distinguish function signatures from function
+        // bodies.
         auto memberTypes = TC.lookupMemberType(parentTy, comp->getIdentifier(),
                                                DC);
 

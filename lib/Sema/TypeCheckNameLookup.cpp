@@ -92,7 +92,8 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
 }
 
 LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
-                                               DeclContext *dc) {
+                                               DeclContext *dc,
+                                               bool isKnownPrivate) {
   LookupTypeResult result;
 
   // Look through an inout type.
@@ -109,6 +110,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   unsigned options = NL_QualifiedDefault | NL_ProtocolMembers;
+  if (isKnownPrivate)
+    options |= NL_KnownPrivateDependency;
   if (!dc->lookupQualified(type, name, options, this, decls))
     return result;
 

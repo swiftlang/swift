@@ -1006,10 +1006,13 @@ public:
   /// \param type The type in which we will look for a member type.
   /// \param name The name of the member to look for.
   /// \param dc The context that needs the member.
+  /// \param isKnownPrivate If true, this lookup is counted as a private
+  /// dependency
   ///
   /// \returns The result of name lookup.
   LookupTypeResult lookupMemberType(Type type, Identifier name,
-                                    DeclContext *dc);
+                                    DeclContext *dc,
+                                    bool isKnownPrivate = false);
 
   /// \brief Look up the constructors of the given type.
   ///
