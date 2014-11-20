@@ -810,15 +810,57 @@ depend on how the l-value is used:
     // instantaneous FA reading i
     // instantaneous FA reading rightObject
     // instantaneous FA reading j
-    // begin FA for inout argument leftObject.array (DSN={})
+    // begin FA for subobject base leftObject.array (DSN={})
     // begin FA for inout argument leftObject.array[i] (DSN={lhs})
-    // begin FA for inout argument rightObject.array (DSN={})
+    // begin FA for subobject base rightObject.array (DSN={})
     // begin FA for inout argument rightObject.array[j] (DSN={rhs})
     // evaluation of swap
-    // end FA for inout argument rightObject.array[j]
+    // end FA for subobject base rightObject.array[j]
     // end FA for inout argument rightObject.array
-    // end FA for inout argument leftObject.array[i]
+    // end FA for subobject base leftObject.array[i]
     // end FA for inout argument leftObject.array
+
+* An l-value which is the base of an ! operator begins an FA whose
+  duration is the same the duration of the FA for the resulting
+  l-value.  The DSN set is empty.
+
+  Example::
+
+    // left is a variable of type T
+    // right is a variable of type T?
+    swap(&left, &right!)
+
+  This results in the following sequence of formal accesses::
+
+    // begin FA for inout argument left (DSN={lhs})
+    // begin FA for ! operand right (DSN={})
+    // begin FA for inout argument right! (DSN={rhs})
+    // evaluation of swap
+    // end FA for inout argument right!
+    // end FA for ! operand right
+    // end FA for inout argument left
+
+* An l-value which is the base of a ? operator begins an FA whose
+  duration begins during the formal evaluation of the l-value
+  and ends either immediately (if the operand was nil) or at the
+  end of the duration of the FA for the resulting l-value.
+  In either case, the DSN set is empty.
+
+  Example::
+
+    // left is a variable of optional struct type
+    // right is a variable of type Int
+    left?.member += right
+
+  This results in the following sequence of formal accesses, assuming
+  that ``left`` contains a value::
+
+    // begin FA for ? operand left (DSN={})
+    // instataneous FA reading right (DSN={})
+    // begin FA for inout argument left?.member (DSN={lhs})
+    // evaluation of +=
+    // end FA for inout argument left?.member
+    // end FA for ? operand left
 
 The FAs for all ``inout`` arguments to a call begin simultaneously at
 a point strictly following the evaluation of all the argument
@@ -831,6 +873,41 @@ during the formal evaluation of ``&array``, but for an expression like
 expressions would be fully evaluated at that time, and then the
 l-value would be kept abstract until the FA begins.  Note that this
 requires changes in SILGen's current code generation patterns.
+
+The FA rule for the chaining operator ``?`` is an exception to the
+otherwise-simple intuition that formal accesses begin immediately
+before the modification begins.  This is necessary because the
+evaluation rules for ``?`` may cause arbitrary computation to be
+short-circuited, and therefore the operand must be accessed during the
+formal evaluation of the l-value.  There were three options here:
+
+* Abandon short-circuiting for assignments to optional l-values.  This
+  is a very high price; short-circuiting fits into user intuitions
+  about the behavior of the chaining operator, and it can actually be
+  quite awkward to replicate with explicit accesses.
+
+* Short-circuit using an instantaneous formal access, then start a
+  separate formal access before the actual modification.  In other
+  words, evaluation of ``X += Y`` would proceed by first determining
+  whether ``X`` exists (capturing the results of any r-value
+  components), discarding any projection information derived from
+  that, evaluating ``Y``, reprojecting ``X`` again (using the saved
+  r-value components and checking again for whether the l-value
+  exists), and finally calling the ``+=`` operator.
+
+  If ``X`` involves any sort of computed storage, the steps required
+  to evaluate this might be... counter-intuitive.
+
+* Allow the formal access to begin during the formal evaluation of the
+  l-value. This means that code like the following will have
+  unspecified behavior::
+
+    array[i]?.member = deriveNewValueFrom(array)
+
+In the end, I've gone with the third option.  The intuitive
+explanation is that ``array`` has to be accessed early in order to
+continue the evaluation of the l-value.  I think that's
+comprehensible to users, even if it's not immediately obvious.
 
 Disjoint and non-disjoint formal accesses
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
