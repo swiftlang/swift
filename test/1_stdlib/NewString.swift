@@ -169,12 +169,16 @@ ascii()
 println("--- Literals ---")
 
 // CHECK-NEXT: String(Contiguous(owner: null, count: 6)) = "foobar"
+// CHECK-NEXT: true
 var asciiLiteral: String = "foobar"
 println("  \(repr(asciiLiteral))")
+println("  \(asciiLiteral._core.isASCII)")
 
 // CHECK-NEXT: String(Contiguous(owner: null, count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
+// CHECK-NEXT: false
 var nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 println("  \(repr(nonASCIILiteral))")
+println("  \(!asciiLiteral._core.isASCII)")
 
 // ===------- Appending -------===
 

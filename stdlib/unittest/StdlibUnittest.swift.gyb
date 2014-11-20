@@ -1366,9 +1366,8 @@ public func expectEqualSequence<
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   expectEqualSequence(
-    expected, actual, { $0 == $1 },
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo,
-    file: file, line: line)
+    expected, actual, { $0 == $1 }, stackTrace: stackTrace,
+    collectMoreInfo: collectMoreInfo, file: file, line: line)
 }
 
 public func expectEqualSequence<
@@ -1412,6 +1411,37 @@ public func expectEqualsUnordered<
   expectEqualSequence(
     x, y, compose(compare, { $0.isEQ() }), stackTrace: stackTrace,
     collectMoreInfo: collectMoreInfo, file: file, line:  line)
+}
+
+public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
+    arguments: [ArgumentType], function1: ArgumentType -> Result,
+    function2: ArgumentType -> Result
+) {
+  for a in arguments {
+    let expected = function1(a)
+    let actual = function2(a)
+    expectEqual(expected, actual) {
+      "where the argument is: \(a)"
+    }
+  }
+}
+
+public func expectEqualMethodsForDomain<
+  SelfType, ArgumentType, Result : Equatable
+>(
+  selfs: [SelfType], arguments: [ArgumentType],
+  function1: SelfType -> ArgumentType -> Result,
+  function2: SelfType -> ArgumentType -> Result
+) {
+  for s in selfs {
+    for a in arguments {
+      let expected = function1(s)(a)
+      let actual = function2(s)(a)
+      expectEqual(expected, actual) {
+        "where the first argument is: \(s)\nand the second argument is: \(a)"
+      }
+    }
+  }
 }
 
 public func expectEqualUnicodeScalars(

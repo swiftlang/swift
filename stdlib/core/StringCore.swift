@@ -178,6 +178,7 @@ public struct _StringCore {
   // Properties
   
   /// The number of elements stored
+  /// Complexity: O(1).
   public var count: Int {
     get {
       return Int(_countAndFlags & _countMask)
@@ -195,6 +196,8 @@ public struct _StringCore {
   }
   
   /// the number of bytes per element
+  /// If the string does not have an ASCII buffer available (including the case
+  /// when we don't have a utf16 buffer) then it equals 2.
   public var elementWidth: Int {
     return elementShift + 1
   }
@@ -215,6 +218,11 @@ public struct _StringCore {
   public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {
     _sanityCheck(elementWidth == 1, "String does not contain contiguous ASCII")
     return UnsafeMutablePointer(_baseAddress)
+  }
+
+  /// True iff a contiguous ASCII buffer available.
+  public var isASCII: Bool {
+    return elementWidth == 1
   }
 
   public var startUTF16: UnsafeMutablePointer<UTF16.CodeUnit> {

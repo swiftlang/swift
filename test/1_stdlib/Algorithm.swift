@@ -69,7 +69,7 @@ func checkStartsWith(
 ) {
   expectEqual(expected, startsWith(sequence, prefix), stackTrace: stackTrace)
   expectEqual(
-    expected, startsWith(sequence, prefix) { $0 == $1 },
+    expected, startsWith(sequence, prefix, (==)),
     stackTrace: stackTrace)
   expectEqual(
     expected, startsWith(map(sequence) { $0 * 2 }, prefix) { $0 / 2 == $1 },
@@ -80,7 +80,7 @@ func checkStartsWith(
     expected, startsWith(ContiguousArray(sequence), prefix),
     stackTrace: stackTrace)
   expectEqual(
-    expected, startsWith(ContiguousArray(sequence), prefix) { $0 == $1 },
+    expected, startsWith(ContiguousArray(sequence), prefix, (==)),
     stackTrace: stackTrace)
 }
 

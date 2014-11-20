@@ -861,5 +861,25 @@ StringTests.test("Construction") {
   expectEqual(text, String(Array<Character>(text)))
 }
 
+StringTests.test("Conversions") {
+  if true {
+    var c: Character = "a"
+    let x = String(c)
+    expectTrue(x._core.isASCII)
+
+    var s: String = "a"
+    expectEqual(s, x)
+  }
+
+  if true {
+    var c: Character = "\u{B977}"
+    let x = String(c)
+    expectFalse(x._core.isASCII)
+
+    var s: String = "\u{B977}"
+    expectEqual(s, x)
+  }
+}
+
 runAllTests()
 

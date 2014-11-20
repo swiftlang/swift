@@ -1582,6 +1582,30 @@ let comparisonTests = [
   ComparisonTest(.EQ, "", ""),
   ComparisonTest(.LT, "", "a"),
 
+  // ASCII cases
+  ComparisonTest(.LT, "t", "tt"),
+  ComparisonTest(.GT, "t", "Tt"),
+  ComparisonTest(.GT, "\u{0}", ""),
+  ComparisonTest(.EQ, "\u{0}", "\u{0}"),
+  // Currently fails:
+  // ComparisonTest(.LT, "\r\n", "t"),
+  // ComparisonTest(.GT, "\r\n", "\n"),
+  // ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}"),
+
+  // Whitespace
+  // U+000A LINE FEED (LF)
+  // U+000B LINE TABULATION
+  // U+000C FORM FEED (FF)
+  // U+0085 NEXT LINE (NEL)
+  // U+2028 LINE SEPARATOR
+  // U+2029 PARAGRAPH SEPARATOR
+  ComparisonTest(.GT, "\u{0085}", "\n"),
+  ComparisonTest(.GT, "\u{000b}", "\n"),
+  ComparisonTest(.GT, "\u{000c}", "\n"),
+  ComparisonTest(.GT, "\u{2028}", "\n"),
+  ComparisonTest(.GT, "\u{2029}", "\n"),
+  ComparisonTest(.GT, "\r\n\r\n", "\r\n"),
+
   // U+0301 COMBINING ACUTE ACCENT
   // U+00E1 LATIN SMALL LETTER A WITH ACUTE
   ComparisonTest(.EQ, "a\u{301}", "\u{e1}"),
@@ -1761,10 +1785,10 @@ func checkHasPrefixHasSuffix(
       Array(String($0).unicodeScalars)
     }
   let expectHasPrefix =
-    startsWith(lhsNFDGraphemeClusters, rhsNFDGraphemeClusters) { $0 == $1 }
+    startsWith(lhsNFDGraphemeClusters, rhsNFDGraphemeClusters, (==))
   let expectHasSuffix = startsWith(
     lazy(lhsNFDGraphemeClusters).reverse(),
-    lazy(rhsNFDGraphemeClusters).reverse()) { $0 == $1 }
+    lazy(rhsNFDGraphemeClusters).reverse(), (==))
 
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(
@@ -1778,6 +1802,21 @@ NSStringAPIs.test("hasPrefix,hasSuffix") {
   for test in comparisonTests {
     checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
     checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
+  }
+}
+
+NSStringAPIs.test("Failures{hasPrefix,hasSuffix}-CF")
+  .xfail(.Custom({ true }, reason: "rdar://problem/19034601")).code {
+  let test = ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}")
+  checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
+}
+
+NSStringAPIs.test("Failures{hasPrefix,hasSuffix}")
+  .xfail(.Custom({ true }, reason: "blocked on rdar://problem/19036555")).code {
+  let tests =
+    [ComparisonTest(.LT, "\r\n", "t"), ComparisonTest(.GT, "\r\n", "\n")]
+  tests.map {
+    checkHasPrefixHasSuffix($0.lhs, $0.rhs, $0.loc.withCurrentLoc())
   }
 }
 
@@ -1797,6 +1836,15 @@ NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
 // FIXME: these properties should be implemented in the core library.
 // <rdar://problem/17550602> [unicode] Implement case folding
 NSStringAPIs.test("lowercaseString") {
+  // Use setlocale so tolower is correct on ASCII
+  setlocale(LC_ALL, "C")
+  // Check the ASCII domain
+  let asciiDomain: [Int32] = Array(0..<128)
+  expectEqualFunctionsForDomain(asciiDomain,
+    { String(UnicodeScalar(Int(tolower($0)))) },
+    { String(UnicodeScalar(Int($0))).lowercaseString })
+
+  expectEqual("", "".lowercaseString)
   expectEqual("abcd", "abCD".lowercaseString)
   expectEqual("абвг", "абВГ".lowercaseString)
   expectEqual("たちつてと", "たちつてと".lowercaseString)
@@ -1820,6 +1868,15 @@ NSStringAPIs.test("lowercaseString") {
 }
 
 NSStringAPIs.test("uppercaseString") {
+  // Use setlocale so tolower is correct on ASCII
+  setlocale(LC_ALL, "C")
+  // Check the ASCII domain
+  let asciiDomain: [Int32] = Array(0..<128)
+  expectEqualFunctionsForDomain(asciiDomain,
+    { String(UnicodeScalar(Int(toupper($0)))) },
+    { String(UnicodeScalar(Int($0))).uppercaseString })
+
+  expectEqual("", "".uppercaseString)
   expectEqual("ABCD", "abCD".uppercaseString)
   expectEqual("АБВГ", "абВГ".uppercaseString)
   expectEqual("たちつてと", "たちつてと".uppercaseString)
