@@ -141,6 +141,103 @@ namespace {
 } // end anonymous namespace
 
 
+namespace {
+  /// Base class for BB cloners.
+  class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
+    friend class SILVisitor<BaseThreadingCloner>;
+    friend class SILCloner<BaseThreadingCloner>;
+
+  protected:
+    SILBasicBlock *FromBB, *DestBB;
+
+  public:
+    // A map of old to new available values.
+    SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
+
+    BaseThreadingCloner(SILFunction &F)
+        : SILClonerWithScopes(F), FromBB(nullptr), DestBB(nullptr) {}
+
+    BaseThreadingCloner(SILFunction &F, SILBasicBlock *From, SILBasicBlock *Dest)
+        : SILClonerWithScopes(F), FromBB(From), DestBB(Dest) {}
+
+    void process(SILInstruction *I) { visit(I); }
+
+    SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
+
+    SILValue remapValue(SILValue Value) {
+      // If this is a use of an instruction in another block, then just use it.
+      if (auto SI = dyn_cast<SILInstruction>(Value)) {
+        if (SI->getParent() != FromBB)
+          return Value;
+      } else if (auto BBArg = dyn_cast<SILArgument>(Value)) {
+        if (BBArg->getParent() != FromBB)
+          return Value;
+      } else {
+        assert(isa<SILUndef>(Value) && "Unexpected Value kind");
+        return Value;
+      }
+
+      return SILCloner<BaseThreadingCloner>::remapValue(Value);
+    }
+
+    void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+      DestBB->getInstList().push_back(Cloned);
+      SILClonerWithScopes<BaseThreadingCloner>::postProcess(Orig, Cloned);
+      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+    }
+  };
+
+  // Cloner used by jump-threading.
+  class ThreadingCloner : public BaseThreadingCloner {
+  public:
+    ThreadingCloner(BranchInst *BI)
+        : BaseThreadingCloner(*BI->getFunction(), BI->getDestBB(),
+                              BI->getParent()) {
+      // Populate the value map so that uses of the BBArgs in the DestBB are
+      // replaced with the branch's values.
+      for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+        ValueMap[FromBB->getBBArg(i)] = BI->getArg(i);
+        AvailVals.push_back(std::make_pair(FromBB->getBBArg(i), BI->getArg(i)));
+      }
+    }
+  };
+
+  /// Helper class for cloning of basic blocks.
+  class BasicBlockCloner : public BaseThreadingCloner {
+  public:
+    BasicBlockCloner(SILBasicBlock *From, SILBasicBlock *To = nullptr)
+        : BaseThreadingCloner(*From->getParent()) {
+      FromBB = From;
+      if (To == nullptr) {
+        // Create a new BB that is to be used as a target
+        // for cloning.
+        To = From->getParent()->createBasicBlock();
+        for (auto *Arg : FromBB->getBBArgs()) {
+          To->createArgument(Arg->getType(), Arg->getDecl());
+        }
+      }
+      DestBB = To;
+
+      // Populate the value map so that uses of the BBArgs in the SrcBB are
+      // replaced with the BBArgs of the DestBB.
+      for (unsigned i = 0, e = FromBB->bbarg_size(); i != e; ++i) {
+        ValueMap[FromBB->getBBArg(i)] = DestBB->getBBArg(i);
+        AvailVals.push_back(
+            std::make_pair(FromBB->getBBArg(i), DestBB->getBBArg(i)));
+      }
+    }
+
+    // Clone all instructions of the FromBB into DestBB
+    void clone() {
+      for (auto &I : *FromBB) {
+        process(&I);
+      }
+    }
+
+    SILBasicBlock *getDestBB() { return DestBB; }
+  };
+} // end anonymous namespace
+
 
 static bool isConditional(TermInst *I) {
   switch (I->getKind()) {
@@ -463,54 +560,6 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
   return false;
 }
 
-
-namespace {
-  class ThreadingCloner : public SILClonerWithScopes<ThreadingCloner> {
-    friend class SILVisitor<ThreadingCloner>;
-    friend class SILCloner<ThreadingCloner>;
-
-    SILBasicBlock *FromBB, *DestBB;
-  public:
-    // A map of old to new available values.
-    SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
-
-    ThreadingCloner(BranchInst *BI)
-      : SILClonerWithScopes(*BI->getFunction()),
-        FromBB(BI->getDestBB()), DestBB(BI->getParent()) {
-      // Populate the value map so that uses of the BBArgs in the DestBB are
-      // replaced with the branch's values.
-      for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-        ValueMap[FromBB->getBBArg(i)] = BI->getArg(i);
-        AvailVals.push_back(std::make_pair(FromBB->getBBArg(i), BI->getArg(i)));
-      }
-    }
-
-    void process(SILInstruction *I) { visit(I); }
-
-    SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
-
-    SILValue remapValue(SILValue Value) {
-      // If this is a use of an instruction in another block, then just use it.
-      if (auto SI = dyn_cast<SILInstruction>(Value)) {
-        if (SI->getParent() != FromBB) return Value;
-      } else if (auto BBArg = dyn_cast<SILArgument>(Value)) {
-        if (BBArg->getParent() != FromBB) return Value;
-      } else {
-        assert(isa<SILUndef>(Value) && "Unexpected Value kind");
-        return Value;
-      }
-
-      return SILCloner<ThreadingCloner>::remapValue(Value);
-    }
-
-
-    void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-      DestBB->getInstList().push_back(Cloned);
-      SILClonerWithScopes<ThreadingCloner>::postProcess(Orig, Cloned);
-      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
-    }
-  };
-} // end anonymous namespace
 
 
 /// We can not duplicate blocks with AllocStack instructions (they need to be
