@@ -1981,7 +1981,7 @@ namespace {
                                      getSemanticsProvidingExpr());
 
         LValue lv = SGF.emitLValue(e->getSubExpr(), AccessKind::ReadWrite);
-        address = SGF.emitAddressOfLValue(e->getSubExpr(), lv,
+        address = SGF.emitAddressOfLValue(e->getSubExpr(), std::move(lv),
                                           AccessKind::ReadWrite);
       }
 

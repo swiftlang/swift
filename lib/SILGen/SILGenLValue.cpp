@@ -1845,7 +1845,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
 /// location for it.
 static const PathComponent &drillToLastComponent(SILGenFunction &SGF,
                                                  SILLocation loc,
-                                                 const LValue &lv,
+                                                 LValue &&lv,
                                                  ManagedValue &addr,
                                                  AccessKind accessKind) {
   assert(lv.begin() != lv.end() &&
@@ -1861,14 +1861,14 @@ static const PathComponent &drillToLastComponent(SILGenFunction &SGF,
 }
 
 ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
-                                              const LValue &src,
+                                              LValue &&src,
                                               SGFContext C) {
   // No need to write back to a loaded lvalue.
   DisableWritebackScope scope(*this);
 
   ManagedValue addr;
   auto &component =
-    drillToLastComponent(*this, loc, src, addr, AccessKind::Read);
+    drillToLastComponent(*this, loc, std::move(src), addr, AccessKind::Read);
 
   // If the last component is physical, just drill down and load from it.
   if (component.isPhysical()) {
@@ -1882,10 +1882,11 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
-                                                 const LValue &src,
+                                                 LValue &&src,
                                                  AccessKind accessKind) {
   ManagedValue addr;
-  auto &component = drillToLastComponent(*this, loc, src, addr, accessKind);
+  auto &component =
+    drillToLastComponent(*this, loc, std::move(src), addr, accessKind);
   addr = drillIntoComponent(*this, loc, component, addr, accessKind);
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
@@ -1893,14 +1894,14 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
 }
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
-                                        const LValue &dest) {
+                                        LValue &&dest) {
   WritebackScope scope(*this);
   
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
   ManagedValue destAddr;
-  auto &component =
-    drillToLastComponent(*this, loc, dest, destAddr, AccessKind::ReadWrite);
+  auto &component = drillToLastComponent(*this, loc, std::move(dest), destAddr,
+                                         AccessKind::ReadWrite);
   
   // Write to the tail component.
   if (component.isPhysical()) {
@@ -1917,10 +1918,10 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
   // writeback chain.
 }
 
-void SILGenFunction::emitCopyLValueInto(SILLocation loc, const LValue &src,
+void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
                                         Initialization *dest) {
   auto skipPeephole = [&]{
-    auto loaded = emitLoadOfLValue(loc, src, SGFContext(dest));
+    auto loaded = emitLoadOfLValue(loc, std::move(src), SGFContext(dest));
     if (!loaded.isInContext())
       RValue(*this, loc, src.getSubstFormalType(), loaded)
         .forwardInto(*this, dest, loc);
@@ -1938,19 +1939,19 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, const LValue &src,
         != destAddr.getType().getSwiftRValueType())
     return skipPeephole();
   
-  auto srcAddr =
-    emitAddressOfLValue(loc, src, AccessKind::Read).getUnmanagedValue();
+  auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
+                   .getUnmanagedValue();
   B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
   dest->finishInitialization(*this);
 }
 
 void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
-                                              const LValue &src,
-                                              const LValue &dest) {
+                                              LValue &&src,
+                                              LValue &&dest) {
   auto skipPeephole = [&]{
-    ManagedValue loaded = emitLoadOfLValue(loc, src, SGFContext());
+    ManagedValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
     emitAssignToLValue(loc, RValue(*this, loc, src.getSubstFormalType(),
-                                   loaded), dest);
+                                   loaded), std::move(dest));
   };
   
   // Only perform the peephole if both operands are physical and there's no
@@ -1960,10 +1961,10 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
   if (!dest.isPhysical())
     return skipPeephole();
   
-  auto srcAddr =
-    emitAddressOfLValue(loc, src, AccessKind::Read).getUnmanagedValue();
-  auto destAddr =
-    emitAddressOfLValue(loc, dest, AccessKind::Write).getUnmanagedValue();
+  auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
+                   .getUnmanagedValue();
+  auto destAddr = emitAddressOfLValue(loc, std::move(dest), AccessKind::Write)
+                    .getUnmanagedValue();
 
   if (srcAddr.getType() == destAddr.getType()) {
     B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsNotInitialization);

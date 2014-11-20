@@ -113,7 +113,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     auto lv = emitLValue(load->getSubExpr(), AccessKind::Read);
-    emitCopyLValueInto(E, lv, I);
+    emitCopyLValueInto(E, std::move(lv), I);
     return;
   }
 
@@ -142,7 +142,8 @@ namespace {
     // These always produce lvalues.
     RValue visitInOutExpr(InOutExpr *E, SGFContext C) {
       LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::ReadWrite);
-      return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv,
+      return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(),
+                                                    std::move(lv),
                                                     AccessKind::ReadWrite));
     }
     
@@ -474,7 +475,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
     LValue lvalue =
       emitLValueForAddressedNonMemberVarDecl(loc, var, formalRValueType,
                                              accessKind, semantics);
-    return emitAddressOfLValue(loc, lvalue, accessKind);
+    return emitAddressOfLValue(loc, std::move(lvalue), accessKind);
   }
 
   case AccessStrategy::DirectToAccessor:
@@ -785,7 +786,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
       base = base.copyUnmanaged(*this, loc);
 
     LValue LV = emitDirectIVarLValue(loc, base, FieldDecl, AccessKind::Read);
-    return emitLoadOfLValue(loc, LV, C);
+    return emitLoadOfLValue(loc, std::move(LV), C);
   }
 
   // rvalue MemberRefExprs are produced in two cases: when accessing a 'let'
@@ -982,7 +983,7 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::Read);
-  return RValue(SGF, E, SGF.emitLoadOfLValue(E, lv, C));
+  return RValue(SGF, E, SGF.emitLoadOfLValue(E, std::move(lv), C));
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
@@ -4257,7 +4258,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
       SGF.emitDirectIVarLValue(loc, self, named->getDecl(), AccessKind::Write);
 
     // Assign to it.
-    SGF.emitAssignToLValue(loc, std::move(src), memberRef);
+    SGF.emitAssignToLValue(loc, std::move(src), std::move(memberRef));
     return;
   }
     
@@ -5054,7 +5055,8 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
 RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
                                                SGFContext C) {
   LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::ReadWrite);
-  SILValue address = SGF.emitAddressOfLValue(E->getSubExpr(), lv,
+  SILValue address = SGF.emitAddressOfLValue(E->getSubExpr(),
+                                             std::move(lv),
                                              AccessKind::ReadWrite)
     .getUnmanagedValue();
   // TODO: Reabstract the lvalue to match the abstraction level expected by
@@ -5638,7 +5640,7 @@ static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src,
   
   // Otherwise, emit the scalar assignment.
   LValue DstLV = Gen.emitLValue(Dest, AccessKind::Write);
-  Gen.emitAssignToLValue(S, std::move(Src), DstLV);
+  Gen.emitAssignToLValue(S, std::move(Src), std::move(DstLV));
 }
 
 RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
@@ -5651,8 +5653,8 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
         && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType())) {
       auto SrcLV = SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr(),
                                   AccessKind::Read);
-      SGF.emitAssignLValueToLValue(E, SrcLV,
-                             SGF.emitLValue(E->getDest(), AccessKind::Write));
+      auto DestLV = SGF.emitLValue(E->getDest(), AccessKind::Write);
+      SGF.emitAssignLValueToLValue(E, std::move(SrcLV), std::move(DestLV));
       return SGF.emitEmptyTupleRValue(E);
     }
   }
@@ -6061,7 +6063,7 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   
   // Get the lvalue address as a raw pointer.
   SILValue address =
-    SGF.emitAddressOfLValue(E, lv, accessKind).getUnmanagedValue();
+    SGF.emitAddressOfLValue(E, std::move(lv), accessKind).getUnmanagedValue();
   address = SGF.B.createAddressToPointer(E, address,
                                SILType::getRawPointerType(SGF.getASTContext()));
   
@@ -6265,7 +6267,7 @@ RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
     if (E->getSubExpr()->getType()->getAs<LValueType>()) {
       // If the unavailable expression is an lvalue, we will load it.
       auto lval = SGF.emitLValue(unavailExpr, AccessKind::Read);
-      ManagedValue loadedValue = SGF.emitLoadOfLValue(loc, lval, C);
+      ManagedValue loadedValue = SGF.emitLoadOfLValue(loc, std::move(lval), C);
       source = RValueSource(
           loc, RValue(SGF, loc, lval.getSubstFormalType(), loadedValue));
     } else {
@@ -6316,13 +6318,13 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
     // If the last component is physical, then we just need to drill through
     // side effects in the lvalue, but don't need to perform the final load.
     if (lv.isLastComponentPhysical()) {
-      emitAddressOfLValue(E, lv, AccessKind::Read);
+      emitAddressOfLValue(E, std::move(lv), AccessKind::Read);
       return;
     }
 
     // Otherwise, we must call the ultimate getter to get its potential side
     // effect.
-    emitLoadOfLValue(E, lv, SGFContext::AllowPlusZero);
+    emitLoadOfLValue(E, std::move(lv), SGFContext::AllowPlusZero);
     return;
   }
 

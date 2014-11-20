@@ -775,14 +775,14 @@ public:
                         SGFContext C, IsTake_t isTake);
   
   void emitAssignToLValue(SILLocation loc, RValue &&src,
-                          const LValue &dest);
+                          LValue &&dest);
   void emitAssignLValueToLValue(SILLocation loc,
-                                const LValue &src, const LValue &dest);
-  void emitCopyLValueInto(SILLocation loc, const LValue &src,
+                                LValue &&src, LValue &&dest);
+  void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
-  ManagedValue emitAddressOfLValue(SILLocation loc, const LValue &src,
+  ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    AccessKind accessKind);
-  ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
+  ManagedValue emitLoadOfLValue(SILLocation loc, LValue &&src,
                                 SGFContext C);
   
   /// Emit a reference to a method from within another method of the type, and

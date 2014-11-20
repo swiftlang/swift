@@ -222,7 +222,7 @@ class LValue {
 
 public:
   LValue() = default;
-  LValue(const LValue &other) = delete; // Would be nice someday.
+  LValue(const LValue &other) = delete;
   LValue(LValue &&other) = default;
 
   bool isValid() const { return !Path.empty(); }
