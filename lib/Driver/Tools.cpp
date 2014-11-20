@@ -669,6 +669,10 @@ Job *linux::Linker::constructJob(const JobAction &JA,
 
   Arguments.push_back("-lswiftCore");
 
+  // Add the linker script that coalesces protocol conformance sections.
+  Arguments.push_back("-Xlinker");
+  Arguments.push_back("-Tswift.ld");
+
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
   Arguments.push_back(Output->getPrimaryOutputFilename().c_str());

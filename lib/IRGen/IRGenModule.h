@@ -369,6 +369,7 @@ private:
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
 
+  llvm::Constant *emitProtocolConformances();
   void emitGlobalLists();
   void emitAutolinkInfo();
 

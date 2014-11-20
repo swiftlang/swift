@@ -454,6 +454,27 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
   return var;
 }
 
+/// Emit the protocol conformance list and return it
+llvm::Constant *IRGenModule::emitProtocolConformances() {
+  std::string sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    sectionName = "__DATA, __swift1_proto, regular, no_dead_strip";
+    break;
+  case llvm::Triple::ELF:
+    sectionName = ".swift1_protocol_conformances";
+    break;
+  default:
+    llvm_unreachable("Don't know how to emit protocol conformances for "
+                     "the selected object format.");
+  }
+
+  return emitGlobalList(*this, ProtocolConformanceRecords,
+                        "protocol_conformances", sectionName,
+                        llvm::GlobalValue::InternalLinkage,
+                        ProtocolConformanceRecordTy, true);
+}
+
 void IRGenModule::emitRuntimeRegistration() {
   // Duck out early if we have nothing to register.
   if (ProtocolConformanceRecords.empty()
@@ -558,13 +579,9 @@ void IRGenModule::emitRuntimeRegistration() {
   }
   // Register Swift protocol conformances if we added any.
   if (!ProtocolConformanceRecords.empty()) {
-    llvm::Constant *conformances
-    = emitGlobalList(*this, ProtocolConformanceRecords,
-                     "protocol_conformances",
-                     "__DATA, __swift1_proto, regular, no_dead_strip",
-                     llvm::GlobalValue::InternalLinkage,
-                     ProtocolConformanceRecordTy,
-                     true);
+
+    llvm::Constant *conformances = emitProtocolConformances();
+
     llvm::Constant *beginIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, 0),
@@ -602,37 +619,37 @@ void IRGenModule::addProtocolConformanceRecord(llvm::Constant *conformanceRec) {
 }
 
 void IRGenModule::emitGlobalLists() {
-  // Objective-C class references go in a variable with a meaningless
-  // name but a magic section.
-  emitGlobalList(*this, ObjCClasses, "objc_classes",
-                 "__DATA, __objc_classlist, regular, no_dead_strip",
-                 llvm::GlobalValue::InternalLinkage,
-                 Int8PtrTy,
-                 false);
-  // So do categories.
-  emitGlobalList(*this, ObjCCategories, "objc_categories",
-                 "__DATA, __objc_catlist, regular, no_dead_strip",
-                 llvm::GlobalValue::InternalLinkage,
-                 Int8PtrTy,
-                 false);
+  if (ObjCInterop) {
+    assert(TargetInfo.OutputObjectFormat == llvm::Triple::MachO);
+    // Objective-C class references go in a variable with a meaningless
+    // name but a magic section.
+    emitGlobalList(*this, ObjCClasses, "objc_classes",
+                   "__DATA, __objc_classlist, regular, no_dead_strip",
+                   llvm::GlobalValue::InternalLinkage,
+                   Int8PtrTy,
+                   false);
+    // So do categories.
+    emitGlobalList(*this, ObjCCategories, "objc_categories",
+                   "__DATA, __objc_catlist, regular, no_dead_strip",
+                   llvm::GlobalValue::InternalLinkage,
+                   Int8PtrTy,
+                   false);
 
-  // Emit nonlazily realized class references in a second magic section to make
-  // sure they are realized by the Objective-C runtime before any instances
-  // are allocated.
-  emitGlobalList(*this, ObjCNonLazyClasses, "objc_non_lazy_classes",
-                 "__DATA, __objc_nlclslist, regular, no_dead_strip",
-                 llvm::GlobalValue::InternalLinkage,
-                 Int8PtrTy,
-                 false);
+    // Emit nonlazily realized class references in a second magic section to make
+    // sure they are realized by the Objective-C runtime before any instances
+    // are allocated.
+    emitGlobalList(*this, ObjCNonLazyClasses, "objc_non_lazy_classes",
+                   "__DATA, __objc_nlclslist, regular, no_dead_strip",
+                   llvm::GlobalValue::InternalLinkage,
+                   Int8PtrTy,
+                   false);
+  }
 
   // Emit protocol conformances into a section we can recognize at runtime.
   // In JIT mode we need to manually register these conformances later.
-  if (!Opts.UseJIT)
-    emitGlobalList(*this, ProtocolConformanceRecords, "protocol_conformances",
-                 "__DATA, __swift1_proto, regular, no_dead_strip",
-                 llvm::GlobalValue::InternalLinkage,
-                 ProtocolConformanceRecordTy,
-                 true);
+  if (!Opts.UseJIT) {
+    emitProtocolConformances();
+  }
   
   // @llvm.used
   assert(std::all_of(LLVMUsed.begin(), LLVMUsed.end(),
