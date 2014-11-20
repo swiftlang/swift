@@ -2432,7 +2432,8 @@ namespace {
       auto superDecl = superTy->getAnyNominal();
       SmallVector<ValueDecl *, 4> results;
       superDecl->lookupQualified(superTy, decl->getFullName(),
-                                 NL_QualifiedDefault, Impl.getTypeResolver(),
+                                 NL_QualifiedDefault | NL_KnownNoDependency,
+                                 Impl.getTypeResolver(),
                                  results);
 
       for (auto member : results) {
@@ -3282,7 +3283,8 @@ namespace {
       // reasons. Fix it.
       auto containerTy = dc->getDeclaredTypeInContext();
       SmallVector<ValueDecl *, 2> lookup;
-      dc->lookupQualified(containerTy, name, NL_QualifiedDefault,
+      dc->lookupQualified(containerTy, name,
+                          NL_QualifiedDefault | NL_KnownNoDependency,
                           Impl.getTypeResolver(), lookup);
       Type unlabeledIndices;
       for (auto result : lookup) {
@@ -3505,8 +3507,9 @@ namespace {
       auto containerTy = dc->getDeclaredTypeInContext();
       VarDecl *overridden = nullptr;
       SmallVector<ValueDecl *, 2> lookup;
-      dc->lookupQualified(containerTy, name, NL_QualifiedDefault, nullptr,
-                          lookup);
+      dc->lookupQualified(containerTy, name,
+                          NL_QualifiedDefault | NL_KnownNoDependency,
+                          nullptr, lookup);
       for (auto result : lookup) {
         if (isa<FuncDecl>(result))
           return nullptr;
@@ -4331,7 +4334,8 @@ namespace {
       auto containerTy = dc->getDeclaredTypeInContext();
       VarDecl *overridden = nullptr;
       SmallVector<ValueDecl *, 2> lookup;
-      dc->lookupQualified(containerTy, name, NL_QualifiedDefault,
+      dc->lookupQualified(containerTy, name,
+                          NL_QualifiedDefault | NL_KnownNoDependency,
                           Impl.getTypeResolver(), lookup);
       for (auto result : lookup) {
         if (isa<FuncDecl>(result) && result->isInstanceMember() &&

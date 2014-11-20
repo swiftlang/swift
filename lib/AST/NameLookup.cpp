@@ -608,9 +608,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (TypeResolver)
           TypeResolver->resolveDeclSignature(BaseDecl);
 
+        unsigned options = NL_UnqualifiedDefault;
+        if (isPrivateUse.getValue())
+          options |= NL_KnownPrivateDependency;
+        else
+          options |= NL_KnownNonPrivateDependency;
+
         SmallVector<ValueDecl *, 4> Lookup;
-        DC->lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault,
-                            TypeResolver, Lookup);
+        DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
         bool isMetatypeType = ExtendedType->is<AnyMetatypeType>();
         bool FoundAny = false;
         for (auto Result : Lookup) {
@@ -1166,6 +1171,25 @@ bool DeclContext::lookupQualified(Type type,
   if (type->is<ErrorType>())
     return false;
 
+  auto checkLookupPrivate = [this, options]() -> Optional<bool> {
+    switch (options & NL_KnownDependencyMask) {
+    case 0:
+      return isPrivateContextForLookup(this, /*includeFunctions=*/false);
+      break;
+    case NL_KnownPrivateDependency:
+      return true;
+      break;
+    case NL_KnownNonPrivateDependency:
+      return false;
+      break;
+    case NL_KnownNoDependency:
+      return None;
+      break;
+    default:
+      llvm_unreachable("mask only includes four values");
+    }
+  };
+
   // Look through lvalue and inout types.
   type = type->getLValueOrInOutObjectType();
 
@@ -1185,10 +1209,10 @@ bool DeclContext::lookupQualified(Type type,
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
-      // FIXME: We should be able to tell if this is part of a function body
-      // or not.
-      recordLookupOfTopLevelName(topLevelScope, member,
-                                 isPrivateContextForLookup(this, false));
+      if (auto lookupPrivacy = checkLookupPrivate()) {
+        recordLookupOfTopLevelName(topLevelScope, member,
+                                   lookupPrivacy.getValue());
+      }
       lookupInModule(module, /*accessPath=*/{}, member, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                      typeResolver, topLevelScope);
@@ -1323,6 +1347,14 @@ bool DeclContext::lookupQualified(Type type,
   if (auto containingSourceFile = dyn_cast<SourceFile>(getModuleScopeContext()))
     tracker = containingSourceFile->getReferencedNameTracker();
 
+  bool isLookupPrivate;
+  if (tracker) {
+    if (auto lookupPrivacy = checkLookupPrivate())
+      isLookupPrivate = lookupPrivacy.getValue();
+    else
+      tracker = nullptr;
+  }
+
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> knownConformances;
@@ -1330,9 +1362,8 @@ bool DeclContext::lookupQualified(Type type,
     auto current = stack.back();
     stack.pop_back();
 
-    // FIXME: We should be able to tell if this is a local or non-local use.
     if (tracker)
-      tracker->addUsedNominal(current, true);
+      tracker->addUsedNominal(current, !isLookupPrivate);
 
     // Make sure we've resolved implicit constructors, if we need them.
     if (member.getBaseName() == ctx.Id_init && typeResolver)

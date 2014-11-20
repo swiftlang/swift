@@ -100,6 +100,34 @@ enum NameLookupOptions {
   /// This option is not valid when performing lookup into a module.
   NL_IgnoreAccessibility = 0x20,
 
+  /// This lookup is known to be a private dependency, i.e. one that does not
+  /// affect downstream files.
+  ///
+  /// \see NL_KnownDependencyMask
+  NL_KnownPrivateDependency = 0x40,
+
+  /// This lookup is known to be a non-private dependency, i.e. one that does
+  /// affect downstream files.
+  ///
+  /// \see NL_KnownDependencyMask
+  NL_KnownNonPrivateDependency = 0x80,
+
+  /// This lookup is known to not add any additional dependencies to the
+  /// primary source file.
+  ///
+  /// \see NL_KnownDependencyMask
+  NL_KnownNoDependency = NL_KnownPrivateDependency|NL_KnownNonPrivateDependency,
+
+  /// A mask of all options controlling how a lookup should be recorded as a
+  /// dependency.
+  ///
+  /// This offers three possible options: NL_KnownPrivateDependency,
+  /// NL_KnownNonPrivateDependency, NL_KnownNoDependency, as well as a default
+  /// "unspecified" value (0). If the dependency kind is unspecified, the
+  /// lookup function will attempt to infer whether it is a private or
+  /// non-private dependency from the decl context.
+  NL_KnownDependencyMask = NL_KnownNoDependency,
+
   /// The default set of options used for qualified name lookup.
   ///
   /// FIXME: Eventually, add NL_ProtocolMembers to this, once all of the

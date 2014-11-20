@@ -1065,7 +1065,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     Identifier name = getIdentifier(IID);
     pathTrace.addValue(name);
 
-    M->lookupQualified(ModuleType::get(M), name, NL_QualifiedDefault,
+    M->lookupQualified(ModuleType::get(M), name,
+                       NL_QualifiedDefault | NL_KnownNoDependency,
                        /*typeResolver=*/nullptr, values);
     filterValues(getType(TID), nullptr, isType, None, values);
     break;

@@ -97,7 +97,8 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       // themselves.
       SmallVector<ValueDecl *, 2> decls;
       mod->lookupQualified(ModuleType::get(mod), C.getIdentifier(typeName),
-                           NL_QualifiedDefault, /*resolver=*/nullptr, decls);
+                           NL_QualifiedDefault | NL_KnownPrivateDependency,
+                           /*resolver=*/nullptr, decls);
       if (decls.size() != 1)
         return CanType();
 
