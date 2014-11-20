@@ -1180,7 +1180,7 @@ extension Array {
   /// Construct from the given `_NSArrayCoreType`.
   ///
   /// If `noCopy` is `true`, either `source` must be known to be immutable,
-  /// or the resulting / `Array` must not survive across code that could mutate
+  /// or the resulting `Array` must not survive across code that could mutate
   /// `source`.
   public init(
     _fromCocoaArray source: _NSArrayCoreType,
