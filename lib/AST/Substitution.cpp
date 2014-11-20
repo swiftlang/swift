@@ -62,7 +62,8 @@ Substitution::Substitution(ArchetypeType *Archetype,
   assert(Archetype && "missing archetype in substitution");
   
   // The conformance list must match the archetype conformances.
-  if (!Replacement->is<ArchetypeType>()) {
+  if (!Replacement->is<ArchetypeType>()
+      && !Replacement->isExistentialType()) {
     assert(Conformance.size() == Archetype->getConformsTo().size()
            && "substitution conformances don't match archetype");
   }

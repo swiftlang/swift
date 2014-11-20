@@ -1728,9 +1728,12 @@ InitExistentialRefInst::create(SILLocation Loc, SILType ExistentialType,
   SILModule &Mod = F->getModule();
   void *Buffer = Mod.allocate(sizeof(InitExistentialRefInst),
                               alignof(InitExistentialRefInst));
-  for (ProtocolConformance *C : Conformances)
+  for (ProtocolConformance *C : Conformances) {
+    if (!C)
+      continue;
     if (!Mod.lookUpWitnessTable(C, false).first)
       declareWitnessTable(Mod, C);
+  }
 
   return ::new (Buffer) InitExistentialRefInst(Loc, ExistentialType,
                                                ConcreteType,

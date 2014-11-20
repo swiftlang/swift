@@ -1325,17 +1325,7 @@ getConformanceOfReplacement(Parser &P, Type subReplacement,
                             ProtocolDecl *proto) {
   auto conformance = P.SF.getParentModule()->lookupConformance(
                        subReplacement, proto, nullptr);
-  if (conformance.getPointer())
-    return conformance.getPointer();
-
-  // Handle self conformance.
-  if (!conformance.getPointer() &&
-      conformance.getInt() != ConformanceKind::DoesNotConform &&
-      subReplacement->is<ProtocolType>())
-    return P.Context.getConformance(subReplacement, proto,
-                                    SourceLoc(), nullptr,
-                                    ProtocolConformanceState::Incomplete);
-  return nullptr;
+  return conformance.getPointer();
 }
 
 /// Return true if B is derived from A.
@@ -1389,6 +1379,7 @@ static bool getConformancesForSubstitution(Parser &P,
   }
 
   if (subArchetype && !subReplacement->is<ArchetypeType>() &&
+      !subReplacement->isExistentialType() &&
       conformances.size() != subArchetype->getConformsTo().size()) {
     P.diagnose(loc, diag::sil_substitution_mismatch);
     return true;
@@ -1513,6 +1504,27 @@ static bool checkFunctionType(FunctionType *Ty, FunctionType *Ty2,
                        Ty2->getInput()->getCanonicalType(), Context, 1) &&
           checkASTType(Ty->getResult()->getCanonicalType(),
                        Ty2->getResult()->getCanonicalType(), Context, 1));
+}
+
+static ArrayRef<ProtocolConformance *>
+collectExistentialConformances(Parser &P,
+                               CanType conformingType, CanType protocolType) {
+  SmallVector<ProtocolDecl *, 2> protocols;
+  bool isExistential = protocolType->isAnyExistentialType(protocols);
+  assert(isExistential);
+  (void)isExistential;
+  if (protocols.empty())
+    return {};
+  
+  MutableArrayRef<ProtocolConformance *> conformances =
+    P.Context.Allocate<ProtocolConformance*>(protocols.size());
+  
+  for (unsigned i : indices(protocols)) {
+    conformances[i]
+      = getConformanceOfReplacement(P, conformingType, protocols[i]);
+  }
+  
+  return conformances;
 }
 
 ///   sil-instruction:
@@ -2983,10 +2995,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                     Lowering::AbstractionPattern(archetype), Ty)
       .getAddressType();
     
+    // Collect conformances for the type.
+    ArrayRef<ProtocolConformance *> conformances
+      = collectExistentialConformances(P, Ty, Val.getType().getSwiftRValueType());
+    
     // FIXME: Conformances in InitExistentialInst is currently not included in
     // SIL.rst.
     ResultVal = B.createInitExistential(InstLoc, Val, Ty, LoweredTy,
-                  ArrayRef<ProtocolConformance*>());
+                                        conformances);
     break;
   }
   case ValueKind::InitExistentialRefInst: {
@@ -3000,11 +3016,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILType(ExistentialTy))
       return true;
     
+    ArrayRef<ProtocolConformance *> conformances
+      = collectExistentialConformances(P, FormalConcreteTy,
+                            ExistentialTy.getSwiftRValueType());
+
     // FIXME: Conformances in InitExistentialRefInst is currently not included
     // in SIL.rst.
     ResultVal = B.createInitExistentialRef(InstLoc, ExistentialTy,
                                            FormalConcreteTy, Val,
-                                           ArrayRef<ProtocolConformance*>());
+                                           conformances);
     break;
   }
   case ValueKind::InitExistentialMetatypeInst: {
