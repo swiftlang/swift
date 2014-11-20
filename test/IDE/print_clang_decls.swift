@@ -124,9 +124,10 @@
 // CHECK-NULLABILITY: func getId2() -> AnyObject?
 // CHECK-NULLABILITY: var global_id: AnyObject?
 // CHECK-NULLABILITY: class SomeClass {
-// CHECK-NULLABILITY:   class func methodA(obj: SomeClass?) -> AnyObject
-// CHECK-NULLABILITY:   func methodA(obj: SomeClass?) -> AnyObject
-// CHECK-NULLABILITY:   class func methodB(block: (@objc_block (Int32, Int32) -> Int32)?) -> AnyObject
-// CHECK-NULLABILITY:   func methodB(block: (@objc_block (Int32, Int32) -> Int32)?) -> AnyObject
+// CHECK-NULLABILITY:   class func methodA(obj: SomeClass?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodA(obj: SomeClass?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   class func methodB(block: (@objc_block (Int32, Int32) -> Int32)?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodB(block: (@objc_block (Int32, Int32) -> Int32)?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodC() -> AnyObject?
 // CHECK-NULLABILITY:   var property: AnyObject?
 // CHECK-NULLABILITY: }
