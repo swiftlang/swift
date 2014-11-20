@@ -333,19 +333,20 @@ internal func _makeObjCBridgeObject<ObjCClass: AnyObject>(
 /// Requires:
 ///
 /// 1. `bits & _objectPointerSpareBits == bits`
-/// 2. if `object` is a tagged pointer, `bits == 0`.  Otherwise, if
-///    `object` is not a native object, `bits ==
+/// 2. if `object` is a tagged pointer, `bits == 0`.  Otherwise, 
+///    `object` is either a native object, or `bits ==
 ///    _objectPointerSpareBits`.
 internal func _makeBridgeObject<Class: AnyObject>(
   object: Class, bits: UInt
 ) -> Builtin.BridgeObject {
-  // FIXME: Workaround for <rdar://19026605>
-  func preconditionTest(object: Class, bits: UInt) -> Bool {
-    return _isObjCTaggedPointer(object) ? bits == 0
-    : bits != _objectPointerSpareBits
-      || _usesNativeSwiftReferenceCounting(Class.self)
-  }
-  _sanityCheck(preconditionTest(object, bits))
+  // if object is a tagged pointer, bits == 0
+  _sanityCheck(!_isObjCTaggedPointer(object) || bits == 0)
+
+  // Otherwise, object is native or bits == _objectPointerSpareBits
+  _sanityCheck(
+    _isObjCTaggedPointer(object) ||
+    _usesNativeSwiftReferenceCounting(object.dynamicType) ||
+    bits == _objectPointerSpareBits)
   
   _sanityCheck(
     bits & _objectPointerSpareBits == bits,

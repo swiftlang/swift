@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib -module-cache-path %t/clang-module-cache %t/out.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 
 import Swift
 
@@ -28,12 +29,14 @@ protocol BridgeStorage {
   typealias ObjC : AnyObject
 
   init(native: Native, bits: Int)
+  init(native: Native)
   init(objC: ObjC)
 
   mutating func isUniquelyReferencedNative() -> Bool
   var isNative: Bool {get}
   var isObjC: Bool {get}
   var nativeInstance: Native {get}
+  var unmaskedNativeInstance: Native {get}
   var objCInstance: ObjC {get}
   var spareBits: Int {get}
 }
@@ -54,6 +57,11 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
     
     self.object = native
     self.bits = UInt8(truncatingBitPattern: bits)
+  }
+  
+  init(native: Native) {
+    self.object = native
+    self.bits = 0
   }
   
   init(objC: ObjC) {
@@ -77,6 +85,12 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
   
   var nativeInstance: Native {
     precondition(isNative)
+    return Builtin.bridgeFromRawPointer(rawObject)
+  }
+    
+  var unmaskedNativeInstance: Native {
+    precondition(isNative)
+    precondition(spareBits == 0)
     return Builtin.bridgeFromRawPointer(rawObject)
   }
     
@@ -166,12 +180,31 @@ var unTaggedNSString : NSString {
 allTests.test("${Self}") {
   typealias B = ${Self}<C,NSString>
   
+  let oy: NSString = "oy"
+  expectTrue(B(objC: oy).objCInstance == oy)
+  
   for i in 0..<3 {
-    var b = B(native: C(), bits: i)
-    expectEmpty(b.objCInstance)
-    expectNotEmpty(b.nativeInstance)
-    expectTrue(b.isUniquelyReferencedNative())
-    expectEqual(i, b.spareBits)
+    if true {
+      var b = B(native: C(), bits: i)
+      expectFalse(b.isObjC)
+      expectTrue(b.isNative)
+      expectTrue(b.isUniquelyReferencedNative())
+      expectEqual(i, b.spareBits)
+    }
+    
+    if true {
+      let c = C()
+      var b = B(native: c, bits: i)
+      expectFalse(b.isObjC)
+      expectTrue(b.isNative)
+      expectFalse(b.isUniquelyReferencedNative())
+      expectEqual(i, b.spareBits)
+      expectTrue(b.nativeInstance === c)
+      if i == 0 {
+        expectTrue(b.unmaskedNativeInstance === c)
+      }
+    }
+    
   }
   
   var b = B(native: C(), bits: 0)
@@ -181,16 +214,24 @@ allTests.test("${Self}") {
   var c = b
   expectFalse(b.isUniquelyReferencedNative())
   _fixLifetime(c) // make sure c is not killed early
+
+  let n = C()
+  var bb = B(native: n)
+  expectEqual(0, bb.spareBits)
+  expectTrue(bb.nativeInstance === n)
+  expectTrue(bb.isNative)
+  expectFalse(bb.isObjC)
   
   var d = B(objC: taggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
-  expectEmpty(d.nativeInstance)
-  expectNotEmpty(d.objCInstance)
+  expectFalse(d.isNative)
+  expectTrue(d.isObjC)
 
   d = B(objC: unTaggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
-  expectEmpty(d.nativeInstance)
-  expectNotEmpty(d.objCInstance)
+  expectFalse(d.isNative)
+  expectTrue(d.isObjC)
+
 }
 % end
 

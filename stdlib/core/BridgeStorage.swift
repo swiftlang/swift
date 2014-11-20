@@ -55,6 +55,7 @@ struct _BridgeStorage<
   
   public // @testable
   var spareBits: Int {
+    _sanityCheck(isNative)
     return Int(
       _nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift)
   }
@@ -68,12 +69,12 @@ struct _BridgeStorage<
 
   public // @testable
   var isNative: Bool {
-    return _nonPointerBits(rawValue) != _objectPointerSpareBits
+    return !_isTagged && _nonPointerBits(rawValue) != _objectPointerSpareBits
   }
   
   public // @testable
   var isObjC: Bool {
-    return _nonPointerBits(rawValue) == _objectPointerSpareBits
+    return _isTagged || _nonPointerBits(rawValue) == _objectPointerSpareBits
   }
   
   public // @testable
@@ -96,5 +97,9 @@ struct _BridgeStorage<
   }
   
   //===--- private --------------------------------------------------------===//
+  internal var _isTagged: Bool {
+    return _isObjCTaggedPointer(Builtin.castReferenceFromBridgeObject(rawValue))
+  }
+  
   internal let rawValue: Builtin.BridgeObject
 }
