@@ -4711,9 +4711,10 @@ public:
 
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
-          // FIXME: Track whether this is a private use or not.
+          bool isNonPrivate =
+            (PD->getAccessibility() != Accessibility::Private);
           for (auto *parentProto : PD->getProtocols())
-            tracker->addUsedNominal(parentProto, true);
+            tracker->addUsedNominal(parentProto, isNonPrivate);
         }
       }
     }

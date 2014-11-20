@@ -67,9 +67,12 @@ extension Int {
   struct InnerToInt {}
 }
 
-// CHECK-DAG: "OtherFileAliasForFloatLiteralConvertible"
+// CHECK-DAG: - "OtherFileAliasForFloatLiteralConvertible"
 protocol ExtraFloatLiteralConvertible
     : OtherFileAliasForFloatLiteralConvertible {
+}
+// CHECK-DAG: !private "UnicodeScalarLiteralConvertible"
+private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
 }
 
 func lookUpManyTopLevelNames() {
@@ -186,7 +189,8 @@ func outerPrivateTy3() {
 // CHECK-DAG: "C4main18ClassFromOtherFile"
 // CHECK-DAG: "C4main8Subclass"
 // CHECK-DAG: "Si"
-// CHECK-DAG: "PSs23FloatLiteralConvertible"
+// CHECK-DAG: - "PSs23FloatLiteralConvertible"
+// CHECK-DAG: !private "PSs31UnicodeScalarLiteralConvertible"
 // CHECK-DAG: "PSs10Strideable"
 // CHECK-DAG: "V4main18OtherFileOuterType"
 // CHECK-DAG: "VV4main18OtherFileOuterType9InnerType"
