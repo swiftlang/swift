@@ -28,19 +28,16 @@
 #include "../shims/RuntimeShims.h"
 #include "stddef.h"
 
-#if defined(__APPLE__) && defined(__MACH__)
+#ifdef __APPLE__
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
-#elif defined(__ELF__)
-#include <elf.h>
-#include <link.h>
+#include <dispatch/dispatch.h>
 #endif
 
 #include <dlfcn.h>
 #include <cstring>
 #include <deque>
 #include <mutex>
-#include <atomic>
 #include <sstream>
 #include <type_traits>
 
@@ -1659,17 +1656,14 @@ const {
   }
 }
 
-#if defined(__APPLE__) && defined(__MACH__)
+// TODO: Implement protocol conformance lookup for non-Apple environments
+#ifdef __APPLE__
+
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift1_proto"
-#elif defined(__ELF__)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift1_protocol_conformances_start"
-#endif
 
-// FIXME: Implement this callback on non-apple platforms.
-
-// std:once_flag token to install the dyld callback to enqueue images for
+// dispatch_once token to install the dyld callback to enqueue images for
 // protocol conformance lookup.
-static std::once_flag InstallProtocolConformanceAddImageCallbackOnce;
+static dispatch_once_t InstallProtocolConformanceAddImageCallbackOnce = 0;
 
 // Monotonic generation number that is increased when we load an image with
 // new protocol conformances.
@@ -1817,21 +1811,6 @@ swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin
   pthread_mutex_unlock(&SectionsToScanLock);
 }
 
-static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
-                                               size_t conformancesSize) {
-  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0
-         && "weird-sized conformances section?!");
-
-  // If we have a section, enqueue the conformances for lookup.
-  auto recordsBegin
-    = reinterpret_cast<const ProtocolConformanceRecord*>(conformances);
-  auto recordsEnd
-    = reinterpret_cast<const ProtocolConformanceRecord*>
-                                            (conformances + conformancesSize);
-  swift_registerProtocolConformances(recordsBegin, recordsEnd);
-}
-
-#if defined(__APPLE__) && defined(__MACH__)
 static void _addImageProtocolConformances(const mach_header *mh,
                                           intptr_t vmaddr_slide) {
 #ifdef __LP64__
@@ -1851,57 +1830,29 @@ static void _addImageProtocolConformances(const mach_header *mh,
   if (!conformances)
     return;
   
-  _addImageProtocolConformancesBlock(conformances, conformancesSize);
+  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0
+         && "weird-sized conformances section?!");
+  
+  // If we have a section, enqueue the conformances for lookup.
+  auto recordsBegin
+    = reinterpret_cast<const ProtocolConformanceRecord*>(conformances);
+  auto recordsEnd
+    = reinterpret_cast<const ProtocolConformanceRecord*>
+                                              (conformances + conformancesSize);
+  swift_registerProtocolConformances(recordsBegin, recordsEnd);
 }
-#elif defined(__ELF__)
-static int _addImageProtocolConformances(struct dl_phdr_info *info,
-                                          size_t size, void * /*data*/) {
-  // Skip the executable and ld-linux.so, which both have a null or empty name.
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0')
-    return 0;
-
-  void *handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
-  auto conformances = reinterpret_cast<const uint8_t*>(
-      dlsym(handle, SWIFT_PROTOCOL_CONFORMANCES_SECTION));
-
-  if (!conformances) {
-    // if there are no conformances, don't hold this handle open.
-    dlclose(handle);
-    return 0;
-  }
-
-  // Extract the size of the conformances block from the head of the section
-  auto conformancesSize = *reinterpret_cast<const uint64_t*>(conformances);
-  conformances += sizeof(conformancesSize);
-
-  _addImageProtocolConformancesBlock(conformances, conformancesSize);
-
-  dlclose(handle);
-  return 0;
-}
-#endif
 
 const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
                                             const ProtocolDescriptor *protocol){
   // TODO: Generic types, subclasses, foreign classes
 
-  std::call_once(InstallProtocolConformanceAddImageCallbackOnce, [](){
-#if defined(__APPLE__) && defined(__MACH__)
-    // Install our dyld callback if we haven't already.
-    // Dyld will invoke this on our behalf for all images that have already been
-    // loaded.
+  // Install our dyld callback if we haven't already.
+  // Dyld will invoke this on our behalf for all images that have already been
+  // loaded.
+  dispatch_once(&InstallProtocolConformanceAddImageCallbackOnce, ^(void){
     _dyld_register_func_for_add_image(_addImageProtocolConformances);
-#elif defined(__ELF__)
-    // Search the loaded dls. Unlike the above, this only searches the already
-    // loaded ones.
-    // FIXME: Find a way to have this continue to happen after.
-    // rdar://problem/19045112
-    dl_iterate_phdr(_addImageProtocolConformances, nullptr);
-#else
-#error No known mechanism to inspect loaded dynamic libraries on this platform.
-#endif
   });
-
+  
   auto origType = type;
   
 recur:
@@ -2017,6 +1968,16 @@ recur_inside_cache_lock:
   type = origType;
   goto recur;
 }
+
+#else // if !__APPLE__
+
+const WitnessTable *swift::swift_conformsToProtocol(const Metadata *type,
+                                            const ProtocolDescriptor *protocol){
+  // Not implemented for non-Apple platforms.
+  return nullptr;
+}
+
+#endif // __APPLE__
 
 // The return type is incorrect.  It is only important that it is
 // passed using 'sret'.

@@ -1161,13 +1161,6 @@ macro(add_swift_library name)
     set(SWIFTLIB_DEFAULT_LINK_FLAGS
         "-Xlinker -segalign -Xlinker 0x4000")
   endif()
-  # On linux add the linker script that coalesces protocol conformance
-  # sections. This wouldn't be necessary if the link was done by the swift
-  # binary: rdar://problem/19007002
-  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(SWIFTLIB_DEFAULT_LINK_FLAGS
-        "${SWIFTLIB_DEFAULT_LINK_FLAGS} -Xlinker -Tswift.ld")
-  endif()
 
   # If we're supposed to build this library for the target...
   if(SWIFTLIB_TARGET_LIBRARY AND SWIFT_SDKS)

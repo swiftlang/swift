@@ -1729,17 +1729,7 @@ namespace {
                                              ? Twine("_$_") + CategoryName.str()
                                              : Twine()));
       var->setAlignment(IGM.getPointerAlignment().getValue());
-      switch (IGM.TargetInfo.OutputObjectFormat) {
-      case llvm::Triple::MachO:
-        var->setSection("__DATA, __objc_const");
-        break;
-      case llvm::Triple::ELF:
-        var->setSection(".data");
-        break;
-      default:
-        llvm_unreachable("Don't know how to emit private global constants for "
-                         "the selected object format.");
-      }
+      var->setSection("__DATA, __objc_const");
       return var;
     }
 
