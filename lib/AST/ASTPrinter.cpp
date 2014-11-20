@@ -569,7 +569,8 @@ bool PrintAST::shouldPrint(const Decl *D) {
   if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
       return false;
 
-  if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+  if (Options.SkipEmptyExtensionDecls && isa<ExtensionDecl>(D)) {
+    auto Ext = cast<ExtensionDecl>(D);
     // If the extension doesn't add protocols or has no members that we should
     // print then skip printing it.
     if (Ext->getProtocols().empty()) {

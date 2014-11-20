@@ -81,6 +81,9 @@ struct PrintOptions {
   /// Whether to skip internal stdlib declarations.
   bool SkipPrivateStdlibDecls = false;
 
+  /// Whether to skip extensions that don't add protocols or no members.
+  bool SkipEmptyExtensionDecls = true;
+
   /// Whether to print attributes.
   bool SkipAttributes = false;
 
@@ -175,6 +178,7 @@ struct PrintOptions {
     result.ExcludeAttrList.clear();
     result.PrintStorageRepresentationAttrs = true;
     result.PrintAccessibility = true;
+    result.SkipEmptyExtensionDecls = false;
     return result;
   }
 };
