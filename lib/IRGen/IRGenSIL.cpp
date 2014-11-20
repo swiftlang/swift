@@ -1258,7 +1258,6 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // visitAllocStackInst.
     if (Arg->getType().isExistentialType() ||
         Arg->getType().getSwiftRValueType()->isDependentType() ||
-        // FIXME: Why is this condition not a subset of isDependentType()?
         Arg->getType().is<ArchetypeType>())
       continue;
 

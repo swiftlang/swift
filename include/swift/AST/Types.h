@@ -686,6 +686,14 @@ public:
   
   /// Return whether this type is or can be substituted for a class type.
   TypeTraitResult canBeClass();
+  
+  /// Returns true if the type conforms to protocols using witnesses from the
+  /// environment or from within the value. Generic parameters and existentials
+  /// meet this criteria. In these cases we represent the
+  /// conformance as a null ProtocolConformance* pointer, because there is no
+  /// static conformance associated with the conforming type.
+  bool hasDependentProtocolConformances();
+  
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
@@ -3667,6 +3675,10 @@ inline CanType Type::getCanonicalTypeOrNull() const {
   return isNull() ? CanType() : getPointer()->getCanonicalType();
 }
 
+inline bool TypeBase::hasDependentProtocolConformances() {
+  return is<SubstitutableType>() || is<GenericTypeParamType>()
+      || isAnyExistentialType();
+}
 
 #define TYPE(id, parent)
 #define SUGARED_TYPE(id, parent) \

@@ -1378,8 +1378,7 @@ static bool getConformancesForSubstitution(Parser &P,
     }
   }
 
-  if (subArchetype && !subReplacement->is<ArchetypeType>() &&
-      !subReplacement->isExistentialType() &&
+  if (subArchetype && !subReplacement->hasDependentProtocolConformances() &&
       conformances.size() != subArchetype->getConformsTo().size()) {
     P.diagnose(loc, diag::sil_substitution_mismatch);
     return true;

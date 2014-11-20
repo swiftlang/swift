@@ -62,8 +62,7 @@ Substitution::Substitution(ArchetypeType *Archetype,
   assert(Archetype && "missing archetype in substitution");
   
   // The conformance list must match the archetype conformances.
-  if (!Replacement->is<ArchetypeType>()
-      && !Replacement->isExistentialType()) {
+  if (!Replacement->hasDependentProtocolConformances()) {
     assert(Conformance.size() == Archetype->getConformsTo().size()
            && "substitution conformances don't match archetype");
   }
@@ -98,8 +97,7 @@ Substitution Substitution::subst(Module *module,
   // When substituting a concrete type for an archetype, we need to fill in the
   // conformances.
   if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
-    if (!substReplacement->is<ArchetypeType>()
-        && !substReplacement->isAnyExistentialType()) {
+    if (!substReplacement->hasDependentProtocolConformances()) {
       conformancesChanged = true;
       // Find the conformances mapped to the archetype.
       auto foundConformances = conformanceMap.find(replacementArch);
@@ -141,7 +139,7 @@ found_conformance:;
   else
     substConformanceRef = Conformance;
 
-  assert(substReplacement->is<ArchetypeType>()
+  assert(substReplacement->hasDependentProtocolConformances()
          || substConformanceRef.size() == Archetype->getConformsTo().size());
 
   return Substitution{Archetype, substReplacement, substConformanceRef};

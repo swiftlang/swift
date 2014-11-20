@@ -102,10 +102,7 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
                "Constraint system missed a conformance?");
         (void)conforms;
 
-        assert(conformance ||
-               replacement->isExistentialType() ||
-               replacement->is<ArchetypeType>() ||
-               replacement->is<GenericTypeParamType>());
+        assert(conformance || replacement->hasDependentProtocolConformances());
         currentConformances.push_back(conformance);
         break;
       }
@@ -192,9 +189,9 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
   if (!conforms)
     return nullptr;
 
-  // For an archetype, just return the requirement from the protocol. There
-  // are no protocol conformance tables.
-  if (type->is<ArchetypeType>()) {
+  // For an type with dependent conformance, just return the requirement from
+  // the protocol. There are no protocol conformance tables.
+  if (type->hasDependentProtocolConformances()) {
     return requirement;
   }
 
@@ -225,9 +222,8 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
       // and ArchetypeMemberRef want to take the base as an rvalue.
       if (auto *fd = dyn_cast<FuncDecl>(func))
         if (!fd->isMutating() &&
-            (baseObjectTy->isExistentialType() ||
-             baseObjectTy->is<ArchetypeType>()))
-            return baseObjectTy;
+            baseObjectTy->hasDependentProtocolConformances())
+          return baseObjectTy;
       
       return InOutType::get(baseObjectTy);
     }
@@ -666,14 +662,14 @@ namespace {
       // Otherwise, we're referring to a member of a type.
 
       // Is it an archetype or existential member?
-      bool isArchetypeOrExistentialRef
+      bool isDependentConformingRef
             = isa<ProtocolDecl>(member->getDeclContext()) &&
-              (baseTy->is<ArchetypeType>() || baseTy->isAnyExistentialType());
+              baseTy->hasDependentProtocolConformances();
 
       // If we are referring to an optional member of a protocol, convert
       // the base type (which may be something that conforms to the protocol) to
       // the protocol type itself.
-      if (isArchetypeOrExistentialRef &&
+      if (isDependentConformingRef &&
           member->getAttrs().hasAttribute<OptionalAttr>())
         baseTy =cast<ProtocolDecl>(member->getDeclContext())->getDeclaredType();
 
@@ -688,7 +684,7 @@ namespace {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
         Type selfTy;
-        if (isArchetypeOrExistentialRef)
+        if (isDependentConformingRef)
           selfTy = baseTy;
         else
           selfTy = containerTy;
@@ -704,7 +700,7 @@ namespace {
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetatypeType::get(isArchetypeOrExistentialRef
+                            MetatypeType::get(isDependentConformingRef
                                                 ? baseTy
                                                 : containerTy),
                             locator.withPathElement(
@@ -717,7 +713,7 @@ namespace {
       assert(base && "Unable to convert base?");
 
       // Handle archetype and existential references.
-      if (isArchetypeOrExistentialRef) {
+      if (isDependentConformingRef) {
         assert(semantics == AccessSemantics::Ordinary &&
                "Direct property access doesn't make sense for this");
         assert(!dynamicSelfFnType && 
@@ -4711,7 +4707,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // We're constructing a value of nominal type. Look for the constructor or
   // enum element to use.
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
-         ty->is<ArchetypeType>() || ty->isExistentialType());
+         ty->hasDependentProtocolConformances());
   auto selected = getOverloadChoiceIfAvailable(
                     cs.getConstraintLocator(
                       locator.withPathElement(
