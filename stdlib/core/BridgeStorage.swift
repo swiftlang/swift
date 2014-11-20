@@ -48,6 +48,12 @@ struct _BridgeStorage<
   }
   
   public // @testable
+  init(native: Native) {
+    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    rawValue = Builtin.reinterpretCast(native)
+  }
+  
+  public // @testable
   var spareBits: Int {
     return Int(
       _nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift)
@@ -74,6 +80,13 @@ struct _BridgeStorage<
   var nativeInstance: Native {
     _sanityCheck(isNative)
     return Builtin.castReferenceFromBridgeObject(rawValue)
+  }
+  
+  public // @testable
+  var unmaskedNativeInstance: Native {
+    _sanityCheck(isNative)
+    _sanityCheck(_nonPointerBits(rawValue) == 0)
+    return Builtin.reinterpretCast(rawValue)
   }
   
   public // @testable
