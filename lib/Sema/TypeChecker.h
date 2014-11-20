@@ -357,8 +357,7 @@ public:
                              IdentTypeRepr *IdType,
                              TypeResolutionOptions options,
                              bool diagnoseErrors,
-                             GenericTypeResolver *resolver,
-                             ValueDecl *typeContext = nullptr);
+                             GenericTypeResolver *resolver);
   
   /// \brief Validate the given type.
   ///
@@ -379,8 +378,7 @@ public:
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, DeclContext *DC,
                     TypeResolutionOptions options = None,
-                    GenericTypeResolver *resolver = nullptr,
-                    ValueDecl *typeContext = nullptr);
+                    GenericTypeResolver *resolver = nullptr);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   /// We pass in a vector of nested GenericParamLists and a vector of
@@ -404,13 +402,10 @@ public:
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
   ///
-  /// \param typeContext The declaration that this type applies to.
-  ///
   /// \returns a well-formed type or an ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR, DeclContext *DC,
                    TypeResolutionOptions options,
-                   GenericTypeResolver *resolver = nullptr,
-                   ValueDecl *typeContext = nullptr);
+                   GenericTypeResolver *resolver = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
 

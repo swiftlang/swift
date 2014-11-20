@@ -856,8 +856,7 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
                                         IdentTypeRepr *IdType,
                                         TypeResolutionOptions options,
                                         bool diagnoseErrors,
-                                        GenericTypeResolver *resolver,
-                                        ValueDecl *typeContext) {
+                                        GenericTypeResolver *resolver) {
   assert(resolver && "Missing generic type resolver");
 
   auto ComponentRange = IdType->getComponentRange();
@@ -914,8 +913,7 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
 
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                TypeResolutionOptions options,
-                               GenericTypeResolver *resolver,
-                               ValueDecl *typeContext) {
+                               GenericTypeResolver *resolver) {
   // FIXME: Verify that these aren't circular and infinite size.
   
   // If we've already validated this type, don't do so again.
@@ -923,8 +921,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     return Loc.isError();
 
   if (Loc.getType().isNull()) {
-    Loc.setType(resolveType(Loc.getTypeRepr(), DC, options, resolver, typeContext),
-                true);
+    Loc.setType(resolveType(Loc.getTypeRepr(), DC, options, resolver), true);
     return Loc.isError();
   }
 
@@ -941,14 +938,11 @@ namespace {
     ASTContext &Context;
     DeclContext *DC;
     GenericTypeResolver *Resolver;
-    ValueDecl *TypeContext;
 
   public:
     TypeResolver(TypeChecker &tc, DeclContext *DC,
-                 GenericTypeResolver *resolver,
-                 ValueDecl *typeContext)
-      : TC(tc), Context(tc.Context), DC(DC), Resolver(resolver),
-        TypeContext(typeContext) {
+                 GenericTypeResolver *resolver)
+      : TC(tc), Context(tc.Context), DC(DC), Resolver(resolver) {
       assert(resolver);
     }
 
@@ -1004,8 +998,7 @@ namespace {
 
 Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                               TypeResolutionOptions options,
-                              GenericTypeResolver *resolver,
-                              ValueDecl *typeContext) {
+                              GenericTypeResolver *resolver) {
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
 
   // Make sure we always have a resolver to use.
@@ -1013,7 +1006,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   if (!resolver)
     resolver = &defaultResolver;
 
-  TypeResolver typeResolver(*this, DC, resolver, typeContext);
+  TypeResolver typeResolver(*this, DC, resolver);
   return typeResolver.resolveType(TyR, options);
 }
 
@@ -1032,8 +1025,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr), options,
-                                    /*diagnoseErrors*/ true, Resolver,
-                                    TypeContext);
+                                    /*diagnoseErrors*/ true, Resolver);
 
   case TypeReprKind::Function:
     if (!(options & TR_SILType))
