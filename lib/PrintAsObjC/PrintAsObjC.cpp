@@ -216,6 +216,17 @@ private:
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
         (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
+        printNullability(ctor->getFailability(),
+                         NullabilityPrintKind::ContextSensitive);
+      } else {
+        auto func = cast<FuncDecl>(AFD);
+        OptionalTypeKind optionalKind;
+        (void)func->getResultType()->getAnyOptionalObjectType(optionalKind);
+        printNullability(optionalKind,
+                         NullabilityPrintKind::ContextSensitive);
+      }
+
       os << "instancetype";
     } else if (methodTy->getResult()->isVoid() &&
                AFD->getAttrs().hasAttribute<IBActionAttr>()) {
@@ -407,20 +418,37 @@ private:
     TypeVisitor::visit(ty, optionalKind);
   }
 
-  void printNullability(OptionalTypeKind kind) {
+  /// Where nullability information should be printed.
+  enum class NullabilityPrintKind {
+    Before,
+    After,
+    ContextSensitive,
+  };
+
+  void printNullability(OptionalTypeKind kind,
+                        NullabilityPrintKind printKind
+                          = NullabilityPrintKind::After) {
+    if (printKind == NullabilityPrintKind::After)
+      os << ' ';
+    if (printKind != NullabilityPrintKind::ContextSensitive)
+      os << "__";
+
     switch (kind) {
     case OTK_None:
-      os << " __nonnull";
+      os << "nonnull";
       break;
 
     case OTK_Optional:
-      os << " __nullable";
+      os << "nullable";
       break;
 
     case OTK_ImplicitlyUnwrappedOptional:
-      os << " __null_unspecified";
+      os << "null_unspecified";
       break;
     }
+
+    if (printKind != NullabilityPrintKind::After)
+      os << ' ';
   }
 
   /// If "name" is one of the standard library types used to map in Clang
@@ -767,6 +795,7 @@ private:
 
   void visitDynamicSelfType(DynamicSelfType *DST, 
                             OptionalTypeKind optionalKind) {
+    printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
     os << "instancetype";
   }
 
