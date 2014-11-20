@@ -3564,8 +3564,16 @@ public:
   // Helper Functions.
   //===--------------------------------------------------------------------===//
 
-  template<typename DeclType>
-  void checkExplicitConformance(DeclType *D, Type T) {
+  static bool isPrivateConformer(const ExtensionDecl *ED) {
+    return ED->getDefaultAccessibility() == Accessibility::Private;
+  }
+
+  static bool isPrivateConformer(const NominalTypeDecl *NTD) {
+    return NTD->getAccessibility() == Accessibility::Private;
+  }
+
+  template<typename NominalOrExtensionDecl>
+  void checkExplicitConformance(NominalOrExtensionDecl *D, Type T) {
     SmallVector<ProtocolConformance *, 4> conformances;
     ReferencedNameTracker *tracker = nullptr;
     if (SourceFile *SF = D->getParentSourceFile())
@@ -3580,9 +3588,8 @@ public:
                                   D->getStartLoc(), D);
       conformances.push_back(conformance);
 
-      // FIXME: We should be able to tell if this is a private use or not.
       if (tracker)
-        tracker->addUsedNominal(proto, true);
+        tracker->addUsedNominal(proto, !isPrivateConformer(D));
     }
 
     D->setConformances(D->getASTContext().AllocateCopy(conformances));

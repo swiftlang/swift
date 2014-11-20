@@ -48,6 +48,10 @@ typealias TopLevelTy1 = Int
 typealias TopLevelTy2 = Int
 typealias TopLevelTy3 = Int
 
+protocol TopLevelProto1 {}
+protocol TopLevelProto2 {}
+protocol TopLevelProto3 {}
+
 func privateTopLevel1() -> Int { return 2 }
 func privateTopLevel2() -> Int { return 2 }
 func privateTopLevel3() -> Int { return 2 }
@@ -61,3 +65,7 @@ func privateTopLevel9() -> Int { return 2 }
 typealias PrivateTopLevelTy1 = Int
 typealias PrivateTopLevelTy2 = Int
 typealias PrivateTopLevelTy3 = Int
+
+protocol PrivateProto1 {}
+protocol PrivateProto2 {}
+protocol PrivateProto3 {}

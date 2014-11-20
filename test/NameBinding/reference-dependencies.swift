@@ -26,9 +26,9 @@
 
 // CHECK-LABEL: {{^top-level:$}}
 
-// CHECK-DAG: "Comparable"
+// CHECK-DAG: - "Comparable"
 struct IntWrapper: Comparable {
-  // CHECK-DAG: "Int"
+  // CHECK-DAG: - "Int"
   var value: Int
 
   struct InnerForNoReason {}
@@ -131,7 +131,8 @@ var use2 = { topLevel2() }
 // CHECK-DAG: - "topLevel3"
 var use3 = { ({ topLevel3() })() }
 // CHECK-DAG: - "topLevel4"
-struct Use4 {
+// CHECK-DAG: - "TopLevelProto1"
+struct Use4 : TopLevelProto1 {
   var use4 = topLevel4()
 }
 // CHECK-DAG: - "*"
@@ -153,14 +154,16 @@ func useTy1(x: TopLevelTy1) {}
 // CHECK-DAG: - "TopLevelTy2"
 func useTy2() -> TopLevelTy2 {}
 // CHECK-DAG: - "TopLevelTy3"
-extension Use4 {
+// CHECK-DAG: - "TopLevelProto2"
+extension Use4 : TopLevelProto2 {
   var useTy3: TopLevelTy3? { return nil }
 }
 
 // CHECK-DAG: !private "privateTopLevel1"
 func private1(a: Int = privateTopLevel1()) {}
 // CHECK-DAG: !private "privateTopLevel2"
-private struct Private2 {
+// CHECK-DAG: !private "PrivateProto1"
+private struct Private2 : PrivateProto1 {
   var private2 = privateTopLevel2()
 }
 // CHECK-DAG: !private "privateTopLevel3"
@@ -173,7 +176,8 @@ private extension Use4 {
   var privateTy1: PrivateTopLevelTy1? { return nil }
 } 
 // CHECK-DAG: !private "PrivateTopLevelTy2"
-extension Private2 {
+// CHECK-DAG: "PrivateProto2"
+extension Private2 : PrivateProto2 {
   var privateTy2: PrivateTopLevelTy2? { return nil }
 }
 // CHECK-DAG: !private "PrivateTopLevelTy3"
@@ -197,6 +201,10 @@ func outerPrivateTy3() {
 // CHECK-DAG: "VV4main26OtherFileSecretTypeWrapper10SecretType"
 // CHECK-DAG: "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: "V4main26OtherFileProtoImplementor2"
+// CHECK-DAG: - "P4main14TopLevelProto1"
+// CHECK-DAG: - "P4main14TopLevelProto2"
+// CHECK-DAG: !private "P4main13PrivateProto1"
+// CHECK-DAG: !private "P4main13PrivateProto2"
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
