@@ -257,7 +257,6 @@ public func _swift_isClass(x: Any) -> Bool
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
 #if arch(i386) || arch(arm)
-@inline(__always)
 internal var _objectPointerSpareBits: UInt {
     @inline(__always) get { return 0x0000_0003 }
 }
