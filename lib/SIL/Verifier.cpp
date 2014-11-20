@@ -2277,7 +2277,14 @@ public:
     require(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
                       ti->getParameterSILTypes().begin(),
                       [&](SILArgument *bbarg, SILType ty) {
-                        return bbarg->getType() == F.mapTypeIntoContext(ty);
+                        auto mappedTy = F.mapTypeIntoContext(ty);
+                        if (bbarg->getType() != mappedTy) {
+                          llvm::errs() << "argument type mismatch!\n";
+                          llvm::errs() << "  argument: "; bbarg->dump();
+                          llvm::errs() << "  expected: "; mappedTy.dump();
+                          return false;
+                        }
+                        return true;
                       }),
             "entry point argument types do not match function type");
   }
