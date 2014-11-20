@@ -171,6 +171,30 @@ bb0(%0 : $Int):
   return %3 : $Bool
 }
 
+// CHECK-LABEL: sil @tst_icmp_slt 
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
+sil @tst_icmp_slt : $@thin (Int) -> Bool {
+bb0(%0 : $Int):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = builtin "cmp_slt_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil @tst_icmp_sgt 
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
+sil @tst_icmp_sgt : $@thin (Int) -> Bool {
+bb0(%0 : $Int):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = builtin "cmp_sgt_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  return %3 : $Bool
+}
+
 // CHECK-LABEL: sil @tst_icmp_ule 
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
@@ -191,6 +215,30 @@ sil @tst_icmp_uge : $@thin (UInt) -> Bool {
 bb0(%0 : $UInt):
   %1 = struct_extract %0 : $UInt, #UInt.value
   %2 = builtin "cmp_uge_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil @tst_icmp_ult 
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
+sil @tst_icmp_ult : $@thin (UInt) -> Bool {
+bb0(%0 : $UInt):
+  %1 = struct_extract %0 : $UInt, #UInt.value
+  %2 = builtin "cmp_ult_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil @tst_icmp_ugt 
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
+sil @tst_icmp_ugt : $@thin (UInt) -> Bool {
+bb0(%0 : $UInt):
+  %1 = struct_extract %0 : $UInt, #UInt.value
+  %2 = builtin "cmp_ugt_Word"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
   %3 = struct $Bool (%2 : $Builtin.Int1)
   return %3 : $Bool
 }

@@ -1004,6 +1004,10 @@ static SILInstruction *optimizeBuiltinWithSameOperands(BuiltinInst *I,
   case BuiltinValueKind::URem:
   case BuiltinValueKind::Xor:
   case BuiltinValueKind::ICMP_NE:
+  case BuiltinValueKind::ICMP_SLT:
+  case BuiltinValueKind::ICMP_SGT:
+  case BuiltinValueKind::ICMP_ULT:
+  case BuiltinValueKind::ICMP_UGT:
   case BuiltinValueKind::FCMP_ONE:
     if (auto Ty = I->getType().getAs<BuiltinIntegerType>()) {
       return IntegerLiteralInst::create(I->getLoc(), I->getType(),
