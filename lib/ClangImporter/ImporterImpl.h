@@ -656,6 +656,9 @@ public:
   /// translated into Swift.
   ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
 
+  /// Returns true if it is expected that the macro is ignored.
+  bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro);
+
   /// \brief Classify the given Clang enumeration type to describe how it
   /// should be imported 
   EnumKind classifyEnum(const clang::EnumDecl *decl);

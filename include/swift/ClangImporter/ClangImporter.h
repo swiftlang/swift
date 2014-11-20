@@ -25,7 +25,9 @@ namespace llvm {
 namespace clang {
   class ASTContext;
   class Decl;
+  class MacroInfo;
   class Module;
+  class Sema;
   class TargetInfo;
   class VisibleDeclConsumer;
 }
@@ -178,7 +180,11 @@ public:
   clang::TargetInfo &getTargetInfo() const;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
+  clang::Sema &getClangSema() const;
   std::string getClangModuleHash() const;
+
+  /// Returns true if it is expected that the macro is ignored.
+  bool shouldIgnoreMacro(StringRef Name, const clang::MacroInfo *Macro);
 
   using ClangModuleLoader::addDependency;
   

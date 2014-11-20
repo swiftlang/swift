@@ -2599,8 +2599,17 @@ bool ClangImporter::hasTypedef(const clang::Decl *typeDecl) const {
   return Impl.DeclsWithSuperfluousTypedefs.count(typeDecl);
 }
 
+clang::Sema &ClangImporter::getClangSema() const {
+  return Impl.getClangSema();
+}
+
 std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash();
+}
+
+bool ClangImporter::shouldIgnoreMacro(StringRef Name,
+                                      const clang::MacroInfo *Macro) {
+  return Impl.shouldIgnoreMacro(Name, Macro);
 }
 
 void ClangImporter::printStatistics() const {
