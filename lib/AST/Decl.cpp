@@ -727,8 +727,10 @@ loadAllConformances(const T *container,
   auto contextData = loaderInfo.getLoaderContextData();
   const_cast<LazyLoaderArray<ProtocolConformance*> &>(loaderInfo) = {};
 
-  auto conformances = resolver->loadAllConformances(container, contextData);
-  const_cast<T *>(container)->setConformances(conformances);
+  SmallVector<ProtocolConformance *, 8> Conformances;
+  resolver->loadAllConformances(container, contextData, Conformances);
+  const_cast<T *>(container)->setConformances(
+                        container->getASTContext().AllocateCopy(Conformances));
 }
 
 DeclRange NominalTypeDecl::getMembers(bool forceDelayedMembers) const {

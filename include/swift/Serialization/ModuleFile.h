@@ -361,15 +361,14 @@ private:
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
 
-  /// Reads members of a DeclContext from \c DeclTypeCursor.
+  /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
   ///
-  /// The returned array is owned by the ASTContext.
-  /// Returns None if there is an error.
+  /// Returns true if there is an error.
   ///
   /// Note: this destroys the cursor's position in the stream. Furthermore,
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow a DECL_CONTEXT record.
-  Optional<MutableArrayRef<Decl *>> readMembers();
+  bool readMembers(SmallVectorImpl<Decl *> &Members);
 
   /// Resolves a cross-reference, starting from the given module.
   ///
@@ -521,12 +520,14 @@ public:
   /// Has no effect in NDEBUG builds.
   void verify() const;
 
-  virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
-                                          uint64_t contextData,
-                                          bool *ignored) override;
+  virtual void loadAllMembers(const Decl *D,
+                              uint64_t contextData,
+                              SmallVectorImpl<Decl *> &Members,
+                              bool *ignored) override;
 
-  virtual ArrayRef<ProtocolConformance *>
-  loadAllConformances(const Decl *D, uint64_t contextData) override;
+  virtual void
+  loadAllConformances(const Decl *D, uint64_t contextData,
+                      SmallVectorImpl<ProtocolConformance*> &Conforms) override;
 
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) override;

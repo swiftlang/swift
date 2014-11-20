@@ -560,8 +560,10 @@ void IterableDeclContext::loadAllMembers() const {
   }
 
   bool hasMissingRequiredMembers = false;
-  for (auto member : resolver->loadAllMembers(container, contextData,
-                                              &hasMissingRequiredMembers)) {
+  SmallVector<Decl *, 16> Members;
+  resolver->loadAllMembers(container, contextData, Members,
+                           &hasMissingRequiredMembers);
+  for (auto member : Members) {
     const_cast<IterableDeclContext *>(this)->addMember(member);
   }
 

@@ -952,12 +952,12 @@ void ModuleFile::readGenericRequirements(
   }
 }
 
-Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
+bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
   using namespace decls_block;
 
   auto entry = DeclTypeCursor.advance();
   if (entry.Kind != llvm::BitstreamEntry::Record)
-    return None;
+    return true;
 
   SmallVector<uint64_t, 16> memberIDBuffer;
 
@@ -969,19 +969,16 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
   decls_block::DeclContextLayout::readRecord(memberIDBuffer, rawMemberIDs);
 
   if (rawMemberIDs.empty())
-    return MutableArrayRef<Decl *>();
+    return false;
 
-  ASTContext &ctx = getContext();
-  MutableArrayRef<Decl *> members = ctx.Allocate<Decl *>(rawMemberIDs.size());
-
-  auto nextMember = members.begin();
+  Members.reserve(rawMemberIDs.size());
   for (DeclID rawID : rawMemberIDs) {
-    *nextMember = getDecl(rawID);
-    assert(*nextMember && "unable to deserialize next member");
-    ++nextMember;
+    Decl *D = getDecl(rawID);
+    assert(D && "unable to deserialize next member");
+    Members.push_back(D);
   }
 
-  return members;
+  return false;
 }
 
 static Optional<swift::CtorInitializerKind>
@@ -3594,19 +3591,20 @@ Type ModuleFile::getType(TypeID TID) {
   return typeOrOffset;
 }
 
-ArrayRef<Decl *> ModuleFile::loadAllMembers(const Decl *D,
-                                            uint64_t contextData,
-                                            bool *) {
+void ModuleFile::loadAllMembers(const Decl *D,
+                                uint64_t contextData,
+                                SmallVectorImpl<Decl *> &Members,
+                                bool *) {
   // FIXME: Add PrettyStackTrace.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);
-  auto result = readMembers();
-  assert(result && "unable to read members");
-  return result.getValue();
+  bool Err = readMembers(Members);
+  assert(!Err && "unable to read members");
 }
 
-ArrayRef<ProtocolConformance *>
-ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData) {
+void
+ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
+                         SmallVectorImpl<ProtocolConformance *> &conformances) {
   // FIXME: Add PrettyStackTrace.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);
@@ -3618,10 +3616,8 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData) {
     conformingTy = cast<ExtensionDecl>(D)->getDeclaredTypeInContext();
   CanType canTy = conformingTy->getCanonicalType();
 
-  SmallVector<ProtocolConformance *, 16> conformances;
   while (auto conformance = maybeReadConformance(canTy, DeclTypeCursor))
     conformances.push_back(conformance.getValue());
-  return getContext().AllocateCopy(conformances);
 }
 
 TypeLoc

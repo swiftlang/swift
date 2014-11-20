@@ -112,25 +112,25 @@ class alignas(void*) LazyMemberLoader {
 public:
   virtual ~LazyMemberLoader() = default;
 
-  /// Returns an ASTContext-allocated array containing all member decls for
-  /// \p D.
+  /// Populates the given vector with all member decls for \p D.
   ///
   /// The implementation should \em not call setMembers on \p D.
   ///
   /// \param[out] hasMissingRequiredMembers If present, set to true if any
   /// members failed to import and were non-optional protocol requirements.
-  virtual ArrayRef<Decl *>
+  virtual void
   loadAllMembers(const Decl *D, uint64_t contextData,
+                 SmallVectorImpl<Decl *> &Members,
                  bool *hasMissingRequiredMembers = nullptr) {
     llvm_unreachable("unimplemented");
   }
 
-  /// Returns an ASTContext-allocated array containing all conformances for
-  /// \p D.
+  /// Populates the given vector with all conformances for \p D.
   ///
   /// The implementation should \em not call setConformances on \p D.
-  virtual ArrayRef<ProtocolConformance *>
-  loadAllConformances(const Decl *D, uint64_t contextData) {
+  virtual void
+  loadAllConformances(const Decl *D, uint64_t contextData,
+                      SmallVectorImpl<ProtocolConformance *> &Conformances) {
     llvm_unreachable("unimplemented");
   }
 

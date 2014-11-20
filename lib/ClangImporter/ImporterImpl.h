@@ -933,8 +933,9 @@ public:
     typeResolver = newResolver;
   }
 
-  virtual ArrayRef<Decl *>
+  virtual void
   loadAllMembers(const Decl *D, uint64_t unused,
+                 SmallVectorImpl<Decl *> &Members,
                  bool *hasMissingRequiredMembers) override;
 
   template <typename DeclTy, typename ...Targs>

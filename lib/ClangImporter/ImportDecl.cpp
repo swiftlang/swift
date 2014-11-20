@@ -5211,13 +5211,13 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 }
 
 
-ArrayRef<Decl *>
+void
 ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused,
+                                              SmallVectorImpl<Decl *> &members,
                                               bool *hasMissingRequiredMembers) {
   assert(D->hasClangNode());
   auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
 
-  SmallVector<Decl *, 4> members;
   SwiftDeclConverter converter(*this);
 
   const DeclContext *DC;
@@ -5264,8 +5264,6 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused,
   converter.importMirroredProtocolMembers(clangDecl,
                                           const_cast<DeclContext *>(DC),
                                           protos, members, SwiftContext);
-
-  return SwiftContext.AllocateCopy(members);
 }
 
 Optional<MappedTypeNameKind>
