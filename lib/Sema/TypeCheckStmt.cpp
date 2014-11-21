@@ -634,7 +634,7 @@ public:
         }
 
         // Coerce the pattern to the subject's type.
-        if (TC.coercePatternToType(pattern, DC, subjectType, None)) {
+        if (TC.coercePatternToType(pattern, DC, subjectType, TR_InExpression)) {
           // If that failed, mark any variables binding pieces of the pattern
           // as invalid to silence follow-on errors.
           pattern->forEachVariable([&](VarDecl *VD) {

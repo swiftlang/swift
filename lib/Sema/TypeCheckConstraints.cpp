@@ -1180,9 +1180,12 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
                && "solution did not find optional type for "
                   "conditional binding?!");
       }
-      
+
+      TypeResolutionOptions options;
+      options |= TR_OverrideType;
+      options |= TR_InExpression;
       if (tc.coercePatternToType(pattern, Binding->getDeclContext(),
-                                 patternType, TR_OverrideType)) {
+                                 patternType, options)) {
         return nullptr;
       }
       Binding->setPattern(pattern);
@@ -1312,6 +1315,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       TypeResolutionOptions options;
       options |= TR_OverrideType;
       options |= TR_EnumerationVariable;
+      options |= TR_InExpression;
       if (tc.coercePatternToType(pattern, cs.DC, InitType, options)) {
         return nullptr;
       }
