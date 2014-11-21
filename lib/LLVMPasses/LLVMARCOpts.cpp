@@ -187,7 +187,6 @@ static bool canonicalizeInputFunction(Function &F) {
 
     switch (classifyInstruction(Inst)) {
     case RT_Unknown:
-    case RT_BridgeRetain:
     case RT_BridgeRelease:
     case RT_AllocObject:
     case RT_FixLifetime:
@@ -295,6 +294,7 @@ static bool canonicalizeInputFunction(Function &F) {
     // These retain instructions return their argument so must be processed
     // specially.
     case RT_UnknownRetain:
+    case RT_BridgeRetain:
     case RT_ObjCRetain: {
       // Canonicalize the retain so that nothing uses its result.
       CallInst &CI = cast<CallInst>(Inst);
@@ -840,11 +840,13 @@ static bool performGeneralOptimizations(Function &F) {
       case RT_AllocObject:
         Changed |= performStoreOnlyObjectElimination(cast<CallInst>(I), BBI);
         break;
+      case RT_BridgeRelease:
       case RT_ObjCRelease:
       case RT_UnknownRelease:
       case RT_Release:
         Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
         break;
+      case RT_BridgeRetain:
       case RT_RetainNoResult:
       case RT_UnknownRetain:
       case RT_ObjCRetain: {

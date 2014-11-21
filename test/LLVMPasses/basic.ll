@@ -6,6 +6,7 @@ target triple = "x86_64-apple-macosx10.9"
 %swift.refcounted = type { %swift.heapmetadata*, i64 }
 %swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
 %objc_object = type opaque
+%swift.bridge = type opaque
 
 declare %swift.refcounted* @swift_unknownRetain(%swift.refcounted*)
 declare void @swift_unknownRelease(%swift.refcounted*)
@@ -17,6 +18,8 @@ declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
 declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
 declare { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* , i64, i64 , i64 )
 declare void @swift_fixLifetime(%swift.refcounted* ) nounwind
+declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
+declare void @swift_bridgeObjectRelease(%swift.bridge*)
 
 declare void @user(%swift.refcounted *) nounwind
 
@@ -25,7 +28,7 @@ declare void @user(%swift.refcounted *) nounwind
 ; CHECK-NEXT: call void @user
 ; CHECK-NEXT: ret void
 
-define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O) {
+define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O, %swift.bridge * %B) {
 entry:
   tail call void @swift_retain_noresult(%swift.refcounted* %P)
   tail call void @swift_release(%swift.refcounted* %P) nounwind
@@ -33,6 +36,8 @@ entry:
   tail call void @swift_unknownRelease(%swift.refcounted* %P)
   tail call %objc_object* @objc_retain(%objc_object* %O)
   tail call void @objc_release(%objc_object* %O)
+  %v = tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %B)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %v)
   call void @user(%swift.refcounted* %0) nounwind
   ret void
 }
