@@ -19,8 +19,8 @@ import Foundation
 @objc protocol B : A {}
 
 // CHECK-LABEL: @protocol Initializers{{$}}
-// CHECK-NEXT: - (nonnull instancetype)init;
-// CHECK-NEXT: - (nonnull instancetype)initWithObject:(id __nonnull)any;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithObject:(id __nonnull)any;
 // CHECK-NEXT: @end
 @objc protocol Initializers {
   init()

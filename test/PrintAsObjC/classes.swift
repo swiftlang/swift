@@ -46,16 +46,16 @@ import CoreFoundation
 }
 
 // CHECK-LABEL: @interface ClassWithNSObjectProtocol : NSObject <NSObject>
-// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 class ClassWithNSObjectProtocol : NSObject, NSObjectProtocol {}
 
 // CHECK-LABEL: @interface Initializers
-// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (nonnull instancetype)initWithInt:(NSInteger)_;
-// CHECK-NEXT: - (nonnull instancetype)initWithFloat:(float)f;
-// CHECK-NEXT: - (nonnull instancetype)initWithString:(NSString * __nonnull)s boolean:(BOOL)b;
-// CHECK-NEXT: - (nullable instancetype)initWithBoolean:(BOOL)b;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithInt:(NSInteger)_;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithFloat:(float)f;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithString:(NSString * __nonnull)s boolean:(BOOL)b;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithBoolean:(BOOL)b;
 // CHECK-NEXT: @end
 @objc class Initializers {
   init() {}
@@ -85,7 +85,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSizedSignedTypes:(int8_t)a b:(int16_t)b c:(int32_t)c d:(int64_t)d;
 // CHECK-NEXT: - (void)testSizedUnsignedTypes:(uint8_t)a b:(uint16_t)b c:(uint32_t)c d:(uint64_t)d;
 // CHECK-NEXT: - (void)testSizedFloats:(float)a b:(double)b;
-// CHECK-NEXT: - (nonnull instancetype)getDynamicSelf;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)getDynamicSelf;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nonnull)getSelf;
 // CHECK-NEXT: - (Methods * __nullable)maybeGetSelf;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nullable)maybeGetSelf;
