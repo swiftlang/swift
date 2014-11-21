@@ -13,16 +13,19 @@ class C {
 
 // We have no ObjC tagged pointers, and two low spare bits due to alignment.
 let NATIVE_SPARE_BITS: UInt = 0x0000_0003
+let OBJC_TAGGED_POINTER_BITS: UInt = 0
 
 #elseif arch(x86_64)
 
 // We have ObjC tagged pointers in the lowest and highest bit
 let NATIVE_SPARE_BITS: UInt = 0x7F00_0000_0000_0006
+let OBJC_TAGGED_POINTER_BITS: UInt = 0x8000_0000_0000_0001
 
 #elseif arch(arm64)
 
 // We have ObjC tagged pointers in the highest bit
 let NATIVE_SPARE_BITS: UInt = 0x7F00_0000_0000_0007
+let OBJC_TAGGED_POINTER_BITS: UInt = 0x8000_0000_0000_0000
 
 #endif
 
@@ -101,11 +104,17 @@ if true {
 
 import Foundation
 
+func nonNativeBridgeObject(o: AnyObject) -> Builtin.BridgeObject {
+  let tagged = ((Builtin.reinterpretCast(o) as UInt) & OBJC_TAGGED_POINTER_BITS) != 0
+  return Builtin.castToBridgeObject(
+    o, tagged ? 0.value : NATIVE_SPARE_BITS.value)
+}
+
 // Try with a (probably) tagged pointer. No bits may be masked into a
 // non-native object.
 if true {
   let x = NSNumber(integer: 22)
-  let bo = Builtin.castToBridgeObject(x, 0.value)
+  let bo = nonNativeBridgeObject(x)
   let bo2 = bo
   let x1: NSNumber = Builtin.castReferenceFromBridgeObject(bo)
   let x2: NSNumber = Builtin.castReferenceFromBridgeObject(bo2)
@@ -114,7 +123,7 @@ if true {
   // CHECK-NEXT: true
   println(x === x2)
 
-  var bo3 = Builtin.castToBridgeObject(NSNumber(integer: 22), 0.value)
+  var bo3 = nonNativeBridgeObject(NSNumber(integer: 22))
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
       bitPattern(bo3)) != 0)
@@ -129,7 +138,7 @@ var unTaggedString: NSString {
 // Try with an un-tagged pointer. 
 if true {
   let x = unTaggedString
-  let bo = Builtin.castToBridgeObject(x, 0.value)
+  let bo = nonNativeBridgeObject(x)
   let bo2 = bo
   let x1: NSString = Builtin.castReferenceFromBridgeObject(bo)
   let x2: NSString = Builtin.castReferenceFromBridgeObject(bo2)
@@ -138,10 +147,7 @@ if true {
   // CHECK-NEXT: true
   println(x === x2)
   
-  println(nonPointerBits(bo) == 0)
-  // CHECK-NEXT: true
-  
-  var bo3 = Builtin.castToBridgeObject(unTaggedString, 0.value)
+  var bo3 = nonNativeBridgeObject(unTaggedString)
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
       bitPattern(bo3)) != 0)
