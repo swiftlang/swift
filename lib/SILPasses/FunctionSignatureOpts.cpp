@@ -82,7 +82,55 @@ struct ArgumentDescriptor {
   bool hasConvention(ParameterConvention P) const {
     return Arg->hasConvention(P);
   }
+
+  /// Convert the potentially multiple interface params associated with this
+  /// argument.
+  void
+  computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const;
+
+  /// Add potentially multiple new arguments to NewArgs that should represent
+  /// this argument in the optimized function signature.
+  void addNewArguments(SmallVectorImpl<SILValue> &NewArgs, ApplyInst *AI) const;
 };
+
+} // end anonymous namespace
+
+void
+ArgumentDescriptor::
+computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const {
+  // If we have a dead argument, bail.
+  if (IsDead)
+    return;
+
+  // If we found a release in the callee in the last BB on an @owned
+  // parameter, change the parameter to @guaranteed and continue...
+  if (CalleeRelease) {
+    assert(ParameterInfo.getConvention() == ParameterConvention::Direct_Owned &&
+           "Can only transform @owned => @guaranteed in this code path");
+    SILParameterInfo NewInfo(ParameterInfo.getType(),
+                             ParameterConvention::Direct_Guaranteed);
+    Out.push_back(NewInfo);
+    return;
+  }
+
+  // Otherwise just propagate through the parameter info.
+  Out.push_back(ParameterInfo);
+}
+
+void
+ArgumentDescriptor::addNewArguments(llvm::SmallVectorImpl<SILValue> &NewArgs,
+                                    ApplyInst *AI) const {
+  if (IsDead)
+    return;
+
+  NewArgs.push_back(AI->getArgument(Index));
+}
+
+//===----------------------------------------------------------------------===//
+//                             Function Analyzer
+//===----------------------------------------------------------------------===//
+
+namespace {
 
 template <typename T1, typename T2>
 inline T1 getFirstPairElt(const std::pair<T1, T2> &P) { return P.first; }
@@ -139,10 +187,6 @@ public:
   }
 
 private:
-  /// Compute the interface params of the optimized function.
-  void
-  computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &OutArray);
-
   /// Compute the CanSILFunctionType for the optimized function.
   CanSILFunctionType createOptimizedSILFunctionType();
 };
@@ -178,6 +222,7 @@ FunctionAnalyzer::analyze() {
       }
     }
 
+    // Add the argument to our list.
     ArgDescList.push_back(A);
   }
 
@@ -187,34 +232,6 @@ FunctionAnalyzer::analyze() {
 //===----------------------------------------------------------------------===//
 //                         Creating the New Function
 //===----------------------------------------------------------------------===//
-
-void
-FunctionAnalyzer::
-computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &OutArray) {
-  CanSILFunctionType OldFTy = F->getLoweredFunctionType();
-  ArrayRef<SILParameterInfo> ParameterInfo = OldFTy->getParameters();
-  for (unsigned i = 0, e = ParameterInfo.size(); i != e; ++i) {
-    // If we have a dead argument, skip it.
-    if (ArgDescList[i].IsDead) {
-      continue;
-    }
-
-    // If we found a release in the callee in the last BB on an @owned
-    // parameter, change the parameter to @guaranteed and continue...
-    if (ArgDescList[i].CalleeRelease) {
-      const SILParameterInfo &OldInfo = ParameterInfo[i];
-      assert(OldInfo.getConvention() == ParameterConvention::Direct_Owned &&
-             "Can only transform @owned => @guaranteed in this code path");
-      SILParameterInfo NewInfo(OldInfo.getType(),
-                               ParameterConvention::Direct_Guaranteed);
-      OutArray.push_back(NewInfo);
-      continue;
-    }
-
-    // Otherwise just propagate through the parameter info.
-    OutArray.push_back(ParameterInfo[i]);
-  }
-}
 
 CanSILFunctionType
 FunctionAnalyzer::createOptimizedSILFunctionType() {
@@ -226,7 +243,9 @@ FunctionAnalyzer::createOptimizedSILFunctionType() {
   // arguments will have SSA uses in the function. We would need to be smarter
   // in our moving to handle such cases.
   llvm::SmallVector<SILParameterInfo, 8> InterfaceParams;
-  computeOptimizedInterfaceParams(InterfaceParams);
+  for (auto &ArgDesc : ArgDescList) {
+    ArgDesc.computeOptimizedInterfaceParams(InterfaceParams);
+  }
 
   SILResultInfo InterfaceResult = FTy->getResult();
 
@@ -344,11 +363,9 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
 
     // Create the args for the new apply, ignoring any dead arguments.
     llvm::SmallVector<SILValue, 8> NewArgs;
-    ArrayRef<ArgumentDescriptor> ArgDescList = Analyzer.getArgDescList();
-    for (unsigned i = 0, e = ArgDescList.size(); i != e; ++i) {
-      if (ArgDescList[i].IsDead)
-        continue;
-      NewArgs.push_back(AI->getArgument(i));
+    ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
+    for (auto &ArgDesc : ArgDescs) {
+      ArgDesc.addNewArguments(NewArgs, AI);
     }
 
     // We are ignoring generic functions and functions with out parameters for
