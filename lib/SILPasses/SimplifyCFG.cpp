@@ -693,23 +693,6 @@ static unsigned basicBlockInlineCost(SILBasicBlock *BB, unsigned Cutoff) {
   return Cost;
 }
 
-/// Strip upcasts and downcasts from a value.
-static SILValue stripClassCasts(SILValue V) {
-  while (true) {
-    if (auto *UI = dyn_cast<UpcastInst>(V)) {
-      V = UI->getOperand();
-      continue;
-    }
-
-    if (auto *UCCI = dyn_cast<UnconditionalCheckedCastInst>(V)) {
-      V = UCCI->getOperand();
-      continue;
-    }
-
-    return V;
-  }
-}
-
 namespace {
 /// This is a class implementing a dominator-based jump-threading
 /// for checked_cast_br [exact].
@@ -866,10 +849,10 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
     SILValue Value, SILBasicBlock *DomBB, SILValue DomValue,
     DominanceInfo *DT) {
   SmallPtrSet<ValueBase *, 16> SeenValues;
-  DomValue = stripClassCasts(DomValue);
+  DomValue = DomValue.stripClassCasts();
 
   while (true) {
-    Value = stripClassCasts(Value);
+    Value = Value.stripClassCasts();
     if (Value == DomValue)
       return Value;
 
@@ -894,7 +877,7 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       // Each incoming value should be either from a block
       // dominated by DomBB or it should be the value used in
       // condition in DomBB
-      Value = stripClassCasts(IncomingValue);
+      Value = IncomingValue.stripClassCasts();
       if (Value == DomValue)
         continue;
 
@@ -1228,7 +1211,7 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
   // Init information about the checked_cast_br we try to
   // jump-thread.
   BB = Term->getParent();
-  Condition = stripClassCasts(Term->getOperand(0));
+  Condition = Term->getOperand(0).stripClassCasts();
   SuccessBB = CCBI->getSuccessBB();
   FailureBB = CCBI->getFailureBB();
 
@@ -1255,7 +1238,7 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     // based on the found dominating checked_cast_br.
     DomSuccessBB = DomCCBI->getSuccessBB();
     DomFailureBB = DomCCBI->getFailureBB();
-    DomCondition = stripClassCasts(DomTerm->getOperand(0));
+    DomCondition = DomTerm->getOperand(0).stripClassCasts();
 
     // Init state variables for paths analysis
     SuccessPreds.clear();

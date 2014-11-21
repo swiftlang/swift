@@ -126,6 +126,24 @@ SILValue SILValue::stripUpCasts() {
   }
 }
 
+SILValue SILValue::stripClassCasts() {
+  SILValue V = *this;
+  while (true) {
+    if (auto *UI = dyn_cast<UpcastInst>(V)) {
+      V = UI->getOperand();
+      continue;
+    }
+
+    if (auto *UCCI = dyn_cast<UnconditionalCheckedCastInst>(V)) {
+      V = UCCI->getOperand();
+      continue;
+    }
+
+    return V;
+  }
+}
+
+
 SILValue SILValue::stripAddressProjections() {
   SILValue V = *this;
 
