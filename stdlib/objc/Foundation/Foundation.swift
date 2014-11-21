@@ -1085,6 +1085,15 @@ extension NSDictionary : SequenceType {
   }
 }
 
+extension NSEnumerator : SequenceType {
+  /// Return a *generator* over the *enumerator*.
+  ///
+  /// Complexity: O(1)
+  public func generate() -> NSFastGenerator {
+    return NSFastGenerator(self)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Ranges
 //===----------------------------------------------------------------------===//
