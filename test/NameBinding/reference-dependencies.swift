@@ -131,6 +131,9 @@ func lookUpManyTopLevelNames() {
   }
 
   let _ = .Value as OtherFileEnumWrapper.Enum
+  let _ = { (_: PrivateTopLevelStruct.ValueType) -> PrivateTopLevelStruct2.ValueType? in
+    return nil
+  }
 }
 
 struct Outer {
@@ -156,6 +159,7 @@ var use3 = { ({ topLevel3() })() }
 struct Use4 : TopLevelProto1 {
   var use4 = topLevel4()
 }
+
 // CHECK-DAG: - "*"
 print(42 * 30)
 
@@ -179,6 +183,11 @@ func useTy2() -> TopLevelTy2 {}
 extension Use4 : TopLevelProto2 {
   var useTy3: TopLevelTy3? { return nil }
 }
+
+let useTy4 = { (_: TopLevelStruct.ValueType) -> TopLevelStruct2.ValueType? in
+  return nil
+}
+
 
 // CHECK-DAG: !private "privateTopLevel1"
 func private1(a: Int = privateTopLevel1()) {}
@@ -225,6 +234,13 @@ func outerPrivateTy3() {
 // CHECK-DAG: !private "VSs17IndexingGenerator"
 // CHECK-DAG: - "O4main13OtherFileEnum"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
+// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
+// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
+
+// CHECK-DAG: - "V4main14TopLevelStruct"
+// CHECK-DAG: - "V4main15TopLevelStruct2"
+// CHECK-DAG: !private "V4main21PrivateTopLevelStruct"
+// CHECK-DAG: !private "V4main22PrivateTopLevelStruct2"
 
 // CHECK-DAG: - "P4main14TopLevelProto1"
 // CHECK-DAG: - "P4main14TopLevelProto2"

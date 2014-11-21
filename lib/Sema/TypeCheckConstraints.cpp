@@ -537,6 +537,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   options |= TR_AllowUnspecifiedTypes;
   options |= TR_AllowUnboundGenerics;
   options |= TR_ImmediateFunctionInput;
+  options |= TR_InExpression;
   bool hadParameterError = false;
   if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
     closure->setType(ErrorType::get(TC.Context));
@@ -550,7 +551,8 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TC.validateType(closure->getExplicitResultTypeLoc(), DC)) {
+      TC.validateType(closure->getExplicitResultTypeLoc(), DC,
+                      TR_InExpression)) {
     closure->setType(ErrorType::get(TC.Context));
     return false;
   }

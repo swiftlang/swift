@@ -73,6 +73,12 @@ func topLevel9() -> Int { return 2 }
 typealias TopLevelTy1 = Int
 typealias TopLevelTy2 = Int
 typealias TopLevelTy3 = Int
+struct TopLevelStruct {
+  typealias ValueType = Int
+}
+struct TopLevelStruct2 {
+  typealias ValueType = Int
+}
 
 protocol TopLevelProto1 {}
 protocol TopLevelProto2 {}
@@ -91,6 +97,12 @@ func privateTopLevel9() -> Int { return 2 }
 typealias PrivateTopLevelTy1 = Int
 typealias PrivateTopLevelTy2 = Int
 typealias PrivateTopLevelTy3 = Int
+struct PrivateTopLevelStruct {
+  typealias ValueType = Int
+}
+struct PrivateTopLevelStruct2 {
+  typealias ValueType = Int
+}
 
 protocol PrivateProto1 {}
 protocol PrivateProto2 {}
