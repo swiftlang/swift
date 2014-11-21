@@ -5617,50 +5617,158 @@ RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc) {
   return RValue(CanType(TupleType::getEmpty(F.getASTContext())));
 }
 
-/// Destructure (potentially) recursive assignments into tuple expressions
-/// down to their scalar stores.
-static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src,
-                                    Expr *Dest, SILGenFunction &Gen) {
-  // If the destination is a tuple, recursively destructure.
-  if (auto *TE = dyn_cast<TupleExpr>(Dest)) {
-    SmallVector<RValue, 4> elements;
-    std::move(Src).extractElements(elements);
-    unsigned EltNo = 0;
-    for (Expr *DestElem : TE->getElements()) {
-      emitAssignExprRecursive(S,
-                              std::move(elements[EltNo++]),
-                              DestElem, Gen);
+namespace {
+  /// A visitor for creating a flattened list of LValues from a
+  /// tuple-of-lvalues expression.
+  ///
+  /// Note that we can have tuples down to arbitrary depths in the
+  /// type, but every branch should lead to an l-value otherwise.
+  class TupleLValueEmitter
+      : public Lowering::ExprVisitor<TupleLValueEmitter> {
+    SILGenFunction &SGF;
+
+    AccessKind TheAccessKind;
+
+    /// A flattened list of l-values.
+    SmallVectorImpl<Optional<LValue>> &Results;
+  public:
+    TupleLValueEmitter(SILGenFunction &SGF, AccessKind accessKind,
+                       SmallVectorImpl<Optional<LValue>> &results)
+      : SGF(SGF), TheAccessKind(accessKind), Results(results) {}
+
+    // If the destination is a tuple, recursively destructure.
+    void visitTupleExpr(TupleExpr *E) {
+      assert(E->getType()->is<TupleType>());
+      assert(!E->getType()->isMaterializable());
+      for (auto &elt : E->getElements()) {
+        visit(elt);
+      }
     }
-    return;
-  }
-  
-  // If the destination is '_', do nothing.
-  if (isa<DiscardAssignmentExpr>(Dest))
-    return;
-  
-  // Otherwise, emit the scalar assignment.
-  LValue DstLV = Gen.emitLValue(Dest, AccessKind::Write);
-  Gen.emitAssignToLValue(S, std::move(Src), std::move(DstLV));
+
+    // If the destination is '_', queue up a discard.
+    void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
+      Results.push_back(None);
+    }
+
+    // Otherwise, queue up a scalar assignment to an lvalue.
+    void visitExpr(Expr *E) {
+      assert(E->getType()->is<LValueType>());
+      Results.push_back(SGF.emitLValue(E, TheAccessKind));
+    }
+  };
+
+  /// A visitor for consuming tuples of l-values.
+  class TupleLValueAssigner
+      : public CanTypeVisitor<TupleLValueAssigner, void, RValue &&> {
+    SILGenFunction &SGF;
+    SILLocation AssignLoc;
+    MutableArrayRef<Optional<LValue>> DestLVQueue;
+
+    Optional<LValue> &&getNextDest() {
+      assert(!DestLVQueue.empty());
+      Optional<LValue> &next = DestLVQueue.front();
+      DestLVQueue = DestLVQueue.slice(1);
+      return std::move(next);
+    }
+
+  public:
+    TupleLValueAssigner(SILGenFunction &SGF, SILLocation assignLoc,
+                        SmallVectorImpl<Optional<LValue>> &destLVs)
+      : SGF(SGF), AssignLoc(assignLoc), DestLVQueue(destLVs) {}
+
+    /// Top-level entrypoint.
+    void emit(CanType destType, RValue &&src) {
+      visitTupleType(cast<TupleType>(destType), std::move(src));
+      assert(DestLVQueue.empty() && "didn't consume all l-values!");
+    }
+
+    // If the destination is a tuple, recursively destructure.
+    void visitTupleType(CanTupleType destTupleType, RValue &&srcTuple) {
+      // Break up the source r-value.
+      SmallVector<RValue, 4> srcElts;
+      std::move(srcTuple).extractElements(srcElts);
+
+      // Consume source elements off the queue.
+      unsigned eltIndex = 0;
+      for (CanType destEltType : destTupleType.getElementTypes()) {
+        visit(destEltType, std::move(srcElts[eltIndex++]));
+      }
+    }
+
+    // Okay, otherwise we pull one destination off the queue.
+    void visitType(CanType destType, RValue &&src) {
+      assert(isa<LValueType>(destType));
+
+      Optional<LValue> &&next = getNextDest();
+
+      // If the destination is a discard, do nothing.
+      if (!next.hasValue())
+        return;
+
+      // Otherwise, emit the scalar assignment.
+      SGF.emitAssignToLValue(AssignLoc, std::move(src),
+                             std::move(next.getValue()));
+    }
+  };
 }
 
-RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
-  FullExpr scope(SGF.Cleanups, CleanupLocation(E));
-
-  // Handle lvalue-to-lvalue assignments with a high-level copy_addr instruction
-  // if possible.
-  if (auto *LE = dyn_cast<LoadExpr>(E->getSrc())) {
-    if (!isa<TupleExpr>(E->getDest())
-        && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType())) {
-      auto SrcLV = SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr(),
-                                  AccessKind::Read);
-      auto DestLV = SGF.emitLValue(E->getDest(), AccessKind::Write);
-      SGF.emitAssignLValueToLValue(E, std::move(SrcLV), std::move(DestLV));
-      return SGF.emitEmptyTupleRValue(E);
+/// Emit a simple assignment, i.e.
+///
+///   dest = src
+///
+/// The destination operand can be an arbitrarily-structured tuple of
+/// l-values.
+static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
+                                 Expr *dest, Expr *src) {
+  // Handle lvalue-to-lvalue assignments with a high-level copy_addr
+  // instruction if possible.
+  if (auto *srcLoad = dyn_cast<LoadExpr>(src)) {
+    // Check that the two l-value expressions have the same type.
+    // Compound l-values like (a,b) have tuple type, so this check
+    // also prevents us from getting into that case.
+    if (dest->getType()->isEqual(srcLoad->getSubExpr()->getType())) {
+      assert(!dest->getType()->is<TupleType>());
+      auto destLV = SGF.emitLValue(dest, AccessKind::Write);
+      auto srcLV = SGF.emitLValue(srcLoad->getSubExpr(), AccessKind::Read);
+      SGF.emitAssignLValueToLValue(loc, std::move(srcLV), std::move(destLV));
+      return;
     }
   }
 
   // Handle tuple destinations by destructuring them if present.
-  emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), SGF);
+  CanType destType = dest->getType()->getCanonicalType();
+  assert(!destType->isMaterializable());
+
+  // But avoid this in the common case.
+  if (!isa<TupleType>(destType)) {
+    // If we're assigning to a discard, just emit the operand as ignored.
+    dest = dest->getSemanticsProvidingExpr();
+    if (isa<DiscardAssignmentExpr>(dest)) {
+      SGF.emitIgnoredExpr(src);
+      return;
+    }
+
+    LValue destLV = SGF.emitLValue(dest, AccessKind::Write);
+    RValue srcRV = SGF.emitRValue(src);
+    SGF.emitAssignToLValue(loc, std::move(srcRV), std::move(destLV));
+    return;
+  }
+
+  // Produce a flattened queue of LValues.
+  SmallVector<Optional<LValue>, 4> destLVs;
+  TupleLValueEmitter(SGF, AccessKind::Write, destLVs).visit(dest);
+
+  // Emit the r-value.
+  RValue srcRV = SGF.emitRValue(src);
+
+  // Recurse on the type of the destination, pulling LValues as
+  // needed from the queue we built up before.
+  TupleLValueAssigner(SGF, loc, destLVs).emit(destType, std::move(srcRV));
+}
+
+RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
+  FullExpr scope(SGF.Cleanups, CleanupLocation(E));
+  emitSimpleAssignment(SGF, E, E->getDest(), E->getSrc());
   return SGF.emitEmptyTupleRValue(E);
 }
 

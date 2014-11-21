@@ -12,15 +12,15 @@ class Base {}
 
 // CHECK-LABEL: sil hidden @_TF25protocol_class_refinement12getObjectUIDUS_9ObjectUID__FQ_TSiSi_
 // CHECK:       bb0([[X:%.*]] : $T):
+//   (This retain is for the setter, later.)
+// CHECK:         strong_retain [[X]]
 // -- call x.uid()
-// CHECK-NOT:     strong_retain [[X]]
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[UID:%.*]] = witness_method $T, #UID.uid
 // CHECK:         [[UID_VALUE:%.*]] = apply [[UID]]<T>([[TMP]]#1)
 // CHECK-NOT:     strong_release [[X]]
 // -- call x.clsid.setter (TODO: avoid r/r here)
-// CHECK:         strong_retain [[X]]
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter
@@ -50,15 +50,15 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int) {
 
 // CHECK-LABEL: sil hidden @_TF25protocol_class_refinement16getBaseObjectUIDUS_3UID__FQ_TSiSi_
 // CHECK:       bb0([[X:%.*]] : $T):
+//   (This retain is for the setter, later.)
+// CHECK:         strong_retain [[X]]
 // -- call x.uid()
-// CHECK-NOT:     strong_retain [[X]]
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[UID:%.*]] = witness_method $T, #UID.uid
 // CHECK:         [[UID_VALUE:%.*]] = apply [[UID]]<T>([[TMP]]#1)
 // CHECK-NOT:     strong_release [[X]]
 // -- call x.clsid.setter (TODO: avoid r/r here)
-// CHECK:         strong_retain [[X]]
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter

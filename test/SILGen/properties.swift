@@ -648,7 +648,7 @@ class rdar16151899Derived : rdar16151899Base {
         x = zero
         
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
-        // CHECK-NEXT: load{{.*}}Int
+        // CHECK: load{{.*}}Int
         // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter.1 : rdar16151899Base
         // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
     }

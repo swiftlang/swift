@@ -254,6 +254,7 @@ class SelfCapturedInInit : Base {
   // CHECK-LABEL: sil hidden @_TFC8closures18SelfCapturedInInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit {
   // CHECK:         [[VAL:%.*]] = load {{%.*}}#1 : $*SelfCapturedInInit
   // CHECK:         [[VAL:%.*]] = load {{%.*}}#1 : $*SelfCapturedInInit
+  // CHECK:         [[VAL:%.*]] = load {{%.*}}#1 : $*SelfCapturedInInit
   // CHECK:         strong_retain [[VAL]] : $SelfCapturedInInit
   // CHECK:         partial_apply {{%.*}}([[VAL]]) : $@thin (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
   override init() {
