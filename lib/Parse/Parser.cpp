@@ -628,7 +628,7 @@ struct ParserUnit::Implementation {
   std::unique_ptr<Parser> TheParser;
 
   Implementation(SourceManager &SM, unsigned BufferID,
-                 const LangOptions& Opts, StringRef ModuleName)
+                 const LangOptions &Opts, StringRef ModuleName)
     : LangOpts(Opts),
       Diags(SM),
       Ctx(LangOpts, SearchPathOpts, SM, Diags),
