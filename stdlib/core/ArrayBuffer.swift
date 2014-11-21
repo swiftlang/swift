@@ -209,7 +209,11 @@ extension _ArrayBuffer {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }
 
-  func _typeCheck(subRange: Range<Int>) {
+  // We have two versions of type check: one that takes a range and the other
+  // checks one element. The reason for this is that the ARC optimizer does not
+  // handle loops atm. and so can get blocked by the presence of a loop (over
+  // the range). This loop is not necessary for a single element access.
+  func _typeCheck(index: Int) {
     if !_isClassOrObjCExistential(T.self) {
       return
     }
@@ -218,14 +222,22 @@ extension _ArrayBuffer {
       _sanityCheck(
         !_isNative, "A native array that needs a type check?")
 
-      if !subRange.isEmpty {
-        let ns = _nonNative
-        // Could be sped up, e.g. by using
-        // enumerateObjectsAtIndexes:options:usingBlock:
-        for i in subRange {
-          _precondition(ns.objectAtIndex(i) is T,
-            "NSArray element failed to match the Swift Array Element type")
-        }
+      let ns = _nonNative
+      // Could be sped up, e.g. by using
+      // enumerateObjectsAtIndexes:options:usingBlock:
+      _precondition(ns.objectAtIndex(index) is T,
+                    "NSArray element failed to match the Swift Array Element type")
+    }
+  }
+
+  func _typeCheck(subRange: Range<Int>) {
+    if !_isClassOrObjCExistential(T.self) {
+      return
+    }
+
+    if _slowPath(needsElementTypeCheck) {
+      for i in subRange {
+        _typeCheck(i)
       }
     }
   }
@@ -341,7 +353,7 @@ extension _ArrayBuffer {
   subscript(i: Int) -> T {
     get {
       if _isClassOrObjCExistential(T.self) {
-        _typeCheck(i...i)
+        _typeCheck(i)
       }
       if _fastPath(_isNative) {
         return _native[i]
