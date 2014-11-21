@@ -57,6 +57,9 @@ struct ArgumentDescriptor {
   /// The original parameter info of this argument.
   SILParameterInfo ParameterInfo;
 
+  /// The original decl of this Argument.
+  const ValueDecl *Decl;
+
   /// Was this parameter originally dead?
   bool IsDead;
 
@@ -76,7 +79,7 @@ struct ArgumentDescriptor {
   /// when optimizing.
   ArgumentDescriptor(SILArgument *A)
     : Arg(A), Index(A->getIndex()), ParameterInfo(A->getParameterInfo()),
-      IsDead(A->use_empty()), CalleeRelease() {}
+      Decl(A->getDecl()), IsDead(A->use_empty()), CalleeRelease() {}
 
   /// \returns true if this argument's ParameterConvention is P.
   bool hasConvention(ParameterConvention P) const {
@@ -88,9 +91,14 @@ struct ArgumentDescriptor {
   void
   computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const;
 
-  /// Add potentially multiple new arguments to NewArgs that should represent
-  /// this argument in the optimized function signature.
-  void addNewArguments(SmallVectorImpl<SILValue> &NewArgs, ApplyInst *AI) const;
+  /// Add potentially multiple new arguments to NewArgs from the caller's apply
+  /// inst.
+  void addCallerArgs(ApplyInst *AI, SmallVectorImpl<SILValue> &NewArgs) const;
+
+  /// Add potentially multiple new arguments to NewArgs from the thunk's
+  /// function arguments.
+  void addThunkArgs(SILBasicBlock *BB,
+                    SmallVectorImpl<SILValue> &NewArgs) const;
 };
 
 } // end anonymous namespace
@@ -118,13 +126,23 @@ computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const {
 }
 
 void
-ArgumentDescriptor::addNewArguments(llvm::SmallVectorImpl<SILValue> &NewArgs,
-                                    ApplyInst *AI) const {
+ArgumentDescriptor::
+addCallerArgs(ApplyInst *AI, llvm::SmallVectorImpl<SILValue> &NewArgs) const {
   if (IsDead)
     return;
 
   NewArgs.push_back(AI->getArgument(Index));
 }
+
+void
+ArgumentDescriptor::
+addThunkArgs(SILBasicBlock *BB, SmallVectorImpl<SILValue> &NewArgs) const {
+  if (IsDead)
+    return;
+
+  NewArgs.push_back(BB->getBBArg(Index));
+}
+
 
 //===----------------------------------------------------------------------===//
 //                             Function Analyzer
@@ -150,18 +168,13 @@ class FunctionAnalyzer {
   /// an argument that we will use during our optimization.
   llvm::SmallVector<ArgumentDescriptor, 8> ArgDescList;
 
-  /// A list containing all dead argument indices. This is useful precompiled
-  /// information that we learn early on but need later deep in the analysis
-  llvm::SmallVector<unsigned, 8> DeadArgIndices;
-
 public:
   FunctionAnalyzer() = delete;
   FunctionAnalyzer(const FunctionAnalyzer &) = delete;
   FunctionAnalyzer(FunctionAnalyzer &&) = delete;
 
   FunctionAnalyzer(RCIdentityAnalysis *RCIA, SILFunction *F)
-    : RCIA(RCIA), F(F), ShouldOptimize(false), ArgDescList(),
-      DeadArgIndices() {}
+    : RCIA(RCIA), F(F), ShouldOptimize(false), ArgDescList() {}
 
   /// Analyze the given function.
   bool analyze();
@@ -177,7 +190,6 @@ public:
   SILFunction *createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &Name);
 
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
-  ArrayRef<unsigned> getDeadArgIndices() const { return DeadArgIndices; }
 
 private:
   /// Compute the CanSILFunctionType for the optimized function.
@@ -205,7 +217,6 @@ FunctionAnalyzer::analyze() {
 
     if (A.IsDead) {
       ShouldOptimize = true;
-      DeadArgIndices.push_back(i);
       ++NumDeadArgsEliminated;
     }
 
@@ -362,7 +373,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     llvm::SmallVector<SILValue, 8> NewArgs;
     ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
     for (auto &ArgDesc : ArgDescs) {
-      ArgDesc.addNewArguments(NewArgs, AI);
+      ArgDesc.addCallerArgs(AI, NewArgs);
     }
 
     // We are ignoring generic functions and functions with out parameters for
@@ -406,16 +417,9 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 
   // Create the args for the thunk's apply, ignoring any dead arguments.
   llvm::SmallVector<SILValue, 8> ThunkArgs;
-
-  ArrayRef<unsigned> DeadArgs = Analyzer.getDeadArgIndices();
-  unsigned deadarg_i = 0, deadarg_e = DeadArgs.size();
-  for (unsigned i = 0, e = BB->getNumBBArg(); i < e; ++i) {
-    if (deadarg_i < deadarg_e && DeadArgs[deadarg_i] == i) {
-      deadarg_i++;
-      continue;
-    }
-
-    ThunkArgs.push_back(BB->getBBArg(i));
+  ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
+  for (auto &ArgDesc : ArgDescs) {
+    ArgDesc.addThunkArgs(BB, ThunkArgs);
   }
 
   // We are ignoring generic functions and functions with out parameters for
@@ -428,7 +432,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 
   // If we have any arguments that were consumed but are now guaranteed,
   // insert a fix lifetime instruction and a release_value.
-  for (auto &ArgDesc : Analyzer.getArgDescList()) {
+  for (auto &ArgDesc : ArgDescs) {
     if (!ArgDesc.CalleeRelease)
       continue;
 
@@ -455,24 +459,26 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // first BB will not match.
   NewF->spliceBody(F);
 
-  // Create a new BB called ThunkBB to use to create F's new body and use NewFs
-  // first BB's arguments as a template for the BB's args.
+  // Create a new BB called ThunkBB and add the old arguments to it.
   SILBasicBlock *ThunkBody = F->createBasicBlock();
+  ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
+  for (auto &ArgDesc : ArgDescs) {
+    ThunkBody->createArgument(ArgDesc.ParameterInfo.getSILType(),
+                              ArgDesc.Decl);
+  }
+
+  // Then erase the dead arguments from NewF.
   SILBasicBlock *NewFEntryBB = &*NewF->begin();
-  for (auto *A : NewFEntryBB->getBBArgs()) {
-    ThunkBody->createArgument(A->getType(), A->getDecl());
+  unsigned NumDeadArgs = 0;
+  for (auto &ArgDesc : ArgDescs) {
+    if (!ArgDesc.IsDead)
+      continue;
+    NewFEntryBB->eraseArgument(ArgDesc.Index - NumDeadArgs);
+    ++NumDeadArgs;
   }
 
-  // Create the new thunk body before we delete any arguments. This ensures that
-  // our argument -> release map is still accurate.
+  // Then create the new thunk body since NewF has the right signature now.
   createThunkBody(ThunkBody, NewF, Analyzer);
-
-  // Then erase the dead arguments from NewF using DeadArgs. We go backwards so
-  // we remove arg elements by decreasing index so we don't invalidate our
-  // indices.
-  for (unsigned i : reversed(Analyzer.getDeadArgIndices())) {
-    NewFEntryBB->eraseArgument(i);
-  }
 
   return NewF;
 }
