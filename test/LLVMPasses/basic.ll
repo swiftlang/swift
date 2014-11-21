@@ -161,6 +161,17 @@ define void @move_retain_across_objc_retain(%swift.refcounted* %A, %objc_object*
   ret void
 }
 
+; CHECK-LABEL: @move_retain_across_load
+; CHECK-NOT: swift_retain
+; CHECK-NOT: swift_release
+; CHECK: ret
+define i32 @move_retain_across_load(%swift.refcounted* %A, i32* %ptr) {
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  %val = load i32* %ptr
+  tail call void @swift_release(%swift.refcounted* %A) nounwind
+  ret i32 %val
+}
+
 ; CHECK-LABEL: @move_retain_but_not_release_across_objc_fix_lifetime
 ; CHECK: call void @swift_fixLifetime
 ; CHECK-NEXT: tail call void @swift_retain_noresult

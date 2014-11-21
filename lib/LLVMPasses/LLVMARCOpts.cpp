@@ -538,6 +538,9 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     }
 
     case RT_Unknown:
+      // Loads cannot affect the retain.
+      if (isa<LoadInst>(CurInst))
+        continue;
 
       // Load, store, memcpy etc can't do a release.
       if (isa<LoadInst>(CurInst) || isa<StoreInst>(CurInst) ||
