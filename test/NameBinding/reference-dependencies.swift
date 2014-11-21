@@ -134,6 +134,8 @@ func lookUpManyTopLevelNames() {
   let _ = { (_: PrivateTopLevelStruct.ValueType) -> PrivateTopLevelStruct2.ValueType? in
     return nil
   }
+  
+  typealias X = OtherFileEnumWrapper.Enum
 }
 
 struct Outer {
@@ -187,6 +189,8 @@ extension Use4 : TopLevelProto2 {
 let useTy4 = { (_: TopLevelStruct.ValueType) -> TopLevelStruct2.ValueType? in
   return nil
 }
+// CHECK-DAG: - "TopLevelStruct"
+typealias useTy5 = TopLevelStruct3.ValueType
 
 
 // CHECK-DAG: !private "privateTopLevel1"
@@ -215,6 +219,7 @@ func outerPrivateTy3() {
   func inner(a: PrivateTopLevelTy3?) {}
   inner(nil)
 }
+private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 
 
 // CHECK-LABEL: {{^member-access:$}}
@@ -239,8 +244,10 @@ func outerPrivateTy3() {
 
 // CHECK-DAG: - "V4main14TopLevelStruct"
 // CHECK-DAG: - "V4main15TopLevelStruct2"
+// CHECK-DAG: - "V4main15TopLevelStruct3"
 // CHECK-DAG: !private "V4main21PrivateTopLevelStruct"
 // CHECK-DAG: !private "V4main22PrivateTopLevelStruct2"
+// CHECK-DAG: !private "V4main22PrivateTopLevelStruct3"
 
 // CHECK-DAG: - "P4main14TopLevelProto1"
 // CHECK-DAG: - "P4main14TopLevelProto2"

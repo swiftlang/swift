@@ -3964,11 +3964,10 @@ public:
     computeAccessibility(TC, TAD);
     if (!IsSecondPass) {
       TypeResolutionOptions options;
-      if (TAD->getDeclContext()->isTypeContext()) {
-        options = None;
-      } else {
-        options = TR_GlobalTypeAlias;
-      }
+      if (!TAD->getDeclContext()->isTypeContext())
+        options |= TR_GlobalTypeAlias;
+      if (TAD->getAccessibility() == Accessibility::Private)
+        options |= TR_KnownPrivateDependency;
       
       if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext(),
                           options)) {

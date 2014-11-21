@@ -654,8 +654,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         }
         
         // Look for member types with the given name.
-        bool isKnownPrivate = false;
-        if (options.contains(TR_InExpression)) {
+        bool isKnownPrivate = options.contains(TR_KnownPrivateDependency);
+        if (!isKnownPrivate && options.contains(TR_InExpression)) {
           // Expressions cannot affect a function's signature.
           isKnownPrivate = isa<AbstractFunctionDecl>(DC);
         }

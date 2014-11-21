@@ -79,6 +79,9 @@ struct TopLevelStruct {
 struct TopLevelStruct2 {
   typealias ValueType = Int
 }
+struct TopLevelStruct3 {
+  typealias ValueType = Int
+}
 
 protocol TopLevelProto1 {}
 protocol TopLevelProto2 {}
@@ -101,6 +104,9 @@ struct PrivateTopLevelStruct {
   typealias ValueType = Int
 }
 struct PrivateTopLevelStruct2 {
+  typealias ValueType = Int
+}
+struct PrivateTopLevelStruct3 {
   typealias ValueType = Int
 }
 
