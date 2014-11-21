@@ -97,7 +97,7 @@ namespace swift {
     bool EnableObjCAttrRequiresFoundation = true;
 
     /// Enables importing of unions and other partially-importable types.
-    bool ImportUnions = false;
+    bool ImportUnions = true;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;

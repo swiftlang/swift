@@ -48,7 +48,8 @@ func testAnonStructs() {
 }
 
 func testBitfieldMembers() {
-  var a: StructWithBitfields // expected-error {{use of undeclared type 'StructWithBitfields'}}
+  var a: StructWithBitfields
+  // TODO: Expose the bitfields as properties.
 }
 
 // FIXME: Import arrays as real array-looking things.
