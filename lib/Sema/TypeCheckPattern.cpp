@@ -896,7 +896,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     auto IP = cast<IsaPattern>(P);
 
     // Type-check the type parameter.
-    if (validateType(IP->getCastTypeLoc(), dc))
+    if (validateType(IP->getCastTypeLoc(), dc, TR_InExpression))
       return nullptr;
 
     auto castType = IP->getCastTypeLoc().getType();
@@ -1027,7 +1027,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     auto NP = cast<NominalTypePattern>(P);
     
     // Type-check the type.
-    if (validateType(NP->getCastTypeLoc(), dc))
+    if (validateType(NP->getCastTypeLoc(), dc, TR_InExpression))
       return nullptr;
     
     Type patTy = NP->getCastTypeLoc().getType();

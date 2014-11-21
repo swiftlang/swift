@@ -136,6 +136,12 @@ func lookUpManyTopLevelNames() {
   }
   
   typealias X = OtherFileEnumWrapper.Enum
+  
+  let value: Any = .Value as X
+  switch value {
+  case is OtherFileEnumWrapper.Enum:
+    break
+  }
 }
 
 struct Outer {
