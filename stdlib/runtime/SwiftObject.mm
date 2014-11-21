@@ -1030,7 +1030,7 @@ unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
     ? _swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object)
     : _swift_isUniquelyReferencedNonObjC_nonNull(object);
 #else
-  return _swift_isUniquelyReferencedNonObjC_nonNull(object);
+  return _swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object);
 #endif
 }
 
