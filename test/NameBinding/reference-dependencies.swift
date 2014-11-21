@@ -142,6 +142,8 @@ func lookUpManyTopLevelNames() {
   case is OtherFileEnumWrapper.Enum:
     break
   }
+  
+  for _: OtherFileEnumWrapper.Enum in EmptyGenerator<X>() {}
 }
 
 struct Outer {

@@ -399,6 +399,7 @@ public:
     TypeResolutionOptions options;
     options |= TR_AllowUnspecifiedTypes;
     options |= TR_AllowUnboundGenerics;
+    options |= TR_InExpression;
     if (TC.typeCheckPattern(S->getPattern(), DC, options)) {
       // FIXME: Handle errors better.
       S->getPattern()->setType(ErrorType::get(TC.Context));
