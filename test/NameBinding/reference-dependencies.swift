@@ -131,6 +131,7 @@ func lookUpManyTopLevelNames() {
   }
 
   let _ = .Value as OtherFileEnumWrapper.Enum
+  let _: OtherFileEnumWrapper.Enum = .Value
   let _ = { (_: PrivateTopLevelStruct.ValueType) -> PrivateTopLevelStruct2.ValueType? in
     return nil
   }
@@ -199,6 +200,7 @@ let useTy4 = { (_: TopLevelStruct.ValueType) -> TopLevelStruct2.ValueType? in
 }
 // CHECK-DAG: - "TopLevelStruct"
 typealias useTy5 = TopLevelStruct3.ValueType
+let useTy6: TopLevelStruct4.ValueType = 0
 
 
 // CHECK-DAG: !private "privateTopLevel1"
@@ -253,6 +255,7 @@ private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 // CHECK-DAG: - "V4main14TopLevelStruct"
 // CHECK-DAG: - "V4main15TopLevelStruct2"
 // CHECK-DAG: - "V4main15TopLevelStruct3"
+// CHECK-DAG: - "V4main15TopLevelStruct4"
 // CHECK-DAG: !private "V4main21PrivateTopLevelStruct"
 // CHECK-DAG: !private "V4main22PrivateTopLevelStruct2"
 // CHECK-DAG: !private "V4main22PrivateTopLevelStruct3"

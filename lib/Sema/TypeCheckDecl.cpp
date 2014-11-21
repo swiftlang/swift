@@ -1231,10 +1231,11 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     }
   }
 
-  // Check the pattern.
-  // If we have an initializer, we can also have unknown types.
-  TypeResolutionOptions options;
+  // Check the pattern. PBDs can never affect a function's signature, so pass
+  // TR_InExpression.
+  TypeResolutionOptions options = TR_InExpression;
   if (binding->getInit()) {
+    // If we have an initializer, we can also have unknown types.
     options |= TR_AllowUnspecifiedTypes;
     options |= TR_AllowUnboundGenerics;
   }
