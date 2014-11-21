@@ -36,7 +36,7 @@ protocol BridgeStorage {
   var isNative: Bool {get}
   var isObjC: Bool {get}
   var nativeInstance: Native {get}
-  var unmaskedNativeInstance: Native {get}
+  var nativeInstance_noSpareBits: Native {get}
   var objCInstance: ObjC {get}
   var spareBits: Int {get}
 }
@@ -88,7 +88,7 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
     return Builtin.bridgeFromRawPointer(rawObject)
   }
     
-  var unmaskedNativeInstance: Native {
+  var nativeInstance_noSpareBits: Native {
     precondition(isNative)
     precondition(spareBits == 0)
     return Builtin.bridgeFromRawPointer(rawObject)
@@ -201,7 +201,7 @@ allTests.test("${Self}") {
       expectEqual(i, b.spareBits)
       expectTrue(b.nativeInstance === c)
       if i == 0 {
-        expectTrue(b.unmaskedNativeInstance === c)
+        expectTrue(b.nativeInstance_noSpareBits === c)
       }
     }
     

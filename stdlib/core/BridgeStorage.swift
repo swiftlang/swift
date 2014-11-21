@@ -96,7 +96,7 @@ struct _BridgeStorage<
   }
   
   public // @testable
-  var unmaskedNativeInstance: Native {
+  var nativeInstance_noSpareBits: Native {
     @inline(__always) get {
       _sanityCheck(isNative)
       _sanityCheck(_nonPointerBits(rawValue) == 0)
