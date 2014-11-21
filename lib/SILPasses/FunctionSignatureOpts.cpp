@@ -99,6 +99,14 @@ struct ArgumentDescriptor {
   /// function arguments.
   void addThunkArgs(SILBasicBlock *BB,
                     SmallVectorImpl<SILValue> &NewArgs) const;
+
+  /// Optimize the argument at ArgOffset and return the index of the next
+  /// argument to be optimized.
+  ///
+  /// The return value makes it easy to SROA arguments since we can return the
+  /// amount of SROAed arguments we created.
+  unsigned
+  updateOptimizedBBArgs(SILBasicBlock *BB, unsigned ArgOffset) const;
 };
 
 } // end anonymous namespace
@@ -143,6 +151,17 @@ addThunkArgs(SILBasicBlock *BB, SmallVectorImpl<SILValue> &NewArgs) const {
   NewArgs.push_back(BB->getBBArg(Index));
 }
 
+unsigned
+ArgumentDescriptor::
+updateOptimizedBBArgs(SILBasicBlock *BB, unsigned ArgOffset) const {
+  // If this argument is not dead, increment the offset and return.
+  if (!IsDead)
+    return ArgOffset+1;
+
+  // Otherwise, delete this argument and return ArgOffset.
+  BB->eraseArgument(ArgOffset);
+  return ArgOffset;
+}
 
 //===----------------------------------------------------------------------===//
 //                             Function Analyzer
@@ -459,25 +478,20 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // first BB will not match.
   NewF->spliceBody(F);
 
-  // Create a new BB called ThunkBB and add the old arguments to it.
-  SILBasicBlock *ThunkBody = F->createBasicBlock();
+  // Then perform any updates to the arguments of NewF.
+  SILBasicBlock *NewFEntryBB = &*NewF->begin();
   ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
+  unsigned ArgOffset = 0;
+  for (auto &ArgDesc : ArgDescs) {
+    ArgOffset = ArgDesc.updateOptimizedBBArgs(NewFEntryBB, ArgOffset);
+  }
+
+  // Then create the new thunk body since NewF has the right signature now.
+  SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgDescs) {
     ThunkBody->createArgument(ArgDesc.ParameterInfo.getSILType(),
                               ArgDesc.Decl);
   }
-
-  // Then erase the dead arguments from NewF.
-  SILBasicBlock *NewFEntryBB = &*NewF->begin();
-  unsigned NumDeadArgs = 0;
-  for (auto &ArgDesc : ArgDescs) {
-    if (!ArgDesc.IsDead)
-      continue;
-    NewFEntryBB->eraseArgument(ArgDesc.Index - NumDeadArgs);
-    ++NumDeadArgs;
-  }
-
-  // Then create the new thunk body since NewF has the right signature now.
   createThunkBody(ThunkBody, NewF, Analyzer);
 
   return NewF;
