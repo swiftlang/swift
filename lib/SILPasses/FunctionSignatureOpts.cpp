@@ -50,6 +50,11 @@ struct ArgumentDescriptor {
 
   /// The argument that we are tracking original data for.
   SILArgument *Arg;
+
+  /// The original index of this argument.
+  unsigned Index;
+
+  /// The original parameter info of this argument.
   SILParameterInfo ParameterInfo;
 
   /// Was this parameter originally dead?
@@ -70,8 +75,8 @@ struct ArgumentDescriptor {
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
   ArgumentDescriptor(SILArgument *A)
-    : Arg(A), ParameterInfo(A->getParameterInfo()), IsDead(A->use_empty()),
-      CalleeRelease() {}
+    : Arg(A), Index(A->getIndex()), ParameterInfo(A->getParameterInfo()),
+      IsDead(A->use_empty()), CalleeRelease() {}
 
   /// \returns true if this argument's ParameterConvention is P.
   bool hasConvention(ParameterConvention P) const {
@@ -350,25 +355,24 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     // now.
     SILType LoweredType = NewF->getLoweredType();
     SILType ResultType = LoweredType.getFunctionInterfaceResultType();
+    SILLocation Loc = AI->getLoc();
 
     // Create the new apply.
-    ApplyInst *NewAI = Builder.createApply(AI->getLoc(), FRI, LoweredType,
-                                           ResultType, ArrayRef<Substitution>(),
-                                           NewArgs, NewF->isTransparent());
+    ApplyInst *NewAI = Builder.createApply(Loc, FRI, LoweredType, ResultType,
+                                           ArrayRef<Substitution>(), NewArgs,
+                                           NewF->isTransparent());
 
     // Replace all uses of the old apply with the new apply.
     AI->replaceAllUsesWith(NewAI);
 
     // If we have any arguments that were consumed but are now guaranteed,
     // insert a fix lifetime instruction and a release_value.
-    //
-    // We iterate over the consumed argument index to release map backwards
-    // since we inserted the instructions in reverse order.
-    for (auto P : Analyzer.getConsumedArgumentIndexReleasePairs()) {
-      Builder.createFixLifetime(AI->getLoc(),
-                                NewAI->getArgument(P.first->getIndex()));
-      Builder.createReleaseValue(AI->getLoc(),
-                                 NewAI->getArgument(P.first->getIndex()));
+    for (auto &ArgDesc : ArgDescs) {
+      if (!ArgDesc.CalleeRelease)
+        continue;
+
+      Builder.createFixLifetime(Loc, AI->getArgument(ArgDesc.Index));
+      Builder.createReleaseValue(Loc, AI->getArgument(ArgDesc.Index));
     }
 
     // Erase the old apply.
@@ -410,11 +414,12 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 
   // If we have any arguments that were consumed but are now guaranteed,
   // insert a fix lifetime instruction and a release_value.
-  for (auto P : Analyzer.getConsumedArgumentIndexReleasePairs()) {
-    // We use the index from the SILArgument since P.first's BB is now in the
-    // new optimized function.
-    Builder.createFixLifetime(Loc, BB->getBBArg(P.first->getIndex()));
-    Builder.createReleaseValue(Loc, BB->getBBArg(P.first->getIndex()));
+  for (auto &ArgDesc : Analyzer.getArgDescList()) {
+    if (!ArgDesc.CalleeRelease)
+      continue;
+
+    Builder.createFixLifetime(Loc, BB->getBBArg(ArgDesc.Index));
+    Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
   }
 
   Builder.createReturn(Loc, ReturnValue);
