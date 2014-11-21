@@ -46,20 +46,34 @@ namespace {
 
 /// A structure that maintains all of the information about a specific
 /// SILArgument that we are tracking.
-///
-/// TODO: Remove IsDead and CalleeRelease and make them properties of
-/// ArgumentDescriptor based off of Arg.
 struct ArgumentDescriptor {
+
+  /// The argument that we are tracking original data for.
   SILArgument *Arg;
   SILParameterInfo ParameterInfo;
+
+  /// Was this parameter originally dead?
   bool IsDead;
+
+  /// If non-null, this is the release in the callee associated with this
+  /// parameter if it is @owned. If the parameter is not @owned or we could not
+  /// find such a release in the callee, this is null.
   SILInstruction *CalleeRelease;
 
   ArgumentDescriptor() = default;
+
+  /// Initialize this argument descriptor with all information from A that we
+  /// use in our optimization.
+  ///
+  /// *NOTE* We cache a lot of data from the argument and maintain a reference
+  /// to the original argument. The reason why we do this is to make sure we
+  /// have access to the original argument's state if we modify the argument
+  /// when optimizing.
   ArgumentDescriptor(SILArgument *A)
     : Arg(A), ParameterInfo(A->getParameterInfo()), IsDead(A->use_empty()),
       CalleeRelease() {}
 
+  /// \returns true if this argument's ParameterConvention is P.
   bool hasConvention(ParameterConvention P) const {
     return Arg->hasConvention(P);
   }
