@@ -31,6 +31,7 @@ struct _BridgeStorage<
   public // @testable
   typealias ObjC = ObjCClass
   
+  @inline(__always)
   public // @testable
   init(native: Native, bits: Int) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
@@ -41,12 +42,14 @@ struct _BridgeStorage<
       native, UInt(bits) << _objectPointerLowSpareBitShift)
   }
   
+  @inline(__always)
   public // @testable
   init(objC: ObjC) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = _makeObjCBridgeObject(objC)
   }
   
+  @inline(__always)
   public // @testable
   init(native: Native) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
@@ -55,11 +58,14 @@ struct _BridgeStorage<
   
   public // @testable
   var spareBits: Int {
+  @inline(__always) get {
     _sanityCheck(isNative)
     return Int(
       _nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift)
+    }
   }
   
+  @inline(__always)
   public // @testable
   mutating func isUniquelyReferencedNative() -> Bool {
     return _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
@@ -69,36 +75,49 @@ struct _BridgeStorage<
 
   public // @testable
   var isNative: Bool {
-    return !_isTagged && _nonPointerBits(rawValue) != _objectPointerSpareBits
+    @inline(__always) get {
+      return !_isTagged && _nonPointerBits(rawValue) != _objectPointerSpareBits
+    }
   }
   
   public // @testable
   var isObjC: Bool {
-    return _isTagged || _nonPointerBits(rawValue) == _objectPointerSpareBits
+    @inline(__always) get {
+      return _isTagged || _nonPointerBits(rawValue) == _objectPointerSpareBits
+    }
   }
   
   public // @testable
   var nativeInstance: Native {
-    _sanityCheck(isNative)
-    return Builtin.castReferenceFromBridgeObject(rawValue)
+    @inline(__always) get {
+      _sanityCheck(isNative)
+      return Builtin.castReferenceFromBridgeObject(rawValue)
+    }
   }
   
   public // @testable
   var unmaskedNativeInstance: Native {
-    _sanityCheck(isNative)
-    _sanityCheck(_nonPointerBits(rawValue) == 0)
-    return Builtin.reinterpretCast(rawValue)
+    @inline(__always) get {
+      _sanityCheck(isNative)
+      _sanityCheck(_nonPointerBits(rawValue) == 0)
+      return Builtin.reinterpretCast(rawValue)
+    }
   }
   
   public // @testable
   var objCInstance: ObjC {
-    _sanityCheck(isObjC)
-    return Builtin.castReferenceFromBridgeObject(rawValue) 
+    @inline(__always) get {
+      _sanityCheck(isObjC)
+      return Builtin.castReferenceFromBridgeObject(rawValue)
+    }
   }
   
   //===--- private --------------------------------------------------------===//
   internal var _isTagged: Bool {
-    return _isObjCTaggedPointer(Builtin.castReferenceFromBridgeObject(rawValue))
+    @inline(__always) get {
+      return _isObjCTaggedPointer(
+        Builtin.castReferenceFromBridgeObject(rawValue))
+    }
   }
   
   internal let rawValue: Builtin.BridgeObject

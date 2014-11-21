@@ -198,6 +198,7 @@ public func unsafeDowncast<T: AnyObject>(x: AnyObject) -> T {
   return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(x))
 }
 
+@inline(__always)
 public func _getUnsafePointerToStoredProperties(x: AnyObject)
   -> UnsafeMutablePointer<UInt8> {
   let storedPropertyOffset = _roundUpToAlignment(
@@ -235,6 +236,7 @@ func _slowPath<C: BooleanType>(x: C) -> Bool {
 
 /// Returns `true` iff the class indicated by `theClass` uses native
 /// Swift reference-counting
+@inline(__always)
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
   return _swift_usesNativeSwiftReferenceCounting_class(
@@ -246,6 +248,7 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 }
 
 /// Returns: `class_getInstanceSize(theClass)`
+@inline(__always)
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
   return Int(_swift_class_getInstancePositiveExtentSize(
       unsafeAddressOf(theClass)))
@@ -289,15 +292,18 @@ internal var _objCTaggedPointerBits: UInt {
 #endif
 
 /// Extract the raw bits of `x`
+@inline(__always)
 internal func _bitPattern(x: Builtin.BridgeObject) -> UInt {
   return UInt(Builtin.castBitPatternFromBridgeObject(x))
 }
 
 /// Extract the raw spare bits of `x`
+@inline(__always)
 internal func _nonPointerBits(x: Builtin.BridgeObject) -> UInt {
   return _bitPattern(x) & _objectPointerSpareBits
 }
 
+@inline(__always)
 internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
   return (Builtin.reinterpretCast(x) & _objCTaggedPointerBits) != 0
 }
@@ -308,6 +314,7 @@ internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
 ///
 /// Requires: `bits != _objectPointerSpareBits`, `bits &
 /// _objectPointerSpareBits == bits`
+@inline(__always)
 internal func _makeNativeBridgeObject(
   nativeObject: AnyObject, bits: UInt
 ) -> Builtin.BridgeObject {
@@ -319,6 +326,7 @@ internal func _makeNativeBridgeObject(
 }
 
 /// Create a `BridgeObject` around the given `objCObject`.
+@inline(__always)
 internal func _makeObjCBridgeObject(
   objCObject: AnyObject
 ) -> Builtin.BridgeObject {
@@ -336,6 +344,7 @@ internal func _makeObjCBridgeObject(
 /// 2. if `object` is a tagged pointer, `bits == 0`.  Otherwise, 
 ///    `object` is either a native object, or `bits ==
 ///    _objectPointerSpareBits`.
+@inline(__always)
 internal func _makeBridgeObject(
   object: AnyObject, bits: UInt
 ) -> Builtin.BridgeObject {
