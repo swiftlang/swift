@@ -428,6 +428,9 @@ private:
   void printNullability(OptionalTypeKind kind,
                         NullabilityPrintKind printKind
                           = NullabilityPrintKind::After) {
+    if (kind == OTK_ImplicitlyUnwrappedOptional)
+      return;
+
     if (printKind == NullabilityPrintKind::After)
       os << ' ';
     if (printKind != NullabilityPrintKind::ContextSensitive)
@@ -443,7 +446,7 @@ private:
       break;
 
     case OTK_ImplicitlyUnwrappedOptional:
-      os << "null_unspecified";
+      llvm_unreachable("Handled above");
       break;
     }
 
@@ -505,9 +508,9 @@ private:
       MAP(Bool, "BOOL", false);
       MAP(String, "NSString *", true);
 
-      MAP(COpaquePointer, "void * __null_unspecified", false);
-      MAP(CMutableVoidPointer, "void * __null_unspecified", false);
-      MAP(CConstVoidPointer, "void const * __null_unspecified", false);
+      MAP(COpaquePointer, "void *", false);
+      MAP(CMutableVoidPointer, "void *", false);
+      MAP(CConstVoidPointer, "void const *", false);
 
       Identifier ID_ObjectiveC = ctx.getIdentifier(OBJC_MODULE_NAME);
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 
@@ -515,7 +518,7 @@ private:
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
         = { "SEL", false };
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
-        = { "NSZone * __null_unspecified", false };
+        = { "NSZone *", false };
     }
 
     auto iter = specialNames.find({moduleName, name});
@@ -621,7 +624,7 @@ private:
     visitPart(args.front(), OTK_None);
     if (isConst)
       os << " const";
-    os << " * __null_unspecified";
+    os << " *";
     return true;
   }
 
@@ -1250,9 +1253,6 @@ public:
            "# endif\n"
            "# if !defined(__nullable)\n"
            "#  define __nullable\n"
-           "# endif\n"
-           "# if !defined(__null_unspecified)\n"
-           "#  define __null_unspecified\n"
            "# endif\n"
            "#endif\n";
   }

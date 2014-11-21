@@ -74,7 +74,7 @@ class NotObjC {}
 // CHECK-LABEL: @interface Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void * __null_unspecified)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
+// CHECK-NEXT: - (void *)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
 // CHECK-NEXT: - (void)testString:(NSString * __nonnull)s;
 // CHECK-NEXT: - (void)testSelector:(SEL)sel boolean:(BOOL)b;
 // CHECK-NEXT: - (void)testCSignedTypes:(signed char)a b:(short)b c:(int)c d:(long)d e:(long long)e;
@@ -89,8 +89,8 @@ class NotObjC {}
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nonnull)getSelf;
 // CHECK-NEXT: - (Methods * __nullable)maybeGetSelf;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nullable)maybeGetSelf;
-// CHECK-NEXT: - (Methods * __null_unspecified)uncheckedGetSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(Methods) __null_unspecified)uncheckedGetSelf;
+// CHECK-NEXT: - (Methods *)uncheckedGetSelf;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods))uncheckedGetSelf;
 // CHECK-NEXT: - (void)testParens:(NSInteger)a;
 // CHECK-NEXT: - (void)testIgnoredParam:(NSInteger)_;
 // CHECK-NEXT: - (void)testIgnoredParams:(NSInteger)_ again:(NSInteger)_;
@@ -157,7 +157,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSArray * __nonnull)emptyArray;
 // CHECK-NEXT: - (NSArray * __nullable)maybeArray;
 // CHECK-NEXT: - (enum NSRuncingMode)someEnum;
-// CHECK-NEXT: - (NSZone * __null_unspecified)zone;
+// CHECK-NEXT: - (NSZone *)zone;
 // CHECK-NEXT: - (struct FooStruct1)tagStruct;
 // CHECK-NEXT: - (enum Tribool)tagEnum;
 // CHECK-NEXT: - (FooStructTypedef2)anonStructTypedef;
@@ -192,10 +192,10 @@ typealias AliasForNSRect = NSRect
 }
 
 // CHECK-LABEL: @interface MethodsWithPointers
-// CHECK-NEXT: - (id __nonnull * __null_unspecified)test:(NSInteger * __null_unspecified)a;
-// CHECK-NEXT: - (void)testNested:(NSInteger * __null_unspecified * __null_unspecified)a;
-// CHECK-NEXT: - (void)testBridging:(NSInteger const * __null_unspecified)a b:(NSInteger * __null_unspecified)b c:(Methods * __nonnull * __null_unspecified)c;
-// CHECK-NEXT: - (void)testBridgingVoid:(void * __null_unspecified)a b:(void const * __null_unspecified)b;
+// CHECK-NEXT: - (id __nonnull *)test:(NSInteger *)a;
+// CHECK-NEXT: - (void)testNested:(NSInteger * *)a;
+// CHECK-NEXT: - (void)testBridging:(NSInteger const *)a b:(NSInteger *)b c:(Methods * __nonnull *)c;
+// CHECK-NEXT: - (void)testBridgingVoid:(void *)a b:(void const *)b;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
@@ -306,12 +306,12 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> __nullable weakProto;
 // CHECK-NEXT: @property (nonatomic) CFTypeRef weakCF;
 // CHECK-NEXT: @property (nonatomic) CFStringRef weakCFString;
-// CHECK-NEXT: @property (nonatomic, weak) IBOutlet id __null_unspecified outlet;
-// CHECK-NEXT: @property (nonatomic) IBOutlet Properties * __null_unspecified typedOutlet;
+// CHECK-NEXT: @property (nonatomic, weak) IBOutlet id outlet;
+// CHECK-NEXT: @property (nonatomic) IBOutlet Properties * typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
 // CHECK-NEXT: @property (nonatomic, copy) NSDictionary * __nonnull dictionary;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __null_unspecified outletCollection;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollection;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionProto;
@@ -359,8 +359,8 @@ private class Private : A1 {}
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
-// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * __null_unspecified bees;
-// CHECK-NEXT: - (null_unspecified instancetype)init
+// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * bees;
+// CHECK-NEXT: - (instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
   override var bees : [AnyObject]! {
