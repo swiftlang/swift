@@ -308,8 +308,8 @@ internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
 ///
 /// Requires: `bits != _objectPointerSpareBits`, `bits &
 /// _objectPointerSpareBits == bits`
-internal func _makeNativeBridgeObject<NativeClass: AnyObject>(
-  nativeObject: NativeClass, bits: UInt
+internal func _makeNativeBridgeObject(
+  nativeObject: AnyObject, bits: UInt
 ) -> Builtin.BridgeObject {
   _sanityCheck(
     bits != _objectPointerSpareBits,
@@ -319,8 +319,8 @@ internal func _makeNativeBridgeObject<NativeClass: AnyObject>(
 }
 
 /// Create a `BridgeObject` around the given `objCObject`.
-internal func _makeObjCBridgeObject<ObjCClass: AnyObject>(
-  objCObject: ObjCClass
+internal func _makeObjCBridgeObject(
+  objCObject: AnyObject
 ) -> Builtin.BridgeObject {
   return _makeBridgeObject(
     objCObject,
@@ -336,17 +336,18 @@ internal func _makeObjCBridgeObject<ObjCClass: AnyObject>(
 /// 2. if `object` is a tagged pointer, `bits == 0`.  Otherwise, 
 ///    `object` is either a native object, or `bits ==
 ///    _objectPointerSpareBits`.
-internal func _makeBridgeObject<Class: AnyObject>(
-  object: Class, bits: UInt
+internal func _makeBridgeObject(
+  object: AnyObject, bits: UInt
 ) -> Builtin.BridgeObject {
-  // if object is a tagged pointer, bits == 0
-  _sanityCheck(!_isObjCTaggedPointer(object) || bits == 0)
+  _sanityCheck(!_isObjCTaggedPointer(object) || bits == 0,
+    "Tagged pointers cannot be combined with bits")
 
-  // Otherwise, object is native or bits == _objectPointerSpareBits
   _sanityCheck(
-    _isObjCTaggedPointer(object) ||
-    _usesNativeSwiftReferenceCounting(object.dynamicType) ||
-    bits == _objectPointerSpareBits)
+    _isObjCTaggedPointer(object)
+    || _usesNativeSwiftReferenceCounting(object.dynamicType)
+    || bits == _objectPointerSpareBits,
+    "All spare bits must be set in non-native, non-tagged bridge objects"
+  )
   
   _sanityCheck(
     bits & _objectPointerSpareBits == bits,
