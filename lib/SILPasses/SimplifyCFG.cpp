@@ -862,10 +862,7 @@ SimplifyCFG::trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT) {
         if (ReachingValue == SILValue()) {
           UnknownPreds.push_back(PredBB);
         } else {
-          // Condition is the same, if BB is reached over a pass through Pred
-          llvm::dbgs() << "Condition is the same if reached over ";
-          PredBB->print(llvm::dbgs());
-
+          // Condition is the same, if BB is reached over a pass through Pred.
           // See if it is reached over Success or Failure path.
           bool SuccessDominates = DT->dominates(PredSuccessBB, PredBB) ||
                                   DT->dominates(PredSuccessBB, BB) ||
