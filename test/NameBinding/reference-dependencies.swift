@@ -123,6 +123,12 @@ func lookUpManyTopLevelNames() {
   
   // CHECK-DAG: !private "getOtherFileIntArray"
   for _ in getOtherFileIntArray() {}
+  
+  // CHECK-DAG: !private "getOtherFileEnum"
+  switch getOtherFileEnum() {
+  case .Value:
+    break
+  }
 }
 
 struct Outer {
@@ -215,6 +221,7 @@ func outerPrivateTy3() {
 // CHECK-DAG: "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "VSs17IndexingGenerator"
+// CHECK-DAG: - "O4main13OtherFileEnum"
 
 // CHECK-DAG: - "P4main14TopLevelProto1"
 // CHECK-DAG: - "P4main14TopLevelProto2"

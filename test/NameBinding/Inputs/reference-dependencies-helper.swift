@@ -29,6 +29,13 @@ prefix operator *** {}
 
 typealias OtherFileAliasForFloatLiteralConvertible = FloatLiteralConvertible
 
+enum OtherFileEnum {
+  case Value
+  case AnotherValue
+}
+
+func getOtherFileEnum() -> OtherFileEnum { return .Value }
+
 
 protocol OtherFileProto {}
 struct OtherFileProtoImplementor : OtherFileProto {}

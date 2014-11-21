@@ -51,10 +51,10 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
 
 /// Find an enum element in an enum type.
 static EnumElementDecl *
-lookupEnumMemberElement(TypeChecker &TC, EnumDecl *oof, Type ty,
+lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
                         Identifier name) {
   // Look up the case inside the enum.
-  LookupResult foundElements = TC.lookupMember(ty, name, oof,
+  LookupResult foundElements = TC.lookupMember(ty, name, DC,
                                                /*allowDynamicLookup=*/false);
   if (!foundElements)
     return nullptr;
@@ -297,7 +297,7 @@ public:
       return nullptr;
 
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, enumDecl, ty, ude->getName());
+      = lookupEnumMemberElement(TC, DC, ty, ude->getName());
     
     // Build a TypeRepr from the head of the full path.
     TypeLoc loc(repr);
@@ -442,8 +442,7 @@ public:
     auto tailComponent = compoundR->Components.back();
     
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, enumDecl, enumTy,
-                                tailComponent->getIdentifier());
+      = lookupEnumMemberElement(TC, DC, enumTy, tailComponent->getIdentifier());
     if (!referencedElement)
       return nullptr;
     
@@ -982,8 +981,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     // type as `.Foo`), resolve it now that we have a type.
     if (!OP->getElementDecl()) {
       EnumElementDecl *element
-        = lookupEnumMemberElement(*this, enumDecl,
-                                  type, OP->getName());
+        = lookupEnumMemberElement(*this, dc, type, OP->getName());
       if (!element) {
         diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
                  OP->getName().str(), type);
