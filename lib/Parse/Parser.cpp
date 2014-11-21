@@ -627,24 +627,32 @@ struct ParserUnit::Implementation {
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
-  Implementation(SourceManager &SM, unsigned BufferID)
-    : Diags(SM),
+  Implementation(SourceManager &SM, unsigned BufferID,
+                 const LangOptions& Opts, StringRef ModuleName)
+    : LangOpts(Opts),
+      Diags(SM),
       Ctx(LangOpts, SearchPathOpts, SM, Diags),
-      SF(new (Ctx) SourceFile(*Module::create(Ctx.getIdentifier("input"), Ctx),
-                              SourceFileKind::Main, BufferID,
-                              SourceFile::ImplicitModuleImportKind::None)) {
+      SF(new (Ctx) SourceFile(
+            *Module::create(Ctx.getIdentifier(ModuleName), Ctx),
+            SourceFileKind::Main, BufferID,
+            SourceFile::ImplicitModuleImportKind::None)) {
   }
 };
 
 ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID)
-  : Impl(*new Implementation(SM, BufferID)) {
+  : ParserUnit(SM, BufferID, LangOptions(), "input") {
+}
+
+ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
+                       const LangOptions &LangOpts, StringRef ModuleName)
+  : Impl(*new Implementation(SM, BufferID, LangOpts, ModuleName)) {
 
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, nullptr));
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
              unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, BufferID)) {
+  : Impl(*new Implementation(SM, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
@@ -662,3 +670,16 @@ ParserUnit::~ParserUnit() {
 Parser &ParserUnit::getParser() {
   return *Impl.TheParser;
 }
+
+DiagnosticEngine &ParserUnit::getDiagnosticEngine() {
+  return Impl.Diags;
+}
+
+const LangOptions &ParserUnit::getLangOptions() const {
+  return Impl.LangOpts;
+}
+
+SourceFile &ParserUnit::getSourceFile() {
+  return *Impl.SF;
+}
+

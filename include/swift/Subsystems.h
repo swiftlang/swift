@@ -38,6 +38,8 @@ namespace swift {
   class Decl;
   class DeclContext;
   class DelayedParsingCallbacks;
+  class DiagnosticConsumer;
+  class DiagnosticEngine;
   class GenericParamList;
   class IRGenOptions;
   class LangOptions;
@@ -220,6 +222,8 @@ namespace swift {
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
   public:
+    ParserUnit(SourceManager &SM, unsigned BufferID,
+               const LangOptions &LangOpts, StringRef ModuleName);
     ParserUnit(SourceManager &SM, unsigned BufferID);
     ParserUnit(SourceManager &SM, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
@@ -227,6 +231,9 @@ namespace swift {
     ~ParserUnit();
 
     Parser &getParser();
+    SourceFile &getSourceFile();
+    DiagnosticEngine &getDiagnosticEngine();
+    const LangOptions &getLangOptions() const;
 
   private:
     struct Implementation;
