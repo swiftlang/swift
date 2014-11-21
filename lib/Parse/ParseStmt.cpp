@@ -973,7 +973,7 @@ ParserResult<Stmt> Parser::parseStmtDoWhile(LabeledStmtInfo LabelInfo) {
   Status |= Body;
   if (Body.isNull())
     Body = makeParserResult(
-        Body, BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc()));
+        Body, BraceStmt::create(Context, DoLoc, {}, PreviousLoc, true));
 
   SourceLoc WhileLoc;
   if (parseToken(tok::kw_while, WhileLoc, diag::expected_while_in_dowhile))
@@ -1250,7 +1250,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   Status |= Body;
   if (Body.isNull())
     Body = makeParserResult(
-        Body, BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc()));
+        Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
 
   return makeParserResult(
       Status,
@@ -1320,7 +1320,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   Status |= Body;
   if (Body.isNull())
     Body = makeParserResult(
-        Body, BraceStmt::create(Context, PreviousLoc, {}, PreviousLoc));
+        Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
 
   return makeParserResult(
       Status,
