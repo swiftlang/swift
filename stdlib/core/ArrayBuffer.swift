@@ -235,7 +235,7 @@ extension _ArrayBuffer {
       return
     }
 
-    if _slowPath(needsElementTypeCheck) {
+    if _slowPath(indirect.needsElementTypeCheck) {
       for i in subRange {
         _typeCheck(i)
       }
