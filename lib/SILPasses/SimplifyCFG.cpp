@@ -548,7 +548,8 @@ static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
 template <class SwitchEnumTy, class SwitchEnumCaseTy>
 static SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
                                      SmallVectorImpl<SwitchEnumCaseTy> &Cases,
-                                     unsigned EdgeIdx, SILBasicBlock *NewDest) {
+                                     unsigned EdgeIdx,
+                                     SILBasicBlock *NewDest) {
     auto *DefaultBB = S->hasDefault() ? S->getDefaultBB() : nullptr;
     for (unsigned i = 0, e = S->getNumCases(); i != e; ++i)
       if (EdgeIdx != i)
@@ -565,7 +566,7 @@ static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
                                SILBasicBlock *NewDest) {
   SILBuilderWithScope<8> B(T);
 
-  if (auto Br = dyn_cast<BranchInst>(T)) {
+  if (auto *Br = dyn_cast<BranchInst>(T)) {
     SmallVector<SILValue, 8> Args;
     for (auto Arg : Br->getArgs())
       Args.push_back(Arg);
@@ -575,7 +576,7 @@ static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  if (auto CondBr = dyn_cast<CondBranchInst>(T)) {
+  if (auto *CondBr = dyn_cast<CondBranchInst>(T)) {
     SmallVector<SILValue, 8> TrueArgs;
     for (auto Arg : CondBr->getTrueArgs())
       TrueArgs.push_back(Arg);
@@ -595,7 +596,7 @@ static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  if (auto SII = dyn_cast<SwitchValueInst>(T)) {
+  if (auto *SII = dyn_cast<SwitchValueInst>(T)) {
     SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SII, Cases, EdgeIdx, NewDest);
     B.createSwitchValue(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
@@ -603,7 +604,7 @@ static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  if (auto SEI = dyn_cast<SwitchEnumInst>(T)) {
+  if (auto *SEI = dyn_cast<SwitchEnumInst>(T)) {
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SEI, Cases, EdgeIdx, NewDest);
     B.createSwitchEnum(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
@@ -611,7 +612,7 @@ static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  if (auto SEI = dyn_cast<SwitchEnumAddrInst>(T)) {
+  if (auto *SEI = dyn_cast<SwitchEnumAddrInst>(T)) {
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SEI, Cases, EdgeIdx, NewDest);
     B.createSwitchEnumAddr(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
@@ -619,7 +620,7 @@ static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  if (auto DMBI = dyn_cast<DynamicMethodBranchInst>(T)) {
+  if (auto *DMBI = dyn_cast<DynamicMethodBranchInst>(T)) {
     assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
     auto HasMethodBB = !EdgeIdx ? NewDest : DMBI->getHasMethodBB();
     auto NoMethodBB = EdgeIdx ? NewDest : DMBI->getNoMethodBB();
@@ -629,7 +630,7 @@ static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  if (auto CBI = dyn_cast<CheckedCastBranchInst>(T)) {
+  if (auto *CBI = dyn_cast<CheckedCastBranchInst>(T)) {
     assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
@@ -639,7 +640,7 @@ static void changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
+  if (auto *CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
     assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
@@ -697,10 +698,15 @@ static SILValue stripClassCasts(SILValue V) {
   while (true) {
     if (auto *UI = dyn_cast<UpcastInst>(V)) {
       V = UI->getOperand();
-    } else if (auto *UCCI = dyn_cast<UnconditionalCheckedCastInst>(V)) {
+      continue;
+    }
+
+    if (auto *UCCI = dyn_cast<UnconditionalCheckedCastInst>(V)) {
       V = UCCI->getOperand();
-    } else
-      return V;
+      continue;
+    }
+
+    return V;
   }
 }
 
