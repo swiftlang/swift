@@ -654,10 +654,13 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         }
         
         // Look for member types with the given name.
-        // FIXME: This should distinguish function signatures from function
-        // bodies.
+        bool isKnownPrivate = false;
+        if (options.contains(TR_InExpression)) {
+          // Expressions cannot affect a function's signature.
+          isKnownPrivate = isa<AbstractFunctionDecl>(DC);
+        }
         auto memberTypes = TC.lookupMemberType(parentTy, comp->getIdentifier(),
-                                               DC);
+                                               DC, isKnownPrivate);
 
         // Name lookup was ambiguous. Complain.
         // FIXME: Could try to apply generic arguments first, and see whether

@@ -297,10 +297,13 @@ namespace {
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      if (auto *rep = E->getTypeRepr())
-        type = CS.TC.resolveType(rep, CS.DC, TR_AllowUnboundGenerics);
-      else
+      if (auto *rep = E->getTypeRepr()) {
+        TypeResolutionOptions options = TR_AllowUnboundGenerics;
+        options |= TR_InExpression;
+        type = CS.TC.resolveType(rep, CS.DC, options);
+      } else {
         type = E->getTypeLoc().getType();
+      }
       if (!type) return Type();
       
       auto locator = CS.getConstraintLocator(E);
@@ -1302,8 +1305,9 @@ namespace {
       auto &tc = CS.getTypeChecker();
       
       // Validate the resulting type.
-      if (tc.validateType(expr->getCastTypeLoc(), CS.DC,
-                          TR_AllowUnboundGenerics))
+      TypeResolutionOptions options = TR_AllowUnboundGenerics;
+      options |= TR_InExpression;
+      if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
       // Open the type we're casting to.
@@ -1339,8 +1343,9 @@ namespace {
       auto &tc = CS.getTypeChecker();
 
       // Validate the resulting type.
-      if (tc.validateType(expr->getCastTypeLoc(), CS.DC,
-                          TR_AllowUnboundGenerics))
+      TypeResolutionOptions options = TR_AllowUnboundGenerics;
+      options |= TR_InExpression;
+      if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
       // Open the type we're casting to.
@@ -1359,8 +1364,9 @@ namespace {
     Type visitIsaExpr(IsaExpr *expr) {
       // Validate the type.
       auto &tc = CS.getTypeChecker();
-      if (tc.validateType(expr->getCastTypeLoc(), CS.DC,
-                          TR_AllowUnboundGenerics))
+      TypeResolutionOptions options = TR_AllowUnboundGenerics;
+      options |= TR_InExpression;
+      if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
       // Open up the type we're checking.

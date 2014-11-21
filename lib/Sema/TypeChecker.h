@@ -215,6 +215,12 @@ enum TypeResolutionFlags {
 
   /// Whether this type is the value carried in an enum case.
   TR_EnumCase = 0x1000,
+
+  /// Whether this type is being used in an expression or local declaration.
+  ///
+  /// This affects what sort of dependencies are recorded when resolving the
+  /// type.
+  TR_InExpression = 0x2000
 };
 
 /// Option set describing how type resolution should work.

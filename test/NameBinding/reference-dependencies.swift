@@ -129,6 +129,8 @@ func lookUpManyTopLevelNames() {
   case .Value:
     break
   }
+
+  let _ = .Value as OtherFileEnumWrapper.Enum
 }
 
 struct Outer {
@@ -222,6 +224,7 @@ func outerPrivateTy3() {
 // CHECK-DAG: "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "VSs17IndexingGenerator"
 // CHECK-DAG: - "O4main13OtherFileEnum"
+// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
 
 // CHECK-DAG: - "P4main14TopLevelProto1"
 // CHECK-DAG: - "P4main14TopLevelProto2"

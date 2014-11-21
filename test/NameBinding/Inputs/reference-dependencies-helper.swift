@@ -11,6 +11,11 @@ struct OtherFileOuterType {
   }
 }
 
+struct OtherFileOuterType2 {
+  struct InnerType {
+  }
+}
+
 struct OtherFileSecretTypeWrapper {
   struct SecretType {
     static let constant = 42
@@ -32,10 +37,18 @@ typealias OtherFileAliasForFloatLiteralConvertible = FloatLiteralConvertible
 enum OtherFileEnum {
   case Value
   case AnotherValue
+  case ValueWithPayload(Int)
 }
 
 func getOtherFileEnum() -> OtherFileEnum { return .Value }
 
+struct OtherFileEnumWrapper {
+  enum Enum {
+    case Value
+    case AnotherValue
+    case ValueWithPayload(Int)
+  }
+}
 
 protocol OtherFileProto {}
 struct OtherFileProtoImplementor : OtherFileProto {}
