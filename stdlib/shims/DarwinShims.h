@@ -25,6 +25,7 @@ __swift_size_t swift_malloc_size(const void *ptr);
 __swift_size_t strlen(const char *s);
 char *strcpy(char *restrict dst, const char *restrict src);
 int strcmp(const char *s1, const char *s2);
+int memcmp(const void *s1, const void *s2, __swift_size_t n);
 int putchar(int c);
 
 #endif // SWIFT_STDLIB_SHIMS_DARWINSHIMS_H

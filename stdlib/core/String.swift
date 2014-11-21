@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 /// An arbitrary Unicode string value.
 ///
 /// Unicode-Correct
@@ -291,6 +293,15 @@ extension String: Equatable {
 }
 
 public func ==(lhs: String, rhs: String) -> Bool {
+  if lhs._core.isASCII && rhs._core.isASCII {
+    if lhs._core.count != rhs._core.count {
+      return false
+    }
+    return memcmp(
+      UnsafeMutablePointer(lhs._core.startASCII),
+      UnsafeMutablePointer(rhs._core.startASCII),
+      UInt(rhs._core.count)) == 0
+  }
 #if _runtime(_ObjC)
   // Note: this operation should be consistent with equality comparison of
   // Character.
@@ -306,15 +317,39 @@ public func ==(lhs: String, rhs: String) -> Bool {
 extension String : Comparable {
 }
 
-public func <(lhs: String, rhs: String) -> Bool {
+extension String {
+  public // @testable
+  func _lessThanUTF16(rhs: String) -> Bool {
 #if _runtime(_ObjC)
-  return _stdlib_compareNSStringDeterministicUnicodeCollation(
-    lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) < 0
+    return _stdlib_compareNSStringDeterministicUnicodeCollation(
+      self._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) < 0
 #else
-  // FIXME: Actually implement. For now, all strings are unequal
-  // rdar://problem/18878343
-  return false
+    // FIXME: Actually implement. For now, all strings are unequal
+    // rdar://problem/18878343
+    return false
 #endif
+  }
+
+  /// precondition: both self and rhs are ASCII strings
+  public // @testable
+  func _lessThanASCII(rhs: String) -> Bool {
+    let compare = memcmp(
+      UnsafeMutablePointer(self._core.startASCII),
+      UnsafeMutablePointer(rhs._core.startASCII),
+      min(UInt(self._core.count), UInt(rhs._core.count)))
+    if compare == 0 {
+      return self._core.count < rhs._core.count
+    } else {
+      return compare < 0
+    }
+  }
+}
+
+public func <(lhs: String, rhs: String) -> Bool {
+  if lhs._core.isASCII && rhs._core.isASCII {
+    return lhs._lessThanASCII(rhs)
+  }
+  return lhs._lessThanUTF16(rhs)
 }
 
 // Support for copy-on-write
@@ -336,6 +371,7 @@ extension String {
     return _core.count
   }
 
+  public // SPI(Foundation)
   init(_storage: _StringBuffer) {
     _core = _StringCore(_storage)
   }
