@@ -104,6 +104,15 @@ struct _BridgeStorage<
     }
   }
   
+  @inline(__always)
+  public // @testable
+  mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
+    _sanityCheck(isNative)
+    _sanityCheck(_nonPointerBits(rawValue) == 0)
+    let p: UnsafePointer<HeapObject> = Builtin.reinterpretCast(rawValue)
+    return _swift_isUniquelyReferenced_nonNull_native(p) != 0
+  }
+
   public // @testable
   var objCInstance: ObjC {
     @inline(__always) get {

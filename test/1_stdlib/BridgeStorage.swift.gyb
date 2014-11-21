@@ -33,6 +33,7 @@ protocol BridgeStorage {
   init(objC: ObjC)
 
   mutating func isUniquelyReferencedNative() -> Bool
+  mutating func isUniquelyReferenced_native_noSpareBits() -> Bool
   var isNative: Bool {get}
   var isObjC: Bool {get}
   var nativeInstance: Native {get}
@@ -94,6 +95,13 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
     return Builtin.bridgeFromRawPointer(rawObject)
   }
     
+  mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
+    precondition(isNative)
+    precondition(spareBits == 0)
+    return _swift_isUniquelyReferenced_nonNull_native(
+      UnsafePointer(rawObject)) != 0
+  }
+
   var objCInstance: ObjC {
     precondition(isObjC)
     return Builtin.bridgeFromRawPointer(rawObject)
@@ -189,6 +197,9 @@ allTests.test("${Self}") {
       expectFalse(b.isObjC)
       expectTrue(b.isNative)
       expectTrue(b.isUniquelyReferencedNative())
+      if i == 0 {
+        expectTrue(b.isUniquelyReferenced_native_noSpareBits())
+      }
       expectEqual(i, b.spareBits)
     }
     
@@ -202,6 +213,7 @@ allTests.test("${Self}") {
       expectTrue(b.nativeInstance === c)
       if i == 0 {
         expectTrue(b.nativeInstance_noSpareBits === c)
+        expectFalse(b.isUniquelyReferenced_native_noSpareBits())
       }
     }
     
