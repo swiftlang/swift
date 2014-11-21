@@ -1341,9 +1341,6 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
 bool
 SimplifyCFG::trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT) {
 
-  if (!ShouldJumpthreadDevirt)
-    return false;
-
   CheckedCastBrJumpThreading CCBJumpThreading(DT);
 
   bool Result = CCBJumpThreading.trySimplify(Term);
