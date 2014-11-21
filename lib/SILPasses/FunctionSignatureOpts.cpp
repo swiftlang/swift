@@ -138,6 +138,8 @@ inline T1 getFirstPairElt(const std::pair<T1, T2> &P) { return P.first; }
 /// A class that contains all analysis information we gather about our
 /// function. Also provides utility methods for creating the new empty function.
 class FunctionAnalyzer {
+  RCIdentityAnalysis *RCIA;
+
   /// The function that we are analyzing.
   SILFunction *F;
 
@@ -152,18 +154,14 @@ class FunctionAnalyzer {
   /// information that we learn early on but need later deep in the analysis
   llvm::SmallVector<unsigned, 8> DeadArgIndices;
 
-  /// A map from consumed SILArguments to the release associated with the
-  /// argument.
-  ConsumedArgToEpilogueReleaseMatcher ArgToEpilogueReleaseMap;
-
 public:
   FunctionAnalyzer() = delete;
   FunctionAnalyzer(const FunctionAnalyzer &) = delete;
   FunctionAnalyzer(FunctionAnalyzer &&) = delete;
 
   FunctionAnalyzer(RCIdentityAnalysis *RCIA, SILFunction *F)
-    : F(F), ShouldOptimize(false), ArgDescList(), DeadArgIndices(),
-      ArgToEpilogueReleaseMap(RCIA, F) {}
+    : RCIA(RCIA), F(F), ShouldOptimize(false), ArgDescList(),
+      DeadArgIndices() {}
 
   /// Analyze the given function.
   bool analyze();
@@ -180,11 +178,6 @@ public:
 
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
   ArrayRef<unsigned> getDeadArgIndices() const { return DeadArgIndices; }
-
-  Range<ConsumedArgToEpilogueReleaseMatcher::reverse_iterator>
-  getConsumedArgumentIndexReleasePairs() {
-    return reversed(ArgToEpilogueReleaseMap);
-  }
 
 private:
   /// Compute the CanSILFunctionType for the optimized function.
@@ -203,6 +196,10 @@ FunctionAnalyzer::analyze() {
     return false;
 
   ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+
+  // A map from consumed SILArguments to the release associated with an
+  // argument.
+  ConsumedArgToEpilogueReleaseMatcher ArgToEpilogueReleaseMap(RCIA, F);
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     ArgumentDescriptor A{Args[i]};
 
