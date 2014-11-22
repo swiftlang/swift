@@ -35,10 +35,10 @@ func inOutFunc(inout f: (Int -> Int)) { }
 // CHECK-LABEL: sil hidden @_TF20property_abstraction6inOutF
 // CHECK:         [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
+// CHECK:         [[F_SUBST_MAT:%.*]] = alloc_stack
 // CHECK:         [[F_ORIG:%.*]] = load [[F_ADDR]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@thin (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
 // CHECK:         [[F_SUBST_IN:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
-// CHECK:         [[F_SUBST_MAT:%.*]] = alloc_stack
 // CHECK:         store [[F_SUBST_IN]] to [[F_SUBST_MAT]]
 // CHECK:         apply [[INOUTFUNC]]([[F_SUBST_MAT]]#1)
 // CHECK:         [[F_SUBST_OUT:%.*]] = load [[F_SUBST_MAT]]

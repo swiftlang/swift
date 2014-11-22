@@ -6096,7 +6096,7 @@ public:
   }
   
   void set(SILGenFunction &gen, SILLocation loc,
-           RValue &&value, ManagedValue base) const override {
+           RValue &&value, ManagedValue base) && override {
     // Convert the value back to a +1 strong reference.
     auto unowned = std::move(value).getAsSingleValue(gen, loc).getUnmanagedValue();
     auto strongType = SILType::getPrimitiveObjectType(
@@ -6110,7 +6110,7 @@ public:
   }
   
   ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                   ManagedValue base, SGFContext c) const override {
+                   ManagedValue base, SGFContext c) && override {
     // Load the value at +0.
     SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue());
     // Convert it to unowned.
@@ -6164,11 +6164,14 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   case PTK_AutoreleasingUnsafeMutablePointer: {
     // Set up a writeback through a +0 buffer.
     LValueTypeData typeData = lv.getTypeData();
+    SILType rvalueType = SILType::getPrimitiveObjectType(
+      CanUnmanagedStorageType::get(typeData.TypeOfRValue.getSwiftRValueType()));
+
     LValueTypeData unownedTypeData(
       AbstractionPattern(
         CanUnmanagedStorageType::get(typeData.OrigFormalType.getAsType())),
       CanUnmanagedStorageType::get(typeData.SubstFormalType),
-      SILType::getPrimitiveObjectType(typeData.TypeOfRValue.getSwiftRValueType()));
+      rvalueType);
     lv.add<AutoreleasingWritebackComponent>(unownedTypeData);
     break;
   }

@@ -197,12 +197,12 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Builtin.Int1), 0
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
   // CHECK: [[NEEDS_WRITEBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Builtin.Int1), 1  
+  // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: retain_value [[LD]]
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
-  // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: store [[V_R_VP_Z_TUPLE]] to [[V_R_VP_Z_TUPLE_MAT]]#1
   // -- write to val.ref.val_prop.z_tuple.1
   // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]]#1 : {{.*}}, 1
@@ -237,11 +237,11 @@ func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[VAL1:%[0-9]+]] = load [[VAL_LOCAL]]
   // CHECK: retain_value [[VAL1]]
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
-  // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: store [[Z_TUPLE]] to [[Z_TUPLE_MATERIALIZED]]#1
   // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]]#1 : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]

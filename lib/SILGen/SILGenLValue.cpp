@@ -72,8 +72,8 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
     component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc,SGF);
   }
 
-  void performWriteback(SILGenFunction &gen) {
-    component->writeback(gen, loc, base, temp, ExtraInfo);
+  void performWriteback(SILGenFunction &gen) && {
+    std::move(*component).writeback(gen, loc, base, temp, ExtraInfo);
   }
 };
 }
@@ -182,11 +182,11 @@ public:
 
 SILValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
                                                SILLocation loc,
-                                               ManagedValue base) const {
+                                               ManagedValue base) && {
   // If the writeback is disabled, just emit a load into a temporary memory
   // location.
   if (!gen.InWritebackScope) {
-    ManagedValue value = get(gen, loc, base, SGFContext());
+    ManagedValue value = std::move(*this).get(gen, loc, base, SGFContext());
     return gen.emitMaterialize(loc, value).address;
   }
 
@@ -196,19 +196,38 @@ SILValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   if (base && base.hasCleanup())
     getterBase = base.copy(gen, loc);
 
-  ManagedValue value = get(gen, loc, getterBase, SGFContext());
-  Materialize temp = gen.emitMaterialize(loc, value);
-  
-  gen.getWritebackStack().emplace_back(loc,
-                                       clone(gen, loc), base, temp, SILValue());
-  return temp.address;
+  // Clone anything else about the component that we might need in the
+  // writeback.
+  auto clonedComponent = clone(gen, loc);
+
+  // Create a temporary.
+  auto temporaryInit =
+    gen.emitTemporary(loc, gen.getTypeLowering(getTypeOfRValue()));
+
+  // Emit a 'get' into the temporary.
+  ManagedValue value = std::move(*this).get(gen, loc, getterBase,
+                                            SGFContext(temporaryInit.get()));
+  if (!value.isInContext()) {
+    value.forwardInto(gen, loc, temporaryInit->getAddress());
+    temporaryInit->finishInitialization(gen);
+  }
+
+  // Push a writeback for the temporary.
+  ManagedValue managedAddr = temporaryInit->getManagedAddress();
+  auto addr = managedAddr.getValue();
+
+  gen.getWritebackStack().emplace_back(loc, std::move(clonedComponent), base,
+                                  Materialize{addr, managedAddr.getCleanup()},
+                                       SILValue());
+  return addr;
 }
 
 void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
                                      ManagedValue base, Materialize temporary,
-                                     SILValue otherInfo) const {
+                                     SILValue otherInfo) && {
   ManagedValue mv = temporary.claim(gen, loc);
-  set(gen, loc, RValue(gen, loc, getSubstFormalType(), mv), base);
+  std::move(*this).set(gen, loc, RValue(gen, loc, getSubstFormalType(), mv),
+                       base);
 }
 
 ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
@@ -259,25 +278,32 @@ WritebackScope::~WritebackScope() {
   gen->InWritebackScope = wasInWritebackScope;
 
   // Check to see if there is anything going on here.
-  auto i = gen->getWritebackStack().end(),
-       deepest = gen->getWritebackStack().begin() + savedDepth;
-  if (i == deepest) return;
+  
+  auto &stack = gen->getWritebackStack();
+  size_t depthAtPop = stack.size();
+  if (depthAtPop == savedDepth) return;
 
-  while (i-- > deepest) {
+  size_t prevIndex = depthAtPop;
+  while (prevIndex-- > savedDepth) {
+    auto index = prevIndex;
+
     // Attempt to diagnose problems where obvious aliasing introduces illegal
     // code.  We do a simple N^2 comparison here to detect this because it is
     // extremely unlikely more than a few writebacks are active at once.
-    if (i != deepest) {
-      for (auto j = i-1; j >= deepest; --j)
-        i->diagnoseConflict(*j, *gen);
-    }
+    for (auto j = index; j > savedDepth; --j)
+      stack[index].diagnoseConflict(stack[j-1], *gen);
 
     // Claim the address of each and then perform the writeback from the
     // temporary allocation to the source we copied from.
-    i->performWriteback(*gen);
+    //
+    // This evaluates arbitrary code, so it's best to be paranoid
+    // about iterators on the stack.
+    std::move(stack[index]).performWriteback(*gen);
   }
-  
-  gen->getWritebackStack().erase(deepest, gen->getWritebackStack().end());
+
+  assert(depthAtPop == stack.size() &&
+         "more writebacks left on stack during writeback scope pop?");
+  stack.erase(stack.begin() + savedDepth, stack.end());
 }
 
 WritebackScope::WritebackScope(WritebackScope &&o)
@@ -343,8 +369,7 @@ namespace {
         Field(field), SubstFieldType(substFieldType) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind)
-      const override {
+                        AccessKind accessKind) && override {
       assert(base.getType().isObject() &&
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
@@ -367,7 +392,7 @@ namespace {
         ElementIndex(elementIndex) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) const override {
+                        AccessKind accessKind) && override {
       assert(base && "invalid value for element base");
       auto Res = gen.B.createTupleElementAddr(loc, base.getUnmanagedValue(),
                                               ElementIndex,
@@ -390,7 +415,7 @@ namespace {
         Field(field), SubstFieldType(substFieldType) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) const override {
+                        AccessKind accessKind) && override {
       assert(base && "invalid value for element base");
       auto Res = gen.B.createStructElementAddr(loc, base.getUnmanagedValue(),
                                                Field, SubstFieldType);
@@ -411,7 +436,7 @@ namespace {
     {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) const override {
+                        AccessKind accessKind) && override {
       // Assert that the optional value is present.
       gen.emitPreconditionOptionalHasValue(loc, base.getValue());
       // Project out the 'Some' payload.
@@ -465,7 +490,7 @@ namespace {
     using OptionalObjectComponent::OptionalObjectComponent;
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) const override {
+                        AccessKind accessKind) && override {
       // Assert that the optional value is present.
       gen.emitPreconditionOptionalHasValue(loc, base.getValue());
       // Project out the payload.
@@ -486,7 +511,7 @@ namespace {
     {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) const override {
+                        AccessKind accessKind) && override {
       // Check if the optional value is present.
       gen.emitBindOptional(loc, base.getUnmanagedValue(), Depth);
       
@@ -507,7 +532,7 @@ namespace {
     }
 
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) const override {
+                        AccessKind accessKind) && override {
       assert(!base && "value component must be root of lvalue path");
       return Value;
     }
@@ -631,14 +656,14 @@ namespace {
     /// necessary), and subscript arguments, in that order.
     AccessorArgs
     prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base, AbstractFunctionDecl *funcDecl) const
+                        ManagedValue base, AbstractFunctionDecl *funcDecl) &&
     {
       AccessorArgs result;
       if (base)
         result.base = gen.prepareAccessorBaseArg(loc, base, funcDecl);
 
       if (subscripts)
-        result.subscripts = subscripts.copy(gen, loc);
+        result.subscripts = std::move(subscripts);
       
       return result;
     }
@@ -707,9 +732,10 @@ namespace {
     }
     
     void set(SILGenFunction &gen, SILLocation loc,
-             RValue &&value, ManagedValue base) const override {
+             RValue &&value, ManagedValue base) && override {
       // Pass in just the setter.
-      auto args = prepareAccessorArgs(gen, loc, base, decl->getSetter());
+      auto args =
+        std::move(*this).prepareAccessorArgs(gen, loc, base, decl->getSetter());
       
       return gen.emitSetAccessor(loc, decl, substitutions,
                                  std::move(args.base), IsSuper,
@@ -720,7 +746,7 @@ namespace {
 
     SILValue getMaterialized(SILGenFunction &gen,
                              SILLocation loc,
-                             ManagedValue base) const override {
+                             ManagedValue base) && override {
       // If the property is dynamic, or if it doesn't have a
       // materializeForSet, or if we're not in a writeback scope, we
       // should just use the normal logic.
@@ -728,7 +754,8 @@ namespace {
       if (!gen.InWritebackScope ||
           decl->getAttrs().hasAttribute<DynamicAttr>() ||
           !(materializeForSet = decl->getMaterializeForSetFunc())) {
-        return LogicalPathComponent::getMaterialized(gen, loc, base);
+        return std::move(*this).LogicalPathComponent::getMaterialized(gen,
+                                                                    loc, base);
       }
 
       // Allocate a temporary.
@@ -741,7 +768,10 @@ namespace {
       if (base && base.hasCleanup())
         copiedBase = base.copy(gen, loc);
 
-      auto args = prepareAccessorArgs(gen, loc, copiedBase, materializeForSet);
+      auto clonedComponent = clone(gen, loc);
+
+      auto args = std::move(*this).prepareAccessorArgs(gen, loc, copiedBase,
+                                                       materializeForSet);
       auto addressAndNeedsWriteback =
         gen.emitMaterializeForSetAccessor(loc, decl, substitutions,
                                           std::move(args.base), IsSuper,
@@ -754,7 +784,8 @@ namespace {
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct
       // access for stored properties with didSet.
-      gen.getWritebackStack().emplace_back(loc, clone(gen, loc), base,
+      gen.getWritebackStack().emplace_back(loc, std::move(clonedComponent),
+                                           base,
                                            Materialize{address,
                                                        CleanupHandle::invalid()},
                                            addressAndNeedsWriteback.second);
@@ -764,11 +795,12 @@ namespace {
 
     void writeback(SILGenFunction &gen, SILLocation loc,
                    ManagedValue base, Materialize temporary,
-                   SILValue otherInfo) const {
+                   SILValue otherInfo) && {
       // If we don't have otherInfo, we don't have to conditionalize
       // the writeback.
       if (!otherInfo) {
-        LogicalPathComponent::writeback(gen, loc, base, temporary, otherInfo);
+        std::move(*this).LogicalPathComponent::writeback(gen, loc, base,
+                                                         temporary, otherInfo);
         return;
       }
 
@@ -794,7 +826,8 @@ namespace {
           base = base.copy(gen, loc);
 
         ManagedValue mv = claimValueInMemory(gen, loc, temporary.address);
-        set(gen, loc, RValue(gen, loc, getSubstFormalType(), mv), base);
+        RValue writebackValue(gen, loc, getSubstFormalType(), mv);
+        std::move(*this).set(gen, loc, std::move(writebackValue), base);
       }
 
       // Continue.
@@ -802,8 +835,9 @@ namespace {
     }
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) const override {
-      auto args = prepareAccessorArgs(gen, loc, base, decl->getGetter());
+                     ManagedValue base, SGFContext c) && override {
+      auto args =
+        std::move(*this).prepareAccessorArgs(gen, loc, base, decl->getGetter());
       
       return gen.emitGetAccessor(loc, decl, substitutions,
                                  std::move(args.base), IsSuper,
@@ -896,8 +930,9 @@ namespace {
     }
 
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) const override {
-      auto args = prepareAccessorArgs(gen, loc, base,
+                        AccessKind accessKind) && override {
+      auto args =
+        std::move(*this).prepareAccessorArgs(gen, loc, base,
                                       decl->getAddressorForAccess(accessKind));
       return gen.emitAddressorAccessor(loc, decl, accessKind, substitutions,
                                        std::move(args.base), IsSuper,
@@ -928,7 +963,7 @@ namespace {
     {}
     
     void set(SILGenFunction &gen, SILLocation loc,
-             RValue &&value, ManagedValue base) const override {
+             RValue &&value, ManagedValue base) && override {
       // Map the value to the original abstraction level.
       ManagedValue mv = std::move(value).getAsSingleValue(gen, loc);
       mv = gen.emitSubstToOrigValue(loc, mv, origType, substType);
@@ -937,7 +972,7 @@ namespace {
     }
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) const override {
+                     ManagedValue base, SGFContext c) && override {
       // Load the original value.
       ManagedValue baseVal = gen.emitLoad(loc, base.getValue(),
                                           gen.getTypeLowering(base.getType()),
@@ -982,7 +1017,7 @@ namespace {
 
 
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) const override {
+                     ManagedValue base, SGFContext c) && override {
       assert(base && "ownership component must not be root of lvalue path");
       auto &TL = gen.getTypeLowering(getTypeData().TypeOfRValue);
 
@@ -993,7 +1028,7 @@ namespace {
     }
 
     void set(SILGenFunction &gen, SILLocation loc,
-             RValue &&value, ManagedValue base) const override {
+             RValue &&value, ManagedValue base) && override {
       assert(base && "ownership component must not be root of lvalue path");
       auto &TL = gen.getTypeLowering(base.getType());
 
@@ -1832,15 +1867,16 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 /// component.
 static ManagedValue drillIntoComponent(SILGenFunction &SGF,
                                        SILLocation loc,
-                                       const PathComponent &component,
+                                       PathComponent &&component,
                                        ManagedValue base,
                                        AccessKind accessKind) {
   ManagedValue addr;
   if (component.isPhysical()) {
-    addr = component.asPhysical().offset(SGF, loc, base, accessKind);
+    addr = std::move(component.asPhysical()).offset(SGF, loc, base, accessKind);
   } else {
     auto &lcomponent = component.asLogical();
-    addr = ManagedValue::forLValue(lcomponent.getMaterialized(SGF, loc, base));
+    addr = ManagedValue::forLValue(
+                     std::move(lcomponent).getMaterialized(SGF, loc, base));
   }
 
   return addr;
@@ -1848,21 +1884,22 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
 
 /// Find the last component of the given lvalue and derive a base
 /// location for it.
-static const PathComponent &drillToLastComponent(SILGenFunction &SGF,
-                                                 SILLocation loc,
-                                                 LValue &&lv,
-                                                 ManagedValue &addr,
-                                                 AccessKind accessKind) {
+static PathComponent &&drillToLastComponent(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            LValue &&lv,
+                                            ManagedValue &addr,
+                                            AccessKind accessKind) {
   assert(lv.begin() != lv.end() &&
          "lvalue must have at least one component");
 
   auto component = lv.begin(), next = lv.begin(), end = lv.end();
   ++next;
   for (; next != end; component = next, ++next) {
-    addr = drillIntoComponent(SGF, loc, **component, addr, accessKind);
+    addr = drillIntoComponent(SGF, loc, std::move(**component),
+                              addr, accessKind);
   }
 
-  return **component;
+  return std::move(**component);
 }
 
 ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
@@ -1872,27 +1909,28 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
   DisableWritebackScope scope(*this);
 
   ManagedValue addr;
-  auto &component =
+  PathComponent &&component =
     drillToLastComponent(*this, loc, std::move(src), addr, AccessKind::Read);
 
   // If the last component is physical, just drill down and load from it.
   if (component.isPhysical()) {
-    addr = component.asPhysical().offset(*this, loc, addr, AccessKind::Read);
+    addr = std::move(component.asPhysical())
+             .offset(*this, loc, addr, AccessKind::Read);
     return emitLoad(loc, addr.getValue(),
                     getTypeLowering(src.getTypeOfRValue()), C, IsNotTake);
   }
 
   // If the last component is logical, just emit a get.
-  return component.asLogical().get(*this, loc, addr, C);
+  return std::move(component.asLogical()).get(*this, loc, addr, C);
 }
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
                                                  LValue &&src,
                                                  AccessKind accessKind) {
   ManagedValue addr;
-  auto &component =
+  PathComponent &&component =
     drillToLastComponent(*this, loc, std::move(src), addr, accessKind);
-  addr = drillIntoComponent(*this, loc, component, addr, accessKind);
+  addr = drillIntoComponent(*this, loc, std::move(component), addr, accessKind);
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
   return addr;
@@ -1905,18 +1943,20 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
   ManagedValue destAddr;
-  auto &component = drillToLastComponent(*this, loc, std::move(dest), destAddr,
-                                         AccessKind::ReadWrite);
+  PathComponent &&component =
+    drillToLastComponent(*this, loc, std::move(dest), destAddr,
+                         AccessKind::ReadWrite);
   
   // Write to the tail component.
   if (component.isPhysical()) {
-    auto finalDestAddr = component.asPhysical().offset(*this, loc, destAddr,
-                                                       AccessKind::Write);
+    auto finalDestAddr =
+      std::move(component.asPhysical()).offset(*this, loc, destAddr,
+                                               AccessKind::Write);
     
     std::move(src).getAsSingleValue(*this, loc)
       .assignInto(*this, loc, finalDestAddr.getValue());
   } else {
-    component.asLogical().set(*this, loc, std::move(src), destAddr);
+    std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);
   }
 
   // The writeback scope closing will propagate the value back up through the

@@ -147,7 +147,7 @@ public:
   virtual ManagedValue offset(SILGenFunction &gen,
                               SILLocation loc,
                               ManagedValue base,
-                              AccessKind accessKind) const = 0;
+                              AccessKind accessKind) && = 0;
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -178,11 +178,11 @@ public:
   
   /// Set the property.
   virtual void set(SILGenFunction &gen, SILLocation loc,
-                   RValue &&value, ManagedValue base) const = 0;
+                   RValue &&value, ManagedValue base) && = 0;
 
   /// Get the property.
   virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                           ManagedValue base, SGFContext c) const = 0;
+                           ManagedValue base, SGFContext c) && = 0;
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
   /// the same dynamic PathComponent type as the receiver) to see if they are
@@ -197,12 +197,12 @@ public:
   /// we're in a writeback scope, register a writeback.  This returns the
   /// address of the buffer.
   virtual SILValue getMaterialized(SILGenFunction &gen, SILLocation loc,
-                                   ManagedValue base) const;
+                                   ManagedValue base) &&;
 
   /// Perform a writeback on the property.
   virtual void writeback(SILGenFunction &gen, SILLocation loc,
                          ManagedValue base, Materialize temporary,
-                         SILValue otherInfo) const;
+                         SILValue otherInfo) &&;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {
@@ -239,10 +239,7 @@ public:
   /// Is the lvalue's final component physical?
   bool isLastComponentPhysical() const {
     assert(isValid());
-    auto component = begin(), next = begin(), e = end();
-    ++next;
-    for (; next != e; component = next, ++next) { }
-    return (*component)->isPhysical();
+    return Path.back()->isPhysical();
   }
   
   /// Add a new component at the end of the access path of this lvalue.

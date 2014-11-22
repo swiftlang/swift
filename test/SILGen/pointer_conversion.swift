@@ -119,9 +119,9 @@ func classInoutToPointer() {
 
   takesPlusZeroPointer(&c)
   // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @_TF18pointer_conversion20takesPlusZeroPointerFGVSs33AutoreleasingUnsafeMutablePointerCS_1C_T_
+  // CHECK: [[WRITEBACK:%.*]] = alloc_stack $@sil_unmanaged C
   // CHECK: [[OWNED:%.*]] = load [[VAR]]
   // CHECK: [[UNOWNED:%.*]] = ref_to_unmanaged [[OWNED]]
-  // CHECK: [[WRITEBACK:%.*]] = alloc_stack $@sil_unmanaged C
   // CHECK: store [[UNOWNED]] to [[WRITEBACK]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs30_convertInOutToPointerArgumentUSs12_PointerType__FBpQ_
