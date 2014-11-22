@@ -148,12 +148,19 @@ static bool isStringToken(const clang::Token &tok) {
          tok.is(clang::tok::utf8_string_literal);
 }
 
+// Describes the kind of string literal we're importing.
+enum class MappedStringLiteralKind {
+  CString,  // "string"
+  NSString, // @"string"
+  CFString  // CFSTR("string")
+};
+
 static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
                                       DeclContext *DC,
                                       const clang::MacroInfo *MI,
                                       Identifier name,
                                       const clang::Token &tok,
-                                      bool isObjC,
+                                      MappedStringLiteralKind kind,
                                       const clang::MacroInfo *ClangN) {
   DeclContext *dc = Impl.getClangModuleForMacro(MI);
   if (!dc)
@@ -192,8 +199,8 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
 
   case clang::tok::string_literal:
   case clang::tok::utf8_string_literal:
-    return importStringLiteral(Impl, DC, MI, name, tok, /*isObjC*/false,
-                               ClangN);
+    return importStringLiteral(Impl, DC, MI, name, tok,
+                               MappedStringLiteralKind::CString, ClangN);
 
   // TODO: char literals.
   default:
@@ -314,8 +321,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
     // We also allow @"string".
     if (first.is(clang::tok::at) && isStringToken(second))
-      return importStringLiteral(impl, DC, macro, name, second, /*objc*/true,
-                                 ClangN);
+      return importStringLiteral(impl, DC, macro, name, second,
+                                 MappedStringLiteralKind::NSString, ClangN);
 
     break;
   }
@@ -342,6 +349,18 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       return impl.createConstant(name, DC, type, clang::APValue(value),
                                  ConstantConvertKind::Coerce, /*static=*/false,
                                  ClangN);
+    }
+    break;
+  }
+  case 4: {
+    // Check for a CFString literal of the form CFSTR("string").
+    if (tokenI[0].is(clang::tok::identifier) &&
+        tokenI[0].getIdentifierInfo()->isStr("CFSTR") &&
+        tokenI[1].is(clang::tok::l_paren) &&
+        isStringToken(tokenI[2]) &&
+        tokenI[3].is(clang::tok::r_paren)) {
+      return importStringLiteral(impl, DC, macro, name, tokenI[2],
+                                 MappedStringLiteralKind::CFString, ClangN);
     }
     break;
   }

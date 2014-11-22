@@ -26,8 +26,9 @@ func testClangModule() {
 
 func testCompleteModuleQualifiedMacros1() {
   macros.#^CLANG_QUAL_MACROS_1^#
-// CLANG_QUAL_MACROS_1: Begin completions, 15 items
+// CLANG_QUAL_MACROS_1: Begin completions, 16 items
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: A_PI[#CDouble#]{{$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: CF_STRING[#CString#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: EOF[#Int32#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_FALSE[#Int32#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_RGBA[#CInt#]{{$}}

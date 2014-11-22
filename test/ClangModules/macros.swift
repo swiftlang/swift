@@ -68,6 +68,11 @@ func testObjCString() -> Int {
   return count(str)
 }
 
+func testCFString() -> Int {
+  let str: String = CF_STRING
+  return count(str)
+}
+
 func testInvalidIntegerLiterals() {
   var l1 = INVALID_INTEGER_LITERAL_1 // expected-error {{use of unresolved identifier 'INVALID_INTEGER_LITERAL_1'}}
   // FIXME: <rdar://problem/16445608> Swift should set up a DiagnosticConsumer for Clang
