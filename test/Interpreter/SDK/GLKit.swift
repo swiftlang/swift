@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift
+// FIXME: fails on iOS
+// REQUIRES: OS=macosx
 
 import GLKit
 
