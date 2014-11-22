@@ -341,16 +341,19 @@ private:
   CanSILFunctionType getSubstFunctionType(SILGenModule &SGM,
                                           CanSILFunctionType origFnType,
                                           CanAnyFunctionType origLoweredType,
-                                          unsigned uncurryLevel) const {
+                                          unsigned uncurryLevel,
+                                          Optional<SILDeclRef> constant) const {
     if (!HasSubstitutions) return origFnType;
 
     assert(origLoweredType);
     auto substLoweredType =
       SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
-                                          origLoweredType->getExtInfo());
+                                          origLoweredType->getExtInfo(),
+                                          constant);
     auto substLoweredInterfaceType =
       SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
-                                          origLoweredType->getExtInfo());
+                                          origLoweredType->getExtInfo(),
+                                          constant);
     return SGM.Types.substFunctionType(origFnType, origLoweredType,
                                        substLoweredType,
                                        substLoweredInterfaceType);
@@ -580,6 +583,7 @@ public:
     ManagedValue mv;
     bool transparent = isTransparent;
     SILConstantInfo constantInfo;
+    Optional<SILDeclRef> constant = None;
 
     switch (kind) {
     case Kind::IndirectValue:
@@ -593,21 +597,21 @@ public:
              && "uncurrying past natural uncurry level of standalone function");
       if (level < standaloneFunction.uncurryLevel)
         transparent = false;
-      auto constant = standaloneFunction.atUncurryLevel(level);
-      constantInfo = gen.getConstantInfo(constant);
-      SILValue ref = gen.emitGlobalFunctionRef(Loc, constant, constantInfo);
+      constant = standaloneFunction.atUncurryLevel(level);
+      constantInfo = gen.getConstantInfo(*constant);
+      SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
       break;
     }
     case Kind::ClassMethod: {
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
-      auto constant = method.methodName.atUncurryLevel(level);
-      constantInfo = gen.getConstantInfo(constant);
+      constant = method.methodName.atUncurryLevel(level);
+      constantInfo = gen.getConstantInfo(*constant);
       
       // If the call is curried, emit a direct call to the curry thunk.
       if (level < method.methodName.uncurryLevel) {
-        SILValue ref = gen.emitGlobalFunctionRef(Loc, constant, constantInfo);
+        SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         transparent = false;
         break;
@@ -616,10 +620,10 @@ public:
       // Otherwise, do the dynamic dispatch inline.
       SILValue methodVal = gen.B.createClassMethod(Loc,
                                                    method.selfValue,
-                                                   constant,
+                                                   *constant,
                                                    constantInfo.getSILType(),
                                                    /*volatile*/
-                                                     constant.isForeign);
+                                                     constant->isForeign);
       
       mv = ManagedValue::forUnmanaged(methodVal);
       break;
@@ -630,14 +634,14 @@ public:
       assert(level >= 1
              && "currying 'self' of super method dispatch not yet supported");
 
-      auto constant = method.methodName.atUncurryLevel(level);
-      constantInfo = gen.getConstantInfo(constant);
+      constant = method.methodName.atUncurryLevel(level);
+      constantInfo = gen.getConstantInfo(*constant);
       SILValue methodVal = gen.B.createSuperMethod(Loc,
                                                    method.selfValue,
-                                                   constant,
+                                                   *constant,
                                                    constantInfo.getSILType(),
                                                    /*volatile*/
-                                                     constant.isForeign);
+                                                     constant->isForeign);
       
       mv = ManagedValue::forUnmanaged(methodVal);
       break;
@@ -645,12 +649,12 @@ public:
     case Kind::WitnessMethod: {
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
-      auto constant = method.methodName.atUncurryLevel(level);
-      constantInfo = gen.getConstantInfo(constant);
+      constant = method.methodName.atUncurryLevel(level);
+      constantInfo = gen.getConstantInfo(*constant);
 
       // If the call is curried, emit a direct call to the curry thunk.
       if (level < method.methodName.uncurryLevel) {
-        SILValue ref = gen.emitGlobalFunctionRef(Loc, constant, constantInfo);
+        SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         transparent = false;
         break;
@@ -668,10 +672,10 @@ public:
       SILValue fn = gen.B.createWitnessMethod(Loc,
                                   archetype,
                                   /*conformance*/ nullptr,
-                                  constant,
+                                  *constant,
                                   constantInfo.getSILType(),
                                   OpenedExistential,
-                                  constant.isForeign);
+                                  constant->isForeign);
       mv = ManagedValue::forUnmanaged(fn);
       break;
     }
@@ -702,7 +706,7 @@ public:
 
     CanSILFunctionType substFnType =
       getSubstFunctionType(gen.SGM, mv.getType().castTo<SILFunctionType>(),
-                           constantInfo.LoweredType, level);
+                           constantInfo.LoweredType, level, constant);
     
     return std::make_tuple(mv, substFnType, transparent);
   }

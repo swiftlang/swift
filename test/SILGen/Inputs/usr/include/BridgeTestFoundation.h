@@ -27,6 +27,9 @@
 - (BOOL) zim;
 - (void) setZim: (BOOL)b;
 
+- (_Bool) zang;
+- (void) setZang: (_Bool)b;
+
 @end
 
 NSString *bar(void);
@@ -38,4 +41,9 @@ NSString *NSStringFromClass(Class c);
 #define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
 #define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
 
+BOOL getBOOL(void);
+_Bool getBool(void);
 
+
+void useBOOL(BOOL x);
+void useBool(_Bool x);

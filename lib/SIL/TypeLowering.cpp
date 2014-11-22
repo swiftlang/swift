@@ -27,6 +27,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/AST/Type.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -1335,7 +1336,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     // First, lower at the AST level by uncurrying and substituting
     // bridged types.
     auto substLoweredType =
-      getLoweredASTFunctionType(substFnType, uncurryLevel);
+      getLoweredASTFunctionType(substFnType, uncurryLevel, None);
 
     bool canReabstract;
     switch (substLoweredType->getAbstractCC()) {
@@ -1363,7 +1364,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       } else {
         auto origFnType = cast<AnyFunctionType>(origType.getAsType());
         return AbstractionPattern(getLoweredASTFunctionType(origFnType,
-                                                            uncurryLevel));
+                                                            uncurryLevel,
+                                                            None));
       }
     }();
     TypeKey loweredKey = getTypeKey(origLoweredType, substLoweredType, 0);
@@ -2156,7 +2158,8 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
   }
 }
 
-Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {  
+Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc,
+                                          const clang::Type *clangTy) {
   switch (cc) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -2169,24 +2172,31 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
 
     // Look through optional types.
     if (auto valueTy = t->getOptionalObjectType()) {
-      auto Ty = getLoweredCBridgedType(valueTy);
+      auto Ty = getLoweredCBridgedType(valueTy, clangTy);
       return Ty ? OptionalType::get(Ty) : Ty;
     }
     if (auto valueTy = t->getImplicitlyUnwrappedOptionalObjectType()) {
-      auto Ty = getLoweredCBridgedType(valueTy);
+      auto Ty = getLoweredCBridgedType(valueTy, clangTy);
       return Ty ? ImplicitlyUnwrappedOptionalType::get(Ty) : Ty;
     }
-    return getLoweredCBridgedType(t);
+    return getLoweredCBridgedType(t, clangTy);
   }
 };
 
-Type TypeConverter::getLoweredCBridgedType(Type t) {
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType, Opt) \
-  { auto nativeType = get##NativeType##Type();                               \
-    if (nativeType && t->isEqual(nativeType))                                \
-      return get##BridgedType##Type();                                       \
+Type TypeConverter::getLoweredCBridgedType(Type t,
+                                           const clang::Type *clangTy) {
+  // Bridge String back to NSString.
+  auto nativeStringTy = getStringType();
+  if (nativeStringTy && t->isEqual(nativeStringTy))
+    return getNSStringType();
+
+  // Bridge Bool back to ObjC bool, unless the original Clang type was _Bool.
+  auto nativeBoolTy = getBoolType();
+  if (nativeBoolTy && t->isEqual(nativeBoolTy)) {
+    if (clangTy && clangTy->isBooleanType())
+      return t;
+    return getObjCBoolType();
   }
-#include "swift/SIL/BridgedTypes.def"
 
   // Class metatypes bridge to ObjC metatypes.
   if (auto metaTy = t->getAs<MetatypeType>()) {

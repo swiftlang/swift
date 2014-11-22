@@ -631,13 +631,14 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       cast<AnyFunctionType>(constantInfo.FormalType.getResult());
     origLoweredFormalType =
       AbstractionPattern(
-              SGM.Types.getLoweredASTFunctionType(formalTypeWithoutCaptures,0));
+              SGM.Types.getLoweredASTFunctionType(formalTypeWithoutCaptures,0,
+                                                  silDeclRef));
   }
 
   // - the substituted type
   auto substFormalType = cast<AnyFunctionType>(refType);
   auto substLoweredFormalType =
-    SGM.Types.getLoweredASTFunctionType(substFormalType, 0);
+    SGM.Types.getLoweredASTFunctionType(substFormalType, 0, silDeclRef);
 
   // If the declaration reference is specialized, create the partial
   // application.

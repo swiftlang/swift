@@ -907,11 +907,13 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
     assert(substInterfaceType);
     substLoweredType = M.Types.getLoweredASTFunctionType(substFormalType,
                                                          constant.uncurryLevel,
-                                                         extInfo);
+                                                         extInfo,
+                                                         constant);
     substLoweredInterfaceType
                     = M.Types.getLoweredASTFunctionType(substInterfaceType,
                                                         constant.uncurryLevel,
-                                                        extInfo);
+                                                        extInfo,
+                                                        constant);
   } else {
     assert(!substInterfaceType);
     substLoweredType = origLoweredType;
@@ -1033,9 +1035,10 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   // The lowered type is the formal type, but uncurried and with
   // parameters automatically turned into their bridged equivalents.
   auto loweredType =
-    getLoweredASTFunctionType(formalType, constant.uncurryLevel);
+    getLoweredASTFunctionType(formalType, constant.uncurryLevel, constant);
   auto loweredInterfaceType =
-    getLoweredASTFunctionType(formalInterfaceType, constant.uncurryLevel);
+    getLoweredASTFunctionType(formalInterfaceType, constant.uncurryLevel,
+                              constant);
 
   // The SIL type encodes conventions according to the original type.
   CanSILFunctionType silFnType =
@@ -1066,16 +1069,39 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   return result;
 }
 
-/// Bridge the elements of an input tuple type.
 static CanType getBridgedInputType(TypeConverter &tc,
                                    AbstractCC cc,
-                                   CanType input) {
+                                   CanType input,
+                                   const clang::Decl *clangDecl) {
+  
+  auto getClangParamType = [&](unsigned i) -> const clang::Type * {
+    if (!clangDecl)
+      return nullptr;
+    if (auto methodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      if (i < methodDecl->param_size())
+        return methodDecl->param_begin()[i]->getType()
+          ->getUnqualifiedDesugaredType();
+      return nullptr;
+    } else if (auto fnTy = dyn_cast_or_null<clang::FunctionProtoType>
+                 (clangDecl->getFunctionType())) {
+      return fnTy->getParamType(i)->getUnqualifiedDesugaredType();
+    } else {
+      return nullptr;
+    }
+  };
+  
   if (auto tuple = dyn_cast<TupleType>(input)) {
     SmallVector<TupleTypeElt, 4> bridgedFields;
     bool changed = false;
-    for (auto &elt : tuple->getFields()) {
+    
+    for (unsigned i : indices(tuple->getFields())) {
+      auto &elt = tuple->getFields()[i];
+      
+      auto clangInputTy = getClangParamType(i);
+      
       CanType bridged =
-        tc.getLoweredBridgedType(elt.getType(), cc)->getCanonicalType();
+        tc.getLoweredBridgedType(elt.getType(), cc, clangInputTy)
+          ->getCanonicalType();
       if (bridged != CanType(elt.getType())) {
         changed = true;
         bridgedFields.push_back(elt.getWithType(bridged));
@@ -1089,7 +1115,8 @@ static CanType getBridgedInputType(TypeConverter &tc,
     return CanType(TupleType::get(bridgedFields, input->getASTContext()));
   }
   
-  auto loweredBridgedType = tc.getLoweredBridgedType(input, cc);
+  auto clangInputTy = getClangParamType(0);
+  auto loweredBridgedType = tc.getLoweredBridgedType(input, cc, clangInputTy);
   
   if (!loweredBridgedType) {
     tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
@@ -1104,8 +1131,18 @@ static CanType getBridgedInputType(TypeConverter &tc,
 /// Bridge a result type.
 static CanType getBridgedResultType(TypeConverter &tc,
                                     AbstractCC cc,
-                                    CanType result) {
-  auto loweredType = tc.getLoweredBridgedType(result, cc);
+                                    CanType result,
+                                    const clang::Decl *clangDecl) {
+  const clang::Type *clangResultTy = nullptr;
+  if (clangDecl) {
+    if (auto methodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      clangResultTy = methodDecl->getReturnType()->getUnqualifiedDesugaredType();
+    } else if (auto fnTy = clangDecl->getFunctionType()) {
+      clangResultTy = fnTy->getReturnType()->getUnqualifiedDesugaredType();
+    }
+  }
+
+  auto loweredType = tc.getLoweredBridgedType(result, cc, clangResultTy);
   
   if (!loweredType) {
     tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
@@ -1120,7 +1157,8 @@ static CanType getBridgedResultType(TypeConverter &tc,
 /// Fast path for bridging types in a function type without uncurrying.
 static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
                                             CanAnyFunctionType t,
-                                            AnyFunctionType::ExtInfo extInfo) {
+                                            AnyFunctionType::ExtInfo extInfo,
+                                            const clang::Decl *decl) {
   // Blocks are always cdecl.
   AbstractCC effectiveCC = t->getAbstractCC();
   if (t->getRepresentation() == FunctionType::Representation::Block) {
@@ -1174,8 +1212,9 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
 
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    return rebuild(getBridgedInputType(tc, effectiveCC, t.getInput()),
-                   getBridgedResultType(tc, effectiveCC, t.getResult()));
+    // FIXME: Should consider the originating Clang types of e.g. blocks.
+    return rebuild(getBridgedInputType(tc, effectiveCC, t.getInput(), decl),
+                   getBridgedResultType(tc, effectiveCC, t.getResult(), decl));
   }
   llvm_unreachable("bad calling convention");
 }
@@ -1183,10 +1222,16 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
 CanAnyFunctionType
 TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
                                          unsigned uncurryLevel,
-                                         AnyFunctionType::ExtInfo extInfo) {
+                                         AnyFunctionType::ExtInfo extInfo,
+                                         Optional<SILDeclRef> constant) {
+  // Get the original Clang type of a node, if we have one.
+  const clang::Decl *clangDecl = nullptr;
+  if (constant && constant->hasDecl())
+    clangDecl = constant->getDecl()->getClangDecl();
+  
   // Fast path: no uncurrying required.
   if (uncurryLevel == 0)
-    return getBridgedFunctionType(*this, t, extInfo);
+    return getBridgedFunctionType(*this, t, extInfo, clangDecl);
 
   AbstractCC cc = extInfo.getCC();
   assert(!extInfo.isAutoClosure() && "autoclosures cannot be curried");
@@ -1234,8 +1279,10 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   case AbstractCC::C:
     for (auto &input : inputs)
       input = input.getWithType(
-               getBridgedInputType(*this, cc, CanType(input.getType())));
-    resultType = getBridgedResultType(*this, cc, resultType);
+               getBridgedInputType(*this, cc, CanType(input.getType()),
+                                   clangDecl));
+    resultType = getBridgedResultType(*this, cc, resultType,
+                                      clangDecl);
     break;
   case AbstractCC::ObjCMethod: {
     // The "self" parameter should not get bridged unless it's a metatype.
@@ -1245,8 +1292,9 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
 
     for (auto &input : make_range(inputs.begin() + skip, inputs.end()))
       input = input.getWithType(
-                getBridgedInputType(*this, cc, CanType(input.getType())));
-    resultType = getBridgedResultType(*this, cc, resultType);
+                getBridgedInputType(*this, cc, CanType(input.getType()),
+                                    clangDecl));
+    resultType = getBridgedResultType(*this, cc, resultType, clangDecl);
     break;
   }
   }

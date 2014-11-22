@@ -22,6 +22,10 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 
+namespace clang {
+  class Type;
+}
+
 namespace swift {
   class ValueDecl;
   class SILBuilder;
@@ -652,18 +656,22 @@ public:
   
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
-  Type getLoweredBridgedType(Type t, AbstractCC cc);
+  Type getLoweredBridgedType(Type t, AbstractCC cc,
+                             const clang::Type *clangTy);
 
   /// Convert a nested function type into an uncurried AST representation.
   CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
-                                               unsigned uncurryLevel) {
-    return getLoweredASTFunctionType(t, uncurryLevel, t->getExtInfo());
+                                               unsigned uncurryLevel,
+                                               Optional<SILDeclRef> constant) {
+    return getLoweredASTFunctionType(t, uncurryLevel, t->getExtInfo(),
+                                     constant);
   }
 
   /// Convert a nested function type into an uncurried AST representation.
   CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
                                                unsigned uncurryLevel,
-                                               AnyFunctionType::ExtInfo info);
+                                               AnyFunctionType::ExtInfo info,
+                                               Optional<SILDeclRef> constant);
 
   /// Given a referenced value and the substituted formal type of a
   /// resulting l-value expression, produce the substituted formal
@@ -717,7 +725,7 @@ public:
                                              ForDefinition_t definition);
   
 private:
-  Type getLoweredCBridgedType(Type t);
+  Type getLoweredCBridgedType(Type t, const clang::Type *clangTy);
 };
 
 inline const TypeLowering &

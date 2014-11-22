@@ -2325,13 +2325,14 @@ getWitnessFunctionType(SILModule &M,
   CanType origLoweredTy;
   if (auto origFTy = dyn_cast<AnyFunctionType>(origRequirementTy.getAsType()))
     origLoweredTy = M.Types.getLoweredASTFunctionType(origFTy,
-                                                      uncurryLevel);
+                                                      uncurryLevel,
+                                                      None);
   else
     origLoweredTy = origRequirementTy.getAsType();
   auto witnessLoweredTy
-    = M.Types.getLoweredASTFunctionType(witnessSubstTy, uncurryLevel);
+    = M.Types.getLoweredASTFunctionType(witnessSubstTy, uncurryLevel, None);
   auto witnessLoweredIfaceTy
-    = M.Types.getLoweredASTFunctionType(witnessSubstIfaceTy, uncurryLevel);
+    = M.Types.getLoweredASTFunctionType(witnessSubstIfaceTy, uncurryLevel, None);
   
   // Convert to SILFunctionType.
   auto fnTy = getNativeSILFunctionType(M, origLoweredTy,

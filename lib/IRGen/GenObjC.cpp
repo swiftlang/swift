@@ -1013,7 +1013,8 @@ void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
 /// True if the value is of class type, or of a type that is bridged to class
 /// type.
 bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {
-  return IGM.SILMod->Types.getLoweredBridgedType(t, AbstractCC::ObjCMethod)
+  return IGM.SILMod->Types.getLoweredBridgedType(t, AbstractCC::ObjCMethod,
+                                                 nullptr)
     ->getClassOrBoundGenericClass();
 }
 

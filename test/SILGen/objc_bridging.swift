@@ -99,6 +99,20 @@ func setZim(f: Foo, b: Bool) {
 // CHECK:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@thin (Bool) -> ObjCBool
 // CHECK:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
 // CHECK: }
+// @interface Foo -(_Bool) zang; @end
+func getZang(f: Foo) -> Bool {
+  return f.zang()
+}
+// CHECK-LABEL: sil hidden @_TF13objc_bridging7getZangFCSo3FooSb
+// CHECK:   [[BOOL:%.*]] = apply {{%.*}}(%0) : $@cc(objc_method) @thin (Foo) -> Bool
+// CHECK:   return [[BOOL]]
+
+// @interface Foo -(void) setZang: (_Bool)b; @end
+func setZang(f: Foo, b: Bool) {
+  f.setZang(b)
+}
+// CHECK-LABEL: sil hidden @_TF13objc_bridging7setZangFTCSo3FooSb_T_
+// CHECK:   apply {{%.*}}(%1, %0) : $@cc(objc_method) @thin (Bool, Foo) -> ()
 
 // NSString *bar(void);
 func callBar() -> String {
@@ -348,3 +362,18 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // CHECK:         [[METHOD:%.*]] = function_ref @_TTOFCSo7NSArraycfMS_FT7objectsGVSs13UnsafePointerGSqPSs9AnyObject___5countVSs5Int32_S_
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]
 // CHECK:         return [[RESULT]]
+
+// Check that type lowering preserves the bool/BOOL distinction when bridging imported C functions.
+// CHECK-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
+// CHECK:         function_ref @useBOOL : $@cc(cdecl) @thin (ObjCBool) -> ()
+// CHECK:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
+// CHECK:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
+// CHECK:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+func bools(x: Bool) -> (Bool, Bool) {
+  useBOOL(x)
+  useBool(x)
+
+  return (getBOOL(), getBool())
+}
+
+
