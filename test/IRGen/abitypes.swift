@@ -196,10 +196,8 @@ class Foo {
   //
   // arm64-ios-fixme:     define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {
   // arm64-ios-fixme:     define internal zeroext i1 @_TToFC8abitypes3Foo6negate
-  // arm64-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool
   // arm64-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate
-  // arm64-ios-fixme:     [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[R2]])
-  // arm64-ios-fixme:     ret i1 [[R3]]
+  // arm64-ios-fixme:     ret i1 [[R2]]
   //
   // i386-ios-fixme:      define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {
   // i386-ios-fixme:      define internal signext i8 @_TToFC8abitypes3Foo6negate{{.*}}(i8*, i8*, i8 signext) unnamed_addr {
@@ -251,17 +249,13 @@ class Foo {
   // armv7-ios: ret i8 [[TOOBJCBOOL]]
   //
   // arm64-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
-  // arm64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
   // arm64-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 8
-  // arm64-ios: [[NEG:%[0-9]+]] = call i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 [[TOOBJCBOOL]])
-  // arm64-ios: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool{{.*}}(i1 [[NEG]])
-  // arm64-ios: ret i1 [[TOBOOL]]
+  // arm64-ios: [[NEG:%[0-9]+]] = call i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 %0)
+  // arm64-ios: ret i1 [[NEG]]
   //
   // arm64-ios: define internal zeroext i1 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i1 zeroext)
-  // arm64-ios: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool
-  // arm64-ios: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1 [[TOBOOL]]
-  // arm64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
-  // arm64-ios: ret i1 [[TOOBJCBOOL]]
+  // arm64-ios: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1
+  // arm64-ios: ret i1 [[NEG]]
   //
   // i386-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // i386-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
