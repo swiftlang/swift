@@ -132,8 +132,40 @@ static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
 
 static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
                                    std::string &result) {
-  _buildNameForMetadata(func->ArgumentType, TypeSyntaxLevel::TypeSimple,
-                        result);
+
+  if (func->NumArguments == 1) {
+    auto firstArgument = func->getArguments()[0].getPointer();
+    bool isInout = func->getArguments()[0].getFlag();
+
+    // This could be a single input tuple, with one or more arguments inside,
+    // but guaranteed to not have inout types.
+    if (auto tupleMetadata = dyn_cast<TupleTypeMetadata>(firstArgument)) {
+          _buildNameForMetadata(tupleMetadata,
+                                TypeSyntaxLevel::TypeSimple,
+                                result);
+    } else {
+      if (isInout)
+        result += "inout ";
+
+      _buildNameForMetadata(firstArgument,
+                            TypeSyntaxLevel::TypeSimple,
+                            result);
+    }
+  } else {
+      result += "(";
+      for (size_t i = 0; i < func->NumArguments; ++i) {
+        auto arg = func->getArguments()[i].getPointer();
+        bool isInout = func->getArguments()[i].getFlag();
+        if (isInout)
+          result += "inout ";
+        _buildNameForMetadata(arg, TypeSyntaxLevel::TypeSimple, result);
+        if (i < func->NumArguments - 1) {
+          result += ", ";
+        }
+      }
+      result += ")";
+  }
+
   result += " -> ";
   _buildNameForMetadata(func->ResultType, TypeSyntaxLevel::Type, result);
 }
@@ -195,10 +227,10 @@ static void _buildNameForMetadata(const Metadata *type,
       result += "(";
 
     result += "@objc_block ";
-    
+
     auto func = static_cast<const FunctionTypeMetadata *>(type);
     _buildFunctionTypeName(func, result);
-    
+
     if (level >= TypeSyntaxLevel::TypeSimple)
       result += ")";
     return;
@@ -206,7 +238,7 @@ static void _buildNameForMetadata(const Metadata *type,
   case MetadataKind::Function: {
     if (level >= TypeSyntaxLevel::TypeSimple)
       result += "(";
-    
+
     auto func = static_cast<const FunctionTypeMetadata *>(type);
     _buildFunctionTypeName(func, result);
 

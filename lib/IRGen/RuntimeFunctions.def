@@ -272,16 +272,52 @@ FUNCTION(UnknownWeakTakeAssign, swift_unknownWeakTakeAssign,RuntimeCC,
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
-// Metadata *swift_getBlockTypeMetadata(Metadata *arg, Metadata *result);
-FUNCTION(GetBlockMetadata, swift_getBlockTypeMetadata, RuntimeCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_getFunctionTypeMetadata(Metadata *arg, Metadata *result);
+// Metadata *swift_getFunctionTypeMetadata(size_t numArguments, const void **args, const Metadata *resultMetadata);
 FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
+         ARGS(SizeTy, Int8PtrTy->getPointerTo(0), TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getFunctionTypeMetadata1(const void *arg0, const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata1, swift_getFunctionTypeMetadata1, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getFunctionTypeMetadata2(const void *arg0, const void *arg1, const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata2, swift_getFunctionTypeMetadata2, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getFunctionTypeMetadata3(const void *arg0, const void *arg1, const void *arg2, const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata3, swift_getFunctionTypeMetadata3, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getBlockTypeMetadata(size_t numArguments, const void **args, const Metadata *resultMetadata);
+FUNCTION(GetBlockMetadata, swift_getBlockTypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, Int8PtrTy->getPointerTo(0), TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getBlockTypeMetadata1(const void *arg0, const Metadata *resultMetadata);
+FUNCTION(GetBlockMetadata1, swift_getBlockTypeMetadata1, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getBlockTypeMetadata2(const void *arg0, const void *arg1, const void *resultMetadata);
+FUNCTION(GetBlockMetadata2, swift_getBlockTypeMetadata2, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getBlockTypeMetadata3(const void *arg0, const void *arg1, const void *arg2, const Metadata *resultMetadata);
+FUNCTION(GetBlockMetadata3, swift_getBlockTypeMetadata3, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);

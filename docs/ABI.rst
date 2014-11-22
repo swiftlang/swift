@@ -420,12 +420,24 @@ Function Metadata
 In addition to the `common metadata layout`_ fields, function metadata records
 contain the following fields:
 
-- A reference to the **argument type** metadata record is stored at
-  **offset 1**. If the function takes multiple arguments, this references a
-  `tuple metadata`_ record.
+- The number of arguments to the function is stored at **offset 1**.
 - A reference to the **result type** metadata record is stored at
   **offset 2**. If the function has multiple returns, this references a
   `tuple metadata`_ record.
+- The **argument vector** begins at **offset 3** and consists of pointers to
+  metadata records of the function's arguments.
+
+  If the function takes any **inout** arguments, a pointer to each argument's
+  metadata record will be appended separately, the lowest bit being set if it is
+  **inout**. Because of pointer alignment, the lowest bit will always be free to
+  hold this tag.
+
+  If the function takes no **inout** arguments, there will be only one pointer in
+  the vector for the following cases:
+
+  * 0 arguments: a `tuple metadata`_ record for the empty tuple
+  * 1 argument: the first and only argument's metadata record
+  * >1 argument: a `tuple metadata`_ record containing the arguments
 
 Protocol Metadata
 ~~~~~~~~~~~~~~~~~

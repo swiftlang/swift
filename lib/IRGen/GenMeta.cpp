@@ -661,33 +661,132 @@ namespace {
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
+    llvm::Value *extractAndMarkInOut(CanType type) {
+      // If the type is inout, get the metadata for its inner object type
+      // instead, and then set the lowest bit to help the runtime unique
+      // the metadata type for this function.
+      if (auto inoutType = dyn_cast<InOutType>(type)) {
+        auto metadata = IGF.emitTypeMetadataRef(inoutType.getObjectType());
+        auto metadataInt = IGF.Builder.CreatePtrToInt(metadata, IGF.IGM.SizeTy);
+        auto inoutFlag = llvm::ConstantInt::get(IGF.IGM.SizeTy, 1);
+        auto marked = IGF.Builder.CreateOr(metadataInt, inoutFlag);
+        return IGF.Builder.CreateIntToPtr(marked, IGF.IGM.Int8PtrTy);
+      } else {
+        auto metadata = IGF.emitTypeMetadataRef(type);
+        return IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
+      }
+    }
+
     llvm::Value *visitFunctionType(CanFunctionType type) {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
-      auto argMetadata = IGF.emitTypeMetadataRef(type.getInput());
       auto resultMetadata = IGF.emitTypeMetadataRef(type.getResult());
+      CanTupleType inputTuple = dyn_cast<TupleType>(type.getInput());
 
-      llvm::Constant *getMetadataFn;
+      size_t numArguments = 1;
+
+      if (inputTuple && !inputTuple->isMaterializable())
+        numArguments = inputTuple->getNumElements();
+
+      llvm::Constant *getMetadataFn = nullptr;
+
       switch (type->getRepresentation()) {
-      case AnyFunctionType::Representation::Thin:
-        // TODO: Provide metadata for thin function types. This should not come
-        // up yet because thin types aren't allowed in the AST.
-        llvm_unreachable("thin function types aren't allowed in the AST");
-      case AnyFunctionType::Representation::Thick:
-        getMetadataFn = IGF.IGM.getGetFunctionMetadataFn();
-        break;
-      case AnyFunctionType::Representation::Block:
-        getMetadataFn = IGF.IGM.getGetBlockMetadataFn();
-        break;
+        case AnyFunctionType::Representation::Thin:
+          // TODO: Provide metadata for thin function types. This should not come
+          // up yet because thin types aren't allowed in the AST.
+          llvm_unreachable("thin function types aren't allowed in the AST");
+        case AnyFunctionType::Representation::Thick:
+          switch (numArguments) {
+            case 1:
+              getMetadataFn = IGF.IGM.getGetFunctionMetadata1Fn(); break;
+            case 2:
+              getMetadataFn = IGF.IGM.getGetFunctionMetadata2Fn(); break;
+            case 3:
+              getMetadataFn = IGF.IGM.getGetFunctionMetadata3Fn(); break;
+            default:
+              getMetadataFn = IGF.IGM.getGetFunctionMetadataFn();
+          }
+          break;
+        case AnyFunctionType::Representation::Block:
+          switch (numArguments) {
+            case 1:
+              getMetadataFn = IGF.IGM.getGetBlockMetadata1Fn(); break;
+            case 2:
+              getMetadataFn = IGF.IGM.getGetBlockMetadata2Fn(); break;
+            case 3:
+              getMetadataFn = IGF.IGM.getGetBlockMetadata3Fn(); break;
+            default:
+              getMetadataFn = IGF.IGM.getGetBlockMetadataFn();
+          }
+          break;
       }
-      
-      auto call = IGF.Builder.CreateCall2(getMetadataFn,
-                                          argMetadata, resultMetadata);
-      call->setDoesNotThrow();
-      call->setCallingConv(IGF.IGM.RuntimeCC);
 
-      return setLocal(CanType(type), call);
+      switch (numArguments) {
+        case 1: {
+          auto arg0 = (inputTuple && !inputTuple->isMaterializable()) ?
+            extractAndMarkInOut(inputTuple.getElementType(0))
+          : extractAndMarkInOut(type.getInput());
+
+          auto call = IGF.Builder.CreateCall2(getMetadataFn,
+                                              arg0,
+                                              resultMetadata);
+          call->setDoesNotThrow();
+          call->setCallingConv(IGF.IGM.RuntimeCC);
+          return setLocal(CanType(type), call);
+        }
+
+        case 2: {
+          auto arg0 = extractAndMarkInOut(inputTuple.getElementType(0));
+          auto arg1 = extractAndMarkInOut(inputTuple.getElementType(1));
+          auto call = IGF.Builder.CreateCall3(getMetadataFn,
+                                              arg0, arg1,
+                                              resultMetadata);
+          call->setDoesNotThrow();
+          call->setCallingConv(IGF.IGM.RuntimeCC);
+          return setLocal(CanType(type), call);
+        }
+
+        case 3: {
+          auto arg0 = extractAndMarkInOut(inputTuple.getElementType(0));
+          auto arg1 = extractAndMarkInOut(inputTuple.getElementType(1));
+          auto arg2 = extractAndMarkInOut(inputTuple.getElementType(2));
+          auto call = IGF.Builder.CreateCall4(getMetadataFn,
+                                              arg0, arg1, arg2,
+                                              resultMetadata);
+          call->setDoesNotThrow();
+          call->setCallingConv(IGF.IGM.RuntimeCC);
+          return setLocal(CanType(type), call);
+        }
+
+        default:
+          llvm::Value *pointerToFirstArg = nullptr;
+          auto arguments = inputTuple.getElementTypes();
+          auto arrayTy = llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
+                                              arguments.size());
+          Address buffer = IGF.createAlloca(arrayTy,
+                                            IGF.IGM.getPointerAlignment(),
+                                            "function-arguments");
+          for (size_t i = 0; i < arguments.size(); ++i) {
+            auto argMetadata = extractAndMarkInOut(inputTuple.getElementType(i));
+            Address argPtr = IGF.Builder.CreateStructGEP(buffer,
+                                                         i,
+                                                         IGF.IGM.getPointerSize());
+            IGF.Builder.CreateStore(argMetadata, argPtr);
+
+            if (i == 0) pointerToFirstArg = argPtr.getAddress();
+          }
+
+          llvm::Value *args[] = {
+            llvm::ConstantInt::get(IGF.IGM.SizeTy, numArguments),
+            pointerToFirstArg,
+            resultMetadata
+          };
+          auto call = IGF.Builder.CreateCall(getMetadataFn, args);
+          call->setDoesNotThrow();
+          call->setCallingConv(IGF.IGM.RuntimeCC);
+          return setLocal(type, call);
+      }
     }
 
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {

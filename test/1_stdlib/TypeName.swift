@@ -70,3 +70,15 @@ printTypeName(Any.Protocol.self) // CHECK-NEXT: protocol<>.Protocol
 printTypeName(Void.self) // CHECK-NEXT: ()
 typealias Tup = (Any, F, C)
 printTypeName(Tup.self) // CHECK-NEXT: (protocol<>, () -> (), [[THIS]].C)
+
+typealias IF = inout Int -> ()
+typealias IF2 = inout Int -> inout Int -> ()
+typealias IF3 = (inout Int -> ()) -> ()
+typealias IF4 = inout (() -> ()) -> ()
+typealias IF5 = (inout Int, Any) -> ()
+
+printTypeName(IF.self) // CHECK-NEXT: inout Int -> ()
+printTypeName(IF2.self) // CHECK-NEXT: inout Int -> inout Int -> ()
+printTypeName(IF3.self) // CHECK-NEXT: (inout Int -> ()) -> ()
+printTypeName(IF4.self) // CHECK-NEXT: inout (() -> ()) -> ()
+printTypeName(IF5.self) // CHECK-NEXT: (inout Int, Any) -> ()

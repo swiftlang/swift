@@ -265,16 +265,23 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 }
 
 namespace {
-  class FunctionCacheEntry : public CacheEntry<FunctionCacheEntry> {
+  class FunctionCacheEntry;
+  struct FunctionCacheEntryHeader : CacheEntryHeader<FunctionCacheEntry> {
+    size_t NumArguments;
+  };
+  class FunctionCacheEntry
+    : public CacheEntry<FunctionCacheEntry, FunctionCacheEntryHeader> {
+  public:
     FullMetadata<FunctionTypeMetadata> Metadata;
 
-  public:
     static const char *getName() { return "FunctionCache"; }
 
-    FunctionCacheEntry(size_t numArguments) {}
+    FunctionCacheEntry(size_t numArguments) {
+      NumArguments = numArguments;
+    }
 
-    static constexpr size_t getNumArguments() {
-      return 2;
+    size_t getNumArguments() const {
+      return NumArguments;
     }
 
     FullMetadata<FunctionTypeMetadata> *getData() {
@@ -294,25 +301,35 @@ namespace {
 #endif
 
   const FunctionTypeMetadata *
-  _getFunctionTypeMetadata(const Metadata *argMetadata,
-                           const Metadata *resultMetadata,
+  _getFunctionTypeMetadata(size_t numArguments,
+                           const void * argsAndResult [],
                            MetadataKind Kind,
                            MetadataCache<FunctionCacheEntry> &Cache,
                            const ValueWitnessTable &ValueWitnesses) {
     // Search the cache.
 
-    const size_t numGenericArgs = 2;
-    const void *args[] = { argMetadata, resultMetadata };
-    auto entry = Cache.findOrAdd(args, numGenericArgs,
+    // N argument types (with inout bit set)
+    // and 1 result type (a tuple with M elements)
+    auto entry = Cache.findOrAdd(argsAndResult, numArguments + 1,
       [&]() -> FunctionCacheEntry* {
         // Create a new entry for the cache.
-        auto entry = FunctionCacheEntry::allocate(args, numGenericArgs, 0);
+        auto entry = FunctionCacheEntry::allocate(
+          argsAndResult,
+          numArguments + 1,
+          numArguments * sizeof(FunctionTypeMetadata::Argument));
 
         auto metadata = entry->getData();
         metadata->setKind(Kind);
         metadata->ValueWitnesses = &ValueWitnesses;
-        metadata->ArgumentType = argMetadata;
-        metadata->ResultType = resultMetadata;
+        metadata->NumArguments = numArguments;
+        metadata->ResultType = reinterpret_cast<const Metadata *>(
+          argsAndResult[numArguments]);
+
+        for (size_t i = 0; i < numArguments; ++i) {
+          auto arg = FunctionTypeMetadata::Argument::getFromOpaqueValue(
+            argsAndResult[i]);
+          metadata->getArguments()[i] = arg;
+        }
 
         return entry;
       });
@@ -322,9 +339,52 @@ namespace {
 }
 
 const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
-                                     const Metadata *resultMetadata) {
-  return _getFunctionTypeMetadata(argMetadata, resultMetadata,
+swift::swift_getFunctionTypeMetadata(size_t numArguments,
+                                     const void *argsAndResult[]) {
+
+  return _getFunctionTypeMetadata(numArguments,
+                                  argsAndResult,
+                                  MetadataKind::Function,
+                                  FunctionTypes,
+                                  _TWVFT_T_);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata1(const void *arg0,
+                                      const Metadata *resultMetadata) {
+  const void * argsAndResult[] = {
+    arg0,
+    static_cast<const void *>(resultMetadata)
+  };
+  return swift_getFunctionTypeMetadata(1, argsAndResult);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata2(const void *arg0,
+                                      const void *arg1,
+                                      const Metadata *resultMetadata) {
+  const void * argsAndResult[] = {
+    arg0, arg1,
+    static_cast<const void *>(resultMetadata)
+  };
+  return _getFunctionTypeMetadata(2,
+                                  argsAndResult,
+                                  MetadataKind::Function,
+                                  FunctionTypes,
+                                  _TWVFT_T_);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata3(const void *arg0,
+                                      const void *arg1,
+                                      const void *arg2,
+                                      const Metadata *resultMetadata) {
+  const void * argsAndResult[] = {
+    arg0, arg1, arg2,
+    static_cast<const void *>(resultMetadata)
+  };
+  return _getFunctionTypeMetadata(3,
+                                  argsAndResult,
                                   MetadataKind::Function,
                                   FunctionTypes,
                                   _TWVFT_T_);
@@ -332,9 +392,55 @@ swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
 
 #if SWIFT_OBJC_INTEROP
 const FunctionTypeMetadata *
-swift::swift_getBlockTypeMetadata(const Metadata *argMetadata,
-                                  const Metadata *resultMetadata) {
-  return _getFunctionTypeMetadata(argMetadata, resultMetadata,
+swift::swift_getBlockTypeMetadata(size_t numArguments,
+                                  const void *argsAndResult[]) {
+  return _getFunctionTypeMetadata(numArguments,
+                                  argsAndResult,
+                                  MetadataKind::Block,
+                                  BlockTypes,
+                                  _TWVBO);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getBlockTypeMetadata1(const void *arg0,
+                                   const Metadata *resultMetadata) {
+  const void * argsAndResult[] = {
+    arg0,
+    static_cast<const void *>(resultMetadata)
+  };
+  return _getFunctionTypeMetadata(1,
+                                  argsAndResult,
+                                  MetadataKind::Block,
+                                  BlockTypes,
+                                  _TWVBO);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getBlockTypeMetadata2(const void *arg0,
+                                   const void *arg1,
+                                   const Metadata *resultMetadata) {
+  const void * argsAndResult[] = {
+    arg0, arg1,
+    static_cast<const void *>(resultMetadata)
+  };
+  return _getFunctionTypeMetadata(2,
+                                  argsAndResult,
+                                  MetadataKind::Block,
+                                  BlockTypes,
+                                  _TWVBO);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getBlockTypeMetadata3(const void *arg0,
+                                   const void *arg1,
+                                   const void *arg2,
+                                   const Metadata *resultMetadata) {
+  const void * argsAndResult[] = {
+    arg0, arg1, arg2,
+    static_cast<const void *>(resultMetadata)
+};
+  return _getFunctionTypeMetadata(3,
+                                  argsAndResult,
                                   MetadataKind::Block,
                                   BlockTypes,
                                   _TWVBO);

@@ -28,6 +28,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
+#include "swift/Basic/FlaggedPointer.h"
 
 namespace swift {
 
@@ -1486,11 +1487,26 @@ struct StructMetadata : public Metadata {
 
 /// The structure of function type metadata.
 struct FunctionTypeMetadata : public Metadata {
-  /// The type metadata for the argument type.
-  const Metadata *ArgumentType;
+  using Argument = FlaggedPointer<const Metadata *, 0>;
+
+  /// The number of arguments to the function.
+  size_t NumArguments;
 
   /// The type metadata for the result type.
   const Metadata *ResultType;
+
+  Argument *getArguments() {
+    return reinterpret_cast<Argument *>(this + 1);
+  }
+
+  const Argument *getArguments() const {
+    return reinterpret_cast<const Argument *>(this + 1);
+  }
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::Function ||
+           metadata->getKind() == MetadataKind::Block;
+  }
 };
 
 /// The structure of metadata for metatypes.
@@ -1505,7 +1521,6 @@ struct MetatypeMetadata : public Metadata {
 
 /// The structure of tuple type metadata.
 struct TupleTypeMetadata : public Metadata {
-
   TupleTypeMetadata() = default;
   constexpr TupleTypeMetadata(const Metadata &base,
                               size_t numElements,
@@ -2082,14 +2097,51 @@ swift_allocateGenericValueMetadata(GenericMetadata *pattern,
   
 /// \brief Fetch a uniqued metadata for a function type.
 extern "C" const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata(const Metadata *argMetadata,
-                              const Metadata *resultMetadata);
+swift_getFunctionTypeMetadata(size_t numArguments,
+                              const void * argsAndResult []);
+
+extern "C" const FunctionTypeMetadata *
+swift_getFunctionTypeMetadata0(const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getFunctionTypeMetadata1(const void *arg0,
+                               const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getFunctionTypeMetadata2(const void *arg0,
+                               const void *arg1,
+                               const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getFunctionTypeMetadata3(const void *arg0,
+                               const void *arg1,
+                               const void *arg2,
+                               const Metadata *resultMetadata);
+
 
 #if SWIFT_OBJC_INTEROP
 /// \brief Fetch a uniqued metadata for a block type.
 extern "C" const FunctionTypeMetadata *
-swift_getBlockTypeMetadata(const Metadata *argMetadata,
-                           const Metadata *resultMetadata);
+swift_getBlockTypeMetadata(size_t numArguments,
+                           const void *argsAndResult []);
+
+extern "C" const FunctionTypeMetadata *
+swift_getBlockTypeMetadata0(const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getBlockTypeMetadata1(const void *arg0,
+                            const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getBlockTypeMetadata2(const void *arg0,
+                            const void *arg1,
+                            const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getBlockTypeMetadata3(const void *arg0,
+                            const void *arg1,
+                            const void *arg2,
+                            const Metadata *resultMetadata);
 #endif
 
 /// \brief Fetch a uniqued type metadata for an ObjC class.
