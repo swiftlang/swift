@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift | FileCheck %s
 // FIXME: fails on iOS
 // REQUIRES: OS=macosx
 
