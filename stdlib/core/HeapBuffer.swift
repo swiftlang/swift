@@ -70,7 +70,7 @@ internal func _isUniquelyReferenced_native(
   inout x: Builtin.NativeObject?
 ) -> Bool {
   let p: UnsafePointer<_HeapObject> = Builtin.reinterpretCast(x)
-  let result = _swift_isUniquelyReferenced_native(p) != 0
+  let result = _swift_isUniquelyReferenced_native(p)
   Builtin.fixLifetime(x)
   return result
 }
@@ -216,7 +216,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(_storage)
     let result = _swift_isUniquelyReferenced_native(o)
     Builtin.fixLifetime(_storage)
-    return result != 0
+    return result
   }
 }
 

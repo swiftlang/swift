@@ -263,7 +263,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(_nativeBuffer))
     let result = _swift_isUniquelyReferenced_nonNull_native(o)
     _fixLifetime(_nativeBuffer)
-    return result != 0
+    return result
   }
   
   //===--- internal/private API -------------------------------------------===//
@@ -414,7 +414,7 @@ public func isUniquelyReferencedNonObjC<T: AnyObject>(inout object: T) -> Bool {
   let o = UnsafePointer<Void>(Builtin.bridgeToRawPointer(object))
   let result = _swift_isUniquelyReferencedNonObjC_nonNull(o)
   Builtin.fixLifetime(object)
-  return result != 0
+  return result
 }
 
 /// Returns `true` iff `object` is a non-\ `@objc` class instance with a single
@@ -447,7 +447,7 @@ public func isUniquelyReferenced<T: NonObjectiveCBase>(
   let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(object))
   let result = _swift_isUniquelyReferenced_nonNull_native(o)
   Builtin.fixLifetime(object)
-  return result != 0
+  return result
 }
 
 /// Returns `true` iff `object` is a non-\ `@objc` class instance with
@@ -482,6 +482,6 @@ public func isUniquelyReferencedNonObjC<T: AnyObject>(
   let o = Builtin.reinterpretCast(object) as UnsafePointer<Void>
   let result = _swift_isUniquelyReferencedNonObjC(o)
   Builtin.fixLifetime(object)
-  return result != 0
+  return result
 }
 

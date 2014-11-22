@@ -2551,7 +2551,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(self)
       let result = _swift_isUniquelyReferenced_native(o)
       Builtin.fixLifetime(self)
-      return result != 0
+      return result
     }
 
     switch self {
@@ -2559,7 +2559,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(self)
       let result = _swift_isUniquelyReferenced_native(o)
       Builtin.fixLifetime(self)
-      return result != 0
+      return result
     case .Cocoa:
       // Don't consider Cocoa storage mutable, even if it is mutable and is
       // uniquely referenced.

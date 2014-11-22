@@ -241,7 +241,7 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
   return _swift_usesNativeSwiftReferenceCounting_class(
     unsafeAddressOf(theClass)
-  ) != 0
+  )
 #else
   return true
 #endif

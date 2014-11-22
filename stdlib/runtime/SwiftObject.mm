@@ -446,7 +446,7 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 }
 
 // version for SwiftShims
-unsigned char
+bool
 swift::_swift_usesNativeSwiftReferenceCounting_class(const void *theClass) {
 #if SWIFT_OBJC_INTEROP
   return usesNativeSwiftReferenceCounting((const ClassMetadata *)theClass);
@@ -935,7 +935,7 @@ extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,
 
 // Given a non-nil object reference, return true iff the object uses
 // native swift reference counting.
-unsigned char swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
+bool swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
   const void* object
 ) {
     assert(object != nullptr);
@@ -949,7 +949,7 @@ unsigned char swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
 
 // Given a non-nil non-@objc object reference, return true iff the
 // object has a strong reference count of 1.
-unsigned char swift::_swift_isUniquelyReferenced_nonNull_native(
+bool swift::_swift_isUniquelyReferenced_nonNull_native(
   const HeapObject* object
 ) {
   assert(object != nullptr);
@@ -959,7 +959,7 @@ unsigned char swift::_swift_isUniquelyReferenced_nonNull_native(
 
 // Given a non-@objc object reference, return true iff the
 // object is non-nil and has a strong reference count of 1.
-unsigned char swift::_swift_isUniquelyReferenced_native(
+bool swift::_swift_isUniquelyReferenced_native(
   const HeapObject* object
 ) {
   return object != nullptr
@@ -968,7 +968,7 @@ unsigned char swift::_swift_isUniquelyReferenced_native(
 
 // Given a non-nil object reference, return true iff the object is a
 // native swift object with strong reference count of 1.
-unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull(
+bool swift::_swift_isUniquelyReferencedNonObjC_nonNull(
   const void* object
 ) {
   assert(object != nullptr);
@@ -981,22 +981,18 @@ unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull(
 
 // Given an object reference, return true iff it is non-nil and refers
 // to a native swift object with strong reference count of 1.
-unsigned char swift::_swift_isUniquelyReferencedNonObjC(
+bool swift::_swift_isUniquelyReferencedNonObjC(
   const void* object
 ) {
   return object != nullptr
     && _swift_isUniquelyReferencedNonObjC_nonNull(object);
 }
 
-//===----------------------------------------------------------------------===//
-// FIXME: this should return bool but it chokes the compiler
-// <rdar://problem/18573806>
-//===----------------------------------------------------------------------===//
 /// Given the bits of a possibly-nil Native swift object reference, or of a
 /// word-sized Swift enum containing a Native swift object reference as
 /// a payload, return true iff the object's strong reference count is
 /// 1.
-unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
+bool swift::_swift_isUniquelyReferenced_native_spareBits(
   __swift_uintptr_t bits
 ) {
   const auto object = reinterpret_cast<HeapObject*>(
@@ -1012,7 +1008,7 @@ unsigned char swift::_swift_isUniquelyReferenced_native_spareBits(
 
 /// Return true if the given bits of a Builtin.BridgeObject refer to a
 /// native swift object whose strong reference count is 1.
-unsigned char swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
+bool swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   __swift_uintptr_t bits
 ) {
   auto bridgeObject = (void*)bits;

@@ -23,18 +23,20 @@
 
 #ifdef __cplusplus
 namespace swift { extern "C" {
+#else
+#define bool _Bool
 #endif
 
-unsigned char _swift_isUniquelyReferencedNonObjC(const void *);
-unsigned char _swift_isUniquelyReferencedNonObjC_nonNull(const void *);
-unsigned char _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
-unsigned char _swift_usesNativeSwiftReferenceCounting_class(const void *);
-unsigned char _swift_isUniquelyReferenced_native_spareBits(__swift_uintptr_t bits);
-unsigned char _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
+bool _swift_isUniquelyReferencedNonObjC(const void *);
+bool _swift_isUniquelyReferencedNonObjC_nonNull(const void *);
+bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
+bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
+bool _swift_isUniquelyReferenced_native_spareBits(__swift_uintptr_t bits);
+bool _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   __swift_uintptr_t bits);
-unsigned char
+bool
 _swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
-unsigned char _swift_isUniquelyReferenced_native(const struct HeapObject *);
+bool _swift_isUniquelyReferenced_native(const struct HeapObject *);
 __swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
 
 #ifdef __cplusplus
