@@ -1032,8 +1032,8 @@ LValue SILGenFunction::emitLValue(Expr *e, AccessKind accessKind) {
   if (r.isLastComponentPhysical()
       && getTypeLowering(r.getSubstFormalType()).getLoweredType()
             != r.getTypeOfRValue()) {
-    r.add(new OrigToSubstComponent(*this, r.getOrigFormalType(),
-                                   r.getSubstFormalType()));
+    r.add<OrigToSubstComponent>(*this, r.getOrigFormalType(),
+                                r.getSubstFormalType());
   }
   return r;
 }
@@ -1051,7 +1051,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
     auto typeData = getValueTypeData(rv.getValue());
     LValue lv;
-    lv.add(new ValueComponent(rv, typeData));
+    lv.add<ValueComponent>(rv, typeData);
     return lv;
   }
 
@@ -1076,13 +1076,14 @@ getNonMemberVarDeclSubstitutions(SILGenFunction &gen, VarDecl *var) {
 // For now, we don't need either an AccessKind or an
 // AccessSemantics, because addressors are always directly
 // dispatched.
-static AddressorComponent *
-makeNonMemberVarDeclAddressorComponent(SILGenFunction &gen, VarDecl *var,
-                                       const LValueTypeData &typeData) {
+static void
+addNonMemberVarDeclAddressorComponent(SILGenFunction &gen, VarDecl *var,
+                                      const LValueTypeData &typeData,
+                                      LValue &lvalue) {
   SILType storageType = gen.getLoweredType(var->getType()).getAddressType();
-  return new AddressorComponent(var, /*isSuper=*/ false, /*direct*/ true,
-                                getNonMemberVarDeclSubstitutions(gen, var),
-                                typeData, storageType);
+  lvalue.add<AddressorComponent>(var, /*isSuper=*/ false, /*direct*/ true,
+                                 getNonMemberVarDeclSubstitutions(gen, var),
+                                 typeData, storageType);
 }
 
 LValue
@@ -1093,7 +1094,7 @@ SILGenFunction::emitLValueForAddressedNonMemberVarDecl(SILLocation loc,
                                                        AccessSemantics semantics) {
   auto typeData = getUnsubstitutedTypeData(*this, formalRValueType);
   LValue lv;
-  lv.add(makeNonMemberVarDeclAddressorComponent(*this, var, typeData));
+  addNonMemberVarDeclAddressorComponent(*this, var, typeData, lv);
   return lv;
 }
 
@@ -1112,13 +1113,13 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
 
   // If it's a computed variable, push a reference to the getter and setter.
   case AccessStrategy::DirectToAccessor:
-    lv.add(new GetterSetterComponent(var, /*isSuper=*/false, /*direct*/ true,
-                                     getNonMemberVarDeclSubstitutions(gen, var),
-                                     typeData));
+    lv.add<GetterSetterComponent>(var, /*isSuper=*/false, /*direct*/ true,
+                                  getNonMemberVarDeclSubstitutions(gen, var),
+                                  typeData);
     break;
 
   case AccessStrategy::Addressor:
-    lv.add(makeNonMemberVarDeclAddressorComponent(gen, var, typeData));
+    addNonMemberVarDeclAddressorComponent(gen, var, typeData, lv);
     break;
 
   case AccessStrategy::Storage: {
@@ -1128,10 +1129,10 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
                                          accessKind, semantics);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
-    lv.add(new ValueComponent(address, typeData));
+    lv.add<ValueComponent>(address, typeData);
 
     if (address.getType().is<ReferenceStorageType>())
-      lv.add(new OwnershipComponent(typeData));
+      lv.add<OwnershipComponent>(typeData);
     break;
   }
   }
@@ -1147,7 +1148,7 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
 
   SILValue address = gen.emitTemporaryAllocation(e, typeData.TypeOfRValue);
   LValue lv;
-  lv.add(new ValueComponent(ManagedValue::forUnmanaged(address), typeData));
+  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address), typeData);
   return std::move(lv);
 }
 
@@ -1222,7 +1223,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
                              e->getBase(), cast<VarDecl>(baseDeclRef->getDecl()));
           auto typeData = getValueTypeData(self.getValue());
           LValue valueLV;
-          valueLV.add(new ValueComponent(self, typeData));
+          valueLV.add<ValueComponent>(self, typeData);
           return valueLV;
         }
       }
@@ -1237,10 +1238,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   // direct access to underlying storage.
   if (strategy == AccessStrategy::DirectToAccessor ||
       strategy == AccessStrategy::DispatchToAccessor) {
-    lv.add(new GetterSetterComponent(var, e->isSuper(),
-                                 strategy == AccessStrategy::DirectToAccessor,
-                                     e->getMember().getSubstitutions(),
-                                     typeData));
+    lv.add<GetterSetterComponent>(var, e->isSuper(),
+                                  strategy == AccessStrategy::DirectToAccessor,
+                                  e->getMember().getSubstitutions(),
+                                  typeData);
     return std::move(lv);
   }
 
@@ -1274,20 +1275,20 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   // For member variables, this access is done w.r.t. a base computation that
   // was already emitted.  This member is accessed off of it.
   if (strategy == AccessStrategy::Addressor) {
-    lv.add(new AddressorComponent(var, e->isSuper(), /*direct*/ true,
-                                  e->getMember().getSubstitutions(),
-                                  typeData, varStorageType));
+    lv.add<AddressorComponent>(var, e->isSuper(), /*direct*/ true,
+                               e->getMember().getSubstitutions(),
+                               typeData, varStorageType);
   } else if (!e->getBase()->getType()->is<LValueType>() &&
              !e->getBase()->getType()->is<InOutType>()) {
     assert(e->getBase()->getType()->hasReferenceSemantics());
-    lv.add(new RefElementComponent(var, varStorageType, typeData));
+    lv.add<RefElementComponent>(var, varStorageType, typeData);
   } else {
-    lv.add(new StructElementComponent(var, varStorageType, typeData));
+    lv.add<StructElementComponent>(var, varStorageType, typeData);
   }
   
   // If the member has weak or unowned storage, convert it away.
   if (varStorageType.is<ReferenceStorageType>()) {
-    lv.add(new OwnershipComponent(typeData));
+    lv.add<OwnershipComponent>(typeData);
   }
   
   return lv;
@@ -1309,17 +1310,17 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
   if (strategy == AccessStrategy::DirectToAccessor ||
       strategy == AccessStrategy::DispatchToAccessor) {
-    lv.add(new GetterSetterComponent(decl, e->isSuper(),
-                                     strategy == AccessStrategy::DirectToAccessor,
-                                     e->getDecl().getSubstitutions(),
-                                     typeData, indexExpr, &index));
+    lv.add<GetterSetterComponent>(decl, e->isSuper(),
+                                  strategy == AccessStrategy::DirectToAccessor,
+                                  e->getDecl().getSubstitutions(),
+                                  typeData, indexExpr, &index);
   } else {
     assert(strategy == AccessStrategy::Addressor);
     auto storageType = 
       gen.SGM.Types.getSubstitutedStorageType(decl, e->getType());
-    lv.add(new AddressorComponent(decl, e->isSuper(), /*direct*/ true,
-                                  e->getDecl().getSubstitutions(),
-                                  typeData, storageType, indexExpr, &index));
+    lv.add<AddressorComponent>(decl, e->isSuper(), /*direct*/ true,
+                               e->getDecl().getSubstitutions(),
+                               typeData, storageType, indexExpr, &index);
   }
 
   return lv;
@@ -1339,7 +1340,7 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
     baseTypeData.TypeOfRValue.getTupleElementType(index)
   };
 
-  lv.add(new TupleElementComponent(index, typeData));
+  lv.add<TupleElementComponent>(index, typeData);
   return lv;
 }
 
@@ -1362,7 +1363,7 @@ LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
                                          AccessKind accessKind) {
   LValue lv = visitRec(e->getSubExpr(), accessKind);
   LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
-  lv.add(new ForceOptionalObjectComponent(typeData));
+  lv.add<ForceOptionalObjectComponent>(typeData);
   return lv;
 }
 
@@ -1370,7 +1371,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
                                            AccessKind accessKind) {
   LValue lv = visitRec(e->getSubExpr(), accessKind);
   LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
-  lv.add(new BindOptionalObjectComponent(typeData, e->getDepth()));
+  lv.add<BindOptionalObjectComponent>(typeData, e->getDepth());
   return lv;
 }
 
@@ -1387,7 +1388,7 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
   auto baseType = base.getType().getSwiftRValueType();
 
   // Refer to 'self' as the base of the lvalue.
-  lv.add(new ValueComponent(base, getUnsubstitutedTypeData(*this, baseType)));
+  lv.add<ValueComponent>(base, getUnsubstitutedTypeData(*this, baseType));
 
   auto origFormalType = getOrigFormalRValueType(ivar->getType());
   auto substFormalType = base.getType().getSwiftRValueType()
@@ -1402,16 +1403,16 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
     SGM.Types.getSubstitutedStorageType(ivar, LValueType::get(substFormalType));
 
   if (baseType->hasReferenceSemantics())
-    lv.add(new RefElementComponent(ivar, varStorageType, typeData));
+    lv.add<RefElementComponent>(ivar, varStorageType, typeData);
   else
-    lv.add(new StructElementComponent(ivar, varStorageType, typeData));
+    lv.add<StructElementComponent>(ivar, varStorageType, typeData);
 
   if (varStorageType.is<ReferenceStorageType>()) {
     auto formalRValueType =
       ivar->getType()->getRValueType()->getReferenceStorageReferent();
     auto typeData =
       getUnsubstitutedTypeData(*this, formalRValueType->getCanonicalType());
-    lv.add(new OwnershipComponent(typeData));
+    lv.add<OwnershipComponent>(typeData);
   }
 
   return lv;

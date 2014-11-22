@@ -246,8 +246,9 @@ public:
   }
   
   /// Add a new component at the end of the access path of this lvalue.
-  void add(PathComponent *component) {
-    Path.push_back(std::unique_ptr<PathComponent>(component));
+  template <class T, class... As>
+  void add(As &&... args) {
+    Path.emplace_back(new T(std::forward<As>(args)...));
   }
 
   typedef std::vector<std::unique_ptr<PathComponent>>::iterator iterator;
