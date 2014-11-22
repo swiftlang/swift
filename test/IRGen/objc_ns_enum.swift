@@ -108,6 +108,30 @@ func objc_enum_switch(x: ExportedToObjC) -> Int {
   }
 }
 
-// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+@objc class ObjCEnumMethods {
+  // CHECK: define internal void @_TToFC12objc_ns_enum15ObjCEnumMethods6enumInfS0_FOS_14ExportedToObjCT_([[OBJC_ENUM_METHODS:.*]]*, i8*, i64)
+  dynamic func enumIn(x: ExportedToObjC) {}
+  // CHECK: define internal i64 @_TToFC12objc_ns_enum15ObjCEnumMethods7enumOutfS0_FT_OS_14ExportedToObjC([[OBJC_ENUM_METHODS]]*, i8*)
+  dynamic func enumOut() -> ExportedToObjC { return .Foo }
 
+  // CHECK: define internal i64 @_TToFC12objc_ns_enum15ObjCEnumMethodsg4propOS_14ExportedToObjC([[OBJC_ENUM_METHODS]]*, i8*)
+  // CHECK: define internal void @_TToFC12objc_ns_enum15ObjCEnumMethodss4propOS_14ExportedToObjC([[OBJC_ENUM_METHODS]]*, i8*, i64)
+  dynamic var prop: ExportedToObjC = .Foo
+}
+
+// CHECK-LABEL: define hidden void @_TF12objc_ns_enum22objc_enum_method_callsFCS_15ObjCEnumMethodsT_(%C12objc_ns_enum15ObjCEnumMethods*)
+func objc_enum_method_calls(x: ObjCEnumMethods) {
+  
+  // CHECK: call i64 bitcast (void ()* @objc_msgSend to i64 ([[OBJC_ENUM_METHODS]]*, i8*)*)
+  // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJC_ENUM_METHODS]]*, i8*, i64)*)
+  x.enumIn(x.enumOut())
+  // CHECK: call i64 bitcast (void ()* @objc_msgSend to i64 ([[OBJC_ENUM_METHODS]]*, i8*)*)
+  // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJC_ENUM_METHODS]]*, i8*, i64)*)
+  x.enumIn(x.prop)
+  // CHECK: call i64 bitcast (void ()* @objc_msgSend to i64 ([[OBJC_ENUM_METHODS]]*, i8*)*)
+  // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJC_ENUM_METHODS]]*, i8*, i64)*)
+  x.prop = x.enumOut()
+}
+
+// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
 

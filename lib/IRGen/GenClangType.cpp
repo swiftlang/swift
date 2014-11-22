@@ -303,7 +303,11 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
 }
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
-  llvm_unreachable("Imported enum without Clang decl!");
+  assert(type->getDecl()->isObjC() && "not an @objc enum?!");
+  
+  // @objc enums lower to their raw types.
+  return Converter.convert(IGM,
+                           type->getDecl()->getRawType()->getCanonicalType());
 }
 
 clang::QualType GenClangType::convertFunctionType(CanFunctionType type) {
