@@ -33,20 +33,20 @@ func cast(a: Builtin.NativeObject?) -> UnsafePointer<HeapObject> {
 
 tests.test("_isUniquelyReferenced/NativeObject") {
   var a: Builtin.NativeObject = Builtin.castToNativeObject(X())
-  expectNotEqual(0, _swift_isUniquelyReferenced_nonNull_native(cast(a)))
+  expectNotEqual(false, _swift_isUniquelyReferenced_nonNull_native(cast(a)))
   var b = a
-  expectFalse(_swift_isUniquelyReferenced_nonNull_native(cast(a)) != 0)
-  expectFalse(_swift_isUniquelyReferenced_nonNull_native(cast(b)) != 0)
+  expectFalse(_swift_isUniquelyReferenced_nonNull_native(cast(a)))
+  expectFalse(_swift_isUniquelyReferenced_nonNull_native(cast(b)))
 }
 
 tests.test("_isUniquelyReferenced/OptionalNativeObject") {
   var a: Builtin.NativeObject? = Builtin.castToNativeObject(X())
-  StdlibUnittest.expectTrue(_swift_isUniquelyReferenced_native(cast(a)) != 0)
+  StdlibUnittest.expectTrue(_swift_isUniquelyReferenced_native(cast(a)))
   var b = a
-  expectFalse(_swift_isUniquelyReferenced_native(cast(a)) != 0)
-  expectFalse(_swift_isUniquelyReferenced_native(cast(b)) != 0)
+  expectFalse(_swift_isUniquelyReferenced_native(cast(a)))
+  expectFalse(_swift_isUniquelyReferenced_native(cast(b)))
   var x: Builtin.NativeObject? = nil
-  expectFalse(_swift_isUniquelyReferenced_native(cast(x)) != 0)
+  expectFalse(_swift_isUniquelyReferenced_native(cast(x)))
 }
 
 runAllTests()

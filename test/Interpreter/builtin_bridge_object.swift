@@ -55,12 +55,12 @@ if true {
   var bo3 = Builtin.castToBridgeObject(C(), 0.value)
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      bitPattern(bo3)) != 0)
+      bitPattern(bo3)))
   // CHECK-NEXT: true
   let bo4 = bo3
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      bitPattern(bo3)) != 0)
+      bitPattern(bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
   _fixLifetime(bo4)
@@ -87,12 +87,12 @@ if true {
   var bo3 = Builtin.castToBridgeObject(C(), NATIVE_SPARE_BITS.value)
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      bitPattern(bo3)) != 0)
+      bitPattern(bo3)))
   // CHECK-NEXT: true
   let bo4 = bo3
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      bitPattern(bo3)) != 0)
+      bitPattern(bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
   _fixLifetime(bo4)
@@ -126,7 +126,7 @@ if true {
   var bo3 = nonNativeBridgeObject(NSNumber(integer: 22))
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      bitPattern(bo3)) != 0)
+      bitPattern(bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
 }
@@ -150,7 +150,7 @@ if true {
   var bo3 = nonNativeBridgeObject(unTaggedString)
   println(
     _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      bitPattern(bo3)) != 0)
+      bitPattern(bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
 }

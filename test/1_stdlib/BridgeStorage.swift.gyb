@@ -72,12 +72,12 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
 
   mutating func isUniquelyReferencedNative() -> Bool {
     return _swift_isUniquelyReferencedNonObjC_nonNull(
-      UnsafePointer(rawObject)) != 0
+      UnsafePointer(rawObject))
   }
 
   var isNative: Bool {
     return _swift_usesNativeSwiftReferenceCounting_nonNull(
-      UnsafePointer(rawObject)) != 0
+      UnsafePointer(rawObject))
   }
 
   var isObjC: Bool {
@@ -99,7 +99,7 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
     precondition(isNative)
     precondition(spareBits == 0)
     return _swift_isUniquelyReferenced_nonNull_native(
-      UnsafePointer(rawObject)) != 0
+      UnsafePointer(rawObject))
   }
 
   var objCInstance: ObjC {
