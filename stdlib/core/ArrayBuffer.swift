@@ -18,131 +18,60 @@
 #if _runtime(_ObjC)
 import SwiftShims
 
-final internal
-class _IndirectArrayBuffer {
-  
-  init<T>(
-    nativeBuffer: _ContiguousArrayBuffer<T>,
-    isMutable: Bool,
-    needsElementTypeCheck: Bool
-  ) {
-    self.buffer = nativeBuffer._storage
-    self.isMutable = isMutable
-    self.isCocoa = false
-    self.needsElementTypeCheck = needsElementTypeCheck
-  }
-    
-  init(cocoa: _NSArrayCoreType, needsElementTypeCheck: Bool) {
-    self.buffer = cocoa
-    self.isMutable = false
-    self.isCocoa = true
-    self.needsElementTypeCheck = needsElementTypeCheck
-  }
-
-  init<Target>(
-    castFrom source: _IndirectArrayBuffer,
-    toElementType _: Target.Type
-  ) {
-    self.buffer = source.buffer
-    self.isCocoa = source.isCocoa
-    
-    self.isMutable = !source.isCocoa
-      && source.getNative().canStoreElementsOfDynamicType(Target.self)
-    
-    self.needsElementTypeCheck = source.needsElementTypeCheck
-      ? !(AnyObject.self is Target.Type)
-      : false
-  }
-  
-  // When this buffer has immutable storage and it is modified, the
-  // storage is replaced with mutable storage.
-  func replaceStorage<T>(newBuffer: _ContiguousArrayBuffer<T>) {
-    self.buffer = newBuffer._storage
-    self.isMutable = true
-    self.isCocoa = false
-    self.needsElementTypeCheck = false
-  }
-
-  var buffer: AnyObject
-  var isMutable: Bool
-  var isCocoa: Bool
-  var needsElementTypeCheck: Bool
-
-  func getNative() -> _ContiguousArrayStorageBase {
-    _sanityCheck(!isCocoa)
-    return unsafeDowncast(buffer)
-  }
-
-  func getCocoa() -> _NSArrayCoreType {
-    _sanityCheck(isCocoa)
-    return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(buffer))
-  }
-}
+internal typealias _ArrayBridgeStorage
+  = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCoreType>
 
 public struct _ArrayBuffer<T> : _ArrayBufferType {
-  var storage: Builtin.NativeObject
 
-  var indirect: _IndirectArrayBuffer {
-    _sanityCheck(_isClassOrObjCExistential(T.self))
-    return Builtin.castFromNativeObject(storage)
-  }
-  
   public typealias Element = T
 
   /// create an empty buffer
   public init() {
-    storage = !_isClassOrObjCExistential(T.self)
-      ? Builtin.castToNativeObject(_emptyArrayStorage) 
-      : Builtin.castToNativeObject(
-      _IndirectArrayBuffer(
-        nativeBuffer: _ContiguousArrayBuffer<T>(),
-        isMutable: false,
-        needsElementTypeCheck: false
-      ))
+    _storage = _ArrayBridgeStorage(native: _emptyArrayStorage)
   }
 
-  public init(_ cocoa: _NSArrayCoreType) {
+  public init(nsArray: _NSArrayCoreType) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
-    storage = Builtin.castToNativeObject(
-      _IndirectArrayBuffer(
-        cocoa: cocoa,
-        // FIXME: it may be possible to avoid a deferred check if we can
-        // verify that source is backed by a ContiguousArray<T>.
-        needsElementTypeCheck: !(AnyObject.self is T.Type)))
+    _storage = _ArrayBridgeStorage(objC: nsArray)
   }
 
-  init(_ buffer: _IndirectArrayBuffer) {
-    storage = Builtin.castToNativeObject(buffer)
-  }
-  
   /// Returns an `_ArrayBuffer<U>` containing the same elements.
   /// Requires: the elements actually have dynamic type `U`, and `U`
   /// is a class or `@objc` existential.
   func castToBufferOf<U>(_: U.Type) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
-    return _ArrayBuffer<U>(
-      _IndirectArrayBuffer(castFrom: self.indirect, toElementType: U.self))
+    return _ArrayBuffer<U>(storage: _storage)
   }
+
+  var needsElementTypeCheck: Bool {
+    // NSArray's need an element typecheck when the element type isn't AnyObject
+    return _isClassOrObjCExistential(T.self)
+      && _storage.isObjC
+      && !(AnyObject.self is T.Type)
+  }
+  
+  //===--- private --------------------------------------------------------===//
+  internal init(storage: _ArrayBridgeStorage) {
+    _storage = storage
+  }
+
+  internal var _storage: _ArrayBridgeStorage
 }
 
 extension _ArrayBuffer {
   /// Adopt the storage of source
   public
   init(_ source: NativeBuffer) {
-    if !_isClassOrObjCExistential(T.self) {
-      self.storage = Builtin.castToNativeObject(source._storage)
-    }
-    else {
-      self.storage = Builtin.castToNativeObject(
-        _IndirectArrayBuffer(
-          nativeBuffer: source, isMutable: true, needsElementTypeCheck: false))
-    }
+    _storage = _ArrayBridgeStorage(native: source._storage)
   }
   
   /// Return true iff this buffer's storage is uniquely-referenced.
   mutating func isUniquelyReferenced() -> Bool {
-    return _isUniquelyReferenced_native(&storage)
+    if !_isClassOrObjCExistential(T.self) {
+      return _storage.isUniquelyReferenced_native_noSpareBits()
+    }
+    return _storage.isUniquelyReferencedNative()
   }
 
   /// Convert to an NSArray.
@@ -156,13 +85,6 @@ extension _ArrayBuffer {
     return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative
   }
 
-  var _hasMutableBuffer: Bool {
-    if !_isClassOrObjCExistential(T.self) {
-      return true
-    }
-    return indirect.isMutable && isUniquelyReferencedNonObjC(&indirect.buffer)
-  }
-
   /// If this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
@@ -171,7 +93,7 @@ extension _ArrayBuffer {
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
-    if _fastPath(isUniquelyReferenced() && _hasMutableBuffer) {
+    if _fastPath(isUniquelyReferenced()) {
       let b = _native
       if _fastPath(b.capacity >= minimumCapacity) {
         return b
@@ -182,7 +104,7 @@ extension _ArrayBuffer {
 
   public
   mutating func isMutableAndUniquelyReferenced() -> Bool {
-    return isUniquelyReferenced() && _hasMutableBuffer
+    return isUniquelyReferenced()
   }
   
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
@@ -192,9 +114,7 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(T.self) {
       return _native
     }
-    else {
-      return indirect.isCocoa ? nil : NativeBuffer(indirect.getNative())
-    }
+    return _fastPath(_storage.isNative) ? _native : nil
   }
 
   /// Replace the given subRange with the first newCount elements of
@@ -218,7 +138,7 @@ extension _ArrayBuffer {
       return
     }
     
-    if _slowPath(indirect.needsElementTypeCheck) {
+    if _slowPath(needsElementTypeCheck) {
       _sanityCheck(
         !_isNative, "A native array that needs a type check?")
 
@@ -235,7 +155,7 @@ extension _ArrayBuffer {
       return
     }
 
-    if _slowPath(indirect.needsElementTypeCheck) {
+    if _slowPath(needsElementTypeCheck) {
       for i in subRange {
         _typeCheck(i)
       }
@@ -362,12 +282,13 @@ extension _ArrayBuffer {
     }
     
     nonmutating set {
-      if _fastPath(_hasMutableBuffer) {
+      if _fastPath(_isNative) {
         _native[i] = newValue
       }
       else {
-        indirect.replaceStorage(_copyCollectionToNativeArrayBuffer(self))
-        _native[i] = newValue
+        var refCopy = self
+        refCopy.replace(
+          subRange: i...i, with: 1, elementsOf: CollectionOfOne(newValue))
       }
     }
   }
@@ -379,14 +300,12 @@ extension _ArrayBuffer {
   func withUnsafeBufferPointer<R>(
     body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
-    if _isClassOrObjCExistential(T.self) {
-      if !_isNative {
-        indirect.replaceStorage(_copyCollectionToNativeArrayBuffer(self))
-      }
+    if _fastPath(_isNative) {
+      let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
+      _fixLifetime(self)
+      return ret
     }
-    let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
-    _fixLifetime(self)
-    return ret
+    return ContiguousArray(self).withUnsafeBufferPointer(body)
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -462,28 +381,22 @@ extension _ArrayBuffer {
       return true
     }
     else {
-      return !indirect.isCocoa
+      return _storage.isNative
     }
   }
 
-  /// Our native representation, if any.  If there's no native
-  /// representation, the result is an empty buffer.
+  /// Our native representation.
+  ///
+  /// Requires: `_isNative`
   var _native: NativeBuffer {
-    if !_isClassOrObjCExistential(T.self) {
-      let s: _ContiguousArrayStorageBase = Builtin.castFromNativeObject(storage)
-      return NativeBuffer(s)
-    }
-    else {
-      return indirect.isCocoa
-        ? NativeBuffer() : NativeBuffer(indirect.getNative())
-    }
+    return NativeBuffer(
+      _isClassOrObjCExistential(T.self)
+      ? _storage.nativeInstance : _storage.nativeInstance_noSpareBits)
   }
 
   var _nonNative: _NSArrayCoreType {
     _sanityCheck(_isClassOrObjCExistential(T.self))
-    let i = indirect
-    _sanityCheck(i.isCocoa)
-    return i.getCocoa()
+    return _storage.objCInstance
   }
 }
 #endif

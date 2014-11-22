@@ -1191,7 +1191,7 @@ extension Array {
         unsafeBitCast(
           source.copyWithZone(nil),
           _NSArrayCoreType.self)
-    self = Array(_ArrayBuffer(selectedSource))
+    self = Array(_ArrayBuffer(nsArray: selectedSource))
   }
 }
 #endif

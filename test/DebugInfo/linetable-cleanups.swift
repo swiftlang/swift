@@ -18,10 +18,10 @@ func main() {
 // CHECK: br label
 // CHECK: <label>:
 // CHECK: , !dbg ![[LOOPHEADER_LOC:.*]]
-// CHECK: call void {{.*}}_release({{.*}}) {{#[0-9]+}}, !dbg ![[LOOPHEADER_LOC]]
+// CHECK: call void {{.*}}elease({{.*}}) {{#[0-9]+}}, !dbg ![[LOOPHEADER_LOC]]
 // CHECK: call void @_TFSs7println
 // The cleanups should share the line number with the ret stmt.
-// CHECK:  call void {{.*}}_release({{.*}}) {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
+// CHECK:  call void {{.*}}elease({{.*}}) {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
 // CHECK-NEXT:  ret void, !dbg ![[CLEANUPS]]
 // CHECK: ![[CLEANUPS]] = metadata !{i32 [[@LINE+1]], i32 1,
