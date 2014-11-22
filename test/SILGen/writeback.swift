@@ -117,9 +117,9 @@ func zung() -> Int { return 0 }
 // Ensure that subscripts are only evaluated once.
 bar(x: &x[zung()])
 // CHECK: [[BAR:%.*]] = function_ref @_TF9writeback3barFT1xRVS_3Foo_T_ : $@thin (@inout Foo) -> ()
-// CHECK: [[GET_X:%.*]] = function_ref @_TF9writebackg1xVS_3Foo : $@thin () -> Foo
 // CHECK: [[ZUNG:%.*]] = function_ref @_TF9writeback4zungFT_Si : $@thin () -> Int
 // CHECK: [[INDEX:%.*]] = apply [[ZUNG]]() : $@thin () -> Int
+// CHECK: [[GET_X:%.*]] = function_ref @_TF9writebackg1xVS_3Foo : $@thin () -> Foo
 // CHECK: [[GET_SUBSCRIPT:%.*]] = function_ref @_TFV9writeback3Foog9subscript{{.*}} : $@cc(method) @thin (Int, Foo) -> Foo
 // CHECK: apply [[GET_SUBSCRIPT]]([[INDEX]], {{%.*}}) : $@cc(method) @thin (Int, Foo) -> Foo
 // CHECK: apply [[BAR]]({{%.*}}) : $@thin (@inout Foo) -> ()

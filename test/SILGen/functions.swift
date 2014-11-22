@@ -328,9 +328,9 @@ func calls(var i:Int, var j:Int, var k:Int) {
   i = c[j, k]
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
+  // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned SomeClass) -> () 
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   c[i, j] = k

@@ -617,8 +617,10 @@ namespace {
     bool IsSuper;
     bool IsDirectAccessorUse;
     std::vector<Substitution> substitutions;
+
+    /// The subscript index expression.  Useless
     Expr *subscriptIndexExpr;
-    mutable RValue origSubscripts;
+    RValue subscripts;
 
     struct AccessorArgs {
       RValueSource base;
@@ -634,14 +636,9 @@ namespace {
       AccessorArgs result;
       if (base)
         result.base = gen.prepareAccessorBaseArg(loc, base, funcDecl);
-      
-      if (subscriptIndexExpr) {
-        if (!origSubscripts)
-          origSubscripts = gen.emitRValue(subscriptIndexExpr);
-        // TODO: use the subscript expression as the source if we're
-        // only using this l-value once.
-        result.subscripts = origSubscripts.copy(gen, loc);
-      }
+
+      if (subscripts)
+        result.subscripts = subscripts.copy(gen, loc);
       
       return result;
     }
@@ -651,12 +648,16 @@ namespace {
                             bool isSuper, bool isDirectAccessorUse,
                             ArrayRef<Substitution> substitutions,
                             LValueTypeData typeData,
-                            Expr *subscriptIndexExpr)
+                            Expr *subscriptIndexExpr,
+                            RValue *optSubscripts)
       : Base(typeData, kind), decl(decl),
         IsSuper(isSuper), IsDirectAccessorUse(isDirectAccessorUse),
         substitutions(substitutions.begin(), substitutions.end()),
         subscriptIndexExpr(subscriptIndexExpr)
     {
+      assert((optSubscripts != nullptr) == (subscriptIndexExpr != nullptr));
+      if (optSubscripts)
+        subscripts = std::move(*optSubscripts);
     }
 
     AccessorBasedComponent(const AccessorBasedComponent &copied,
@@ -668,7 +669,7 @@ namespace {
         IsDirectAccessorUse(copied.IsDirectAccessorUse),
         substitutions(copied.substitutions),
         subscriptIndexExpr(copied.subscriptIndexExpr),
-        origSubscripts(copied.origSubscripts.copy(gen, loc)) {}
+        subscripts(copied.subscripts.copy(gen, loc)) {}
 
     void printBase(raw_ostream &OS, StringRef name) const {
       OS << name << "(" << decl->getName() << ")";
@@ -690,10 +691,11 @@ namespace {
                            bool isSuper, bool isDirectAccessorUse,
                            ArrayRef<Substitution> substitutions,
                            LValueTypeData typeData,
-                           Expr *subscriptIndexExpr = nullptr)
+                           Expr *subscriptIndexExpr = nullptr,
+                           RValue *subscriptIndex = nullptr)
       : AccessorBasedComponent(GetterSetterKind, decl, isSuper,
                                isDirectAccessorUse, substitutions,
-                               typeData, subscriptIndexExpr)
+                               typeData, subscriptIndexExpr, subscriptIndex)
     {
     }
     
@@ -832,7 +834,7 @@ namespace {
       if (decl != rhs.decl || IsSuper != rhs.IsSuper) return;
 
       // If this is a simple property access, then we must have a conflict.
-      if (!subscriptIndexExpr) {
+      if (!subscripts) {
         assert(isa<VarDecl>(decl));
         gen.SGM.diagnose(loc1, diag::writeback_overlap_property,decl->getName())
            .highlight(loc1.getSourceRange());
@@ -842,12 +844,10 @@ namespace {
       }
 
       // Otherwise, it is a subscript, check the index values.
-      // If we haven't emitted the lvalue for some reason, just ignore this.
-      if (!origSubscripts || !rhs.origSubscripts) return;
       
       // If the indices are literally identical SILValue's, then there is
       // clearly a conflict.
-      if (!origSubscripts.isObviouslyEqual(rhs.origSubscripts)) {
+      if (!subscripts.isObviouslyEqual(rhs.subscripts)) {
         // If the index value doesn't lower to literally the same SILValue's,
         // do some fuzzy matching to catch the common case.
         if (!areCertainlyEqualIndices(subscriptIndexExpr,
@@ -886,10 +886,11 @@ namespace {
                         bool isSuper, bool isDirectAccessorUse,
                         ArrayRef<Substitution> substitutions,
                         LValueTypeData typeData, SILType substFieldType,
-                        Expr *subscriptIndexExpr = nullptr)
+                        Expr *subscriptIndexExpr = nullptr,
+                        RValue *subscriptIndex = nullptr)
       : AccessorBasedComponent(AddressorKind, decl, isSuper,
                                isDirectAccessorUse, substitutions,
-                               typeData, subscriptIndexExpr),
+                               typeData, subscriptIndexExpr, subscriptIndex),
         SubstFieldType(substFieldType)
     {
     }
@@ -1303,19 +1304,22 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(decl, accessKind, strategy));
 
+  Expr *indexExpr = e->getIndex();
+  RValue index = gen.emitRValue(indexExpr);
+
   if (strategy == AccessStrategy::DirectToAccessor ||
       strategy == AccessStrategy::DispatchToAccessor) {
     lv.add(new GetterSetterComponent(decl, e->isSuper(),
                                      strategy == AccessStrategy::DirectToAccessor,
                                      e->getDecl().getSubstitutions(),
-                                     typeData, e->getIndex()));
+                                     typeData, indexExpr, &index));
   } else {
     assert(strategy == AccessStrategy::Addressor);
     auto storageType = 
       gen.SGM.Types.getSubstitutedStorageType(decl, e->getType());
     lv.add(new AddressorComponent(decl, e->isSuper(), /*direct*/ true,
                                   e->getDecl().getSubstitutions(),
-                                  typeData, storageType, e->getIndex()));
+                                  typeData, storageType, indexExpr, &index));
   }
 
   return lv;
