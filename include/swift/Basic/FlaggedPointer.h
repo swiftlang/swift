@@ -1,4 +1,4 @@
-//===- ArrayRefView.h - Adapter for iterating over an ArrayRef --*- C++ -*-===//
+//===- FlaggedPointer.h - Explicit pointer tagging container ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
