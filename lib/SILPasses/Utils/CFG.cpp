@@ -313,7 +313,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     if (!SuccBB->getNumBBArg())
       return;
     Args.push_back(
-        SILValue(NewEdgeBB->createArgument(SuccBB->getBBArg(0)->getType()), 0));
+        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
     return;
   }
 
@@ -324,7 +324,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     if (!SuccBB->getNumBBArg())
       return;
     Args.push_back(
-        SILValue(NewEdgeBB->createArgument(SuccBB->getBBArg(0)->getType()), 0));
+        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
     return;
   }
 
@@ -334,7 +334,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     if (!SuccBB->getNumBBArg())
       return;
     Args.push_back(
-        SILValue(NewEdgeBB->createArgument(SuccBB->getBBArg(0)->getType()), 0));
+        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
     return;
   }
   if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
@@ -342,7 +342,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     if (!SuccBB->getNumBBArg())
       return;
     Args.push_back(
-        SILValue(NewEdgeBB->createArgument(SuccBB->getBBArg(0)->getType()), 0));
+        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
     return;
   }
 

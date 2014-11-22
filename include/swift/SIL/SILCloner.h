@@ -406,7 +406,7 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
       // Create new arguments for each of the original block's arguments.
       for (auto &Arg : Succ.getBB()->getBBArgs()) {
         SILValue MappedArg =
-          new (F.getModule()) SILArgument(getOpType(Arg->getType()), MappedBB);
+          new (F.getModule()) SILArgument(MappedBB, getOpType(Arg->getType()));
 
         ValueMap.insert(std::make_pair(Arg, MappedArg));
       }

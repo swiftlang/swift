@@ -230,7 +230,7 @@ namespace {
         // for cloning.
         To = From->getParent()->createBasicBlock();
         for (auto *Arg : FromBB->getBBArgs()) {
-          To->createArgument(Arg->getType(), Arg->getDecl());
+          To->createBBArg(Arg->getType(), Arg->getDecl());
         }
       }
       DestBB = To;
@@ -2902,7 +2902,7 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
     DEBUG(llvm::dbgs() << "*** Erasing " << i <<"th BB argument.\n");
     NumDeadArguments++;
     Changed = true;
-    BB->eraseArgument(i);
+    BB->eraseBBArg(i);
 
     // Determine the set of predecessors in case any predecessor has
     // two edges to this block (e.g. a conditional branch where both

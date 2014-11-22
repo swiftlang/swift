@@ -1224,7 +1224,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   
   // Get the captured native function value out of the block.
   auto storageAddrTy = SILType::getPrimitiveAddressType(blockStorageTy);
-  auto storage = new (gen.SGM.M) SILArgument(storageAddrTy, entry);
+  auto storage = new (gen.SGM.M) SILArgument(entry, storageAddrTy);
   auto capture = gen.B.createProjectBlockStorage(loc, storage);
   auto &funcTL = gen.getTypeLowering(funcTy);
   auto fn = gen.emitLoad(loc, capture, funcTL, SGFContext(), IsNotTake);
@@ -1238,7 +1238,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   for (unsigned i : indices(funcTy->getParameters())) {
     auto &funcParam = funcTy->getParameters()[i];
     auto &param = blockTy->getParameters()[i];
-    SILValue v = new (gen.SGM.M) SILArgument(param.getSILType(), entry);
+    SILValue v = new (gen.SGM.M) SILArgument(entry, param.getSILType());
     
     ManagedValue mv;
     switch (param.getConvention()) {
@@ -1377,7 +1377,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
               ? param.getConvention() == ParameterConvention::Direct_Unowned
               : param.getConvention() == ParameterConvention::Direct_Owned)
            && "nonstandard conventions for native functions not implemented");
-    SILValue v = new (gen.SGM.M) SILArgument(param.getSILType(), entry);
+    SILValue v = new (gen.SGM.M) SILArgument(entry, param.getSILType());
     auto mv = gen.emitManagedRValueWithCleanup(v, tl);
     args.push_back(gen.emitNativeToBridgedValue(loc, mv, AbstractCC::C,
                                         param.getType(), param.getType(),
@@ -1386,8 +1386,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
   
   // Add the block argument.
   SILValue blockV
-    = new (gen.SGM.M) SILArgument(SILType::getPrimitiveObjectType(blockTy),
-                                  entry);
+    = new (gen.SGM.M) SILArgument(entry,
+                                  SILType::getPrimitiveObjectType(blockTy));
   ManagedValue block = gen.emitManagedRValueWithCleanup(blockV);
   
   // Call the block.
@@ -1891,7 +1891,7 @@ namespace {
                                           abstraction, origTargetTL, ctx);
         } else {
           SILValue argument = new (SGF.F.getModule())
-            SILArgument(origTargetTL.getLoweredType(), trueBB);
+            SILArgument(trueBB, origTargetTL.getLoweredType());
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
         }
@@ -2178,7 +2178,7 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
     auto argument =
-      new (SGF.F.getModule()) SILArgument(resultTL.getLoweredType(), contBB);
+      new (SGF.F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
 
@@ -2238,7 +2238,7 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
     });
 
   auto contBB = scope.exit();
-  auto isa = new (SGF.SGM.M) SILArgument(i1Ty, contBB);
+  auto isa = new (SGF.SGM.M) SILArgument(contBB, i1Ty);
   
   // Call the _getBool library intrinsic.
   ASTContext &ctx = SGF.SGM.M.getASTContext();
@@ -3425,8 +3425,9 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
                                AC.getIdentifier("$metatype"), SourceLoc(),
                                AC.getIdentifier("$metatype"), metatype,
                                ctor->getDeclContext());
-  return new (gen.F.getModule()) SILArgument(gen.getLoweredType(metatype),
-                                             gen.F.begin(), VD);
+  return new (gen.F.getModule()) SILArgument(gen.F.begin(),
+                                             gen.getLoweredType(metatype),
+                                             VD);
 }
 
 static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
@@ -3446,8 +3447,9 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
                                  AC.getIdentifier("$implicit_value"), 
                                  SourceLoc(),
                                  AC.getIdentifier("$implicit_value"), ty, DC);
-    SILValue arg = new (gen.F.getModule()) SILArgument(gen.getLoweredType(ty),
-                                                       gen.F.begin(), VD);
+    SILValue arg = new (gen.F.getModule()) SILArgument(gen.F.begin(),
+                                                       gen.getLoweredType(ty),
+                                                       VD);
     return RValue(gen, loc, ty, ManagedValue::forUnmanaged(arg));
   }
 }
@@ -3482,7 +3484,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"), selfTyCan,
                                  ctor);
-    resultSlot = new (gen.F.getModule()) SILArgument(selfTy, gen.F.begin(), VD);
+    resultSlot = new (gen.F.getModule()) SILArgument(gen.F.begin(), selfTy, VD);
   }
   
   // Emit the elementwise arguments.
@@ -3619,7 +3621,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     } else {
       // Pass 'nil' as the return value to the exit BB.
       failureExitArg = new (F.getModule())
-        SILArgument(resultLowering.getLoweredType(), failureExitBB);
+        SILArgument(failureExitBB, resultLowering.getLoweredType());
       SILValue nilResult = B.createEnum(ctor, {},
                     getASTContext().getOptionalNoneDecl(ctor->getFailability()),
                     resultLowering.getLoweredType());
@@ -3749,7 +3751,7 @@ static void emitAddressOnlyEnumConstructor(SILGenFunction &gen,
                                enumTy.getSwiftType(),
                                element->getDeclContext());
   SILValue resultSlot
-    = new (gen.F.getModule()) SILArgument(enumTy, gen.F.begin(), VD);
+    = new (gen.F.getModule()) SILArgument(gen.F.begin(), enumTy, VD);
   
   // Emit the exploded constructor argument.
   ManagedValue argValue;
@@ -3834,8 +3836,9 @@ namespace {
           makeArgument(fieldType, varDecl);
       } else {
         SILValue arg =
-          new (gen.F.getModule()) SILArgument(gen.getLoweredType(ty),
-                                              gen.F.begin(), varDecl);
+          new (gen.F.getModule()) SILArgument(gen.F.begin(),
+                                              gen.getLoweredType(ty),
+                                              varDecl);
         args.push_back(arg);
       }
     }
@@ -4051,7 +4054,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
              TupleType::getEmpty(F.getASTContext()), ctor);
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin(), selfDecl);
+  SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
 
   if (!NeedsBoxForSelf)
     B.createDebugValue(selfDecl, selfArg);
@@ -4107,7 +4110,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     SILBasicBlock *failureBB = createBasicBlock();
     failureExitBB = createBasicBlock();
     failureExitArg = new (F.getModule())
-      SILArgument(resultLowering.getLoweredType(), failureExitBB);
+      SILArgument(failureExitBB, resultLowering.getLoweredType());
 
     // On failure, we'll clean up everything (except self, which should already
     // have been released) and return nil instead.
@@ -4306,7 +4309,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   // Emit 'self', then mark it uninitialized.
   auto selfDecl = cd->getDestructor()->getImplicitSelfDecl();
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfArg = new (SGM.M) SILArgument(selfTy, F.begin(), selfDecl);
+  SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
   B.createDebugValue(selfDecl, selfArg);
   selfArg = B.createMarkUninitialized(selfDecl, selfArg,
                                       MarkUninitializedInst::RootSelf);
@@ -4358,7 +4361,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   ASTContext &c = gen.getASTContext();
   
   auto addSILArgument = [&](SILType t, ValueDecl *d) {
-    args.push_back(new (gen.SGM.M) SILArgument(t, gen.F.begin(), d));
+    args.push_back(new (gen.SGM.M) SILArgument(gen.F.begin(), t, d));
   };
 
   auto *vd = capture.getPointer();
@@ -4557,8 +4560,9 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
     auto selfMetatype = CanMetatypeType::get(allocatorSelfType->getCanonicalType(),
                                              MetatypeRepresentation::Thick);
     auto selfArg = new (F.getModule()) SILArgument(
+                                 F.begin(),
                                  SILType::getPrimitiveObjectType(selfMetatype),
-                                 F.begin(), fd->getImplicitSelfDecl());
+                                 fd->getImplicitSelfDecl());
     args.push_back(selfArg);
   }
   

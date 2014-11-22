@@ -162,7 +162,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *TrueBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    new (F.getModule()) SILArgument(argTy, ContBB);
+    new (F.getModule()) SILArgument(ContBB, argTy);
   }
   
   SILBasicBlock *FalseBB, *FalseDestBB;

@@ -159,7 +159,7 @@ updateOptimizedBBArgs(SILBasicBlock *BB, unsigned ArgOffset) const {
     return ArgOffset+1;
 
   // Otherwise, delete this argument and return ArgOffset.
-  BB->eraseArgument(ArgOffset);
+  BB->eraseBBArg(ArgOffset);
   return ArgOffset;
 }
 
@@ -489,8 +489,8 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // Then create the new thunk body since NewF has the right signature now.
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgDescs) {
-    ThunkBody->createArgument(ArgDesc.ParameterInfo.getSILType(),
-                              ArgDesc.Decl);
+    ThunkBody->createBBArg(ArgDesc.ParameterInfo.getSILType(),
+                           ArgDesc.Decl);
   }
   createThunkBody(ThunkBody, NewF, Analyzer);
 

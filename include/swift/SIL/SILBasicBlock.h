@@ -135,14 +135,28 @@ public:
   unsigned getNumBBArg() const { return BBArgList.size(); }
   const SILArgument *getBBArg(unsigned i) const { return BBArgList[i]; }
   SILArgument *getBBArg(unsigned i) { return BBArgList[i]; }
-  SILArgument *replaceBBArg(unsigned i, SILType Ty, ValueDecl *D =nullptr);
+
+  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and ValueDecl
+  /// \p D.
+  SILArgument *replaceBBArg(unsigned i, SILType Ty, ValueDecl *D=nullptr);
+
+  /// Erase a specific argument from the arg list.
+  void eraseBBArg(int Index) { BBArgList.erase(BBArgList.begin() + Index); }
+
+  /// Allocate a new argument of type \p Ty and append it to the argument
+  /// list. Optionally you can pass in a value decl parameter.
+  SILArgument *createBBArg(SILType Ty, const ValueDecl *D=nullptr);
+
+  /// Insert a new SILArgument with type \p Ty and \p Decl at position \p Pos.
+  SILArgument *insertBBArg(bbarg_iterator Pos, SILType Ty,
+                           const ValueDecl *D=nullptr);
 
   /// \brief Remove all block arguments.
-  void dropAllArgs() { BBArgList.clear(); }
+  void dropAllBBArgs() { BBArgList.clear(); }
 
   /// \brief Drops all uses that belong to this basic block.
   void dropAllReferences() {
-    dropAllArgs();
+    dropAllBBArgs();
     for (SILInstruction &I : *this)
       I.dropAllReferences();
   }
@@ -205,17 +219,13 @@ public:
     return &SILBasicBlock::InstList;
   }
 
-  /// Erase a specific argument from the arg list.
-  void eraseArgument(int idx) { BBArgList.erase(BBArgList.begin() + idx); }
-
-  /// Allocate a new argument of type \p Ty. Optionally you can pass in a value
-  /// decl parameter.
-  SILArgument *createArgument(SILType Ty, const ValueDecl *D=nullptr);
-
 private:
   friend class SILArgument;
+
   /// BBArgument's ctor adds it to the argument list of this block.
-  void addArgument(SILArgument *Arg) { BBArgList.push_back(Arg); }
+  void insertArgument(bbarg_iterator Iter, SILArgument *Arg) {
+    BBArgList.insert(Iter, Arg);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

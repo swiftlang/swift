@@ -124,8 +124,8 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
     F.getBlocks().splice(F.getBlocks().end(), F.getBlocks(),
                          SILFunction::iterator(ReturnToBB));
   // Create an argument on the return-to BB representing the returned value.
-  SILValue RetArg = new (F.getModule()) SILArgument(AI->getType(0),
-                                                    ReturnToBB);
+  SILValue RetArg = new (F.getModule()) SILArgument(ReturnToBB,
+                                                    AI->getType(0));
   // Replace all uses of the ApplyInst with the new argument.
   SILValue(AI).replaceAllUsesWith(RetArg);
   // And get rid of the no-longer-needed ApplyInst.

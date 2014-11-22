@@ -563,7 +563,7 @@ DeadParamCloner::populateCloned() {
     if (!DeadParamIndices.count(ArgNo)) {
       // Create a new argument which copies the original argument.
       SILValue MappedValue =
-        new (M) SILArgument((*I)->getType(), ClonedEntryBB, (*I)->getDecl());
+        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     } else {
       DeadParameters.insert(SILValue(*I));

@@ -886,7 +886,7 @@ emitReconstitutedConstantCaptureArguments(SILType ty,
                                           SILGenFunction &gen) {
   auto TT = ty.getAs<TupleType>();
   if (!TT)
-    return new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
+    return new (gen.SGM.M) SILArgument(gen.F.begin(), ty, capture);
   
   SmallVector<SILValue, 4> Elts;
   for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
@@ -928,9 +928,10 @@ static void emitCaptureArguments(SILGenFunction &gen,
     // LValues are captured as two arguments: a retained NativeObject that owns
     // the captured value, and the address of the value itself.
     SILType ty = gen.getLoweredType(type).getAddressType();
-    SILValue box = new (gen.SGM.M) SILArgument(SILType::getNativeObjectType(c),
-                                               gen.F.begin(), VD);
-    SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), VD);
+    SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(),
+                                               SILType::getNativeObjectType(c),
+                                               VD);
+    SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::getAddress(addr, box);
     gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
@@ -940,8 +941,9 @@ static void emitCaptureArguments(SILGenFunction &gen,
     assert(!type->is<LValueType>() && !type->is<InOutType>() &&
            "capturing inout by value?!");
     const TypeLowering &ti = gen.getTypeLowering(type);
-    SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
-                                                 gen.F.begin(), VD);
+    SILValue value = new (gen.SGM.M) SILArgument(gen.F.begin(),
+                                                 ti.getLoweredType(),
+                                                 VD);
     gen.LocalFunctions[SILDeclRef(VD)] = value;
     gen.enterDestroyCleanup(value);
     break;
@@ -950,7 +952,7 @@ static void emitCaptureArguments(SILGenFunction &gen,
     // Capture the setter and getter closures by value.
     Type setTy = cast<AbstractStorageDecl>(VD)->getSetter()->getType();
     SILType lSetTy = gen.getLoweredType(setTy);
-    SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(), VD);
+    SILValue value = new (gen.SGM.M) SILArgument(gen.F.begin(), lSetTy, VD);
     gen.LocalFunctions[SILDeclRef(cast<AbstractStorageDecl>(VD)->getSetter(),
                                   SILDeclRef::Kind::Func)] = value;
     gen.enterDestroyCleanup(value);
@@ -960,7 +962,7 @@ static void emitCaptureArguments(SILGenFunction &gen,
     // Capture the getter closure by value.
     Type getTy = cast<AbstractStorageDecl>(VD)->getGetter()->getType();
     SILType lGetTy = gen.getLoweredType(getTy);
-    SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(), VD);
+    SILValue value = new (gen.SGM.M) SILArgument(gen.F.begin(), lGetTy, VD);
     gen.LocalFunctions[SILDeclRef(cast<AbstractStorageDecl>(VD)->getGetter(),
                                   SILDeclRef::Kind::Func)] = value;
     gen.enterDestroyCleanup(value);
@@ -995,7 +997,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
                                  AC.getIdentifier("$return_value"), resultType,
                                  DeclCtx);
     IndirectReturnAddress = new (SGM.M)
-      SILArgument(returnTI.getLoweredType(), F.begin(), VD);
+      SILArgument(F.begin(), returnTI.getLoweredType(), VD);
   }
   
   // Emit the argument variables in calling convention order.
@@ -1013,7 +1015,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
 SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
   SILType selfType = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfValue = new (SGM.M) SILArgument(selfType, F.begin(), selfDecl);
+  SILValue selfValue = new (SGM.M) SILArgument(F.begin(), selfType, selfDecl);
   VarLocs[selfDecl] = VarLoc::getConstant(selfValue);
   B.createDebugValue(selfDecl, selfValue);
   return selfValue;
@@ -1028,7 +1030,7 @@ void SILGenFunction::prepareEpilog(Type resultType, CleanupLocation CleanupL) {
   if (NeedsReturn) {
     auto &resultTI = getTypeLowering(resultType);
     if (!resultTI.isAddressOnly())
-      new (F.getModule()) SILArgument(resultTI.getLoweredType(), epilogBB);
+      new (F.getModule()) SILArgument(epilogBB, resultTI.getLoweredType());
   }
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 }
@@ -1730,7 +1732,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   if (objcInfo->hasIndirectResult()) {
     SILType argTy = gen.F.mapTypeIntoContext(
                            objcInfo->getIndirectResult().getSILType());
-    auto arg = new (gen.F.getModule()) SILArgument(argTy, gen.F.begin());
+    auto arg = new (gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
     bridgedArgs.push_back(ManagedValue::forUnmanaged(arg));
   }
   
@@ -1739,7 +1741,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   assert(!inputs.empty());
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = gen.F.mapTypeIntoContext(inputs[i].getSILType());
-    SILValue arg = new(gen.F.getModule()) SILArgument(argTy, gen.F.begin());
+    SILValue arg = new(gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
     
     // If the argument is a block, copy it.
     if (argTy.isBlockPointerCompatible()) {

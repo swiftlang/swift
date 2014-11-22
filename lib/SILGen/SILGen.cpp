@@ -821,9 +821,9 @@ void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   auto &C = gen.getASTContext();
   auto FnTy = gen.F.getLoweredFunctionType();
   auto argc = new (gen.F.getModule()) SILArgument(
-                                  FnTy->getParameters()[0].getSILType(), entry);
+                                  entry, FnTy->getParameters()[0].getSILType());
   auto argv = new (gen.F.getModule()) SILArgument(
-                                  FnTy->getParameters()[1].getSILType(), entry);
+                                  entry, FnTy->getParameters()[1].getSILType());
   
   // If the standard library provides a _didEnterMain intrinsic, call it first
   // thing.

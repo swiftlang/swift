@@ -389,8 +389,9 @@ static void collectParams(SILGenFunction &gen,
     gen.F.getLoweredFunctionType()->getParametersWithoutIndirectResult();
   for (auto param : paramTypes) {
     auto paramTy = gen.F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = new (gen.SGM.M) SILArgument(paramTy,
-                                                  gen.F.begin());
+    auto paramValue = new (gen.SGM.M) SILArgument(gen.F.begin(),
+                                                  paramTy);
+                                      
     params.push_back(manageParam(gen, loc, paramValue, param));
   }
 }
@@ -890,7 +891,7 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   if (thunkType->hasIndirectResult()) {
     auto resultType = thunkType->getIndirectResult().getSILType();
     resultType = gen.F.mapTypeIntoContext(resultType);
-    outerResultAddr = new (gen.SGM.M) SILArgument(resultType, gen.F.begin());
+    outerResultAddr = new (gen.SGM.M) SILArgument(gen.F.begin(), resultType);
   }
 
   SmallVector<ManagedValue, 8> params;
@@ -1576,7 +1577,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   if (thunkTy->hasIndirectResult()) {
     auto resultType = thunkTy->getIndirectResult().getSILType();
     resultType = F.mapTypeIntoContext(resultType);
-    reqtResultAddr = new (SGM.M) SILArgument(resultType, F.begin());
+    reqtResultAddr = new (SGM.M) SILArgument(F.begin(), resultType);
   }
 
   SmallVector<ManagedValue, 8> origParams;

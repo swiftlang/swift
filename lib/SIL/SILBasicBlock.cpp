@@ -62,8 +62,13 @@ SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty, ValueDecl *D) {
   return NewArg;
 }
 
-SILArgument *SILBasicBlock::createArgument(SILType Ty, const ValueDecl *D) {
-  return new (getModule()) SILArgument(Ty, this, D);
+SILArgument *SILBasicBlock::createBBArg(SILType Ty, const ValueDecl *D) {
+  return new (getModule()) SILArgument(this, Ty, D);
+}
+
+SILArgument *SILBasicBlock::insertBBArg(bbarg_iterator Iter, SILType Ty,
+                                        const ValueDecl *D) {
+  return new (getModule()) SILArgument(this, Iter, Ty, D);
 }
 
 /// \brief Splits a basic block into two at the specified instruction.

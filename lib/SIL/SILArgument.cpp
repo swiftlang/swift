@@ -23,7 +23,7 @@ using namespace swift;
 // SILArgument Implementation
 //===----------------------------------------------------------------------===//
 
-SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB,
+SILArgument::SILArgument(SILBasicBlock *ParentBB, SILType Ty,
                          const ValueDecl *D)
   : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
   // Function arguments need to have a decl.
@@ -32,7 +32,20 @@ SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB,
     ParentBB->getParent()->size() == 1
           ? D != nullptr
           : true );
-  ParentBB->addArgument(this);
+  ParentBB->insertArgument(ParentBB->bbarg_end(), this);
+}
+
+SILArgument::SILArgument(SILBasicBlock *ParentBB,
+                         SILBasicBlock::bbarg_iterator Pos,
+                         SILType Ty, const ValueDecl *D)
+  : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
+  // Function arguments need to have a decl.
+  assert(
+    !ParentBB->getParent()->isBare() &&
+    ParentBB->getParent()->size() == 1
+          ? D != nullptr
+          : true );
+  ParentBB->insertArgument(Pos, this);
 }
 
 

@@ -348,15 +348,16 @@ ClosureCloner::populateCloned() {
       // Handle the case of a promoted capture argument
       SILArgument *ReleaseArgument = *I++;
       SILValue MappedValue =
-        new (M) SILArgument((*I)->getType().getObjectType(),
-                            ClonedEntryBB, (*I)->getDecl());
+        new (M) SILArgument(ClonedEntryBB,
+                            (*I)->getType().getObjectType(),
+                            (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(ReleaseArgument, MappedValue));
       AddrArgumentMap.insert(std::make_pair(*I, MappedValue));
       ++ArgNo;
     } else {
       // Otherwise, create a new argument which copies the original argument
       SILValue MappedValue =
-        new (M) SILArgument((*I)->getType(), ClonedEntryBB, (*I)->getDecl());
+        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;

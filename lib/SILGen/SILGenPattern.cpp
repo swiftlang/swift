@@ -1726,7 +1726,7 @@ void SwitchEmission::emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         if (eltTL.isLoadable())
           eltValue = SGF.B.createLoad(loc, eltValue);
       } else {
-        eltValue = new (SGF.F.getModule()) SILArgument(eltTy, caseBB);
+        eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
       }
 
       // Normally we'd just use the consumption of the source

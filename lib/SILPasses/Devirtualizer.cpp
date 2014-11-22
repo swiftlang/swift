@@ -660,7 +660,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createArgument(SubClassTy);
+  Iden->createBBArg(SubClassTy);
 
   SILBasicBlock *Continue = Entry->splitBasicBlock(It);
 
@@ -699,7 +699,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
 
   // Create a PHInode for returning the return value from both apply
   // instructions.
-  SILArgument *Arg = Continue->createArgument(AI->getType());
+  SILArgument *Arg = Continue->createBBArg(AI->getType());
   IdenBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(IdenAI))
     ->setDebugScope(AI->getDebugScope());
   VirtBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(VirtAI))

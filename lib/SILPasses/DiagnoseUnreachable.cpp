@@ -178,7 +178,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   }
 
   // Remove args from the block.
-  BB.dropAllArgs();
+  BB.dropAllBBArgs();
 
   // The old branch instructions are no longer used, erase them.
   recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);

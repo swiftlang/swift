@@ -3282,7 +3282,7 @@ bool SILParser::parseSILBasicBlock() {
             P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
             parseSILType(Ty))
           return true;
-        auto Arg = new (SILMod) SILArgument(Ty, BB);
+        auto Arg = new (SILMod) SILArgument(BB, Ty);
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
       

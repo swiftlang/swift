@@ -165,7 +165,7 @@ void CapturePropagationCloner::cloneBlocks(
     SILArgument *Arg = OrigEntryBB->getBBArg(ParamIdx);
 
     SILValue MappedValue = new (M)
-        SILArgument(remapType(Arg->getType()), ClonedEntryBB, Arg->getDecl());
+        SILArgument(ClonedEntryBB, remapType(Arg->getType()), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }
   assert(OrigEntryBB->bbarg_size() - ParamIdx == PartialApplyArgs.size()

@@ -553,7 +553,7 @@ static SILValue fixPhiPredBlocks(SmallVectorImpl<StoreInst *> &Stores,
   assert(Stores.size() ==
          (unsigned)std::distance(Dest->pred_begin(), Dest->pred_end()) &&
          "Multiple store forwarding size mismatch");
-  auto PhiValue = new (M) SILArgument(Stores[0]->getSrc().getType(), Dest);
+  auto PhiValue = new (M) SILArgument(Dest, Stores[0]->getSrc().getType());
   unsigned Id = 0;
   for (auto Pred : PredOrder) {
     TermInst *TI = Pred->getTerminator();

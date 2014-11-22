@@ -733,7 +733,7 @@ namespace {
       for (auto &elt : nonTrivialElts) {
         auto bb = new (M) SILBasicBlock(&B.getFunction());
         auto argTy = elt.getLowering().getLoweredType();
-        new (M) SILArgument(argTy, bb);
+        new (M) SILArgument(bb, argTy);
         nonTrivialBBs.push_back({elt.getElement(), bb});
       }
 

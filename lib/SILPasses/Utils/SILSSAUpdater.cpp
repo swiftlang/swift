@@ -200,7 +200,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   }
 
   // Create a new phi node.
-  SILArgument *PHI(new (BB->getModule()) SILArgument(ValType, BB));
+  SILArgument *PHI(new (BB->getModule()) SILArgument(BB, ValType));
   for (auto &EV : PredVals)
     addNewEdgeValueToBranch(EV.first->getTerminator(), BB, EV.second);
 
@@ -304,7 +304,7 @@ public:
   static SILValue CreateEmptyPHI(SILBasicBlock *BB, unsigned NumPreds,
                                  SILSSAUpdater *Updater) {
     // Add the argument to the block.
-    SILValue PHI(new (BB->getModule()) SILArgument(Updater->ValType, BB), 0);
+    SILValue PHI(new (BB->getModule()) SILArgument(BB, Updater->ValType), 0);
 
     // Mark all predecessor blocks with the sentinel undef value.
     for (auto *PredBB: BB->getPreds()) {

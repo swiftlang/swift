@@ -318,7 +318,7 @@ namespace {
                                 CastConsumptionKind::TakeAlways);
         } else {
           SILValue sourceObjectValue =
-            new (M) SILArgument(loweredSourceObjectType, someBB);
+            new (M) SILArgument(someBB, loweredSourceObjectType);
           objectSource = Source(sourceObjectValue, sourceObjectType,
                                 source.Consumption);
         }
@@ -356,7 +356,7 @@ namespace {
       if (target.isAddress()) {
         return target.asAddressSource();
       } else {
-        SILValue result = new (M) SILArgument(target.LoweredType, contBB);
+        SILValue result = new (M) SILArgument(contBB, target.LoweredType);
         return target.asScalarSource(result);
       }
     }
@@ -539,7 +539,7 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
   B.setInsertionPoint(scalarSuccBB); {
     auto &targetTL = B.getModule().Types.getTypeLowering(targetValueType);
     SILValue succValue =
-      new (B.getModule()) SILArgument(targetValueType, scalarSuccBB);
+      new (B.getModule()) SILArgument(scalarSuccBB, targetValueType);
     if (!shouldTakeOnSuccess(consumption))
       targetTL.emitRetainValue(B, loc, succValue);
     targetTL.emitStoreOfCopy(B, loc, succValue, dest, IsInitialization);

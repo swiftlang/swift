@@ -119,7 +119,7 @@ void SpecializingCloner::populateCloned() {
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
   while (I != E) {
     SILValue MappedValue =
-      new (M) SILArgument(remapType((*I)->getType()), ClonedEntryBB,
+      new (M) SILArgument(ClonedEntryBB, remapType((*I)->getType()),
                           (*I)->getDecl());
     ValueMap.insert(std::make_pair(*I, MappedValue));
     ++I;

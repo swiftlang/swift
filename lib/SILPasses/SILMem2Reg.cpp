@@ -346,7 +346,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   SILModule &M = ASI->getModule();
 
   for (auto Block : PhiBlocks)
-    new (M) SILArgument(ASI->getElementType(), Block);
+    new (M) SILArgument(Block, ASI->getElementType());
 }
 
 SILValue
