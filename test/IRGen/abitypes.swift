@@ -223,15 +223,12 @@ class Foo {
   // x86_64-macosx: ret i8 [[TOOBJCBOOL]]
   //
   // x86_64-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
-  // x86_64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
   // x86_64-ios: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 8
-  // x86_64-ios: [[NEG:%[0-9]+]] = call i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 [[TOOBJCBOOL]])
-  // x86_64-ios: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool{{.*}}(i1 [[NEG]])
-  // x86_64-ios: ret i1 [[TOBOOL]]
+  // x86_64-ios: [[NEG:%[0-9]+]] = call i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 %0)
+  // x86_64-ios: ret i1 [[NEG]]
   //
   // x86_64-ios: define internal zeroext i1 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i1 zeroext)
-  // x86_64-ios: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool
-  // x86_64-ios: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1 [[TOBOOL]]
+  // x86_64-ios: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1
   // x86_64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // x86_64-ios: ret i1 [[TOOBJCBOOL]]
   //
