@@ -27,6 +27,7 @@ namespace clang {
   class Decl;
   class MacroInfo;
   class Module;
+  class NamedDecl;
   class Sema;
   class TargetInfo;
   class VisibleDeclConsumer;
@@ -38,6 +39,7 @@ class ASTContext;
 class ClangImporterOptions;
 class ClangModuleUnit;
 class ClangNode;
+class Decl;
 class IRGenOptions;
 class LazyResolver;
 class Module;
@@ -182,6 +184,10 @@ public:
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const;
   std::string getClangModuleHash() const;
+
+  /// If we already imported a given decl, return the corresponding Swift decl.
+  /// Otherwise, return nullptr.
+  Decl *importDeclCached(const clang::NamedDecl *ClangDecl);
 
   /// Returns true if it is expected that the macro is ignored.
   bool shouldIgnoreMacro(StringRef Name, const clang::MacroInfo *Macro);

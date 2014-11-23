@@ -2607,6 +2607,10 @@ std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash();
 }
 
+Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
+  return Impl.importDeclCached(ClangDecl);
+}
+
 bool ClangImporter::shouldIgnoreMacro(StringRef Name,
                                       const clang::MacroInfo *Macro) {
   return Impl.shouldIgnoreMacro(Name, Macro);
