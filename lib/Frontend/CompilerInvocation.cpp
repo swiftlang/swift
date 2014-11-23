@@ -937,6 +937,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
   Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
+  if (Args.hasArg(OPT_disable_llvm_verify))
+    Opts.Verify = false;
+
   Opts.EnableDynamicValueTypeLayout |=
     Args.hasArg(OPT_enable_dynamic_value_type_layout);
   Opts.HasUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);

@@ -130,6 +130,9 @@ def disable_llvm_optzns : Flag<["-"], "disable-llvm-optzns">,
 def disable_llvm_arc_opts : Flag<["-"], "disable-llvm-arc-opts">,
   HelpText<"Don't run LLVM ARC optimization passes.">;
 
+def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
+  HelpText<"Don't run the LLVM IR verifier.">;
+
 def disable_sil_linking : Flag<["-"], "disable-sil-linking">,
   HelpText<"Don't link SIL functions">;
 
