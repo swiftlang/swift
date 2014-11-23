@@ -255,7 +255,8 @@ class Foo {
   //
   // arm64-ios: define internal zeroext i1 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i1 zeroext)
   // arm64-ios: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1
-  // arm64-ios: ret i1 [[NEG]]
+  // arm64-ios: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
+  // arm64-ios: ret i1 [[TOOBJCBOOL]]
   //
   // i386-ios: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {
   // i386-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
