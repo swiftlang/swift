@@ -1,4 +1,5 @@
 // RUN: %swift -parse %clang-importer-sdk %s -verify
+// XFAIL: linux
 import ObjectiveC
 
 // Attribute requires that all stored properties have in-class

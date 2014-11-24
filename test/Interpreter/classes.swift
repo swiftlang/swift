@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// XFAIL: linux
 
 class Interval {
   var lo, hi : Int

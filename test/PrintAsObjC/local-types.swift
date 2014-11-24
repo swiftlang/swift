@@ -6,6 +6,7 @@
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -parse-as-library %t/local.swiftmodule -parse -emit-objc-header-path %t/local.h -import-objc-header %S/../Inputs/empty.h
 // RUN: FileCheck %s < %t/local.h
 // RUN: %check-in-clang %t/local.h
+// XFAIL: linux
 
 import ObjectiveC
 

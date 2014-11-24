@@ -1,4 +1,5 @@
 // RUN: %swift -emit-ir %s
+// XFAIL: linux
 
 // This is a compile-only test. It checks if IRGen does not crash when packing
 // and unpacking enums (e.g. optionas) which contain empty structs as payloads.

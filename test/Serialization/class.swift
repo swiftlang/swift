@@ -4,7 +4,7 @@
 // RUN: llvm-bcanalyzer %t/def_class.swiftmodule | FileCheck %s
 // RUN: %swift -emit-sil -sil-debug-serialization -I=%t %s | FileCheck %s -check-prefix=SIL
 // RUN: echo "import def_class; struct A : ClassProto {}" | not %swift -parse -I=%t - 2>&1 | FileCheck %s -check-prefix=CHECK-STRUCT
-
+// XFAIL: linux
 // CHECK-NOT: UnknownCode
 // CHECK-STRUCT: non-class type 'A' cannot conform to class protocol 'ClassProto'
 

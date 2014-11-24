@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// XFAIL: linux
 
 func allToInt<T>(x: T) -> Int {
   return x as Int

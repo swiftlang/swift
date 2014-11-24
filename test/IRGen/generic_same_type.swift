@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -Onone | FileCheck %s
+// XFAIL: linux
 
 // FIXME: Should be a SIL test, but we can't parse same-type constraints
 // <rdar://problem/16238241>

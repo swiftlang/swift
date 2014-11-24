@@ -1,4 +1,5 @@
 // RUN: %swift -parse-stdlib -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -o - | FileCheck %s
+// XFAIL: linux
 
 import Swift
 

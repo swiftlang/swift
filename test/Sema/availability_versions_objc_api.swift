@@ -1,5 +1,6 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -enable-experimental-availability-checking -target x86_64-apple-macosx10.9 %s
+// XFAIL: linux
 
 import Foundation
 

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -parse -verify
+// XFAIL: linux
 import Foundation
 import CoreGraphics
 

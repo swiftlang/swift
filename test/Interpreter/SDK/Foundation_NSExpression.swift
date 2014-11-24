@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// XFAIL: linux
 // rdar://16726530
 
 import Foundation

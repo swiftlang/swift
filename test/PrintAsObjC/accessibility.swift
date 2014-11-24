@@ -6,6 +6,7 @@
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache %s -parse -import-objc-header %S/../Inputs/empty.h -emit-objc-header-path %t/accessibility-internal.h
 // RUN: FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-internal.h
 // RUN: %check-in-clang %t/accessibility-internal.h
+// XFAIL: linux
 
 // CHECK-LABEL: @interface A_Public{{$}}
 // CHECK-INTERNAL-NEXT: init

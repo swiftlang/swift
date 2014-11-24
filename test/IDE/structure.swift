@@ -1,4 +1,5 @@
 // RUN: %swift-ide-test -structure -source-filename %s | FileCheck %s
+// XFAIL: linux
 
 // CHECK: Class at [[@LINE+1]]:1 - [[@LINE+27]]:2, name at [[@LINE+1]]:7 - [[@LINE+1]]:12, inherited types at [[@LINE+1]]:15 - [[@LINE+1]]:25
 class MyCls : OtherClass {

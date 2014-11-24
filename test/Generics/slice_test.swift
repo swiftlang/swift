@@ -1,4 +1,5 @@
 // RUN: %swift %s -parse -parse-stdlib -verify
+// XFAIL: linux
 
 import Swift
 

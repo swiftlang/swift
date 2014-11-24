@@ -1,5 +1,6 @@
 // RUN: rm -rf %t
 // RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -O -emit-sil -I %S/Inputs -enable-source-import -primary-file %s -enable-union-import | FileCheck %s
+// XFAIL: linux
 
 import gizmo
 

@@ -1,4 +1,5 @@
 // RUN: %swift -parse %s -verify
+// XFAIL: linux
 
 class Root : Hashable { 
   var hashValue: Int {

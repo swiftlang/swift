@@ -2,6 +2,7 @@
 // RUN: %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s -verify
 // -- Check that we can successfully round-trip.
 // RUN: %swift %clang-importer-sdk -emit-ir -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s >/dev/null
+// XFAIL: linux
 
 import Foundation
 import user_objc

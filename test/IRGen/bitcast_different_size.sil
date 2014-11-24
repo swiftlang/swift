@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir %s -verify | FileCheck %s
+// XFAIL: linux
 
 sil_stage canonical
 

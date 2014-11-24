@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift foo | FileCheck %s
+// XFAIL: linux
 
 import Foundation
 

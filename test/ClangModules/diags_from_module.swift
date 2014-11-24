@@ -1,6 +1,7 @@
 // RUN: rm -rf %t.mcp
 // RUN: not %swift -parse %s -F %S/Inputs/frameworks -module-cache-path %t.mcp -Xcc -D -Xcc FOO 2> %t.err.txt
 // RUN: FileCheck -input-file=%t.err.txt %s
+// XFAIL: linux
 
 import Module
 

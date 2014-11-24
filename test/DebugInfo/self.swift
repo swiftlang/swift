@@ -1,4 +1,5 @@
 // RUN: %swift -primary-file %s -emit-ir -g -o - | FileCheck %s
+// XFAIL: linux
 struct stuffStruct {
     var a: Int = 6
     var b: String = "Nothing"

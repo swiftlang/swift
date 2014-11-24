@@ -1,5 +1,6 @@
 // RUN: %target-build-swift -parse %s -Xfrontend -verify
 // RUN: %target-build-swift -emit-ir -g %s -DNO_ERROR > /dev/null
+// XFAIL: linux
 
 import OpenAL.AL
 

@@ -1,5 +1,6 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
+// XFAIL: linux
 
 import gizmo
 import objc_protocols_Bas

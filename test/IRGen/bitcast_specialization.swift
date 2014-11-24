@@ -1,4 +1,5 @@
 // RUN: %swift -emit-object -target x86_64-apple-macosx10.9 -O %s
+// XFAIL: linux
 
 // This is a compile-only test. It checks that the compiler does not crash for
 // a (not executed) bitcast with different sizes. This appears in the

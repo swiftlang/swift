@@ -1,4 +1,5 @@
 // RUN: %swift -primary-file %s -emit-ir -g -o - | FileCheck %s
+// XFAIL: linux
 // Test debug info for storageless variables.
 struct Symbol {}
 func peek() -> Symbol? { return Symbol() }

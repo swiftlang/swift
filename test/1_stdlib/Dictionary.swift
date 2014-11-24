@@ -8,6 +8,7 @@
 // RUN: %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
 //
 // RUN: %target-run %t/Dictionary
+// XFAIL: linux
 
 import Darwin
 import StdlibUnittest

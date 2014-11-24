@@ -1,4 +1,5 @@
 // RUN: %swift -parse %s -verify
+// XFAIL: linux
 
 class V {}
 class U : V {}

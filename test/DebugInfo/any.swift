@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// XFAIL: linux
 func main() {
   // CHECK: call void @llvm.dbg.declare(metadata !{%"protocol<>"* {{.*}}}, metadata ![[S:.*]], metadata !{{[0-9]+}}), !dbg ![[DBG:.*]]
   // CHECK: ![[S]] ={{.*}}[ DW_TAG_auto_variable ] [s] [line [[@LINE+3]]]

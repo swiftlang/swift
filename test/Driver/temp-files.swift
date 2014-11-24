@@ -4,6 +4,7 @@
 // RUN: env TMPDIR=%t/tmp/ %swiftc_driver -emit-executable %s -o %t/main
 // RUN: ls %t/main
 // RUN: ls %t/tmp | FileCheck -check-prefix=EMPTY %s
+// XFAIL: linux
 
 // EMPTY-NOT: .{{(o|swiftmodule|swiftdoc)}}
 

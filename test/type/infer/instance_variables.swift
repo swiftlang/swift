@@ -1,4 +1,5 @@
 // RUN: %swift -parse %s -verify
+// XFAIL: linux
 
 struct X { 
   var b = true, i = 17

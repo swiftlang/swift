@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir | FileCheck %s
+// XFAIL: linux
 
 // -- partial_apply context metadata
 

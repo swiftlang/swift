@@ -1,6 +1,7 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift %clang-importer-sdk -emit-sil -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s -verify
 // RUN: ls -lR %t/clang-module-cache | FileCheck %s
+// XFAIL: linux
 // CHECK: ObjectiveC{{.*}}.pcm
 
 import AppKit

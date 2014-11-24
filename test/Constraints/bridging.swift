@@ -1,5 +1,6 @@
 // RUN: rm -rf %t  &&  mkdir %t
 // RUN: %target-swift-frontend %s -parse -verify
+// XFAIL: linux
 
 import Foundation
 

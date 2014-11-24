@@ -2,6 +2,7 @@
 // RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache %s -DIMPORT_TOP_LEVEL
 // RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache %s
 // RUN: ls -lR %t/clang-module-cache | FileCheck %s
+// XFAIL: linux
 // CHECK: ctypes{{.*}}.pcm
 
 // RUN: %swift %clang-importer-sdk -emit-module-path %t/submodules.swiftmodule -module-cache-path %t/clang-module-cache %s -DNO_ERRORS

@@ -1,4 +1,5 @@
 // RUN: %swift -emit-ir %s | FileCheck %s
+// XFAIL: linux
 
 protocol A {
   typealias B

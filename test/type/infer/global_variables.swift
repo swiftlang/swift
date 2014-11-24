@@ -1,4 +1,5 @@
 // RUN: %swift -parse %s -verify
+// XFAIL: linux
 
 var b = true, i = 17
 

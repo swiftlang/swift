@@ -1,5 +1,6 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -S -g -o - | FileCheck %s --check-prefix ASM-CHECK
+// XFAIL: linux
 import Swift
 
 class MyClass

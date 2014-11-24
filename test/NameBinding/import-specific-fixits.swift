@@ -9,6 +9,7 @@
 // RUN: %swift -parse -I=%t -serialize-diagnostics-path %t.dia %s -verify
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
 // RUN: FileCheck --input-file=%t.deserialized_diagnostics.txt %s
+// XFAIL: linux
 
 import typealias Swift.Int
 import struct Swift.Int

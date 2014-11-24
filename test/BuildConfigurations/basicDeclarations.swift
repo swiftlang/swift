@@ -1,4 +1,5 @@
 // RUN: %swift -parse %s -verify -D FOO -D BAR -target x86_64-apple-macosx10.9
+// XFAIL: linux
 
 class A {}
 

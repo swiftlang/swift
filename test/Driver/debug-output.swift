@@ -1,6 +1,7 @@
 // REQUIRES: asserts
 
 // RUN: %swift -emit-ir %S/Inputs/single_int.swift -o /dev/null -print-stats 2>&1 | FileCheck %s -check-prefix=STATS
+// XFAIL: linux
 // STATS: Statistics Collected
 // Only print statistics once
 // STATS-NOT: Statistics Collected

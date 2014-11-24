@@ -1,5 +1,6 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -I %S/Inputs/custom-modules %s -verify
+// XFAIL: linux
 
 import AppKit
 

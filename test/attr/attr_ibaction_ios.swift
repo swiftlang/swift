@@ -1,4 +1,5 @@
 // RUN: not %target-build-swift -parse %s 2>&1 | FileCheck -check-prefix=CHECK-%target-os %s
+// XFAIL: linux
 
 class IBActionWrapperTy {
   @IBAction func nullary() {}

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/FloatingPoint
 // RUN: %target-run %t/FloatingPoint
-// XFAIL: interpret
+// XFAIL: interpret, linux
 
 import Swift
 import StdlibUnittest

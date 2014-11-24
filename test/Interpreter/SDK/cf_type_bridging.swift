@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// XFAIL: linux
 
 #if os(OSX)
 import AppKit

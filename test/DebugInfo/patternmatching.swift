@@ -2,6 +2,7 @@
 // RUN: cat %t | FileCheck %s
 // RUN: cat %t | FileCheck --check-prefix=CHECK-SCOPES %s
 // RUN: %swift -emit-sil -emit-verbose-sil -primary-file %s -o - | FileCheck %s --check-prefix=SIL-CHECK
+// XFAIL: linux
 func classifyPoint2(p: (Double, Double)) {
     func return_same (var input : Double) -> Double
     {

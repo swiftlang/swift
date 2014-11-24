@@ -7,6 +7,7 @@
 // RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/ObjCWeak/ObjCWeak.m -c -o %t/ObjCWeak.o
 // RUN: %target-build-swift %t/main.swift -I %S/Inputs/ObjCWeak/ -Xlinker %t/ObjCWeak.o -o %t/weak_objc_interop -Xfrontend -disable-access-control
 // RUN: %target-run %t/weak_objc_interop 2>&1 | FileCheck %s
+// XFAIL: linux
 
 import Foundation
 import ObjCWeak

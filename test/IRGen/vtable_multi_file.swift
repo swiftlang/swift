@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s %S/Inputs/vtable_multi_file_helper.swift -emit-ir | FileCheck %s
+// XFAIL: linux
 
 // CHECK-LABEL: define hidden void @_TF17vtable_multi_file36baseClassVtablesIncludeImplicitInitsFT_T_() {
 func baseClassVtablesIncludeImplicitInits() {

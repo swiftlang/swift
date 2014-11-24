@@ -8,6 +8,7 @@
 // RUN: %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control
 //
 // RUN: %target-run %t/Set
+// XFAIL: linux
 
 import StdlibUnittest
 import Foundation

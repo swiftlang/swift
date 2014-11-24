@@ -9,6 +9,7 @@
 
 // RUN: rm %t/serialized-objc-header.h
 // RUN: lldb-moduleimport-test %t/ASTSection-with-ObjC | FileCheck %s
+// XFAIL: linux
 
 // REQUIRES: ld-add_ast_path
 

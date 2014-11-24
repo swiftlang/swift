@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -parse-stdlib -disable-access-control -enable-character-literals | FileCheck %s
+// XFAIL: linux
 
 import Swift
 

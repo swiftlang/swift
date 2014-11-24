@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// XFAIL: linux
 class Class {
 // CHECK: _TtQq_FC5atype5Class8function
 	func function <T> (x : T) {

@@ -7,4 +7,4 @@
 // RUN: sed -n -e '/A000/,$ p' %t/comments.h > %t/comments.h-cleaned
 // RUN: diff %t/comments.h-cleaned %S/Inputs/comments-expected-output.h
 // RUN: %check-in-clang -Wno-documentation %t/comments.h
-
+// XFAIL: linux

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -verify -parse %s
+// XFAIL: linux
 
 import Dispatch
 

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse %s -verify
+// XFAIL: linux
 
 import Darwin
 import ObjectiveC

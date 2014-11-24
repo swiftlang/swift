@@ -2,6 +2,7 @@
 
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -primary-file %s -emit-ir -module-name clang_inline | FileCheck %s
+// XFAIL: linux
 import gizmo
 
 // CHECK: define hidden i64 @_TFC12clang_inline16CallStaticInline10ReturnZerofS0_FT_Si(%C12clang_inline16CallStaticInline*) {

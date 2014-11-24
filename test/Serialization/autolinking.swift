@@ -20,6 +20,7 @@
 // RUN: %swift -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load | FileCheck --check-prefix=FORCE-LOAD %s
 // RUN: %swift -emit-ir -parse-stdlib -module-name someModule -module-link-name 0module %S/../Inputs/empty.swift -autolink-force-load | FileCheck --check-prefix=FORCE-LOAD-HEX %s
 
+// XFAIL: linux
 // REQUIRES: X86
 
 import someModule

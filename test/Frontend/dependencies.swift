@@ -2,6 +2,7 @@
 // RUN: mkdir %t
 
 // RUN: %swift -emit-dependencies-path - -parse %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC %s
+// XFAIL: linux
 
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty.swift

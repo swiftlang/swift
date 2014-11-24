@@ -1,6 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules/ %s
 // RUN: ls -lR %t/clang-module-cache | FileCheck %s
+// XFAIL: linux
 // CHECK: ctypes{{.*}}.pcm
 
 // RUN: %swift %clang-importer-sdk -o %t -emit-module -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules/ %s -module-name submodules

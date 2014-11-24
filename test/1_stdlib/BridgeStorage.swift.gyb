@@ -18,6 +18,7 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib -module-cache-path %t/clang-module-cache %t/out.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
+// XFAIL: linux
 
 import Swift
 

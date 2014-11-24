@@ -7,6 +7,7 @@
 // RUN: FileCheck %s < %t/extensions.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/extensions.h
 // RUN: %check-in-clang %t/extensions.h
+// XFAIL: linux
 
 import Foundation
 import AppKit

@@ -7,6 +7,7 @@
 
 // RUN: %swiftc_driver -emit-module -o %t/Mixed.framework/Modules/Mixed.swiftmodule/x86_64.swiftmodule %S/Inputs/mixed-framework/Mixed.swift -import-underlying-module -F %t -module-name Mixed -Xfrontend -disable-objc-attr-requires-foundation-module
 // RUN: %swift %clang-importer-sdk -module-cache-path %t -F %t -parse %s -verify
+// XFAIL: linux
 
 // REQUIRES: X86
 

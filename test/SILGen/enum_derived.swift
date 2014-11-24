@@ -1,4 +1,5 @@
 // RUN: %swift -O -primary-file %s -emit-ir | FileCheck %s
+// XFAIL: linux
 
 // Check if the hashValue and == for an enum (without payload) are generated and
 // check if that functions are compiled in an optimal way.

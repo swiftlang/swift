@@ -1,6 +1,7 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
 // RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck %s
+// XFAIL: linux
 
 // CHECK: [[HOOZIT:%C17objc_class_export6Hoozit]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[REF]] = type

@@ -7,6 +7,7 @@
 // RUN: FileCheck %s < %t/protocols.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
 // RUN: %check-in-clang %t/protocols.h
+// XFAIL: linux
 
 import Foundation
 

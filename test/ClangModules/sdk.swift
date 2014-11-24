@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse -verify %s 
+// XFAIL: linux
 
 import Foundation
 

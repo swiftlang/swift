@@ -1,4 +1,5 @@
 // RUN: %swift %clang-importer-sdk -parse %s -verify
+// XFAIL: linux
 
 import Security
 

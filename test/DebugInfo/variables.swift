@@ -1,4 +1,5 @@
 // RUN: %target-build-swift %s -g -emit-ir -o - | FileCheck %s
+// XFAIL: linux
 
 // Ensure that the debug info we're emitting passes the back end verifier.
 // RUN: %target-build-swift %s -g -S -o - | FileCheck %s --check-prefix ASM

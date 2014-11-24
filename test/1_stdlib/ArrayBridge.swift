@@ -20,6 +20,7 @@
 
 // RUN: %target-run %t/ArrayBridge > %t.txt
 // RUN: FileCheck %s < %t.txt
+// XFAIL: linux
 
 import Foundation
 import ArrayBridgeObjC

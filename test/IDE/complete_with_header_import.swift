@@ -1,5 +1,6 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP -import-objc-header %S/Inputs/header.h | FileCheck %s -check-prefix=CHECK-TOP
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE -import-objc-header %S/Inputs/header.h | FileCheck %s -check-prefix=CHECK-TYPE
+// XFAIL: linux
 
 func foo() {
   #^TOP^#

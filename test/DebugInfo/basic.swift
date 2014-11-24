@@ -14,6 +14,7 @@
 // CHECK: foo
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
 // CHECK-DAG: ![[FOO:[0-9]+]] ={{.*}}!"0x2e\00{{[^"]+}}\00[[@LINE+2]]"{{, [^,]+, [^,]+}}, metadata ![[FOOTYPE:[0-9]+]],{{.*}} [ DW_TAG_subprogram ] {{.*}} [foo]
+// XFAIL: linux
 public
 func foo(var a: Int, var b: Int) -> Int {
      // CHECK-DAG: !"0xb\00[[@LINE-1]]\0041\000"{{, [^,]+}}, metadata ![[FOO]]} ; [ DW_TAG_lexical_block ]

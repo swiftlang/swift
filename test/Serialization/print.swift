@@ -1,6 +1,7 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %swift %clang-importer-sdk -emit-module -o %t %s
 // RUN: %swift-ide-test -print-module -module-to-print=print -I %t -source-filename=%s %clang-importer-sdk | FileCheck %s
+// XFAIL: linux
 
 import Foundation
 

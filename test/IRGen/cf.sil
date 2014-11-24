@@ -1,5 +1,6 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs %s -emit-ir -import-cf-types | FileCheck %s
+// XFAIL: linux
 
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[REFRIGERATOR:%CSo14CCRefrigerator]] = type

@@ -1,5 +1,6 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -emit-ir -o - -primary-file %s | FileCheck %s
+// XFAIL: linux
 
 import ctypes
 

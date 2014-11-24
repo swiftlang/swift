@@ -1,4 +1,5 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
+// XFAIL: linux
 
 import Swift
 

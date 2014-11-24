@@ -1,6 +1,7 @@
 // We were missing target transform info and not vectorizing the loop below.
 // RUN: %swift -target x86_64-apple-macosx10.9  -Ounchecked %s  -emit-ir | FileCheck %s
 // REQUIRES: X86
+// XFAIL: linux
 
 // CHECK: xor <2 x i64>
 

@@ -1,3 +1,4 @@
+// XFAIL: linux
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 

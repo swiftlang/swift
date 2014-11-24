@@ -1,4 +1,5 @@
 // RUN: %swift -g -emit-ir %s | FileCheck %s
+// XFAIL: linux
 class UIViewController {
 }
 
