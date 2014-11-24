@@ -1505,6 +1505,7 @@ void SimplifyCFG::findLoopHeaders() {
     } else {
       // Visit the next successor.
       SILBasicBlock *NextSucc = *(D.second);
+      ++D.second;
       if (Visited.insert(NextSucc).second) {
         InDFSStack.insert(NextSucc);
         DFSStack.push_back(std::make_pair(NextSucc, NextSucc->succ_begin()));
@@ -1513,7 +1514,6 @@ void SimplifyCFG::findLoopHeaders() {
         // is a back-edge.
         LoopHeaders.insert(NextSucc);
       }
-      ++D.second;
     }
   }
 }
