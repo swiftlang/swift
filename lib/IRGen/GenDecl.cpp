@@ -1587,7 +1587,7 @@ llvm::Constant *IRGenModule::getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
 
 llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                                 ForDefinition_t forDefinition) {
-  if (ObjCInterop && D->isObjC())
+  if (D->isObjC())
     return getAddrOfObjCProtocolRecord(D, forDefinition);
   
   auto entity = LinkEntity::forProtocolDescriptor(D);

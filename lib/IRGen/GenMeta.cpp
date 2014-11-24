@@ -4447,7 +4447,7 @@ namespace {
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   // If the protocol is Objective-C-compatible, go through the path that
   // produces an ObjC-compatible protocol_t.
-  if (ObjCInterop && protocol->isObjC()) {
+  if (protocol->isObjC()) {
     // In JIT mode, we need to create protocol descriptors using the ObjC
     // runtime in JITted code.
     if (Opts.UseJIT)
@@ -4481,7 +4481,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 /// startup.
 llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
                                               ProtocolDecl *protocol) {
-  if (!IGF.IGM.ObjCInterop || !protocol->isObjC())
+  if (!protocol->isObjC())
     return IGF.IGM.getAddrOfProtocolDescriptor(protocol, NotForDefinition);
   
   auto refVar = IGF.IGM.getAddrOfObjCProtocolRef(protocol, NotForDefinition);

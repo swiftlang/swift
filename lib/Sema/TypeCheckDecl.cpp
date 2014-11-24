@@ -6584,9 +6584,7 @@ public:
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
-    if (TC.Context.LangOpts.EnableObjCInterop) {
-      markAsObjC(TC, DD, true);
-    }
+    markAsObjC(TC, DD, true);
 
     validateAttributes(TC, DD);
     TC.checkDeclAttributes(DD);
