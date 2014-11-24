@@ -287,6 +287,24 @@ extension String {
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   lhs: AnyObject, rhs: AnyObject
 )-> Int32
+#else
+/// Compare two strings using the current locale and as defined by the
+/// platform's clib. Unlike the above, this may or may not do normalization,
+/// depending on the platform.
+/// FIXME: Make this do unicode normalization?
+@asmname("strcoll")
+public func _stdlib_strcoll(
+  lhs: UnsafePointer<Int8>, rhs: UnsafePointer<Int8>
+) -> CInt
+
+public func _stdlib_strcoll_wrap(lhs: String, rhs: String) -> CInt {
+  var res : CInt
+  return lhs.withCString { lhs -> CInt in
+    return rhs.withCString { rhs -> CInt in
+      return _stdlib_strcoll(lhs, rhs)
+    }
+  }
+}
 #endif
 
 extension String: Equatable {
@@ -308,9 +326,7 @@ public func ==(lhs: String, rhs: String) -> Bool {
   return _stdlib_compareNSStringDeterministicUnicodeCollation(
     lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) == 0
 #else
-  // FIXME: Actually implement. For now, all strings are unequal.
-  // rdar://problem/18878343
-  return false
+  return _stdlib_strcoll_wrap(lhs, rhs) == 0
 #endif
 }
 
@@ -324,9 +340,7 @@ extension String {
     return _stdlib_compareNSStringDeterministicUnicodeCollation(
       self._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) < 0
 #else
-    // FIXME: Actually implement. For now, all strings are unequal
-    // rdar://problem/18878343
-    return false
+  return _stdlib_strcoll_wrap(self, rhs) < 0
 #endif
   }
 
@@ -391,6 +405,7 @@ extension String : Hashable {
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
+#if _runtime(_ObjC)
     // Mix random bits into NSString's hash so that clients don't rely on
     // Swift.String.hashValue and NSString.hash being the same.
 #if arch(i386) || arch(arm)
@@ -398,16 +413,21 @@ extension String : Hashable {
 #else
     let hashOffset = 0x429b126688ddcc21
 #endif
-#if _runtime(_ObjC)
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
     let cocoaString =
       unsafeBitCast(self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
     return hashOffset ^ _stdlib_NSStringNFDHashValue(cocoaString)
 #else
-    // FIXME: Actually implement. For now, all strings have the same hash.
-    // rdar://problem/18878343
-    return hashOffset
+    // FIXME: A better algorithm? Maybe murmur? This is djb2, which is fairly
+    // common and simple.
+    // FIXME: Like string comparison above, this does not normalize the unicode
+    // string like the NSString callout does.
+    var hash = 5381
+    for char in UTF8View(_core) {
+      hash = ((hash << 5) &+ hash) &+ Int(char)
+    }
+    return hash
 #endif
   }
 }
