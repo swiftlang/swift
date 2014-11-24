@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -primary-file %s | FileCheck %s
-// XFAIL: linux
 
 // Make sure that optimization passes don't choke on storage types for generic tuples
 // RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir -O %s

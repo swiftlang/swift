@@ -1,5 +1,4 @@
 // RUN: %swift-ide-test -syntax-coloring -source-filename %s -D CONF | FileCheck %s
-// XFAIL: linux
 
 // CHECK: <kw>var</kw> f : <type>Int</type>
 var f : Int

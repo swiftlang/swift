@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 // LValues are direct values, too. They are reference types, though.
 
 func Close(fn: () -> Int) { fn() }

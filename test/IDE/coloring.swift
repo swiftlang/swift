@@ -1,6 +1,5 @@
 // RUN: %swift-ide-test -syntax-coloring -source-filename %s | FileCheck %s
 // RUN: %swift-ide-test -syntax-coloring -typecheck -source-filename %s | FileCheck %s
-// XFAIL: linux
 
 // CHECK: <kw>struct</kw> S {
 struct S {

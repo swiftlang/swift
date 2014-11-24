@@ -1,5 +1,4 @@
 // RUN: %swift %s -S -g -o - | FileCheck %s
-// XFAIL: linux
 var a = 1
 var b = 2
 println(a+b)

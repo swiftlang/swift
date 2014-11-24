@@ -1,5 +1,4 @@
 // RUN: %swift -emit-ir %s -disable-access-control -parse-stdlib -o - | FileCheck %s
-// XFAIL: linux
 import Swift
 class HeapStorage<Value, Element> {
   public final func withUnsafeMutablePointerToElements<R>(

@@ -13,7 +13,6 @@
 
 // RUN: ls -1 %t | FileCheck %s
 // RUN: ls -1 %t/sub/ | FileCheck %s -check-prefix=SUB
-// XFAIL: linux
 
 // CHECK: explicit.bc
 // CHECK-NEXT: explicit.llvmbc

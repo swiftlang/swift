@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 class Foo {
   var x : Int
   // CHECK: _TFC11Destructors3FooD{{.*}} ; [ DW_TAG_subprogram ] [line 2] [def] [deinit]

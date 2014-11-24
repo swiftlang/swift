@@ -3,7 +3,6 @@
 // RUN: %swift %s -import-objc-header %S/Inputs/bridging-header.h %clang-importer-sdk -module-cache-path %t/clang-module-cache -parse -emit-objc-header-path %t/pragma-clang.h
 // RUN: %check-in-clang -fsyntax-only -Werror %t/pragma-clang.h
 // RUN: FileCheck %s < %t/pragma-clang.h
-// XFAIL: linux
 
 // CHECK: #pragma clang diagnostic push
 // CHECK-NOT: clang diagnostic pop

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -parse -verify %s -import-objc-header %S/Inputs/sdk-bridging-header.h
-// XFAIL: linux
 
 import Foundation
 

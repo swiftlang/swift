@@ -14,7 +14,6 @@
 // RUN: %target-run %t/a.out BridgedKeyIsNotNSCopyable2 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out Downcast1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out Downcast2 2>&1 | FileCheck %s -check-prefix=CHECK
-// XFAIL: linux
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}

@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -Onone -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 class ClassA
 {
     var x : Int

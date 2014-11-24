@@ -1,5 +1,4 @@
 // RUN: %swift %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 var a = 1
 println(a)
 // Verify that global variables are emitted once in main, once as

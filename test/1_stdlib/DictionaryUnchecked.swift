@@ -2,7 +2,6 @@
 // RUN: %target-build-swift %s -o %t/a.out -Ounchecked
 //
 // RUN: %target-run %t/a.out
-// XFAIL: linux
 
 import StdlibUnittest
 

@@ -9,7 +9,6 @@
 // RUN: %check-in-clang %t/classes.h
 // RUN: not %check-in-clang -fno-modules %t/classes.h
 // RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
-// XFAIL: linux
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;

@@ -1,5 +1,4 @@
 // RUN: %swift -emit-ir %s | FileCheck %s
-// XFAIL: linux
 
 sil_stage canonical
 

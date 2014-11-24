@@ -1,5 +1,4 @@
 // RUN: %swift -gnone -emit-ir %s | FileCheck %s
-// XFAIL: linux
 
 import Builtin
 

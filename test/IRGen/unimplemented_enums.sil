@@ -1,5 +1,4 @@
 // RUN: %swift -emit-ir %s -verify
-// XFAIL: linux
 
 enum Either<T, U> { // expected-error{{unimplemented}}
   case Left(T)

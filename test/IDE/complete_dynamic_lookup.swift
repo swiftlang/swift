@@ -1,4 +1,3 @@
-// XFAIL: linux
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %swift -emit-module -o %t %S/Inputs/AnyObject/foo_swift_module.swift

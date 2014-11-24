@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
-// XFAIL: interpret, linux
+// XFAIL: interpret
 
 import StdlibUnittest
 import Foundation

@@ -1,6 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -emit-sil -module-cache-path %t/clang-module-cache -sdk %S/../SILGen/Inputs %s -I %S/../SILGen/Inputs -enable-source-import -parse-stdlib -o /dev/null -verify
-// XFAIL: linux
 
 import Swift
 import gizmo

@@ -1,6 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs %s -emit-silgen | FileCheck %s
-// XFAIL: linux
 
 import ansible
 

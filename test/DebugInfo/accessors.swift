@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 
 // Verify that we generate appropriate names for accessors.
 // CHECK: DW_TAG_subprogram{{.*}}x.get

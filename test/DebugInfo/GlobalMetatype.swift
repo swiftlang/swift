@@ -1,5 +1,4 @@
 // RUN: %swift %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 class Foo {}
 println("Hello World!")
 // Test that no static variable for the metatype of Foo is emitted.

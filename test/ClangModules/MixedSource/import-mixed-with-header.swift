@@ -6,7 +6,6 @@
 
 // RUN: rm -rf %t/mixed-target/
 // RUN: %swift %clang-importer-sdk -module-cache-path %t -I %t -I %S/../Inputs/custom-modules -parse %s -verify
-// XFAIL: linux
 
 import MixedWithHeader
 

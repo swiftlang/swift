@@ -1,7 +1,6 @@
 // Check both AOT and JIT modes
 // RUN: %target-run-simple-swift | FileCheck %s
 // RUN: %swift -interpret %s | FileCheck %s
-// XFAIL: linux
 
 protocol Fooable {
   func foo()

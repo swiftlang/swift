@@ -1,6 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s
-// XFAIL: linux
 
 import Dispatch
 import Foundation

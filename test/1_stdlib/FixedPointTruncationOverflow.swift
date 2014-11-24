@@ -21,7 +21,6 @@
 // RUN: %target-run %t/a.out_Release 6 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Release 7 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Release 8 2>&1 | FileCheck %s -check-prefix=CHECK
-// XFAIL: linux
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}

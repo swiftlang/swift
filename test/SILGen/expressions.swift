@@ -2,7 +2,6 @@
 // RUN: mkdir %t
 // RUN: echo "public var x = Int()" | %swift -target x86_64-apple-macosx10.9 -module-name FooBar -emit-module -o %t -
 // RUN: %swift -parse-stdlib -emit-silgen %s -I%t -enable-character-literals -disable-access-control | FileCheck %s
-// XFAIL: linux
 import Swift
 import FooBar
 

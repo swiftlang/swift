@@ -7,7 +7,6 @@
 // RUN: FileCheck %s < %t/imports.h
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t/imports.h
 // RUN: %check-in-clang %t/imports.h -I %S/Inputs/custom-modules/
-// XFAIL: linux
 
 // CHECK-DAG: @import ctypes.bits;
 // CHECK-DAG: @import Foundation;

@@ -1,5 +1,4 @@
 // RUN: %swift -primary-file %s -O -disable-llvm-optzns -emit-ir | FileCheck %s
-// XFAIL: linux
 
 enum NoPayload {
   case E0

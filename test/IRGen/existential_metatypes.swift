@@ -1,5 +1,4 @@
 // RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -o - -primary-file %s | FileCheck %s
-// XFAIL: linux
 
 // Currently, this can't be a SIL file because we don't parse
 // conformances correctly.

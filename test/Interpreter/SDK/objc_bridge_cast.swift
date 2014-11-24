@@ -1,5 +1,4 @@
 // RUN: %target-run-simple-swift | FileCheck %s
-// XFAIL: linux
 
 // Test dynamic casts that bridge value types through the runtime.
 

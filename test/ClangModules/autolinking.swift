@@ -7,7 +7,6 @@
 // RUN: %swift %s -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I=%S/Inputs/custom-modules -I %t -module-cache-path %t/clang-module-cache -emit-ir -o %t/with-adapter.ll
 // RUN: FileCheck %s < %t/with-adapter.ll
 // RUN: FileCheck --check-prefix=CHECK-WITH-SWIFT %s < %t/with-adapter.ll
-// XFAIL: linux
 
 import LinkMusket
 import LinkFramework

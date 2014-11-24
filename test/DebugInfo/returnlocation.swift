@@ -1,6 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %target-build-swift -g -emit-ir -module-cache-path %t/clang-module-cache %s -o %t.ll
-// XFAIL: linux
 
 import Foundation
 

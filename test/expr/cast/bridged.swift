@@ -1,5 +1,4 @@
 // RUN: %swift -parse %s -verify
-// XFAIL: linux
 
 // Test casting through a class type to a bridged value type.
 

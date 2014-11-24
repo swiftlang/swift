@@ -1,5 +1,4 @@
 // RUN: %swift -parse %s -verify
-// XFAIL: linux
 
 @objc
 class A {

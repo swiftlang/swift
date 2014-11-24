@@ -1,6 +1,5 @@
 // RUN: rm -rf %t.mcp
 // RUN: %swift %clang-importer-sdk -emit-silgen %s -module-cache-path %t.mcp | FileCheck %s
-// XFAIL: linux
 
 import Foundation
 

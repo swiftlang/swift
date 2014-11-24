@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift %s | FileCheck %s
-// XFAIL: interpret, linux
+// XFAIL: interpret
 
 import Swift
 import SwiftShims

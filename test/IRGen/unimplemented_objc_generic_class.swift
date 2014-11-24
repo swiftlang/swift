@@ -1,6 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -verify
-// XFAIL: linux
 
 @objc class ObjCBox<T> {
   var x: T // expected-error{{unimplemented}}

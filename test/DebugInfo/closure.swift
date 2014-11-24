@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 
 func foldl1<T>(list: [T], function: (a: T, b: T) -> T) -> T {
      assert(list.count > 1)

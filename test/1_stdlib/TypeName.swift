@@ -1,5 +1,4 @@
 // RUN: %target-run-simple-swift
-// XFAIL: linux
 
 class C {}
 struct S {}

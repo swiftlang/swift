@@ -1,5 +1,4 @@
 // RUN: %swift -parse %s -verify -D FOO -D BAZ -target x86_64-apple-macosx10.9
-// XFAIL: linux
 
 #if FOO
 var a = 0

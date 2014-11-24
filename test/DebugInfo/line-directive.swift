@@ -12,7 +12,6 @@ func f() {
 }
 
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -S -g -o - | FileCheck %s
-// XFAIL: linux
 // CHECK: .file	[[MAIN:.*]] "{{.*}}line-directive.swift"
 // CHECK: .loc	[[MAIN]] 1
 // CHECK: .file	[[ABC:.*]] "{{.*}}abc.swift"

@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 struct Foo {
   // Allocating constructor - should have no line table info.
   // CHECK: _TFV12Constructors3FooCfMS0_FT1xSi_S0_{{.*}}[ DW_TAG_subprogram ] [line [[@LINE+1]]] [def] [scope 0] [init]

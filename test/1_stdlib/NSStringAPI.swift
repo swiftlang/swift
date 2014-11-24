@@ -2,7 +2,6 @@
 // RUN: mkdir -p %t
 // RUN: %target-build-swift -module-cache-path %t/clang-module-cache %s -o %t/a.out
 // RUN: %target-run %t/a.out
-// XFAIL: linux
 
 //
 // Tests for the NSString APIs as exposed by String

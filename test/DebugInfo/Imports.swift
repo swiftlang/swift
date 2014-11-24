@@ -3,7 +3,6 @@
 
 // RUN: %swift -emit-ir -module-name Foo %s -I %t -g -o - | FileCheck %s
 // RUN: %swift -c -module-name Foo %s -I %t -g -o - | llvm-dwarfdump - | FileCheck --check-prefix=DWARF %s
-// XFAIL: linux
 
 // CHECK-DAG: ![[FOOMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Foo]
 // CHECK-DAG: metadata !{metadata !"0x3a\001\00", metadata ![[THISFILE:[0-9]+]], metadata ![[FOOMODULE]]} ; [ DW_TAG_imported_module ]

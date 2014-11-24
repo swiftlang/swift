@@ -1,6 +1,5 @@
 // RUN: %target-build-swift -module-name a %s -o %t.out
 // RUN: %target-run %t.out
-// XFAIL: linux
 
 //
 // This file contains reflection tests that depend on hash values.

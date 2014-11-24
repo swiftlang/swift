@@ -5,7 +5,6 @@
 
 // RUN: %t.shebang.swift | FileCheck -check-prefix=NONE %s
 // RUN: %t.shebang.swift a b c | FileCheck -check-prefix=THREE-ARGS %s
-// XFAIL: linux
 
 println("Begin")
 for arg in Process.arguments {

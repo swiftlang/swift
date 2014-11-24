@@ -12,7 +12,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/Builtins
 // RUN: %target-run %t/Builtins
-// XFAIL: interpret, linux
+// XFAIL: interpret
 
 import Swift
 import SwiftShims

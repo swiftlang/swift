@@ -1,7 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
 // RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
-// XFAIL: linux
 
 // CHECK: @"\01L_selector_data(initWithRed:green:blue:)"
 // CHECK: @"\01L_selector_data(colorWithRed:green:blue:)"

@@ -1,5 +1,4 @@
 // RUN: %swift -parse -enable-experimental-availability-checking -target x86_64-apple-macosx10.9 -verify %s
-// XFAIL: linux
 
 @availability(OSX, introduced=10.9)
 var globalAvailableOn10_9: Int = 9

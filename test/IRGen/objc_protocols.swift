@@ -2,7 +2,6 @@
 // RUN: %build-irgen-test-overlays
 // RUN: %swift -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
 // RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I %t -primary-file %s -emit-ir | FileCheck %s
-// XFAIL: linux
 
 import gizmo
 import objc_protocols_Bas

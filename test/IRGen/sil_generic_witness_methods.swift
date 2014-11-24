@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir | FileCheck %s
-// XFAIL: linux
 
 // FIXME: These should be SIL tests, but we can't parse generic types in SIL
 // yet.

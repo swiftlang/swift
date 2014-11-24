@@ -5,7 +5,6 @@
 // RUN: %check-in-clang %t/empty.h
 // RUN: %check-in-clang -fno-modules %t/empty.h
 // RUN: not %check-in-clang -I %S/Inputs/clang-headers %t/empty.h 2>&1 | FileCheck %s --check-prefix=CUSTOM-OBJC-PROLOGUE
-// XFAIL: linux
 
 // CHECK-NOT: @import Swift;
 

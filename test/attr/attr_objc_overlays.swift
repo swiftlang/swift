@@ -1,5 +1,4 @@
 // RUN: %swift -parse %s %clang-importer-sdk -verify
-// XFAIL: linux
 
 import ObjectiveC
 

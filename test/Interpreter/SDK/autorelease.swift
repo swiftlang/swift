@@ -1,5 +1,4 @@
 // RUN: %target-run-simple-swift foo | FileCheck %s
-// XFAIL: linux
 
 // The Objective-C runtime does not implement the autorelease
 // optimization on i386, even in the iOS simulator.

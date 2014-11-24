@@ -1,5 +1,4 @@
 // RUN: %swift -emit-silgen -target x86_64-apple-macosx10.9 -enable-experimental-availability-checking %s | FileCheck %s
-// XFAIL: linux
 
 // CHECK: [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK: [[MINOR:%.*]] = integer_literal $Builtin.Word, 9

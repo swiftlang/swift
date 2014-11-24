@@ -2,7 +2,6 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -code-completion-token=CLANG_UNQUAL_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_CTYPES < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_MACROS < %t.compl.txt
-// XFAIL: linux
 
 import macros
 import ctypes

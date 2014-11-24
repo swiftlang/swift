@@ -1,4 +1,3 @@
-// XFAIL: linux
 // RUN: rm -rf %t && mkdir -p %t
 
 // RUN: %swift-ide-test -print-module -source-filename %s -sdk %sdk -target %target-triple -module-to-print=ObjectiveC.NSObject -function-definitions=false -module-cache-path=%t/mcp > %t/ObjectiveC.NSObject.printed.txt

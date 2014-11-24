@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
-// XFAIL: linux
 
 import Darwin
 

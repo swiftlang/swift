@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 func outer(a: Int) -> Int {
      // Inner functions have a linkage name of "closure[0-9]+", but
      // their DW_AT_name is preserved.

@@ -1,5 +1,4 @@
 // RUN: %swift -parse -verify %s
-// XFAIL: linux
 
 class A {
   @objc func do_a() {}

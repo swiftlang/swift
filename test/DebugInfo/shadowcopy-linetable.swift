@@ -1,5 +1,4 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 func foo(inout x : Int) {
   // Make sure the shadow copy is being made in the prologue, but the
   // code to load the value from the inout storage is not.

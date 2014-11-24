@@ -2,7 +2,6 @@
 // platforms.
 
 // RUN: %target-build-swift %s -S -o - | FileCheck -check-prefix=%target-cpu %s
-// XFAIL: linux
 
 var global: Int = 0
 

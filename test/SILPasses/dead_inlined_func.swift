@@ -1,6 +1,5 @@
 // RUN: %swift -O -g %s -emit-sil | FileCheck %s -check-prefix=CHECK-SIL
 // RUN: %swift -O -g %s -sil-serialize-all -emit-ir | FileCheck %s -check-prefix=CHECK-IR
-// XFAIL: linux
 
 
 // The dead inlined function should not be in the SIL

@@ -1,5 +1,4 @@
 // RUN: %swift -emit-ir %s
-// XFAIL: linux
 
 enum Singleton {
   case F(Singleton -> ())

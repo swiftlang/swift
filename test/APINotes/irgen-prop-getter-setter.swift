@@ -1,6 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %target-build-swift -Xfrontend %clang-importer-sdk -module-cache-path %t/clang-module-cache %s -emit-ir
-// XFAIL: linux
 
 // Test that we don't crash when producing IR.
 

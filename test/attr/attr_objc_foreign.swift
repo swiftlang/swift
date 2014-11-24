@@ -2,7 +2,6 @@
 // RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift-ide-test %clang-importer-sdk -print-ast-typechecked -source-filename %s -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true | FileCheck %s
-// XFAIL: linux
 
 import CoreGraphics
 

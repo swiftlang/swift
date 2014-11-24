@@ -8,7 +8,6 @@
 // RUN: mkdir %t
 // RUN: %target-build-swift -Xfrontend %clang-importer-sdk -emit-module -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -Xfrontend -sil-serialize-all -o %t/def_basic.swiftmodule %S/Inputs/def_basic.sil
 // RUN: %target-build-swift -Xfrontend %clang-importer-sdk -emit-silgen -Xfrontend -sil-link-all -I=%t %s | FileCheck -check-prefix=CHECK_DECL %S/Inputs/def_basic.sil
-// XFAIL: linux
 
 // CHECK-NOT: UnknownCode
 

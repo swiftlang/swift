@@ -7,7 +7,6 @@
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -module-name Mixed -import-objc-header %S/Inputs/Mixed.framework/Headers/Mixed.h %s -parse -emit-objc-header-path %t/mixed-header.h
 // RUN: FileCheck -check-prefix=CHECK -check-prefix=HEADER %s < %t/mixed-header.h
 // RUN: %check-in-clang -include %S/Inputs/Mixed.framework/Headers/Mixed.h %t/mixed-header.h
-// XFAIL: linux
 
 // CHECK-LABEL: #if defined(__has_feature) && __has_feature(modules)
 // CHECK-NEXT: @import Foundation;

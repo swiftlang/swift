@@ -1,5 +1,4 @@
 // RUN: %swift -parse %s -verify
-// XFAIL: linux
 
 class A {
   var x = 0

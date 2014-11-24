@@ -1,5 +1,4 @@
 // RUN: %swift -O -target x86_64-apple-macosx10.9 -primary-file %s -emit-ir -g -o - | FileCheck %s
-// XFAIL: linux
 
 // CHECK: define{{.*}}2fn
 func fn() {

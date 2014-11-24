@@ -9,7 +9,6 @@
 // RUN: %target-run %t/OptionalTraps_Debug UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/OptionalTraps_Release UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/OptionalTraps_Fast UnwrapNoneFast1 2>&1 | FileCheck %s -check-prefix=CHECK_UNWRAP_NONE_1_FAST
-// XFAIL: linux
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}

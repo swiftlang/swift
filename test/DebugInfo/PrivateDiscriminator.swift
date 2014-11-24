@@ -5,7 +5,6 @@
 
 // RUN: %swift %S/../Inputs/empty.swift -primary-file %s -emit-ir -g | FileCheck %s
 // CHECK: -private-discriminator [[DISCRIMINATOR:_[A-Z0-9]+]]{{.*}}; [ DW_TAG_compile_unit ]
-// XFAIL: linux
 
 private class A {
   init(val : Int) { member = val }

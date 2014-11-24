@@ -1,5 +1,4 @@
 // RUN: %swift -O -emit-sil %s | FileCheck %s
-// XFAIL: linux
 
 // The second run tests is it can be compiled without crashes.
 // RUN: %swift -O -S %s

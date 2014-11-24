@@ -6,7 +6,6 @@
 // RUN: %swift %clang-importer-sdk -emit-module -o %t -module-cache-path %t/clang-module-cache %s -module-name submodules
 // RUN: echo 'import submodules; println("\(x), \(y)")' | %swift %clang-importer-sdk -parse - -I %t
 // RUN: echo 'import submodules; println("\(x), \(y)")' | not %swift -parse - -I %t 2>&1 | FileCheck -check-prefix=MISSING %s
-// XFAIL: linux
 
 import typealias ctypes.bits.DWORD
 // MISSING: missing required modules:

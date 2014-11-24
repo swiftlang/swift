@@ -1,6 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 -emit-silgen -o - %s | FileCheck %s
-// XFAIL: linux
 
 import ObjectiveC
 import Foundation

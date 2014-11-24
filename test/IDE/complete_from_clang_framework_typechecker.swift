@@ -2,7 +2,6 @@
 // RUN: mkdir -p %t
 
 // RUN: %swift -parse -verify %s -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache
-// XFAIL: linux
 
 import Foo
 // Don't import 'FooHelper'.

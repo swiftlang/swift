@@ -8,7 +8,6 @@
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
-// XFAIL: linux
 
 import Darwin
 

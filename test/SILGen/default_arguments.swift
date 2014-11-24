@@ -1,5 +1,4 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
-// XFAIL: linux
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main

@@ -1,5 +1,4 @@
 // RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -primary-file %s | FileCheck %s
-// XFAIL: linux
 protocol Runcer {
   typealias Runcee
 }
