@@ -4057,8 +4057,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
 
-  if (!NeedsBoxForSelf)
-    B.createDebugValue(selfDecl, selfArg);
+  if (!NeedsBoxForSelf) {
+    SILLocation PrologueLoc(selfDecl);
+    PrologueLoc.markAsPrologue();
+    B.createDebugValue(PrologueLoc, selfArg);
+  }
   
   bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
   if (!ctor->hasStubImplementation()) {
@@ -4311,7 +4314,9 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   auto selfDecl = cd->getDestructor()->getImplicitSelfDecl();
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
-  B.createDebugValue(selfDecl, selfArg);
+  SILLocation PrologueLoc(selfDecl);
+  PrologueLoc.markAsPrologue();
+  B.createDebugValue(PrologueLoc, selfArg);
   selfArg = B.createMarkUninitialized(selfDecl, selfArg,
                                       MarkUninitializedInst::RootSelf);
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");

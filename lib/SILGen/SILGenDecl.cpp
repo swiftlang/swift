@@ -363,10 +363,12 @@ public:
   void emitDebugValue(SILValue v, SILGenFunction &gen) {
     // Emit a debug_value[_addr] instruction to record the start of this value's
     // lifetime.
+    SILLocation PrologueLoc(vd);
+    PrologueLoc.markAsPrologue();
     if (!v.getType().isAddress())
-      gen.B.createDebugValue(vd, v);
+      gen.B.createDebugValue(PrologueLoc, v);
     else
-      gen.B.createDebugValueAddr(vd, v);
+      gen.B.createDebugValueAddr(PrologueLoc, v);
   }
 
   SILValue getAddressOrNull() const override {
@@ -1017,7 +1019,9 @@ SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
   SILType selfType = getLoweredLoadableType(selfDecl->getType());
   SILValue selfValue = new (SGM.M) SILArgument(F.begin(), selfType, selfDecl);
   VarLocs[selfDecl] = VarLoc::getConstant(selfValue);
-  B.createDebugValue(selfDecl, selfValue);
+  SILLocation PrologueLoc(selfDecl);
+  PrologueLoc.markAsPrologue();
+  B.createDebugValue(PrologueLoc, selfValue);
   return selfValue;
 }
 

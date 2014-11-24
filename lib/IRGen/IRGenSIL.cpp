@@ -1382,7 +1382,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
       // Ignore scope-less instructions and have IRBuilder reuse the
       // previous location and scope.
-      if (DS && !KeepCurrentLocation)
+      if (DS && !KeepCurrentLocation && !ILoc.isInPrologue())
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
 
       // Function argument handling.
