@@ -310,7 +310,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   internal static func _checkValidBufferClass(
     bufferClass: AnyClass, creating: Bool = false
   ) {
-#if !arch(arm) && !arch(i386)
+#if !arch(arm) && !arch(i386) && _runtime(_ObjC)
     // FIXME: test disabled until we figure out what's wrong on this
     // platform: <rdar://problem/18682097> Generic and non-generic
     // class instances have different sizes on armv7

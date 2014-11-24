@@ -247,12 +247,18 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #endif
 }
 
+#if _runtime(_ObjC)
+// FIXME: The call to unsafeAddressOf(theClass) doesn't work without the
+// objective-c runtime right now. This will need to be fixed to re-enable
+// this function.
+
 /// Returns: `class_getInstanceSize(theClass)`
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
   return Int(_swift_class_getInstancePositiveExtentSize(
       unsafeAddressOf(theClass)))
 }
+#endif
 
 @asmname("_swift_isClass")
 public func _swift_isClass(x: Any) -> Bool

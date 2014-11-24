@@ -4083,6 +4083,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return new (tc.Context) ClassMetatypeToObjectExpr(expr, toType);
     }
     case ConversionRestrictionKind::ExistentialMetatypeToAnyObject: {
+      // FIXME: The SIL generation for this operation winds up going through
+      // an objective-c object conversion, which doesn't work without the
+      // objective-c runtime. So for now assert that we're using objective-c
+      // interop if this happens in code.
+      if (!tc.getLangOpts().EnableObjCInterop) {
+        tc.diagnose(expr->getLoc(),
+                    diag::not_implemented,
+                    "Existential metatype to AnyObject conversion currently "
+                    "unsupported without Objective-C runtime.");
+      }
       return new (tc.Context) ExistentialMetatypeToObjectExpr(expr, toType);
     }
     case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass: {
