@@ -1,4 +1,4 @@
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(TARGET functionNameDemangle)
   add_swift_unittest(FunctionNameDemangleTests
     DemangleTest.cpp
     )
