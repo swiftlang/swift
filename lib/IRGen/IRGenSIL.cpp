@@ -2521,8 +2521,20 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
     getLoweredExplosion(i->getCondition()).claimNext();
 
   addIncomingSILArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
-  addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
   
+  if (i->getTrueBB() == i->getFalseBB()) {
+    // A cond_br with identical true/false blocks is not optimized away if the
+    // true/false block arguments differ.
+    // Avoid creating a phi node with identical predecessors and differing
+    // values. Therefore we insert an empty block in one of the branches.
+    auto *Trampoline = llvm::BasicBlock::Create(IGM.getLLVMContext());
+    Builder.CreateCondBr(condValue, trueBB.bb, Trampoline);
+    Builder.emitBlock(Trampoline);
+    Builder.CreateBr(falseBB.bb);
+    addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
+    return;
+  }
+  addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
   Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb);
 }
 

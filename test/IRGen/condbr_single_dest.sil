@@ -1,0 +1,21 @@
+// RUN: %swift %s -emit-ir -target x86_64-apple-macosx10.9 -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Check that we don't create a phi node with identical predecessors and
+// differing values.
+
+// CHECK-LABEL: define i64 @testfunc
+// CHECK: %{{[0-9]}} = phi i64 [ %1, %entry ], [ %2, %{{[0-9]}} ]
+sil @testfunc : $@thin (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Word {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word, %2 : $Builtin.Word):
+  %3 = integer_literal $Builtin.Word, 0
+  %4 = builtin "cmp_ne_Word"(%0 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %4, bb1(%1 : $Builtin.Word), bb1(%2 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word):
+  return %5 : $Builtin.Word
+}
+
