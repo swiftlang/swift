@@ -1772,13 +1772,17 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // can expose CFG simplifications.
   simplifyBranchOperands(OperandValueArrayRef(BI->getAllOperands()));
   auto *ThisBB = BI->getParent();
+  SILBasicBlock *TrueSide = BI->getTrueBB();
+  SILBasicBlock *FalseSide = BI->getFalseBB();
+  auto TrueArgs = BI->getTrueArgs();
+  auto FalseArgs = BI->getFalseArgs();
 
   // If the condition is an integer literal, we can constant fold the branch.
   if (auto *IL = dyn_cast<IntegerLiteralInst>(BI->getCondition())) {
     bool isFalse = !IL->getValue();
-    auto LiveArgs =  isFalse ? BI->getFalseArgs() : BI->getTrueArgs();
-    auto *LiveBlock =  isFalse ? BI->getFalseBB() : BI->getTrueBB();
-    auto *DeadBlock = !isFalse ? BI->getFalseBB() : BI->getTrueBB();
+    auto LiveArgs =  isFalse ? FalseArgs : TrueArgs;
+    auto *LiveBlock =  isFalse ? FalseSide : TrueSide;
+    auto *DeadBlock = !isFalse ? FalseSide : TrueSide;
     auto *ThisBB = BI->getParent();
 
     SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
@@ -1794,15 +1798,12 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // If the destination block is a simple trampoline (jump to another block)
   // then jump directly.
-  SILBasicBlock *TrueSide = BI->getTrueBB();
-  SILBasicBlock *FalseSide = BI->getFalseBB();
-
   if (isTrampolineBlock(TrueSide)) {
     BranchInst* Br = cast<BranchInst>(TrueSide->getTerminator());
     SILBuilderWithScope<1>(BI)
       .createCondBranch(BI->getLoc(), BI->getCondition(),
-                        Br->getDestBB(), BI->getTrueArgs(),
-                        BI->getFalseBB(), BI->getFalseArgs());
+                        Br->getDestBB(), TrueArgs,
+                        FalseSide, FalseArgs);
     BI->eraseFromParent();
 
     if (LoopHeaders.count(TrueSide))
@@ -1816,8 +1817,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     BranchInst* Br = cast<BranchInst>(FalseSide->getTerminator());
     SILBuilderWithScope<1>(BI)
       .createCondBranch(BI->getLoc(), BI->getCondition(),
-                        BI->getTrueBB(), BI->getTrueArgs(),
-                        Br->getDestBB(), BI->getFalseArgs());
+                        TrueSide, TrueArgs,
+                        Br->getDestBB(), FalseArgs);
     BI->eraseFromParent();
     if (LoopHeaders.count(FalseSide))
       LoopHeaders.insert(ThisBB);
@@ -1828,27 +1829,13 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // Simplify cond_br where both sides jump to the same blocks with the same
   // args.
-  TrueSide = BI->getTrueBB();
-  FalseSide = BI->getFalseBB();
-  if (TrueSide == FalseSide) {
-    auto TrueArgs = BI->getTrueArgs();
-    auto FalseArgs = BI->getFalseArgs();
-    assert(TrueArgs.size() == FalseArgs.size() && "Invalid args!");
-    bool SameArgs = true;
-    for (int i = 0, e = TrueArgs.size(); i < e; i++)
-      if (TrueArgs[i] != FalseArgs[i]){
-        SameArgs = false;
-        break;
-      }
-
-    if (SameArgs) {
-      SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
-      BI->eraseFromParent();
-      addToWorklist(ThisBB);
-      addToWorklist(TrueSide);
-      ++NumConstantFolded;
-      return true;
-    }
+  if (TrueSide == FalseSide && TrueArgs == FalseArgs) {
+    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
+    BI->eraseFromParent();
+    addToWorklist(ThisBB);
+    addToWorklist(TrueSide);
+    ++NumConstantFolded;
+    return true;
   }
 
   // If we have a (cond (select_enum)) on a two element enum, always have the

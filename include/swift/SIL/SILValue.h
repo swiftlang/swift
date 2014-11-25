@@ -399,6 +399,19 @@ public:
   OperandValueArrayRef slice(unsigned begin) const {
     return OperandValueArrayRef(Operands.slice(begin));
   }
+  
+  bool operator==(const OperandValueArrayRef RHS) const {
+    if (size() != RHS.size())
+      return false;
+    for (auto L = begin(), LE = end(), R = RHS.begin(); L != LE; ++L, ++R)
+      if (*L != *R)
+        return false;
+    return true;
+  }
+  
+  bool operator!=(const OperandValueArrayRef RHS) const {
+    return !(*this == RHS);
+  }
 };
 
 /// An iterator over all uses of a ValueBase.
