@@ -49,4 +49,16 @@ tests.test("_isUniquelyReferenced/OptionalNativeObject") {
   expectFalse(_swift_isUniquelyReferenced_native(cast(x)))
 }
 
+var x = 27
+
+@inline(never)
+func genint() -> Int {
+  return x
+}
+
+tests.test("_assumeNonNegative") {
+  let r = _assumeNonNegative(genint())
+  expectEqual(r, 27)
+}
+
 runAllTests()

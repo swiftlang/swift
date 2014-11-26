@@ -488,3 +488,27 @@ func copyGenArray<T>(dest: Builtin.RawPointer, src: Builtin.RawPointer, count: B
 func conditionallyUnreachable() {
   Builtin.conditionallyUnreachable()
 }
+
+struct Abc {
+	var value : Builtin.Word
+}
+
+// CHECK-LABEL define hidden @_TF8builtins22assumeNonNegative_testFRVS_3AbcBw
+func assumeNonNegative_test(inout x: Abc) -> Builtin.Word {
+  // CHECK: load {{.*}}, !range ![[R:[0-9]+]]
+  return Builtin.assumeNonNegative_Word(x.value)
+}
+
+@inline(never)
+func return_word(x: Builtin.Word) -> Builtin.Word {
+	return x
+}
+
+// CHECK-LABEL define hidden @_TF8builtins23assumeNonNegative_test2FRVS_3AbcBw
+func assumeNonNegative_test2(x: Builtin.Word) -> Builtin.Word {
+  // CHECK: call {{.*}}, !range ![[R]]
+  return Builtin.assumeNonNegative_Word(return_word(x))
+}
+
+// CHECK: ![[R]] = metadata !{i64 0, i64 9223372036854775807}
+

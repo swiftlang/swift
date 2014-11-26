@@ -203,6 +203,8 @@ ERROR(division_overflow,sil_analysis,none,
       "division '%0 %1 %2' results in an overflow",
       (StringRef, StringRef, StringRef))
 ERROR(division_by_zero,sil_analysis,none, "division by zero", ())
+ERROR(wrong_non_negative_assumption,sil_analysis,none,
+      "assumed non-negative value '%0' is negative", (StringRef))
 
 // FIXME: We won't need this as it will be replaced with user-generated strings.
 // staticReport diagnostics.

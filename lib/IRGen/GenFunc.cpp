@@ -1462,6 +1462,38 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return out.add(v);
   }
   
+  if (Builtin.ID == BuiltinValueKind::AssumeNonNegative) {
+    llvm::Value *v = args.claimNext();
+    // Set a value range on the load instruction, which must be the argument of
+    // the builtin.
+    if (isa<llvm::LoadInst>(v) || isa<llvm::CallInst>(v)) {
+      // The load must be post-dominated by the builtin. Otherwise we would get
+      // a wrong assumption in the else-branch in this example:
+      //    x = f()
+      //    if condition {
+      //      y = assumeNonNegative(x)
+      //    } else {
+      //      // x might be negative here!
+      //    }
+      // For simplicity we just enforce that both the load and the builtin must
+      // be in the same block.
+      llvm::Instruction *I = static_cast<llvm::Instruction *>(v);
+      if (I->getParent() == IGF.Builder.GetInsertBlock()) {
+        llvm::LLVMContext &ctx = IGF.IGM.Module.getContext();
+        llvm::IntegerType *intType = dyn_cast<llvm::IntegerType>(v->getType());
+        llvm::Value *rangeElems[] = {
+          llvm::ConstantInt::get(intType, 0),
+          llvm::ConstantInt::get(intType,
+                             APInt::getSignedMaxValue(intType->getBitWidth()))
+        };
+        llvm::MDNode *range = llvm::MDNode::get(ctx, rangeElems);
+        I->setMetadata(llvm::LLVMContext::MD_range, range);
+      }
+    }
+    // Don't generate any code for the builtin.
+    return out.add(v);
+  }
+  
   if (Builtin.ID == BuiltinValueKind::AllocRaw) {
     auto size = args.claimNext();
     auto align = args.claimNext();

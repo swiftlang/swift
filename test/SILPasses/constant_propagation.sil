@@ -390,3 +390,14 @@ bb0(%0 : $Builtin.RawPointer):
   %8 = tuple(%6 : $Builtin.Int8, %7 : $Builtin.Int8)
   return %8 : $(Builtin.Int8, Builtin.Int8)
 }
+
+// CHECK-LABEL: sil @constant_assume_non_negative
+// CHECK: bb0:
+// CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Word, 27
+// CHECK-NEXT: return [[I]]
+// CHECK-NEXT: }
+sil @constant_assume_non_negative : $@thin () -> Builtin.Word {
+  %0 = integer_literal $Builtin.Word, 27
+  %1 = builtin "assumeNonNegative_Word"(%0 : $Builtin.Word) : $Builtin.Word
+  return %0 : $Builtin.Word
+}

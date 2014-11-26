@@ -361,3 +361,8 @@ func testPreDecOverflow() {
   var u64_min = UInt64.min
   --u64_min // expected-error {{arithmetic operation '0 - 1' (on unsigned 64-bit integer type) results in an overflow}}
 }
+
+func testAssumeNonNegative() {
+  var input = -3
+  _assumeNonNegative(input); // expected-error {{assumed non-negative value '-3' is negative}}
+}

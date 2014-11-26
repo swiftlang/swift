@@ -346,6 +346,13 @@ func assert_configuration() -> Builtin.Int32 {
   // CHECK: return [[APPLY]] : $Builtin.Int32
 }
 
+// CHECK-LABEL: sil hidden @_TF8builtins17assumeNonNegativeFBwBw
+func assumeNonNegative(x: Builtin.Word) -> Builtin.Word {
+  return Builtin.assumeNonNegative_Word(x)
+  // CHECK: [[APPLY:%.*]] = builtin "assumeNonNegative_Word"(%0 : $Builtin.Word) : $Builtin.Word
+  // CHECK: return [[APPLY]] : $Builtin.Word
+}
+
 // CHECK-LABEL: sil hidden @_TF8builtins11autorelease
 // CHECK: autorelease_value %0
 func autorelease(o: O) {
@@ -426,4 +433,3 @@ func castRefFromBridgeObject(bo: Builtin.BridgeObject) -> C {
 func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
-

@@ -715,6 +715,21 @@ case BuiltinValueKind::id:
     SILBuilderWithScope<1> B(BI);
     return B.createFloatLiteral(Loc, BI->getType(), TruncVal);
   }
+      
+  case BuiltinValueKind::AssumeNonNegative: {
+    IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+    if (!V)
+      return nullptr;
+
+    APInt VInt = V->getValue();
+    if (VInt.isNegative() && ResultsInError.hasValue()) {
+      diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
+               diag::wrong_non_negative_assumption,
+               VInt.toString(/*Radix*/ 10, /*Signed*/ true));
+      ResultsInError = Optional<bool>(true);
+    }
+    return V;
+  }
   }
   return nullptr;
 }
