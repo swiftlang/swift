@@ -41,7 +41,7 @@ internal struct _ArrayBody {
   /// The number of elements stored in this Array
   var count: Int {
     get {
-      return _storage.count
+      return _assumeNonNegative(_storage.count)
     }
     set(newCount) {
       _storage.count = newCount
