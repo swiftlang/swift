@@ -19,6 +19,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILArgument.h"
@@ -37,6 +38,7 @@ STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
 STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
 STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
+STATISTIC(NumSROAArguments, "Total SROA argumments optimized");
 
 //===----------------------------------------------------------------------===//
 //                             Argument Analysis
@@ -68,6 +70,9 @@ struct ArgumentDescriptor {
   /// find such a release in the callee, this is null.
   SILInstruction *CalleeRelease;
 
+  /// The projection tree of this arguments.
+  ProjectionTree ProjTree;
+
   ArgumentDescriptor() = default;
 
   /// Initialize this argument descriptor with all information from A that we
@@ -79,7 +84,10 @@ struct ArgumentDescriptor {
   /// when optimizing.
   ArgumentDescriptor(SILArgument *A)
     : Arg(A), Index(A->getIndex()), ParameterInfo(A->getParameterInfo()),
-      Decl(A->getDecl()), IsDead(A->use_empty()), CalleeRelease() {}
+      Decl(A->getDecl()), IsDead(A->use_empty()), CalleeRelease(),
+      ProjTree(A->getModule(), A->getType()) {
+    ProjTree.computeUsesAndLiveness(A);
+  }
 
   /// \returns true if this argument's ParameterConvention is P.
   bool hasConvention(ParameterConvention P) const {
@@ -93,11 +101,12 @@ struct ArgumentDescriptor {
 
   /// Add potentially multiple new arguments to NewArgs from the caller's apply
   /// inst.
-  void addCallerArgs(ApplyInst *AI, SmallVectorImpl<SILValue> &NewArgs) const;
+  void addCallerArgs(SILBuilder &Builder, ApplyInst *AI,
+                     SmallVectorImpl<SILValue> &NewArgs) const;
 
   /// Add potentially multiple new arguments to NewArgs from the thunk's
   /// function arguments.
-  void addThunkArgs(SILBasicBlock *BB,
+  void addThunkArgs(SILBuilder &Builder, SILBasicBlock *BB,
                     SmallVectorImpl<SILValue> &NewArgs) const;
 
   /// Optimize the argument at ArgOffset and return the index of the next
@@ -106,7 +115,16 @@ struct ArgumentDescriptor {
   /// The return value makes it easy to SROA arguments since we can return the
   /// amount of SROAed arguments we created.
   unsigned
-  updateOptimizedBBArgs(SILBasicBlock *BB, unsigned ArgOffset) const;
+  updateOptimizedBBArgs(SILBuilder &Builder, SILBasicBlock *BB,
+                        unsigned ArgOffset);
+
+  bool canOptimizeLiveArg() const {
+    return ParameterInfo.getSILType().isObject();
+  }
+
+  bool canExplodeValue() const {
+    return ProjTree.canExplodeValue() && canOptimizeLiveArg();
+  }
 };
 
 } // end anonymous namespace
@@ -114,52 +132,169 @@ struct ArgumentDescriptor {
 void
 ArgumentDescriptor::
 computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const {
+  DEBUG(llvm::dbgs() << "        Computing Interface Params\n");
   // If we have a dead argument, bail.
-  if (IsDead)
-    return;
-
-  // If we found a release in the callee in the last BB on an @owned
-  // parameter, change the parameter to @guaranteed and continue...
-  if (CalleeRelease) {
-    assert(ParameterInfo.getConvention() == ParameterConvention::Direct_Owned &&
-           "Can only transform @owned => @guaranteed in this code path");
-    SILParameterInfo NewInfo(ParameterInfo.getType(),
-                             ParameterConvention::Direct_Guaranteed);
-    Out.push_back(NewInfo);
+  if (IsDead) {
+    DEBUG(llvm::dbgs() << "            Dead!\n");
     return;
   }
 
-  // Otherwise just propagate through the parameter info.
-  Out.push_back(ParameterInfo);
+  // If this argument is live, but we can not optimize it.
+  if (!canOptimizeLiveArg()) {
+    DEBUG(llvm::dbgs() << "            Can not optimize live arg!\n");
+    Out.push_back(ParameterInfo);
+    return;
+  }
+
+  // If we can not explode this value, handle callee release and return.
+  if (!canExplodeValue()) {
+    DEBUG(llvm::dbgs() << "            ProjTree can not explode arg.\n");
+    // If we found a release in the callee in the last BB on an @owned
+    // parameter, change the parameter to @guaranteed and continue...
+    if (CalleeRelease) {
+      DEBUG(llvm::dbgs() << "            Has callee release.\n");
+      assert(ParameterInfo.getConvention() == ParameterConvention::Direct_Owned &&
+             "Can only transform @owned => @guaranteed in this code path");
+      SILParameterInfo NewInfo(ParameterInfo.getType(),
+                               ParameterConvention::Direct_Guaranteed);
+      Out.push_back(NewInfo);
+      return;
+    }
+
+    DEBUG(llvm::dbgs() << "            Does not have callee release.\n");
+    // Otherwise just propagate through the parameter info.
+    Out.push_back(ParameterInfo);
+    return;
+  }
+
+  DEBUG(llvm::dbgs() << "            ProjTree can explode arg.\n");
+  // Ok, we need to use the projection tree. Iterate over the leafs of the
+  // tree...
+  llvm::SmallVector<SILType, 8> LeafTypes;
+  ProjTree.getLeafTypes(LeafTypes);
+  DEBUG(llvm::dbgs() << "            Leafs:\n");
+  for (SILType Ty : LeafTypes) {
+    DEBUG(llvm::dbgs() << "                " << Ty << "\n");
+    // If Ty is trivial, just pass it directly.
+    if (Ty.isTrivial(Arg->getModule())) {
+      SILParameterInfo NewInfo(Ty.getSwiftRValueType(),
+                               ParameterConvention::Direct_Unowned);
+      Out.push_back(NewInfo);
+      continue;
+    }
+
+    // If Ty is guaranteed, just pass it through.
+    ParameterConvention Conv = ParameterInfo.getConvention();
+    if (Conv == ParameterConvention::Direct_Guaranteed) {
+      assert(!CalleeRelease && "Guaranteed parameter should not have a callee "
+             "release.");
+      SILParameterInfo NewInfo(Ty.getSwiftRValueType(),
+                               ParameterConvention::Direct_Guaranteed);
+      Out.push_back(NewInfo);
+      continue;
+    }
+
+    // If Ty is not trivial and we found a callee release, pass it as
+    // guaranteed.
+    assert(ParameterInfo.getConvention() == ParameterConvention::Direct_Owned
+           && "Can only transform @owned => @guaranteed in this code path");
+    if (CalleeRelease) {
+      SILParameterInfo NewInfo(Ty.getSwiftRValueType(),
+                               ParameterConvention::Direct_Guaranteed);
+      Out.push_back(NewInfo);
+      continue;
+    }
+
+    // Otherwise, just add Ty as an @owned parameter.
+    SILParameterInfo NewInfo(Ty.getSwiftRValueType(),
+                             ParameterConvention::Direct_Owned);
+    Out.push_back(NewInfo);
+  }
 }
 
 void
 ArgumentDescriptor::
-addCallerArgs(ApplyInst *AI, llvm::SmallVectorImpl<SILValue> &NewArgs) const {
+addCallerArgs(SILBuilder &B, ApplyInst *AI,
+              llvm::SmallVectorImpl<SILValue> &NewArgs) const {
   if (IsDead)
     return;
 
-  NewArgs.push_back(AI->getArgument(Index));
+  if (!canExplodeValue()) {
+    NewArgs.push_back(AI->getArgument(Index));
+    return;
+  }
+
+  ProjTree.createTreeFromValue(B, AI->getLoc(), AI->getArgument(Index),
+                               NewArgs);
 }
 
 void
 ArgumentDescriptor::
-addThunkArgs(SILBasicBlock *BB, SmallVectorImpl<SILValue> &NewArgs) const {
+addThunkArgs(SILBuilder &Builder, SILBasicBlock *BB,
+             llvm::SmallVectorImpl<SILValue> &NewArgs) const {
   if (IsDead)
     return;
 
-  NewArgs.push_back(BB->getBBArg(Index));
+  if (!canExplodeValue()) {
+    NewArgs.push_back(BB->getBBArg(Index));
+    return;
+  }
+
+  ProjTree.createTreeFromValue(Builder, BB->getParent()->getLocation(),
+                               BB->getBBArg(Index), NewArgs);
 }
 
 unsigned
 ArgumentDescriptor::
-updateOptimizedBBArgs(SILBasicBlock *BB, unsigned ArgOffset) const {
-  // If this argument is not dead, increment the offset and return.
-  if (!IsDead)
-    return ArgOffset+1;
+updateOptimizedBBArgs(SILBuilder &Builder, SILBasicBlock *BB,
+                      unsigned ArgOffset) {
+  // If this argument is dead delete this argument and return ArgOffset.
+  if (IsDead) {
+    BB->eraseBBArg(ArgOffset);
+    return ArgOffset;
+  }
 
-  // Otherwise, delete this argument and return ArgOffset.
-  BB->eraseBBArg(ArgOffset);
+  // If this argument is not dead and we did not perform SROA, increment the
+  // offset and return.
+  if (!canExplodeValue()) {
+    return ArgOffset + 1;
+  }
+
+  // Create values for the leaf types.
+  llvm::SmallVector<SILValue, 8> LeafValues;
+
+  // Create a reference to the old arg offset and increment arg offset so we can
+  // create the new arguments.
+  unsigned OldArgOffset = ArgOffset++;
+
+  // We do this in the same order as leaf types since ProjTree expects that the
+  // order of leaf values matches the order of leaf types.
+  {
+    llvm::SmallVector<SILType, 8> LeafTypes;
+    ProjTree.getLeafTypes(LeafTypes);
+    for (auto Ty : LeafTypes) {
+      LeafValues.push_back(BB->insertBBArg(ArgOffset++, Ty, BB->getBBArg(OldArgOffset)->getDecl()));
+    }
+  }
+
+  // Then go through the projection tree constructing aggregates and replacing
+  // uses.
+  //
+  // TODO: What is the right location to use here?
+  ProjTree.replaceValueUsesWithLeafUses(Builder, BB->getParent()->getLocation(),
+                                        LeafValues);
+
+  // Replace all uses of the the original arg with undef so it does not have any
+  // uses.
+  SILValue OrigArg = SILValue(BB->getBBArg(OldArgOffset));
+  OrigArg.replaceAllUsesWith(SILUndef::get(OrigArg.getType(),
+                                           BB->getModule()));
+
+  // Now erase the old argument since it does not have any uses. We also
+  // decrement ArgOffset since we have one less argument now.
+  BB->eraseBBArg(OldArgOffset);
+  --ArgOffset;
+
   return ArgOffset;
 }
 
@@ -209,6 +344,7 @@ public:
   SILFunction *createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &Name);
 
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
+  MutableArrayRef<ArgumentDescriptor> getArgDescList() { return ArgDescList; }
 
 private:
   /// Compute the CanSILFunctionType for the optimized function.
@@ -247,6 +383,11 @@ FunctionAnalyzer::analyze() {
         ShouldOptimize = true;
         ++NumOwnedConvertedToGuaranteed;
       }
+    }
+
+    if (A.ProjTree.canExplodeValue()) {
+      ShouldOptimize = true;
+      ++NumSROAArguments;
     }
 
     // Add the argument to our list.
@@ -357,12 +498,21 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
         continue;
       }
 
+      bool WillOptimize = false;
       // If we have an @owned argument and found a callee release for it,
       // convert the argument to guaranteed.
       if (Arg.CalleeRelease) {
+        WillOptimize = true;
         buffer << "o2g";
-        continue;
       }
+
+      if (Arg.ProjTree.canExplodeValue()) {
+        WillOptimize = true;
+        buffer << "s";
+      }
+
+      if (WillOptimize)
+        continue;
 
       // Otherwise we are doing nothing so add 'n' to the packed signature.
       buffer << 'n';
@@ -392,7 +542,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     llvm::SmallVector<SILValue, 8> NewArgs;
     ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
     for (auto &ArgDesc : ArgDescs) {
-      ArgDesc.addCallerArgs(AI, NewArgs);
+      ArgDesc.addCallerArgs(Builder, AI, NewArgs);
     }
 
     // We are ignoring generic functions and functions with out parameters for
@@ -430,7 +580,8 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
                             FunctionAnalyzer &Analyzer) {
   // TODO: What is the proper location to use here?
   SILLocation Loc = BB->getParent()->getLocation();
-  SILBuilderWithScope<16> Builder(BB, BB->getParent()->getDebugScope());
+  SILBuilderWithScope<16> Builder(BB,
+                                  BB->getParent()->getDebugScope());
 
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 
@@ -438,7 +589,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   llvm::SmallVector<SILValue, 8> ThunkArgs;
   ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
   for (auto &ArgDesc : ArgDescs) {
-    ArgDesc.addThunkArgs(BB, ThunkArgs);
+    ArgDesc.addThunkArgs(Builder, BB, ThunkArgs);
   }
 
   // We are ignoring generic functions and functions with out parameters for
@@ -480,10 +631,14 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 
   // Then perform any updates to the arguments of NewF.
   SILBasicBlock *NewFEntryBB = &*NewF->begin();
-  ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
+  MutableArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
   unsigned ArgOffset = 0;
+  SILBuilderWithScope<16> Builder(NewFEntryBB->begin(),
+                                  NewFEntryBB->getParent()->getDebugScope());
   for (auto &ArgDesc : ArgDescs) {
-    ArgOffset = ArgDesc.updateOptimizedBBArgs(NewFEntryBB, ArgOffset);
+    DEBUG(llvm::dbgs() << "Updating arguments at ArgOffset: " << ArgOffset
+          << " for: " << *ArgDesc.Arg);
+    ArgOffset = ArgDesc.updateOptimizedBBArgs(Builder, NewFEntryBB, ArgOffset);
   }
 
   // Then create the new thunk body since NewF has the right signature now.

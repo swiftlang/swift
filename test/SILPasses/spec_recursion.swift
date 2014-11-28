@@ -1,4 +1,4 @@
-// RUN: %swift -O -emit-sil %s |  FileCheck %s
+// RUN: %swift -O -disable-func-sig-opts -emit-sil %s |  FileCheck %s
 
 // Make sure we are not looping forever.
 extension Array {
