@@ -151,6 +151,13 @@ public:
   SILArgument *insertBBArg(bbarg_iterator Pos, SILType Ty,
                            const ValueDecl *D=nullptr);
 
+  SILArgument *insertBBArg(unsigned Index, SILType Ty,
+                           const ValueDecl *D=nullptr) {
+    bbarg_iterator Pos = BBArgList.begin();
+    std::advance(Pos, Index);
+    return insertBBArg(Pos, Ty, D);
+  }
+
   /// \brief Remove all block arguments.
   void dropAllBBArgs() { BBArgList.clear(); }
 
