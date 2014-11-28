@@ -22,8 +22,9 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 
@@ -40,6 +41,8 @@ enum class ProjectionKind : uint8_t {
 /// An abstract representation of a SIL Projection that allows one to work with
 /// value projections and address projections at an abstract level.
 class Projection {
+  friend class ProjectionTree;
+
   /// The kind of projection that we are processing.
   ProjectionKind Kind;
 
@@ -166,6 +169,11 @@ public:
     return Index;
   }
 
+  /// Return the generalized index that works for both decls and tuples.
+  unsigned getGeneralizedIndex() const {
+    return Index;
+  }
+
   /// Returns true if this projection is a nominal kind projection.
   bool isNominalKind() const {
     switch (Kind) {
@@ -204,7 +212,22 @@ public:
   NullablePtr<SILInstruction>
   createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const;
 
+  NullablePtr<SILInstruction>
+  createProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
+    if (Base.getType().isAddress()) {
+      return createAddrProjection(B, Loc, Base);
+    } else if (Base.getType().isObject()) {
+      return createValueProjection(B, Loc, Base);
+    } else {
+      llvm_unreachable("Unsupported SILValueCategory");
+    }
+  }
+
 private:
+  Projection(ProjectionKind Kind, SILType Type, ValueDecl *Decl,
+             unsigned Index)
+    : Kind(Kind), Type(Type), Decl(Decl), Index(Index) {}
+
   explicit Projection(StructElementAddrInst *SEA);
   explicit Projection(TupleElementAddrInst *TEA);
   explicit Projection(RefElementAddrInst *REA);
@@ -324,6 +347,243 @@ public:
   reverse_iterator rend() { return Path.rend(); }
   const_reverse_iterator rbegin() const { return Path.rbegin(); }
   const_reverse_iterator rend() const { return Path.rend(); }
+};
+
+class ProjectionTree;
+
+class ProjectionTreeNode {
+  friend class ProjectionTree;
+
+  /// The index of the current node in the tree. Can be used to lookup this node
+  /// from the ProjectionTree. The reason why we use an Index instead of a
+  /// pointer is that the SmallVector that we use to store these can reallocate
+  /// invalidating our pointers.
+  unsigned Index;
+
+  /// The base type from which this projection tree node is derived via Proj. It
+  /// is necessary to maintain a separate such entry from BaseValues since we
+  /// may have projection tree nodes without any BaseValues since we completely
+  /// explode non-enum scalar values to the leafs of our tree.
+  ///
+  /// In the root of the tree, this is the actual type.
+  SILType BaseType;
+
+  /// The base values we are tracking for which there is a Proj projection from.
+  llvm::SmallVector<SILValue, 4> BaseValues;
+
+  /// The projection that this node represents. None in the root.
+  llvm::Optional<Projection> Proj;
+
+  /// The index of the parent of this projection tree node in the projection
+  /// tree. None in the root.
+  llvm::Optional<unsigned> Parent;
+
+  /// The list of 'non-projection' users of this projection.
+  ///
+  /// *NOTE* This also includes projections like enums we do not handle.
+  llvm::SmallVector<Operand *, 4> NonProjUsers;
+
+  /// The indices of the child projections of this node. Each one of these
+  /// projections is associated with a field type from BaseType and will contain
+  /// references to
+  llvm::SmallVector<unsigned, 4> ChildProjections;
+
+  /// Flag to see if ChildProjections have been initialized.
+  bool Initialized;
+
+  /// The index to the first ancestor of this node in the projection tree with a
+  /// non-projection user.
+  ///
+  /// The reason that we track this information is that all nodes below such an
+  /// ancestor must necessarily be alive. This makes it easy to fold together
+  /// "levels" of leaf nodes recursively to create aggregate structures until we
+  /// get to this ancestor.
+  bool IsLive;
+
+  enum {
+    RootIndex = 0
+  };
+
+  /// Constructor for the root of the tree.
+  ProjectionTreeNode(SILType BaseTy)
+    : Index(0), BaseType(BaseTy), BaseValues(), Proj(), Parent(),
+      NonProjUsers(), ChildProjections(), Initialized(false), IsLive(false) {}
+
+  // Normal constructor for non-root nodes.
+  ProjectionTreeNode(ProjectionTreeNode *Parent, unsigned Index, SILType BaseTy,
+                     Projection P)
+    : Index(Index), BaseType(BaseTy), BaseValues(), Proj(P),
+      Parent(Parent->getIndex()), NonProjUsers(), ChildProjections(),
+      Initialized(false), IsLive(false) {}
+
+public:
+  class AggregateBuilder;
+
+  ~ProjectionTreeNode() = default;
+  ProjectionTreeNode(const ProjectionTreeNode &) = default;
+
+  bool isRoot() const {
+    // Root does not have a parent. So if we have a parent, we can not be root.
+    if (Parent.hasValue()) {
+      assert(Proj.hasValue() && "If parent is not none, then P should be not "
+             "none");
+      assert(Index != RootIndex && "If parent is not none, we can not be root");
+      return false;
+    } else {
+      assert(!Proj.hasValue() && "If parent is none, then P should be none");
+      assert(Index == RootIndex && "Index must be root index");
+      return true;
+    }
+  }
+
+  SILType getType() const {
+    if (isRoot())
+      return BaseType;
+    return Proj.getValue().getType();
+  }
+
+  ProjectionTreeNode *getChildForProjection(ProjectionTree &Tree,
+                                            const Projection &P);
+
+  NullablePtr<SILInstruction> createProjection(SILBuilder &B, SILLocation Loc,
+                                               SILValue Arg) const;
+
+  SILInstruction *
+  createAggregate(SILBuilder &B, SILLocation Loc,
+                  ArrayRef<SILValue> Args) const;
+
+  unsigned getIndex() const { return Index; }
+
+  ProjectionTreeNode *getParent(ProjectionTree &Tree);
+  const ProjectionTreeNode *getParent(const ProjectionTree &Tree) const;
+
+  ProjectionTreeNode *getParentOrNull(ProjectionTree &Tree) {
+    if (!Parent.hasValue())
+      return nullptr;
+    return getParent(Tree);
+  }
+
+private:
+  void addNonProjectionUser(Operand *Op) {
+    IsLive = true;
+    NonProjUsers.push_back(Op);
+  }
+
+  using ValueNodePair = std::pair<SILValue, ProjectionTreeNode *>;
+
+  void processUsersOfValue(ProjectionTree &Tree,
+                           llvm::SmallVectorImpl<ValueNodePair> &Worklist,
+                           SILValue Value);
+
+
+  void
+  createChildren(ProjectionTree &Tree,
+                 llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist);
+
+  void
+  createChildrenForStruct(ProjectionTree &Tree,
+                          llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
+                          StructDecl *SD);
+
+  void
+  createChildrenForTuple(ProjectionTree &Tree,
+                         llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
+                         TupleType *TT);
+};
+
+class ProjectionTree {
+  friend class ProjectionTreeNode;
+
+  SILModule &Mod;
+
+  llvm::SmallVector<ProjectionTreeNode, 32> ProjectionTreeNodes;
+
+  llvm::SmallVector<unsigned, 16> LeafIndices;
+
+public:
+  /// Construct a projection tree from BaseTy.
+  ProjectionTree(SILModule &Mod, SILType BaseTy);
+
+  /// Compute liveness and use information in this projection tree using Base.
+  void computeUsesAndLiveness(SILValue Base);
+
+  /// Return the module associated with this tree.
+  SILModule &getModule() const { return Mod; }
+
+  /// Iterate over all values in the tree. The function should return false if
+  /// it wants the iteration to end and true if it wants to continue.
+  void visitProjectionTreeNodes(std::function<bool (ProjectionTreeNode &)> F);
+
+  ProjectionTreeNode *getRoot() {
+    return getNode(ProjectionTreeNode::RootIndex);
+  }
+  const ProjectionTreeNode *getRoot() const {
+    return getNode(ProjectionTreeNode::RootIndex);
+  }
+
+  ProjectionTreeNode *getNode(unsigned i) {
+    return &ProjectionTreeNodes[i];
+  }
+
+  const ProjectionTreeNode *getNode(unsigned i) const {
+    return &ProjectionTreeNodes[i];
+  }
+
+  bool canExplodeValue() const {
+    return ProjectionTreeNodes.size() > 1;
+  }
+
+  void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
+    for (unsigned LeafIndex : LeafIndices) {
+      const ProjectionTreeNode *Node = getNode(LeafIndex);
+      assert(Node->IsLive && "We are only interested in leafs that are live");
+      OutArray.push_back(Node->getType());
+    }
+  }
+
+  void createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
+                           llvm::SmallVectorImpl<SILValue> &Leafs) const;
+
+  void
+  replaceValueUsesWithLeafUses(SILBuilder &B, SILLocation Loc,
+                               llvm::SmallVectorImpl<SILValue> &Leafs);
+
+private:
+
+  void createRoot(SILType BaseTy) {
+    assert(ProjectionTreeNodes.empty() &&
+           "Should only create root when ProjectionTreeNodes is empty");
+    ProjectionTreeNodes.push_back(ProjectionTreeNode(BaseTy));
+  }  
+
+  ProjectionTreeNode *createChild(ProjectionTreeNode *Parent,
+                                  SILType BaseTy,
+                                  const Projection &P) {
+    unsigned Index = ProjectionTreeNodes.size();
+    ProjectionTreeNodes.push_back(ProjectionTreeNode(Parent, Index, BaseTy, P));
+    return &ProjectionTreeNodes[Index];
+  }
+
+  ProjectionTreeNode *
+  createChildForStruct(ProjectionTreeNode *Parent, SILType Ty, ValueDecl *VD,
+                       unsigned Index) {
+    return createChild(Parent, Ty, Projection(ProjectionKind::Struct, Ty, VD,
+                                              Index));
+  }
+
+  ProjectionTreeNode *
+  createChildForClass(ProjectionTreeNode *Parent, SILType Ty, ValueDecl *VD,
+                      unsigned Index) {
+    return createChild(Parent, Ty, Projection(ProjectionKind::Class, Ty, VD,
+                                              Index));
+  }
+
+  ProjectionTreeNode *
+  createChildForTuple(ProjectionTreeNode *Parent, SILType Ty, unsigned Index) {
+    return createChild(Parent, Ty, Projection(ProjectionKind::Tuple, Ty,
+                                              nullptr, Index));
+  }
+
 };
 
 } // end swift namespace
