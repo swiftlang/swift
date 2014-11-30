@@ -69,7 +69,6 @@ enum class PassKind {
   SILLinker,
   GlobalARCOpts,
   DCE,
-  EnumSimplification,
   LoopInfoPrinter,
   FunctionSignatureOpts,
   ViewCFG,
@@ -237,9 +236,6 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::DCE,
                                    "dce",
                                    "Eliminate dead code"),
-                        clEnumValN(PassKind::EnumSimplification,
-                                   "enum-simplification",
-                                   "Enum Simplification"),
                         clEnumValN(PassKind::LoopInfoPrinter,
                                    "loop-info-printer",
                                    "Display loop information."),
@@ -452,9 +448,6 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::DCE:
       PM.add(createDCE());
-      break;
-    case PassKind::EnumSimplification:
-      PM.add(createEnumSimplification());
       break;
     case PassKind::LoopInfoPrinter:
       PM.add(createLoopInfoPrinter());

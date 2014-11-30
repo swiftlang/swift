@@ -35,7 +35,6 @@ add_swift_library(swiftSILPasses
   GlobalOpt.cpp
   GlobalARCOpts.cpp
   DeadCodeElimination.cpp
-  EnumSimplification.cpp
   LoopInfoPrinter.cpp
   FunctionSignatureOpts.cpp
   CFGPrinter.cpp
