@@ -2455,6 +2455,12 @@ public:
     return getParameters()[0];
   }
 
+  /// Returns the 'self' parameter, assuming that this is the type of
+  /// a method.
+  SILParameterInfo getSelfParameter() const {
+    return getParameters().back();
+  }
+
   /// Returns the SILType of the semantic result of this function: the
   /// indirect result type, if there is one, otherwise the direct result.
   ///

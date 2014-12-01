@@ -1665,7 +1665,8 @@ ManagedValue SILGenFunction::emitApply(
   SILValue lifetimeExtendedSelf;
   if (substFnType->getResult().getConvention()
         == ResultConvention::UnownedInnerPointer) {
-    lifetimeExtendedSelf = args.back().getValue();
+    auto selfMV = args.back();
+    lifetimeExtendedSelf = selfMV.getValue();
     
     switch (substFnType->getParameters().back().getConvention()) {
     case swift::ParameterConvention::Direct_Owned:
@@ -1675,9 +1676,13 @@ ManagedValue SILGenFunction::emitApply(
       break;
     case swift::ParameterConvention::Direct_Guaranteed:
     case swift::ParameterConvention::Direct_Unowned:
-      // We'll manually manage the argument's lifetime after the call. Disable
-      // its cleanup.
-      args.back().forwardCleanup(*this);
+      // We'll manually manage the argument's lifetime after the
+      // call. Disable its cleanup, forcing a copy if it was emitted +0.
+      if (selfMV.hasCleanup()) {
+        selfMV.forwardCleanup(*this);
+      } else {
+        lifetimeExtendedSelf = selfMV.copyUnmanaged(*this, loc).forward(*this);
+      }
       break;
         
     case swift::ParameterConvention::Indirect_In:
@@ -3099,32 +3104,73 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 
 RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                     ManagedValue base,
-                                                    AbstractFunctionDecl *decl){
-  auto accessorBaseTy
-    = decl->getDeclContext()->getDeclaredTypeInContext();
+                                                    SILDeclRef accessor) {
+  auto accessorType = SGM.Types.getConstantFunctionType(accessor);
+  SILParameterInfo selfParam = accessorType->getParameters().back();
 
-  if (base.isLValue()) {
-    // inout bases get passed by their address.
-    if (decl->getImplicitSelfDecl()->getType()->is<InOutType>())
-      return RValueSource(loc, RValue(*this, loc,
-                                      base.getType().getSwiftType(),
-                                      base));
-    // When calling an accessor, the base may be provided as an inout value,
-    // even though we only need an rvalue.  In this case, load the value out of
-    // the address.
-    // TODO: this causes us to materialize stuff (at the SIL level) that will
-    // just be loaded - unnecessarily dumping stuff in memory.
-    base = emitLoad(loc, base.getValue(),
-                    getTypeLowering(base.getType().getObjectType()),
-                    SGFContext(), IsNotTake);
-  } else if (SGM.Types.isIndirectPlusZeroSelfParameter(accessorBaseTy)
-             && decl->isInstanceMember()) {
-    // When calling an opaque generic accessor, we need to pass the base
-    // indirectly at +0.
-    if (!base.getType().isAddress()) {
-      auto tmp = emitTemporaryAllocation(loc, base.getType());
-      B.createStore(loc, base.getValue(), tmp);
-      base = ManagedValue::forUnmanaged(tmp);
+  assert(!base.isInContext());
+  assert(!base.isLValue() || !base.hasCleanup());
+  SILType baseType = base.getValue().getType();
+
+  // If the base is currently an address, we may have to copy it.
+  if (baseType.isAddress()) {
+    auto needsLoad = [&] {
+      switch (selfParam.getConvention()) {
+      // If the accessor wants the value 'inout', always pass the
+      // address we were given.  This is semantically required.
+      case ParameterConvention::Indirect_Inout:
+        return false;
+
+      // If the accessor wants the value 'in', we have to copy if the
+      // base isn't a temporary.  We aren't allowed to pass aliased
+      // memory to 'in', and we have pass at +1.
+      case ParameterConvention::Indirect_In:
+        return base.isPlusZeroRValueOrTrivial();
+
+      case ParameterConvention::Indirect_Out:
+        llvm_unreachable("out parameter not expected here");
+
+      // If the accessor wants the value directly, we definitely have to
+      // load.  TODO: don't load-and-retain if the value is passed at +0.
+      case ParameterConvention::Direct_Owned:
+      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Direct_Guaranteed:
+        return true;
+      }
+      llvm_unreachable("bad convention");
+    };
+    if (needsLoad()) {
+      // The load can only be a take if the base is a +1 rvalue.
+      auto shouldTake = IsTake_t(base.hasCleanup());
+
+      base = emitLoad(loc, base.forward(*this), getTypeLowering(baseType),
+                      SGFContext(), shouldTake);
+    }
+
+  // If the base is currently a value, we may have to drop it in
+  // memory or copy it.
+  } else {
+    assert(!base.isLValue());
+
+    // We need to produce the value at +1 if it's going to be consumed.
+    if (selfParam.isConsumed() && !base.hasCleanup()) {
+      base = base.copyUnmanaged(*this, loc);
+    }
+
+    // If the parameter is indirect, we need to drop the value into
+    // temporary memory.
+    if (selfParam.isIndirect()) {
+      auto temporary = emitTemporaryAllocation(loc, baseType);
+      bool hadCleanup = base.hasCleanup();
+      B.createStore(loc, base.forward(*this), temporary);
+
+      // The temporary memory is +0 if the value was.  (But note that
+      // we'll make it +1 if the parameter is consumed.)
+      if (hadCleanup) {
+        base = ManagedValue(temporary, enterDestroyCleanup(temporary));
+      } else {
+        base = ManagedValue::forUnmanaged(temporary);
+      }
     }
   }
 
@@ -3132,19 +3178,20 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                   base.getType().getSwiftType(), base));
 }
 
+SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,
+                                            bool isDirectUse) {
+  return SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func,
+                    SILDeclRef::ConstructAtBestResilienceExpansion,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    !isDirectUse && storage->requiresObjCGetterAndSetter());
+}
 
 /// Emit a call to a getter.
 ManagedValue SILGenFunction::
-emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
+emitGetAccessor(SILLocation loc, SILDeclRef get,
                 ArrayRef<Substitution> substitutions, RValueSource &&selfValue,
                 bool isSuper, bool isDirectUse,
                 RValue &&subscripts, SGFContext c) {
- 
-  SILDeclRef get(decl->getGetter(), SILDeclRef::Kind::Func,
-                 SILDeclRef::ConstructAtBestResilienceExpansion,
-                 SILDeclRef::ConstructAtNaturalUncurryLevel,
-                 !isDirectUse && decl->requiresObjCGetterAndSetter());
-
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
@@ -3167,16 +3214,19 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   return emission.apply(c);
 }
 
-void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
+SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage,
+                                            bool isDirectUse) {
+  return SILDeclRef(storage->getSetter(), SILDeclRef::Kind::Func,
+                    SILDeclRef::ConstructAtBestResilienceExpansion,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    !isDirectUse && storage->requiresObjCGetterAndSetter());
+}
+
+void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
                                      ArrayRef<Substitution> substitutions,
                                      RValueSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
                                      RValue &&subscripts, RValue &&setValue) {
-  SILDeclRef set(decl->getSetter(), SILDeclRef::Kind::Func,
-                 SILDeclRef::ConstructAtBestResilienceExpansion,
-                 SILDeclRef::ConstructAtNaturalUncurryLevel,
-                 !isDirectUse && decl->requiresObjCGetterAndSetter());
-
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
@@ -3206,17 +3256,22 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   emission.apply();
 }
 
+SILDeclRef
+SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage,
+                                            bool isDirectUse) {
+  return SILDeclRef(storage->getMaterializeForSetFunc(),
+                    SILDeclRef::Kind::Func,
+                    SILDeclRef::ConstructAtBestResilienceExpansion,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    /*foreign*/ false);
+}
+
 std::pair<SILValue, SILValue> SILGenFunction::
-emitMaterializeForSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
+emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                               ArrayRef<Substitution> substitutions,
                               RValueSource &&selfValue,
                               bool isSuper, bool isDirectUse,
                               RValue &&subscripts, SILValue buffer) {
-  SILDeclRef materializeForSet(decl->getMaterializeForSetFunc(),
-                               SILDeclRef::Kind::Func,
-                               SILDeclRef::ConstructAtBestResilienceExpansion,
-                               SILDeclRef::ConstructAtNaturalUncurryLevel,
-                               /*foreign*/ false);
 
   Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
                                                      materializeForSet,
@@ -3264,21 +3319,22 @@ emitMaterializeForSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   return { address, needsWriteback };
 }
 
+SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,
+                                               AccessKind accessKind,
+                                               bool isDirectUse) {
+  FuncDecl *addressorFunc = storage->getAddressorForAccess(accessKind);
+  return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func,
+                    SILDeclRef::ConstructAtBestResilienceExpansion,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    /*foreign*/ false);
+}
+
 /// Emit a call to an addressor.
 ManagedValue SILGenFunction::
-emitAddressorAccessor(SILLocation loc, AbstractStorageDecl *decl,
-                      AccessKind accessKind,
+emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                       ArrayRef<Substitution> substitutions,
                       RValueSource &&selfValue, bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {
-  FuncDecl *addressorFunc =
-    (accessKind == AccessKind::Read ? decl->getAddressor()
-                                    : decl->getMutableAddressor());
-
-  SILDeclRef addressor(addressorFunc, SILDeclRef::Kind::Func,
-                       SILDeclRef::ConstructAtBestResilienceExpansion,
-                       SILDeclRef::ConstructAtNaturalUncurryLevel,
-                       /*foreign*/ false);
 
   Callee callee =
     emitSpecializedAccessorFunctionRef(*this, loc, addressor,

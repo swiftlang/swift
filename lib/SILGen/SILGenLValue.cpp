@@ -656,11 +656,11 @@ namespace {
     /// necessary), and subscript arguments, in that order.
     AccessorArgs
     prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
-                        ManagedValue base, AbstractFunctionDecl *funcDecl) &&
+                        ManagedValue base, SILDeclRef accessor) &&
     {
       AccessorArgs result;
       if (base)
-        result.base = gen.prepareAccessorBaseArg(loc, base, funcDecl);
+        result.base = gen.prepareAccessorBaseArg(loc, base, accessor);
 
       if (subscripts)
         result.subscripts = std::move(subscripts);
@@ -733,11 +733,13 @@ namespace {
     
     void set(SILGenFunction &gen, SILLocation loc,
              RValue &&value, ManagedValue base) && override {
+      SILDeclRef setter = gen.getSetterDeclRef(decl, IsDirectAccessorUse);
+
       // Pass in just the setter.
       auto args =
-        std::move(*this).prepareAccessorArgs(gen, loc, base, decl->getSetter());
+        std::move(*this).prepareAccessorArgs(gen, loc, base, setter);
       
-      return gen.emitSetAccessor(loc, decl, substitutions,
+      return gen.emitSetAccessor(loc, setter, substitutions,
                                  std::move(args.base), IsSuper,
                                  IsDirectAccessorUse,
                                  std::move(args.subscripts),
@@ -750,10 +752,9 @@ namespace {
       // If the property is dynamic, or if it doesn't have a
       // materializeForSet, or if we're not in a writeback scope, we
       // should just use the normal logic.
-      FuncDecl *materializeForSet;
       if (!gen.InWritebackScope ||
           decl->getAttrs().hasAttribute<DynamicAttr>() ||
-          !(materializeForSet = decl->getMaterializeForSetFunc())) {
+          !decl->getMaterializeForSetFunc()) {
         return std::move(*this).LogicalPathComponent::getMaterialized(gen,
                                                                     loc, base);
       }
@@ -770,10 +771,13 @@ namespace {
 
       auto clonedComponent = clone(gen, loc);
 
+      SILDeclRef materializeForSet =
+        gen.getMaterializeForSetDeclRef(decl, IsDirectAccessorUse);
+
       auto args = std::move(*this).prepareAccessorArgs(gen, loc, copiedBase,
                                                        materializeForSet);
       auto addressAndNeedsWriteback =
-        gen.emitMaterializeForSetAccessor(loc, decl, substitutions,
+        gen.emitMaterializeForSetAccessor(loc, materializeForSet, substitutions,
                                           std::move(args.base), IsSuper,
                                           IsDirectAccessorUse,
                                           std::move(args.subscripts),
@@ -836,10 +840,12 @@ namespace {
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
                      ManagedValue base, SGFContext c) && override {
+      SILDeclRef getter = gen.getGetterDeclRef(decl, IsDirectAccessorUse);
+
       auto args =
-        std::move(*this).prepareAccessorArgs(gen, loc, base, decl->getGetter());
+        std::move(*this).prepareAccessorArgs(gen, loc, base, getter);
       
-      return gen.emitGetAccessor(loc, decl, substitutions,
+      return gen.emitGetAccessor(loc, getter, substitutions,
                                  std::move(args.base), IsSuper,
                                  IsDirectAccessorUse,
                                  std::move(args.subscripts), c);
@@ -931,10 +937,11 @@ namespace {
 
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
+      SILDeclRef addressor = gen.getAddressorDeclRef(decl, accessKind, 
+                                                     IsDirectAccessorUse);
       auto args =
-        std::move(*this).prepareAccessorArgs(gen, loc, base,
-                                      decl->getAddressorForAccess(accessKind));
-      return gen.emitAddressorAccessor(loc, decl, accessKind, substitutions,
+        std::move(*this).prepareAccessorArgs(gen, loc, base, addressor);
+      return gen.emitAddressorAccessor(loc, addressor, substitutions,
                                        std::move(args.base), IsSuper,
                                        IsDirectAccessorUse,
                                        std::move(args.subscripts),

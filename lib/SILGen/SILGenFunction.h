@@ -707,27 +707,38 @@ public:
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   
   RValueSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
-                                      AbstractFunctionDecl *decl);
-  
-  ManagedValue emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
+                                      SILDeclRef accessor);
+
+  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl,
+                              bool isDirectAccessorUse);  
+  ManagedValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                                ArrayRef<Substitution> substitutions,
                                RValueSource &&optionalSelfValue,
                                bool isSuper, bool isDirectAccessorUse,
                                RValue &&optionalSubscripts, SGFContext C);
-  void emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
+
+  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl,
+                              bool isDirectAccessorUse);  
+  void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
                        RValueSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
                        RValue &&optionalSubscripts, RValue &&value);
+
+  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl,
+                                         bool isDirectAccessorUse);  
   std::pair<SILValue, SILValue>
-  emitMaterializeForSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
+  emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 ArrayRef<Substitution> substitutions,
                                 RValueSource &&optionalSelfValue,
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
                                 SILValue buffer);
-  ManagedValue emitAddressorAccessor(SILLocation loc, AbstractStorageDecl *decl,
-                                     AccessKind accessKind,
+
+  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
+                                 AccessKind accessKind,
+                                 bool isDirectAccessorUse);  
+  ManagedValue emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                      ArrayRef<Substitution> substitutions,
                                      RValueSource &&optionalSelfValue,
                                      bool isSuper, bool isDirectAccessorUse,

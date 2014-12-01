@@ -25,7 +25,7 @@ class Base {}
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter
 // CHECK:         apply [[SET_CLSID]]<T>([[UID_VALUE]], [[TMP]]#1)
-// CHECK:         strong_release [[X]]
+// CHECK:         destroy_addr [[TMP]]#1
 // -- call x.iid.getter
 // CHECK-NOT:     strong_retain [[X]]
 // CHECK:         [[TMP:%.*]] = alloc_stack $T
@@ -39,7 +39,7 @@ class Base {}
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[GET_CLSID:%.*]] = witness_method $T, #UID.clsid!getter
 // CHECK:         apply [[GET_CLSID]]<T>([[TMP]]#1)
-// CHECK:         strong_release [[X]]
+// CHECK:         destroy_addr [[TMP]]#1
 // -- done
 // CHECK:         strong_release [[X]]
 
@@ -63,21 +63,30 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int) {
 // CHECK:         store [[X]] to [[TMP]]
 // CHECK:         [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter
 // CHECK:         apply [[SET_CLSID]]<T>([[UID_VALUE]], [[TMP]]#1)
-// CHECK:         strong_release [[X]]
+// CHECK-NOT:     strong_release [[X]]
+// CHECK:         destroy_addr [[TMP]]#1
+// CHECK-NOT:     strong_release [[X]]
 // -- call x.iid.getter
 // CHECK-NOT:     strong_retain [[X]]
-// CHECK:         [[TMP:%.*]] = alloc_stack $T
-// CHECK:         store [[X]] to [[TMP]]
+// CHECK:         [[TMP0:%.*]] = alloc_stack $T
+// CHECK:         store [[X]] to [[TMP0]]
 // CHECK:         [[GET_IID:%.*]] = witness_method $T, #UID.iid!getter
-// CHECK:         apply [[GET_IID]]<T>([[TMP]]#1)
+// CHECK:         apply [[GET_IID]]<T>([[TMP0]]#1)
 // CHECK-NOT:     strong_release [[X]]
+// CHECK-NOT:     destroy_addr [[TMP0]]
 // -- call x.clsid.getter (TODO: avoid r/r here)
 // CHECK:         strong_retain [[X]]
-// CHECK:         [[TMP:%.*]] = alloc_stack $T
-// CHECK:         store [[X]] to [[TMP]]
+// CHECK:         [[TMP1:%.*]] = alloc_stack $T
+// CHECK:         store [[X]] to [[TMP1]]
 // CHECK:         [[GET_CLSID:%.*]] = witness_method $T, #UID.clsid!getter
-// CHECK:         apply [[GET_CLSID]]<T>([[TMP]]#1)
-// CHECK:         strong_release [[X]]
+// CHECK:         apply [[GET_CLSID]]<T>([[TMP1]]#1)
+// CHECK-NOT:     strong_release [[X]]
+// CHECK-NOT:     destroy_addr [[TMP0]]
+// CHECK:         destroy_addr [[TMP1]]#1
+// CHECK-NOT:     strong_release [[X]]
+// CHECK-NOT:     destroy_addr [[TMP0]]
+// CHECK:         dealloc_stack [[TMP1]]#0
+// CHECK:         dealloc_stack [[TMP0]]#0
 // -- done
 // CHECK:         strong_release [[X]]
 
