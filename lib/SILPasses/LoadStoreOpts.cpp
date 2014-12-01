@@ -28,8 +28,9 @@
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 
 using namespace swift;
 
@@ -931,9 +932,16 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
     unsigned PostOrderSize = std::distance(ReversePostOrder.begin(),
                                            ReversePostOrder.end());
 
+    // NextPowerOf2 operates on uint64_t, so we can not overflow since our input
+    // is a 32 bit value. But we need to make sure if the next power of 2 is
+    // greater than the representable UINT_MAX, we just pass in (1 << 31)
+    uint64_t SizeRoundedToPow2 = llvm::NextPowerOf2(PostOrderSize);
+    if (SizeRoundedToPow2 > uint64_t(UINT_MAX))
+      SizeRoundedToPow2 = 1 << 31;
+
     // TODO: Each block does not need its own LSBBForwarder instance. Only
     // the set of reaching loads and stores is specific to the block.
-    llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap(PostOrderSize);
+    llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap(SizeRoundedToPow2);
     std::vector<LSBBForwarder> BBIDToForwarderMap(PostOrderSize);
 
     for (SILBasicBlock *BB : ReversePostOrder) {
