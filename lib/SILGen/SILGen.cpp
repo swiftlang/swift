@@ -130,15 +130,15 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                    moduleName, functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
-    
+
     cacheSlot = c;
   }
-  
+
   DEBUG(llvm::dbgs() << "bridging function "
           << moduleName << '.' << functionName
           << " mapped to ";
         cacheSlot->print(llvm::dbgs()));
-  
+
   return *cacheSlot;
 }
 
@@ -223,7 +223,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   auto extInfo = FunctionType::ExtInfo()
     .withRepresentation(FunctionType::Representation::Thin)
     .withCallingConv(AbstractCC::C);
-  
+
   auto findStdlibDecl = [&](StringRef name) -> ValueDecl* {
     if (!getASTContext().getStdlibModule())
       return nullptr;
@@ -258,7 +258,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
         ->getCanonicalType();
     }
   }
-  
+
   SILParameterInfo params[] = {
     SILParameterInfo(Int32Ty, ParameterConvention::Direct_Unowned),
     SILParameterInfo(PtrPtrInt8Ty, ParameterConvention::Direct_Unowned),
@@ -270,7 +270,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    C);
-  
+
   return SILFunction::create(M, SILLinkage::Public,
                              SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
                              Loc, IsBare, IsNotTransparent, IsNotFragile);
@@ -298,7 +298,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     }
     return F;
   }
-  
+
   auto constantType = getConstantType(constant).castTo<SILFunctionType>();
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
@@ -322,7 +322,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     inlineStrategy = NoInline;
   else if (constant.isAlwaysInline())
     inlineStrategy = AlwaysInline;
-  
+
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
                                 None, IsNotBare, IsTrans, IsFrag,
@@ -333,7 +333,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     if (auto SemanticsA =
         constant.getDecl()->getAttrs().getAttribute<SemanticsAttr>())
       F->setSemanticsAttr(SemanticsA->Value);
-  
+
   ValueDecl *VD = nullptr;
   if (constant.hasDecl())
     VD = constant.getDecl();
@@ -364,7 +364,7 @@ SILFunction *SILGenModule::preEmitFunction(SILDeclRef constant, T *astNode,
 
   f->setContextGenericParams(
                          Types.getConstantInfo(constant).ContextGenericParams);
-  
+
   // Create a debug scope for the function using astNode as source location.
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode), *f));
 
@@ -409,7 +409,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   if (!AFD->getDeclContext()->isLocalContext() &&
       TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
     SmallVector<SILValue, 4> Captures;
-    
+
     for (auto Capture : AFD->getCaptureInfo().getCaptures()) {
       auto It = TopLevelSGF->VarLocs.find(Capture);
       if (It == TopLevelSGF->VarLocs.end() ||
@@ -419,7 +419,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
       Captures.push_back(It->second.getAddress());
     }
-    
+
     if (!Captures.empty())
       TopLevelSGF->B.createMarkFunctionEscape(AFD, Captures);
   }
@@ -429,7 +429,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   SILDeclRef::Loc decl = fd;
 
   emitAbstractFuncDecl(fd);
-  
+
   // Emit the actual body of the function to a new SILFunction.  Ignore
   // prototypes and methods whose bodies weren't synthesized by now.
   if (fd->getBody(/*canSynthesize=*/false)) {
@@ -463,7 +463,7 @@ void SILGenModule::emitForeignThunk(SILDeclRef thunk) {
 
 void SILGenModule::addGlobalVariable(VarDecl *global) {
   // We create SILGlobalVariable here.
-  getSILGlobalVariable(global, ForDefinition); 
+  getSILGlobalVariable(global, ForDefinition);
 }
 
 void SILGenModule::emitConstructor(ConstructorDecl *decl) {
@@ -507,7 +507,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     // Struct and enum constructors do everything in a single function.
     SILGenFunction(*this, *f).emitValueConstructor(decl);
     postEmitFunction(constant, f);
-  }  
+  }
 }
 
 void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
@@ -600,7 +600,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       SILGenFunction(*this, *f).emitIVarDestroyer(ivarDestroyer);
       postEmitFunction(ivarDestroyer, f);
     }
-    
+
     return;
   }
 
@@ -638,8 +638,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                     FunctionType::ExtInfo()
                       .withRepresentation(FunctionType::Representation::Thin));
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
-  
-  auto *f = 
+
+  auto *f =
     SILFunction::create(M, SILLinkage::Private, funcName,
                         initSILType, nullptr, SILLocation(binding),
                         IsNotBare, IsNotTransparent,
@@ -648,12 +648,12 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(binding->getInit()), *f));
   f->setLocation(binding);
-  
+
   SILGenFunction(*this, *f)
     .emitLazyGlobalInitializer(binding);
-  
+
   f->verify();
-  
+
   return f;
 }
 
@@ -678,7 +678,7 @@ void SILGenModule::emitGlobalGetter(VarDecl *global,
     .emitGlobalGetter(global, onceToken, onceFunc);
   postEmitFunction(accessor, f);
 }
-  
+
 void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ArrayRef<Pattern*> patterns) {
   unsigned index = 0;
@@ -705,7 +705,7 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
                    SILDeclRef::ConstructAtBestResilienceExpansion,
                    SILDeclRef::ConstructAtNaturalUncurryLevel,
                    /*isObjC*/ true);
-  
+
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
     return;
@@ -725,7 +725,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
                     SILDeclRef::ConstructAtBestResilienceExpansion,
                     SILDeclRef::ConstructAtNaturalUncurryLevel,
                     /*isObjC*/ true);
-                     
+
   // Don't emit the thunks if they already exist.
   if (hasFunction(getter))
     return;
@@ -801,7 +801,7 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
       return;
     }
   }
-  
+
   // Otherwise, emit the initializer for library global variables.
   if (pd->hasInit())
     emitGlobalInitialization(pd);
@@ -815,7 +815,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   assert(gen.B.getInsertionBB() == gen.F.begin()
          && "not at entry point?!");
-  
+
   SILBasicBlock *entry = gen.B.getInsertionBB();
   // Create the argc and argv arguments.
   auto &C = gen.getASTContext();
@@ -824,7 +824,7 @@ void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
                                   entry, FnTy->getParameters()[0].getSILType());
   auto argv = new (gen.F.getModule()) SILArgument(
                                   entry, FnTy->getParameters()[1].getSILType());
-  
+
   // If the standard library provides a _didEnterMain intrinsic, call it first
   // thing.
   if (auto didEnterMain = C.getDidEnterMain(nullptr)) {
@@ -850,13 +850,13 @@ public:
       assert(!sgm.TopLevelSGF && "already emitted toplevel?!");
       assert(!sgm.M.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)
              && "already emitted toplevel?!");
-      
+
       RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
       SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
-      
+
       // Assign a debug scope pointing into the void to the top level function.
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
-      
+
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel);
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->Name;
       sgm.TopLevelSGF->prepareEpilog(Type(),
@@ -867,7 +867,7 @@ public:
       emitTopLevelProlog(*sgm.TopLevelSGF, PrologueLoc);
     }
   }
-  
+
   ~SourceFileScope() {
     if (sgm.TopLevelSGF) {
       // Write out the epilog.
@@ -875,7 +875,7 @@ public:
       auto returnInfo
         = sgm.TopLevelSGF->emitEpilogBB(moduleLoc);
       auto returnLoc = returnInfo.second;
-      
+
       // Signal a normal return to the OS by returning 0.
       auto &B = sgm.TopLevelSGF->B;
       auto &F = sgm.TopLevelSGF->F;
@@ -887,22 +887,22 @@ public:
                           F.getLoweredFunctionType()->getResult().getSILType(),
                           zero);
       sgm.TopLevelSGF->B.createReturn(returnLoc, zero);
-      
+
       SILFunction *toplevel = &sgm.TopLevelSGF->getFunction();
       delete sgm.TopLevelSGF;
-      
+
       DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
             toplevel->print(llvm::dbgs()));
       toplevel->verify();
       sgm.TopLevelSGF = nullptr;
     }
-    
+
     // If the source file contains an artificial main, emit the implicit
     // toplevel code.
     switch (auto artificialMain = sf->getArtificialMainKind()) {
     case ArtificialMainKind::None:
       break;
-    
+
     case ArtificialMainKind::UIApplicationMain:
     case ArtificialMainKind::NSApplicationMain:
       ClassDecl *mainClass = sf->getParentModule()->getMainClass();
@@ -914,7 +914,7 @@ public:
 
       // Assign a debug scope pointing into the void to the top level function.
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
-      
+
       SILGenFunction gen(sgm, *toplevel);
       emitTopLevelProlog(gen, mainClass);
       gen.emitArtificialTopLevel(artificialMain, mainClass);
@@ -964,7 +964,7 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
       sgm.emitSourceFile(nextSF, 0);
     }
   }
-    
+
   // Emit external definitions used by this module.
   for (auto def : mod->Ctx.ExternalDefinitions) {
     sgm.emitExternalDefinition(def);
