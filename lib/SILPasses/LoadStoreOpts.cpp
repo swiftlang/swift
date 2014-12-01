@@ -928,12 +928,12 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
     auto *PDI = DA->getPostDomInfo(F);
 
     auto ReversePostOrder = POTA->getReversePostOrder(F);
-    int PostOrderSize = std::distance(ReversePostOrder.begin(),
-                                      ReversePostOrder.end());
+    unsigned PostOrderSize = std::distance(ReversePostOrder.begin(),
+                                           ReversePostOrder.end());
 
     // TODO: Each block does not need its own LSBBForwarder instance. Only
     // the set of reaching loads and stores is specific to the block.
-    llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
+    llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap(PostOrderSize);
     std::vector<LSBBForwarder> BBIDToForwarderMap(PostOrderSize);
 
     for (SILBasicBlock *BB : ReversePostOrder) {
