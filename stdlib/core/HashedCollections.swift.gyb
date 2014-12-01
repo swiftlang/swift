@@ -451,6 +451,10 @@ public struct _Set<T : Hashable> :
     }
   }
 
+  public func any() -> T? {
+    return count > 0 ? self[startIndex] : .None
+  }
+
   /// Returns true if this set is a subset of another one.
   public func isSubset(other: _Set<T>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)

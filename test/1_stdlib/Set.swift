@@ -890,11 +890,27 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   }
 }
 
+SetTestSuite.test("COW.Fast.AnyDoesNotReallocate") {
+  var s = getCOWFastSet()
+  var identity1 = unsafeBitCast(s, Word.self)
+
+  expectNotEmpty(s.any())
+  expectEqual(identity1, unsafeBitCast(s, Word.self))
+}
+
 SetTestSuite.test("COW.Fast.CountDoesNotReallocate") {
   var s = getCOWFastSet()
   var identity1 = unsafeBitCast(s, Word.self)
 
   expectEqual(3, s.count)
+  expectEqual(identity1, unsafeBitCast(s, Word.self))
+}
+
+SetTestSuite.test("COW.Slow.AnyDoesNotReallocate") {
+  var s = getCOWSlowSet()
+  var identity1 = unsafeBitCast(s, Word.self)
+
+  expectNotEmpty(s.any())
   expectEqual(identity1, unsafeBitCast(s, Word.self))
 }
 
@@ -1655,12 +1671,30 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   }
 }
 
+SetTestSuite.test("BridgedFromObjC.Verbatim.Any") {
+  var s = getBridgedVerbatimSet()
+  var identity1 = unsafeBitCast(s, Word.self)
+  expectTrue(isCocoaSet(s))
+
+  expectNotEmpty(s.any())
+  expectEqual(identity1, unsafeBitCast(s, Word.self))
+}
+
 SetTestSuite.test("BridgedFromObjC.Verbatim.Count") {
   var s = getBridgedVerbatimSet()
   var identity1 = unsafeBitCast(s, Word.self)
   expectTrue(isCocoaSet(s))
 
   expectEqual(3, s.count)
+  expectEqual(identity1, unsafeBitCast(s, Word.self))
+}
+
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.Any") {
+  var s = getBridgedNonverbatimSet()
+  var identity1 = unsafeBitCast(s, Word.self)
+  expectTrue(isNativeSet(s))
+
+  expectNotEmpty(s.any())
   expectEqual(identity1, unsafeBitCast(s, Word.self))
 }
 
@@ -1904,6 +1938,11 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
 // Value is bridged verbatim.
 //===---
 
+SetTestSuite.test("BridgedToObjC.Verbatim.Any") {
+  let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
+  expectNotEmpty(s.anyObject())
+}
+
 SetTestSuite.test("BridgedToObjC.Verbatim.Count") {
   let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
 
@@ -2048,6 +2087,11 @@ SetTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
   checkSetFastEnumerationFromObjC(
     [], s, { s },
     { ($0 as TestObjCKeyTy).value })
+}
+
+SetTestSuite.test("BridgedToObjC.Any") {
+  let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
+  expectNotEmpty(s.anyObject())
 }
 
 SetTestSuite.test("BridgedToObjC.Count") {
@@ -2819,6 +2863,14 @@ SetTestSuite.test("memberAtIndex") {
 
   let foundIndex = s1.indexForMember(1010)!
   expectEqual(1010, s1[foundIndex])
+}
+
+SetTestSuite.test("any") {
+  let s1 = _Set([1010, 2020, 3030])
+  let emptySet = _Set<Int>()
+
+  expectNotEmpty(s1.any())
+  expectEmpty(emptySet.any())
 }
 
 SetTestSuite.test("count") {
