@@ -22,6 +22,8 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 
+#include "Algorithm.h"
+
 namespace swift {
 
 /// This class implements a pair of a pointer and boolean flag.
@@ -29,11 +31,15 @@ namespace swift {
 /// of the pointer, taking advantage of pointer alignment. Unlike
 /// PointerIntPair, you must specify the bit position explicitly, instead of
 /// automatically placing an integer into the highest bits possible.
+///
+/// Composing this with `PointerIntPair` is not allowed.
 template <typename PointerTy,
           unsigned BitPosition,
           typename PtrTraits = llvm::PointerLikeTypeTraits<PointerTy>>
 class FlaggedPointer {
   intptr_t Value;
+  static_assert(PtrTraits::NumLowBitsAvailable > 0,
+                "Not enough bits to store flag at this position");
   enum : uintptr_t {
     FlagMask = (uintptr_t)1 << BitPosition,
     PointerBitMask = ~FlagMask
@@ -152,17 +158,20 @@ public:
   static inline void *
     getAsVoidPointer(const swift::FlaggedPointer<PointerTy, BitPosition> &P) {
       return P.getOpaqueValue();
-    }
+  }
   static inline swift::FlaggedPointer<PointerTy, BitPosition>
     getFromVoidPointer(void *P) {
       return swift::FlaggedPointer<PointerTy, BitPosition>::getFromOpaqueValue(P);
-    }
+  }
   static inline swift::FlaggedPointer<PointerTy, BitPosition>
     getFromVoidPointer(const void *P) {
       return swift::FlaggedPointer<PointerTy, BitPosition>::getFromOpaqueValue(P);
-    }
+  }
   enum {
-    NumLowBitsAvailable = PtrTraits::NumLowBitsAvailable
+    NumLowBitsAvailable = (BitPosition >= PtrTraits::NumLowBitsAvailable)
+      ? PtrTraits::NumLowBitsAvailable
+      : (swift::min(int(BitPosition + 1),
+        int(PtrTraits::NumLowBitsAvailable)) - 1)
   };
 };
 
