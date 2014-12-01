@@ -226,6 +226,10 @@ public:
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
+  SILInstruction *propagateExistential(ApplyInst *AI,
+                                       WitnessMethodInst *WMI,
+                                       SILValue IE,
+                                       SILType InstanceType);
 
 private:
   /// Perform one SILCombine iteration.

@@ -1105,6 +1105,94 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   return nullptr;
 }
 
+/// Propagate information about a concrete type from init_existential
+/// or init_existential_ref into witness_method conformances and into
+/// apply instructions.
+/// This helps the devirtualizer to replace witness_method by
+/// class_method instructions and then devirtualize.
+SILInstruction *
+SILCombiner::propagateExistential(ApplyInst *AI,
+                                  WitnessMethodInst *WMI,
+                                  SILValue InitExistential,
+                                  SILType InstanceType) {
+  // Replace this witness_method by a more concrete one
+  ArrayRef<ProtocolConformance*> Conformances;
+  CanType LookupType;
+  SILValue LastArg;
+
+  if (auto IE = dyn_cast<InitExistentialInst>(InitExistential)) {
+    Conformances = IE->getConformances();
+    LookupType = IE->getFormalConcreteType();
+    LastArg = IE;
+  } else if (auto IER = dyn_cast<InitExistentialRefInst>(InitExistential)) {
+    Conformances = IER->getConformances();
+    LookupType = IER->getFormalConcreteType();
+    LastArg = IER->getOperand();
+  }
+
+  // Generic classes and structs are not supported yet.
+  if (auto *CD = LookupType.getClassOrBoundGenericClass())
+    if (!CD->getGenericParamTypes().empty())
+      return nullptr;
+
+  if (auto *SD = LookupType.getStructOrBoundGenericStruct())
+    if (!SD->getGenericParamTypes().empty())
+      return nullptr;
+
+  if (Conformances.empty())
+    return nullptr;
+
+  // Find the conformance related to witness_method
+  for (auto Conformance : Conformances) {
+    if (Conformance->getProtocol() == WMI->getLookupProtocol()) {
+
+      SmallVector<SILValue, 8> Args;
+      for (auto Arg : AI->getArgumentsWithoutSelf()) {
+        Args.push_back(Arg);
+      }
+
+      Args.push_back(LastArg);
+
+      SILValue OptionalExistential =
+          WMI->hasOperand() ? WMI->getOperand() : SILValue();
+      auto *NewWMI = Builder->createWitnessMethod(
+          WMI->getLoc(), LookupType, Conformance, WMI->getMember(),
+          WMI->getType(), OptionalExistential, WMI->isVolatile());
+
+      replaceInstUsesWith(*WMI, NewWMI, 0);
+      eraseInstFromFunction(*WMI);
+
+      SmallVector<Substitution, 8> Substitutions;
+      for (auto Subst : AI->getSubstitutions()) {
+        if (Subst.getArchetype()->isSelfDerived()) {
+          Substitution NewSubst(Subst.getArchetype(), LookupType,
+                                Subst.getConformances());
+          Substitutions.push_back(NewSubst);
+        } else
+          Substitutions.push_back(Subst);
+      }
+
+      SILType SubstCalleeType = AI->getSubstCalleeSILType();
+      TypeSubstitutionMap TypeSubstitutions;
+      TypeSubstitutions[InstanceType.getSwiftType().getPointer()] =
+          LookupType;
+
+      SILType NewSubstCalleeType = SubstCalleeType.subst(
+          AI->getModule(), AI->getModule().getSwiftModule(),
+          TypeSubstitutions);
+      auto NewAI = Builder->createApply(
+          AI->getLoc(), AI->getCallee(), NewSubstCalleeType,
+          AI->getType(), Substitutions, Args, AI->isTransparent());
+      replaceInstUsesWith(*AI, NewAI, 0);
+
+      eraseInstFromFunction(*AI);
+      return nullptr;
+    }
+  }
+
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
@@ -1176,6 +1264,29 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                              AI->getSubstitutions(), Arguments,
                              AI->isTransparent(),
                              *AI->getFunction());
+  }
+
+  // (apply (witness_method)) -> propagate information about
+  // a concrete type from init_existential or init_existential_ref.
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
+    if (WMI->getConformance())
+      return nullptr;
+    auto LastArg = AI->getArguments().back();
+    // Try to derive conformances from the apply_inst
+    if (auto *Instance = dyn_cast<OpenExistentialInst>(LastArg)) {
+      auto Op = Instance->getOperand();
+      for (auto Use : Op.getUses()) {
+        if (auto *IE = dyn_cast<InitExistentialInst>(Use->getUser())) {
+          return propagateExistential(AI, WMI, IE, Instance->getType());
+        }
+      }
+    }
+
+    if (auto *Instance = dyn_cast<OpenExistentialRefInst>(LastArg)) {
+      if (auto *IE = dyn_cast<InitExistentialRefInst>(Instance->getOperand())) {
+        return propagateExistential(AI, WMI, IE, Instance->getType());
+      }
+    }
   }
 
   return nullptr;
