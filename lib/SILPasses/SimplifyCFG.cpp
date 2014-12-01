@@ -1095,6 +1095,9 @@ bool CheckedCastBrJumpThreading::checkCloningConstraints() {
   // Check if code-bloat would be too big when this BB
   // is jump-threaded.
   // TODO: Make InlineCostCutoff parameter configurable?
+  // We looked at the inline costs of BBs from our benchmark suite
+  // and found that currently the highest inline cost for the
+  // whole benchmark suite is 12. In 95% of all cases it is <=3.
   const unsigned InlineCostCutoff = 20;
   if (basicBlockInlineCost(BB, InlineCostCutoff) >= InlineCostCutoff)
     return false;
