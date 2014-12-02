@@ -93,16 +93,14 @@ bool areIdentical(AvailableValsTy &Avails) {
 void SILSSAUpdater::RewriteUse(Operand &Op) {
   // Replicate function_refs to their uses. SILGen can't build phi nodes for
   // them and it would not make much sense anyways.
-  if (auto *FR = dyn_cast<FunctionRefInst>(
-          getAvailVals(AV).begin()->second.getDef())) {
+  if (auto *FR = dyn_cast<FunctionRefInst>(Op.get())) {
     assert(areIdentical(getAvailVals(AV)) &&
            "The function_refs need to have the same value");
     SILInstruction *User = Op.getUser();
     auto *NewFR = FR->clone(User);
     Op.set(SILValue(NewFR, Op.get().getResultNumber()));
     return;
-  } else if (auto *IL = dyn_cast<IntegerLiteralInst>(
-                  getAvailVals(AV).begin()->second.getDef()))
+  } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Op.get()))
     if (areIdentical(getAvailVals(AV))) {
       // Some llvm intrinsics don't like phi nodes as their constant inputs (e.g
       // ctlz).
