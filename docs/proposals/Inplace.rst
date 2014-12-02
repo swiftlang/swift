@@ -2,356 +2,337 @@
 
 .. @raise litre.TestsAreMissing
 
-==============================================
- Strings, Mutability, and In-Place Operations
-==============================================
+=====================
+ In-Place Operations
+=====================
 
 :Author: Dave Abrahams
 :Author: Joe Groff
 
-:Abstract: The design of Strings has revealed some misconceptions
-  we held in the past, and leads us to a general design for handling
-  in-place operations analgous to ``+=``.  This paper discusses the
-  thinking behind the current design and proposes a language extension
-  for in-place operation support.
+:Abstract: The goal of efficiently processing complex data structures
+  leads naturally to pairs of related operations such as ``+`` and
+  ``+=``: one that produces a new value, and another that mutates on
+  the data structure in-place.  By formalizing the relationship and
+  adding syntactic affordances, we can make these pairs easier to work
+  with and accelerate the evaluation of some common expressions.
 
-String Mutation
-===============
+Examples
+========
 
-Should Swift ``String``\ s be immutable? Even if the backing store is
-immutable, the values themselves could still be reassigned and
-swapped.  Therefore, there's really no choice: ``String``\ s **are
-mutable**.
+In recent standard library design meetings about the proper API for
+sets, it was decided that the canonical ``Set`` interface should be
+written in terms of methods: [#operators]_ ::
 
-We can also ask if it makes sense to *limit* mutations to those that
-can be expressed as wholesale assignments, but that question turns out
-to be meaningless, because *any* mutation of a ``String`` can be
-expressed in terms of a wholesale assignment.  Even if we tried to
-impose an “assignment-only” limitation, I'd still be free to write::
-
-  extension String {
-    func inplace_upper() {
-        this = self.upper()
-    }
+  struct Set<T> {
+    public func contains(x: T) -> Bool                // x ∈ A, A ∋ x
+    public func isSubsetOf(b: Set<T>) -> Bool         // A ⊆ B
+    public func isStrictSubsetOf(b: Set<T>) -> Bool   // A ⊂ B
+    public func isSupersetOf(b: Set<T>) -> Bool       // A ⊇ B
+    public func isStrictSupersetOf(b: Set<T>) -> Bool // A ⊃ B
+    ...
   }
 
-The ``inplace_upper`` implementation above is semantically
-indistinguishable from one that's written in terms of by-part
-mutations.  We never pass out *logical* references to the underlying
-string buffer—even though the buffer may be shared by many strings,
-each ``String`` instance presents an logically-independent value.
+When we started to look at the specifics, however, we ran into a
+familiar pattern::
+   
+  ...
+    public func union(b: Set<T>) -> Set<T>              // A ∪ B
+    public mutating func unionInPlace(b: Set<T>)        // A ∪= B
 
-In-Place Mutations
-==================
+    public func intersect(b: Set<T>) -> Set<T>          // A ∩ B
+    public mutating func intersectInPlace(b: Set<T>)    // A ∩= B
 
-Once we allow assignment and concatenation via ``a.s1 + b.s2``\ —which
-creates a new ``String``\ —it clearly makes sense to also allow ``a.s1
-+= b.s2``\ —which modifies a ``String`` in place.  However, there are
-many operations for which “create a new string” and “modify in place”
-variants both make sense, but don't have distinct, concise, accepted
-spellings.  For example, does ``s.upper()`` modify ``s`` in-place, or
-does it create a new string value that can only be used to overwrite
-``s`` via ``s = s.upper()``?
+    public func subtract(b: Set<T>) -> Set<T>           // A - B
+    public mutating func subtractInPlace(b: Set<T>)     // A -= B
 
-.. Note:: We could also present both interfaces, using a canonical
-          naming relationship for creating and mutating variants
-          like the one we have for the (inplace) operators.  We'll
-          explore that approach—which has the obvious downside of
-          complicating the API—after working through this one.
+    public func exclusiveOr(b: Set<T>) -> Set<T>        // A ⊕ B
+    public mutating func exclusiveOrInPlace(b: Set<T>)  // A ⊕= B
 
-.. _creating-or-mutating:
-
-Creating or Mutating?
-=====================
-
-From a usability point-of-view, this question answers itself fairly
-easily.  With a creating ``upper()``, we get::
-
-  var y = x.upper()           // y is an upcased copy of x
-
-  x = x.upper()               // upcase x "in-place"
-
-  var z = f().upper().split() // compose operations
-
-With a mutating ``upper()``, we get::
-
-  var y = x.copy()   // y is going to be an upcased copy of x...
-  y.upper()          // ...eventually
-
-  x.upper()          // upcase x in place
-
-  var z = f()      // operations don't compose
-  z.upper()
-  z.split()
-
-The creating interfaces are a clear usability win.  The minor
-inconvenience of assigning ``x.upper()`` into ``x`` is more than
-outweighed by the disadvantages of the mutating interface:
-
-1. Verbosity
-
-2. The need to introduce a named temporary
-
-3. Spurious mutations of ``y`` and ``tmp``, which are conceptually
-   costly.  If we eventually get immutability in the type system,
-   we still won't be able to label ``y`` immutable
-
-One could attempt to address the first two issues by making mutating
-operations chainable, but we believe that only replaces one set of
-problems with new ones.  The third issue, we believe, is an inevitable
-symptom of using a mutating operation.
-
-The Argument for Mutating Operations
-====================================
-
-Although, if we had to choose, we would choose creating operations,
-there *are* good arguments for their mutating variants.  For example,
-if you want to do an in-place modification on something that's verbose
-to access, ::
-
-   some.thing().that_is.verbose().to_access.inplace_upper()
-
-is a lot cleaner than either of these approaches::
-
-   some.thing().that_is.verbose().to_access
-   = some.thing().that_is.verbose().to_access.upper()
-
-   var tmp = some.thing().that_is.verbose()
-   tmp.to_access = tmp.to_access.upper()
-
-Furthermore, ``x = x.upper()`` causes an allocation/deallocation pair
-and data copying that can be avoided with a mutating interface
-and are are unlikely to be optimized away by even a clever compiler.
-
-.. Admonition:: It's not just about ``String``\ s
-
-   We stipulate that it's possible in the compiler to implement
-   special-case optimizations for ``String``, but all of these
-   arguments apply to other types as well.  We recommend getting the
-   general feature we're proposing into the core language and leaving
-   these optimizations to the library wherever possible.
-
-Copy On Write
-=============
-
-Once we agree that mutating operations are viable, we can also agree
-that copy-on-write is a viable optimization for mutating operations in
-those cases where the string's buffer is uniquely referenced::
+We had seen the same pattern when considering the API for
+``String``, but in that case, there are no obvious operator
+spellings in all of Unicode.  For example::
 
   struct String {
-    ...
+    public func uppercase() -> String
+    public mutating func uppercaseInPlace()
 
-    func inplace_upper() {
-      self.unique()                  // copy buffer iff refcount > 1
-      for i in 0...buffer.length {
-        buffer[i].inplace_upper()    // naïve ASCII-only implementation
-      }
-    }
-    ...
+    public func lowercase() -> String
+    public mutating func lowercaseInPlace()
 
+    public func replace(
+      pattern: String, with replacement: String) -> String
+    public mutating func replaceInPlace(
+      pattern: String, with replacement: String)
+
+    public func trim() -> String
+    public mutating func trimInPlace()
+    ...
   }
 
-Ponies for Everyone!
-====================
+It also comes up with generic algorithms such as ``sort()`` (which is
+mutating) and ``sorted()``, the corresponding non-mutating version.
 
-When considering ways to present both mutating and creating
-interfaces, we considered several possibilities.  The leading
-candidates fell into two basic schemes: either use methods for one
-semantics and “free functions” for the other, or simply choose two
-different names.
 
-Using “Method-ness” to Distinguish Semantics
---------------------------------------------
+We see at least four problems with this kind of API:
 
-There are two choices.
+1. The lack of a uniform naming convention is problematic.  People
+   have already complained about the asymmetry between mutating
+   ``sort()``, and non-mutating ``reverse()``.  The pattern used by
+   ``sort()`` and ``sorted()`` doesn't apply everywhere, and penalizes
+   the non-mutating form, which should be the more economical of the two.
 
-1. “Methods Mutate”::
+2. Naming conventions that work everywhere and penalize the mutating
+   form are awkward.  In the case of ``String`` it was considered bad
+   enough that we didn't bother with the mutating versions of any
+   operations other than concatenation (which we spelled using ``+``
+   and ``+=``).
 
-     var y = upper(x)     // creating
-     x.upper()            // mutating
+3. Producing a complete interface that defines both variants of each
+   operation is needlessly tedious.  A working (if non-optimal)
+   mutating version of ``op(x: T, y: U) -> T`` can always be defined
+   as ::
 
-   This approach fits with the OOP-ish expectation that methods have
-   special privileges to mutate an instance.  However, it sacrifices
-   the ability to chain create methods, an important syntactic
-   advantage.  Instead we must use nested calls::
+     func opInPlace(inout x: T, y: U) {
+       x = op(x, y)
+     }
 
-    var z = split( trim( upper(x) ) ) // composition
+   Default implementations in protocols could do a lot to relieve
+   tedium here, but cranking out the same ``xxxInPlace`` pattern for
+   each ``xxx`` still amounts to a lot of boilerplate.
 
-2. “Methods Create”::
+4. Without formalizing the relationship between the mutating and
+   non-mutating functions, we lose optimization opportunities.  For
+   example, it should be possible for the compiler to rewrite ::
 
-     var y = x.upper()                // creating
-     upper(&x)                        // mutating
-     var z = x.upper().trim().split() // composition
+     let x = a.intersect(b).intersect(c).intersect(d)
 
-   Here, composition is nicer: it reads left-to-right and without
-   conceptual nesting.  That said, the prevalent mental association of
-   methods with access control may make it harder for our audience to
-   swallow, and it has the disadvantage that when you type “up” in an
-   IDE, code completion will have to show you all the functions whose
-   names begin with “up,” rather than just those that apply to
-   ``String``.
+   as ::
 
-Tying Semantics to a Naming Convention
---------------------------------------
+     var t = a.intersect(b)
+     t.intersectInPlace(c)
+     t.intersectInPlace(d)
+     let x = t
 
-The precedent for this approach has already been set by the binary
-operators.  The only question is, what should the convention be?  The
-two categories here are:
+   for efficiency, without forcing the user to sacrifice expressivity.
+   This optimization would generalize naturally to more common idioms
+   such as::
 
-1. Mutating operations get the short name::
+     let newString = s1 + s2 + s3 + s4
 
-     var y = x.uppered()                      // creating
-     x.upper()                                // mutating
-     var z = x.uppered().trimmed().splitted() // composed
-     
-2. Creating operations get the short name::
+   Given all the right conditions, it is true that a similar
+   optimization can be made at runtime for COW data structures using a
+   uniqueness check on the left-hand operand.  However, that approach
+   only applies to COW data structures, and penalizes other cases.
 
-     var y = x.upper()                // creating
-     x.inplace_upper()                // mutating
-     var z = x.upper().trim().split() // composed
+The Proposal
+============
 
-Because the creating interface is the right choice `in so many
-cases`__ and because it will appear repeatedly in a single statement
-compositions, we favor design #2.
+Our proposal has four basic components:
 
-__ creating-or-mutating_
+1. Solve the naming convention problem by giving the mutating and
+   non-mutating functions the same name.
 
-Optimization and Convenience
-============================
+2. Establish clarity at the point of use by extending the language to
+   support a concise yet distinctive syntax for invoking the mutating
+   operation.
 
-We've discussed providing a means to automatically derive in-place assignment
-versions of operators from the creating operators, and vice
-versa. This provides a consistent interface to operators for free without
-boilerplate::
+3. Eliminate tedium by allowing mutating functions to be automatically
+   generated from non-mutating ones, and, for value types, vice-versa
+   (doing this for reference types is problematic due to the lack of a
+   standard syntax for copying the referent).
 
-      operator infix ☃ {}
-      func ☃ (x:Int, y:Int) -> Int { ... }
+4. Support optimization by placing semantic requirements on mutating
+   and non-mutating versions of the same operation, and allowing the
+   compiler to make substitutions.
 
-      // Users want this to work...
-      var x = 0
-      x ☃= 12
+Use One Simple Name
+-------------------
 
-      // ...without typing all this
-      operator infix ☃= { assignment }
-      func ☃=(x:[inout] Int, y:Int) {
-        x = x ☃ y
-      }
+There should be one simple name for both in-place and non-mutating
+sorting: ``sort``.  Set union should be spelled ``union``.  This
+unification bypasses the knotty problem of naming conventions and
+makes code cleaner and more readable.
 
-We've also discussed teaching the compiler the relationship between
-value-creating and in-place forms of operators, so that it can optimize
-operations that take rvalues or kill lvalues into in-place operations on the
-user's behalf::
+When these paired operations are free functions, we can easily
+distinguish the mutating versions by the presence of the address-of
+operator on the left-hand side::
 
-      struct BigInt { ... }
+  let z = union(x, y)  // non-mutating
+  union(&x, y)         // mutating
+
+Methods are a more interesting case, since on mutating methods,
+``self`` is *implicitly* ``inout``::
+
+  x.union(y) // mutating or non-mutating?
+
+We propose to allow method overload pairs of the form:
+
+.. parsed-literal::
+
+  extension **X** {
+    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **X**
+
+    **@assignment**
+    mutating func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+  }
+
+The second overload is known as an **assignment method**, [#getset]_
+and overloads of this form without the ``@assignment`` attribute are
+rejected as ill-formed.
+
+An assignment method is only accessible via a special syntax, for
+example:
+
+.. parsed-literal::
+
+  x\ **.=**\ union(y)
+
+The target of an assignment method is always required, even when the
+target is ``self``::
+
+  extension Set {
+    mutating func frob(other: Set) {
+      let brick = union(other) // self.union(other) implied
+      self.=union(other)       // calls the assignment method
+      union(other)             // warning: result ignored
+    }
+  }
+
+Eliminating Tedious Boilerplate
+===============================
+
+Generating the In-Place Form
+----------------------------
+
+Given an ordinary method of a value type ``X``:
+
+.. parsed-literal::
+
+  extension **X** {
+    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **X**
+  }
+
+if there is no corresponding *assignment method* in ``X`` with the signature
+
+.. parsed-literal::
+
+  extension **X** {
+    @assignment
+    mutating func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+  }
+
+we can compile the statement
+
+.. parsed-literal::
+
+  x\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+
+as though it were written:
   
-      // Users want to write this:
-      func foo(x:BigInt, y:BigInt, z:BigInt) -> BigInt {
-        return x + y + z
-      }
+.. parsed-literal::
+
+  x **= x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+
+Generating the Non-Mutating Form
+--------------------------------
+
+Given an *assignment method* of a value type ``X``:
+
+.. parsed-literal::
+
+  extension **X** {
+    **@assignment**
+    mutating func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **Void**
+  }
+
+if there is no method in ``X`` with the signature
+
+.. parsed-literal::
+
+  extension **X** {
+    func *f*\ (p₀: T₀, p₁: T₁, p₂: T₂, …p\ *n*: T\ *n*) -> **X**
+  }
+
+we can compile the expression
+
+.. parsed-literal::
+
+  **x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+
+as though it were written:
   
-      // but want the perfomance of this:
-      func fooʹ(x:BigInt, y:BigInt, z:BigInt) -> BigInt {
-        var r = x
-        r += y
-        r += z
-        return r
-      }
+.. parsed-literal::
 
-These same motivations extend to methods with in-place and value-creating
-variants. Methods such as ``str.upper()`` that return the same type as their
-``this`` parameter can be derived from and optimized into
-``str.inplace_upper()``, in the same way ``+`` can be from ``+=``.
+  { 
+    (var y: X)->X in
+    y\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+    return y
+  }(x)
 
-Enabling the in-place relationship
-----------------------------------
+Enabling Optimization
+=====================
 
-For operators, we have the ``assignment`` attribute for in-place
-operators. We can extend this attribute to also specify the value-creating form
-of the operator::
+By requiring that explicitly-written assignment method pairs obey the
+laws of implicit generation laid out above, we can allow the compiler
+to use rvalues (and lvalues whose last use is the current expression)
+as "scratch space," thus avoiding expensive temporaries.
 
-      operator infix += {
-        // Assignment form of +
-        assignment +
-      }
+Specifically, we must require that the following two lines are
+equivalent:
 
-For methods, we propose tying the relationship to the ``inplace_*`` naming
-convention proposed for the standard library. That has the advantage of
-encouraging consistent coding standards and eliminating boilerplate entirely.
+.. parsed-literal::
 
-Alternatively, if baking a naming convention into the compiler is unpalatable,
-we can use declaration attributes::
+  **x = x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*) // form 1
+  **x.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)    // form 2
 
-      struct String {
-        func [inplace_of=upper] inplace_upper() { ... }
-        func [inplace=inplace_upper] upper() { ... }
-      }
+With that requirement in place, the compiler can rewrite form 1 as form 2, and
 
-Default implementations
------------------------
+.. parsed-literal::
 
-When an in-place relationship is created, a definition matching either the
-in-place or value-creating form introduces an implicit definition of the other
-form::
+  x.\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+   .\ *f*\ (b₀, p₁: b₁, p₂: b₂, …p\ *n*: b\ *n*)
 
-      func += (x:[inout] String, y:String) { ... }
-      // Implicitly defines func + (x:String, y:String) -> String
+as
 
-      func + (x:Int, y:Int) -> Int { ... }
-      // Implicitly defines func += (x:[inout] Int, y:Int) -> ()
+.. parsed-literal::
 
-      struct String {
-        func upper() -> String { ... }
-        // Implicitly defines inplace_upper() -> ()
-      }
+  { ()->X in 
+    let __t = **x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+    __t\ **.=**\ *f*\ (b₀, p₁: b₁, p₂: b₂, …p\ *n*: b\ *n*)
+    return __t
+  }()
 
-      struct Stringʹ {
-        func inplace_upper() { ... }
-        // Implicitly defines upper() -> Stringʹ
-      }
+thereby avoiding the creation of temporaries.
 
-Both forms can also be explicitly defined if desired.
+These same optimizations can and should be extended to assignment
+operator pairs such as ``+`` and ``+=`` by making similiar
+requirements on their semantic relationship.
 
-The implicit value-creating definition copies its left argument and applies the
-in-place form, as if written::
+Supporting Reference Types
+==========================
 
-      func + (x:String, y:String) -> String {
-        var r = x
-        x += y
-        return r
-      }
+This system can be generalized to cover classes, at some cost in
+complexity.  Assignment methods would of course not be labeled
+``mutating`` (unless we decided to eventually support a C++-\
+``const``\ -style semantics for classes), and would have reference
+semantics.  It would probably be best to guarantee that the compiler
+will not make optimizations based on expected semantic relationships
+between assignment method pairs.
 
-      extension Stringʹ {
-        func upper() -> Stringʹ {
-          var r = this
-          r.inplace_upper()
-          return r
-        }
-      }
+----------
 
-The implicit in-place form applies the value-creating form to its arguments and
-assigns the result to its left argument, as if written::
+.. [#operators] Unicode operators, which dispatch to those methods,
+   would also be supported.  For example, ::
 
-      func += (x:[inout] Int, y:Int) {
-        x = x + y
-      }
+     public func ⊃ <T>(a: Set<T>, b: Set<T>) -> Bool {
+       return a.isStrictSupersetOf(b)
+     }
 
-      extension String {
-        func inplace_upper() {
-          this = self.upper()
-        }
-      }
+   however we decided that these operators were sufficiently esoteric,
+   and also inaccessible using current programming tools, that they
+   had to remain a secondary interface.
 
-Optimizations
--------------
-
-The compiler should be allowed to exploit the in-place relationship to optimize
-code. Some obvious optimization opportunities include:
-
-* Code that performs in-place assignment using value-creating forms, such as
-  ``x = x + y`` or ``s = s.upper()``, can be transformed to use the in-place
-  form.
-* Compound expressions can be written in terms of value-creating forms, with
-  the compiler transforming operations on rvalues into in-place operations.
-* If the last use of an lvalue is as an argument to an operation with an
-  in-place form, that operation can be turned into the in-place form.
-
+.. [#getset] the similarity to getter/setter pairs is by no means lost on
+          the authors.  However, omitting one form in this case has a
+          very different meaning than in the case of getter/setter
+          pairs.
