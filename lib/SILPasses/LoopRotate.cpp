@@ -186,14 +186,6 @@ rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
 
   SILSSAUpdater Updater;
 
-  // For each instruction in the original header including phis (arguments to
-  // the block).
-  SmallVector<ValueBase *, 16> Insts;
-  std::copy(Header->getBBArgs().begin(), Header->getBBArgs().end(),
-            std::back_inserter(Insts));
-  for (auto &Inst: *Header)
-    Insts.push_back(&Inst);
-
   // Fix PHIs (incomming arguments).
   for (auto *Inst: Header->getBBArgs())
     updateSSAForUseOfInst(Updater, ValueMap, Header, EntryCheckBlock, Inst);
