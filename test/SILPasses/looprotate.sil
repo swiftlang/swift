@@ -202,3 +202,50 @@ bb3:
   %23 = struct $Int (%4 : $Builtin.Word)
   return %23 : $Int
 }
+
+sil @readInt : $@thin (Int) -> () {
+bb0(%a0 : $Int):
+  %t1 = tuple ()
+  return %t1 : $()
+}
+
+// Test the SSA Updater utility: replaceBBArgWithCast().
+//
+// CHECK-LABEL: struct_arg
+// CHECK: bb0:
+// CHECK:  cond_br
+// CHECK: bb1:
+// CHECK:  br bb2
+// CHECK: bb2([[WORD:%[0-9]+]]
+// CHECK:  [[STRUCT:%[0-9]+]] = struct $Int ([[WORD]]
+// CHECK:  apply {{.*}}([[STRUCT]])
+// CHECK:  br bb3
+// CHECK: bb3
+// CHECK:  cond_br
+// CHECK: bb4:
+// CHECK:  return
+sil @struct_arg : $@thin () -> () {
+bb0:
+  %c0 = integer_literal $Builtin.Word, 0
+  %c100 = integer_literal $Builtin.Word, 100
+  br bb1(%c0 : $Builtin.Word)
+
+bb1(%a0 : $Builtin.Word):
+  %s0 = struct $Int (%a0 : $Builtin.Word)
+  %z1 = builtin "cmp_eq_Word"(%a0 : $Builtin.Word, %c100 : $Builtin.Word) : $Builtin.Int1
+  cond_br %z1, bb2, bb3
+
+bb3:
+  %c1 = integer_literal $Builtin.Word, 1
+  %z2 = integer_literal $Builtin.Int1, 0
+  %d1 = builtin "sadd_with_overflow_Word"(%a0 : $Builtin.Word, %c1 : $Builtin.Word, %z2 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %t1 = tuple_extract %d1 : $(Builtin.Word, Builtin.Int1), 0
+  %f1 = function_ref @readInt : $@thin (Int) -> ()
+  %l1 = apply %f1(%s0) : $@thin (Int) -> ()
+  br bb1(%t1 : $Builtin.Word)
+
+bb2:
+  %t2 = tuple ()
+  return %t2 : $()
+
+}

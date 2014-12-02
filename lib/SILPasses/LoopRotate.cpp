@@ -131,6 +131,7 @@ static void mapOperands(SILInstruction *I,
 
 static void
 updateSSAForUseOfInst(SILSSAUpdater &Updater,
+                      SmallVectorImpl<SILArgument*> &InsertedPHIs,
                       llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
                       SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock,
                       ValueBase *Inst) {
@@ -148,6 +149,7 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
     SILValue Res(Inst, i);
     SILValue MappedRes(MappedInst, i);
 
+    InsertedPHIs.clear();
     Updater.Initialize(Res.getType());
     Updater.AddAvailableValue(Header, Res);
     Updater.AddAvailableValue(EntryCheckBlock, MappedRes);
@@ -175,6 +177,15 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
              "The entry check block should dominate the header");
       Updater.RewriteUse(*Use);
     }
+    // Canonicalize inserted phis to avoid extra BB Args.
+    for (SILArgument *Arg : InsertedPHIs) {
+      if (SILInstruction *Inst = replaceBBArgWithCast(Arg)) {
+        Arg->replaceAllUsesWith(Inst);
+        // DCE+SimplifyCFG runs as a post-pass cleanup.
+        // DCE replaces dead arg values with undef.
+        // SimplifyCFG deletes the dead BB arg.
+      }
+    }
   }
 }
 
@@ -183,19 +194,21 @@ static void
 rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
                               SILBasicBlock *EntryCheckBlock,
                               llvm::DenseMap<ValueBase *, SILValue> ValueMap) {
-
-  SILSSAUpdater Updater;
+  SmallVector<SILArgument*, 4> InsertedPHIs;
+  SILSSAUpdater Updater(&InsertedPHIs);
 
   // Fix PHIs (incomming arguments).
   for (auto *Inst: Header->getBBArgs())
-    updateSSAForUseOfInst(Updater, ValueMap, Header, EntryCheckBlock, Inst);
+    updateSSAForUseOfInst(Updater, InsertedPHIs, ValueMap, Header,
+                          EntryCheckBlock, Inst);
 
   auto InstIter = Header->begin();
 
   // The terminator might change from under us.
   while (InstIter != Header->end()) {
     auto &Inst = *InstIter;
-    updateSSAForUseOfInst(Updater, ValueMap, Header, EntryCheckBlock, &Inst);
+    updateSSAForUseOfInst(Updater, InsertedPHIs, ValueMap, Header,
+                          EntryCheckBlock, &Inst);
     InstIter++;
   }
 }

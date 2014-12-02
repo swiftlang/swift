@@ -29,6 +29,10 @@ class SILBasicBlock;
 class SILType;
 class SILUndef;
 
+/// Independent utility that canonicalizes BB arguments by reusing structurally
+/// equivalent arguments and replacing the original arguments with casts.
+SILInstruction *replaceBBArgWithCast(SILArgument *Arg);
+
 /// This class updates SSA for a set of SIL instructions defined in multiple
 /// blocks.
 class SILSSAUpdater {

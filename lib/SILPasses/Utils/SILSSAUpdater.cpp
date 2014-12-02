@@ -90,6 +90,8 @@ bool areIdentical(AvailableValsTy &Avails) {
   return true;
 }
 
+/// This should be called in top-down order of each def that needs its uses
+/// rewrited. The order that we visit uses for a given def is irrelevant.
 void SILSSAUpdater::RewriteUse(Operand &Op) {
   // Replicate function_refs to their uses. SILGen can't build phi nodes for
   // them and it would not make much sense anyways.
@@ -451,4 +453,87 @@ UseWrapper::operator Operand *() {
   }
 
   llvm_unreachable("uninitialize use type");
+}
+
+/// Find the specified value in the BB arguments for the edge from PredBB to
+/// PhiBB.
+static Optional<unsigned> findEdgeValueIdx(SILValue V, SILBasicBlock *PredBB,
+                                           SILBasicBlock *PhiBB) {
+  OperandValueArrayRef EdgeValues =
+    getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
+  for (unsigned ArgIdx : indices(EdgeValues)) {
+    if (EdgeValues[ArgIdx] == V)
+      return ArgIdx;
+  }
+  return None;
+}
+
+/// At least one value feeding the specified SILArgument is a Struct. Attempt to
+/// replace the Argument with a new Struct in the same block.
+///
+/// When we handle more types of casts, this can become a template.
+///
+/// ArgValues are the values feeding the specified Argument from each
+/// predecessor. They must be listed in order of Arg->getParent()->getPreds().
+static StructInst *replaceBBArgWithStruct(
+  SILArgument *Arg,
+  SmallVectorImpl<SILValue> &ArgValues) {
+
+  SILBasicBlock *PhiBB = Arg->getParent();
+
+  // Collect the BBArg index of each struct oper.
+  // e.g.
+  //   struct(A, B)
+  //   br (B, A)
+  // : ArgIdxForOper => {1, 0}
+  SmallVector<unsigned, 4> ArgIdxForOper;
+  // Visit each PredBB and its ArgValue in order.
+  SmallVectorImpl<SILValue>::const_iterator AVIter = ArgValues.begin();
+  for (SILBasicBlock *PredBB : PhiBB->getPreds()) {
+    // All argument values must be StructInst.
+    auto *PredSI = dyn_cast<StructInst>(*AVIter++);
+    if (!PredSI)
+      return nullptr;
+
+    // Initialize ArgIdxForOper for the first predecessor.
+    if (ArgIdxForOper.empty()) {
+      for (auto Oper : PredSI->getElements()) {
+        auto ArgIdx = findEdgeValueIdx(Oper, PredBB, PhiBB);
+        if (!ArgIdx.hasValue())
+          return nullptr;
+        ArgIdxForOper.push_back(*ArgIdx);
+      }
+    } else {
+      // Check consistent ArgIdxForOper for the remaining incoming structs.
+      OperandValueArrayRef EdgeValues =
+        getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
+      for (unsigned OperIdx : indices(PredSI->getElements())) {
+        if (EdgeValues[ArgIdxForOper[OperIdx]]
+            != PredSI->getElements()[OperIdx])
+          return nullptr;
+      }
+    }
+  }
+  assert(AVIter == ArgValues.end() && "# ArgValues does not match # BB preds");
+  SmallVector<SILValue, 4> StructArgs;
+  for (auto ArgIdx : ArgIdxForOper)
+    StructArgs.push_back(PhiBB->getBBArg(ArgIdx));
+
+  SILBuilder Builder(PhiBB, PhiBB->begin());
+  return Builder.createStruct(cast<StructInst>(ArgValues[0])->getLoc(),
+                              Arg->getType(), StructArgs);
+}
+
+/// Canonicalize BB arguments, replacing argument-of-casts with
+/// cast-of-arguments. This only eliminates existing arguments, replacing them
+/// with casts. No new arguments are created. This allows downstream pattern
+/// detection like induction variable analysis to succeed.
+///
+/// If Arg is replaced, return the cast instruction. Otherwise return nullptr.
+SILInstruction *swift::replaceBBArgWithCast(SILArgument *Arg) {
+  SmallVector<SILValue, 4> ArgValues;
+  Arg->getIncomingValues(ArgValues);
+  if (isa<StructInst>(ArgValues[0]))
+    return replaceBBArgWithStruct(Arg, ArgValues);
+  return nullptr;
 }
