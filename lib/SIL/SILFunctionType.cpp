@@ -974,20 +974,34 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
   // Anonymous functions currently always have Freestanding CC.
   if (!c.hasDecl())
     return AbstractCC::Freestanding;
-  
+
   // FIXME: Assert that there is a native entry point
   // available. There's no great way to do this.
 
   // Protocol witnesses are called using the witness calling convention.
   if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext()))
     return getProtocolWitnessCC(proto);
-  
-  if (c.getDecl()->isInstanceMember() ||
-      c.kind == SILDeclRef::Kind::Initializer ||
-      c.kind == SILDeclRef::Kind::IVarInitializer ||
-      c.kind == SILDeclRef::Kind::IVarDestroyer)
-    return AbstractCC::Method;
-  return AbstractCC::Freestanding;
+
+  switch (c.kind) {
+    case SILDeclRef::Kind::Func:
+    case SILDeclRef::Kind::Allocator:
+    case SILDeclRef::Kind::EnumElement:
+    case SILDeclRef::Kind::Destroyer:
+    case SILDeclRef::Kind::Deallocator:
+    case SILDeclRef::Kind::GlobalAccessor:
+    case SILDeclRef::Kind::GlobalGetter:
+      if (c.getDecl()->isInstanceMember())
+        return AbstractCC::Method;
+      return AbstractCC::Freestanding;
+
+    case SILDeclRef::Kind::DefaultArgGenerator:
+      return AbstractCC::Freestanding;
+
+    case SILDeclRef::Kind::Initializer:
+    case SILDeclRef::Kind::IVarInitializer:
+    case SILDeclRef::Kind::IVarDestroyer:
+      return AbstractCC::Method;
+  }
 }
 
 CanSILFunctionType TypeConverter::getConstantFunctionType(SILDeclRef constant,
