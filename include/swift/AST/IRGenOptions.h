@@ -41,6 +41,12 @@ enum class IRGenOutputKind : unsigned {
   ObjectFile
 };
 
+enum class IRGenDebugInfoKind : unsigned {
+  None,       /// No debug info.
+  LineTables, /// Line tables only.
+  Normal      /// Line tables + DWARF types.
+};
+
 /// The set of options supported by IR generation.
 class IRGenOptions {
 public:
@@ -70,7 +76,7 @@ public:
   unsigned Optimize : 1;
 
   /// Whether we should emit debug info.
-  unsigned DebugInfo : 1;
+  IRGenDebugInfoKind DebugInfoKind : 2;
 
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
@@ -94,8 +100,8 @@ public:
   unsigned Playground : 1;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
-                   Optimize(false), DebugInfo(false), UseJIT(false),
-                   EnableDynamicValueTypeLayout(false),
+                   Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
+                   UseJIT(false), EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
                    Playground(false) {}

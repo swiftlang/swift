@@ -496,7 +496,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   addPrimaryInputsOfType(Arguments, *Inputs, types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
-  if (OI.ShouldGenerateDebugInfo) {
+  if (OI.DebugInfoKind > IRGenDebugInfoKind::None) {
     Arguments.push_back("-add_ast_path");
 
     size_t argCount = Arguments.size();

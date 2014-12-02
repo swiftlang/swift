@@ -253,6 +253,9 @@ def g : Flag<["-"], "g">, Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit debug info">;
 def gnone : Flag<["-"], "gnone">, Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Don't emit debug info">;
+def gline_tables_only : Flag<["-"], "gline-tables-only">,
+  Group<g_Group>, Flags<[FrontendOption]>,
+  HelpText<"Emit minimal debug info for backtraces only">;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,

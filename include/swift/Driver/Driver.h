@@ -17,6 +17,7 @@
 #ifndef SWIFT_DRIVER_DRIVER_H
 #define SWIFT_DRIVER_DRIVER_H
 
+#include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
@@ -81,7 +82,7 @@ public:
 
   /// Whether or not the output should contain debug info.
   // FIXME: Eventually this should be replaced by dSYM generation.
-  bool ShouldGenerateDebugInfo = false;
+  IRGenDebugInfoKind DebugInfoKind = IRGenDebugInfoKind::None;
 
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;

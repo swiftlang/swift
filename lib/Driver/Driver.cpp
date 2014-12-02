@@ -641,12 +641,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   assert(OI.CompilerOutputType != types::ID::TY_INVALID);
 
   if (const Arg *A = Args.getLastArg(options::OPT_g_Group)) {
-    if (A->getOption().matches(options::OPT_g)) {
-      OI.ShouldGenerateDebugInfo = true;
-    } else {
+    if (A->getOption().matches(options::OPT_g))
+      OI.DebugInfoKind = IRGenDebugInfoKind::Normal;
+    else if (A->getOption().matches(options::OPT_gline_tables_only))
+      OI.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+    else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
-    }
   }
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
@@ -654,7 +655,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if ((OI.ShouldGenerateDebugInfo && OI.shouldLink()) ||
+  } else if ((OI.DebugInfoKind > IRGenDebugInfoKind::None && OI.shouldLink()) ||
              Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path)) {
     // An option has been passed which requires a module, but the user hasn't
@@ -883,13 +884,14 @@ void Driver::buildActions(const ToolChain &TC,
       // LinkJobAction. It shares inputs with the LinkAction, so tell it that it
       // no longer owns its inputs.
       MergeModuleAction->setOwnsInputs(false);
-      if (OI.ShouldGenerateDebugInfo)
+      if (OI.DebugInfoKind > IRGenDebugInfoKind::None)
         LinkAction->addInput(MergeModuleAction.release());
       else
         Actions.push_back(MergeModuleAction.release());
     }
     Actions.push_back(LinkAction);
-    if (TC.getTriple().isOSDarwin() && OI.ShouldGenerateDebugInfo) {
+    if (TC.getTriple().isOSDarwin() &&
+        OI.DebugInfoKind > IRGenDebugInfoKind::None) {
       Action *dSYMAction = new GenerateDSYMJobAction(LinkAction);
       dSYMAction->setOwnsInputs(false);
       Actions.push_back(dSYMAction);

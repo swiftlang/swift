@@ -2,9 +2,19 @@
 // A (no longer) basic test for debug info.
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -gnone -o - | FileCheck %s --check-prefix NDEBUG
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -o - | FileCheck %s --check-prefix NDEBUG
 // NDEBUG-NOT: !dbg
 // NDEBUG-NOT: DW_TAG
+// --------------------------------------------------------------------
+// Verify that we don't emit any debug info with -gnone.
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -gnone -o - | FileCheck %s --check-prefix NDEBUG
+// --------------------------------------------------------------------
+// Verify that we don't emit any type info with -gline-tables-only.
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -gline-tables-only -o - | FileCheck %s --check-prefix CHECK-LINETABLES
+// CHECK: !dbg
+// CHECK-LINETABLES-NOT: DW_TAG_{{.*}}variable
+// CHECK-LINETABLES-NOT: DW_TAG_structure_type
+// CHECK-LINETABLES-NOT: DW_TAG_basic_type
 // --------------------------------------------------------------------
 // Now check that we do generate line+scope info with -g.
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s

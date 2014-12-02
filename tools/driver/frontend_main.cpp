@@ -438,7 +438,7 @@ static bool performCompile(CompilerInstance &Instance,
     IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
-    IRGenOpts.DebugInfo = true;
+    IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
                                                    opts.ImmediateArgv.end());
     Instance.setSILModule(std::move(SM));

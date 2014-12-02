@@ -270,7 +270,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   auto &clangASTContext = CI->getClangASTContext();
   ABITypes = new CodeGenABITypes(clangASTContext, Module, DataLayout);
 
-  if (Opts.DebugInfo) {
+  if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
     DebugInfo = new IRGenDebugInfo(Opts, *CI, *this, Module);
   }
 

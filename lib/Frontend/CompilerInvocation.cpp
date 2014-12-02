@@ -907,8 +907,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
-    if (A->getOption().matches(OPT_g)) {
-      Opts.DebugInfo = true;
+    if (A->getOption().matches(OPT_g))
+      Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+    else if (A->getOption().matches(options::OPT_gline_tables_only))
+      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::None) {
       ArgStringList RenderedArgs;
       for (auto A : Args)
         A->render(Args, RenderedArgs);

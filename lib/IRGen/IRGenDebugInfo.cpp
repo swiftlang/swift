@@ -151,7 +151,8 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
     LastDebugLoc({}),
     LastScope(nullptr)
 {
-  assert(Opts.DebugInfo);
+  assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None
+         && "no debug info should be generated");
   StringRef Dir, Filename;
   if (Opts.MainInputFilename.empty()) {
     Filename = "<unknown>";
@@ -184,8 +185,12 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   // No split DWARF on Darwin.
   StringRef SplitName = StringRef();
-  TheCU = DBuilder.createCompileUnit(Lang, Filename, Dir, Producer, IsOptimized,
-                                     Flags, RuntimeVersion, SplitName);
+  TheCU = DBuilder.
+    createCompileUnit(Lang, Filename, Dir, Producer, IsOptimized,
+                      Flags, RuntimeVersion, SplitName,
+                      Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
+                      ? llvm::DIBuilder::LineTablesOnly
+                      : llvm::DIBuilder::FullDebug);
 
   if (IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
     IsLibrary = false;
@@ -469,10 +474,13 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     return SP;
   }
 
+  llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
+  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+    return Parent;
+
   assert(DS->Parent && "lexical block must have a parent subprogram");
   Location L = getStartLocation(SM, DS->Loc);
   llvm::DIFile File = getOrCreateFile(L.Filename);
-  llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
   llvm::DILexicalBlock DScope =
       DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col);
 
@@ -725,7 +733,9 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   }
 
   CanSILFunctionType FnTy = getFunctionType(SILTy);
-  auto Params = createParameterTypes(SILTy, DeclCtx);
+  auto Params =
+    Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables ? llvm::DITypeArray()
+    : createParameterTypes(SILTy, DeclCtx);
   llvm::DICompositeType DIFnTy = DBuilder.createSubroutineType(File, Params);
   llvm::DIArray TemplateParameters;
   llvm::DISubprogram Decl;
@@ -781,6 +791,9 @@ void IRGenDebugInfo::eraseFunction(llvm::Function *Fn) {}
 ///        DW_AT_name("Foundation")
 ///
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
+  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+    return;
+
   // Imports are visited after SILFunctions.
   llvm::DIModule Module = MainModule;
   swift::Module *M = IGM.Context.getModule(D->getModulePath());
@@ -878,6 +891,9 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                                       StringRef Name) {
+  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+    return;
+
   auto TName = BumpAllocatedString(("$swift.type." + Name).str());
   DebugTypeInfo DbgTy(getMetadataType(), Metadata->getType(),
                       (Size)CI.getTargetInfo().getPointerWidth(0),
@@ -1006,6 +1022,9 @@ void IRGenDebugInfo::emitVariableDeclaration(
   // FIXME: Make this an assertion.
   //assert(DS && "variable has no scope");
   if (!DS)
+    return;
+
+  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
 
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
@@ -1137,6 +1156,9 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DbgTy,
                                                    Optional<SILLocation> Loc) {
+  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+    return;
+
   llvm::DIType Ty = getOrCreateType(DbgTy);
   if (Ty.isArtificial() || Ty == InternalType)
     // FIXME: Really these should be marked as artificial, but LLVM

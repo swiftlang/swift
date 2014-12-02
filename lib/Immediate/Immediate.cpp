@@ -1195,7 +1195,7 @@ public:
     IRGenOpts.Optimize = false;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
-    IRGenOpts.DebugInfo = false;
+    IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::None;
 
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any
