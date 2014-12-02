@@ -2190,6 +2190,14 @@ swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
                             const Metadata *elt2, const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
 
+/// Replace entries of a freshly-instantiated value witness table with more
+/// efficient common implementations where applicable.
+///
+/// For instance, if the value witness table represents a POD type, this will
+/// insert POD value witnesses into the table. The vwtable's flags must have
+/// been initialized before calling this function.
+void swift_installCommonValueWitnesses(ValueWitnessTable *vwtable);
+
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
 extern "C" void swift_initStructMetadata_UniversalStrategy(size_t numFields,

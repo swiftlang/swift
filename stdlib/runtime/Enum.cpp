@@ -71,6 +71,9 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
     .withExtraInhabitants(unusedExtraInhabitants > 0)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
   vwtable->stride = llvm::RoundUpToAlignment(size, align);
+  
+  // Substitute in better common value witnesses if we have them.
+  swift_installCommonValueWitnesses(vwtable);
                        
   // If the payload has extra inhabitants left over after the ones we used,
   // forward them as our own.

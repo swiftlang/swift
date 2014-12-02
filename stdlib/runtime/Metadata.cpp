@@ -1050,6 +1050,212 @@ swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
   return swift_getTupleTypeMetadata(3, elts, labels, proposedWitnesses);
 }
 
+/*** Common value witnesses ************************************************/
+
+// Value witness methods for an arbitrary trivial type.
+// The buffer operations assume that the value is stored indirectly, because
+// installCommonValueWitnesses will install the direct equivalents instead.
+
+namespace {
+  template<typename T>
+  struct pointer_function_cast_impl;
+  
+  template<typename OutRet, typename...OutArgs>
+  struct pointer_function_cast_impl<OutRet * (OutArgs *...)> {
+    template<typename InRet, typename...InArgs>
+    static constexpr auto perform(InRet * (*function)(InArgs *...))
+      -> OutRet * (*)(OutArgs *...)
+    {
+      static_assert(sizeof...(InArgs) == sizeof...(OutArgs),
+                    "cast changed number of arguments");
+      return (OutRet *(*)(OutArgs *...))function;
+    }
+  };
+
+  template<typename...OutArgs>
+  struct pointer_function_cast_impl<void (OutArgs *...)> {
+    template<typename...InArgs>
+    static constexpr auto perform(void (*function)(InArgs *...))
+      -> void (*)(OutArgs *...)
+    {
+      static_assert(sizeof...(InArgs) == sizeof...(OutArgs),
+                    "cast changed number of arguments");
+      return (void (*)(OutArgs *...))function;
+    }
+  };
+}
+
+/// Cast a function that takes all pointer arguments and returns to a
+/// function type that takes different pointer arguments and returns.
+/// In any reasonable calling convention the input and output function types
+/// should be ABI-compatible.
+template<typename Out, typename In>
+static constexpr Out *pointer_function_cast(In *function) {
+  return pointer_function_cast_impl<Out>::perform(function);
+}
+
+static void pod_indirect_deallocateBuffer(ValueBuffer *buffer,
+                                          const Metadata *self) {
+  auto value = *reinterpret_cast<OpaqueValue**>(buffer);
+  auto wtable = self->getValueWitnesses();
+  swift_slowDealloc(value, wtable->size, wtable->getAlignmentMask());
+}
+#define pod_indirect_destroyBuffer \
+  pointer_function_cast<value_witness_types::destroyBuffer>(pod_indirect_deallocateBuffer)
+
+static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
+                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
+  auto wtable = self->getValueWitnesses();
+  auto destBuf = (OpaqueValue*)swift_slowAlloc(wtable->size,
+                                               wtable->getAlignmentMask());
+  *reinterpret_cast<OpaqueValue**>(dest) = destBuf;
+  OpaqueValue *srcBuf = *reinterpret_cast<OpaqueValue**>(src);
+  memcpy(destBuf, srcBuf, wtable->size);
+  return destBuf;
+}
+#define pod_indirect_initializeBufferWithTakeOfBuffer \
+  pod_indirect_initializeBufferWithCopyOfBuffer
+
+static OpaqueValue *pod_indirect_projectBuffer(ValueBuffer *buffer,
+                                               const Metadata *self) {
+  return *reinterpret_cast<OpaqueValue**>(buffer);
+}
+
+static OpaqueValue *pod_indirect_allocateBuffer(ValueBuffer *buffer,
+                                                const Metadata *self) {
+  auto wtable = self->getValueWitnesses();
+  auto destBuf = (OpaqueValue*)swift_slowAlloc(wtable->size,
+                                               wtable->getAlignmentMask());
+  *reinterpret_cast<OpaqueValue**>(buffer) = destBuf;
+  return destBuf;
+}
+
+static void pod_noop(void *object, const Metadata *self) {
+}
+#define pod_direct_destroy \
+  pointer_function_cast<value_witness_types::destroy>(pod_noop)
+#define pod_indirect_destroy pod_direct_destroy
+#define pod_direct_destroyBuffer \
+  pointer_function_cast<value_witness_types::destroyBuffer>(pod_noop)
+#define pod_direct_deallocateBuffer \
+  pointer_function_cast<value_witness_types::deallocateBuffer>(pod_noop)
+
+static void *pod_noop_return(void *object, const Metadata *self) {
+  return object;
+}
+#define pod_direct_projectBuffer \
+  pointer_function_cast<value_witness_types::projectBuffer>(pod_noop_return)
+#define pod_direct_allocateBuffer \
+  pointer_function_cast<value_witness_types::allocateBuffer>(pod_noop_return)
+
+static OpaqueValue *pod_indirect_initializeBufferWithCopy(ValueBuffer *dest,
+                                                          OpaqueValue *src,
+                                                          const Metadata *self){
+  auto wtable = self->getValueWitnesses();
+  auto destBuf = (OpaqueValue*)swift_slowAlloc(wtable->size,
+                                               wtable->getAlignmentMask());
+  *reinterpret_cast<OpaqueValue**>(dest) = destBuf;
+  memcpy(destBuf, src, wtable->size);
+  return destBuf;
+}
+#define pod_indirect_initializeBufferWithTake pod_indirect_initializeBufferWithCopy
+
+static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
+                                                  OpaqueValue *src,
+                                                  const Metadata *self) {
+  memcpy(dest, src, self->getValueWitnesses()->size);
+  return dest;
+}
+#define pod_indirect_initializeWithCopy pod_direct_initializeWithCopy
+#define pod_direct_initializeBufferWithCopyOfBuffer \
+  pointer_function_cast<value_witness_types::initializeBufferWithCopyOfBuffer> \
+    (pod_direct_initializeWithCopy)
+#define pod_direct_initializeBufferWithTakeOfBuffer \
+  pointer_function_cast<value_witness_types::initializeBufferWithTakeOfBuffer> \
+    (pod_direct_initializeWithCopy)
+#define pod_direct_initializeBufferWithCopy \
+  pointer_function_cast<value_witness_types::initializeBufferWithCopy> \
+    (pod_direct_initializeWithCopy)
+#define pod_direct_initializeBufferWithTake \
+  pointer_function_cast<value_witness_types::initializeBufferWithTake> \
+    (pod_direct_initializeWithCopy)
+#define pod_direct_assignWithCopy pod_direct_initializeWithCopy
+#define pod_indirect_assignWithCopy pod_direct_initializeWithCopy
+#define pod_direct_initializeWithTake pod_direct_initializeWithCopy
+#define pod_indirect_initializeWithTake pod_direct_initializeWithCopy
+#define pod_direct_assignWithTake pod_direct_initializeWithCopy
+#define pod_indirect_assignWithTake pod_direct_initializeWithCopy
+
+static void pod_direct_destroyArray(OpaqueValue *, size_t, const Metadata *) {
+  // noop
+}
+#define pod_indirect_destroyArray pod_direct_destroyArray
+
+static OpaqueValue *pod_direct_initializeArrayWithCopy(OpaqueValue *dest,
+                                                       OpaqueValue *src,
+                                                       size_t n,
+                                                       const Metadata *self) {
+  auto totalSize = self->getValueWitnesses()->stride * n;
+  memcpy(dest, src, totalSize);
+  return dest;
+}
+#define pod_indirect_initializeArrayWithCopy pod_direct_initializeArrayWithCopy
+
+static OpaqueValue *pod_direct_initializeArrayWithTakeFrontToBack(
+                                                        OpaqueValue *dest,
+                                                        OpaqueValue *src,
+                                                        size_t n,
+                                                        const Metadata *self) {
+  auto totalSize = self->getValueWitnesses()->stride * n;
+  memmove(dest, src, totalSize);
+  return dest;
+}
+#define pod_direct_initializeArrayWithTakeBackToFront \
+  pod_direct_initializeArrayWithTakeFrontToBack
+#define pod_indirect_initializeArrayWithTakeFrontToBack \
+  pod_direct_initializeArrayWithTakeFrontToBack
+#define pod_indirect_initializeArrayWithTakeBackToFront \
+  pod_direct_initializeArrayWithTakeFrontToBack
+
+void swift::swift_installCommonValueWitnesses(ValueWitnessTable *vwtable) {
+  auto flags = vwtable->flags;
+  if (flags.isPOD()) {
+    // Use POD value witnesses.
+    if (flags.isInlineStorage()) {
+#define INSTALL_POD_DIRECT_WITNESS(NAME) vwtable->NAME = pod_direct_##NAME;
+      FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_DIRECT_WITNESS)
+#undef INSTALL_POD_DIRECT_WITNESS
+    } else {
+#define INSTALL_POD_INDIRECT_WITNESS(NAME) vwtable->NAME = pod_indirect_##NAME;
+      FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_INDIRECT_WITNESS)
+#undef INSTALL_POD_INDIRECT_WITNESS
+    }
+  }
+  
+  if (vwtable->flags.isBitwiseTakable()) {
+    // Use POD value witnesses for operations that do an initializeWithTake.
+    if (flags.isInlineStorage()) {
+      vwtable->initializeWithTake = pod_direct_initializeWithTake;
+      vwtable->initializeBufferWithTakeOfBuffer
+        = pod_direct_initializeBufferWithTakeOfBuffer;
+      vwtable->initializeArrayWithTakeFrontToBack
+        = pod_direct_initializeArrayWithTakeFrontToBack;
+      vwtable->initializeArrayWithTakeBackToFront
+        = pod_direct_initializeArrayWithTakeBackToFront;
+    } else {
+      vwtable->initializeWithTake = pod_indirect_initializeWithTake;
+      vwtable->initializeBufferWithTakeOfBuffer
+        = pod_indirect_initializeBufferWithTakeOfBuffer;
+      vwtable->initializeArrayWithTakeFrontToBack
+        = pod_indirect_initializeArrayWithTakeFrontToBack;
+      vwtable->initializeArrayWithTakeBackToFront
+        = pod_indirect_initializeArrayWithTakeBackToFront;
+    }
+  }
+  
+  return;
+}
+
 /*** Structs ***************************************************************/
 
 /// Initialize the value witness table and struct field offset vector for a
@@ -1067,6 +1273,9 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   vwtable->size = layout.size;
   vwtable->flags = layout.flags;
   vwtable->stride = layout.stride;
+  
+  // Substitute in better value witnesses if we have them.
+  swift_installCommonValueWitnesses(vwtable);
 
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
