@@ -1882,6 +1882,18 @@ public:
     Representation getRepresentation() const {
       return Representation((Bits & RepresentationMask) >> RepresentationShift);
     }
+
+    bool hasSelfParam() const {
+      switch (getCC()) {
+      case AbstractCC::Freestanding:
+      case AbstractCC::C:
+        return false;
+      case AbstractCC::ObjCMethod:
+      case AbstractCC::Method:
+      case AbstractCC::WitnessMethod:
+        return true;
+      }
+    }
     
     /// True if the function representation carries context.
     bool hasContext() const {
