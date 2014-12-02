@@ -42,20 +42,20 @@ class ExplodeTupleValue
 public:
   std::vector<ManagedValue> &values;
   SILGenFunction &gen;
-  
+
   ExplodeTupleValue(std::vector<ManagedValue> &values,
                     SILGenFunction &gen)
     : values(values), gen(gen)
   {
   }
-  
+
   void visitType(CanType t, ManagedValue v, SILLocation l) {
     values.push_back(v);
   }
-  
+
   void visitTupleType(CanTupleType t, ManagedValue mv, SILLocation l) {
     bool IsPlusZero = mv.isPlusZeroRValueOrTrivial();
-    
+
     SILValue v = mv.forward(gen);
     if (v.getType().isAddressOnly(gen.F.getModule())) {
       // Destructure address-only types by addressing the individual members.
@@ -68,12 +68,12 @@ public:
         assert(fieldTI.getSemanticType() == fieldTy);
         if (fieldTI.isLoadable() && !isa<InOutType>(fieldCanTy))
           member = gen.B.createLoad(l, member);
-        
+
         // If we're returning a +1 value, emit a cleanup for the member to cover
         // for the cleanup we disabled for the tuple aggregate.
         auto SubValue = IsPlusZero ? ManagedValue::forUnmanaged(member)
                             : gen.emitManagedRValueWithCleanup(member, fieldTI);
-        
+
         visit(fieldCanTy, SubValue, l);
       }
     } else {
@@ -84,7 +84,7 @@ public:
         assert(fieldTI.isLoadable());
         SILValue member = gen.B.createTupleExtract(l, v, i,
                                                    fieldTI.getLoweredType());
-        
+
         // If we're returning a +1 value, emit a cleanup for the member to cover
         // for the cleanup we disabled for the tuple aggregate.
         auto SubValue = IsPlusZero ? ManagedValue::forUnmanaged(member)
@@ -118,18 +118,18 @@ public:
       return v.copyUnmanaged(gen, l).forward(gen);
     }
   }
-  
+
   ImplodeLoadableTupleValue(ArrayRef<ManagedValue> values,
                             SILGenFunction &gen)
     : values(values), gen(gen)
   {}
-  
+
   SILValue visitType(CanType t, SILLocation l) {
     SILValue result = getValue(gen, values[0], l);
     values = values.slice(1);
     return result;
   }
-  
+
   SILValue visitTupleType(CanTupleType t, SILLocation l) {
     SmallVector<SILValue, 4> elts;
     for (auto fieldTy : t.getElementTypes())
@@ -137,7 +137,7 @@ public:
     SILType ty = gen.getLoweredLoadableType(t);
     return gen.B.createTuple(l, ty, elts);
   }
-  
+
   ~ImplodeLoadableTupleValue() {
     assert(values.empty() && "values not exhausted imploding tuple?!");
   }
@@ -152,18 +152,18 @@ class ImplodeAddressOnlyTuple
 public:
   ArrayRef<ManagedValue> values;
   SILGenFunction &gen;
-  
+
   ImplodeAddressOnlyTuple(ArrayRef<ManagedValue> values,
                           SILGenFunction &gen)
     : values(values), gen(gen)
   {}
-  
+
   void visitType(CanType t, SILValue address, SILLocation l) {
     ManagedValue v = values[0];
     switch (KIND) {
     case ImplodeKind::Unmanaged:
       llvm_unreachable("address-only types always managed!");
-      
+
     case ImplodeKind::Forward:
       v.forwardInto(gen, l, address);
       break;
@@ -174,7 +174,7 @@ public:
     }
     values = values.slice(1);
   }
-  
+
   void visitTupleType(CanTupleType t, SILValue address, SILLocation l) {
     for (unsigned n = 0, size = t->getNumElements(); n < size; ++n) {
       CanType fieldCanTy = t.getElementType(n);
@@ -185,12 +185,12 @@ public:
       this->visit(fieldCanTy, fieldAddr, l);
     }
   }
-  
+
   ~ImplodeAddressOnlyTuple() {
     assert(values.empty() && "values not exhausted imploding tuple?!");
   }
 };
-  
+
 template<ImplodeKind KIND>
 static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
                                    SILGenFunction &gen,
@@ -200,9 +200,9 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
     assert(values.size() == 1 && "exploded non-tuple value?!");
     return ImplodeLoadableTupleValue<KIND>::getValue(gen, values[0], l);
   }
-  
+
   SILType loweredType = gen.getLoweredType(tupleType);
-  
+
   // To implode an address-only tuple, we need to create a buffer to hold the
   // result tuple.
   if (loweredType.isAddressOnly(gen.F.getModule())) {
@@ -212,7 +212,7 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
     ImplodeAddressOnlyTuple<KIND>(values, gen).visit(tupleType, buffer, l);
     return buffer;
   }
-  
+
   // To implode loadable tuples, we just need to combine the elements with
   // TupleInsts.
   return ImplodeLoadableTupleValue<KIND>(values, gen).visit(tupleType, l);
@@ -227,17 +227,17 @@ public:
   ArrayRef<ManagedValue> values;
   SILGenFunction &gen;
   SILLocation loc;
-  
+
   CopyIntoTupleValues(ArrayRef<ManagedValue> values, SILGenFunction &gen,
                         SILLocation l)
     : values(values), gen(gen), loc(l)
   {}
-  
+
   void visitType(CanType t, Initialization *I) {
     // Pop a value off.
     ManagedValue orig = values[0];
     values = values.slice(1);
-    
+
     switch (I->kind) {
     case Initialization::Kind::AddressBinding:
       llvm_unreachable("cannot emit into a inout binding");
@@ -275,21 +275,21 @@ public:
       return;
     }
   }
-  
+
   void visitTupleType(CanTupleType t, Initialization *I) {
     // Break up the aggregate initialization if we can.
     if (I->canSplitIntoSubelementAddresses()) {
       SmallVector<InitializationPtr, 4> subInitBuf;
       auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf, loc);
-      
+
       assert(subInits.size() == t->getNumElements() &&
              "initialization does not match tuple?!");
-      
+
       for (unsigned i = 0, e = subInits.size(); i < e; ++i)
         visit(t.getElementType(i), subInits[i].get());
       return;
     }
-    
+
     // Otherwise, process this by turning the values corresponding to the tuple
     // into a single value (through an implosion) and then binding that value to
     // our initialization.
@@ -309,17 +309,17 @@ public:
   ArrayRef<ManagedValue> values;
   SILGenFunction &gen;
   SILLocation loc;
-  
+
   InitializeTupleValues(ArrayRef<ManagedValue> values, SILGenFunction &gen,
                         SILLocation l)
     : values(values), gen(gen), loc(l)
   {}
-  
+
   void visitType(CanType t, Initialization *I) {
     // Pop a result off.
     ManagedValue result = values[0];
     values = values.slice(1);
-    
+
     switch (I->kind) {
     case Initialization::Kind::AddressBinding:
       llvm_unreachable("cannot emit into a inout binding");
@@ -357,26 +357,26 @@ public:
         // cleanup.
         result.forwardCleanup(gen);
       }
-      
+
       I->finishInitialization(gen);
       return;
     }
   }
-  
+
   void visitTupleType(CanTupleType t, Initialization *I) {
     // Break up the aggregate initialization if we can.
     if (I->canSplitIntoSubelementAddresses()) {
       SmallVector<InitializationPtr, 4> subInitBuf;
       auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf, loc);
-      
+
       assert(subInits.size() == t->getNumElements() &&
              "initialization does not match tuple?!");
-      
+
       for (unsigned i = 0, e = subInits.size(); i < e; ++i)
         visit(t.getElementType(i), subInits[i].get());
       return;
     }
-    
+
     // Otherwise, process this by turning the values corresponding to the tuple
     // into a single value (through an implosion) and then binding that value to
     // our initialization.
@@ -386,7 +386,7 @@ public:
     I->finishInitialization(gen);
   }
 };
-  
+
 class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
                                               /*RetTy*/ RValue>
 {
@@ -395,18 +395,18 @@ public:
   SILBasicBlock *parent;
   SILLocation loc;
   bool functionArgs;
-  
+
   EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent,
                   SILLocation l, bool functionArgs)
     : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
-  
+
   RValue visitType(CanType t) {
     SILValue arg = new (gen.SGM.M)
       SILArgument(parent, gen.getLoweredType(t), loc.getAsASTNode<ValueDecl>());
     ManagedValue mv = isa<InOutType>(t)
       ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);
-    
+
     // If the value is a (possibly optional) ObjC block passed into the entry
     // point of the function, then copy it so we can treat the value reliably
     // as a heap object. Escape analysis can eliminate this copy if it's
@@ -423,17 +423,17 @@ public:
     }
     return RValue(gen, loc, t, mv);
   }
-  
+
   RValue visitTupleType(CanTupleType t) {
     RValue rv{t};
-    
+
     for (auto fieldType : t.getElementTypes())
       rv.addElement(visit(fieldType));
-    
+
     return rv;
   }
 };
-  
+
 } // end anonymous namespace
 
 /// Return the number of rvalue elements in the given canonical type.
@@ -456,7 +456,7 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
     elementsToBeAdded = Used;
     return;
   }
-    
+
 }
 
 RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
@@ -464,26 +464,26 @@ RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
   : type(formalType), elementsToBeAdded(0)
 {
   assert(v && "creating r-value with consumed value");
-  
+
   if (v.isInContext()) {
     type = CanType();
     elementsToBeAdded = Used;
     return;
   }
-  
+
   ExplodeTupleValue(values, gen).visit(type, v, l);
   assert(values.size() == getRValueSize(type));
 }
 
 RValue::RValue(SILGenFunction &gen, Expr *expr, ManagedValue v)
   : type(expr->getType()->getCanonicalType()), elementsToBeAdded(0) {
-    
+
   if (v.isInContext()) {
     type = CanType();
     elementsToBeAdded = Used;
     return;
   }
-    
+
   assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, gen).visit(type, v, expr);
   assert(values.size() == getRValueSize(type));
@@ -564,7 +564,7 @@ ManagedValue RValue::getAsSingleValue(SILGenFunction &gen, SILLocation l) && {
     makeUsed();
     return result;
   }
-  
+
   // Forward into a single value, then install a cleanup on the resulting
   // imploded value.
   return gen.emitManagedRValueWithCleanup(
@@ -580,23 +580,23 @@ SILValue RValue::getUnmanagedSingleValue(SILGenFunction &gen,
 void RValue::forwardAll(SILGenFunction &gen,
                         SmallVectorImpl<SILValue> &dest) && {
   assert(isComplete() && "rvalue is not complete");
-  
+
   for (auto value : values)
     dest.push_back(value.forward(gen));
-  
+
   makeUsed();
 }
 
 void RValue::getAll(SmallVectorImpl<ManagedValue> &dest) && {
   assert(isComplete() && "rvalue is not complete");
 
-  dest.append(values.begin(), values.end());  
+  dest.append(values.begin(), values.end());
   makeUsed();
 }
 
 void RValue::getAllUnmanaged(SmallVectorImpl<SILValue> &dest) const & {
   assert(isComplete() && "rvalue is not complete");
-  
+
   for (auto value : values)
     dest.push_back(value.getUnmanagedValue());
 }
@@ -620,7 +620,7 @@ RValue RValue::extractElement(unsigned n) && {
   auto range = getElementRange(tupleTy, n);
   unsigned from = range.first, to = range.second;
 
-  CanType eltType = cast<TupleType>(type).getElementType(n);  
+  CanType eltType = cast<TupleType>(type).getElementType(n);
   RValue element(llvm::makeArrayRef(values).slice(from, to - from), eltType);
   makeUsed();
   return element;
@@ -629,7 +629,7 @@ RValue RValue::extractElement(unsigned n) && {
 void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   assert(isComplete() && "rvalue is not complete");
 
-  unsigned from = 0;  
+  unsigned from = 0;
   for (auto eltType : cast<TupleType>(type).getElementTypes()) {
     unsigned to = from + getRValueSize(eltType);
     elements.push_back({llvm::makeArrayRef(values).slice(from, to - from),

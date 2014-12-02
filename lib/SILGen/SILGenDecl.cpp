@@ -44,23 +44,23 @@ namespace {
     BlackHoleInitialization()
       : Initialization(Initialization::Kind::Ignored)
     {}
-    
+
     SILValue getAddressOrNull() const override { return SILValue(); }
     ArrayRef<InitializationPtr> getSubInitializations() const override {
       return {};
     }
   };
-  
+
 
   /// An Initialization subclass used to destructure tuple initializations.
   class TupleElementInitialization : public SingleBufferInitialization {
   public:
     SILValue ElementAddr;
-    
+
     TupleElementInitialization(SILValue addr)
       : ElementAddr(addr)
     {}
-    
+
     SILValue getAddressOrNull() const override { return ElementAddr; }
 
     void finishInitialization(SILGenFunction &gen) override {}
@@ -115,7 +115,7 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
       SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
                                                         baseAddr, i,
                                                         fieldTy);
-                          
+
       buf.push_back(InitializationPtr(new
                                         TupleElementInitialization(fieldAddr)));
     }
@@ -152,7 +152,7 @@ ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // Generate the local function body.
   SGM.emitFunction(fd);
-  
+
   // If there are captures or we are in a generic context, build the local
   // closure value for the function and store it as a local constant.
   if (fd->getCaptureInfo().hasLocalCaptures()
@@ -186,18 +186,18 @@ public:
   SmallVector<InitializationPtr, 4> subInitializations;
 
   TupleInitialization() : Initialization(Initialization::Kind::Tuple) {}
-  
+
   SILValue getAddressOrNull() const override {
     if (subInitializations.size() == 1)
       return subInitializations[0]->getAddressOrNull();
     else
       return SILValue();
   }
-  
+
   ArrayRef<InitializationPtr> getSubInitializations() const override {
     return subInitializations;
   }
-  
+
   void finishInitialization(SILGenFunction &gen) override {
     for (auto &sub : subInitializations)
       sub->finishInitialization(gen);
@@ -217,7 +217,7 @@ class ReleaseValueCleanup : public Cleanup {
   SILValue v;
 public:
   ReleaseValueCleanup(SILValue v) : v(v) {}
-  
+
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     if (v.getType().isAddress())
       gen.B.emitDestroyAddr(l, v);
@@ -242,7 +242,7 @@ class DestroyLocalVariable : public Cleanup {
   VarDecl *Var;
 public:
   DestroyLocalVariable(VarDecl *var) : Var(var) {}
-  
+
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.destroyLocalVariable(l, Var);
   }
@@ -253,12 +253,12 @@ class DeallocateUninitializedLocalVariable : public Cleanup {
   VarDecl *Var;
 public:
   DeallocateUninitializedLocalVariable(VarDecl *var) : Var(var) {}
-  
+
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.deallocateUninitializedLocalVariable(l, Var);
   }
 };
-  
+
 /// An initialization of a local 'var'.
 class LocalVariableInitialization : public SingleBufferInitialization {
   /// The local variable decl being initialized.
@@ -271,7 +271,7 @@ class LocalVariableInitialization : public SingleBufferInitialization {
 
   /// The cleanup we pushed to destroy and deallocate the local variable.
   CleanupHandle ReleaseCleanup;
-  
+
   bool DidFinish = false;
 public:
   /// Sets up an initialization for the allocated box. This pushes a
@@ -289,11 +289,11 @@ public:
     gen.Cleanups.pushCleanup<DeallocateUninitializedLocalVariable>(var);
     DeallocCleanup = gen.Cleanups.getTopCleanup();
   }
-  
+
   ~LocalVariableInitialization() override {
     assert(DidFinish && "did not call VarInit::finishInitialization!");
   }
-  
+
   SILValue getAddressOrNull() const override {
     assert(Gen.VarLocs.count(Var) && "did not emit var?!");
     return Gen.VarLocs[Var].getAddress();
@@ -320,7 +320,7 @@ class LetValueInitialization : public Initialization {
 
   /// The cleanup we pushed to destroy the local variable.
   CleanupHandle DestroyCleanup;
-  
+
   bool DidFinish = false;
 
 public:
@@ -355,7 +355,7 @@ public:
     }
     DestroyCleanup = gen.Cleanups.getTopCleanup();
   }
-  
+
   ~LetValueInitialization() override {
     assert(DidFinish && "did not call LetValueInit::finishInitialization!");
   }
@@ -378,7 +378,7 @@ public:
   ArrayRef<InitializationPtr> getSubInitializations() const override {
     return {};
   }
-  
+
   void bindValue(SILValue value, SILGenFunction &gen) override {
     assert(!gen.VarLocs.count(vd) && "Already emitted this vardecl?");
     gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(value);
@@ -399,15 +399,15 @@ public:
 class GlobalInitialization : public SingleBufferInitialization {
   /// The physical address of the global.
   SILValue address;
-  
+
 public:
   GlobalInitialization(SILValue address) : address(address)
   {}
-  
+
   SILValue getAddressOrNull() const override {
     return address;
   }
-  
+
   void finishInitialization(SILGenFunction &gen) override {
     // Globals don't need to be cleaned up.
   }
@@ -418,7 +418,7 @@ public:
   DebuggerInitialization(SILValue address) : GlobalInitialization(address) {
   }
 };
-  
+
 /// Cleanup that writes back to a inout argument on function exit.
 class CleanupWriteBackToInOut : public Cleanup {
   VarDecl *var;
@@ -427,7 +427,7 @@ class CleanupWriteBackToInOut : public Cleanup {
 public:
   CleanupWriteBackToInOut(VarDecl *var, SILValue inoutAddr)
     : var(var), inoutAddr(inoutAddr) {}
-  
+
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     // Assign from the local variable to the inout address with an
     // 'autogenerated' copyaddr.
@@ -436,7 +436,7 @@ public:
                          IsNotTake, IsNotInitialization);
   }
 };
-  
+
 /// Initialize a writeback buffer that receives the "in" value of a inout
 /// argument on function entry and writes the "out" value back to the inout
 /// address on function exit.
@@ -446,7 +446,7 @@ class InOutInitialization : public Initialization {
 public:
   InOutInitialization(VarDecl *vd)
     : Initialization(Initialization::Kind::AddressBinding), vd(vd) {}
-  
+
   SILValue getAddressOrNull() const override {
     llvm_unreachable("inout argument should be bound by bindAddress");
   }
@@ -458,7 +458,7 @@ public:
                    SILLocation loc) override {
     // Allocate the local variable for the inout.
     auto initVar = gen.emitLocalVariableWithCleanup(vd);
-    
+
     // Initialize with the value from the inout with an "autogenerated"
     // copyaddr.
     loc.markAsPrologue();
@@ -466,7 +466,7 @@ public:
     gen.B.createCopyAddr(loc, address, initVar->getAddress(),
                          IsNotTake, IsInitialization);
     initVar->finishInitialization(gen);
-    
+
     // Set up a cleanup to write back to the inout.
     gen.Cleanups.pushCleanup<CleanupWriteBackToInOut>(vd, address);
   }
@@ -495,7 +495,7 @@ public:
 
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
-/// Initialization representing the needed initializations. 
+/// Initialization representing the needed initializations.
 struct InitializationForPattern
   : public PatternVisitor<InitializationForPattern, InitializationPtr>
 {
@@ -503,7 +503,7 @@ struct InitializationForPattern
   enum ArgumentOrVar_t { Argument, Var } ArgumentOrVar;
   InitializationForPattern(SILGenFunction &Gen, ArgumentOrVar_t ArgumentOrVar)
     : Gen(Gen), ArgumentOrVar(ArgumentOrVar) {}
-  
+
   // Paren, Typed, and Var patterns are noops, just look through them.
   InitializationPtr visitParenPattern(ParenPattern *P) {
     return visit(P->getSubPattern());
@@ -514,13 +514,13 @@ struct InitializationForPattern
   InitializationPtr visitVarPattern(VarPattern *P) {
     return visit(P->getSubPattern());
   }
-  
+
   // AnyPatterns (i.e, _) don't require any storage. Any value bound here will
   // just be dropped.
   InitializationPtr visitAnyPattern(AnyPattern *P) {
     return InitializationPtr(new BlackHoleInitialization());
   }
-  
+
   // Bind to a named pattern by creating a memory location and initializing it
   // with the initial value.
   InitializationPtr visitNamedPattern(NamedPattern *P) {
@@ -534,7 +534,7 @@ struct InitializationForPattern
                                             ArgumentOrVar == Argument,
                                             P->hasType() ? P->getType() : Type());
   }
-  
+
   // Bind a tuple pattern by aggregating the component variables into a
   // TupleInitialization.
   InitializationPtr visitTuplePattern(TuplePattern *P) {
@@ -543,7 +543,7 @@ struct InitializationForPattern
       init->subInitializations.push_back(visit(elt.getPattern()));
     return InitializationPtr(init);
   }
-  
+
   // TODO: Handle bindings from 'case' labels and match expressions.
 #define INVALID_PATTERN(Id, Parent) \
   InitializationPtr visit##Id##Pattern(Id##Pattern *) { \
@@ -554,7 +554,7 @@ struct InitializationForPattern
 #include "swift/AST/PatternNodes.def"
 #undef INVALID_PATTERN
 };
-  
+
 /// A visitor that marks local variables uninitialized in a pattern binding
 /// without an initializer.
 struct MarkPatternUninitialized
@@ -562,7 +562,7 @@ struct MarkPatternUninitialized
 {
   SILGenFunction &Gen;
   MarkPatternUninitialized(SILGenFunction &Gen) : Gen(Gen) {}
-  
+
   // Paren, Typed, and Var patterns are noops, just look through them.
   void visitParenPattern(ParenPattern *P) {
     return visit(P->getSubPattern());
@@ -573,19 +573,19 @@ struct MarkPatternUninitialized
   void visitVarPattern(VarPattern *P) {
     return visit(P->getSubPattern());
   }
-  
+
   void visitAnyPattern(AnyPattern *P) {}
-  
+
   void visitTuplePattern(TuplePattern *P) {
     for (auto elt : P->getFields())
       visit(elt.getPattern());
   }
-  
+
   void visitNamedPattern(NamedPattern *P) {
     VarDecl *var = P->getDecl();
     if ((!var->hasStorage()) || (var->isDebuggerVar()))
       return;
-    
+
     // Emit a mark_uninitialized for the variable's storage, and fix up the
     // loc to refer to the marker.
     assert(Gen.VarLocs.count(var)
@@ -597,7 +597,7 @@ struct MarkPatternUninitialized
       = Gen.B.createMarkUninitializedVar(P->getDecl(), varLoc.getAddress());
     Gen.VarLocs[var] = SILGenFunction::VarLoc::getAddress(mu, varLoc.box);
   }
-  
+
   // TODO: Handle bindings from 'case' labels and match expressions.
 #define INVALID_PATTERN(Id, Parent) \
   void visit##Id##Pattern(Id##Pattern *) { \
@@ -705,7 +705,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
   if (!vd->getDeclContext()->isLocalContext()) {
     auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
     SILValue addr = B.createGlobalAddr(vd, silG);
-    
+
     VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr);
     Result = InitializationPtr(new GlobalInitialization(addr));
   } else {
@@ -726,7 +726,7 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   InitializationPtr initialization =
     InitializationForPattern(*this, InitializationForPattern::Var)
       .visit(D->getPattern());
-  
+
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
   if (D->getInit()) {
@@ -778,7 +778,7 @@ struct ArgumentInitVisitor :
     return RValue::emitBBArguments(ty->getCanonicalType(), gen, parent, l,
                                    /*functionArgs*/ true);
   }
-  
+
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
   void makeArgumentInto(Type ty, SILBasicBlock *parent,
@@ -801,7 +801,7 @@ struct ArgumentInitVisitor :
       std::move(argrv).forwardInto(gen, I, loc);
     }
   }
-    
+
   // Paren, Typed, and Var patterns are no-ops. Just look through them.
   void visitParenPattern(ParenPattern *P, Initialization *I) {
     visit(P->getSubPattern(), I);
@@ -830,7 +830,7 @@ struct ArgumentInitVisitor :
         llvm_unreachable("empty tuple pattern with letvalue initializer?!");
       case Initialization::Kind::Translating:
         llvm_unreachable("empty tuple pattern with translating initializer?!");
-        
+
       case Initialization::Kind::SingleBuffer:
         assert(I->getAddress().getType().getSwiftRValueType()
                  == P->getType()->getCanonicalType()
@@ -839,7 +839,7 @@ struct ArgumentInitVisitor :
       }
       return;
     }
-    
+
     // Destructure the initialization into per-element Initializations.
     SmallVector<InitializationPtr, 2> buf;
     ArrayRef<InitializationPtr> subInits =
@@ -870,7 +870,7 @@ struct ArgumentInitVisitor :
       makeArgumentInto(P->getType(), f.begin(), PD, I);
     }
   }
-  
+
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) \
   void visit##Id##Pattern(Id##Pattern *, Initialization *) { \
@@ -889,7 +889,7 @@ emitReconstitutedConstantCaptureArguments(SILType ty,
   auto TT = ty.getAs<TupleType>();
   if (!TT)
     return new (gen.SGM.M) SILArgument(gen.F.begin(), ty, capture);
-  
+
   SmallVector<SILValue, 4> Elts;
   for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
     auto EltTy = ty.getTupleElementType(i);
@@ -897,14 +897,14 @@ emitReconstitutedConstantCaptureArguments(SILType ty,
       emitReconstitutedConstantCaptureArguments(EltTy, capture, gen);
     Elts.push_back(EV);
   }
-  
+
   return gen.B.createTuple(capture, ty, Elts);
 }
-  
+
 static void emitCaptureArguments(SILGenFunction &gen,
                                  CaptureInfo::LocalCaptureTy capture) {
   ASTContext &c = gen.getASTContext();
-  
+
   auto *VD = capture.getPointer();
   auto type = VD->getType();
   switch (getDeclCaptureKind(capture)) {
@@ -972,7 +972,7 @@ static void emitCaptureArguments(SILGenFunction &gen,
   }
   }
 }
-  
+
 } // end anonymous namespace
 
 void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
@@ -1001,7 +1001,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
     IndirectReturnAddress = new (SGM.M)
       SILArgument(F.begin(), returnTI.getLoweredType(), VD);
   }
-  
+
   // Emit the argument variables in calling convention order.
   for (Pattern *p : reversed(paramPatterns)) {
     // Allocate the local mutable argument storage and set up an Initialization.
@@ -1027,7 +1027,7 @@ SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
 
 void SILGenFunction::prepareEpilog(Type resultType, CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
-  
+
   // If we have a non-null, non-void, non-address-only return type, receive the
   // return value via a BB argument.
   NeedsReturn = resultType && !resultType->isVoid();
@@ -1059,7 +1059,7 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
   // Final functions never require ObjC dispatch.
   if (vd->isFinal())
     return false;
-    
+
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
     // If a function has an associated Clang node, it's foreign and only has
     // an ObjC entry point.
@@ -1082,7 +1082,7 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
   }
   if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
     return asd->requiresObjCGetterAndSetter();
-  
+
   return vd->getAttrs().hasAttribute<DynamicAttr>();
 }
 
@@ -1096,7 +1096,7 @@ public:
   SILGenModule &SGM;
   ClassDecl *theClass;
   std::vector<SILVTable::Pair> vtableEntries;
-  
+
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
     : SGM(SGM), theClass(theClass)
   {
@@ -1110,20 +1110,20 @@ public:
     // Create the vtable.
     SILVTable::create(SGM.M, theClass, vtableEntries);
   }
-  
+
   void visitAncestor(ClassDecl *ancestor) {
     // Recursively visit all our ancestors.
     Type super = ancestor->getSuperclass();
     if (super && super->getClassOrBoundGenericClass())
       visitAncestor(super->getClassOrBoundGenericClass());
-    
+
     // Only visit the members for a class defined natively.
     if (!ancestor->hasClangNode()) {
       for (auto member : ancestor->getMembers())
         visit(member);
     }
   }
-  
+
   // Add an entry to the vtable.
   void addEntry(SILDeclRef member) {
     /// Get the function to reference from the vtable.
@@ -1135,7 +1135,7 @@ public:
         return SGM.getDynamicThunk(member, SGM.Types.getConstantInfo(member));
       return SGM.getFunction(member, NotForDefinition);
     };
-    
+
     // Try to find an overridden entry.
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
@@ -1170,7 +1170,7 @@ public:
 
       for (SILVTable::Pair &entry : vtableEntries) {
         SILDeclRef ref = overridden;
-        
+
         do {
           // Replace the overridden member.
           if (entry.first == ref) {
@@ -1182,7 +1182,7 @@ public:
       }
       llvm_unreachable("no overridden vtable entry?!");
     }
-    
+
   not_overridden:
     // If this is a final member and isn't overriding something, we don't need
     // to add it to the vtable.
@@ -1193,7 +1193,7 @@ public:
     // vtable.
     if (member.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
       return;
-    
+
     // @NSManaged property getters/setters don't have vtable entries, because
     // they are only accessible via the @objc entry points.
     if (auto func = dyn_cast<FuncDecl>(member.getDecl())) {
@@ -1206,23 +1206,23 @@ public:
     // Otherwise, introduce a new vtable entry.
     vtableEntries.emplace_back(member, getVtableEntryFn());
   }
-  
+
   // Default for members that don't require vtable entries.
   void visitDecl(Decl*) {}
-  
+
   void visitFuncDecl(FuncDecl *fd) {
     // ObjC decls don't go in vtables.
     if (fd->hasClangNode())
       return;
-    
+
     addEntry(SILDeclRef(fd));
   }
-  
+
   void visitConstructorDecl(ConstructorDecl *cd) {
     // Stub constructors don't get an entry.
     if (cd->hasStubImplementation())
       return;
-    
+
     // Required constructors (or overrides thereof) have their allocating entry
     // point in the vtable.
     bool isRequired = false;
@@ -1239,15 +1239,15 @@ public:
     }
 
     // All constructors have their initializing constructor in the
-    // vtable, which can be used by a convenience initializer. 
+    // vtable, which can be used by a convenience initializer.
     addEntry(SILDeclRef(cd, SILDeclRef::Kind::Initializer));
   }
-  
+
   void visitVarDecl(VarDecl *vd) {
     // Note: dynamically-dispatched properties have their getter and setter
     // added to the vtable when they are visited.
   }
-  
+
   void visitDestructorDecl(DestructorDecl *dd) {
     if (dd->getParent()->isClassOrClassExtensionContext() == theClass) {
       // Add the deallocating destructor to the vtable just for the purpose
@@ -1255,7 +1255,7 @@ public:
       addEntry(SILDeclRef(dd, SILDeclRef::Kind::Deallocator));
     }
   }
-  
+
   void visitSubscriptDecl(SubscriptDecl *sd) {
     // Note: dynamically-dispatched properties have their getter and setter
     // added to the vtable when they are visited.
@@ -1281,36 +1281,36 @@ public:
   SILGenModule &SGM;
   NominalTypeDecl *theType;
   Optional<SILGenVTable> genVTable;
-  
+
   SILGenType(SILGenModule &SGM, NominalTypeDecl *theType)
     : SGM(SGM), theType(theType) {}
-  
+
   /// Emit SIL functions for all the members of the type.
   void emitType() {
     // Start building a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType))
       genVTable.emplace(SGM, theClass);
-    
+
     for (Decl *member : theType->getMembers()) {
       if (genVTable)
         genVTable->visit(member);
-      
+
       visit(member);
     }
-    
+
     for (Decl *member : theType->getDerivedGlobalDecls()) {
       SGM.visit(member);
     }
-    
+
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
     if (isa<ProtocolDecl>(theType))
       return;
-    
+
     for (auto *conformance : theType->getConformances())
       SGM.getWitnessTable(conformance);
   }
-  
+
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
@@ -1335,19 +1335,19 @@ public:
     assert(isa<ClassDecl>(theType) && "destructor in a non-class type");
     SGM.emitDestructor(cast<ClassDecl>(theType), dd);
   }
-  
+
   void visitEnumElementDecl(EnumElementDecl *ued) {
     assert(isa<EnumDecl>(theType));
     SGM.emitEnumConstructor(ued);
   }
-  
+
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     if (pd->isStatic() && pd->hasInit()) {
       SGM.emitGlobalInitialization(pd);
     }
   }
-  
+
   void visitVarDecl(VarDecl *vd) {
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
@@ -1355,7 +1355,7 @@ public:
       return emitTypeMemberGlobalVariable(SGM, theType->getGenericParams(),
                                           theType, vd);
     }
-    
+
     visitAbstractStorageDecl(vd);
   }
 
@@ -1387,7 +1387,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     // foreign-to-native thunk is sufficient.
     if (C->isFactoryInit())
       break;
-    
+
     emitConstructor(C);
     break;
   }
@@ -1417,16 +1417,16 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     }
     break;
   }
-      
+
   case DeclKind::Protocol:
     // Nothing to do in SILGen for other external types.
     break;
-      
+
   case DeclKind::IfConfig:
     // Any active decls have been added to their parent, so there's nothing
     // else to emit.
     break;
-      
+
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
@@ -1455,7 +1455,7 @@ public:
 
   SILGenExtension(SILGenModule &SGM)
     : SGM(SGM) {}
-  
+
   /// Emit ObjC thunks necessary for an ObjC protocol conformance.
   void emitObjCConformanceThunks(ExtensionDecl *extension,
                                  ProtocolDecl *protocol,
@@ -1466,13 +1466,13 @@ public:
         [&](ValueDecl *req, ConcreteDeclRef witness) {
           if (!witness)
             return;
-          
+
           ValueDecl *vd = witness.getDecl();
           // Don't rethunk definitions from the original class or other
           // extensions that are already @objc.
           if (vd->getDeclContext() != extension && vd->isObjC())
             return;
-          
+
           if (auto *method = dyn_cast<FuncDecl>(vd))
             SGM.emitObjCMethodThunk(method);
           else if (auto *prop = dyn_cast<VarDecl>(vd))
@@ -1488,7 +1488,7 @@ public:
       emitObjCConformanceThunks(extension,
                                 inherited.first, inherited.second);
   }
-  
+
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
     for (Decl *member : e->getMembers())
@@ -1500,7 +1500,7 @@ public:
       for (auto *conformance : e->getConformances())
         SGM.getWitnessTable(conformance);
     }
-    
+
     // ObjC protocol conformances may require ObjC thunks to be introduced for
     // definitions from other contexts.
     for (unsigned i = 0, size = e->getProtocols().size(); i < size; ++i)
@@ -1508,7 +1508,7 @@ public:
                                 e->getProtocols()[i],
                                 e->getConformances()[i]);
   }
-  
+
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
@@ -1528,7 +1528,7 @@ public:
   void visitDestructorDecl(DestructorDecl *dd) {
     llvm_unreachable("destructor in extension?!");
   }
-  
+
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     if (pd->isStatic() && pd->hasInit()) {
       SGM.emitGlobalInitialization(pd);
@@ -1544,7 +1544,7 @@ public:
     }
     visitAbstractStorageDecl(vd);
   }
-  
+
   void visitAbstractStorageDecl(AbstractStorageDecl *vd) {
     if (vd->hasObjCGetterAndSetter())
       SGM.emitObjCPropertyMethodThunks(vd);
@@ -1568,7 +1568,7 @@ void SILGenFunction::emitLocalVariable(VarDecl *vd) {
   AllocBoxInst *allocBox = B.createAllocBox(vd, lType);
   auto box = SILValue(allocBox, 0);
   auto addr = SILValue(allocBox, 1);
-  
+
   /// Remember that this is the memory location that we're emitting the
   /// decl to.
   VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr, box);
@@ -1613,9 +1613,9 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   assert(vd->hasStorage() && "can't emit storage for a computed variable");
 
   assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
-  
+
   auto loc = VarLocs[vd];
-  
+
   // For 'let' bindings, we emit a release_value or destroy_addr, depending on
   // whether we have an address or not.
   if (loc.isConstant()) {
@@ -1627,7 +1627,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
       B.emitDestroyAddr(silLoc, Val);
     return;
   }
-  
+
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   assert(loc.box && "captured var should have been given a box");
@@ -1661,7 +1661,7 @@ static SILValue emitBridgeObjCReturnValue(SILGenFunction &gen,
                                           CanType substNativeTy,
                                           CanType bridgedTy) {
   Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
-  
+
   ManagedValue native = gen.emitManagedRValueWithCleanup(result);
   ManagedValue bridged = gen.emitNativeToBridgedValue(loc, native,
                                                       AbstractCC::ObjCMethod,
@@ -1681,7 +1681,7 @@ static void emitObjCReturnValue(SILGenFunction &gen,
   // Bridge the result.
   result = emitBridgeObjCReturnValue(gen, loc, result, nativeTy, nativeTy,
                                      resultInfo.getType());
-  
+
   // Autorelease the bridged result if necessary.
   switch (resultInfo.getConvention()) {
   case ResultConvention::Autoreleased:
@@ -1709,7 +1709,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
     gen.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     return tmp;
   }
-  
+
   lowering.emitRetainValue(gen.B, loc, arg);
   return arg;
 }
@@ -1720,18 +1720,18 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
                                                SmallVectorImpl<SILValue> &args){
   auto objcInfo = gen.SGM.Types.getConstantFunctionType(thunk);
   auto swiftInfo = gen.SGM.Types.getConstantFunctionType(thunk.asForeign(false));
-  
+
   // Borrow the context archetypes from the unthunked function.
   SILDeclRef native = thunk.asForeign(false);
   SILFunction *orig = gen.SGM.getFunction(native, NotForDefinition);
   gen.F.setContextGenericParams(orig->getContextGenericParams());
-  
+
   RegularLocation Loc(thunk.getDecl());
   Loc.markAutoGenerated();
 
   SmallVector<ManagedValue, 8> bridgedArgs;
   bridgedArgs.reserve(objcInfo->getParameters().size());
-  
+
   // Emit the indirect return argument, if any.
   if (objcInfo->hasIndirectResult()) {
     SILType argTy = gen.F.mapTypeIntoContext(
@@ -1739,14 +1739,14 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
     auto arg = new (gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
     bridgedArgs.push_back(ManagedValue::forUnmanaged(arg));
   }
-  
+
   // Emit the other arguments, taking ownership of arguments if necessary.
   auto inputs = objcInfo->getParametersWithoutIndirectResult();
   assert(!inputs.empty());
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = gen.F.mapTypeIntoContext(inputs[i].getSILType());
     SILValue arg = new(gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
-    
+
     // If the argument is a block, copy it.
     if (argTy.isBlockPointerCompatible()) {
       auto copy = gen.B.createCopyBlock(Loc, arg);
@@ -1783,21 +1783,21 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
                                    argTy.getSwiftType());
     args.push_back(native.forward(gen));
   }
-  
+
   return objcInfo;
 }
 
 void SILGenFunction::emitObjCMethodThunk(SILDeclRef thunk) {
   SILDeclRef native = thunk.asForeign(false);
-  
-  SmallVector<SILValue, 4> args;  
+
+  SmallVector<SILValue, 4> args;
   auto objcFnTy = emitObjCThunkArguments(*this, thunk, args);
   auto nativeInfo = getConstantInfo(native);
   auto swiftResultTy = nativeInfo.SILFnType->getResult()
     .transform([&](Type t) { return F.mapTypeIntoContext(t); });
   auto objcResultTy = objcFnTy->getResult()
     .transform([&](Type t) { return F.mapTypeIntoContext(t); });
-  
+
   // Call the native entry point.
   RegularLocation loc(thunk.getDecl());
   loc.markAutoGenerated();
@@ -1823,7 +1823,7 @@ void SILGenFunction::emitObjCGetter(SILDeclRef getter) {
     .transform([&](Type t) { return F.mapTypeIntoContext(t); });
   auto objcResultTy = objcFnTy->getResult()
     .transform([&](Type t) { return F.mapTypeIntoContext(t); });
-  
+
   RegularLocation loc(getter.getDecl());
   loc.markAutoGenerated();
 
@@ -1854,7 +1854,7 @@ void SILGenFunction::emitObjCSetter(SILDeclRef setter) {
   auto substTy = nativeFn.getType().castTo<SILFunctionType>()
     ->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
   SILValue result = B.createApply(loc, nativeFn,
-                                  SILType::getPrimitiveObjectType(substTy),                                  
+                                  SILType::getPrimitiveObjectType(substTy),
                                   SGM.Types.getEmptyTupleType(),
                                   subs, args, setter.isTransparent());
   // Result should be void.
@@ -1888,7 +1888,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
     return;
 
   auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
-  
+
   // Note: the ivar destroyer is responsible for destroying the
   // instance variables before the object is actually deallocated.
 
@@ -1898,7 +1898,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
   ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
   auto superclassDtorDecl = superclass->getDestructor();
-  SILDeclRef superclassDtor(superclassDtorDecl, 
+  SILDeclRef superclassDtor(superclassDtorDecl,
                             SILDeclRef::Kind::Deallocator,
                             SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
@@ -1929,7 +1929,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-  
+
 /// A visitor for traversing a pattern, creating
 /// global accessor functions for all of the global variables declared inside.
 struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
@@ -1940,10 +1940,10 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
   SILGlobalVariable *OnceToken;
   /// The function containing the initialization code.
   SILFunction *OnceFunc;
-  
+
   /// A reference to the Builtin.once declaration.
   FuncDecl *BuiltinOnceDecl;
-  
+
   GenGlobalAccessors(SILGenModule &SGM,
                      SILGlobalVariable *OnceToken,
                      SILFunction *OnceFunc)
@@ -1955,12 +1955,12 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
     C.TheBuiltinModule
       ->lookupValue({}, C.getIdentifier("once"),
                     NLKind::QualifiedLookup, found);
-    
+
     assert(found.size() == 1 && "didn't find Builtin.once?!");
-    
+
     BuiltinOnceDecl = cast<FuncDecl>(found[0]);
   }
-  
+
   // Walk through non-binding patterns.
   void visitParenPattern(ParenPattern *P) {
     return visit(P->getSubPattern());
@@ -1976,12 +1976,12 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
       visit(elt.getPattern());
   }
   void visitAnyPattern(AnyPattern *P) {}
-  
+
   // When we see a variable binding, emit its global accessor.
   void visitNamedPattern(NamedPattern *P) {
     SGM.emitGlobalAccessor(P->getDecl(), OnceToken, OnceFunc);
   }
-  
+
 #define INVALID_PATTERN(Id, Parent) \
   void visit##Id##Pattern(Id##Pattern *) { \
     llvm_unreachable("pattern not valid in argument or var binding"); \
@@ -1991,7 +1991,7 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
 #include "swift/AST/PatternNodes.def"
 #undef INVALID_PATTERN
 };
-  
+
 } // end anonymous namespace
 
 /// Emit a global initialization.
@@ -2007,10 +2007,10 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
            && "only value type static properties are implemented");
     (void)theType;
   }
-  
+
   // Emit the lazy initialization token for the initialization expression.
   auto counter = anonymousSymbolCounter++;
-  
+
   // Pick one variable of the pattern. Usually it's only one variable, but it
   // can also be something like: var (a, b) = ...
   Pattern *pattern = pd->getPattern();
@@ -2019,31 +2019,31 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
     varDecl = D;
   });
   assert(varDecl);
-  
+
   llvm::SmallString<20> onceTokenBuffer;
   llvm::raw_svector_ostream onceTokenStream(onceTokenBuffer);
   Mangler tokenMangler(onceTokenStream);
   tokenMangler.mangleGlobalInit(varDecl, counter, false);
-  
+
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
-  
+
   // TODO: include the module in the onceToken's name mangling.
   // Then we can make it fragile.
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
                                              makeModuleFragile,
                                              onceTokenStream.str(), onceSILTy);
   onceToken->setDeclaration(false);
-  
+
   // Emit the initialization code into a function.
   llvm::SmallString<20> onceFuncBuffer;
   llvm::raw_svector_ostream onceFuncStream(onceFuncBuffer);
   Mangler funcMangler(onceFuncStream);
   funcMangler.mangleGlobalInit(varDecl, counter, true);
-  
+
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncStream.str(), pd);
-  
+
   // Generate accessor functions for all of the declared variables, which
   // Builtin.once the lazy global initializer we just generated then return
   // the address of the individual variable.
@@ -2052,7 +2052,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd) {
 }
 
 namespace {
-  
+
 // Is this a free function witness satisfying a static method requirement?
 static IsFreeFunctionWitness_t isFreeFunctionWitness(ValueDecl *requirement,
                                                      ValueDecl *witness) {
@@ -2061,10 +2061,10 @@ static IsFreeFunctionWitness_t isFreeFunctionWitness(ValueDecl *requirement,
            && "free function satisfying instance method requirement?!");
     return IsFreeFunctionWitness;
   }
-  
+
   return IsNotFreeFunctionWitness;
 }
-  
+
 /// Emit a witness table for a protocol conformance.
 class SILGenConformance : public Lowering::ASTVisitor<SILGenConformance> {
 public:
@@ -2083,7 +2083,7 @@ public:
     if (!SGM.Types.protocolRequiresWitnessTable(Conformance->getProtocol()))
       Conformance = nullptr;
   }
-  
+
   SILWitnessTable *emit() {
     // Nothing to do if this wasn't a normal conformance.
     if (!Conformance)
@@ -2093,7 +2093,7 @@ public:
     auto protocol = Conformance->getProtocol();
     for (auto base : protocol->getProtocols())
       emitBaseProtocolWitness(base);
-    
+
     // Emit witnesses in protocol declaration order.
     for (auto reqt : protocol->getMembers())
       visit(reqt);
@@ -2130,24 +2130,24 @@ public:
     return SILWitnessTable::create(SGM.M, Linkage, SGM.makeModuleFragile,
                                  Conformance, Entries);
   }
-  
+
   void emitBaseProtocolWitness(ProtocolDecl *baseProtocol) {
     // Only include the witness if the base protocol requires it.
     if (!SGM.Types.protocolRequiresWitnessTable(baseProtocol))
       return;
-    
+
     auto foundBaseConformance
       = Conformance->getInheritedConformances().find(baseProtocol);
     assert(foundBaseConformance != Conformance->getInheritedConformances().end()
            && "no inherited conformance for base protocol");
-    
+
     auto conformance = foundBaseConformance->second;
-    
+
     Entries.push_back(SILWitnessTable::BaseProtocolWitness{
       baseProtocol,
       conformance,
     });
-    
+
     // Emit the witness table for the base conformance if it belongs to this
     // module or is shared.
     if (conformance->getDeclContext()->getParentModule()
@@ -2158,28 +2158,28 @@ public:
           == SILLinkage::Shared)
       SGM.getWitnessTable(conformance);
   }
-  
+
   /// Fallback for unexpected protocol requirements.
   void visitDecl(Decl *d) {
     d->print(llvm::errs());
     llvm_unreachable("unhandled protocol requirement");
   }
-  
+
   void visitFuncDecl(FuncDecl *fd) {
     // FIXME: Emit getter and setter (if settable) witnesses.
     // For now we ignore them, like the IRGen witness table builder did.
     if (fd->isAccessor())
       return;
-    
+
     // Find the witness in the conformance.
     ConcreteDeclRef witness = Conformance->getWitness(fd, nullptr);
     emitFuncEntry(fd, witness.getDecl(), witness.getSubstitutions());
   }
-  
+
   void emitFuncEntry(FuncDecl *fd, ValueDecl *witnessDecl,
                      ArrayRef<Substitution> WitnessSubstitutions) {
     // Emit the witness thunk and add it to the table.
-    
+
     // If this is a non-present optional requirement, emit a MissingOptional.
     if (!witnessDecl) {
       assert(fd->getAttrs().hasAttribute<OptionalAttr>() &&
@@ -2187,8 +2187,8 @@ public:
       Entries.push_back(SILWitnessTable::MissingOptionalWitness{ fd });
       return;
     }
-    
-    
+
+
     // TODO: multiple resilience expansions?
     // TODO: multiple uncurry levels?
     SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func,
@@ -2198,7 +2198,7 @@ public:
     auto isFree = isFreeFunctionWitness(fd, witnessDecl);
     unsigned witnessUncurryLevel = isFree ? requirementRef.uncurryLevel - 1
                                           : requirementRef.uncurryLevel;
-  
+
     SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func,
                           SILDeclRef::ConstructAtBestResilienceExpansion,
                           witnessUncurryLevel);
@@ -2247,7 +2247,7 @@ public:
     // Emit the record for the type itself.
     Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,
                                 witness.getReplacement()->getCanonicalType()});
-    
+
     // Emit records for the protocol requirements on the type.
     assert(td->getProtocols().size() == witness.getConformances().size()
            && "number of conformances in assoc type substitution do not match "
@@ -2265,10 +2265,10 @@ public:
                                [&](const ProtocolConformance *C) -> bool {
                                  return !C;
                                })));
-    
+
     for (unsigned i = 0, e = td->getProtocols().size(); i < e; ++i) {
       auto protocol = td->getProtocols()[i];
-      
+
       // Only reference the witness if the protocol requires it.
       if (!SGM.Types.protocolRequiresWitnessTable(protocol))
         continue;
@@ -2285,23 +2285,23 @@ public:
         assert(foundConformance != witness.getConformances().end());
         conformance = *foundConformance;
       }
-      
+
       Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         td, protocol, conformance
       });
     }
   }
-  
+
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
     // We only care about the contained VarDecls.
   }
-  
+
   void visitIfConfigDecl(IfConfigDecl *icd) {
     // We only care about the active members, which were already subsumed by the
     // enclosing type.
   }
 };
-  
+
 } // end anonymous namespace
 
 SILWitnessTable *
@@ -2310,7 +2310,7 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
   auto found = emittedWitnessTables.find(conformance);
   if (found != emittedWitnessTables.end())
     return found->second;
-  
+
   SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
   emittedWitnessTables.insert({conformance, table});
   return table;
@@ -2337,7 +2337,7 @@ getWitnessFunctionType(SILModule &M,
     = M.Types.getLoweredASTFunctionType(witnessSubstTy, uncurryLevel, None);
   auto witnessLoweredIfaceTy
     = M.Types.getLoweredASTFunctionType(witnessSubstIfaceTy, uncurryLevel, None);
-  
+
   // Convert to SILFunctionType.
   auto fnTy = getNativeSILFunctionType(M, origLoweredTy,
                                        witnessLoweredTy,
@@ -2368,9 +2368,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       ->substGenericArgs(conformance->getDeclContext()->getParentModule(),
                          conformance->getType())
       ->getCanonicalType());
-  
+
   GenericParamList *conformanceParams = conformance->getGenericParams();
-  
+
   // If the requirement is generic, reparent its generic parameter list to
   // the generic parameters of the conformance.
   CanType methodTy = witnessSubstTy.getResult();
@@ -2387,7 +2387,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                                methodParams,
                                                pft->getExtInfo());
   }
-  
+
   // If the conformance is generic, its generic parameters apply to
   // the witness as its outer generic param list.
   if (conformanceParams) {
@@ -2400,17 +2400,17 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                           methodTy,
                                           witnessSubstTy->getExtInfo());
   }
-  
+
   // If the witness is a free function, consider the self argument
   // uncurry level.
   if (isFree)
     ++witnessUncurryLevel;
-  
+
   // The witness SIL function has the type of the AST-level witness, at the
   // abstraction level of the original protocol requirement.
   assert(requirement.uncurryLevel == witnessUncurryLevel
          && "uncurry level of requirement and witness do not match");
-      
+
   // In addition to the usual bevy of abstraction differences, protocol
   // witnesses have potential differences in inout-ness of self. mutating
   // value type methods may reassign 'self' as an inout parameter, but may be
@@ -2422,7 +2422,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       isa<InOutType>(requirementTy.getInput())) {
     inOutSelf = HasInOutSelfAbstractionDifference;
   }
-  
+
   // Work out the interface type for the witness.
   auto reqtIfaceTy
     = cast<GenericFunctionType>(requirementInfo.FormalInterfaceType);
@@ -2432,7 +2432,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     reqtIfaceTy->partialSubstGenericArgs(conformance->getDeclContext()->getParentModule(),
                                          conformance->getInterfaceType())
                ->getCanonicalType());
-  
+
   // If the conformance is generic, its generic parameters apply to the witness.
   GenericSignature *sig
     = conformance->getGenericSignature();
@@ -2447,7 +2447,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       allReqts.append(gft->getRequirements().begin(),
                       gft->getRequirements().end());
       GenericSignature *witnessSig = GenericSignature::get(allParams, allReqts);
-      
+
       witnessSubstIfaceTy = cast<GenericFunctionType>(
         GenericFunctionType::get(witnessSig,
                                  gft.getInput(), gft.getResult(),
@@ -2505,7 +2505,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       }
     }
   }
-  
+
   // Collect the context generic parameters for the witness.
   GenericParamList *witnessContextParams = conformanceParams;
   // If the requirement is generic, reparent its parameters to the conformance
@@ -2520,7 +2520,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     witnessContextParams
       = reqtParams->cloneWithOuterParameters(getASTContext(), outerParams);
   }
-  
+
   auto *f = SILFunction::create(M, linkage, nameBuffer,
                 witnessSILType.castTo<SILFunctionType>(),
                 witnessContextParams,
@@ -2528,17 +2528,17 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                 IsNotBare,
                 IsNotTransparent,
                 makeModuleFragile ? IsFragile : IsNotFragile);
-  
+
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witness.getDecl()), *f));
-  
+
   // Create the witness.
   SILGenFunction(*this, *f)
     .emitProtocolWitness(conformance, requirement, witness, witnessSubs,
                          isFree, inOutSelf);
-  
+
   f->verify();
-  
+
   return f;
 }
 
@@ -2563,13 +2563,13 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
       mangler.mangleGenericSignature(generics,
                                      ResilienceExpansion::Minimal);
     }
-    
+
     // Substitute context parameters out of the "from" and "to" types.
     auto fromInterfaceType
       = Types.getInterfaceTypeOutOfContext(fromType, thunkContextParams);
     auto toInterfaceType
       = Types.getInterfaceTypeOutOfContext(toType, thunkContextParams);
-    
+
     mangler.mangleType(fromInterfaceType,
                        ResilienceExpansion::Minimal, /*uncurry*/ 0);
     mangler.mangleType(toInterfaceType,
