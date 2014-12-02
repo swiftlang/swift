@@ -297,7 +297,7 @@ as
 .. parsed-literal::
 
   { ()->X in 
-    let __t = **x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
+    var __t = **x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
     __t\ **.=**\ *f*\ (b₀, p₁: b₁, p₂: b₂, …p\ *n*: b\ *n*)
     return __t
   }()
