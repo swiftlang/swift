@@ -358,6 +358,29 @@ static LValueTypeData getValueTypeData(SILValue value) {
   };
 }
 
+/// Given the address of an optional value, unsafely project out the
+/// address of the value.
+static ManagedValue getAddressOfOptionalValue(SILGenFunction &gen,
+                                              SILLocation loc,
+                                              ManagedValue optAddr,
+                                        const LValueTypeData &valueTypeData) {
+  // Project out the 'Some' payload.
+  OptionalTypeKind otk;
+  auto valueTy
+    = optAddr.getType().getSwiftRValueType().getAnyOptionalObjectType(otk);
+  assert(valueTy && "base was not optional?"); (void) valueTy;
+
+  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
+
+  // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
+  // a single-payload enum. There will (currently) never be spare bits
+  // embedded in the payload.
+  SILValue someAddr = gen.B
+    .createUncheckedTakeEnumDataAddr(loc, optAddr.getValue(), someDecl,
+                                valueTypeData.TypeOfRValue.getAddressType());
+  return ManagedValue::forLValue(someAddr);
+}
+
 namespace {
   class RefElementComponent : public PhysicalPathComponent {
     VarDecl *Field;
@@ -426,103 +449,28 @@ namespace {
     }
   };
 
-  /// Abstract base class for components that project the object out of
-  /// optionals.
-  class OptionalObjectComponent : public PhysicalPathComponent {
-    SILType SubstFieldType;
+  /// A physical path component which force-projects the address of
+  /// the value of an optional l-value.
+  class ForceOptionalObjectComponent : public PhysicalPathComponent {
   public:
-    OptionalObjectComponent(LValueTypeData typeData)
-      : PhysicalPathComponent(typeData, OptionalObjectKind)
-    {}
+    ForceOptionalObjectComponent(LValueTypeData typeData)
+      : PhysicalPathComponent(typeData, OptionalObjectKind) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       // Assert that the optional value is present.
       gen.emitPreconditionOptionalHasValue(loc, base.getValue());
-      // Project out the 'Some' payload.
-      OptionalTypeKind otk;
-      auto objTy
-        = base.getType().getSwiftRValueType()->getAnyOptionalObjectType(otk);
-      assert(objTy);
-      (void)objTy;
-      
-      EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
-      // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
-      // a single-payload enum. There will (currently) never be spare bits
-      // embedded in the payload.
-      SILValue someAddr = gen.B
-        .createUncheckedTakeEnumDataAddr(loc, base.getValue(),
-                                   someDecl,
-                                   getTypeData().TypeOfRValue.getAddressType());
-      return ManagedValue::forLValue(someAddr);
-    }
 
-    void print(raw_ostream &OS) const override {
-      OS << "OptionalObjectComponent()\n";
-    }
-
-  protected:
-    // Get the address of the object within the optional wrapper, assuming it
-    // has already been validated at the current insertion point.
-    ManagedValue getOffsetOfObject(SILGenFunction &gen, SILLocation loc,
-                                   ManagedValue base) const {
-      // Project out the 'Some' payload.
-      OptionalTypeKind otk;
-      auto objTy
-        = base.getType().getSwiftRValueType()->getAnyOptionalObjectType(otk);
-      assert(objTy);
-      (void)objTy;
-      
-      EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
-      // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
-      // a single-payload enum. There will (currently) never be spare bits
-      // embedded in the payload.
-      SILValue someAddr = gen.B
-        .createUncheckedTakeEnumDataAddr(loc, base.getValue(),
-                                   someDecl,
-                                   getTypeData().TypeOfRValue.getAddressType());
-      return ManagedValue::forLValue(someAddr);
-    }
-  };
-  
-  class ForceOptionalObjectComponent : public OptionalObjectComponent {
-  public:
-    using OptionalObjectComponent::OptionalObjectComponent;
-    
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) && override {
-      // Assert that the optional value is present.
-      gen.emitPreconditionOptionalHasValue(loc, base.getValue());
       // Project out the payload.
-      return getOffsetOfObject(gen, loc, base);
+      return getAddressOfOptionalValue(gen, loc, base, getTypeData());
     }
 
     void print(raw_ostream &OS) const override {
       OS << "ForceOptionalObjectComponent()\n";
     }
   };
-  
-  class BindOptionalObjectComponent : public OptionalObjectComponent {
-    unsigned Depth;
-  public:
-    BindOptionalObjectComponent(LValueTypeData typeData,
-                                unsigned Depth)
-      : OptionalObjectComponent(typeData), Depth(Depth)
-    {}
-    
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) && override {
-      // Check if the optional value is present.
-      gen.emitBindOptional(loc, base.getUnmanagedValue(), Depth);
-      
-      // Project out the payload on the success branch.
-      return getOffsetOfObject(gen, loc, base);
-    }
-    void print(raw_ostream &OS) const override {
-      OS << "BindOptionalObjectComponent(" << Depth << ")\n";
-    }
-  };
 
+  /// A physical path component which returns a literal address.
   class ValueComponent : public PhysicalPathComponent {
     ManagedValue Value;
   public:
@@ -1411,10 +1359,29 @@ LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
 
 LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
                                            AccessKind accessKind) {
-  LValue lv = visitRec(e->getSubExpr(), accessKind);
-  LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
-  lv.add<BindOptionalObjectComponent>(typeData, e->getDepth());
-  return lv;
+  // Do formal evaluation of the base l-value.
+  LValue optLV = visitRec(e->getSubExpr(), accessKind);
+
+  LValueTypeData optTypeData = optLV.getTypeData();
+  LValueTypeData valueTypeData = getOptionalObjectTypeData(gen, optTypeData);
+
+  // The chaining operator immediately begins a formal access to the
+  // base l-value.  In concrete terms, this means we can immediately
+  // evaluate the base down to an address.
+  ManagedValue optAddr =
+    gen.emitAddressOfLValue(e, std::move(optLV), accessKind);
+
+  // Bind the value, branching to the destination address if there's no
+  // value there.
+  gen.emitBindOptional(e, optAddr.getUnmanagedValue(), e->getDepth());
+
+  // Project out the payload on the success branch.  We can just use a
+  // naked ValueComponent here; this is effectively a separate l-value.
+  ManagedValue valueAddr =
+    getAddressOfOptionalValue(gen, e, optAddr, valueTypeData);
+  LValue valueLV;
+  valueLV.add<ValueComponent>(valueAddr, valueTypeData);
+  return valueLV;
 }
 
 LValue SILGenLValue::visitInOutExpr(InOutExpr *e, AccessKind accessKind) {
