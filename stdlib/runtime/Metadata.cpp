@@ -1217,19 +1217,54 @@ static OpaqueValue *pod_direct_initializeArrayWithTakeFrontToBack(
 #define pod_indirect_initializeArrayWithTakeBackToFront \
   pod_direct_initializeArrayWithTakeFrontToBack
 
+static constexpr uintptr_t sizeWithAlignmentMask(uintptr_t size,
+                                                 uintptr_t alignmentMask) {
+  return (size << 16) | alignmentMask;
+}
+
 void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
   auto flags = vwtable->flags;
   if (flags.isPOD()) {
     // Use POD value witnesses.
-    if (flags.isInlineStorage()) {
-#define INSTALL_POD_DIRECT_WITNESS(NAME) vwtable->NAME = pod_direct_##NAME;
-      FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_DIRECT_WITNESS)
-#undef INSTALL_POD_DIRECT_WITNESS
-    } else {
-#define INSTALL_POD_INDIRECT_WITNESS(NAME) vwtable->NAME = pod_indirect_##NAME;
-      FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_INDIRECT_WITNESS)
-#undef INSTALL_POD_INDIRECT_WITNESS
+    // If the value has a common size and alignment, use specialized value
+    // witnesses we already have lying around for the builtin types.
+    const ValueWitnessTable *commonVWT;
+    switch (sizeWithAlignmentMask(vwtable->size, vwtable->getAlignmentMask())) {
+    default:
+      // For uncommon layouts, use value witnesses that work with an arbitrary
+      // size and alignment.
+      if (flags.isInlineStorage()) {
+  #define INSTALL_POD_DIRECT_WITNESS(NAME) vwtable->NAME = pod_direct_##NAME;
+        FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_DIRECT_WITNESS)
+  #undef INSTALL_POD_DIRECT_WITNESS
+      } else {
+  #define INSTALL_POD_INDIRECT_WITNESS(NAME) vwtable->NAME = pod_indirect_##NAME;
+        FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_INDIRECT_WITNESS)
+  #undef INSTALL_POD_INDIRECT_WITNESS
+      }
+      return;
+      
+    case sizeWithAlignmentMask(1, 0):
+      commonVWT = &_TWVBi8_;
+      break;
+    case sizeWithAlignmentMask(2, 1):
+      commonVWT = &_TWVBi16_;
+      break;
+    case sizeWithAlignmentMask(4, 3):
+      commonVWT = &_TWVBi32_;
+      break;
+    case sizeWithAlignmentMask(8, 7):
+      commonVWT = &_TWVBi64_;
+      break;
+    case sizeWithAlignmentMask(16, 15):
+      commonVWT = &_TWVBi128_;
+      break;
     }
+    
+  #define INSTALL_POD_COMMON_WITNESS(NAME) vwtable->NAME = commonVWT->NAME;
+    FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_COMMON_WITNESS)
+  #undef INSTALL_POD_COMMON_WITNESS
+    
     return;
   }
   
