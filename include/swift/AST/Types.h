@@ -2496,6 +2496,19 @@ public:
     return getExtInfo().getCC();
   }
 
+
+  bool hasSelfArgument() const {
+    switch (getAbstractCC()) {
+    case AbstractCC::ObjCMethod:
+    case AbstractCC::Method:
+    case AbstractCC::WitnessMethod:
+      return true;
+    case AbstractCC::Freestanding:
+    case AbstractCC::C:
+      return false;
+    }
+  }
+
   /// \brief Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();

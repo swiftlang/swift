@@ -207,15 +207,7 @@ public:
   /// Returns true if this function has a calling convention that has a self
   /// argument.
   bool hasSelfArgument() const {
-    switch(getAbstractCC()) {
-    case AbstractCC::ObjCMethod:
-    case AbstractCC::Method:
-    case AbstractCC::WitnessMethod:
-      return true;
-    case AbstractCC::Freestanding:
-    case AbstractCC::C:
-      return false;
-    }
+    return getLoweredFunctionType()->hasSelfArgument();
   }
 
   StringRef getName() const { return Name; }

@@ -2301,6 +2301,15 @@ public:
   }
 
   void verifySILFunctionType(CanSILFunctionType FTy) {
+    // Make sure that if FTy's calling convention implies that it must have a
+    // self parameter, it is not empty if we do not have canonical sil.
+    if (F.getModule().getStage() == SILStage::Raw &&
+        FTy->hasSelfArgument()) {
+      require(!FTy->getParameters().empty(),
+              "Functions with a calling convention with self parameter must "
+              "have at least one argument for self.");
+    }
+
     // Make sure that FTy does not have any out parameters except for the first
     // parameter.
     if (FTy->getParameters().size() < 2)
@@ -2398,10 +2407,7 @@ public:
               "generic function definition must have context archetypes");
     }
 
-    // Make sure that FTy does not have any out parameters except for the first
-    // parameter.
     verifySILFunctionType(FTy);
-
     verifyEntryPointArguments(F->getBlocks().begin());
     verifyEpilogBlock(F);
     verifyStackHeight(F);
