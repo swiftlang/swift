@@ -757,8 +757,54 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
-
 namespace {
+
+class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
+                                              /*RetTy*/ RValue>
+{
+public:
+  SILGenFunction &gen;
+  SILBasicBlock *parent;
+  SILLocation loc;
+  bool functionArgs;
+
+  EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent,
+                  SILLocation l, bool functionArgs)
+    : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
+
+  RValue visitType(CanType t) {
+    SILValue arg = new (gen.SGM.M)
+      SILArgument(parent, gen.getLoweredType(t), loc.getAsASTNode<ValueDecl>());
+    ManagedValue mv = isa<InOutType>(t)
+      ? ManagedValue::forLValue(arg)
+      : gen.emitManagedRValueWithCleanup(arg);
+
+    // If the value is a (possibly optional) ObjC block passed into the entry
+    // point of the function, then copy it so we can treat the value reliably
+    // as a heap object. Escape analysis can eliminate this copy if it's
+    // unneeded during optimization.
+    CanType objectType = t;
+    if (auto theObjTy = t.getAnyOptionalObjectType())
+      objectType = theObjTy;
+    if (functionArgs
+        && isa<FunctionType>(objectType)
+        && cast<FunctionType>(objectType)->getRepresentation()
+              == FunctionType::Representation::Block) {
+      SILValue blockCopy = gen.B.createCopyBlock(loc, mv.getValue());
+      mv = gen.emitManagedRValueWithCleanup(blockCopy);
+    }
+    return RValue(gen, loc, t, mv);
+  }
+
+  RValue visitTupleType(CanTupleType t) {
+    RValue rv{t};
+
+    for (auto fieldType : t.getElementTypes())
+      rv.addElement(visit(fieldType));
+
+    return rv;
+  }
+};
 
 /// A visitor for traversing a pattern, creating
 /// SILArguments, and initializing the local value for each pattern variable
@@ -775,8 +821,10 @@ struct ArgumentInitVisitor :
 
   RValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
-    return RValue::emitBBArguments(ty->getCanonicalType(), gen, parent, l,
-                                   /*functionArgs*/ true);
+
+    // Create an RValue by emitting destructured arguments into a basic block.
+    CanType canTy = ty->getCanonicalType();
+    return EmitBBArguments(gen, parent, l, /*functionArgs*/ true).visit(canTy);
   }
 
   /// Create a SILArgument and store its value into the given Initialization,

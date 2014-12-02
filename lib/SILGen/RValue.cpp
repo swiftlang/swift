@@ -493,14 +493,6 @@ RValue::RValue(CanType type)
   : type(type), elementsToBeAdded(getTupleSize(type)) {
 }
 
-RValue RValue::emitBBArguments(CanType type,
-                               SILGenFunction &gen,
-                               SILBasicBlock *parent,
-                               SILLocation l,
-                               bool functionArgs) {
-  return EmitBBArguments(gen, parent, l, functionArgs).visit(type);
-}
-
 void RValue::addElement(RValue &&element) & {
   assert(!element.isUsed() && "adding consumed value to r-value");
   assert(!isComplete() && "rvalue already complete");

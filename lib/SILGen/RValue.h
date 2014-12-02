@@ -97,13 +97,6 @@ public:
   /// been added.
   explicit RValue(CanType type);
   
-  /// Create an RValue by emitting destructured arguments into a basic block.
-  static RValue emitBBArguments(CanType type,
-                                SILGenFunction &gen,
-                                SILBasicBlock *parent,
-                                SILLocation L,
-                                bool functionArgs);
-  
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.
   bool isComplete() const & { return elementsToBeAdded == 0; }
