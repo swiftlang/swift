@@ -939,9 +939,10 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     // Get the access function "a[f(i)]". At the moment this handles only the
     // identity function.
     auto F = AccessFunction::getLinearFunction(ArrayIndex, IndVars);
-    if (!F)
+    if (!F) {
+      DEBUG(llvm::dbgs() << " not a linear function " << *Inst);
       continue;
-
+    }
     DEBUG(llvm::dbgs() << " can hoist " << *Inst);
     Changed |= hoistCheck(Preheader, ArrayCall, F, DT);
   }
