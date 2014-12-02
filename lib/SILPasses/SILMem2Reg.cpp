@@ -110,8 +110,13 @@ private:
   void fixPhiPredBlock(BlockSet &PhiBlocks, SILBasicBlock *Dest,
                        SILBasicBlock *Pred);
 
-  /// \brief Get the definition for block.
-  SILValue getDefinitionForValue(BlockSet &PhiBlocks, SILBasicBlock *StartBB);
+  /// \brief Get the value for this AllocStack variable that is
+  /// flowing out of StartBB.
+  SILValue getLiveOutValue(BlockSet &PhiBlocks, SILBasicBlock *StartBB);
+
+  /// \brief Get the value for this AllocStack variable that is
+  /// flowing into BB.
+  SILValue getLiveInValue(BlockSet &PhiBlocks, SILBasicBlock *BB);
 
   /// \brief Prune AllocStacks usage in the function. Scan the function
   /// and remove in-block usage of the AllocStack. Leave only the first
@@ -350,14 +355,14 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
 }
 
 SILValue
-StackAllocationPromoter::getDefinitionForValue(BlockSet &PhiBlocks,
-                                               SILBasicBlock *StartBB) {
+StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
+                                         SILBasicBlock *StartBB) {
   DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
   // Walk the Dom tree in search of a defining value:
   for (DomTreeNode *Node = DT->getNode(StartBB); Node; Node = Node->getIDom()) {
     SILBasicBlock *BB = Node->getBlock();
 
-    // If there is a store (that must comes after the Phi) use its value.
+    // If there is a store (that must come after the phi), use its value.
     BlockToInstMap::iterator it = LastStoreInBlock.find(BB);
     if (it != LastStoreInBlock.end())
       if (StoreInst *St = dyn_cast_or_null<StoreInst>(it->second)) {
@@ -381,13 +386,40 @@ StackAllocationPromoter::getDefinitionForValue(BlockSet &PhiBlocks,
   return SILValue();
 }
 
+SILValue
+StackAllocationPromoter::getLiveInValue(BlockSet &PhiBlocks,
+                                        SILBasicBlock *BB) {
+  // First, check if there is a Phi value in the current block. We know that
+  // our loads happen before stores, so we need to first check for Phi nodes
+  // in the first block, but stores first in all other stores in the idom
+  // chain.
+  if (PhiBlocks.count(BB)) {
+    DEBUG(llvm::dbgs() << "*** Found a local Phi definition.\n");
+    return BB->getBBArg(BB->getNumBBArg()-1);
+  }
+
+  assert(DT->getNode(BB) && "Block is not in dominator tree!");
+
+  // No phi for this value in this block means that the value flowing
+  // out of the immediate dominator reaches here.
+  DomTreeNode *IDom = DT->getNode(BB)->getIDom();
+  assert(IDom &&
+         "Attempt to get live-in value for alloc_stack in entry block!");
+
+  SILValue Def = getLiveOutValue(PhiBlocks, IDom->getBlock());
+  if (Def)
+    return Def;
+
+  return SILUndef::get(ASI->getElementType(), ASI->getModule());
+}
+
 void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
                                               SILBasicBlock *Dest,
                                               SILBasicBlock *Pred) {
   TermInst *TI = Pred->getTerminator();
   DEBUG(llvm::dbgs() << "*** Fixing the terminator " << TI << ".\n");
 
-  SILValue Def = getDefinitionForValue(PhiBlocks, Pred);
+  SILValue Def = getLiveOutValue(PhiBlocks, Pred);
   if (!Def)
     Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
 
@@ -406,11 +438,10 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
       continue;
 
     SILBasicBlock *BB = LI->getParent();
-    DomTreeNode *Node = DT->getNode(BB);
 
     // If this block has no predecessors then nothing dominates it and the load
     // is dead code. Replace the load value with Undef and move on.
-    if (LI->getParent()->pred_empty() || !Node) {
+    if (BB->pred_empty() || !DT->getNode(BB)) {
       SILValue Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
       SILValue(LI, 0).replaceAllUsesWith(Def);
       LI->eraseFromParent();
@@ -418,30 +449,7 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
       continue;
     }
 
-    // First, check if there is a Phi value in the current block. We know that
-    // our loads happen before stores, so we need to first check for Phi nodes
-    // in the first block, but stores first in all other stores in the idom
-    // chain.
-    if (PhiBlocks.count(BB)) {
-      DEBUG(llvm::dbgs() << "*** Found a local Phi definiton.\n");
-      SILValue Phi = BB->getBBArg(BB->getNumBBArg()-1);
-      // Replace the load with the last argument of the BB, which is our Phi.
-      SILValue(LI, 0).replaceAllUsesWith(Phi);
-      LI->eraseFromParent();
-      NumInstRemoved++;
-      // We are done with this Load. Move on to the next Load.
-      continue;
-    }
-
-    // We know that the load definition is not in our block, so start the search
-    // one level up the idom tree.
-    Node = Node->getIDom();
-    assert(Node && "Promoting a load in the entry block ?");
-    BB = Node->getBlock();
-
-    SILValue Def = getDefinitionForValue(PhiBlocks, BB);
-    if (!Def)
-      Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
+    SILValue Def = getLiveInValue(PhiBlocks, BB);
     DEBUG(llvm::dbgs() << "*** Replacing " << *LI << " with Def " << *Def);
 
     // Replace the load with the definition that we found.
