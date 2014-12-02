@@ -99,6 +99,17 @@ namespace swift {
   /// where there is no common root class. rdar://problem/18987058
   const ClassMetadata *getRootSuperclass();
   
+  /// Replace entries of a freshly-instantiated value witness table with more
+  /// efficient common implementations where applicable.
+  ///
+  /// For instance, if the value witness table represents a POD type, this will
+  /// insert POD value witnesses into the table. The vwtable's flags must have
+  /// been initialized before calling this function.
+  ///
+  /// Returns true if common value witnesses were used, false otherwise.
+  void installCommonValueWitnesses(ValueWitnessTable *vwtable);
+
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

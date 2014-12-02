@@ -1217,7 +1217,7 @@ static OpaqueValue *pod_direct_initializeArrayWithTakeFrontToBack(
 #define pod_indirect_initializeArrayWithTakeBackToFront \
   pod_direct_initializeArrayWithTakeFrontToBack
 
-void swift::swift_installCommonValueWitnesses(ValueWitnessTable *vwtable) {
+void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
   auto flags = vwtable->flags;
   if (flags.isPOD()) {
     // Use POD value witnesses.
@@ -1230,6 +1230,7 @@ void swift::swift_installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_INDIRECT_WITNESS)
 #undef INSTALL_POD_INDIRECT_WITNESS
     }
+    return;
   }
   
   if (vwtable->flags.isBitwiseTakable()) {
@@ -1251,9 +1252,16 @@ void swift::swift_installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       vwtable->initializeArrayWithTakeBackToFront
         = pod_indirect_initializeArrayWithTakeBackToFront;
     }
+    return;
   }
-  
-  return;
+
+  if (!vwtable->flags.isInlineStorage()) {
+    // For values stored out-of-line, initializeBufferWithTakeOfBuffer is
+    // always a memcpy.
+    vwtable->initializeBufferWithTakeOfBuffer
+      = pod_indirect_initializeBufferWithTakeOfBuffer;
+    return;
+  }
 }
 
 /*** Structs ***************************************************************/
@@ -1275,7 +1283,7 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   vwtable->stride = layout.stride;
   
   // Substitute in better value witnesses if we have them.
-  swift_installCommonValueWitnesses(vwtable);
+  installCommonValueWitnesses(vwtable);
 
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.

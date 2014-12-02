@@ -18,6 +18,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
+#include "Private.h"
 #include <cstring>
 #include <algorithm>
 
@@ -73,7 +74,22 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   vwtable->stride = llvm::RoundUpToAlignment(size, align);
   
   // Substitute in better common value witnesses if we have them.
-  swift_installCommonValueWitnesses(vwtable);
+  // If the payload type is a single-refcounted pointer, and the enum has
+  // a single empty case, then we can borrow the witnesses of the single
+  // refcounted pointer type, since swift_retain and objc_retain are both
+  // nil-aware. Most single-refcounted types will use the standard
+  // value witness tables for NativeObject or UnknownObject. This isn't
+  // foolproof but should catch the common case of optional class types.
+  auto payloadVWT = payload->getValueWitnesses();
+  if (emptyCases == 1
+      && (payloadVWT == &_TWVBo
+          || payloadVWT == &_TWVBO)) {
+#define COPY_PAYLOAD_WITNESS(NAME) vwtable->NAME = payloadVWT->NAME;
+    FOR_ALL_FUNCTION_VALUE_WITNESSES(COPY_PAYLOAD_WITNESS)
+#undef COPY_PAYLOAD_WITNESS
+  } else {
+    installCommonValueWitnesses(vwtable);
+  }
                        
   // If the payload has extra inhabitants left over after the ones we used,
   // forward them as our own.
