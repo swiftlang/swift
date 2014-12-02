@@ -655,7 +655,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if ((OI.DebugInfoKind > IRGenDebugInfoKind::None && OI.shouldLink()) ||
+  } else if ((OI.DebugInfoKind == IRGenDebugInfoKind::Normal &&
+              OI.shouldLink()) ||
              Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path)) {
     // An option has been passed which requires a module, but the user hasn't
@@ -884,7 +885,7 @@ void Driver::buildActions(const ToolChain &TC,
       // LinkJobAction. It shares inputs with the LinkAction, so tell it that it
       // no longer owns its inputs.
       MergeModuleAction->setOwnsInputs(false);
-      if (OI.DebugInfoKind > IRGenDebugInfoKind::None)
+      if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal)
         LinkAction->addInput(MergeModuleAction.release());
       else
         Actions.push_back(MergeModuleAction.release());

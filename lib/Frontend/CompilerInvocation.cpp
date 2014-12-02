@@ -911,17 +911,17 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
       Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+    else
+      assert(A->getOption().matches(options::OPT_gnone) &&
+             "unknown -g<kind> option");
 
-    if (Opts.DebugInfoKind > IRGenDebugInfoKind::None) {
+    if (Opts.DebugInfoKind == IRGenDebugInfoKind::Normal) {
       ArgStringList RenderedArgs;
       for (auto A : Args)
         A->render(Args, RenderedArgs);
       CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
                                                RenderedArgs, SDKPath,
                                                ResourceDir);
-    } else {
-      assert(A->getOption().matches(options::OPT_gnone) &&
-             "unknown -g<kind> option");
     }
   }
 

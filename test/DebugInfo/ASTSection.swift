@@ -10,6 +10,10 @@
 // RUN: rm %t/serialized-objc-header.h
 // RUN: lldb-moduleimport-test %t/ASTSection-with-ObjC | FileCheck %s
 
+// RUN: %target-build-swift -emit-executable %s -gline-tables-only -o %t/ASTSection -emit-module
+// RUN: lldb-moduleimport-test %t/ASTSection | FileCheck %s --allow-empty --check-prefix=LINETABLE-CHECK
+
+
 // REQUIRES: ld-add_ast_path
 
 // FIXME: lldb-moduleimport-test does not support 32-bit executables
@@ -34,4 +38,5 @@ func objCUser(obj: ObjCClass) {}
 #endif
 
 // CHECK: Importing ASTSection... ok!
+// LINETABLE-CHECK-NOT: Importing ASTSection... ok!
 
