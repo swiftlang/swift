@@ -1146,11 +1146,6 @@ SILCombiner::propagateExistential(ApplyInst *AI,
   // Find the conformance related to witness_method
   for (auto Conformance : Conformances) {
     if (Conformance->getProtocol() == WMI->getLookupProtocol()) {
-
-      // Inherited protocol conformances are not supported yet.
-      if (isa<InheritedProtocolConformance>(Conformance))
-        return nullptr;
-
       SmallVector<SILValue, 8> Args;
       for (auto Arg : AI->getArgumentsWithoutSelf()) {
         Args.push_back(Arg);

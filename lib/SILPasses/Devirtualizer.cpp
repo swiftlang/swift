@@ -272,6 +272,10 @@ class WitnessMethodDevirtualizer {
   /// If we needed to change Self, this field contains the modified self.
   Optional<SILValue> Self;
 
+  /// If we needed to change arguments (e.g. because we need to upcast them),
+  // this field contains the modified arguments.
+  Optional<SmallVector<SILValue, 4>> Arguments;
+
   /// If we needed to modify the subst callee type of the function, this is the
   /// new subst callee type.
   Optional<SILType> SubstCalleeSILType;
@@ -284,7 +288,7 @@ public:
   WitnessMethodDevirtualizer(ApplyInst *AI, WitnessMethodInst *WMI,
                              ProtocolConformance *C, SILFunction *F,
                              ArrayRef<Substitution> Subs, SILWitnessTable *WT)
-      : AI(AI), WMI(WMI), C(C), F(F), Subs(Subs), WT(WT), Self(),
+      : AI(AI), WMI(WMI), C(C), F(F), Subs(Subs), WT(WT), Self(), Arguments(),
         SubstCalleeSILType(), ResultSILType() {}
 
   /// Main entry point.
@@ -311,7 +315,7 @@ bool WitnessMethodDevirtualizer::devirtualize() {
   /// If we dont and do not have any substitutions, we must then have a pure
   /// inherited protocol conformance.
   if (Subs.empty()) {
-#if 1
+#if 0
     // Disable inherited protocol conformance for seed 5.
     return false;
 #else
@@ -347,8 +351,13 @@ bool WitnessMethodDevirtualizer::processNormalProtocolConformance(
   SmallVector<SILValue, 4> Args;
 
   // First add the non self arguments to the new argument list.
-  for (SILValue A : AI->getArgumentsWithoutSelf())
-    Args.push_back(A);
+  if (!Arguments) {
+    for (SILValue A : AI->getArgumentsWithoutSelf())
+      Args.push_back(A);
+  } else {
+    for (SILValue A : *Arguments)
+      Args.push_back(A);
+  }
 
   // Then add the self argument since the self argument is always last.
   if (!Self)
@@ -393,6 +402,25 @@ bool WitnessMethodDevirtualizer::processNormalProtocolConformance(
   return true;
 }
 
+static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
+  SILType ArgTy = Arg.getType();
+  if (dyn_cast<MetatypeInst>(Arg) || dyn_cast<ValueMetatypeInst>(Arg)) {
+    // In case of metatypes passed as parameters, we need to upcast to a
+    // metatype of a superclass.
+    auto &Module = AI->getModule();
+    assert(SuperTy.isSuperclassOf(ArgTy.getMetatypeInstanceType(Module)) &&
+           "Should only create upcasts for sub class devirtualization.");
+    SuperTy = Lowering::TypeConverter(Module).getLoweredLoadableType(
+        SuperTy.getClassOrBoundGenericClass()->getType());
+  } else {
+    assert(SuperTy.isSuperclassOf(ArgTy) &&
+           "Should only create upcasts for sub class devirtualization.");
+  }
+
+  Arg = SILBuilderWithScope<1>(AI).createUpcast(AI->getLoc(), Arg, SuperTy);
+  return Arg;
+}
+
 bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   // Since we do not need to worry about substitutions, we can just insert an
   // upcast of self to the appropriate type.
@@ -402,9 +430,7 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   SILType SelfTy = Self->getType();
   (void)SelfTy;
 
-  assert(SILTy.isSuperclassOf(SelfTy) &&
-         "Should only create upcasts for sub class devirtualization.");
-  Self = SILBuilderWithScope<1>(AI).createUpcast(AI->getLoc(), *Self, SILTy);
+  Self = upcastArgument(Self.getValue(), SILTy, AI);
 
   SmallVector<Substitution, 16> SelfDerivedSubstitutions;
   for (auto &origSub : AI->getSubstitutions())
@@ -435,6 +461,25 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
       ArrayRef<Substitution>(NewSelfSub));
 
   SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
+
+  // Collect arguments from the apply instruction.
+  Arguments = SmallVector<SILValue, 4>();
+
+  auto CanCalleeSILType = SubstCalleeSILType->getSwiftRValueType();
+  SILFunctionType *FT = dyn_cast<SILFunctionType>(CanCalleeSILType);
+  auto ParamTypes = FT->getParameterSILTypes();
+  // Type of the current parameter being processed
+  auto ParamType = ParamTypes.begin();
+  // Iterate over the non self arguments and add them to the
+  // new argument list, upcasting when required.
+  for (SILValue A : AI->getArgumentsWithoutSelf()) {
+    if (A.getType() != *ParamType) {
+      // Upcast argument
+      A = upcastArgument(A, *ParamType, AI);
+    }
+    Arguments->push_back(A);
+    ++ParamType;
+  }
 
   // Then pass of our new self to the normal protocol conformance witness method
   // handling code.
