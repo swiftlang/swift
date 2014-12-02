@@ -30,6 +30,8 @@
 
 namespace swift {
 
+class AliasAnalysis;
+
 /// This is the worklist management logic for SILCombine.
 class SILCombineWorklist {
   llvm::SmallVector<SILInstruction *, 256> Worklist;
@@ -111,6 +113,8 @@ public:
 class SILCombiner :
     public SILInstructionVisitor<SILCombiner, SILInstruction *> {
 
+  AliasAnalysis *AA;
+
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
 
@@ -132,8 +136,9 @@ class SILCombiner :
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
 
 public:
-  SILCombiner(bool removeCondFails) : Worklist(), MadeChange(false),
-      RemoveCondFails(removeCondFails), Iteration(0), Builder(0) { }
+  SILCombiner(AliasAnalysis *AA, bool removeCondFails)
+    : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
+      Iteration(0), Builder(0) { }
 
   bool runOnFunction(SILFunction &F);
 

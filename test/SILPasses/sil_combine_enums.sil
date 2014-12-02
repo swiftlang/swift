@@ -120,3 +120,25 @@ bb0(%0 : $*G<T>):
   return %6 : $Int
 }
 
+// CHECK-LABEL: sil @canonicalize_init_enum_data_addr
+// CHECK-NOT: init_enum_data_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK: enum $Optional<Int>, #Optional.Some!enumelt.1
+// CHECK-NOT: inject_enum_addr
+// CHECK: return
+sil @canonicalize_init_enum_data_addr : $@thin (@inout Int, Builtin.Word) -> Int {
+bb0(%0 : $*Int, %1 : $Builtin.Word):
+  %s1 = alloc_stack $Optional<Int>
+  %e1 = init_enum_data_addr %s1#1 : $*Optional<Int>, #Optional.Some!enumelt.1
+  %v = load %0 : $*Int
+  store %v to %e1 : $*Int
+  %i1 = integer_literal $Builtin.Word, 1
+  %i0 = integer_literal $Builtin.Int1, 0
+  %a = builtin "sadd_with_overflow_Word"(%1 : $Builtin.Word, %i1 : $Builtin.Word, %i0 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Word, Builtin.Int1), 0
+  %i = struct $Int (%w : $Builtin.Word)
+  store %i to %0 : $*Int
+  inject_enum_addr %s1#1 : $*Optional<Int>, #Optional.Some!enumelt.1
+  dealloc_stack %s1#0 : $*@local_storage Optional<Int>
+  return %i : $Int
+}

@@ -23,6 +23,7 @@
 #include "SILCombiner.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -322,7 +323,8 @@ class SILCombine : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
-    SILCombiner Combiner(getOptions().RemoveRuntimeAsserts);
+    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    SILCombiner Combiner(AA, getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
