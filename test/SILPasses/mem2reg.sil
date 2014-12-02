@@ -140,3 +140,15 @@ bb0(%0 : $Int64):
   return %21 : $()                                // id: %22
 }
 
+// CHECK-LABEL: sil @load_uninitialized_empty
+// CHECK-NOT: load
+// CHECK: return
+sil @load_uninitialized_empty : $@thin (@inout ()) -> () {
+bb0(%0 : $*()):
+  %1 = alloc_stack $()
+  %2 = load %1#1 : $*()
+  store %2 to %0 : $*()
+  dealloc_stack %1#0 : $*@local_storage ()
+  %3 = tuple ()
+  return %3 : $()
+}

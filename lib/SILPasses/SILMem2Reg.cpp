@@ -313,8 +313,11 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     // with our running value.
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
       if (LI->getOperand().getDef() == ASI) {
-        assert(RunningVal.isValid() &&
-               "The AllocStack must be initialized before usage.");
+        if (!RunningVal.isValid()) {
+          assert(ASI->getElementType().isVoid() &&
+                 "Expected initialization of non-void type!");
+          RunningVal = SILUndef::get(ASI->getElementType(), ASI->getModule());
+        }
         SILValue(Inst, 0).replaceAllUsesWith(RunningVal);
         Inst->eraseFromParent();
         NumInstRemoved++;

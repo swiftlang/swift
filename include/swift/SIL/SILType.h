@@ -198,6 +198,10 @@ public:
   template<typename TYPE>
   bool is() const { return isa<TYPE>(getSwiftRValueType()); }
 
+  bool isVoid() const {
+    return value.getPointer()->isVoid();
+  }
+
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
   ClassDecl *getClassOrBoundGenericClass() const {
