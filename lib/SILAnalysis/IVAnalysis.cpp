@@ -68,9 +68,8 @@ SILArgument *IVInfo::isInductionSequence(SCCType &SCC) {
     }
 
     case ValueKind::TupleExtractInst: {
-      auto *TEI = cast<TupleExtractInst>(I);
-      if (!inSCC(TEI->getOperand().getDef(), SCC))
-        return nullptr;
+      assert(inSCC(cast<TupleExtractInst>(I)->getOperand().getDef(), SCC) &&
+             "TupleExtract operand not an induction var");
       break;
     }
 
