@@ -2966,7 +2966,7 @@ open_existential_ref
   // existential type P. 
   // %1 will be of type $P
 
-Extracts the class instance refernece from a class existential
+Extracts the class instance reference from a class existential
 container. The protocol conformances associated with this existential
 container are associated directly with the archetype ``@opened P``. This 
 pointer can be used with any operation on archetypes, such as 
