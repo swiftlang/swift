@@ -860,10 +860,10 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
 /// This helps the devirtualizer to replace witness_method by
 /// class_method instructions and then devirtualize.
 SILInstruction *
-SILCombiner::propagateExistential(ApplyInst *AI,
-                                  WitnessMethodInst *WMI,
-                                  SILValue InitExistential,
-                                  SILType InstanceType) {
+SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
+                                                    WitnessMethodInst *WMI,
+                                                    SILValue InitExistential,
+                                                    SILType InstanceType) {
   // Replace this witness_method by a more concrete one
   ArrayRef<ProtocolConformance*> Conformances;
   CanType LookupType;
@@ -1043,7 +1043,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
           // inside the same BB.
           if (IE->getParent() != AI->getParent())
             continue;
-          return propagateExistential(AI, WMI, IE, Instance->getType());
+          return propagateConcreteTypeOfInitExistential(AI, WMI, IE,
+                                                        Instance->getType());
         }
       }
     }
@@ -1055,7 +1056,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         // and only allow this optimization when it is used
         // inside the same BB.
         if (IE->getParent() == AI->getParent())
-          return propagateExistential(AI, WMI, IE, Instance->getType());
+          return propagateConcreteTypeOfInitExistential(AI, WMI, IE,
+                                                        Instance->getType());
       }
     }
   }
