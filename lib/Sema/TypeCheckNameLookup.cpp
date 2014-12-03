@@ -31,12 +31,15 @@ void LookupResult::filter(const std::function<bool(ValueDecl *)> &pred) {
 
 LookupResult TypeChecker::lookupMember(Type type, DeclName name,
                                        DeclContext *dc,
+                                       bool isKnownPrivate,
                                        bool allowDynamicLookup) {
   LookupResult result;
   unsigned options = NL_QualifiedDefault;
+  if (isKnownPrivate)
+    options |= NL_KnownPrivateDependency;
   if (allowDynamicLookup)
-    options = options | NL_DynamicLookup;
-  
+    options |= NL_DynamicLookup;
+
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
 
@@ -187,6 +190,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
 }
 
 LookupResult TypeChecker::lookupConstructors(Type type, DeclContext *dc) {
-  return lookupMember(type, Context.Id_init,
-                      dc, /*allowDynamicLookup=*/false);
+  // FIXME: Support isKnownPrivate flag.
+  return lookupMember(type, Context.Id_init, dc, /*isKnownPrivate=*/false,
+                      /*allowDynamicLookup=*/false);
 }

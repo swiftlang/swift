@@ -132,6 +132,8 @@ func lookUpManyTopLevelNames() {
 
   let _ = .Value as OtherFileEnumWrapper.Enum
   let _: OtherFileEnumWrapper.Enum = .Value
+  let _ = OtherFileEnumWrapper.Enum.Value
+
   let _ = { (_: PrivateTopLevelStruct.ValueType) -> PrivateTopLevelStruct2.ValueType? in
     return nil
   }
@@ -240,10 +242,10 @@ private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 // CHECK-DAG: "Si"
 // CHECK-DAG: - "PSs23FloatLiteralConvertible"
 // CHECK-DAG: !private "PSs31UnicodeScalarLiteralConvertible"
-// CHECK-DAG: "PSs10Strideable"
-// CHECK-DAG: "V4main18OtherFileOuterType"
-// CHECK-DAG: "VV4main18OtherFileOuterType9InnerType"
-// CHECK-DAG: "VV4main26OtherFileSecretTypeWrapper10SecretType"
+// CHECK-DAG: !private "PSs10Strideable"
+// CHECK-DAG: !private "V4main18OtherFileOuterType"
+// CHECK-DAG: !private "VV4main18OtherFileOuterType9InnerType"
+// CHECK-DAG: !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
 // CHECK-DAG: "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "VSs17IndexingGenerator"

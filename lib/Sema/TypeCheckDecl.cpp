@@ -5573,6 +5573,7 @@ public:
   retry:
     LookupResult members = TC.lookupMember(superclassMetaTy, name,
                                            decl->getDeclContext(),
+                                           /*isKnownPrivate=*/false,
                                            /*allowDynamicLookup=*/false);
 
     typedef std::tuple<ValueDecl *, bool, Type> MatchType;

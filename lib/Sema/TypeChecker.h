@@ -996,10 +996,13 @@ public:
   /// \param type The type in which we will look for a member.
   /// \param name The name of the member to look for.
   /// \param dc The context that needs the member.
+  /// \param isKnownPrivate If true, this lookup is counted as a private
+  /// dependency.
   /// \param allowDynamicLookup Whether to allow dynamic lookup.
   ///
   /// \returns The result of name lookup.
   LookupResult lookupMember(Type type, DeclName name, DeclContext *dc,
+                            bool isKnownPrivate = false,
                             bool allowDynamicLookup = true);
 
   /// \brief Look up a member type within the given type.
@@ -1011,7 +1014,7 @@ public:
   /// \param name The name of the member to look for.
   /// \param dc The context that needs the member.
   /// \param isKnownPrivate If true, this lookup is counted as a private
-  /// dependency
+  /// dependency.
   ///
   /// \returns The result of name lookup.
   LookupTypeResult lookupMemberType(Type type, Identifier name,

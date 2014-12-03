@@ -102,7 +102,7 @@ Type TypeChecker::getNSObjectType(DeclContext *dc) {
     return nullptr;
 
   if (auto result = lookupMember(ModuleType::get(module), Context.Id_NSObject,
-                                 dc)) {
+                                 dc, /*knownPrivate=*/true)) {
     for (auto decl : result) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         NSObjectType = nominal->getDeclaredType();

@@ -199,7 +199,8 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
 
   // Lookup the member.
   MemberLookups[{base, name}] = None;
-  auto lookup = TC.lookupMember(base, name, DC);
+  auto lookup = TC.lookupMember(base, name, DC,
+                                /*knownPrivate=*/isa<AbstractFunctionDecl>(DC));
   auto &result = MemberLookups[{base, name}];
   result = std::move(lookup);
 
