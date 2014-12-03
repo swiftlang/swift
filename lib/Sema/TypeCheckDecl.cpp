@@ -6310,6 +6310,7 @@ public:
     }
     
     if (!IsFirstPass) {
+      computeDefaultAccessibility(TC, ED);
       checkExplicitConformance(ED, ED->getExtendedType());
       checkObjCConformances(ED->getProtocols(), ED->getConformances());
     }

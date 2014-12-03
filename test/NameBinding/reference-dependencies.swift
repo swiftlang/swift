@@ -238,6 +238,11 @@ private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelS
   return x
 }
 
+// Deliberately empty.
+private struct PrivateTy6 {}
+// CHECK-DAG: - "PrivateProto3"
+extension PrivateTy6 : PrivateProto3 {}
+
 
 // CHECK-LABEL: {{^member-access:$}}
 // CHECK-DAG: "V4main10IntWrapper"
@@ -272,6 +277,7 @@ private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelS
 // CHECK-DAG: - "P4main14TopLevelProto2"
 // CHECK-DAG: !private "P4main13PrivateProto1"
 // CHECK-DAG: !private "P4main13PrivateProto2"
+// CHECK-DAG: !private "P4main13PrivateProto3"
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
