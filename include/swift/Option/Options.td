@@ -329,10 +329,14 @@ def deprecated_integrated_repl : Flag<["-"], "deprecated-integrated-repl">,
   Flags<[FrontendOption, NoBatchOption]>, ModeOpt;
 def i : Flag<["-"], "i">, ModeOpt; // only used to provide diagnostics.
 
+def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
+  HelpText<"Optimize input files together instead of individually">,
+  Flags<[FrontendOption, NoInteractiveOption]>;
+
 def force_single_frontend_invocation :
   Flag<["-"], "force-single-frontend-invocation">,
-  HelpText<"Compile the module using a single frontend invocation">,
-  Flags<[HelpHidden]>;
+  Alias<whole_module_optimization>,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
 
 def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;

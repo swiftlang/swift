@@ -51,6 +51,10 @@ const TypeToPathMap *OutputFileMap::getOutputMapForInput(StringRef Input) const{
     return &iter->second;
 }
 
+const TypeToPathMap *OutputFileMap::getOutputMapForSingleOutput() const {
+  return getOutputMapForInput(StringRef());
+}
+
 void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   typedef std::pair<types::ID, std::string> TypePathPair;
 

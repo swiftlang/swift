@@ -561,7 +561,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   } else { // DriverKind::Batch
     OI.CompilerMode = OutputInfo::Mode::StandardCompile;
-    if (Args.hasArg(options::OPT_force_single_frontend_invocation))
+    if (Args.hasArg(options::OPT_whole_module_optimization))
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
     OI.CompilerOutputType = types::TY_Object;
   }
@@ -1252,9 +1252,13 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
   }
 
   const TypeToPathMap *OutputMap = nullptr;
-  if (OFM && isa<CompileJobAction>(JA) &&
-      OI.CompilerMode != OutputInfo::Mode::SingleCompile)
-    OutputMap = OFM->getOutputMapForInput(BaseInput);
+  if (OFM && isa<CompileJobAction>(JA)) {
+    if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+      OutputMap = OFM->getOutputMapForSingleOutput();
+    } else {
+      OutputMap = OFM->getOutputMapForInput(BaseInput);
+    }
+  }
 
   llvm::SmallString<128> Buf;
   StringRef OutputFile = getOutputFilename(JA, OI, OutputMap, C.getArgs(),

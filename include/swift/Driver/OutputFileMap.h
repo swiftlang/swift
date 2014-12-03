@@ -52,6 +52,9 @@ public:
   /// OutputFileMap. (If not present, returns nullptr.)
   const TypeToPathMap *getOutputMapForInput(StringRef Input) const;
 
+  /// Get the map of outputs for a single compile product.
+  const TypeToPathMap *getOutputMapForSingleOutput() const;
+
   /// Dump the OutputFileMap to the given \p os.
   void dump(llvm::raw_ostream &os, bool Sort = false) const;
 
