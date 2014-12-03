@@ -532,6 +532,14 @@ int main(int argc, char **argv) {
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().EnableAccessControl = false;
+  // Setup the SIL Options.
+  SILOptions &SILOpts = Invocation.getSILOptions();
+  SILOpts.InlineThreshold = SILInlineThreshold;
+  SILOpts.DevirtThreshold = SILDevirtThreshold;
+  SILOpts.VerifyAll = EnableSILVerifyAll;
+  SILOpts.PrintAll = EnableSILPrintAll;
+  SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
+  SILOpts.AssertConfig = AssertConfId;
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -586,14 +594,6 @@ int main(int argc, char **argv) {
   // SourceMgr.
   if (VerifyMode)
     enableDiagnosticVerifier(CI.getSourceMgr());
-
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  SILOpts.InlineThreshold = SILInlineThreshold;
-  SILOpts.DevirtThreshold = SILDevirtThreshold;
-  SILOpts.VerifyAll = EnableSILVerifyAll;
-  SILOpts.PrintAll = EnableSILPrintAll;
-  SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
-  SILOpts.AssertConfig = AssertConfId;
 
   if (OptimizationGroup == OptGroup::Diagnostics) {
     runSILDiagnosticPasses(*CI.getSILModule());
