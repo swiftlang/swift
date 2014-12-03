@@ -739,7 +739,7 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
   llvm::SmallVector<WorklistEntry, 32> Worklist;
 
   // Start our worklist with NewBase and Root.
-  Worklist.push_back({getRoot(), NewBase});
+  Worklist.push_back(std::make_tuple(getRoot(), NewBase));
 
   // Then until our worklist is clear...
   while (Worklist.size()) {
@@ -761,7 +761,7 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
         const ProjectionTreeNode *ChildNode = getNode(ChildIdx);
         SILInstruction *I = ChildNode->createProjection(B, Loc, V).get();
         DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType(0) << ": " << *I);
-        Worklist.push_back({ChildNode, SILValue(I)});
+        Worklist.push_back(std::make_tuple(ChildNode, SILValue(I)));
       }
     } else {
       // Otherwise, we have a leaf node. If the leaf node is not alive, do not
