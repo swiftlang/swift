@@ -99,7 +99,8 @@ static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
 ///  %44 = pointer_to_address %43
 ///  store %1 to %44 : $*Int
 static bool isArrayEltStore(StoreInst *SI) {
-  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(SI->getDest()))
+  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(
+          SI->getDest().stripAddressProjections()))
     if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
       ArraySemanticsCall Call(SEI->getOperand().getDef());
       if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
