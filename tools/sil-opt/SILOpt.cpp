@@ -334,9 +334,8 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
                llvm::cl::init(false),
                llvm::cl::desc("Do not dump AST."));
 
-static void runCommandLineSelectedPasses(SILModule *Module,
-                                         const SILOptions &Options) {
-  SILPassManager PM(Module, Options);
+static void runCommandLineSelectedPasses(SILModule *Module) {
+  SILPassManager PM(Module);
 
   PM.registerAnalysis(createCallGraphAnalysis(Module));
   PM.registerAnalysis(createAliasAnalysis(Module));
@@ -597,11 +596,11 @@ int main(int argc, char **argv) {
   SILOpts.AssertConfig = AssertConfId;
 
   if (OptimizationGroup == OptGroup::Diagnostics) {
-    runSILDiagnosticPasses(*CI.getSILModule(), SILOpts);
+    runSILDiagnosticPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Performance) {
-    runSILOptimizationPasses(*CI.getSILModule(), SILOpts);
+    runSILOptimizationPasses(*CI.getSILModule());
   } else {
-    runCommandLineSelectedPasses(CI.getSILModule(), SILOpts);
+    runCommandLineSelectedPasses(CI.getSILModule());
   }
 
   std::error_code EC;

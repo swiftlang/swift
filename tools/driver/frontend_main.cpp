@@ -348,7 +348,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Perform "stable" optimizations that are invariant across compiler versions.
   if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses &&
-      runSILDiagnosticPasses(*SM, Invocation.getSILOptions()))
+      runSILDiagnosticPasses(*SM))
     return true;
 
   // Now if we are asked to link all, link all.
@@ -361,7 +361,7 @@ static bool performCompile(CompilerInstance &Instance,
   // These may change across compiler versions.
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   if (IRGenOpts.Optimize) {
-    runSILOptimizationPasses(*SM, Invocation.getSILOptions());
+    runSILOptimizationPasses(*SM);
     SM->verify();
   }
 

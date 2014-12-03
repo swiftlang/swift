@@ -32,6 +32,8 @@ llvm::cl::opt<std::string>
 bool SILPassManager::
 runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
+  const SILOptions &Options = getOptions();
+
   for (auto &F : *Mod) {
     if (F.empty() || CompleteFuncs->isComplete(&F))
       continue;
@@ -80,6 +82,8 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 }
 
 void SILPassManager::runOneIteration() {
+  const SILOptions &Options = getOptions();
+
   DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
   if (Options.PrintAll && NumOptimizationIterations == 0) {
     if (SILPrintOnlyFun.empty()) {
@@ -169,6 +173,7 @@ void SILPassManager::runOneIteration() {
 }
 
 void SILPassManager::run() {
+  const SILOptions &Options = getOptions();
   if (Options.PrintAll) {
     if (SILPrintOnlyFun.empty()) {
       llvm::dbgs() << "*** SIL module before transformation ("
@@ -215,4 +220,8 @@ void SILPassManager::resetAndRemoveTransformations() {
   anotherIteration = false;
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
   CompleteFuncs->reset();
+}
+
+const SILOptions &SILPassManager::getOptions() const {
+  return Mod->getOptions();
 }

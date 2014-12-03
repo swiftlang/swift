@@ -56,7 +56,7 @@ namespace swift {
     template<typename T>
     T* getAnalysis() { return PM->getAnalysis<T>(); }
 
-    SILOptions &getOptions() { return PM->getOptions(); }
+    const SILOptions &getOptions() { return PM->getOptions(); }
   };
 
   /// A transformation that operates on functions.

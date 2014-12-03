@@ -329,7 +329,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     std::unique_ptr<SILModule> SILMod = performSILGeneration(import,
                                                              CI.getSILOptions());
     performSILLinking(SILMod.get());
-    if (runSILDiagnosticPasses(*SILMod, SILOpts)) {
+    if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;
       break;
     }
@@ -1064,7 +1064,7 @@ private:
       sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
                                  RC.CurIRGenElem);
       performSILLinking(sil.get());
-      runSILDiagnosticPasses(*sil, SILOpts);
+      runSILDiagnosticPasses(*sil);
     }
 
     if (CI.getASTContext().hadError()) {

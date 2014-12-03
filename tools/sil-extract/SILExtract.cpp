@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
   }
 
   // Remove dead functions.
-  SILPassManager PM(M, SILOptions());
+  SILPassManager PM(M);
   PM.registerAnalysis(createCallGraphAnalysis(M));
   PM.add(createDeadFunctionElimination());
   PM.run();

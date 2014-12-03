@@ -27,7 +27,6 @@
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -59,8 +58,7 @@ static void registerAnalysisPasses(SILPassManager &PM) {
   PM.registerAnalysis(createDestructorAnalysis(Mod));
 }
 
-bool swift::runSILDiagnosticPasses(SILModule &Module,
-                                   const SILOptions &Options) {
+bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // If we parsed a .sil file that is already in canonical form, don't rerun
   // the diagnostic passes.
   if (Module.getStage() == SILStage::Canonical)
@@ -68,13 +66,13 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
   auto &Ctx = Module.getASTContext();
 
-  SILPassManager PM(&Module, Options);
+  SILPassManager PM(&Module);
   registerAnalysisPasses(PM);
   // If we are asked do debug serialization, instead of running all diagnostic
   // passes, just run mandatory inlining with dead transparent function cleanup
   // disabled.
   PM.add(createMandatoryInlining());
-  if (Options.DebugSerialization) {
+  if (Module.getOptions().DebugSerialization) {
     PM.run();
     return Ctx.hadError();
   }
@@ -190,17 +188,16 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 }
 
 
-void swift::runSILOptimizationPasses(SILModule &Module,
-                                     const SILOptions &Options) {
-  if (Options.DebugSerialization) {
-    SILPassManager PM(&Module, Options);
+void swift::runSILOptimizationPasses(SILModule &Module) {
+  if (Module.getOptions().DebugSerialization) {
+    SILPassManager PM(&Module);
     registerAnalysisPasses(PM);
     PM.add(createSILLinker());
     PM.run();
     return;
   }
 
-  SILPassManager PM(&Module, Options);
+  SILPassManager PM(&Module);
   registerAnalysisPasses(PM);
 
   // Start by specializing generics and by cloning functions from stdlib.
@@ -255,7 +252,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
   // optimizer after this.
-  if (Options.EnableFuncSigOpts)
+  if (Module.getOptions().EnableFuncSigOpts)
     PM.add(createFunctionSignatureOpts());
 
   PM.run();
@@ -273,8 +270,8 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   PM.runOneIteration();
 
   // Gather instruction counts if we are asked to do so.
-  if (Options.PrintInstCounts) {
-    SILPassManager PrinterPM(&Module, Options);
+  if (Module.getOptions().PrintInstCounts) {
+    SILPassManager PrinterPM(&Module);
     PrinterPM.add(createSILInstCount());
     PrinterPM.runOneIteration();
   }
