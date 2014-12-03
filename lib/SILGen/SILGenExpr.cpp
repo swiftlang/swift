@@ -6109,6 +6109,11 @@ public:
     return std::unique_ptr<LogicalPathComponent>(
       new AutoreleasingWritebackComponent(getTypeData()));
   }
+
+  AccessKind getBaseAccessKind(SILGenFunction &gen,
+                               AccessKind kind) const override {
+    return kind;
+  }
   
   void set(SILGenFunction &gen, SILLocation loc,
            RValue &&value, ManagedValue base) && override {

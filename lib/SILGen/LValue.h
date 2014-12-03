@@ -12,6 +12,10 @@
 //
 // A storage structure for keeping track of logical lvalues during SILGen.
 //
+// In general, only the routines in SILGenLValue.cpp should actually be
+// accessing LValues and their components.  Everything else should just
+// pass them around opaquely.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_LOWERING_LVALUE_H
@@ -114,6 +118,11 @@ public:
 
   LogicalPathComponent &asLogical();
   const LogicalPathComponent &asLogical() const;
+
+  /// Return the appropriate access kind to use when producing the
+  /// base value.
+  virtual AccessKind getBaseAccessKind(SILGenFunction &SGF,
+                                       AccessKind accessKind) const = 0;
   
   /// Returns the logical type-as-rvalue of the value addressed by the
   /// component.
@@ -144,10 +153,18 @@ protected:
   }
 
 public:
+  /// Derive the address of this component given the address of the base.
+  ///
+  /// \param base - always an address, but possibly an r-value
   virtual ManagedValue offset(SILGenFunction &gen,
                               SILLocation loc,
                               ManagedValue base,
                               AccessKind accessKind) && = 0;
+
+  AccessKind getBaseAccessKind(SILGenFunction &gen,
+                               AccessKind accessKind) const override {
+    return accessKind;
+  }
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -177,10 +194,14 @@ public:
   clone(SILGenFunction &gen, SILLocation l) const = 0;
   
   /// Set the property.
+  ///
+  /// \param base - always an address, but possibly an r-value
   virtual void set(SILGenFunction &gen, SILLocation loc,
                    RValue &&value, ManagedValue base) && = 0;
 
   /// Get the property.
+  ///
+  /// \param base - always an address, but possibly an r-value
   virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,
                            ManagedValue base, SGFContext c) && = 0;
 
@@ -193,13 +214,18 @@ public:
                                          SILGenFunction &gen) = 0;
 
 
-  /// Get the property, materialize a temporary lvalue for it, and if
-  /// we're in a writeback scope, register a writeback.  This returns the
-  /// address of the buffer.
-  virtual SILValue getMaterialized(SILGenFunction &gen, SILLocation loc,
-                                   ManagedValue base) &&;
+  /// Materialize the storage into memory.  If the access is for
+  /// mutation, ensure that modifications to the memory will
+  /// eventually be reflected in the original storage.
+  ///
+  /// \param base - always an address, but possibly an r-value
+  virtual ManagedValue getMaterialized(SILGenFunction &gen, SILLocation loc,
+                                       ManagedValue base,
+                                       AccessKind accessKind) &&;
 
   /// Perform a writeback on the property.
+  ///
+  /// \param base - always an address, but possibly an r-value
   virtual void writeback(SILGenFunction &gen, SILLocation loc,
                          ManagedValue base, Materialize temporary,
                          SILValue otherInfo) &&;
