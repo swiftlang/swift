@@ -438,7 +438,7 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
     DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
   }
   DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
-  return SILValue();
+  return SILUndef::get(ASI->getElementType(), ASI->getModule());
 }
 
 SILValue
@@ -461,11 +461,7 @@ StackAllocationPromoter::getLiveInValue(BlockSet &PhiBlocks,
   assert(IDom &&
          "Attempt to get live-in value for alloc_stack in entry block!");
 
-  SILValue Def = getLiveOutValue(PhiBlocks, IDom->getBlock());
-  if (Def)
-    return Def;
-
-  return SILUndef::get(ASI->getElementType(), ASI->getModule());
+  return getLiveOutValue(PhiBlocks, IDom->getBlock());
 }
 
 void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
@@ -475,8 +471,6 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
   DEBUG(llvm::dbgs() << "*** Fixing the terminator " << TI << ".\n");
 
   SILValue Def = getLiveOutValue(PhiBlocks, Pred);
-  if (!Def)
-    Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
 
   DEBUG(llvm::dbgs() << "*** Found the definition: " << *Def);
 
