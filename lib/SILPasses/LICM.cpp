@@ -217,6 +217,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
     return false;
   }
 
+  bool Changed = false;
   // Traverse the dominator tree starting at the loop header. Hoisting
   // instructions as we go.
   auto DTRoot = DT->getNode(HeaderBB);
@@ -278,13 +279,14 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
         continue;
       }
 
+      Changed = true;
       Inst->moveBefore(Preheader->getTerminator());
     }
 
     // Next block in dominator tree.
     ++It;
   }
-  return false;
+  return Changed;
 }
 
 static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
