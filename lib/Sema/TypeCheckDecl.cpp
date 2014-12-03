@@ -4780,8 +4780,8 @@ public:
 
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
-      if (TC.validateType(FD->getBodyResultTypeLoc(), FD->getDeclContext(),
-                          TR_FunctionResult, resolver)) {
+      if (TC.validateType(FD->getBodyResultTypeLoc(), FD, TR_FunctionResult,
+                          resolver)) {
         badType = true;
       }
     }

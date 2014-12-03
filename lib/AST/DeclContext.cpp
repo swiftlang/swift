@@ -346,6 +346,59 @@ bool DeclContext::isInnermostContextGeneric() const {
   llvm_unreachable("bad DeclContextKind");
 }
 
+bool DeclContext::isPrivateContextForLookup(bool functionsArePrivate) const {
+  // FIXME: This is explicitly checking for attributes in some cases because
+  // it can be called before accessibility is computed.
+  switch (getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr:
+    break;
+
+  case DeclContextKind::Initializer:
+    // Default arguments still require a type.
+    if (isa<DefaultArgumentInitializer>(this))
+      return true;
+    break;
+
+  case DeclContextKind::TopLevelCodeDecl:
+    // FIXME: Pattern initializers at top-level scope end up here.
+    return false;
+
+  case DeclContextKind::AbstractFunctionDecl: {
+    if (functionsArePrivate)
+      return true;
+    auto *AFD = cast<AbstractFunctionDecl>(this);
+    if (AFD->hasAccessibility())
+      return AFD->getAccessibility() == Accessibility::Private;
+    break;
+  }
+
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+    return false;
+
+  case DeclContextKind::NominalTypeDecl: {
+    auto *nominal = cast<NominalTypeDecl>(this);
+    if (nominal->hasAccessibility())
+      return nominal->getAccessibility() == Accessibility::Private;
+    break;
+  }
+
+  case DeclContextKind::ExtensionDecl: {
+    auto *extension = cast<ExtensionDecl>(this);
+    if (extension->hasDefaultAccessibility())
+      return extension->getDefaultAccessibility() == Accessibility::Private;
+    // FIXME: duplicated from computeDefaultAccessibility in TypeCheckDecl.cpp.
+    if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
+      return AA->getAccess() == Accessibility::Private;
+    if (Type extendedTy = extension->getExtendedType())
+      return extendedTy->getAnyNominal()->isPrivateContextForLookup(true);
+    break;
+  }
+  }
+
+  return getParent()->isPrivateContextForLookup(true);
+}
+
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
   case DeclContextKind::Module:

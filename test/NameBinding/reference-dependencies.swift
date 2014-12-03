@@ -233,6 +233,10 @@ func outerPrivateTy3() {
   inner(nil)
 }
 private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
+// CHECK-DAG: !private "PrivateTopLevelStruct4"
+private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
+  return x
+}
 
 
 // CHECK-LABEL: {{^member-access:$}}
@@ -262,6 +266,7 @@ private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 // CHECK-DAG: !private "V4main21PrivateTopLevelStruct"
 // CHECK-DAG: !private "V4main22PrivateTopLevelStruct2"
 // CHECK-DAG: !private "V4main22PrivateTopLevelStruct3"
+// CHECK-DAG: !private "V4main22PrivateTopLevelStruct4"
 
 // CHECK-DAG: - "P4main14TopLevelProto1"
 // CHECK-DAG: - "P4main14TopLevelProto2"

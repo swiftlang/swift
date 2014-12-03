@@ -422,54 +422,6 @@ static void filterForDiscriminator(SmallVectorImpl<Result> &results,
   results.push_back(lastMatch);
 }
 
-static bool isPrivateContextForLookup(const DeclContext *DC,
-                                      bool functionsArePrivate) {
-  switch (DC->getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-    break;
-
-  case DeclContextKind::Initializer:
-    // Default arguments still require a type.
-    if (isa<DefaultArgumentInitializer>(DC))
-      return true;
-    break;
-
-  case DeclContextKind::TopLevelCodeDecl:
-    // FIXME: Pattern initializers at top-level scope end up here.
-    return false;
-
-  case DeclContextKind::AbstractFunctionDecl:
-    if (functionsArePrivate)
-      return true;
-    break;
-
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-    return false;
-
-  case DeclContextKind::NominalTypeDecl: {
-    auto *nominal = cast<NominalTypeDecl>(DC);
-    if (nominal->hasAccessibility())
-      return nominal->getAccessibility() == Accessibility::Private;
-    break;
-  }
-
-  case DeclContextKind::ExtensionDecl: {
-    auto *extension = cast<ExtensionDecl>(DC);
-    if (extension->hasDefaultAccessibility())
-      return extension->getDefaultAccessibility() == Accessibility::Private;
-    // FIXME: duplicated from computeDefaultAccessibility in TypeCheckDecl.cpp.
-    if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
-      return AA->getAccess() == Accessibility::Private;
-    if (Type extendedTy = extension->getExtendedType())
-      return isPrivateContextForLookup(extendedTy->getAnyNominal(), true);
-    break;
-  }
-  }
-
-  return isPrivateContextForLookup(DC->getParent(), true);
-}
-
 static void recordLookupOfTopLevelName(DeclContext *topLevelContext,
                                        DeclName name,
                                        bool isNonPrivateUse) {
@@ -496,7 +448,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   // Never perform local lookup for operators.
   if (Name.isOperator()) {
-    isPrivateUse = isPrivateContextForLookup(DC, /*includeFunctions=*/true);
+    isPrivateUse = DC->isPrivateContextForLookup(/*includeFunctions=*/true);
     DC = DC->getModuleScopeContext();
   } else {
     // If we are inside of a method, check to see if there are any ivars in
@@ -528,7 +480,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           }
         }
         if (!isPrivateUse.hasValue() || !isPrivateUse.getValue())
-          isPrivateUse = isPrivateContextForLookup(AFD, false);
+          isPrivateUse = AFD->isPrivateContextForLookup(false);
 
         if (AFD->getExtensionType()) {
           ExtendedType = AFD->getExtensionType();
@@ -568,19 +520,19 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           }
         }
         if (!isPrivateUse.hasValue())
-          isPrivateUse = isPrivateContextForLookup(ACE, false);
+          isPrivateUse = ACE->isPrivateContextForLookup(false);
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
         ExtendedType = ED->getExtendedType();
         BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
         MetaBaseDecl = BaseDecl;
         if (!isPrivateUse.hasValue())
-          isPrivateUse = isPrivateContextForLookup(ED, false);
+          isPrivateUse = ED->isPrivateContextForLookup(false);
       } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
         ExtendedType = ND->getDeclaredType();
         BaseDecl = ND;
         MetaBaseDecl = BaseDecl;
         if (!isPrivateUse.hasValue())
-          isPrivateUse = isPrivateContextForLookup(ND, false);
+          isPrivateUse = ND->isPrivateContextForLookup(false);
       } else if (auto I = dyn_cast<DefaultArgumentInitializer>(DC)) {
         // In a default argument, skip immediately out of both the
         // initializer and the function.
@@ -590,7 +542,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       } else {
         assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC));
         if (!isPrivateUse.hasValue())
-          isPrivateUse = isPrivateContextForLookup(DC, false);
+          isPrivateUse = DC->isPrivateContextForLookup(false);
       }
 
       // Check the generic parameters for something with the given name.
@@ -1174,7 +1126,7 @@ bool DeclContext::lookupQualified(Type type,
   auto checkLookupPrivate = [this, options]() -> Optional<bool> {
     switch (options & NL_KnownDependencyMask) {
     case 0:
-      return isPrivateContextForLookup(this, /*includeFunctions=*/false);
+      return isPrivateContextForLookup(/*includeFunctions=*/false);
       break;
     case NL_KnownPrivateDependency:
       return true;
