@@ -286,7 +286,7 @@ internal struct _SetElement<T> {
 
 /// A collection of unique `T` instances with no defined ordering.
 public struct _Set<T : Hashable> :
-  Hashable, CollectionType, Comparable, ArrayLiteralConvertible {
+  Hashable, CollectionType, ArrayLiteralConvertible {
 
   typealias _Self = _Set<T>
   typealias _VariantStorage = _VariantSetStorage<T>
@@ -693,11 +693,6 @@ public func == <T : Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
       _sanityCheckFailure("internal error: unexpected cocoa set")
 #endif
   }
-}
-
-public func < <T>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
-  // For `Comparable` conformance, not the subset operator.
-  return lhs.isSubsetOf(rhs)
 }
 
 extension _Set: Printable, DebugPrintable {
