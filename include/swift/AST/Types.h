@@ -2219,6 +2219,25 @@ inline bool isConsumedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+/// Returns true if conv is a guaranteed parameter. This may look unnecessary
+/// but this will allow code to generalize to handle Indirect_Guaranteed
+/// parameters when they are added.
+inline bool isGuaranteedParameter(ParameterConvention conv) {
+  switch (conv) {
+  case ParameterConvention::Direct_Guaranteed:
+    return true;
+
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_Out:
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Owned:
+    return false;
+  }
+  llvm_unreachable("bad convention kind");
+}
+
+
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;

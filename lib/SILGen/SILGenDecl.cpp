@@ -767,17 +767,33 @@ public:
   SILBasicBlock *parent;
   SILLocation loc;
   bool functionArgs;
+  ParameterConvention convention;
 
   EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent,
-                  SILLocation l, bool functionArgs)
-    : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
+                  SILLocation l, bool functionArgs,
+                  ParameterConvention convention)
+    : gen(gen), parent(parent), loc(l), functionArgs(functionArgs),
+      convention(convention) {}
+
+  ManagedValue &&getManagedValue(SILValue arg, CanType t) const {
+    if (isa<InOutType>(t))
+      return std::move(ManagedValue::forLValue(arg));
+
+    // If we have a guaranteed parameter, it is passed in at +0. If the
+    // parameter is not a let, we have to for safety reasons retain the argument
+    // and release it at the end of the function to ensure the lifetime of the
+    // operand last the entire lifetime of the function. If the parameter is a
+    // let since it can not be reassigned, we do not need to retain it.
+    if (isGuaranteedParameter(convention))
+      return std::move(gen.emitManagedRetain(loc, arg));
+
+    return std::move(gen.emitManagedRValueWithCleanup(arg));
+  }
 
   RValue visitType(CanType t) {
     SILValue arg = new (gen.SGM.M)
       SILArgument(parent, gen.getLoweredType(t), loc.getAsASTNode<ValueDecl>());
-    ManagedValue mv = isa<InOutType>(t)
-      ? ManagedValue::forLValue(arg)
-      : gen.emitManagedRValueWithCleanup(arg);
+    ManagedValue mv = getManagedValue(arg, t);
 
     // If the value is a (possibly optional) ObjC block passed into the entry
     // point of the function, then copy it so we can treat the value reliably
@@ -816,15 +832,31 @@ struct ArgumentInitVisitor :
   SILGenFunction &gen;
   SILFunction &f;
   SILBuilder &initB;
+
+  /// An ArrayRef that we use in our SILParameterList queue. This just saves us
+  /// having to lookup the parameters over and over again stfrom the SILType.
+  ArrayRef<SILParameterInfo> parameters;
+
+  /// This gives us the next index in the SILParameterList queue.
+  unsigned nextParameterIndex;
+
   ArgumentInitVisitor(SILGenFunction &gen, SILFunction &f)
-    : gen(gen), f(f), initB(gen.B) {}
+    : gen(gen), f(f), initB(gen.B),
+      parameters(f.getLoweredFunctionType()->getParameters()),
+      nextParameterIndex(0) {
+    // If we have an out parameter, skip it.
+    if (parameters.size() && parameters[0].isIndirectResult())
+      nextParameterIndex++;
+  }
 
   RValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
-    return EmitBBArguments(gen, parent, l, /*functionArgs*/ true).visit(canTy);
+    SILParameterInfo parameterInfo = parameters[nextParameterIndex++];
+    return EmitBBArguments(gen, parent, l, /*functionArgs*/ true,
+                           parameterInfo.getConvention()).visit(canTy);
   }
 
   /// Create a SILArgument and store its value into the given Initialization,
