@@ -925,20 +925,20 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
       TypeSubstitutions[InstanceType.getSwiftType().getPointer()] =
           LookupType;
 
-      SILType NewSubstCalleeType = SubstCalleeType.subst(
-          AI->getModule(), AI->getModule().getSwiftModule(),
-          TypeSubstitutions);
+      SILType NewSubstCalleeType;
 
-      // Handle polymorphic functions by properly substituting
-      // their parameter types.
-      if (SILFunctionType *FnTy =
-              AI->getCallee().getType().getAs<SILFunctionType>()) {
-        if (FnTy->isPolymorphic())
-          NewSubstCalleeType =
-              SILType::getPrimitiveObjectType(FnTy->substGenericArgs(
-                  AI->getModule(), AI->getModule().getSwiftModule(),
-                  Substitutions));
-      }
+      auto FnTy = AI->getCallee().getType().getAs<SILFunctionType>();
+      if (FnTy && FnTy->isPolymorphic())
+        // Handle polymorphic functions by properly substituting
+        // their parameter types.
+        NewSubstCalleeType =
+            SILType::getPrimitiveObjectType(FnTy->substGenericArgs(
+                AI->getModule(), AI->getModule().getSwiftModule(),
+                Substitutions));
+      else
+        NewSubstCalleeType = SubstCalleeType.subst(
+            AI->getModule(), AI->getModule().getSwiftModule(),
+            TypeSubstitutions);
 
       auto NewAI = Builder->createApply(
           AI->getLoc(), AI->getCallee(), NewSubstCalleeType,
