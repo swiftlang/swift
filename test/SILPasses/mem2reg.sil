@@ -152,3 +152,18 @@ bb0(%0 : $*()):
   %3 = tuple ()
   return %3 : $()
 }
+
+// CHECK-LABEL: sil @mem2reg_debug_value_addr
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: debug_value_addr
+// CHECK: debug_value %0
+// CHECK: return
+sil @mem2reg_debug_value_addr : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to %1#1 : $*Int
+  debug_value_addr %1#1 : $*Int
+  %2 = load %1#1 : $*Int
+  dealloc_stack %1#0 : $*@local_storage Int
+  return %2 : $Int
+}

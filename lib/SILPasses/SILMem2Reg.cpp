@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass promotes AllocStack instructions into memory references. It only
-// handles load, store and deallocation instructions. The algorithm is based on:
+// This pass promotes AllocStack instructions into virtual register
+// references. It only handles load, store and deallocation
+// instructions. The algorithm is based on:
 //
 //  Sreedhar and Gao. A linear time algorithm for placing phi-nodes. POPL '95.
 //
@@ -22,6 +23,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -69,13 +71,16 @@ class StackAllocationPromoter {
   /// Dominator info.
   DominanceInfo *DT;
 
+  /// The builder used to create new instructions during register promotion.
+  SILBuilder &B;
+
   /// Records the last store instruction in each block for a specific
   /// AllocStackInst.
   BlockToInstMap LastStoreInBlock;
 public:
   /// C'tor.
-  StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di)
-      : ASI(Asi), DSI(0), DT(Di) {
+  StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di, SILBuilder &B)
+      : ASI(Asi), DSI(0), DT(Di), B(B) {
         // Scan the users in search of a deallocation instruction.
         for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
           if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
@@ -99,9 +104,9 @@ private:
   /// \brief Replace the dummy nodes with new block arguments.
   void addBlockArguments(BlockSet &PhiBlocks);
 
-  /// \brief Fix all of the Br instructions and the loads to use the AllocStack
-  /// definitions (which include stores and Phis).
-  void fixBranchesAndLoads(BlockSet &Blocks);
+  /// \brief Fix all of the branch instructions and the uses to use
+  /// the AllocStack definitions (which include stores and Phis).
+  void fixBranchesAndUses(BlockSet &Blocks);
 
   /// \brief update the branch instructions with the new Phi argument.
   /// The blocks in \p PhiBlocks are blocks that define a value, \p Dest is
@@ -141,6 +146,9 @@ class MemoryToRegisters {
   /// Dominators.
   DominanceInfo *DT;
 
+  /// The builder used to create new instructions during register promotion.
+  SILBuilder B;
+
   /// \brief Check if the AllocStackInst \p ASI is captured by any of its users.
   bool isCaptured(AllocStackInst *ASI);
 
@@ -149,7 +157,7 @@ class MemoryToRegisters {
   bool isSingleBlockUsage(AllocStackInst *ASI);
 
   /// \brief Check if the AllocStackInst \p ASI is only written into.
-  bool isWriteOnlyAllocation(AllocStackInst *ASI);
+  bool isWriteOnlyAllocation(AllocStackInst *ASI, bool Promoted = false);
 
   /// \brief Promote all of the AllocStacks in a single basic block in one
   /// linear scan. Note: This function deletes all of the users of the
@@ -159,7 +167,8 @@ class MemoryToRegisters {
 
 public:
   /// C'tor
-  MemoryToRegisters(SILFunction &Func, DominanceInfo *Dt) : F(Func), DT(Dt) {}
+  MemoryToRegisters(SILFunction &Func, DominanceInfo *Dt) : F(Func), DT(Dt),
+                                                            B(Func) {}
 
   /// \brief Promote memory to registers. Return True on change.
   bool run();
@@ -182,8 +191,9 @@ bool MemoryToRegisters::isCaptured(AllocStackInst *ASI) {
       if (SI->getDest().getDef() == ASI)
         continue;
 
-    // Deallocation is also okay.
-    if (isa<DeallocStackInst>(II))
+    // Deallocation is also okay, as are DebugValueAddr. We will turn
+    // the latter into DebugValue.
+    if (isa<DeallocStackInst>(II) || isa<DebugValueAddrInst>(II))
       continue;
 
     // Other instructions are assumed to capture the AllocStack.
@@ -196,7 +206,8 @@ bool MemoryToRegisters::isCaptured(AllocStackInst *ASI) {
 }
 
 /// Returns true if the AllocStack is only stored into.
-bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
+bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI,
+                                              bool Promoted) {
   // For all users of the AllocStack:
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
@@ -206,12 +217,17 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
       if (!isa<AllocStackInst>(SI->getSrc()))
         continue;
 
-    // It is also okay to deallocate.
+    // Deallocation is also okay.
     if (isa<DeallocStackInst>(II))
       continue;
 
+    // If we haven't already promoted the AllocStack, we may see
+    // DebugValueAddr uses.
+    if (!Promoted && isa<DebugValueAddrInst>(II))
+      continue;
+
     // Can't do anything else with it.
-    DEBUG(llvm::dbgs() << "*** AllocStack is loaded by: " << *II);
+    DEBUG(llvm::dbgs() << "*** AllocStack has non-write use: " << *II);
     return false;
   }
 
@@ -231,6 +247,15 @@ bool MemoryToRegisters::isSingleBlockUsage(AllocStackInst *ASI) {
   return true;
 }
 
+/// Promote a DebugValueAddr to a DebugValue of the given value.
+static void
+promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
+  assert(Value.isValid() && "Expected valid value");
+  B.setInsertionPoint(DVAI);
+  B.createDebugValue(DVAI->getLoc(), Value);
+  DVAI->eraseFromParent();
+}
+
 StoreInst *
 StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
   DEBUG(llvm::dbgs() << "*** Promoting ASI in block: " << *ASI);
@@ -238,11 +263,12 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
   // We don't know the value of the alloca until we find the first store.
   SILValue RunningVal = SILValue();
   // Keep track of the last StoreInst that we found.
-  StoreInst *LastStore = 0;
+  StoreInst *LastStore = nullptr;
 
   // For all instructions in the block.
   for (auto BBI = BB->begin(), E = BB->end(); BBI != E;) {
     SILInstruction *Inst = BBI++;
+
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
       // Make sure we are loading from this ASI.
       if (LI->getOperand().getDef() != ASI)
@@ -250,7 +276,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
       if (RunningVal.isValid()) {
         // If we are loading from the AllocStackInst and we already know the
-        // conent of the Alloca then use it.
+        // content of the Alloca then use it.
         DEBUG(llvm::dbgs() << "*** Promoting load: " << *LI);
         SILValue(Inst, 0).replaceAllUsesWith(RunningVal);
         Inst->eraseFromParent();
@@ -283,6 +309,16 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
       continue;
     }
 
+    // Replace debug_value_addr with debug_value of the promoted value
+    // if we have a valid value to use at this point. Otherwise we'll
+    // promote this when we deal with hooking up phis.
+    if (auto *DVAI = dyn_cast<DebugValueAddrInst>(Inst)) {
+      if (DVAI->getOperand() == ASI->getAddressResult() &&
+          RunningVal.isValid())
+        promoteDebugValueAddr(DVAI, RunningVal, B);
+      continue;
+    }
+
     // Stop on deallocation.
     if (DeallocStackInst *DSI = dyn_cast<DeallocStackInst>(Inst)) {
       if (DSI->getOperand() == ASI)
@@ -309,6 +345,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
   // For all instructions in the block.
   for (auto BBI = BB->begin(), E = BB->end(); BBI != E;) {
     SILInstruction *Inst = BBI++;
+
     // Remove instructions that we are loading from. Replace the loaded value
     // with our running value.
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
@@ -334,6 +371,21 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
         NumInstRemoved++;
         continue;
       }
+    }
+
+    // Replace debug_value_addr with debug_value of the promoted value.
+    if (auto *DVAI = dyn_cast<DebugValueAddrInst>(Inst)) {
+      if (DVAI->getOperand() == ASI->getAddressResult()) {
+        if (RunningVal.isValid()) {
+          promoteDebugValueAddr(DVAI, RunningVal, B);
+        } else {
+          // Drop debug_value_addr of uninitialized void values.
+          assert(ASI->getElementType().isVoid() &&
+                 "Expected initialization of non-void type!");
+          DVAI->eraseFromParent();
+        }
+      }
+      continue;
     }
 
     // Remove deallocation.
@@ -432,36 +484,52 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
   TI->eraseFromParent();
 }
 
-void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
-  // Start by fixing loads:
+void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
+  // First update uses of the value.
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E;) {
-    LoadInst *LI = dyn_cast<LoadInst>(UI->getUser());
+    auto *Inst = UI->getUser();
+
     UI++;
-    if (!LI)
+
+    if (!isa<LoadInst>(Inst) && !isa<DebugValueAddrInst>(Inst))
       continue;
 
-    SILBasicBlock *BB = LI->getParent();
+    SILBasicBlock *BB = Inst->getParent();
 
-    // If this block has no predecessors then nothing dominates it and the load
-    // is dead code. Replace the load value with Undef and move on.
+    // If this block has no predecessors then nothing dominates it and
+    // the instruction is unreachable. If the instruction we're
+    // examining is a value, replace it with undef. Either way, delete
+    // the instruction and move on.
     if (BB->pred_empty() || !DT->getNode(BB)) {
-      SILValue Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
-      SILValue(LI, 0).replaceAllUsesWith(Def);
-      LI->eraseFromParent();
+      if (Inst->hasValue()) {
+        auto *Undef = SILUndef::get(ASI->getElementType(), ASI->getModule());
+        Inst->replaceAllUsesWith(Undef);
+      }
+      Inst->eraseFromParent();
       NumInstRemoved++;
       continue;
     }
 
     SILValue Def = getLiveInValue(PhiBlocks, BB);
-    DEBUG(llvm::dbgs() << "*** Replacing " << *LI << " with Def " << *Def);
 
-    // Replace the load with the definition that we found.
-    SILValue(LI, 0).replaceAllUsesWith(Def);
-    LI->eraseFromParent();
-    NumInstRemoved++;
-  } // End of LoadInst loop.
+    // If this is an instruction that produces a value, we'll replace
+    // the uses with our live-in value.
+    if (Inst->hasValue()) {
+      DEBUG(llvm::dbgs() << "*** Replacing " << *Inst << " with Def " << *Def);
 
-  // Now that all of the loads are fixed we can fix the branches that point
+      // Replace the load with the definition that we found.
+      SILValue(Inst, 0).replaceAllUsesWith(Def);
+      Inst->eraseFromParent();
+      NumInstRemoved++;
+      continue;
+    }
+
+    // Otherwise we expect a DebugValueAddr, which we will replace
+    // with a DebugValue.
+    promoteDebugValueAddr(cast<DebugValueAddrInst>(Inst), Def, B);
+  }
+
+  // Now that all of the uses are fixed we can fix the branches that point
   // to the blocks with the added arguments.
 
   // For each Block with a new Phi argument:
@@ -607,8 +675,8 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
   // Replace the dummy values with new block arguments.
   addBlockArguments(PhiBlocks);
 
-  // Hook up the Phi nodes and the loads with storing values.
-  fixBranchesAndLoads(PhiBlocks);
+  // Hook up the Phi nodes, loads, and debug_value_addr with incoming values.
+  fixBranchesAndUses(PhiBlocks);
 
   DEBUG(llvm::dbgs() << "*** Finished placing Phis ***\n");
 }
@@ -676,10 +744,11 @@ bool MemoryToRegisters::run() {
       DEBUG(llvm::dbgs() << "*** Need to insert Phis for " << *ASI);
 
       // Promote this allocation.
-      StackAllocationPromoter(ASI, DT).run();
+      StackAllocationPromoter(ASI, DT, B).run();
 
       // Make sure that all of the allocations were promoted into registers.
-      assert(isWriteOnlyAllocation(ASI) && "Loads left behind");
+      assert(isWriteOnlyAllocation(ASI, /* Promoted =*/ true) &&
+             "Non-write uses left behind");
       // ... and erase the allocation.
       eraseUsesOfInstruction(ASI);
 
