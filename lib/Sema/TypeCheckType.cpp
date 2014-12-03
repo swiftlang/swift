@@ -524,6 +524,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (parentComps.empty()) {
       // Resolve the first component, which is the only one that requires
       // unqualified name lookup.
+      // FIXME: Find a way to pass through TR_KnownPrivateDependency.
       UnqualifiedLookup Globals(comp->getIdentifier(), DC, &TC,comp->getIdLoc(),
                                 /*TypeLookup*/true);
 
