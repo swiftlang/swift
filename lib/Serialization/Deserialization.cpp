@@ -3601,6 +3601,7 @@ void ModuleFile::loadAllMembers(const Decl *D,
   DeclTypeCursor.JumpToBit(contextData);
   bool Err = readMembers(Members);
   assert(!Err && "unable to read members");
+  (void)Err;
 }
 
 void

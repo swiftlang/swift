@@ -105,6 +105,7 @@ uint64_t swift::unicode::getUTF16Length(StringRef Str) {
                                                strictConversion);
   assert(Result == conversionOK &&
          "UTF-8 encoded string cannot be converted into UTF-16 encoding");
+  (void)Result;
 
   // The length of the transcoded string in UTF-16 code points.
   Length = toPtr - &buffer[0];

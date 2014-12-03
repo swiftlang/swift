@@ -31,10 +31,12 @@ _swift_mangleSimpleClass(const char *module, const char *class_) {
   if (strcmp(module, swift::STDLIB_NAME) == 0) {
     int result = asprintf(&value, "_TtCSs%zu%s", classLength, class_);
     assert(result > 0);
+    (void)result;
   } else {
     int result = asprintf(&value, "_TtC%zu%s%zu%s", moduleLength, module,
                           classLength, class_);
     assert(result > 0);
+    (void)result;
   }
   assert(value);
   return value;
@@ -48,10 +50,12 @@ _swift_mangleSimpleProtocol(const char *module, const char *protocol) {
   if (strcmp(module, swift::STDLIB_NAME) == 0) {
     int result = asprintf(&value, "_TtPSs%zu%s_", protocolLength, protocol);
     assert(result > 0);
+    (void)result;
   } else {
     int result = asprintf(&value, "_TtP%zu%s%zu%s_", moduleLength, module,
                           protocolLength, protocol);
     assert(result > 0);
+    (void)result;
   }
   assert(value);
   return value;

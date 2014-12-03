@@ -415,6 +415,7 @@ static SILValue upcastArgument(SILValue Arg, SILType SuperTy, ApplyInst *AI) {
   } else {
     assert(SuperTy.isSuperclassOf(ArgTy) &&
            "Should only create upcasts for sub class devirtualization.");
+    (void)ArgTy;
   }
 
   Arg = SILBuilderWithScope<1>(AI).createUpcast(AI->getLoc(), Arg, SuperTy);

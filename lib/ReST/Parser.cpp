@@ -1237,6 +1237,7 @@ Document *Parser::parseDocument(LineListRef LL) {
       SubLL, Children, SubLL[0].FirstTextCol, ColumnNum::make(0),
       /*IgnoreIndentationOfTheFirstLine=*/false, &MinIndentation);
   assert(NumLines == SubLL.size());
+  (void)NumLines;
 
   if (!Context.LangOpts.IgnoreUniformIndentation &&
       MinIndentation != ColumnNum::make(0)) {
