@@ -97,11 +97,12 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
   }
 };
 
-SILModule::SILModule(Module *SwiftModule, const DeclContext *associatedDC,
+SILModule::SILModule(Module *SwiftModule, SILOptions &Options,
+                     const DeclContext *associatedDC,
                      bool wholeModule)
   : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
     Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
-    wholeModule(wholeModule), Types(*this) {
+    wholeModule(wholeModule), Options(Options), Types(*this) {
   TypeListUniquing = new SILTypeListUniquingType();
 }
 

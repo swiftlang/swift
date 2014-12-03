@@ -936,7 +936,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 //===--------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(Module *mod, SourceFile *sf,
+SILModule::constructSIL(Module *mod, SILOptions &options, SourceFile *sf,
                         Optional<unsigned> startElem, bool makeModuleFragile,
                         bool isWholeModule) {
   const DeclContext *DC;
@@ -951,7 +951,7 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
     DC = mod;
   }
 
-  std::unique_ptr<SILModule> m(new SILModule(mod, DC, isWholeModule));
+  std::unique_ptr<SILModule> m(new SILModule(mod, options, DC, isWholeModule));
   SILGenModule sgm(*m, mod, makeModuleFragile);
 
   if (sf) {
@@ -973,16 +973,19 @@ SILModule::constructSIL(Module *mod, SourceFile *sf,
   return m;
 }
 
-std::unique_ptr<SILModule> swift::performSILGeneration(Module *mod,
-                                            bool makeModuleFragile,
-                                            bool wholeModuleCompilation) {
-  return SILModule::constructSIL(mod, nullptr, None, makeModuleFragile,
+std::unique_ptr<SILModule>
+swift::performSILGeneration(Module *mod,
+                            SILOptions &options,
+                            bool makeModuleFragile,
+                            bool wholeModuleCompilation) {
+  return SILModule::constructSIL(mod, options, nullptr, None, makeModuleFragile,
                                  wholeModuleCompilation);
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(SourceFile &sf, Optional<unsigned> startElem,
+swift::performSILGeneration(SourceFile &sf, SILOptions &options,
+                            Optional<unsigned> startElem,
                             bool makeModuleFragile) {
-  return SILModule::constructSIL(sf.getParentModule(), &sf, startElem,
+  return SILModule::constructSIL(sf.getParentModule(), options, &sf, startElem,
                                  makeModuleFragile, false);
 }

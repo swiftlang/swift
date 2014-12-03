@@ -167,9 +167,13 @@ private:
   /// The external SIL source to use when linking this module.
   SILExternalSource *ExternalSource = nullptr;
 
+  /// The options passed into this SILModule.
+  SILOptions &Options;
+
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(Module *M, const DeclContext *associatedDC, bool wholeModule);
+  SILModule(Module *M, SILOptions &Options, const DeclContext *associatedDC,
+            bool wholeModule);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -209,15 +213,16 @@ public:
   /// If \p makeModuleFragile is true, all functions and global variables of
   /// the module are marked as fragile. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
-  constructSIL(Module *M, SourceFile *sf = nullptr,
+  constructSIL(Module *M, SILOptions &Options, SourceFile *sf = nullptr,
                Optional<unsigned> startElem = None,
                bool makeModuleFragile = false,
                bool isWholeModule = false);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static std::unique_ptr<SILModule> createEmptyModule(Module *M) {
-    return std::unique_ptr<SILModule>(new SILModule(M, M, false));
+  static std::unique_ptr<SILModule> createEmptyModule(Module *M,
+                                                      SILOptions &Options) {
+    return std::unique_ptr<SILModule>(new SILModule(M, Options, M, false));
   }
 
   /// Get the Swift module associated with this SIL module.
@@ -244,6 +249,8 @@ public:
   bool isWholeModule() const {
     return wholeModule;
   }
+
+  SILOptions &getOptions() const { return Options; }
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;

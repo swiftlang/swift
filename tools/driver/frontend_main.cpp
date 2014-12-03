@@ -329,9 +329,11 @@ static bool performCompile(CompilerInstance &Instance,
   std::unique_ptr<SILModule> SM = Instance.takeSILModule();
   if (!SM) {
     if (PrimarySourceFile)
-      SM = performSILGeneration(*PrimarySourceFile, None, opts.SILSerializeAll);
+      SM = performSILGeneration(*PrimarySourceFile, Invocation.getSILOptions(),
+                                None, opts.SILSerializeAll);
     else
-      SM = performSILGeneration(Instance.getMainModule(), opts.SILSerializeAll,
+      SM = performSILGeneration(Instance.getMainModule(), Invocation.getSILOptions(),
+                                opts.SILSerializeAll,
                                 true);
   }
 
