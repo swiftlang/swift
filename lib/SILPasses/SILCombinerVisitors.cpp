@@ -1180,6 +1180,18 @@ SILCombiner::propagateExistential(ApplyInst *AI,
       SILType NewSubstCalleeType = SubstCalleeType.subst(
           AI->getModule(), AI->getModule().getSwiftModule(),
           TypeSubstitutions);
+
+      // Handle polymorphic functions by properly substituting
+      // their parameter types.
+      if (SILFunctionType *FnTy =
+              AI->getCallee().getType().getAs<SILFunctionType>()) {
+        if (FnTy->isPolymorphic())
+          NewSubstCalleeType =
+              SILType::getPrimitiveObjectType(FnTy->substGenericArgs(
+                  AI->getModule(), AI->getModule().getSwiftModule(),
+                  Substitutions));
+      }
+
       auto NewAI = Builder->createApply(
           AI->getLoc(), AI->getCallee(), NewSubstCalleeType,
           AI->getType(), Substitutions, Args, AI->isTransparent());
@@ -1277,6 +1289,12 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       auto Op = Instance->getOperand();
       for (auto Use : Op.getUses()) {
         if (auto *IE = dyn_cast<InitExistentialInst>(Use->getUser())) {
+          // IE should dominate Instance.
+          // Without a DomTree we want to be very defensive
+          // and only allow this optimization when it is used
+          // inside the same BB.
+          if (IE->getParent() != AI->getParent())
+            continue;
           return propagateExistential(AI, WMI, IE, Instance->getType());
         }
       }
@@ -1284,7 +1302,12 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
     if (auto *Instance = dyn_cast<OpenExistentialRefInst>(LastArg)) {
       if (auto *IE = dyn_cast<InitExistentialRefInst>(Instance->getOperand())) {
-        return propagateExistential(AI, WMI, IE, Instance->getType());
+        // IE should dominate Instance.
+        // Without a DomTree we want to be very defensive
+        // and only allow this optimization when it is used
+        // inside the same BB.
+        if (IE->getParent() == AI->getParent())
+          return propagateExistential(AI, WMI, IE, Instance->getType());
       }
     }
   }
