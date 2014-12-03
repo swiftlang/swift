@@ -879,6 +879,11 @@ getImplementationForClass(const OpaqueValue *Value) {
   const void *obj = *reinterpret_cast<const void * const *>(Value);
   auto isa = _swift_getClass(obj);
 
+  // Look through artificial subclasses.
+  while (isa->isTypeMetadata() && isa->isArtificialSubclass()) {
+    isa = isa->SuperClass;
+  }
+
 #if SWIFT_OBJC_INTEROP
   // If this is a pure ObjC class, reflect it using ObjC's runtime facilities.
   if (!isa->isTypeMetadata())
@@ -1042,7 +1047,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
 /// invoke its getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
 ///
-/// This function consumes 'value', following Swift's +1 convention for in
+/// This function consumes 'value', following Swift's +1 convention for "in"
 /// arguments.
 Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   const ReflectableWitnessTable *witness;
