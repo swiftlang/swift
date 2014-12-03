@@ -2138,7 +2138,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
     return SolutionKind::Error;
   }
 
-  auto ctors = TC.lookupConstructors(valueType, DC);
+  auto ctors = TC.lookupConstructors(valueType, DC,
+                                     isa<AbstractFunctionDecl>(DC));
   if (!ctors) {
     // If we are supposed to record failures, do so.
     if (shouldRecordFailures()) {
@@ -2684,7 +2685,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   bool isExistential = instanceTy->isExistentialType();
   if (name.isSimpleName(TC.Context.Id_init)) {
     // Constructors have their own approach to name lookup.
-    auto ctors = TC.lookupConstructors(baseObjTy, DC);
+    auto ctors = TC.lookupConstructors(baseObjTy, DC,
+                                       isa<AbstractFunctionDecl>(DC));
     if (!ctors) {
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                     baseObjTy, name);

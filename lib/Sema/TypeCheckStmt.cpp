@@ -915,7 +915,8 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   // only one designated initializer.
   if (implicitlyGenerated) {
     auto superclassTy = ctor->getExtensionType();
-    for (auto member : tc.lookupConstructors(superclassTy, fromCtor)) {
+    for (auto member : tc.lookupConstructors(superclassTy, fromCtor,
+                                             /*knownPrivate=*/true)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)

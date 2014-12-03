@@ -1025,9 +1025,12 @@ public:
   ///
   /// \param type The type for which we will look for constructors.
   /// \param dc The context that needs the constructor.
+  /// \param isKnownPrivate If true, this lookup is counted as a private
+  /// dependency.
   ///
   /// \returns the constructors found for this type.
-  LookupResult lookupConstructors(Type type, DeclContext *dc);
+  LookupResult lookupConstructors(Type type, DeclContext *dc,
+                                  bool isKnownPrivate = false);
 
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType(const DeclContext *dc);

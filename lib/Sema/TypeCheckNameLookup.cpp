@@ -189,8 +189,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   return result;
 }
 
-LookupResult TypeChecker::lookupConstructors(Type type, DeclContext *dc) {
-  // FIXME: Support isKnownPrivate flag.
-  return lookupMember(type, Context.Id_init, dc, /*isKnownPrivate=*/false,
+LookupResult TypeChecker::lookupConstructors(Type type, DeclContext *dc,
+                                             bool isKnownPrivate) {
+  return lookupMember(type, Context.Id_init, dc, isKnownPrivate,
                       /*allowDynamicLookup=*/false);
 }

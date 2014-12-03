@@ -109,9 +109,10 @@ func lookUpManyTopLevelNames() {
 
   // CHECK-DAG: !private "OtherFileOuterType"
   _ = OtherFileOuterType.InnerType.sharedConstant
+  _ = OtherFileOuterType.InnerType()
 
   // CHECK-DAG: !private "OtherFileAliasForSecret"
-  _ = OtherFileAliasForSecret.constant
+  _ = OtherFileAliasForSecret.constant  
 
   // CHECK-DAG: !private "otherFileUse"
   // CHECK-DAG: !private "otherFileGetImpl"
