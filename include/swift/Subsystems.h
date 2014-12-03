@@ -29,6 +29,7 @@
 namespace llvm {
   class MemoryBuffer;
   class Module;
+  class TargetOptions;
 }
 
 namespace swift {
@@ -201,6 +202,10 @@ namespace swift {
   /// Serializes a module or single source file to the given output file.
   void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
                  const SILModule *M = nullptr);
+
+  /// Get the CPU and subtarget feature options to use when emitting code.
+  std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+  getIRTargetOptions(IRGenOptions &Opts, swift::Module *M);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.

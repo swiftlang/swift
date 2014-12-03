@@ -73,6 +73,20 @@ enum ImageInfoFlags {
   eImageInfo_ImageIsSimulated    = (1 << 5)
 };
 
+std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+swift::getIRTargetOptions(IRGenOptions &Opts, swift::Module *M) {
+  // Things that maybe we should collect from the command line:
+  //   - relocation model
+  //   - code model
+  // FIXME: We should do this entirely through Clang, for consistency.
+  TargetOptions TargetOpts;
+  TargetOpts.NoFramePointerElim = Opts.DisableFPElim;
+  
+  auto *Clang = static_cast<ClangImporter *>(M->Ctx.getClangModuleLoader());
+  clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
+  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features);
+}
+
 static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                          swift::Module *M,
                                                          SILModule *SILMod,
@@ -94,29 +108,23 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   CodeGenOpt::Level OptLevel = Opts.Optimize ? CodeGenOpt::Aggressive
                                              : CodeGenOpt::None;
 
-  auto *Clang = static_cast<ClangImporter *>(M->Ctx.getClangModuleLoader());
-  clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
-
-  // Set up TargetOptions.
-  // Things that maybe we should collect from the command line:
-  //   - relocation model
-  //   - code model
-  // FIXME: We should do this entirely through Clang, for consistency.
+  // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;
-  TargetOpts.NoFramePointerElim = Opts.DisableFPElim;
-
-  // Create the target features string.
+  std::string CPU;
+  std::vector<std::string> targetFeaturesArray;
+  std::tie(TargetOpts, CPU, targetFeaturesArray)
+    = getIRTargetOptions(Opts, M);
   std::string targetFeatures;
-  if (!ClangOpts.Features.empty()) {
+  if (!targetFeaturesArray.empty()) {
     llvm::SubtargetFeatures features;
-    for (std::string &feature : ClangOpts.Features)
+    for (const std::string &feature : targetFeaturesArray)
       features.AddFeature(feature);
     targetFeatures = features.getString();
   }
 
   // Create a target machine.
   llvm::TargetMachine *TargetMachine
-    = Target->createTargetMachine(Opts.Triple, ClangOpts.CPU, targetFeatures,
+    = Target->createTargetMachine(Opts.Triple, CPU, targetFeatures,
                                   TargetOpts, Reloc::PIC_,
                                   CodeModel::Default, OptLevel);
   if (!TargetMachine) {

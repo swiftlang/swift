@@ -405,9 +405,14 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   llvm::EngineBuilder builder(std::move(ModuleOwner));
   std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
-  TargetOpt.NoFramePointerElim = IRGenOpts.DisableFPElim;
+  std::string CPU;
+  std::vector<std::string> Features;
+  std::tie(TargetOpt, CPU, Features)
+    = getIRTargetOptions(IRGenOpts, swiftModule);
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
+  builder.setMCPU(CPU);
+  builder.setMAttrs(Features);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
   llvm::ExecutionEngine *EE = builder.create();
@@ -1183,9 +1188,15 @@ public:
         std::move(std::unique_ptr<llvm::Module>(Module)));
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
-    TargetOpt.NoFramePointerElim = IRGenOpts.DisableFPElim;
+    std::string CPU;
+    std::vector<std::string> Features;
+    std::tie(TargetOpt, CPU, Features)
+      = getIRTargetOptions(IRGenOpts, CI.getMainModule());
+    
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
+    builder.setMCPU(CPU);
+    builder.setMAttrs(Features);
     builder.setErrorStr(&ErrorMsg);
     builder.setEngineKind(llvm::EngineKind::JIT);
     EE = builder.create();
