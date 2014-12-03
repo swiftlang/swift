@@ -238,4 +238,7 @@ def disable_func_sig_opts : Flag<["-"], "disable-func-sig-opts">,
 
 def interpret : Flag<["-"], "interpret">, HelpText<"Immediate mode">, ModeOpt;
 
+def enable_guaranteed_self : Flag<["-"], "enable-guaranteed-self">,
+  HelpText<"Enable the passing of self as a guaranteed parameter">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

@@ -88,6 +88,9 @@ public:
 
   /// Should we optimize function signatures. Disabled by default.
   bool EnableFuncSigOpts = true;
+
+  /// Should we emit self as a guaranteed parameter. Disabled by default.
+  bool EnableGuaranteedSelf = false;
 };
 
 } // end namespace swift

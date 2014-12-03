@@ -481,7 +481,11 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 namespace {
   /// The default Swift conventions.
   struct DefaultConventions : Conventions {
-    DefaultConventions() : Conventions(ConventionsKind::Default) {}
+    bool hasGuaranteedSelf;
+
+    DefaultConventions(bool guaranteedSelf)
+      : Conventions(ConventionsKind::Default),
+        hasGuaranteedSelf(guaranteedSelf) {}
 
     ParameterConvention getIndirectParameter(unsigned index,
                                              CanType type) const override {
@@ -502,6 +506,8 @@ namespace {
     }
 
     ParameterConvention getDirectSelfParameter(CanType type) const override {
+      if (hasGuaranteedSelf)
+        return ParameterConvention::Direct_Guaranteed;
       return ParameterConvention::Direct_Owned;
     }
 
@@ -561,9 +567,11 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                               extInfo, DefaultBlockConventions());
 
   case AnyFunctionType::Representation::Thin:
-  case AnyFunctionType::Representation::Thick:
+  case AnyFunctionType::Representation::Thick: {
+    bool enableGuaranteedSelf = M.getOptions().EnableGuaranteedSelf;
     return getSILFunctionType(M, origType, substType, substInterfaceType,
-                              extInfo, DefaultConventions());
+                              extInfo, DefaultConventions(enableGuaranteedSelf));
+  }
   }
 }
 
