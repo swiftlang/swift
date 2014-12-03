@@ -39,7 +39,6 @@
 // RUN: %swiftc_driver -driver-print-bindings -output-file-map %t/map.json -target x86_64-apple-macosx10.9 %s 2>&1 | FileCheck %s -check-prefix=MAP
 // MAP: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}bindings.swift"], output: {object: "objroot/bindings.o"}
 
-// RUN: echo '{"": {"object": "objroot/bindings.o"}, {"image": "objroot/bindings"}}' > %t/map.json
+// RUN: echo '{"": {"object": "objroot/bindings.o"}}' > %t/map.json
 // RUN: %swiftc_driver -driver-print-bindings -output-file-map %t/map.json -whole-module-optimization -target x86_64-apple-macosx10.9 %s %S/Inputs/lib.swift 2>&1 | FileCheck %s -check-prefix=MAP-WFO
 // MAP-WFO: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}bindings.swift", "{{.*}}lib.swift"], output: {object: "objroot/bindings.o"}
-// MAP_WFO: # "x86_64-apple-macosx10.9" - "darwin::Linker", inputs: ["objroot/bindings.o"], output: {image: "objroot/bindings"}
