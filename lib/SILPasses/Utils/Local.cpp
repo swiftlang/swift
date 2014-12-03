@@ -145,6 +145,12 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
               isInstructionTriviallyDead(OpValInst))
             NextInsts.insert(OpValInst);
       }
+
+      // If we have a function ref inst, we need to especially drop its function
+      // argument so that it gets a proper ref decement.
+      auto *FRI = dyn_cast<FunctionRefInst>(I);
+      if (FRI && FRI->getReferencedFunction())
+        FRI->dropReferencedFunction();
     }
 
     for (auto I : DeadInsts) {
