@@ -130,7 +130,7 @@ func newConstruction(a: A, aproxy: AProxy) {
   b = B(worldDomination:()) // expected-error{{incorrect argument label in call (have 'worldDomination:', expected 'forWorldDomination:')}}
   b = B(int: 17, andDouble : 3.14159)
 
-  b = B.`new`(a: a)
+  b = B.new(a: a)
   B.alloc()._initFoo()
   b.notAnInit()
 

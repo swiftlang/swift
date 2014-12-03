@@ -356,10 +356,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
         new (Context) DiscardAssignmentExpr(Loc, /*Implicit=*/false));
   }
 
-  // If the next token is the keyword 'new', this must be expr-new.
-  case tok::kw_new:
-    return parseExprNew();
-    
   case tok::amp_prefix: {
     SourceLoc Loc = consumeToken(tok::amp_prefix);
 
@@ -437,75 +433,6 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
 
   // Bypass local lookup.
   return new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
-}
-
-/// parseExprNew
-///
-///   expr-new:
-///     'new' type-simple expr-new-bounds expr-closure?
-///   expr-new-bounds:
-///     expr-new-bound
-///     expr-new-bounds expr-new-bound
-///   expr-new-bound:
-///     lsquare-unspaced expr ']'
-ParserResult<Expr> Parser::parseExprNew() {
-  SourceLoc newLoc = Tok.getLoc();
-  consumeToken(tok::kw_new);
-
-  ParserResult<TypeRepr> elementTy = parseTypeSimple();
-  if (elementTy.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
-  if (elementTy.isNull())
-    return makeParserError();
-
-  bool hadInvalid = false;
-  while (Tok.isFollowingLSquare()) {
-    Parser::StructureMarkerRAII ParsingIndices(*this, Tok);
-    SourceRange brackets;
-    brackets.Start = consumeToken(tok::l_square);
-
-    // If the bound is missing, that's okay unless this is the first bound.
-    if (Tok.is(tok::r_square)) {
-      brackets.End = consumeToken(tok::r_square);
-      continue;
-    }
-
-    auto boundValue = parseExpr(diag::expected_expr_new_array_bound);
-    if (boundValue.hasCodeCompletion())
-      return boundValue;
-
-    if (boundValue.isNull() || !Tok.is(tok::r_square)) {
-      if (!boundValue.isNull())
-        diagnose(Tok, diag::expected_bracket_array_new);
-
-      skipUntil(tok::r_square);
-      if (!Tok.is(tok::r_square))
-        return nullptr;
-      hadInvalid = true;
-    }
-
-    brackets.End = consumeToken(tok::r_square);
-  }
-
-  if (hadInvalid)
-    return nullptr;
-  
-  // Check for an initialization closure.
-  Expr *constructExpr = nullptr;
-  if (Tok.is(tok::l_brace)) {
-    ParserResult<Expr> construction = parseExprClosure();
-    if (construction.hasCodeCompletion())
-      return construction;
-
-    if (construction.isParseError())
-      return construction;
-
-    constructExpr = construction.get();
-    assert(constructExpr);
-  }
-
-  diagnose(newLoc, diag::array_new_removed);
-  return makeParserError();
 }
 
 static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,

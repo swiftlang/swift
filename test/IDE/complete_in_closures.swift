@@ -8,8 +8,6 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_PARENT_PARAM_5 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_PARENT_PARAM_6 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=ARRAY_INIT_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
-
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
@@ -101,12 +99,6 @@ func testResolveParentParam6() {
   func testResolveParentParam6a(fs: FooStruct) {
     { fs.#^RESOLVE_PARENT_PARAM_6^# }
   }
-}
-
-//===--- Test completion in array initializer closures.
-
-func testArrayInit1() {
-  var a = new Int[42] { #^ARRAY_INIT_1^# }
 }
 
 //===--- Test completion in various statements in closures.

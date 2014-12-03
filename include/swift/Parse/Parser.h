@@ -1051,7 +1051,6 @@ public:
                                        bool isConfigCondition = false);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
-  ParserResult<Expr> parseExprNew();
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
   Expr *parseExprStringLiteral();
