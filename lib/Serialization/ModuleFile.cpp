@@ -631,6 +631,7 @@ ModuleFile::ModuleFile(
         }
         case input_block::MODULE_FLAGS: {
           assert(!seenFlags && "only one flags record allowed");
+          seenFlags = true;
           bool hasUnderlyingModule;
           input_block::ModuleFlagsLayout::readRecord(scratch,
                                                      hasUnderlyingModule);
