@@ -299,36 +299,44 @@ public:
   
 /// RAII object to enable writebacks for logical lvalues evaluated within the
 /// scope, which will be applied when the object goes out of scope.
+///
+/// A writeback scope is used to limit the extent of a formal access
+/// to an l-value, under the rules specified in the accessors
+/// proposal.  It should be entered at a point where it will conclude
+/// at the appropriate instant.
+///
+/// For example, the rules specify that a formal access for an inout
+/// argument begins immediately before the call and ends immediately
+/// after it.  This can be implemented by pushing a WritebackScope
+/// before the formal evaluation of the arguments and popping it
+/// immediately after the call.  (It must be pushed before the formal
+/// evaluation because, in some cases, the formal evaluation of a base
+/// l-value will immediately begin a formal access that must end at
+/// the same time as that of its projected subobject l-value.)
 class WritebackScope {
   SILGenFunction *gen;
   bool wasInWritebackScope;
   size_t savedDepth;
+  void popImpl();
 public:
   WritebackScope(SILGenFunction &gen);
-  ~WritebackScope();
+  ~WritebackScope() {
+    if (gen) {
+      popImpl();
+    }
+  }
+
+  void pop() {
+    assert(gen && "popping an already-popped writeback scope!");
+    popImpl();
+    gen = nullptr;
+  }
   
   WritebackScope(const WritebackScope &) = delete;
   WritebackScope &operator=(const WritebackScope &) = delete;
   
   WritebackScope(WritebackScope &&o);
   WritebackScope &operator=(WritebackScope &&o);
-};
-  
-/// RAII object to disable writebacks for logical lvalues evaluated within the
-/// scope. Used for LoadExprs.
-class DisableWritebackScope {
-  SILGenFunction &gen;
-  bool wasInWritebackScope;
-public:
-  DisableWritebackScope(SILGenFunction &gen)
-    : gen(gen), wasInWritebackScope(gen.InWritebackScope)
-  {
-    gen.InWritebackScope = false;
-  }
-  
-  ~DisableWritebackScope() {
-    gen.InWritebackScope = wasInWritebackScope;
-  }
 };
   
 /// RAII object used to enter an inout conversion scope. Writeback scopes formed

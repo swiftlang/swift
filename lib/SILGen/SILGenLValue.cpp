@@ -281,10 +281,7 @@ WritebackScope::WritebackScope(SILGenFunction &g)
   g.InWritebackScope = true;
 }
 
-WritebackScope::~WritebackScope() {
-  if (!gen)
-    return;
-
+void WritebackScope::popImpl() {
   // Pop the InWritebackScope bit.
   gen->InWritebackScope = wasInWritebackScope;
 

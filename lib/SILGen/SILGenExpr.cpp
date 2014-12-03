@@ -492,8 +492,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   assert(!ncRefType->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   
-  // Don't need to write back to decls loaded as rvalues.
-  DisableWritebackScope scope(*this);
+  // Any writebacks for this access are tightly scoped.
+  WritebackScope scope(*this);
   
   // If this is an decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
@@ -2364,8 +2364,8 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 }
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
-  // Don't need to write back to members loaded as rvalues.
-  DisableWritebackScope scope(SGF);
+  // Any writebacks for this access are tightly scoped.
+  WritebackScope scope(SGF);
   
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
