@@ -770,8 +770,62 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
   return false;
 }
 
+static bool isApplyOfStringConcat(SILInstruction &I) {
+  if (auto *AI = dyn_cast<ApplyInst>(&I))
+    if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+      if (FRI->getReferencedFunction()->hasSemanticsString("string.concat"))
+        return true;
+  return false;
+}
+
 static bool isFoldable(SILInstruction *I) {
   return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I);
+}
+
+static void
+constantFoldStringConcatenation(ApplyInst *AI,
+                                llvm::SetVector<SILInstruction *> &WorkList) {
+  SILBuilder B(AI);
+  // Try to apply the string literal concatenation optimization.
+  StringConcatenationOptimizer SLConcatenationOptimizer(AI, &B);
+  auto *Concatenated = SLConcatenationOptimizer.optimize();
+  // Bail if string literal concatenation could not be performed.
+  if (!Concatenated)
+    return;
+
+  // Add the newly created instruction to the BB.
+  AI->getParent()->getInstList().insert(AI,
+                                        dyn_cast<SILInstruction>(Concatenated));
+
+  // Replace all uses of the old instruction by a new instruction.
+  SILValue(AI).replaceAllUsesWith(Concatenated);
+
+  auto RemoveCallback = [&](SILInstruction *DeadI) { WorkList.remove(DeadI); };
+  // Remove operands that are not used anymore.
+  // Even if they are apply_inst, it is safe to
+  // do so, because they can only be applies
+  // of functions annotated as string.utf16
+  // or string.utf16.
+  for (auto &Op : AI->getAllOperands()) {
+    SILValue Val = Op.get();
+    Op.drop();
+    if (Val.use_empty()) {
+      SILInstruction *DeadI = dyn_cast<SILInstruction>(Val);
+      recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
+                                                 RemoveCallback);
+      WorkList.remove(DeadI);
+    }
+  }
+  // Schedule users of the new instruction for constant folding.
+  // We only need to schedule the string.concat invocations.
+  for (auto AIUse : Concatenated->getUses()) {
+    if (isApplyOfStringConcat(*AIUse->getUser())) {
+      WorkList.insert(AIUse->getUser());
+    }
+  }
+  // Delete the old apply instruction.
+  recursivelyDeleteTriviallyDeadInstructions(AI, /*force*/ true,
+                                             RemoveCallback);
 }
 
 static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
@@ -800,6 +854,8 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
       else if (InstantiateAssertConfiguration
                && (isApplyOfBuiltin(I, BuiltinValueKind::AssertConf)
                    || isApplyOfBuiltin(I, BuiltinValueKind::CondUnreachable)))
+        WorkList.insert(&I);
+      else if (isApplyOfStringConcat(I))
         WorkList.insert(&I);
     }
   }
@@ -837,6 +893,12 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
           continue;
         }
       }
+
+    if (auto *AI = dyn_cast<ApplyInst>(I)) {
+      // Apply may only come from a string.concat invocation.
+      constantFoldStringConcatenation(AI, WorkList);
+      continue;
+    }
 
     // Go through all users of the constant and try to fold them.
     FoldedUsers.clear();
