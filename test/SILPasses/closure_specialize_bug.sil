@@ -16,7 +16,7 @@ sil @_TF4test3bazfSiFT1mSi_Si : $@thin (Int, Int) -> Int
 sil [noinline] @_TF4test3barFTPS_1P_Si_Si : $@thin (@in P, Int) -> Int {
 bb0(%0 : $*P, %1 : $Int):
   %2 = open_existential %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
-  %3 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1 : $@thin @cc(witness_method) @callee_owned <T: P> (@owned @callee_owned (Int) -> Int, Int, @inout T) -> Int
+  %3 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1, %2 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@thin @cc(witness_method) @callee_owned <T: P> (@owned @callee_owned (Int) -> Int, Int, @inout T) -> Int
   %4 = integer_literal $Builtin.Word, 2
   %5 = struct $Int (%4 : $Builtin.Word)
   // function_ref test.baz (Swift.Int)(m : Swift.Int) -> Swift.Int
