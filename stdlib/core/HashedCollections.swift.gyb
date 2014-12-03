@@ -261,7 +261,7 @@ internal struct _UnmanagedAnyObjectArray {
   }
 }
 
-//===--- APIs unique to _Set<T> --------------------------------------------===//
+//===--- APIs unique to _Set<T> -------------------------------------------===//
 
 /// Header part of the native storage for `Set`.
 internal struct _SetBody {
@@ -271,7 +271,8 @@ internal struct _SetBody {
 
   internal var capacity: Int
   internal var count: Int = 0
-  internal var maxLoadFactorInverse: Double = _hashContainerDefaultMaxLoadFactorInverse
+  internal var maxLoadFactorInverse: Double =
+    _hashContainerDefaultMaxLoadFactorInverse
 }
 
 /// An element of the variable-length array part of the native storage for
@@ -363,14 +364,14 @@ public struct _Set<T : Hashable> :
     return _variantStorage.maybeGet(member) != nil
   }
 
-  /// Returns the `Index` for the given member, or `nil` if the member is not
+  /// Returns the `Index` of a given member, or `nil` if the member is not
   /// present in the set.
-  public func indexForMember(member: T) -> Index? {
+  public func indexOf(member: T) -> Index? {
     return _variantStorage.indexForKey(member)
   }
 
-  /// Add a member to the set.
-  public mutating func add(member: T) {
+  /// Insert a member into the set.
+  public mutating func insert(member: T) {
     _variantStorage.updateValue(member, forKey: member)
   }
 
@@ -388,6 +389,13 @@ public struct _Set<T : Hashable> :
   /// will not decrease.
   public mutating func removeAll(keepCapacity: Bool = false) {
     _variantStorage.removeAll(keepCapacity: keepCapacity)
+  }
+
+  /// Remove a member of the set and return it. Requires: count > 0
+  public mutating func removeFirst() -> T {
+    let member = first!
+    remove(member)
+    return member
   }
 
   /// The number of members in the set.
@@ -432,53 +440,83 @@ public struct _Set<T : Hashable> :
   // API itself.
   //
 
-  /// Create an empty Set.
+  /// Create an empty `Set`.
   public init() {
     self = _Set<T>(minimumCapacity: 0)
   }
 
-  /// Create a set from a sequence of items.
+  /// Create a `Set` from a finite sequence of items.
   public init<S: SequenceType where S.Generator.Element == T>(_ sequence: S) {
     self.init()
-    // FIXME: <rdar://problem/18803556> Can't use for-in syntax on a
-    // SequenceType passed through a generic initializer or method
-    // Workaround: use the generator's sequence.
-    var generator = sequence.generate()
-    var item: T? = generator.next()
-    while item != nil {
-      add(item!)
-      item = generator.next()
+    if let s = sequence as? _Set<T> {
+      // If this sequence is actually a native `Set`, then we can quickly
+      // adopt its native storage and let COW handle uniquing only
+      // if necessary.
+      switch (s._variantStorage) {
+        case .Native(let owner):
+          _variantStorage = .Native(owner)
+        case .Cocoa(let owner):
+          _variantStorage = .Cocoa(owner)
+      }
+    } else {
+      // FIXME: <rdar://problem/18803556> Can't use for-in syntax on a
+      // SequenceType passed through a generic initializer or method
+      // Workaround: use the generator's sequence.
+      var generator = sequence.generate()
+      var item: T? = generator.next()
+      while item != nil {
+        insert(item!)
+        item = generator.next()
+      }
     }
   }
 
-  public func any() -> T? {
+  /// Return the first found member if count > 0, else return `nil`.
+  public var first: T? {
     return count > 0 ? self[startIndex] : .None
   }
 
-  /// Returns true if this set is a subset of another one.
-  public func isSubset(other: _Set<T>) -> Bool {
+  /// Returns true if the set is a subset of a finite sequence as a `Set`.
+  public func isSubsetOf<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> Bool {
+    let other = (sequence as? _Set<T>) ?? _Set(sequence)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
 
-  /// Returns true if this set is a subset of another one but not equal.
-  public func isStrictSubset(other: _Set<T>) -> Bool {
+  /// Returns true if the set is a subset of a finite sequence as a `Set`
+  /// but not equal.
+  public func isStrictSubsetOf<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> Bool {
+    let other = (sequence as? _Set<T>) ?? _Set(sequence)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset && !isEqual
   }
 
-  /// Returns true if this set is a superset of another one.
-  public func isSuperset(other: _Set<T>) -> Bool {
-    return other.isSubset(self)
+  /// Returns true if the set is a superset of a finite sequence as a `Set`.
+  public func isSupersetOf<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> Bool {
+    let other = (sequence as? _Set<T>) ?? _Set(sequence)
+    return other.isSubsetOf(self)
   }
 
-  /// Returns true if this set is a superset of another one but not equal.
-  public func isStrictSuperset(other: _Set<T>) -> Bool {
-    return other.isStrictSubset(self)
+  /// Returns true if the set is a superset of a finite sequence as a `Set`
+  /// but not equal.
+  public func isStrictSupersetOf<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> Bool {
+    let other = (sequence as? _Set<T>) ?? _Set(sequence)
+    return other.isStrictSubsetOf(self)
   }
 
-  /// Returns true if no members in this set are in another.
-  public func isDisjoint(other: _Set<T>) -> Bool {
+  /// Returns true if no members in the set are in a finite sequence as a `Set`.
+  public func isDisjointWith<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> Bool {
+    let other = (sequence as? _Set<T>) ?? _Set(sequence)
     for member in self {
       if other.contains(member) {
         return false
@@ -487,60 +525,74 @@ public struct _Set<T : Hashable> :
     return true
   }
 
-  /// Add all members of another set to this one.
-  public mutating func add<
+  /// Return a new `Set` with items in both this set and a finite sequence.
+  public func union<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> _Set<T> {
+    var newSet = self
+    newSet.unionInPlace(sequence)
+    return newSet
+  }
+
+  /// Insert elements of a finite sequence into this `Set`.
+  public mutating func unionInPlace<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) {
     // FIXME: <rdar://problem/18803556> Can't use for-in syntax on a
     // SequenceType passed through a generic initializer or method
-    // Workaround: convert the sequence to an array.
-    let array = [T](sequence)
-    for item in array {
-      add(item)
+    // Workaround: use the generator's sequence.
+    var generator = sequence.generate()
+    var item: T? = generator.next()
+    while item != nil {
+      insert(item!)
+      item = generator.next()
     }
   }
 
-  /// Return a new set with elements in both this set and another.
-  public func union(other: _Set<T>) -> _Set<T> {
+  /// Return a new set with elements in this set that do not occur
+  /// in a finite sequence.
+  public func subtract<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> _Set<T> {
     var newSet = self
-    for member in other {
-      newSet.add(member)
-    }
+    newSet.subtractInPlace(sequence)
     return newSet
   }
 
-  /// Return a new set with elements in this set but not another.
-  public func difference(other: _Set<T>) -> _Set<T> {
-    var newSet = _Set<T>()
-    for member in self {
-      if !other.contains(member) {
-        newSet.add(member)
-      }
+  /// Remove all members in the set that occur in a finite sequence.
+  public mutating func subtractInPlace<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) {
+    // FIXME: <rdar://problem/18803556> Can't use for-in syntax on a
+    // SequenceType passed through a generic initializer or method
+    // Workaround: use the generator's sequence.
+    var generator = sequence.generate()
+    var item: T? = generator.next()
+    while item != nil {
+      remove(item!)
+      item = generator.next()
     }
+  }
+
+  /// Return a new set with elements common to this set and a finite sequence.
+  public func intersect<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> _Set<T> {
+    var newSet = self
+    newSet.intersectInPlace(sequence)
     return newSet
   }
 
-  /// Remove all members in another set from this one.
-  public mutating func subtract(other: _Set<T>) {
-    for member in other {
-      remove(member)
-    }
-  }
-
-  /// Return a new set with elements common to this set and another.
-  public func intersection(other: _Set<T>) -> _Set<T> {
-    var newSet = _Set<T>()
-    for member in self {
-      if other.contains(member) {
-        newSet.add(member)
-      }
-    }
-    return newSet
-  }
-
-
-  /// Remove any members of this set that aren't also in another set.
-  public mutating func intersect(other: _Set<T>) {
+  /// Remove any members of this set that aren't also in a finite sequence.
+  public mutating func intersectInPlace<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) {
+    // We only want a single pass over the sequence.
+    // If the sequence is on the left-hand side, it must be a set.
+    // If the sequence is on the right-hand side, it must support
+    // O(1) `contains`, and the only way to do that is to make it
+    // a set.
+    let other = _Set(sequence)
     for member in self {
       if !other.contains(member) {
         remove(member)
@@ -563,20 +615,8 @@ public struct _Set<T : Hashable> :
   }
 }
 
-public func + <T>(lhs: _Set<T>, rhs: _Set<T>) -> _Set<T> {
-  return lhs.union(rhs)
-}
-
-public func - <T>(lhs: _Set<T>, rhs: _Set<T>) -> _Set<T> {
-  return lhs.difference(rhs)
-}
-
-public func & <T>(lhs: _Set<T>, rhs: _Set<T>) -> _Set<T> {
-  return lhs.intersection(rhs)
-}
-
 /// Check for both subset and equality relationship between
-/// two sets.
+/// a set and some sequence (which may itself be a `Set`).
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
 internal func _compareSets<T>(lhs: _Set<T>, rhs: _Set<T>) ->
@@ -655,24 +695,9 @@ public func == <T : Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
   }
 }
 
-public func != <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
-  return !(lhs == rhs)
-}
-
-public func < <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
-  return lhs.isStrictSubset(rhs)
-}
-
-public func > <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
-  return lhs.isStrictSuperset(rhs)
-}
-
-public func <= <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
-  return lhs.isSubset(rhs)
-}
-
-public func >= <T: Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
-  return lhs.isSuperset(rhs)
+public func < <T>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
+  // For `Comparable` conformance, not the subset operator.
+  return lhs.isSubsetOf(rhs)
 }
 
 extension _Set: Printable, DebugPrintable {
@@ -768,7 +793,7 @@ source: _Set<SwiftValue>) -> _Set<ObjCValue> {
       "set member cannot be bridged to Objective-C")
       bridgedMember = unsafeBitCast(bridged!, ObjCValue.self)
     }
-    result.add(bridgedMember)
+    result.insert(bridgedMember)
   }
   return result
 }
@@ -814,7 +839,7 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
   var result = _Set<DerivedValue>(minimumCapacity: source.count)
   for member in source {
     if let derivedMember = member as? DerivedValue {
-      result.add(derivedMember)
+      result.insert(derivedMember)
       continue
     }
     return .None
@@ -870,7 +895,7 @@ public func _setBridgeFromObjectiveCConditional<
         return nil
       }
     }
-    result.add(resultValue)
+    result.insert(resultValue)
   }
   return result
 }
@@ -930,7 +955,8 @@ public struct Dictionary<Key : Hashable, Value> :
   }
 
   /// Private initializer.
-  internal init(_nativeStorageOwner: _NativeDictionaryStorageOwner<Key, Value>) {
+  internal init(_nativeStorageOwner:
+    _NativeDictionaryStorageOwner<Key, Value>) {
     _variantStorage = .Native(_nativeStorageOwner)
   }
 

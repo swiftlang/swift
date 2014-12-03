@@ -109,7 +109,7 @@ if arg == "RemoveInvalidIndex3" {
 
 if arg == "RemoveInvalidIndex4" {
   var s: _Set<Int> = [ 10 ]
-  let index = s.indexForMember(10)!
+  let index = s.indexOf(10)!
   s.removeAtIndex(index)
   assert(!s.contains(10))
   println("OK")
