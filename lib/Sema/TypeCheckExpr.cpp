@@ -487,10 +487,12 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   return result;
 }
 
-static Type lookupGlobalType(TypeChecker &TC, DeclContext *dc, StringRef name) {
+static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
+                                     StringRef name) {
   UnqualifiedLookup lookup(TC.Context.getIdentifier(name),
                            dc->getModuleScopeContext(),
-                           nullptr);
+                           nullptr,
+                           /*private=*/isa<AbstractFunctionDecl>(dc));
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
@@ -574,10 +576,10 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
 
   // If we haven't found the type yet, look for it now.
   if (!*type) {
-    *type = lookupGlobalType(*this, dc, name);
+    *type = lookupDefaultLiteralType(*this, dc, name);
 
     if (!*type)
-      *type = lookupGlobalType(*this, getStdlibModule(dc), name);
+      *type = lookupDefaultLiteralType(*this, getStdlibModule(dc), name);
 
     // Strip off one level of sugar; we don't actually want to print
     // the name of the typealias itself anywhere.

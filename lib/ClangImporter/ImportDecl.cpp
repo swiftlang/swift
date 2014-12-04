@@ -456,10 +456,13 @@ static FuncDecl *makeOptionSetRawTrivialGetter(StructDecl *optionSetDecl,
   return getterDecl;
 }
 
+/// Returns an operator from the standard library that can be used to import
+/// a macro correctly.
 static Expr *
 getOperatorRef(ASTContext &C, Identifier name) {
   // FIXME: This is hideous!
-  UnqualifiedLookup lookup(name, C.getStdlibModule(), nullptr);
+  UnqualifiedLookup lookup(name, C.getStdlibModule(), nullptr,
+                           /*private=*/true);
   if (!lookup.isSuccess())
     return nullptr;
   

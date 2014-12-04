@@ -436,6 +436,7 @@ static void recordLookupOfTopLevelName(DeclContext *topLevelContext,
 
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
+                                     bool IsKnownPrivate,
                                      SourceLoc Loc, bool IsTypeLookup) {
   typedef UnqualifiedLookupResult Result;
 
@@ -445,10 +446,13 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   DebuggerClient *DebugClient = M.getDebugClient();
 
   Optional<bool> isPrivateUse;
+  if (IsKnownPrivate)
+    isPrivateUse = true;
 
   // Never perform local lookup for operators.
   if (Name.isOperator()) {
-    isPrivateUse = DC->isPrivateContextForLookup(/*includeFunctions=*/true);
+    if (!isPrivateUse.hasValue())
+      isPrivateUse = DC->isPrivateContextForLookup(/*includeFunctions=*/true);
     DC = DC->getModuleScopeContext();
   } else {
     // If we are inside of a method, check to see if there are any ivars in
@@ -466,8 +470,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // FIXME: when we can parse and typecheck the function body partially for
         // code completion, AFD->getBody() check can be removed.
         if (Loc.isValid() && AFD->getBody()) {
-          isPrivateUse =
-              SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
+          if (!isPrivateUse.hasValue()) {
+            isPrivateUse =
+                SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
+          }
+
           FindLocalVal localVal(SM, Loc, Name);
           localVal.visit(AFD->getBody());
           if (!localVal.MatchingValue) {

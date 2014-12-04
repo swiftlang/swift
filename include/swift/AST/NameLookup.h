@@ -191,6 +191,7 @@ public:
   /// is used to determine which declarations in that body are visible.
   UnqualifiedLookup(DeclName Name, DeclContext *DC,
                     LazyResolver *TypeResolver,
+                    bool IsKnownPrivate = false,
                     SourceLoc Loc = SourceLoc(),
                     bool IsTypeLookup = false);
 

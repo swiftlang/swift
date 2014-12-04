@@ -29,7 +29,8 @@ using namespace swift;
 static EnumElementDecl *
 lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
                                    Identifier name) {
-  UnqualifiedLookup lookup(name, DC, &TC, SourceLoc(), /*typeLookup*/false);
+  UnqualifiedLookup lookup(name, DC, &TC, /*private=*/true,
+                           SourceLoc(), /*typeLookup*/false);
   
   if (!lookup.isSuccess())
     return nullptr;

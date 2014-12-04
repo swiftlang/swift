@@ -1245,7 +1245,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   if (requirement->getName().isOperator()) {
     // Operator lookup is always global.
     UnqualifiedLookup lookup(requirement->getName(),
-                             DC->getModuleScopeContext(), &TC);
+                             DC->getModuleScopeContext(),
+                             &TC,
+                             DC->isPrivateContextForLookup(false));
 
     if (lookup.isSuccess()) {
       for (auto candidate : lookup.Results) {

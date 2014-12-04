@@ -77,7 +77,7 @@ private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
 }
 
 func lookUpManyTopLevelNames() {
-  // CHECK-DAG: "Dictionary"
+  // CHECK-DAG: !private "Dictionary"
   let _: Dictionary = [1:1]
 
   // CHECK-DAG: !private "UInt"
@@ -95,7 +95,7 @@ func lookUpManyTopLevelNames() {
   funcFromOtherFile()
 
   // "CInt" is not used as a top-level name here.
-  // CHECK-DAG: "StringLiteralType"
+  // CHECK-DAG: !private "StringLiteralType"
   // NEGATIVE-NOT: "CInt"
   let CInt = "abc"
   // CHECK-DAG: !private "println"
@@ -232,6 +232,7 @@ func outerPrivateTy3() {
   func inner(a: PrivateTopLevelTy3?) {}
   inner(nil)
 }
+// CHECK-DAG: !private "PrivateTopLevelStruct3"
 private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 // CHECK-DAG: !private "PrivateTopLevelStruct4"
 private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {

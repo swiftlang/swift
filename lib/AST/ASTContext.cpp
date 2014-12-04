@@ -1083,7 +1083,8 @@ ClangModuleLoader *ASTContext::getClangModuleLoader() const {
 static void recordKnownProtocol(Module *Stdlib, StringRef Name,
                                 KnownProtocolKind Kind) {
   Identifier ID = Stdlib->Ctx.getIdentifier(Name);
-  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, SourceLoc(), /*IsType=*/true);
+  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, /*private=*/true,
+                           SourceLoc(), /*IsType=*/true);
   if (auto Proto = dyn_cast_or_null<ProtocolDecl>(Lookup.getSingleTypeResult()))
     Proto->setKnownProtocolKind(Kind);
 }

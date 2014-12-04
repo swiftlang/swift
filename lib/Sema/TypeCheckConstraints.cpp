@@ -295,7 +295,9 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
-  UnqualifiedLookup Lookup(Name, Context, &TC, UDRE->getLoc());
+  UnqualifiedLookup Lookup(Name, Context, &TC,
+                           /*Private=*/isa<AbstractFunctionDecl>(Context),
+                           UDRE->getLoc());
 
   if (!Lookup.isSuccess()) {
     TC.diagnose(Loc, diag::use_unresolved_identifier, Name);
@@ -1499,7 +1501,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   EP->setMatchVar(matchVar);
   
   // Find '~=' operators for the match.
-  UnqualifiedLookup matchLookup(Context.Id_MatchOperator, DC, this);
+  UnqualifiedLookup matchLookup(Context.Id_MatchOperator, DC, this,
+                                /*Private=*/true);
 
   if (!matchLookup.isSuccess()) {
     diagnose(EP->getLoc(), diag::no_match_operator);
