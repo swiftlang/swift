@@ -165,10 +165,6 @@ static llvm::cl::list<std::string>
 InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
                llvm::cl::ZeroOrMore);
 
-static llvm::cl::opt<std::string>
-OutputFilename("o",
-               llvm::cl::desc("Output file name"));
-
 static llvm::cl::list<std::string>
 BuildConfigs("D", llvm::cl::desc("Build configurations"));
 
