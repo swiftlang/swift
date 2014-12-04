@@ -474,6 +474,9 @@ public:
   /// one. Can only be called during type-checking.
   bool registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc);
 
+  /// Returns the associated clang module if one exists.
+  const clang::Module *findUnderlyingClangModule();
+
 private:
   // Make placement new and vanilla new/delete illegal for Modules.
   void *operator new(size_t Bytes) throw() = delete;
@@ -618,6 +621,9 @@ public:
   }
 
   /// @}
+
+  /// Returns the associated clang module if one exists.
+  virtual const clang::Module *getUnderlyingClangModule() { return nullptr; }
 
   /// Traverse the decls within this file.
   ///

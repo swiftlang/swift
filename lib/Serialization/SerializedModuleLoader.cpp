@@ -439,6 +439,12 @@ StringRef SerializedASTFile::getFilename() const {
   return File.getModuleFilename();
 }
 
+const clang::Module *SerializedASTFile::getUnderlyingClangModule() {
+  if (auto *ShadowedModule = getFile().getShadowedModule())
+    return ShadowedModule->findUnderlyingClangModule();
+  return nullptr;
+}
+
 Identifier
 SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   Identifier discriminator = File.getDiscriminatorForPrivateValue(D);

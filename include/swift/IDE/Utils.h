@@ -59,8 +59,6 @@ struct SourceCompleteResult {
 SourceCompleteResult isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 SourceCompleteResult isSourceInputComplete(StringRef Text);
 
-const clang::Module *findUnderlyingClangModule(const Module *M);
-
 /// Visits all overridden declarations exhaustively from VD, including protocol
 /// conformances and clang declarations.
 void walkOverriddenDecls(const ValueDecl *VD,

@@ -2289,7 +2289,7 @@ static bool isDynamicLookup(Type T) {
 }
 
 static bool isClangSubModule(Module *TheModule) {
-  if (auto ClangMod = ide::findUnderlyingClangModule(TheModule))
+  if (auto ClangMod = TheModule->findUnderlyingClangModule())
     return ClangMod->isSubModule();
   return false;
 }

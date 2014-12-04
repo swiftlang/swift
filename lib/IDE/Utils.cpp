@@ -182,22 +182,6 @@ SourceCompleteResult ide::isSourceInputComplete(StringRef Text) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text));
 }
 
-const clang::Module *ide::findUnderlyingClangModule(const Module *M) {
-  const ClangModuleUnit *CMU = nullptr;
-  for (auto *FU : M->getFiles()) {
-    if ((CMU = dyn_cast<ClangModuleUnit>(FU)))
-      break;
-    if (auto *AST = dyn_cast<SerializedASTFile>(FU)) {
-      if (auto *ShadowedModule = AST->getFile().getShadowedModule())
-        if (auto *Result = findUnderlyingClangModule(ShadowedModule))
-          return Result;
-    }
-  }
-  if (!CMU)
-    return nullptr;
-  return CMU->getClangModule();
-}
-
 template <typename FnTy>
 static void walkOverriddenClangDecls(const clang::NamedDecl *D, const FnTy &Fn){
   SmallVector<const clang::NamedDecl *, 8> OverDecls;

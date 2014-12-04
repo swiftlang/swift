@@ -277,7 +277,7 @@ bool SemaAnnotator::handleImports(ImportDecl *Import) {
   if (!Mod)
     return true;
 
-  auto ClangMod = findUnderlyingClangModule(Mod);
+  auto ClangMod = Mod->findUnderlyingClangModule();
   if (ClangMod && ClangMod->isSubModule()) {
     if (!passModulePathElements(Import->getModulePath(), ClangMod))
       return false;

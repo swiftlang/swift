@@ -90,6 +90,10 @@ public:
 
   virtual StringRef getFilename() const override;
 
+  virtual const clang::Module *getUnderlyingClangModule() override {
+    return getClangModule();
+  }
+
   clang::ASTContext &getClangASTContext() const;
 
   static bool classof(const FileUnit *file) {

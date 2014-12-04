@@ -197,6 +197,8 @@ public:
 
   virtual StringRef getFilename() const override;
 
+  virtual const clang::Module *getUnderlyingClangModule() override;
+
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;
   }

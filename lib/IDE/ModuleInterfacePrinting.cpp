@@ -139,7 +139,7 @@ void swift::ide::printSubmoduleInterface(
   // Drop top-level module name.
   FullModuleName = FullModuleName.slice(1);
 
-  InterestingClangModule = findUnderlyingClangModule(M);
+  InterestingClangModule = M->findUnderlyingClangModule();
   if (InterestingClangModule) {
     for (StringRef Name : FullModuleName) {
       InterestingClangModule = InterestingClangModule->findSubmodule(Name);

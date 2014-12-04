@@ -1380,6 +1380,14 @@ bool Module::walk(ASTWalker &Walker) {
   return false;
 }
 
+const clang::Module *Module::findUnderlyingClangModule() {
+  for (auto *FU : getFiles()) {
+    if (auto *Mod = FU->getUnderlyingClangModule())
+      return Mod;
+  }
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // SourceFile Implementation
 //===----------------------------------------------------------------------===//
