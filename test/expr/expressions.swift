@@ -633,3 +633,14 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 .None == nil // expected-error {{'union1.Type' does not have a member named 'None'}}
 nil == .None // expected-error {{type 'union1' does not conform to protocol 'NilLiteralConvertible'}}
+
+
+func testOptionalChaining(a : Int?, b : Int!) {
+  // <rdar://problem/19032294> Disallow postfix ? when not chaining
+  a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}}
+  a?.getMirror()
+
+  b?   // Ok, because we're converting IUO to Optional
+  b?.getMirror()
+}
+

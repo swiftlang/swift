@@ -3015,6 +3015,19 @@ namespace {
 
     Expr *visitOptionalEvaluationExpr(OptionalEvaluationExpr *expr) {
       Type optType = simplifyType(expr->getType());
+
+      // If this is an optional chain that isn't chaining anything, and if the
+      // subexpression is already optional (not IUO), then this is a noop:
+      // reject it.  This avoids confusion of the model (where the programmer
+      // thought it was doing something) and keeps pointless ?'s out of the
+      // code.
+      if (!SuppressDiagnostics)
+        if (auto *Bind = dyn_cast<BindOptionalExpr>(
+                        expr->getSubExpr()->getSemanticsProvidingExpr()))
+          if (Bind->getSubExpr()->getType()->isEqual(optType))
+            cs.TC.diagnose(expr->getLoc(), diag::optional_chain_noop,
+                           optType).fixItRemove(Bind->getQuestionLoc());
+
       Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
                                    cs.getConstraintLocator(expr));
       if (!subExpr) return nullptr;
