@@ -22,6 +22,9 @@
 
 using namespace swift;
 
+// Do we use array.props?
+static bool HaveArrayProperty = false;
+
 bool
 swift::isSideEffectFree(BuiltinInst *FR) {
 
@@ -360,17 +363,21 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() {
   auto F = cast<FunctionRefInst>(SemanticsCall->getCallee())
                ->getReferencedFunction();
 
-  auto Kind = llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
-      .Case("array.init", ArrayCallKind::kArrayInit)
-      .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
-      .Case("array.check_index", ArrayCallKind::kCheckIndex)
-      .Case("array.get_count", ArrayCallKind::kGetCount)
-      .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
-      .Case("array.get_element", ArrayCallKind::kGetElement)
-      .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
-      .Case("array.get_element_address", ArrayCallKind::kGetElementAddress)
-      .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
-      .Default(ArrayCallKind::kNone);
+  auto Kind =
+      llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
+          .Case("array.props.isCocoa", ArrayCallKind::kArrayPropsIsCocoa)
+          .Case("array.props.needsElementTypeCheck",
+                ArrayCallKind::kArrayPropsNeedsTypeCheck)
+          .Case("array.init", ArrayCallKind::kArrayInit)
+          .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
+          .Case("array.check_index", ArrayCallKind::kCheckIndex)
+          .Case("array.get_count", ArrayCallKind::kGetCount)
+          .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
+          .Case("array.get_element", ArrayCallKind::kGetElement)
+          .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
+          .Case("array.get_element_address", ArrayCallKind::kGetElementAddress)
+          .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
+          .Default(ArrayCallKind::kNone);
 
   return Kind;
 }
@@ -417,15 +424,52 @@ static bool canHoistArrayArgument(SILValue Arr, SILInstruction *InsertBefore,
 
 bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
                                          DominanceInfo *DT) {
-  switch (getKind()) {
+  auto Kind = getKind();
+  switch (Kind) {
+  default:
+    break;
+
+  case ArrayCallKind::kCheckIndex:
+  case ArrayCallKind::kArrayPropsIsCocoa:
+  case ArrayCallKind::kArrayPropsNeedsTypeCheck:
+  case ArrayCallKind::kGetElementAddress:
+    return canHoistArrayArgument(getSelf(), InsertBefore, DT);
+
   case ArrayCallKind::kCheckSubscript:
-  case ArrayCallKind::kCheckIndex: {
+  case ArrayCallKind::kGetElement: {
+    if (HaveArrayProperty) {
+      auto IsCocoaArg = getArrayPropertyIsCocoa();
+      ArraySemanticsCall IsCocoa(IsCocoaArg.getDef(),
+                                 "array.props.isCocoa", true);
+      if (!IsCocoa) {
+        // Do we have a constant parameter?
+        auto *SI = dyn_cast<StructInst>(IsCocoaArg);
+        if (!SI)
+          return false;
+        if (!isa<IntegerLiteralInst>(SI->getOperand(0)))
+          return false;
+      } else if(!IsCocoa.canHoist(InsertBefore, DT))
+        // Otherwise, we must be able to hoist the function call.
+        return false;
+
+      if (Kind == ArrayCallKind::kCheckSubscript)
+        return canHoistArrayArgument(getSelf(), InsertBefore, DT);
+
+      // Can we hoist the needsElementTypeCheck argument.
+      ArraySemanticsCall TypeCheck(getArrayPropertyNeedsTypeCheck().getDef(),
+                                  "array.props.needsElementTypeCheck", true);
+      if (!TypeCheck || !TypeCheck.canHoist(InsertBefore, DT))
+        return false;
+    }
+
     return canHoistArrayArgument(getSelf(), InsertBefore, DT);
   }
 
-  default:
-    break;
+  case ArrayCallKind::kMakeMutable: {
+    return canHoistArrayArgument(getSelf(), InsertBefore, DT);
   }
+  } // End switch.
+
   return false;
 }
 
@@ -474,6 +518,26 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
                                                   bool LeaveOriginal) {
   auto Kind = getKind();
   switch (Kind) {
+  case ArrayCallKind::kArrayPropsIsCocoa:
+  case ArrayCallKind::kArrayPropsNeedsTypeCheck: {
+    auto Self = getSelf();
+    // Emit matching release if we are removing the original call.
+    if (!LeaveOriginal)
+      SILBuilder(SemanticsCall)
+          .createReleaseValue(SemanticsCall->getLoc(), Self);
+
+    auto NewArrayStructValue = copyArrayLoad(Self, InsertBefore, DT);
+
+    SILBuilder B(InsertBefore);
+
+    // Retain the array.
+    B.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue);
+
+    auto *Call =
+        hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
+    Call->setSelfArgument(NewArrayStructValue);
+    return Call;
+  }
 
   case ArrayCallKind::kCheckSubscript:
   case ArrayCallKind::kCheckIndex: {
@@ -489,17 +553,49 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
 
     // Retain the array.
     B.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue)
-      ->setDebugScope(SemanticsCall->getDebugScope());
+        ->setDebugScope(SemanticsCall->getDebugScope());
+
+    SILValue NewArrayProps;
+    if (HaveArrayProperty && Kind == ArrayCallKind::kCheckSubscript) {
+      // Copy the array.props argument call.
+      auto IsCocoaArg = getArrayPropertyIsCocoa();
+      ArraySemanticsCall IsCocoa(IsCocoaArg.getDef(), "array.props.isCocoa",
+                                 true);
+      if (!IsCocoa) {
+        // Do we have a constant parameter?
+        auto *SI = dyn_cast<StructInst>(IsCocoaArg);
+        assert(SI && isa<IntegerLiteralInst>(SI->getOperand(0)) &&
+               "Must have a constant parameter or an array.props.isCocoa call "
+               "as argument");
+        SI->moveBefore(
+            DT->findNearestCommonDominator(InsertBefore->getParent(),
+                                           SI->getParent())->begin());
+        auto *IL = cast<IntegerLiteralInst>(SI->getOperand(0));
+        IL->moveBefore(
+            DT->findNearestCommonDominator(InsertBefore->getParent(),
+                                           IL->getParent())->begin());
+      } else {
+        NewArrayProps = IsCocoa.copyTo(InsertBefore, DT);
+      }
+    }
+
+    // Hoist the call.
     auto Call = hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
     Call->setSelfArgument(NewArrayStructValue);
+
+    if (NewArrayProps) {
+      // Set the array.props argument.
+      Call->setArgument(1, NewArrayProps);
+    }
+
     return Call;
   }
 
   case ArrayCallKind::kMakeMutable: {
     assert(!LeaveOriginal && "Copying not yet implemented");
-    SemanticsCall->moveBefore(InsertBefore);
-    placeFuncRef(SemanticsCall, DT);
-    return SemanticsCall;
+    // Hoist the call.
+    auto Call = hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
+    return Call;
   }
 
   default:
@@ -516,6 +612,47 @@ void swift::ArraySemanticsCall::replaceByRetainValue() {
   SemanticsCall->eraseFromParent();
 }
 
+static bool hasArrayPropertyNeedsTypeCheck(ArrayCallKind Kind,
+                                           unsigned &ArgIdx) {
+  switch (Kind) {
+  default: break;
+  case ArrayCallKind::kGetElement:
+    ArgIdx = 2;
+    return true;
+  }
+  return false;
+}
+static bool hasArrayPropertyIsCocoa(ArrayCallKind Kind, unsigned &ArgIdx) {
+  switch (Kind) {
+  default: break;
+
+  case ArrayCallKind::kCheckSubscript:
+  case ArrayCallKind::kGetElement:
+    ArgIdx = 1;
+    return true;
+  }
+  return false;
+}
+
+SILValue swift::ArraySemanticsCall::getArrayPropertyIsCocoa() {
+  unsigned ArgIdx = 0;
+  bool HasArg = hasArrayPropertyIsCocoa(getKind(), ArgIdx);
+  (void)HasArg;
+  assert(HasArg &&
+         "Must have an array.props argument");
+
+  return SemanticsCall->getArgument(ArgIdx);
+}
+
+SILValue swift::ArraySemanticsCall::getArrayPropertyNeedsTypeCheck() {
+  unsigned ArgIdx = 0;
+  bool HasArg = hasArrayPropertyNeedsTypeCheck(getKind(), ArgIdx);
+  (void)HasArg;
+  assert(HasArg &&
+         "Must have an array.props argument");
+
+  return SemanticsCall->getArgument(ArgIdx);
+}
 /// Remove all instructions in the body of \p BB in safe manner by using
 /// undef.
 void swift::clearBlockBody(SILBasicBlock *BB) {

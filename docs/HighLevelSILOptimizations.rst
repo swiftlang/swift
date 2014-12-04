@@ -140,6 +140,14 @@ array.init
   may act as a guard to other potentially mutating operations, such as
   ``get_element_address``.
 
+array.props.isCocoa/needsElementTypeCheck -> Bool
+  Reads storage descriptors properties (isCocoa, needsElementTypeCheck).
+  This is not control dependent or guarded. The optimizer has
+  semantic knowledge of the state transfer those properties can not make:
+  An array that is not ``isCocoa`` can not tranfer to ``isCocoa``.
+  An array that is not ``needsElementTypeCheck`` can not transfer to
+  ``needsElementTypeCheck``.
+
 array.get_element(index: Int) -> Element
 
    Read an element from the array at the specified index. No other
@@ -227,9 +235,12 @@ semantic op      relation        semantic ops
 ================ =============== ==========================================
 make_mutable     guards          get_element_address
 check_subscript  guards          get_element, get_element_address
-get_elt_addr     interferes-with get_element, get_element_address
+make_mutable     interferes-with props.isCocoa/needsElementTypeCheck
+get_elt_addr     interferes-with get_element, get_element_address,
+                                 props.isCocoa/needsElementTypeCheck
 mutate_unknown   itereferes-with get_element, check_subscript, get_count,
-                                 get_capacity, get_element_address
+                                 get_capacity, get_element_address,
+                                 props.isCocoa/needsElementTypeCheck
 ================ =============== ==========================================
 
 .. [#f1] Any check_subscript(N) may act as a guard for
