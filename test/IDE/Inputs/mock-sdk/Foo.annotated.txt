@@ -1,5 +1,5 @@
-<decl:Import>@exported import <loc>Foo.FooSub</loc></decl>
-<decl:Import>@exported import <loc>FooHelper</loc></decl>
+<decl:Import>@exported import <ref:module>Foo</ref>.<ref:module>FooSub</ref></decl>
+<decl:Import>@exported import <ref:module>FooHelper</ref></decl>
 
 
 <decl:Struct>/// Aaa.  FooEnum1.  Bbb.

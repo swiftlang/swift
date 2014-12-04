@@ -34,6 +34,7 @@
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -855,6 +856,33 @@ void PrintAST::printInherited(const GenericTypeParamDecl *D) {
                  false, true);
 }
 
+static void getModuleEntities(const clang::Module *ClangMod,
+                              SmallVectorImpl<ModuleEntity> &ModuleEnts) {
+  if (!ClangMod)
+    return;
+
+  getModuleEntities(ClangMod->Parent, ModuleEnts);
+  ModuleEnts.push_back(ClangMod);
+}
+
+static void getModuleEntities(ImportDecl *Import,
+                              SmallVectorImpl<ModuleEntity> &ModuleEnts) {
+  if (auto *ClangMod = Import->getClangModule()) {
+    getModuleEntities(ClangMod, ModuleEnts);
+    return;
+  }
+
+  auto Mod = Import->getModule();
+  if (!Mod)
+    return;
+
+  if (auto *ClangMod = Mod->findUnderlyingClangModule()) {
+    getModuleEntities(ClangMod, ModuleEnts);
+  } else {
+    ModuleEnts.push_back(Mod);
+  }
+}
+
 void PrintAST::visitImportDecl(ImportDecl *decl) {
   printAttributes(decl);
   Printer << "import ";
@@ -884,14 +912,21 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
     Printer << "func ";
     break;
   }
-  recordDeclLoc(decl,
-    [&]{
-      interleave(decl->getFullAccessPath(),
-                 [&](const ImportDecl::AccessPathElement &Elem) {
-                   Printer << Elem.first.str();
-                 },
-                 [&] { Printer << "."; });
-    });
+
+  SmallVector<ModuleEntity, 4> ModuleEnts;
+  getModuleEntities(decl, ModuleEnts);
+
+  ArrayRef<ModuleEntity> Mods = ModuleEnts;
+  interleave(decl->getFullAccessPath(),
+             [&](const ImportDecl::AccessPathElement &Elem) {
+               if (!Mods.empty()) {
+                 Printer.printModuleRef(Mods.front(), Elem.first);
+                 Mods = Mods.slice(1);
+               } else {
+                 Printer << Elem.first.str();
+               }
+             },
+             [&] { Printer << "."; });
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
