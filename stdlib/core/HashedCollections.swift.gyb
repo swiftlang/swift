@@ -605,6 +605,32 @@ public struct _Set<T : Hashable> :
     }
   }
 
+  /// Return a new set with elements that are either in the set or a finite
+  /// sequence but do not occur in both.
+  public func exclusiveOr<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) -> _Set<T> {
+    var newSet = self
+    newSet.exclusiveOrInPlace(sequence)
+    return newSet
+  }
+
+  /// For each element of a finite sequence, remove it from the set if it is a
+  /// common element, otherwise add it to the set. Repeated elements of the
+  /// sequence will be ignored.
+  public mutating func exclusiveOrInPlace<
+    S: SequenceType where S.Generator.Element == T
+  >(sequence: S) {
+    var other = (sequence as? _Set<T>) ?? _Set(sequence)
+    for member in other {
+      if contains(member) {
+        remove(member)
+      } else {
+        insert(member)
+      }
+    }
+  }
+
   /// `true` if the set is empty.
   public var isEmpty: Bool {
     return count == 0

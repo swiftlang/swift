@@ -2746,6 +2746,59 @@ SetTestSuite.test("intersect") {
   expectEqual(_Set<Int>(), _Set<Int>().intersect(s1))
 }
 
+SetTestSuite.test("exclusiveOr") {
+
+  // Overlap with 4040, 5050, 6060
+  let s1 = _Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let s2 = _Set([4040, 5050, 6060, 7070, 8080, 9090])
+  let result = _Set([1010, 2020, 3030, 7070, 8080, 9090])
+  let universe = _Set([1010, 2020, 3030, 4040, 5050, 6060,
+                       7070, 8080, 9090])
+
+  let identity1 = unsafeBitCast(s1, Word.self)
+
+  // s1 ⨁ s2 == result
+  let s3 = s1.exclusiveOr(s2)
+
+  expectEqual(identity1, unsafeBitCast(s1, Word.self))
+
+  expectEqual(s3, result)
+
+  // A ⨁ B == (A ∪ B) ⋂ ⌐(A ∩ B)
+  expectEqual(s1.exclusiveOr(s2),
+    s1.union(s2).intersect(universe.subtract(s1.intersect(s2))))
+
+  // A ⨁ B == (A ⋂ ⌐B) ∪ (⌐A ∩ B)
+  expectEqual(s1.exclusiveOr(s2),
+    s1.intersect(universe.subtract(s2)).union(universe.subtract(s1).intersect(s2)))
+
+  // A ⨁ A == {}
+  expectTrue(s1.exclusiveOr(s1).isEmpty)
+}
+
+SetTestSuite.test("exclusiveOrInPlace") {
+  // Overlap with 4040, 5050, 6060
+  var s1 = _Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let s2 = _Set([1010])
+  let result = _Set([2020, 3030, 4040, 5050, 6060])
+
+  // s1 ⨁ s2 == result
+  let identity1 = unsafeBitCast(s1, Word.self)
+  s1.exclusiveOrInPlace(s2)
+
+  // Removing just one element shouldn't cause an identity change
+  expectEqual(identity1, unsafeBitCast(s1, Word.self))
+
+  expectEqual(s1, result)
+
+  // A ⨁ A == {}
+  s1.exclusiveOrInPlace(s1)
+  expectTrue(s1.isEmpty)
+
+  // Removing all elements should cause an identity change
+  expectNotEqual(identity1, unsafeBitCast(s1, Word.self))
+}
+
 SetTestSuite.test("removeMember") {
   let s1 = _Set([1010, 2020, 3030])
   var s2 = _Set<Int>(minimumCapacity: 10)
