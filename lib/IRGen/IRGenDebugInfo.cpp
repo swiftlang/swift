@@ -1642,7 +1642,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     for (auto *ProtocolDecl : Archetype->getConformsTo()) {
       auto PTy = IGM.SILMod->Types.getLoweredType(ProtocolDecl->getType())
                      .getSwiftRValueType();
-      auto PDbgTy = DebugTypeInfo(ProtocolDecl, PTy, IGM.getTypeInfoForLowered(PTy));
+      auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy);
       Protocols.push_back(DBuilder.createInheritance(DITy, PDITy, 0, Flags));
     }
