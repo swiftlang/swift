@@ -146,6 +146,12 @@ func lookUpManyTopLevelNames() {
   case is OtherFileEnumWrapper.Enum:
     break
   }
+
+  // CHECK-DAG: !private "~="
+  switch 42 {
+  case 50:
+    break
+  }
   
   for _: OtherFileEnumWrapper.Enum in EmptyGenerator<X>() {}
 }
