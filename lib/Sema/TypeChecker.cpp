@@ -172,16 +172,15 @@ Module *TypeChecker::getStdlibModule(const DeclContext *dc) {
 Type TypeChecker::lookupBoolType(const DeclContext *dc) {
   if (!boolType) {
     boolType = ([&] {
-      UnqualifiedLookup boolLookup(Context.getIdentifier("Bool"),
-                                   getStdlibModule(dc), nullptr,
-                                   SourceLoc(),
-                                   /*IsTypeLookup=*/true);
-      if (!boolLookup.isSuccess()) {
+      SmallVector<ValueDecl *, 2> results;
+      getStdlibModule(dc)->lookupValue({}, Context.getIdentifier("Bool"),
+                                       NLKind::QualifiedLookup, results);
+      if (results.size() != 1) {
         diagnose(SourceLoc(), diag::bool_type_broken);
         return Type();
       }
-      TypeDecl *tyDecl = boolLookup.getSingleTypeResult();
 
+      auto tyDecl = dyn_cast<TypeDecl>(results.front());
       if (!tyDecl) {
         diagnose(SourceLoc(), diag::bool_type_broken);
         return Type();
