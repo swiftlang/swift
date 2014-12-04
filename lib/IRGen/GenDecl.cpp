@@ -1172,7 +1172,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   auto &ti = getTypeInfo(var->getLoweredType());
   if (var->getDecl()) {
     // If we have the VarDecl, use it for more accurate debugging information.
-    DebugTypeInfo DbgTy(var->getDecl(), ti);
+    DebugTypeInfo DbgTy(var->getDecl(),
+                        var->getLoweredType().getSwiftType(), ti);
     gvar = link.createVariable(*this, ti.StorageType, DbgTy,
                                SILLocation(var->getDecl()),
                                var->getDecl()->getName().str());

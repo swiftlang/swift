@@ -563,7 +563,8 @@ public:
     StringRef Name = Decl->getNameStr();
     auto SILVal = i->getOperand();
     Explosion e = getLoweredExplosion(SILVal);
-    DebugTypeInfo DbgTy(Decl, getTypeInfo(SILVal.getType()));
+    DebugTypeInfo DbgTy(Decl, SILVal.getType().getSwiftRValueType(),
+                        getTypeInfo(SILVal.getType()));
     // Emit an -O0 shadow copy for the explosion.
     llvm::SmallVector<llvm::Value *, 8> Copy;
     emitShadowCopy(e.claimAll(), Name, Copy);
@@ -579,7 +580,8 @@ public:
     auto Val = getLoweredAddress(SILVal).getAddress();
     emitDebugVariableDeclaration
       (Builder, Val,
-       DebugTypeInfo(Decl, getTypeInfo(SILVal.getType())),
+       DebugTypeInfo(Decl, SILVal.getType().getSwiftRValueType(),
+                     getTypeInfo(SILVal.getType())),
        i->getDebugScope(), Name);
   }
   void visitLoadWeakInst(LoadWeakInst *i);
@@ -2915,7 +2917,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     // or may not be bad.
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
-       emitShadowCopy(addr.getAddress(), Name), DebugTypeInfo(Decl, type),
+       emitShadowCopy(addr.getAddress(), Name),
+       DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
        i->getDebugScope(), Name, Indirection);
   }
 }

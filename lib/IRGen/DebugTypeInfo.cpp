@@ -104,12 +104,11 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy,
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
                              const TypeInfo &Info)
   : DeclOrContext(Decl) {
-  // Use the sugared version of the type, if there is one.
-  if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl)) {
-    Type = AliasDecl->getAliasType();
-    assert(AliasDecl->getType().getPointer() == Ty.getPointer()
-           && "sugared type and override type disagree");
-  } else
+  // Prefer the original, potentially sugared version of the type if
+  // the type hasn't been mucked with by an optimization pass.
+  if (Decl->getType().getCanonicalTypeOrNull() == Ty.getCanonicalTypeOrNull())
+    Type = Decl->getType().getPointer();
+  else
     Type = Ty.getPointer();
 
   initFromTypeInfo(size, align, StorageType, Info);
