@@ -140,6 +140,14 @@ class ExplicitSelfRequiredTest {
     // Methods follow the same rules as properties, uses of 'self' must be marked with "self."
     doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}}
     doStuff { self.method() }
+
+    // <rdar://problem/18877391> "self." shouldn't be required in the initializer expression in a capture list
+    // This should not produce an error, "x" isn't being captured by the closure.
+    doStuff({ [myX = x] in 4 })
+
+    // This should produce an error, but crashes the compiler earlier.
+    // doStuff({ [myX = {x}] in method() })
+
     return 42
   }
 }

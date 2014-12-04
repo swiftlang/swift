@@ -401,6 +401,9 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
     // self reference.
     SmallVector<Expr*, 2> DiagnosedSelfs;
 
+    /// This is a set of expressions that have already been checked, so they
+    /// should not be re-recursed into.
+    SmallPtrSet<Expr*, 2> AlreadyCheckedSubexprs;
   public:
     explicit DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
 
@@ -412,10 +415,26 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // If we've already prechecked this subexpression, don't walk into it.
+      if (AlreadyCheckedSubexprs.erase(E))
+        return { false, E };
+
       // If this is an explicit closure expression - not an autoclosure - then
       // we keep track of the fact that recursive walks are within the closure.
-      if (isa<ClosureExpr>(E))
+      if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+        // We don't want to consider capture lists part of the closure itself
+        // (even though they are children of the ClosureExpr), so we precheck
+        // them before bumping the "InClosure" count.
+        for (const auto &Capture : CE->getCaptureList()) {
+          if (Capture.Init == nullptr || Capture.Init->getInit() == nullptr)
+            continue;
+
+          Capture.Init->walk(*this);
+          AlreadyCheckedSubexprs.insert(Capture.Init->getInit());
+        }
+
         ++InClosure;
+      }
 
       // If we see a property reference with an implicit base from within a
       // closure, then reject it as requiring an explicit "self." qualifier.  We
