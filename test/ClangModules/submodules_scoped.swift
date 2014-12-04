@@ -1,11 +1,9 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache %s -DCHECK_SCOPING
-// RUN: ls -lR %t/clang-module-cache | FileCheck %s
-// CHECK: ctypes{{.*}}.pcm
-
-// RUN: %swift %clang-importer-sdk -emit-module -o %t -module-cache-path %t/clang-module-cache %s -module-name submodules
-// RUN: echo 'import submodules; println("\(x), \(y)")' | %swift %clang-importer-sdk -parse - -I %t
-// RUN: echo 'import submodules; println("\(x), \(y)")' | not %swift -parse - -I %t 2>&1 | FileCheck -check-prefix=MISSING %s
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %target-swift-frontend %clang-importer-sdk -parse -verify %s -DCHECK_SCOPING
+// RUN: %target-swift-frontend %clang-importer-sdk -emit-module -o %t %s -module-name submodules
+// RUN: echo 'import submodules; println("\(x), \(y)")' | %target-swift-frontend %clang-importer-sdk -parse - -I %t
+// RUN: echo 'import submodules; println("\(x), \(y)")' | not %target-swift-frontend -parse - -I %t 2>&1 | FileCheck -check-prefix=MISSING %s
 
 import typealias ctypes.bits.DWORD
 // MISSING: missing required modules:

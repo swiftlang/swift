@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules  %s -verify
+// RUN: %swift %clang-importer-sdk -parse -I %S/Inputs/custom-modules %s -verify
 
 // Test the use of Objective-C categories on the value types that
 // bridge to Objective-C class types.

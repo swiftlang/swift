@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: not --crash %target-swift-frontend %s -module-cache-path %t/clang-module-cache -emit-silgen
+// RUN: not --crash %target-swift-frontend %s -emit-silgen
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by http://github.com/martijnwalraven (Martijn Walraven)

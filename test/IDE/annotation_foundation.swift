@@ -1,5 +1,4 @@
-// RUN: rm -rf %t.mcp
-// RUN: %swift-ide-test -annotate -source-filename %s -sdk %sdk -target %target-triple -module-cache-path %t.mcp | FileCheck %s
+// RUN: %target-swift-ide-test -annotate -source-filename %s | FileCheck %s
 
 // CHECK: import <iMod>Foundation</iMod>
 import Foundation

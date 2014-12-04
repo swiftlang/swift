@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
 
 import gizmo
 

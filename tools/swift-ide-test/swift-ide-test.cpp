@@ -175,8 +175,7 @@ static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"));
 
 static llvm::cl::opt<std::string>
-ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
-                llvm::cl::init(SWIFT_MODULE_CACHE_PATH));
+ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 static llvm::cl::list<std::string>
 ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));

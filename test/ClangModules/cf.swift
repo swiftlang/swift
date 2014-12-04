@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -parse -verify -import-cf-types -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s
+// RUN: %swift -parse -verify -import-cf-types -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s
 
 import CoreCooling
 

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s | FileCheck %s
+// RUN: %swift %clang-importer-sdk -emit-silgen -target x86_64-apple-macosx10.9 %s | FileCheck %s
 
 import Foundation
 

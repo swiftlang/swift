@@ -1,12 +1,12 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -module-name Foo -o %t -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache %s
+// RUN: %swift -emit-module -module-name Foo -o %t -F %S/Inputs/mock-sdk %s
 //
-// RUN: %swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -module-to-print=Foo -accessibility-filter-public > %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -accessibility-filter-public > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_WITH_OVERLAY -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_NO_INTERNAL -strict-whitespace < %t.printed.txt
 //
-// RUN: %swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -module-to-print=Foo.FooSub > %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo.FooSub > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_WITHOUT_OVERLAY -strict-whitespace < %t.printed.txt
 
 @exported import Foo

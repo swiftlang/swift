@@ -1,8 +1,5 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-
-// RUN: %swift -parse -verify %clang-importer-sdk %s -module-cache-path %t/clang-module-cache
-// RUN: %swift-ide-test -print-usrs -source-filename %s -module-cache-path %t/clang-module-cache %clang-importer-sdk | FileCheck %s -strict-whitespace
+// RUN: %swift -parse -verify %clang-importer-sdk %s
+// RUN: %swift-ide-test -print-usrs -source-filename %s %clang-importer-sdk | FileCheck %s -strict-whitespace
 
 import macros
 

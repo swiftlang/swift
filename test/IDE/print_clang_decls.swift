@@ -4,24 +4,24 @@
 // Instead, it generates custom overlay modules itself, and uses -I %t when it
 // wants to use them.
 
-// RUN: %swift -emit-module -o %t %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
-// RUN: %swift -emit-module -o %t %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN: %swift -emit-module -o %t -I %t %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN: %swift -emit-module -o %t -I %t %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=ctypes -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: %swift -emit-module -o %t %clang-importer-sdk -target x86_64-apple-macosx10.9 %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN: %swift -emit-module -o %t %clang-importer-sdk -target x86_64-apple-macosx10.9 %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN: %swift -emit-module -o %t -I %t %clang-importer-sdk -target x86_64-apple-macosx10.9 %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN: %swift -emit-module -o %t -I %t %clang-importer-sdk -target x86_64-apple-macosx10.9 %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=ctypes -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=TAG_DECLS_AND_TYPEDEFS -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=NEGATIVE -strict-whitespace < %t.printed.txt
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foundation -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foundation -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=AppKit -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=AppKit -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=ctypes.bits -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=ctypes.bits -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=nullability -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=nullability -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt
 
 // TAG_DECLS_AND_TYPEDEFS:      {{^}}struct FooStruct1 {{{$}}

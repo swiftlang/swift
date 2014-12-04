@@ -204,6 +204,8 @@ option(
 option(SWIFT_VERIFY_ALL "Run SIL verification after each transform when building Swift files in the build process" NO)
 option(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE "Should the stdlib be build with assert config set to release" NO)
 option(SWIFT_EMIT_SORTED_SIL "Sort SIL output by name to enable diffing of output" NO)
+
+# FIXME: provide a default value
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
 

@@ -1,9 +1,8 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %s -emit-silgen | FileCheck %s
+// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 %s -emit-silgen | FileCheck %s
 
 // FIXME: The -emit-sil line is there only to check that the generated
 // SIL doesn't freak out DI.
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %s -emit-sil | FileCheck %s
+// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 %s -emit-sil | FileCheck %s
 
 import Foundation
 

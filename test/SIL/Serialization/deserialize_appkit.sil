@@ -1,5 +1,5 @@
 // Make sure that we can deserialize AppKit.
-// RUN: %sil-opt -verify %platform-module-dir/AppKit.swiftmodule -sdk %sdk -target %target-triple > /dev/null
+// RUN: %target-sil-opt -verify %platform-module-dir/AppKit.swiftmodule > /dev/null
 // RUN: llvm-bcanalyzer %platform-module-dir/AppKit.swiftmodule | FileCheck %s
 // REQUIRES: sdk
 // REQUIRES: OS=macosx

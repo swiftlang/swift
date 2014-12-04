@@ -1,5 +1,4 @@
-// RUN: rm -rf %t.mcp
-// RUN: echo '#!%swift_driver_plain -module-cache-path %t.mcp' > %t.shebang.swift
+// RUN: echo '#!%swift_driver_plain' > %t.shebang.swift
 // RUN: cat %s >> %t.shebang.swift
 // RUN: chmod u+x %t.shebang.swift
 

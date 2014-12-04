@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %target-swift-frontend %s -module-cache-path %t/clang-module-cache -emit-ir
+// RUN: %target-swift-frontend %s -emit-ir
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/fluidsonic (Marc Knaup)

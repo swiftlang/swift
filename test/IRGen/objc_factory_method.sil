@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %clang-importer-sdk %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %clang-importer-sdk %s -emit-ir | FileCheck %s
 
 // CHECK: [[SWIFT_TYPE:%swift.type]] = type { i64 }
 sil_stage canonical

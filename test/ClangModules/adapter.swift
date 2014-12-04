@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -parse -verify -module-cache-path %t/clang-module-cache %clang-importer-sdk -I %S/Inputs/custom-modules %s
+// RUN: %swift -parse -verify %clang-importer-sdk -I %S/Inputs/custom-modules %s
 
 // Do not import Foundation! This tests indirect visibility.
 import Redeclaration

@@ -3,10 +3,10 @@
 // RUN: cp -r %S/Inputs/mixed-framework/Mixed.framework %t
 
 // Don't crash if a generated header is present but the swiftmodule is missing.
-// RUN: not %swift %clang-importer-sdk -module-cache-path %t -F %t -parse %s
+// RUN: not %swift %clang-importer-sdk -F %t -parse %s
 
 // RUN: %swiftc_driver -emit-module -o %t/Mixed.framework/Modules/Mixed.swiftmodule/x86_64.swiftmodule %S/Inputs/mixed-framework/Mixed.swift -import-underlying-module -F %t -module-name Mixed -Xfrontend -disable-objc-attr-requires-foundation-module
-// RUN: %swift %clang-importer-sdk -module-cache-path %t -F %t -parse %s -verify
+// RUN: %swift %clang-importer-sdk -F %t -parse %s -verify
 
 // REQUIRES: X86
 

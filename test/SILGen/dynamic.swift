@@ -1,6 +1,5 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | FileCheck %s
-// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
+// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
 
 import Foundation
 import gizmo

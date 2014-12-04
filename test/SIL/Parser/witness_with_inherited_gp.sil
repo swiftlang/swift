@@ -1,4 +1,4 @@
-// RUN: sil-opt %s -verify -module-name WitnessTableWithGP | FileCheck %s
+// RUN: %sil-opt %s -verify -module-name WitnessTableWithGP | FileCheck %s
 import Swift
 
 public struct mmEnumerateGenerator<

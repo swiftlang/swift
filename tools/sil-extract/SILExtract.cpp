@@ -57,8 +57,7 @@ ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
                                          "stdin."));
 
 static llvm::cl::opt<std::string>
-ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
-                llvm::cl::init(SWIFT_MODULE_CACHE_PATH));
+ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for

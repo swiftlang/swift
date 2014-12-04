@@ -1,7 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-
-// RUN: %swift-ide-test -code-completion -source-filename %s -module-cache-path %t/clang-module-cache -sdk %sdk  -code-completion-token=T1 | FileCheck %s -check-prefix=T1
+// RUN: %swift-ide-test -code-completion -source-filename %s -sdk %sdk  -code-completion-token=T1 | FileCheck %s -check-prefix=T1
 
 // REQUIRES: sdk
 

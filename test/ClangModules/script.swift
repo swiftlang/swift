@@ -1,7 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -I=%S/Inputs/custom-modules %s
-// RUN: ls -lR %t/clang-module-cache | FileCheck %s
-// CHECK: script{{.*}}.pcm
+// RUN: %swift %clang-importer-sdk -parse -verify -I %S/Inputs/custom-modules %s
 
 import script // Clang module
 

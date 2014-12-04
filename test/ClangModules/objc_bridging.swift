@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -parse -parse-as-library -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s
+// RUN: %swift %clang-importer-sdk -parse -parse-as-library -verify -target x86_64-apple-macosx10.9 %s
 
 import Foundation
 

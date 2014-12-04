@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path %t/clang-module-cache %clang-importer-sdk -parse %s -verify
+// RUN: %swift %clang-importer-sdk -parse %s -verify
 
 import Foundation
 

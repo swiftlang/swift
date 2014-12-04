@@ -1,7 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s -emit-ir -o - | FileCheck %s
-// RUN: ls -lR %t/clang-module-cache | FileCheck %s --check-prefix=CHECK-LS
-// CHECK-LS: cvars{{.*}}.pcm
+// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 %s -emit-ir -o - | FileCheck %s
 
 import cvars
 

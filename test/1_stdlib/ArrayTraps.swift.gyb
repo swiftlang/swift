@@ -3,7 +3,7 @@
 // RUN: rm -rf %t ; mkdir -p %t
 // RUN: %S/../../utils/gyb -DRUN_TESTS= %s -o %t/ArrayTraps.swift
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/ArrayTraps.swift -Xlinker %t/CatchCrashes.o -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -Xlinker %t/CatchCrashes.o -o %t/a.out
 // RUN: %S/../../utils/gyb -DRUN_TESTS="%target-run %t/a.out" -DSOURCE=%s %s > /dev/null
 //
 // CHECK: OK

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk  -I %S/Inputs/user-module -parse -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 %s -verify
+// RUN: %swift %clang-importer-sdk -I %S/Inputs/user-module -parse -target x86_64-apple-darwin13 %s -verify
 
 // Type checker should not report any errors in the code below.
 

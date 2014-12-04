@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %target-build-swift -module-cache-path %t/clang-module-cache -emit-ir -g %s -o %t.ll
+// RUN: %target-build-swift -emit-ir -g %s -o %t.ll
 // RUN: cat %t.ll | FileCheck %s --check-prefix SANITY
 // RUN: cat %t.ll | FileCheck %s --check-prefix IMPORT-CHECK
 // RUN: cat %t.ll | FileCheck %s --check-prefix LOC-CHECK

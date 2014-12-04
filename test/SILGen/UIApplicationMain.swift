@@ -1,6 +1,5 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -emit-silgen -parse-as-library -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
-// RUN: %swift -emit-ir -parse-as-library -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s -check-prefix=IR
+// RUN: %swift -emit-silgen -parse-as-library -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %swift -emit-ir -parse-as-library -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s -check-prefix=IR
 
 import Foundation
 import UIKit

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -I=%S/Inputs/custom-modules %s -parse -verify
+// RUN: %swift %clang-importer-sdk -I %S/Inputs/custom-modules %s -parse -verify
 
 import ExternIntX
 

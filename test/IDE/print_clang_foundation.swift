@@ -1,10 +1,10 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// RUN: %swift-ide-test -print-module -source-filename %s -sdk %sdk -target %target-triple -module-to-print=Foundation.NSArray -function-definitions=false -module-cache-path=%t/mcp > %t/Foundation.NSArray.printed.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSArray -function-definitions=false > %t/Foundation.NSArray.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSArray.printed.txt -check-prefix=CHECK1 %s
 
-// RUN: %swift-ide-test -print-module -source-filename %s -sdk %sdk -target %target-triple -module-to-print=Foundation.NSArray -function-definitions=false -module-cache-path=%t/mcp > %t/Foundation.NSArray-failable-inits.printed.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSArray -function-definitions=false > %t/Foundation.NSArray-failable-inits.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSArray-failable-inits.printed.txt -check-prefix=CHECK1-FAILABLE-INITS %s
 
 // CHECK1: class NSMutableArray : NSArray
@@ -15,12 +15,12 @@
 // init()CHECK1-FAILABLE-INITS: convenience init?(contentsOfFile path: String)
 // init()CHECK1-FAILABLE-INITS: convenience init?(contentsOfURL url: NSURL)
 
-// RUN: %swift-ide-test -print-module -source-filename %s -sdk %sdk -target %target-triple -module-to-print=Foundation.NSKeyValueCoding -function-definitions=false -print-regular-comments -module-cache-path=%t/mcp > %t/Foundation.NSKeyValueCoding.printed.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSKeyValueCoding -function-definitions=false -print-regular-comments > %t/Foundation.NSKeyValueCoding.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSKeyValueCoding.printed.txt -check-prefix=CHECK2 %s
 
 // CHECK2: extension NSObject
 
-// RUN: %swift-ide-test -print-module -source-filename %s -sdk %sdk -target %target-triple -module-to-print=Foundation.NSString -function-definitions=false -module-cache-path=%t/mcp > %t/Foundation.NSString.printed.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSString -function-definitions=false > %t/Foundation.NSString.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSString.printed.txt -check-prefix=CHECK_NSSTRING %s
 // RUN: FileCheck -input-file %t/Foundation.NSString.printed.txt -check-prefix=CHECK_DICTIONARY %s
 

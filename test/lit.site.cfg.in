@@ -12,7 +12,6 @@ config.swift_src_root = "@SWIFT_SOURCE_DIR@"
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@TARGET_TRIPLE@"
 config.targets_to_build = "@TARGETS_TO_BUILD@"
-config.module_cache_path = "@SWIFT_MODULE_CACHE_PATH@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
 

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t.mcp
-// RUN: %swift %clang-importer-sdk -emit-silgen %s -module-cache-path %t.mcp | FileCheck %s
+// RUN: %swift %clang-importer-sdk -emit-silgen %s | FileCheck %s
 
 import Foundation
 

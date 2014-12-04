@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache %s -parse -emit-objc-header-path %t/empty.h
+// RUN: %swift %clang-importer-sdk %s -parse -emit-objc-header-path %t/empty.h
 // RUN: FileCheck %s < %t/empty.h
 // RUN: %check-in-clang %t/empty.h
 // RUN: %check-in-clang -fno-modules %t/empty.h

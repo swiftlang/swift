@@ -1,9 +1,8 @@
-// RUN: rm -rf %t/clang-module-cache
 // RUN: rm -rf %t/APINotes
 // RUN: mkdir -p %t/APINotes
 // RUN: %clang_apinotes -yaml-to-binary %S/Inputs/gizmo.apinotes -o %t/APINotes/gizmo.apinotesc
-// RUN: %swift -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | FileCheck -check-prefix=SILGEN %s
-// RUN: %swift -emit-sil -O -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | FileCheck -check-prefix=OPT %s
+// RUN: %swift -emit-silgen -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | FileCheck -check-prefix=SILGEN %s
+// RUN: %swift -emit-sil -O -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | FileCheck -check-prefix=OPT %s
 
 import Foundation
 import gizmo

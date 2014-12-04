@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %target-build-swift -Xfrontend %clang-importer-sdk -module-cache-path %t/clang-module-cache -I=%S/Inputs/abi %s -emit-ir | FileCheck -check-prefix=%target-cpu-%target-os %s
+// RUN: %target-build-swift -Xfrontend %clang-importer-sdk -I=%S/Inputs/abi %s -emit-ir | FileCheck -check-prefix=%target-cpu-%target-os %s
 
 import gadget
 import Foundation

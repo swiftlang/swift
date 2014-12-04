@@ -1,5 +1,4 @@
-// RUN: rm -rf %t.mcp
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PA -code-completion-keywords=false -F %S/Inputs/mock-sdk -module-cache-path %t.mcp > %t.txt
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PA -code-completion-keywords=false -F %S/Inputs/mock-sdk > %t.txt
 // RUN: FileCheck %s -check-prefix=CHECK1 < %t.txt
 
 import Foo

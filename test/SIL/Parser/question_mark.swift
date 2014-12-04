@@ -1,4 +1,5 @@
-// RUN: %swift %s -emit-silgen | sil-opt -verify
+// RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt -verify
+
 infix operator ?? {
   associativity right
   precedence 110

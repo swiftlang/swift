@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %swift -emit-ir -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t -primary-file %s | FileCheck %s
+// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %t -primary-file %s | FileCheck %s
 
 import Foundation
 

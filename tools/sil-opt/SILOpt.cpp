@@ -320,8 +320,7 @@ EmitVerboseSIL("emit-verbose-sil",
                llvm::cl::desc("Emit locations during sil emission."));
 
 static llvm::cl::opt<std::string>
-ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
-                llvm::cl::init(SWIFT_MODULE_CACHE_PATH));
+ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 static llvm::cl::opt<bool>
 EnableSILSortOutput("sil-sort-output", llvm::cl::Hidden,
@@ -521,6 +520,11 @@ int main(int argc, char **argv) {
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
   // Set the SDK path and target if given.
+  if (SDKPath.getNumOccurrences() == 0) {
+    const char *SDKROOT = getenv("SDKROOT");
+    if (SDKROOT)
+      SDKPath = SDKROOT;
+  }
   if (!SDKPath.empty())
     Invocation.setSDKPath(SDKPath);
   if (!Target.empty())

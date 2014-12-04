@@ -1,2 +1,2 @@
-// RUN: %swift %s -emit-sil -Ounchecked | sil-opt -verify
+// RUN: %target-swift-frontend %s -emit-sil -Ounchecked | %target-sil-opt -verify
 var W = [UInt32](count: 16, repeatedValue: 0)
