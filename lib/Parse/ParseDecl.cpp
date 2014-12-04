@@ -947,7 +947,6 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
 ///     'infix' '=' numeric_constant
 ///     'unary'
 ///     'stdlib'
-///     'strong'
 ///     'weak'
 ///     'inout'
 ///     'unowned'

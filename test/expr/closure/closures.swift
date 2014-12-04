@@ -193,6 +193,11 @@ extension SomeClass {
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
 
   }
+
+  func strong_in_capture_list() {
+    // <rdar://problem/18819742> QOI: "[strong self]" in capture list generates unhelpful error message
+    var fn = {[strong self] () -> () in return }  // expected-error {{expected 'weak', 'unowned', or no specifier in capture list}}
+  }
 }
 
 
