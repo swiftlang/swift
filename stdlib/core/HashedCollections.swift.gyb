@@ -578,8 +578,13 @@ public struct _Set<T : Hashable> :
   public func intersect<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> _Set<T> {
-    var newSet = self
-    newSet.intersectInPlace(sequence)
+    let other = (sequence as? _Set<T>) ?? _Set(sequence)
+    var newSet = _Set<T>()
+    for member in self {
+      if other.contains(member) {
+        newSet.insert(member)
+      }
+    }
     return newSet
   }
 
@@ -587,16 +592,16 @@ public struct _Set<T : Hashable> :
   public mutating func intersectInPlace<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) {
-    // We only want a single pass over the sequence.
-    // If the sequence is on the left-hand side, it must be a set.
-    // If the sequence is on the right-hand side, it must support
-    // O(1) `contains`, and the only way to do that is to make it
-    // a set.
-    let other = _Set(sequence)
-    for member in self {
-      if !other.contains(member) {
-        remove(member)
-      }
+    // Because `intersect` needs to both modify and iterate over
+    // the left-hand side, the index may become invalidated during
+    // traversal so an intermediate set must be created.
+    var result = self.intersect(sequence)
+
+    // The result can only have fewer or the same number of elements.
+    // If no elements were removed, don't perform a reassignment
+    // as this may cause an unnecessary uniquing COW.
+    if result.count != count {
+      self = result
     }
   }
 
