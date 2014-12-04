@@ -57,7 +57,7 @@ private:
   void printTypeRef(const TypeDecl *TD, Identifier Name) override {
     return OtherPrinter.printTypeRef(TD, Name);
   }
-  void printModuleRef(const Module *Mod, Identifier Name) override {
+  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     return OtherPrinter.printModuleRef(Mod, Name);
   }
 

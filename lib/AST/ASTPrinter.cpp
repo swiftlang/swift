@@ -77,6 +77,10 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   printText(Text);
 }
 
+void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
+  printName(Name);
+}
+
 ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
   llvm::SmallString<32> Str;
   llvm::raw_svector_ostream OS(Str);

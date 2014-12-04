@@ -1240,7 +1240,7 @@ public:
     StreamPrinter::printTypeRef(TD, Name);
     OS << "</ref>";
   }
-  void printModuleRef(const Module *Mod, Identifier Name) override {
+  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     OS << "<ref:module>";
     StreamPrinter::printModuleRef(Mod, Name);
     OS << "</ref>";

@@ -27,6 +27,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/SourceManager.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -1571,4 +1572,32 @@ void *FileUnit::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
 
 StringRef LoadedFile::getFilename() const {
   return "";
+}
+
+StringRef ModuleEntity::getName() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod->getName().str();
+  return Mod.get<const clang::Module*>()->Name;
+}
+
+std::string ModuleEntity::getFullName() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod->getName().str();
+  return Mod.get<const clang::Module*>()->getFullModuleName();
+}
+
+bool ModuleEntity::isSystemModule() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod->isSystemModule();
+  return Mod.get<const clang::Module*>()->IsSystem;
+}
+
+bool ModuleEntity::isBuiltinModule() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod->isBuiltinModule();
+  return false;
 }

@@ -997,6 +997,25 @@ inline FileUnit &Module::getMainFile(FileUnitKind expectedKind) const {
   return *Files.front();
 }
 
+/// Wraps either a swift module or a clang one.
+/// FIXME: Should go away once swift modules can support submodules natively.
+class ModuleEntity {
+  llvm::PointerUnion<const Module *, const clang::Module *> Mod;
+
+public:
+  ModuleEntity() = default;
+  ModuleEntity(const Module *Mod) : Mod(Mod) {}
+  ModuleEntity(const clang::Module *Mod) : Mod(Mod) {}
+
+  StringRef getName() const;
+  std::string getFullName() const;
+
+  bool isSystemModule() const;
+  bool isBuiltinModule() const;
+
+  explicit operator bool() const { return !Mod.isNull(); }
+};
+
 } // end namespace swift
 
 namespace llvm {

@@ -27,34 +27,6 @@
 using namespace swift;
 using namespace ide;
 
-StringRef ModuleEntity::getName() const {
-  assert(!Mod.isNull());
-  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
-    return SwiftMod->getName().str();
-  return Mod.get<const clang::Module*>()->Name;
-}
-
-std::string ModuleEntity::getFullName() const {
-  assert(!Mod.isNull());
-  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
-    return SwiftMod->getName().str();
-  return Mod.get<const clang::Module*>()->getFullModuleName();
-}
-
-bool ModuleEntity::isSystemModule() const {
-  assert(!Mod.isNull());
-  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
-    return SwiftMod->isSystemModule();
-  return Mod.get<const clang::Module*>()->IsSystem;
-}
-
-bool ModuleEntity::isBuiltinModule() const {
-  assert(!Mod.isNull());
-  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
-    return SwiftMod->isBuiltinModule();
-  return false;
-}
-
 namespace {
 
 class SemaAnnotator : public ASTWalker {
@@ -435,6 +407,11 @@ bool SourceEntityWalker::walk(DeclContext *DC) {
 bool SourceEntityWalker::visitCallArgName(Identifier Name,
                                           CharSourceRange Range,
                                           ValueDecl *D) {
+  return true;
+}
+
+bool SourceEntityWalker::visitModuleReference(ModuleEntity Mod,
+                                              CharSourceRange Range) {
   return true;
 }
 

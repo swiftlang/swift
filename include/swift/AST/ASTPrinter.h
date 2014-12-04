@@ -20,7 +20,7 @@
 
 namespace swift {
   class Decl;
-  class Module;
+  class ModuleEntity;
   class TypeDecl;
 
 /// An abstract class used to print an AST.
@@ -53,9 +53,7 @@ public:
     printName(Name);
   }
   /// Called when printing the referenced name of a module.
-  virtual void printModuleRef(const Module *Mod, Identifier Name) {
-    printName(Name);
-  }
+  virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
 
   // Helper functions.
 
