@@ -1188,6 +1188,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
     .Case("load_weak", ValueKind::LoadWeakInst)
+    .Case("mark_dependence", ValueKind::MarkDependenceInst)
     .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
@@ -1842,6 +1843,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
 
     ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
+    break;
+  }
+
+  case ValueKind::MarkDependenceInst: {
+    SILValue Base;
+    if (parseTypedValueRef(Val) ||
+        parseVerbatim("on") ||
+        parseTypedValueRef(Base))
+      return true;
+
+    ResultVal = B.createMarkDependence(InstLoc, Val, Base);
     break;
   }
       

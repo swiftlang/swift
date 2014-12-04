@@ -1425,6 +1425,108 @@ of the values from which the addresses were derived, ignoring "blessed"
 alias-introducing operations such as ``pointer_to_address``, the ``bitcast``
 intrinsic, and the ``inttoptr`` intrinsic.
 
+Value Dependence
+----------------
+
+In general, analyses can assume that independent values are
+independently assured of validity.  For example, a class method may
+return a class reference::
+
+  bb0(%0 : $MyClass):
+    %1 = class_method %0 : $MyClass, #MyClass.foo!1
+    %2 = apply %1(%0) : $@cc(method) @thin (@guaranteed MyClass) -> @owned MyOtherClass
+    // use of %2 goes here; no use of %1
+    strong_release %2 : $MyOtherClass
+    strong_release %1 : $MyClass
+
+The optimizer is free to move the release of ``%1`` to immediately
+after the call here, because ``%2`` can be assumed to be an
+independently-managed value, and because Swift generally permits the
+reordering of destructors.
+
+However, some instructions do create values that are intrinsically
+dependent on their operands.  For example, the result of
+``ref_element_addr`` will become a dangling pointer if the base is
+released too soon.  This is captured by the concept of *value dependence*,
+and any transformation which can reorder of destruction of a value
+around another operation must remain conscious of it.
+
+A value ``%1`` is said to be *value-dependent* on a value ``%0`` if:
+
+- ``%1`` is the result and ``%0`` is the first operand of one of the
+  following instructions:
+
+  - ``ref_element_addr``
+  - ``struct_element_addr``
+  - ``tuple_element_addr``
+  - ``unchecked_take_enum_data_addr``
+  - ``pointer_to_address``
+  - ``address_to_pointer``
+  - ``index_addr``
+  - ``index_raw_pointer``
+  - possibly some other conversions
+
+- ``%1`` is the result of ``mark_dependence`` and ``%0`` is either of
+  the operands.
+
+- ``%1`` is the value address of an allocation instruction of which
+  ``%0`` is the local storage token or box reference.
+
+- ``%1`` is the result of a ``struct``, ``tuple``, or ``enum``
+  instruction and ``%0`` is an operand.
+
+- ``%1`` is the result of projecting out a subobject of ``%0``
+  with ``tuple_extract``, ``struct_extract``, ``unchecked_enum_data``,
+  ``select_enum``, or ``select_enum_addr``.
+
+- ``%1`` is the result of ``select_value`` and ``%0`` is one of the cases.
+
+- ``%1`` is a basic block parameter and ``%0`` is the corresponding
+  argument from a branch to that block.
+
+- ``%1`` is the result of a ``load`` from ``%0``.  However, the value
+  dependence is cut after the first attempt to manage the value of
+  ``%1``, e.g. by retaining it.
+
+- Transitivity: there exists a value ``%2`` which ``%1`` depends on
+  and which depends on ``%0``.  However, transitivity does not apply
+  to different subobjects of a struct, tuple, or enum.
+
+Note, however, that an analysis is not required to track dependence
+through memory.  Nor is it required to consider the possibility of
+dependence being established "behind the scenes" by opaque code, such
+as by a method returning an unsafe pointer to a class property.  The
+dependence is required to be locally obvious in a function's SIL
+instructions.  Precautions must be taken against this either by SIL
+generators (by using ``mark_dependence`` appropriately) or by the user
+(by using the appropriate intrinsics and attributes with unsafe
+language or library features).
+
+Only certain types of SIL value can carry value-dependence:
+
+- SIL address types
+- unmanaged pointer types:
+  - ``@sil_unmanaged`` types
+  - ``Builtin.RawPointer``
+  - aggregates containing such a type, such as ``UnsafePointer``,
+    possibly recursively
+- non-trivial types (but they can be independently managed)
+
+This rule means that casting a pointer to an integer type breaks
+value-dependence.  This restriction is necessary so that reading an
+``Int`` from a class doesn't force the class to be kept around!
+A class holding an unsafe reference to an object must use some
+sort of unmanaged pointer type to do so.
+
+This rule does not include generic or resilient value types which
+might contain unmanaged pointer types.  Analyses are free to assume
+that e.g. a ``copy_addr`` of a generic or resilient value type yields
+an independently-managed value.  The extension of value dependence to
+types containing obvious unmanaged pointer types is an affordance to
+make the use of such types more convenient; it does not shift the
+ultimate responsibility for assuring the safety of unsafe
+language/library features away from the user.
+
 Instruction Set
 ---------------
 
@@ -2012,6 +2114,30 @@ Acts as a use of a value operand, or of the value in memory referenced by an
 address operand. Optimizations may not move operations that would destroy the
 value, such as ``release_value``, ``strong_release``, ``copy_addr [take]``, or
 ``destroy_addr``, past this instruction.
+
+mark_dependence
+```````````````
+
+::
+
+  sil-instruction :: 'mark_dependence' sil-operand 'on' sil-operand
+
+  %2 = mark_dependence %0 : $*T on %1 : $Builtin.NativeObject
+
+Indicates that the validity of the first operand depends on the value
+of the second operand.  Operations that would destroy the second value
+must not be moved before any instructions which depend on the result
+of this instruction, exactly as if the address had been obviously
+derived from that operand (e.g. using ``ref_element_addr``).
+
+The result is always equal to the first operand.  The first operand
+will typically be an address, but it could be an address in a
+non-obvious form, such as a Builtin.RawPointer or a struct containing
+the same.  Transformations should be somewhat forgiving here.
+
+The second operand may have either object or address type.  In the
+latter case, the dependency is on the current value stored in the
+address.
 
 copy_block
 ``````````

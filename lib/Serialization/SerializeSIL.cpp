@@ -831,6 +831,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     FuncsToDeclare.insert(ReferencedFunction);
     break;
   }
+  case ValueKind::MarkDependenceInst:
   case ValueKind::IndexAddrInst:
   case ValueKind::IndexRawPointerInst: {
     SILValue operand, operand2;
@@ -839,6 +840,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       const IndexRawPointerInst *IRP = cast<IndexRawPointerInst>(&SI);
       operand = IRP->getBase();
       operand2 = IRP->getIndex();
+    } else if (SI.getKind() == ValueKind::MarkDependenceInst) {
+      const MarkDependenceInst *MDI = cast<MarkDependenceInst>(&SI);
+      operand = MDI->getValue();
+      operand2 = MDI->getBase();
     } else {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();

@@ -777,6 +777,11 @@ namespace {
 
       SILValue address = addressAndNeedsWriteback.first;
 
+      // Mark a value-dependence on the base.
+      if (base && base.hasCleanup()) {
+        address = gen.B.createMarkDependence(loc, address, base.getValue());
+      }
+
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct
       // access for stored properties with didSet.

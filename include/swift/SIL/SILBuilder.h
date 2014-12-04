@@ -806,6 +806,11 @@ public:
       return;
     createFixLifetime(Loc, Operand);
   }
+  MarkDependenceInst *createMarkDependence(SILLocation loc,
+                                           SILValue value,
+                                           SILValue base) {
+    return insert(new (F.getModule()) MarkDependenceInst(loc, value, base));
+  }
   
   DeallocStackInst *createDeallocStack(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) DeallocStackInst(loc, operand));

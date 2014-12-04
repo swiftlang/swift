@@ -214,6 +214,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DebugValueAddrInst:
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
+    case ValueKind::MarkDependenceInst:
     case ValueKind::FunctionRefInst:
     case ValueKind::GlobalAddrInst:
       return InlineCost::Free;

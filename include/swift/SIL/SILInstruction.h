@@ -2653,6 +2653,30 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
+/// MarkDependenceInst - Marks that one value depends on another for
+/// validity in a non-obvious way.
+class MarkDependenceInst : public SILInstruction {
+  enum { Value, Base };
+  FixedOperandList<2> Operands;
+public:
+  MarkDependenceInst(SILLocation loc, SILValue value, SILValue base)
+    : SILInstruction(ValueKind::MarkDependenceInst, loc, value.getType()),
+      Operands{this, value, base}
+  {}
+
+  SILValue getValue() const { return Operands[Value].get(); }
+  SILValue getBase() const { return Operands[Base].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::MarkDependenceInst;
+  }
+};
+
 /// Promote an Objective-C block that is on the stack to the heap, or simply
 /// retain a block that is already on the heap.
 class CopyBlockInst :

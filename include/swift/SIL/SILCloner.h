@@ -1225,6 +1225,15 @@ SILCloner<ImplClass>::visitFixLifetimeInst(FixLifetimeInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createMarkDependence(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getValue()),
+                                      getOpValue(Inst->getBase())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createStrongRelease(getOpLocation(Inst->getLoc()),

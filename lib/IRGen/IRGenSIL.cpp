@@ -626,6 +626,7 @@ public:
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
   
   void visitFixLifetimeInst(FixLifetimeInst *i);
+  void visitMarkDependenceInst(MarkDependenceInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
@@ -2738,6 +2739,19 @@ void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType()))
     .fixLifetime(*this, in);
+}
+
+void IRGenSILFunction::visitMarkDependenceInst(swift::MarkDependenceInst *i) {
+  // Dependency-marking is purely for SIL.  Just forward the input as
+  // the result.
+
+  SILValue value = i->getValue();
+  if (value.getType().isAddress()) {
+    setLoweredAddress(i, getLoweredAddress(value));
+  } else {
+    Explosion temp = getLoweredExplosion(value);
+    setLoweredExplosion(i, temp);
+  }
 }
 
 void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {

@@ -1093,6 +1093,10 @@ public:
   void visitFixLifetimeInst(FixLifetimeInst *RI) {
     OS << "fix_lifetime " << getIDAndType(RI->getOperand());
   }
+  void visitMarkDependenceInst(MarkDependenceInst *MDI) {
+    OS << "mark_dependence " << getIDAndType(MDI->getValue())
+       << " on " << getIDAndType(MDI->getBase());
+  }
   void visitCopyBlockInst(CopyBlockInst *RI) {
     OS << "copy_block " << getIDAndType(RI->getOperand());
   }

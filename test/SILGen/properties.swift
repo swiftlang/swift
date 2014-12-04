@@ -195,8 +195,9 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : Ref -> (Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.Int1)
   // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[VAL_REF]])
   // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Builtin.Int1), 0
-  // CHECK: [[VAL_REF_VAL_PROP_MAT:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
+  // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
   // CHECK: [[NEEDS_WRITEBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Builtin.Int1), 1  
+  // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: retain_value [[LD]]

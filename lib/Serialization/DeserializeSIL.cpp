@@ -1000,6 +1000,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                             getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
+  case ValueKind::MarkDependenceInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultVal = Builder.createMarkDependence(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty,  (SILValueCategory)TyCategory)),
+        getLocalValue(ValID2, ValResNum2,
+                      getSILType(Ty2,  (SILValueCategory)TyCategory2)));
+    break;
+  }
   case ValueKind::IndexAddrInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);

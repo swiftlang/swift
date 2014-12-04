@@ -51,8 +51,9 @@ func test0(ref: A) {
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $A, #A.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], %0)
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
-// CHECK-NEXT: [[TEMP2:%.*]] = pointer_to_address [[T3]]
+// CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[SHOULD_WRITEBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
+// CHECK-NEXT: [[TEMP2:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on %0 : $A
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11OrdinarySubs9subscriptFSiSi
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[TEMP2]])
@@ -106,8 +107,9 @@ func test1(ref: B) {
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $B, #B.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], %0)
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
-// CHECK-NEXT: [[TEMP:%.*]] = pointer_to_address [[T3]]
+// CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[SHOULD_WRITEBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
+// CHECK-NEXT: [[TEMP:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubg9subscriptFSiSi : $@cc(method) @thin (Int, @inout MutatingSub) -> Int 
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[TEMP]])
@@ -126,8 +128,9 @@ func test1(ref: B) {
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $B, #B.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], %0)
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
-// CHECK-NEXT: [[TEMP:%.*]] = pointer_to_address [[T3]]
+// CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[SHOULD_WRITEBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
+// CHECK-NEXT: [[TEMP:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubs9subscriptFSiSi : $@cc(method) @thin (Int, Int, @inout MutatingSub) -> () 
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[TEMP]])
