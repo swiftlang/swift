@@ -1787,16 +1787,22 @@ static Expr *createPropertyLoadOrCallSuperclassGetter(FuncDecl *accessor,
 /// Otherwise return null.
 static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
                                           DeclContext *DC) {
-
-  // Perform standard value name lookup.
-  UnqualifiedLookup Lookup(DeclName(TC.Context.getIdentifier("NSCopying")),
-                           DC, &TC, SourceLoc());
-
-  if (!Lookup.isSuccess() || Lookup.Results.size() != 1 ||
-      !Lookup.Results[0].hasValueDecl())
+  ASTContext &ctx = TC.Context;
+  auto foundation = ctx.getLoadedModule(ctx.getIdentifier("Foundation"));
+  if (!foundation)
     return nullptr;
 
-  return dyn_cast<ProtocolDecl>(Lookup.Results[0].getValueDecl());
+  SmallVector<ValueDecl *, 2> results;
+  DC->lookupQualified(ModuleType::get(foundation),
+                      ctx.getIdentifier("NSCopying"),
+                      NL_QualifiedDefault | NL_KnownPrivateDependency,
+                      /*resolver=*/nullptr,
+                      results);
+
+  if (results.size() != 1)
+    return nullptr;
+
+  return dyn_cast<ProtocolDecl>(results.front());
 }
 
 
