@@ -3023,10 +3023,13 @@ namespace {
       // code.
       if (!SuppressDiagnostics)
         if (auto *Bind = dyn_cast<BindOptionalExpr>(
-                        expr->getSubExpr()->getSemanticsProvidingExpr()))
+                        expr->getSubExpr()->getSemanticsProvidingExpr())) {
           if (Bind->getSubExpr()->getType()->isEqual(optType))
             cs.TC.diagnose(expr->getLoc(), diag::optional_chain_noop,
                            optType).fixItRemove(Bind->getQuestionLoc());
+          else
+            cs.TC.diagnose(expr->getLoc(), diag::optional_chain_isnt_chaining);
+        }
 
       Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
                                    cs.getConstraintLocator(expr));

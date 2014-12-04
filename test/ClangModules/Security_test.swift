@@ -14,7 +14,7 @@ func testIntegration() {
   let status = SecItemCopyMatching(query, &dataTypeRef)
   
   if status == errSecSuccess {
-    if let filledRef = dataTypeRef? {
+    if let filledRef = dataTypeRef {
       let str: NSString = filledRef.takeRetainedValue() as NSString
       println("Got: \(str)")
     }

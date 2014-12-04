@@ -244,6 +244,9 @@ ERROR(downcast_to_more_optional,sema_tcc,none,
 ERROR(optional_chain_noop,sema_tcc,none,
       "optional chain has no effect, expression already produces %0",
       (Type))
+ERROR(optional_chain_isnt_chaining,sema_tcc,none,
+      "'?' must be followed by a call, member lookup, or subscript",
+      ())
 ERROR(pattern_in_expr,sema_tcc,none,
       "%0 cannot appear in an expression", (PatternKind))
 NOTE(note_call_to_operator,sema_tcc,none,
