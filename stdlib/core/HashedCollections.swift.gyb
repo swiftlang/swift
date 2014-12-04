@@ -391,11 +391,10 @@ public struct _Set<T : Hashable> :
     _variantStorage.removeAll(keepCapacity: keepCapacity)
   }
 
-  /// Remove a member of the set and return it. Requires: count > 0
-  public mutating func removeFirst() -> T {
-    let member = first!
-    remove(member)
-    return member
+  /// Remove a member from the set and return it if `count` > 0,
+  /// else return `nil`.
+  public mutating func removeAny() -> T? {
+    return (count > 0) ? remove(any!) : nil
   }
 
   /// The number of members in the set.
@@ -471,8 +470,8 @@ public struct _Set<T : Hashable> :
     }
   }
 
-  /// Return the first found member if count > 0, else return `nil`.
-  public var first: T? {
+  /// Return any member of the set if `count` > 0, else return `nil`.
+  public var any: T? {
     return count > 0 ? self[startIndex] : .None
   }
 

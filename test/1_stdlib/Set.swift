@@ -891,11 +891,11 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   }
 }
 
-SetTestSuite.test("COW.Fast.FirstDoesNotReallocate") {
+SetTestSuite.test("COW.Fast.AnyDoesNotReallocate") {
   var s = getCOWFastSet()
   var identity1 = unsafeBitCast(s, Word.self)
 
-  expectNotEmpty(s.first)
+  expectNotEmpty(s.any)
   expectEqual(identity1, unsafeBitCast(s, Word.self))
 }
 
@@ -907,11 +907,11 @@ SetTestSuite.test("COW.Fast.CountDoesNotReallocate") {
   expectEqual(identity1, unsafeBitCast(s, Word.self))
 }
 
-SetTestSuite.test("COW.Slow.FirstDoesNotReallocate") {
+SetTestSuite.test("COW.Slow.AnyDoesNotReallocate") {
   var s = getCOWSlowSet()
   var identity1 = unsafeBitCast(s, Word.self)
 
-  expectNotEmpty(s.first)
+  expectNotEmpty(s.any)
   expectEqual(identity1, unsafeBitCast(s, Word.self))
 }
 
@@ -2799,7 +2799,22 @@ SetTestSuite.test("exclusiveOrInPlace") {
   expectNotEqual(identity1, unsafeBitCast(s1, Word.self))
 }
 
-SetTestSuite.test("removeMember") {
+SetTestSuite.test("removeAny") {
+  var s1 = _Set([1010, 2020, 3030])
+  let s2 = s1
+  let empty = _Set<Int>()
+
+  let any = s1.removeAny()
+  expectNotEmpty(any)
+
+  expectFalse(s1.contains(any!))
+  expectTrue(s2.contains(any!))
+  expectNotEqual(unsafeBitCast(s1, Word.self), unsafeBitCast(s2, Word.self))
+  expectTrue(s1.isSubsetOf(s2))
+  expectEmpty(empty.any)
+}
+
+SetTestSuite.test("remove(member)") {
   let s1 = _Set([1010, 2020, 3030])
   var s2 = _Set<Int>(minimumCapacity: 10)
   for i in [1010, 2020, 3030] {
@@ -2836,15 +2851,12 @@ SetTestSuite.test("memberAtIndex") {
   expectEqual(1010, s1[foundIndex])
 }
 
-SetTestSuite.test("first") {
+SetTestSuite.test("any") {
   let s1 = _Set([1010, 2020, 3030])
   let emptySet = _Set<Int>()
 
-  let a1 = s1.first
-  expectTrue(s1.contains(a1!))
-
-  let none = emptySet.first
-  expectEmpty(none)
+  expectTrue(s1.contains(s1.any!))
+  expectEmpty(emptySet.any)
 }
 
 SetTestSuite.test("count") {
