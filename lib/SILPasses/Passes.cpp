@@ -130,6 +130,9 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   // Cleanup.
   PM.add(createDCE());
   PM.add(createCOWArrayOpts());
+  // Cleanup.
+  PM.add(createDCE());
+  PM.add(createSwiftArrayOpts());
 }
 
 void AddLowLevelLoopOptPasses(SILPassManager &PM) {

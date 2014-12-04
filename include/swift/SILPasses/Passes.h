@@ -89,6 +89,7 @@ namespace swift {
   SILTransform *createABCOpt();
   SILTransform *createCapturePropagation();
   SILTransform *createCopyForwarding();
+  SILTransform *createSwiftArrayOpts();
 
   // Utilities
   SILTransform *createStripDebug();
