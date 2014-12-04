@@ -14,6 +14,8 @@
 // CHECK-NEXT: "MyArray"
 // CHECK-NEXT: "someGlobal"
 // CHECK-NEXT: "ExtraFloatLiteralConvertible"
+// CHECK-NEXT: "~~~"
+// CHECK-NEXT: "ThreeTildeType"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
 // CHECK-NEXT: "Outer"
 // CHECK: "eof"
@@ -75,6 +77,17 @@ protocol ExtraFloatLiteralConvertible
 // CHECK-DAG: !private "UnicodeScalarLiteralConvertible"
 private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
 }
+
+prefix operator ~~~ {}
+protocol ThreeTildeType {
+  prefix func ~~~(lhs: Self)
+}
+
+private struct ThreeTildeTypeImpl : ThreeTildeType {
+}
+
+// CHECK-DAG: !private "~~~"
+private prefix func ~~~(_: ThreeTildeTypeImpl) {}
 
 func lookUpManyTopLevelNames() {
   // CHECK-DAG: !private "Dictionary"
