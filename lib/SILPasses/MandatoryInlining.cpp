@@ -410,6 +410,11 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         ApplySubs.insert(ApplySubs.end(), PAISubs.begin(), PAISubs.end());
       }
 
+      if (hasAnyExistentialTypes(ApplySubs)) {
+        I = InnerAI;
+        continue;
+      }
+
       ContextSubs.copyFrom(CalleeFunction->getContextGenericParams()
                                          ->getSubstitutionMap(ApplySubs));
 
