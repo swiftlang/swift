@@ -2764,11 +2764,11 @@ SetTestSuite.test("exclusiveOr") {
 
   expectEqual(s3, result)
 
-  // A ⨁ B == (A ∪ B) ⋂ ⌐(A ∩ B)
+  // A ⨁ B == (A ∪ B) ⋂ ¬(A ∩ B)
   expectEqual(s1.exclusiveOr(s2),
     s1.union(s2).intersect(universe.subtract(s1.intersect(s2))))
 
-  // A ⨁ B == (A ⋂ ⌐B) ∪ (⌐A ∩ B)
+  // A ⨁ B == (A ⋂ ¬B) ∪ (¬A ∩ B)
   expectEqual(s1.exclusiveOr(s2),
     s1.intersect(universe.subtract(s2)).union(universe.subtract(s1).intersect(s2)))
 
