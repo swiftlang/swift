@@ -595,6 +595,9 @@ public struct _Set<T : Hashable> :
     // Because `intersect` needs to both modify and iterate over
     // the left-hand side, the index may become invalidated during
     // traversal so an intermediate set must be created.
+    //
+    // FIXME(performance): perform this operation at a lower level
+    // to avoid invalidating the index and avoiding a copy.
     var result = self.intersect(sequence)
 
     // The result can only have fewer or the same number of elements.
