@@ -137,7 +137,10 @@ class CallGraphNode {
   /// The call sites within this function. This CallGraph node owns these.
   llvm::SmallVector<CallGraphEdge *, 4> CallSites;
 
-  /// Do we know all the potential callers of this function?
+  /// Do we know all the potential callers of this function? We initialize this
+  /// to !canHaveIndirectUses(F) optimistically and if we find any use that we
+  /// can not prove does not cause a reference to a function_ref to escape in a
+  /// we set this to false.
   bool CallerSetComplete;
 
 public:

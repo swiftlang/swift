@@ -168,7 +168,8 @@ void CallGraph::addEdges(SILFunction *F) {
               return !isa<ApplyInst>(Op->getUser());
             });
 
-          // If we have a non-apply user of this function, return false.
+          // If we have a non-apply user of this function, mark its caller set
+          // as being incomplete.
           if (!hasAllApplyUsers) {
             auto *CalleeNode = getCallGraphNode(CalleeFn);
             CalleeNode->markCallerSetIncomplete();
