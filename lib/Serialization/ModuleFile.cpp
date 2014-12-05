@@ -996,6 +996,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1>
           AccessPath;
       AccessPath.push_back({ ModuleID, SourceLoc() });
+      Module *M = Ctx.getModule(AccessPath);
 
       auto Kind = ImportKind::Module;
       if (!ScopePath.empty()) {
@@ -1003,7 +1004,6 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
         assert(!ScopeID.empty() &&
                "invalid decl name (non-top-level decls not supported)");
 
-        Module *M = Ctx.getModule(AccessPath);
         if (!M) {
           // The dependency module could not be loaded.  Just make a guess
           // about the import kind, we can not do better.
@@ -1024,6 +1024,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
       auto *ID = ImportDecl::create(Ctx, FileContext, SourceLoc(), Kind,
                                     SourceLoc(), AccessPath);
+      ID->setModule(M);
       if (Dep.isExported())
         ID->getAttrs().add(
             new (Ctx) ExportedAttr(/*IsImplicit=*/false));

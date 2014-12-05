@@ -9,6 +9,9 @@
 // RUN: %swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo.FooSub > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_WITHOUT_OVERLAY -strict-whitespace < %t.printed.txt
 
+// RUN: %swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -accessibility-filter-public -annotate-print > %t.annotated.txt
+// RUN: FileCheck %s -check-prefix=PASS_ANNOTATED -strict-whitespace < %t.annotated.txt
+
 @exported import Foo
 
 public func overlay_func() {}
@@ -36,3 +39,6 @@ public class FooOverlayClassDerived : FooOverlayClassBase {
 
 // PASS_NO_INTERNAL-NOT: overlay_func_internal
 
+// PASS_ANNOTATED: <decl:Import>@exported import <ref:module>Foo</ref>.<ref:module>FooSub</ref></decl>
+// PASS_ANNOTATED: <decl:Import>@exported import <ref:module>Foo</ref></decl>
+// PASS_ANNOTATED: <decl:Import>@exported import <ref:module>FooHelper</ref></decl>
