@@ -330,6 +330,14 @@ extension String {
 #endif
   }
 
+  /// This is consistent with Foundation, but incorrect as defined by Unicode.
+  /// Unicode weights some ASCII punctuation in a different order than ASCII
+  /// value. Such as:
+  /// 0022  ; [*02FF.0020.0002] # QUOTATION MARK
+  /// 0023  ; [*038B.0020.0002] # NUMBER SIGN
+  /// 0025  ; [*038C.0020.0002] # PERCENT SIGN
+  /// 0026  ; [*0389.0020.0002] # AMPERSAND
+  /// 0027  ; [*02F8.0020.0002] # APOSTROPHE
   /// precondition: both self and rhs are ASCII strings
   public // @testable
   func _lessThanASCII(rhs: String) -> Bool {
