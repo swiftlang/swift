@@ -2512,15 +2512,26 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     return false;
   }
 
-  // Record that we depend on the type's conformance.
   const DeclContext *topLevelContext = DC->getModuleScopeContext();
-  if (auto *constSF = dyn_cast<SourceFile>(topLevelContext)) {
+  auto recordDependency = [=](ProtocolConformance *conformance) {
+    // Record that we depend on the type's conformance.
+    auto *constSF = dyn_cast<SourceFile>(topLevelContext);
+    if (!constSF)
+      return;
     auto *SF = const_cast<SourceFile *>(constSF);
-    if (auto *tracker = SF->getReferencedNameTracker()) {
-      tracker->addUsedNominal(nominal,
-                              !DC->isPrivateContextForLookup(InExpression));
-    }
-  }
+
+    auto *tracker = SF->getReferencedNameTracker();
+    if (!tracker)
+      return;
+
+    // We only care about intra-module dependencies.
+    if (SF->getParentModule() !=
+        conformance->getDeclContext()->getParentModule())
+      return;
+
+    tracker->addUsedNominal(nominal,
+                            !DC->isPrivateContextForLookup(InExpression));
+  };
 
   // Check whether we have already cached an answer to this query.
   if (auto Known = Context.getConformsTo(canT, Proto)) {
@@ -2529,6 +2540,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       if (Conformance)
         *Conformance = Known->getPointer();
 
+      recordDependency(Known->getPointer());
       return !(Known->getPointer()->isInvalid());
     }
 
@@ -2558,6 +2570,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
       if (Conformance)
         *Conformance = lookupResult.getPointer();
+      recordDependency(lookupResult.getPointer());
       return true;
 
     case ConformanceKind::DoesNotConform:

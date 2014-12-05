@@ -269,15 +269,12 @@ extension PrivateTy6 : PrivateProto3 {}
 // CHECK-DAG: - "PSs10Comparable"
 // CHECK-DAG: - "C4main18ClassFromOtherFile"
 // CHECK-DAG: - "C4main8Subclass"
-// CHECK-DAG: - "Si"
+// CHECK-DAG: !private "Si"
 // CHECK-DAG: - "PSs23FloatLiteralConvertible"
 // CHECK-DAG: !private "PSs31UnicodeScalarLiteralConvertible"
 // CHECK-DAG: !private "PSs10Strideable"
 // CHECK-DAG: !private "Sa"
 // CHECK-DAG: !private "Sb"
-// CHECK-DAG: !private "Sd"
-// CHECK-DAG: !private "SS"
-// CHECK-DAG: !private "Su"
 // CHECK-DAG: !private "VSs10Dictionary"
 // CHECK-DAG: !private "V4main17OtherFileIntArray"
 // CHECK-DAG: !private "V4main18OtherFileOuterType"
@@ -309,6 +306,7 @@ extension PrivateTy6 : PrivateProto3 {}
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
+// NEGATIVE-NOT: "SS"
 // These are used by the other file in this module, but not by this one.
 // NEGATIVE-NOT: "FloatLiteralConvertible"
 // NEGATIVE-NOT: "Int16"
