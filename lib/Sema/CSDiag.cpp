@@ -713,6 +713,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
                           failure.getSecondType()->castTo<ProtocolType>()
                             ->getDecl(),
                           cs.DC,
+                          true,
                           nullptr,
                           loc);
     if (targetLocator)

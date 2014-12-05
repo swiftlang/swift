@@ -987,7 +987,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
         baseObjTy->getAnyNominal()) {
       auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
       ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance) &&
+      if (TC.conformsToProtocol(baseObjTy, proto, DC, true, &conformance) &&
           conformance->isComplete()) {
         auto memberTy = conformance->getTypeWitness(assocType, &TC)
           .getReplacement();
@@ -1132,7 +1132,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     } else if (!baseObjTy->isExistentialType() &&
                !baseObjTy->is<ArchetypeType>()) {
       ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance) &&
+      if (TC.conformsToProtocol(baseObjTy, proto, DC, true, &conformance) &&
           conformance->isComplete()) {
         type = conformance->getTypeWitness(assocType, &TC).getReplacement();
       }

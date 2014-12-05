@@ -973,7 +973,8 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
 
   for (auto proto : archetype->getConformsTo()) {
     ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(replacement, proto, dc, &conformance);
+    bool conforms = tc.conformsToProtocol(replacement, proto, dc, false,
+                                          &conformance);
     assert(conforms && "Conformance should already have been verified");
     (void)conforms;
     conformances.push_back(conformance);
@@ -1652,7 +1653,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 
   // Check protocol conformances.
   for (auto reqProto : assocType->getProtocols()) {
-    if (!tc.conformsToProtocol(type, reqProto, dc))
+    if (!tc.conformsToProtocol(type, reqProto, dc, false))
       return reqProto;
   }
 
@@ -2250,8 +2251,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;
-    if (TC.conformsToProtocol(T, InheritedProto, DC, &InheritedConformance,
-                              ComplainLoc, ExplicitConformance)) {
+    if (TC.conformsToProtocol(T, InheritedProto, DC, false,
+                              &InheritedConformance, ComplainLoc,
+                              ExplicitConformance)) {
       if (!conformance->hasInheritedConformance(InheritedProto))
         conformance->setInheritedConformance(InheritedProto,
                                              InheritedConformance);
@@ -2478,7 +2480,7 @@ static bool existentialConformsToProtocol(TypeChecker &tc, Type type,
 }
 
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                     DeclContext *DC,
+                                     DeclContext *DC, bool InExpression,
                                      ProtocolConformance **Conformance,
                                      SourceLoc ComplainLoc, 
                                      Decl *ExplicitConformance) {
@@ -2497,8 +2499,30 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   if (T->isExistentialType())
     return existentialConformsToProtocol(*this, T, Proto, ComplainLoc);
 
-  // Check whether we have already cached an answer to this query.
+  // Only nominal types conform to protocols.
   auto canT = T->getCanonicalType();
+  auto nominal = canT->getAnyNominal();
+  if (!nominal) {
+    // If we need to complain, do so.
+    if (ComplainLoc.isValid()) {
+      diagnose(ComplainLoc, diag::type_does_not_conform, T,
+               Proto->getDeclaredType());
+    }
+
+    return false;
+  }
+
+  // Record that we depend on the type's conformance.
+  const DeclContext *topLevelContext = DC->getModuleScopeContext();
+  if (auto *constSF = dyn_cast<SourceFile>(topLevelContext)) {
+    auto *SF = const_cast<SourceFile *>(constSF);
+    if (auto *tracker = SF->getReferencedNameTracker()) {
+      tracker->addUsedNominal(nominal,
+                              !DC->isPrivateContextForLookup(InExpression));
+    }
+  }
+
+  // Check whether we have already cached an answer to this query.
   if (auto Known = Context.getConformsTo(canT, Proto)) {
     // If we conform, set the conformance and return true.
     if (Known->getInt()) {
@@ -2525,26 +2549,6 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   // If we're checking for conformance (rather than stating it),
   // look for the explicit declaration of conformance in the list of protocols.
   if (!ExplicitConformance) {
-    // Only nominal types conform to protocols.
-    auto nominal = T->getAnyNominal();
-    if (!nominal) {
-      // If we need to complain, do so.
-      if (ComplainLoc.isValid()) {
-        diagnose(ComplainLoc, diag::type_does_not_conform, T,
-                 Proto->getDeclaredType());
-      }
-
-      return false;
-    }
-
-    const DeclContext *topLevelContext = DC->getModuleScopeContext();
-    if (auto *constSF = dyn_cast<SourceFile>(topLevelContext)) {
-      auto *SF = const_cast<SourceFile *>(constSF);
-      // FIXME: Track whether this is a private use or not.
-      if (auto *tracker = SF->getReferencedNameTracker())
-        tracker->addUsedNominal(nominal, true);
-    }
-
     Module *M = topLevelContext->getParentModule();
     auto lookupResult = M->lookupConformance(T, Proto, this);
     switch (lookupResult.getInt()) {
@@ -2587,10 +2591,10 @@ ProtocolConformance *TypeChecker::resolveConformance(NominalTypeDecl *type,
   auto conformanceContext = ext ? (DeclContext *)ext : (DeclContext *)type;
   ProtocolConformance *conformance = nullptr;
   bool conforms = conformsToProtocol(type->getDeclaredTypeInContext(), protocol,
-                                     conformanceContext, &conformance,
+                                     conformanceContext, false, &conformance,
                                      explicitConformance->getLoc(),
                                      explicitConformance);
-  return conforms? conformance : nullptr;
+  return conforms ? conformance : nullptr;
 }
 
 void TypeChecker::resolveTypeWitness(

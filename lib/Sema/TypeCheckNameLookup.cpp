@@ -78,7 +78,8 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
         // If the protocol contains the member we're looking for, force the
         // conformance to be derived.
         // FIXME: We don't actually need to emit the definitions here.
-        if (conformsToProtocol(nominalDecl->getDeclaredType(), proto, dc))
+        if (conformsToProtocol(nominalDecl->getDeclaredType(), proto, dc,
+                               isKnownPrivate))
           anyChange = true;
 
         // Don't just break out of the loop, though...it's possible (though
@@ -169,7 +170,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
       // particular witness.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
       ProtocolConformance *conformance = nullptr;
-      if (!conformsToProtocol(type, protocol, dc, &conformance) ||
+      if (!conformsToProtocol(type, protocol, dc, isKnownPrivate,
+                              &conformance) ||
           !conformance || !conformance->isComplete()) {
         // FIXME: This is an error path. Should we try to recover?
         continue;

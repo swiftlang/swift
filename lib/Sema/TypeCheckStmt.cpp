@@ -440,7 +440,7 @@ public:
     {
       Type sequenceType = sequence->getType();
       ProtocolConformance *conformance = nullptr;
-      if (!TC.conformsToProtocol(sequenceType, sequenceProto, DC,
+      if (!TC.conformsToProtocol(sequenceType, sequenceProto, DC, /*expr=*/true,
                                  &conformance, sequence->getLoc()))
         return nullptr;
       
@@ -488,8 +488,8 @@ public:
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
     ProtocolConformance *genConformance = nullptr;
-    if (!TC.conformsToProtocol(generatorTy, generatorProto, DC, &genConformance,
-                               sequence->getLoc()))
+    if (!TC.conformsToProtocol(generatorTy, generatorProto, DC, /*expr=*/true,
+                               &genConformance, sequence->getLoc()))
       return nullptr;
     
     Type elementTy = TC.getWitnessType(generatorTy, generatorProto,

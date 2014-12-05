@@ -901,7 +901,8 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
         // checking the protocol declaration.
         } else if (DC == proto ||
                    DC->isChildContextOf(proto) ||
-                   conformsToProtocol(proto->getDeclaredType(), proto, DC)) {
+                   conformsToProtocol(proto->getDeclaredType(), proto, DC,
+                                      false)) {
           continue;
         }
         
@@ -2278,9 +2279,11 @@ Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
     return nullptr;
 
   // Check whether the type conforms to _BridgedToObjectiveC.
+  // FIXME: We should be able to tell if this is being checked within a function
+  // body.
   ProtocolConformance *conformance = nullptr;
   if (!conformsToProtocol(type, bridgedProto, const_cast<DeclContext *>(dc),
-                          &conformance))
+                          /*inExpression=*/false, &conformance))
     return nullptr;
 
   // If the type is generic, check whether its generic arguments are also

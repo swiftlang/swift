@@ -963,7 +963,7 @@ namespace {
 
       ProtocolConformance *conformance = nullptr;
       if (!CS.TC.conformsToProtocol(paramTy, equatableProto,
-                                    CS.DC, &conformance))
+                                    CS.DC, true, &conformance))
         return;
       if (!conformance)
         return;

@@ -746,7 +746,9 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
     if (Conformances.empty()) {
       for (auto Proto : archetype->getConformsTo()) {
         ProtocolConformance *Conformance = nullptr;
-        if (conformsToProtocol(T, Proto, DC, &Conformance, ComplainLoc)) {
+        // FIXME: This should track whether this should result in a private or
+        // non-private dependency.
+        if (conformsToProtocol(T, Proto, DC, false, &Conformance, ComplainLoc)){
           Conformances.push_back(Conformance);
         } else {
           return true;

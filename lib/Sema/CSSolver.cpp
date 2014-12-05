@@ -846,7 +846,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       for (auto proto : literalProtocols) {
         do {
           // If the type conforms to this protocol, we're covered.
-          if (tc.conformsToProtocol(testType, proto, cs.DC)) {
+          if (tc.conformsToProtocol(testType, proto, cs.DC, true)) {
             coveredLiteralProtocols.insert(proto);
             break;
           }

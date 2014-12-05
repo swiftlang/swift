@@ -646,7 +646,7 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
            [=](Module &M, Type T, ProtocolDecl *Protocol)
            -> ProtocolConformance* {
              ProtocolConformance *c;
-             if (conformsToProtocol(T, Protocol, &M, &c))
+             if (conformsToProtocol(T, Protocol, &M, /*expression=*/false, &c))
                return c;
              return nullptr;
            });
@@ -1829,7 +1829,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // recovery by synthesizing without the copy call.
   auto *CopyingProto = getNSCopyingProtocol(TC, VD->getDeclContext());
   if (!CopyingProto || !TC.conformsToProtocol(UnderlyingType, CopyingProto,
-                                              VD->getDeclContext())) {
+                                              VD->getDeclContext(), false)) {
     TC.diagnose(VD->getLoc(), diag::nscopying_doesnt_conform);
     return Val;
   }
@@ -3591,7 +3591,7 @@ public:
     for (auto proto : D->getProtocols(false)) {
       ProtocolConformance *conformance = nullptr;
       // FIXME: Better location info
-      (void)TC.conformsToProtocol(T, proto, D, &conformance,
+      (void)TC.conformsToProtocol(T, proto, D, /*expr=*/false, &conformance,
                                   D->getStartLoc(), D);
       conformances.push_back(conformance);
 
@@ -4031,7 +4031,8 @@ public:
       ProtocolDecl *ilcProto =
         TC.getProtocol(forElt->getLoc(),
                        KnownProtocolKind::IntegerLiteralConvertible);
-      if (!TC.conformsToProtocol(rawTy, ilcProto, forElt->getDeclContext())) {
+      if (!TC.conformsToProtocol(rawTy, ilcProto, forElt->getDeclContext(),
+                                 false)) {
         TC.diagnose(forElt->getLoc(),
                     diag::enum_non_integer_convertible_raw_type_no_value);
         return nullptr;
@@ -4154,7 +4155,8 @@ public:
         {
           ProtocolDecl *literalProto =
             TC.getProtocol(ED->getLoc(), literalProtoKind);
-          if (TC.conformsToProtocol(rawTy, literalProto, ED->getDeclContext())){
+          if (TC.conformsToProtocol(rawTy, literalProto, ED->getDeclContext(),
+                                    false)) {
             literalConvertible = true;
             break;
           }
@@ -7652,7 +7654,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     // For literal-convertible types, form the corresponding literal.
 #define CHECK_LITERAL_PROTOCOL(Kind, String) \
     if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) { \
-      if (tc.conformsToProtocol(type, proto, dc)) \
+      if (tc.conformsToProtocol(type, proto, dc, true)) \
         return std::string(String); \
     }
     CHECK_LITERAL_PROTOCOL(ArrayLiteralConvertible, "[]")

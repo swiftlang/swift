@@ -2200,7 +2200,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
   } else {
     // Check whether this type conforms to the protocol.
-    if (TC.conformsToProtocol(type, protocol, DC))
+    if (TC.conformsToProtocol(type, protocol, DC, true))
       return SolutionKind::Solved;
   }
   
@@ -2507,7 +2507,7 @@ static Type getRawRepresentableValueType(TypeChecker &tc, DeclContext *dc,
     return nullptr;
 
   ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(type, proto, dc, &conformance))
+  if (!tc.conformsToProtocol(type, proto, dc, true, &conformance))
     return nullptr;
 
   return tc.getWitnessType(type, proto, conformance, tc.Context.Id_RawValue,

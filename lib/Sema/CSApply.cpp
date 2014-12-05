@@ -94,6 +94,7 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
         bool conforms = tc.conformsToProtocol(replacement,
                                               protoType->getDecl(),
                                               getConstraintSystem().DC,
+                                              /*expression=*/true,
                                               &conformance);
         assert((conforms ||
                 replacement->isExistentialType() ||
@@ -185,7 +186,7 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
 
   // Find the member used to satisfy the named requirement.
   ProtocolConformance *conformance = 0;
-  bool conforms = tc.conformsToProtocol(type, proto, dc, &conformance);
+  bool conforms = tc.conformsToProtocol(type, proto, dc, true, &conformance);
   if (!conforms)
     return nullptr;
 
@@ -1188,7 +1189,7 @@ namespace {
       Type valueType = value->getType()->getRValueType();
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
-                                            &conformance);
+                                            true, &conformance);
       assert(conforms && "Should already have checked the conformance");
       (void)conforms;
 
@@ -1563,7 +1564,7 @@ namespace {
       ProtocolDecl *protocol = tc.getProtocol(
           expr->getLoc(), KnownProtocolKind::StringLiteralConvertible);
 
-      if (!tc.conformsToProtocol(type, protocol, cs.DC)) {
+      if (!tc.conformsToProtocol(type, protocol, cs.DC, true)) {
         // If the type does not conform to StringLiteralConvertible, it should
         // be ExtendedGraphemeClusterLiteralConvertible.
         protocol = tc.getProtocol(
@@ -1572,7 +1573,7 @@ namespace {
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (!tc.conformsToProtocol(type, protocol, cs.DC)) {
+      if (!tc.conformsToProtocol(type, protocol, cs.DC, true)) {
         // ... or it should be UnicodeScalarLiteralConvertible.
         protocol = tc.getProtocol(
             expr->getLoc(),
@@ -1581,7 +1582,7 @@ namespace {
         isGraphemeClusterLiteral = false;
       }
 
-      assert(tc.conformsToProtocol(type, protocol, cs.DC));
+      assert(tc.conformsToProtocol(type, protocol, cs.DC, true));
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1622,7 +1623,7 @@ namespace {
             expr->getLoc(),
             KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible);
         if (!forceASCII &&
-            tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
+            tc.conformsToProtocol(type, builtinProtocol, cs.DC, true)) {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_BuiltinUTF16StringLiteral,
@@ -2372,7 +2373,7 @@ namespace {
 
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(arrayTy, arrayProto,
-                                            cs.DC, &conformance);
+                                            cs.DC, true, &conformance);
       (void)conforms;
       assert(conforms && "Type does not conform to protocol?");
 
@@ -2435,7 +2436,7 @@ namespace {
 
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(dictionaryTy, dictionaryProto,
-                                            cs.DC, &conformance);
+                                            cs.DC, true, &conformance);
       if (!conforms)
         return nullptr;
 
@@ -3599,7 +3600,8 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
   SmallVector<ProtocolConformance *, 4> conformances;
   for (auto proto : protocols) {
     ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(fromType, proto, DC, &conformance);
+    bool conforms = tc.conformsToProtocol(fromType, proto, DC, true,
+                                          &conformance);
     assert(conforms && "Type does not conform to protocol?");
     (void)conforms;
     conformances.push_back(conformance);
@@ -4435,7 +4437,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   // Check whether this literal type conforms to the builtin protocol.
   ProtocolConformance *builtinConformance = nullptr;
   if (builtinProtocol &&
-      tc.conformsToProtocol(type, builtinProtocol, cs.DC, &builtinConformance)){
+      tc.conformsToProtocol(type, builtinProtocol, cs.DC, true,
+                            &builtinConformance)) {
     // Find the builtin argument type we'll use.
     Type argType;
     if (builtinLiteralType.is<Type>())
@@ -4475,7 +4478,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
   ProtocolConformance *conformance = nullptr;
-  bool conforms = tc.conformsToProtocol(type, protocol, cs.DC, &conformance);
+  bool conforms = tc.conformsToProtocol(type, protocol, cs.DC, true,
+                                        &conformance);
   assert(conforms && "must conform to literal protocol");
   (void)conforms;
 

@@ -949,6 +949,10 @@ public:
   /// \param DC The context in which to check conformance. This affects, for
   /// example, extension visibility.
   ///
+  /// \param InExpression If true, this conformance is being checked as part of
+  /// type-checking an expression. This results in dependencies being treated
+  /// slightly differently.
+  ///
   /// \param Conformance If non-NULL, and the type does conform to the given
   /// protocol, this will be set to the protocol conformance mapping that
   /// maps the given type \c T to the protocol \c Proto. The mapping may be
@@ -967,6 +971,7 @@ public:
   ///
   /// \returns true if T conforms to the protocol Proto, false otherwise.
   bool conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                          bool InExpression,
                           ProtocolConformance **Conformance = 0,
                           SourceLoc ComplainLoc = SourceLoc(),
                           Decl *ExplicitConformance = nullptr);
