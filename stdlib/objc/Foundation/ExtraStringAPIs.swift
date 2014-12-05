@@ -13,20 +13,47 @@
 // FIXME: these properties should be implemented in the core library.
 // <rdar://problem/17550602> [unicode] Implement case folding
 extension String {
+  /// A "table" for which ASCII characters need to be upper cased.
+  /// Each bit represents 2 ASCII characters. The bit is set iff the character
+  /// is lower case. It is offsetted down by 1.
+  internal var _asciiLowerCaseTable: UInt64 {
+    @inline(__always)
+    get {
+      return 0b0001_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000
+    }
+  }
+
+  /// The same table for characters that are upper case.
+  internal var _asciiUpperCaseTable: UInt64 {
+    @inline(__always)
+    get {
+      return 0b0000_0000_0000_0000_0001_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000
+    }
+  }
+
   public var lowercaseString: String {
     if self._core.isASCII {
       let length = self._core.count
-      let string = self._core.startASCII
+      let source = self._core.startASCII
       var buffer = _StringBuffer(
         capacity: length, initialSize: length, elementWidth: 1)
-      var pointer = UnsafeMutablePointer<UInt8>(buffer.start)
+      var dest = UnsafeMutablePointer<UInt8>(buffer.start)
       for i in 0..<length {
-        switch string[i] {
-        case let x where (x >= 0x41 && x <= 0x5a):
-          pointer[i] = x &+ 0x20
-        case let x:
-          pointer[i] = x
-        }
+        // For each character in the string, we lookup if it should be shifted
+        // in our ascii table, then we return 0x20 if it should, 0x0 if not.
+        // This code is equivalent to:
+        // switch source[i] {
+        // case let x where (x >= 0x41 && x <= 0x5a):
+        //   dest[i] = x &+ 0x20
+        // case let x:
+        //   dest[i] = x
+        // }
+        let value = source[i]
+        let isUpper =
+          _asciiUpperCaseTable >>
+          UInt64(((value &- 1) & 0b0111_1111) >> 1)
+        let add = (isUpper & 0x1) << 5
+        dest[i] = value + UInt8(add)
       }
       return String(_storage: buffer)
     }
@@ -37,17 +64,18 @@ extension String {
   public var uppercaseString: String {
     if self._core.isASCII {
       let length = self._core.count
-      let string = self._core.startASCII
+      let source = self._core.startASCII
       var buffer = _StringBuffer(
         capacity: length, initialSize: length, elementWidth: 1)
-      var pointer = UnsafeMutablePointer<UInt8>(buffer.start)
+      var dest = UnsafeMutablePointer<UInt8>(buffer.start)
       for i in 0..<length {
-        switch string[i] {
-        case let x where (x >= 0x61 && x <= 0x7a):
-          pointer[i] = x &- 0x20
-        case let x:
-          pointer[i] = x
-        }
+        // See the comment above in lowercaseString.
+        let value = source[i]
+        let isLower =
+          _asciiLowerCaseTable >>
+          UInt64(((value &- 1) & 0b0111_1111) >> 1)
+        let add = (isLower & 0x1) << 5
+        dest[i] = value - UInt8(add)
       }
       return String(_storage: buffer)
     }
@@ -55,4 +83,3 @@ extension String {
     return _ns.uppercaseString
   }
 }
-
