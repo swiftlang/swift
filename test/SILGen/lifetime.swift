@@ -656,4 +656,3 @@ func tuple_explosion() {
   // CHECK-NOT: tuple_extract [[TUPLE]] : {{.*}}, 1
   // CHECK-NOT: release
 }
-  // CHECK: }

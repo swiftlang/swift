@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 162; // Last change: reintroduce force deserialization of decls
+const uint16_t VERSION_MINOR = 161; // Last change: witness_method serialization
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1230,9 +1230,6 @@ namespace index_block {
     /// Objective-C selectors to the methods/initializers/properties/etc. that
     /// produce Objective-C methods.
     OBJC_METHODS,
-    
-    /// A set of declarations to eagerly deserialize.
-    FORCE_DESERIALIZATION,
   };
 
   using OffsetsLayout = BCGenericRecordLayout<
@@ -1250,11 +1247,6 @@ namespace index_block {
     OBJC_METHODS,  // record ID
     BCVBR<16>,     // table offset within the blob (see below)
     BCBlob         // map from Objective-C selectors to methods with that selector
-  >;
-  
-  using ForceDeserializationTableLayout = BCRecordLayout<
-    FORCE_DESERIALIZATION, // record ID
-    BCArray<DeclIDField> // decl IDs to eagerly deserialize
   >;
 }
 
