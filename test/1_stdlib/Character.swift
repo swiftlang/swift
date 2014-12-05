@@ -239,11 +239,12 @@ CharacterTests.test(
   let asciiDomain = Array(0..<127)
   let ascii0to126 = asciiDomain.map({ UnicodeScalar(Int($0)) })
   let ascii1to127 = asciiDomain.map({ UnicodeScalar(Int($0 + 1)) })
+  typealias PredicateFn = (UnicodeScalar) -> (UnicodeScalar) -> Bool
   expectEqualMethodsForDomain(
     ascii0to126,
     ascii1to127,
-    { x in { String(x) < String($0) } },
-    { x in { String(Character(x)) < String(Character($0)) } })
+    { x in { String(x) < String($0) } } as PredicateFn,
+    { x in { String(Character(x)) < String(Character($0)) } } as PredicateFn)
 }
 
 runAllTests()
