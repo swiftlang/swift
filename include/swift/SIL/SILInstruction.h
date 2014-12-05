@@ -87,10 +87,11 @@ public:
     MayWrite,
     /// The instruction may read or write memory.
     MayReadWrite,
-    /// \brief The instruction may have side effects not captured solely by its
-    ///        users. Specifically, it can return, release memory, or store. Note,
-    ///        alloc is not considered to have side effects because its
-    ///        result/users represent its effect.
+    /// \brief The instruction may have side effects not captured
+    ///        solely by its users. Specifically, it can return,
+    ///        release memory, or store. Note, alloc is not considered
+    ///        to have side effects because its result/users represent
+    ///        its effect.
     MayHaveSideEffects,
   };
 
