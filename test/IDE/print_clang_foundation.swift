@@ -28,3 +28,9 @@
 // CHECK_NSSTRING: init?(contentsOfFile path: String, encoding enc: UInt, error: NSErrorPointer)
 
 // CHECK_DICTIONARY: func propertyListFromStringsFileFormat() -> [NSObject : AnyObject]
+
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false > %t/Foundation.printed.txt
+// RUN: FileCheck -input-file %t/Foundation.printed.txt -check-prefix=CHECK_DUP %s
+
+// CHECK_DUP: import CoreFoundation{{$}}
+// CHECK_DUP-NOT: import CoreFoundation{{$}}

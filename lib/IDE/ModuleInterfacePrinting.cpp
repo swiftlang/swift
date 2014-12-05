@@ -95,6 +95,18 @@ private:
 };
 } // unnamed namespace
 
+static const clang::Module *
+getUnderlyingClangModuleForImport(ImportDecl *Import) {
+  if (auto *ClangMod = Import->getClangModule())
+    return ClangMod;
+
+  if (auto Mod = Import->getModule())
+    if (auto *ClangMod = Mod->findUnderlyingClangModule())
+      return ClangMod;
+
+  return nullptr;
+}
+
 void swift::ide::printModuleInterface(Module *M,
                                       ModuleTraversalOptions TraversalOptions,
                                       ASTPrinter &Printer,
@@ -131,6 +143,7 @@ void swift::ide::printSubmoduleInterface(
   const clang::Module *InterestingClangModule = nullptr;
 
   SmallVector<ImportDecl *, 1> ImportDecls;
+  llvm::DenseSet<const clang::Module *> ClangModulesForImports;
   SmallVector<Decl *, 1> SwiftDecls;
   llvm::DenseMap<const clang::Module *,
                  SmallVector<std::pair<Decl *, clang::SourceLocation>, 1>>
@@ -210,8 +223,19 @@ void swift::ide::printSubmoduleInterface(
     };
 
     if (auto ID = dyn_cast<ImportDecl>(D)) {
-      if (ShouldPrintImport(ID))
+      if (ShouldPrintImport(ID)) {
+        if (ID->getImportKind() == ImportKind::Module) {
+          // Make sure we don't print duplicate imports, due to getting imports
+          // for both a clang module and its overlay.
+          if (auto *ClangMod = getUnderlyingClangModuleForImport(ID)) {
+            auto P = ClangModulesForImports.insert(ClangMod);
+            bool IsNew = P.second;
+            if (!IsNew)
+              continue;
+          }
+        }
         ImportDecls.push_back(ID);
+      }
       continue;
     }
 
