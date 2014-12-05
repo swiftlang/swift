@@ -1856,6 +1856,17 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
   
+  if (Builtin.ID == BuiltinValueKind::ZeroInitializer) {
+    // Build a zero initializer of the result type.
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
+    auto schema = valueTy.second.getSchema();
+    for (auto &elt : schema) {
+      out.add(llvm::Constant::getNullValue(elt.getScalarType()));
+    }
+    return;
+  }
+  
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 

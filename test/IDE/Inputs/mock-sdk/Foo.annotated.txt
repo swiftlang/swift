@@ -44,15 +44,21 @@ struct <loc>FooRuncingOptions</loc> : <ref:Protocol>RawOptionSetType</ref> {
 <decl:Struct>struct <loc>FooStruct1</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>y</loc>: <ref:Struct>Double</ref></decl>
+  <decl:Constructor><loc>init()</loc></decl>
+  <decl:Constructor><loc>init(x: <ref:Struct>Int32</ref>, y: <ref:Struct>Double</ref>)</loc></decl>
 }</decl>
 <decl:Struct>struct <loc>FooStruct2</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>y</loc>: <ref:Struct>Double</ref></decl>
+  <decl:Constructor><loc>init()</loc></decl>
+  <decl:Constructor><loc>init(x: <ref:Struct>Int32</ref>, y: <ref:Struct>Double</ref>)</loc></decl>
 }</decl>
 <decl:TypeAlias>typealias <loc>FooStructTypedef1</loc> = <ref:Struct>FooStruct2</ref></decl>
 <decl:Struct>struct <loc>FooStructTypedef2</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>y</loc>: <ref:Struct>Double</ref></decl>
+  <decl:Constructor><loc>init()</loc></decl>
+  <decl:Constructor><loc>init(x: <ref:Struct>Int32</ref>, y: <ref:Struct>Double</ref>)</loc></decl>
 }</decl>
 
 <decl:TypeAlias>/// Aaa.  FooTypedef1.  Bbb.
@@ -180,6 +186,8 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
 <decl:Func>func <loc>_internalTopLevelFunc()</loc></decl>
 <decl:Struct>struct <loc>_InternalStruct</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Constructor><loc>init()</loc></decl>
+  <decl:Constructor><loc>init(x: <ref:Struct>Int32</ref>)</loc></decl>
 }</decl>
 <decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
   <decl:Func>class func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>

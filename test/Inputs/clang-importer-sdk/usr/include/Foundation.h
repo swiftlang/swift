@@ -494,3 +494,7 @@ extern NSZone *NSCreateZone(NSUInteger startSize, NSUInteger granularity, BOOL c
 @interface NSXPCInterface : NSObject
 + (NSXPCInterface *)interfaceWithProtocol:(Protocol *)protocol;
 @end
+
+typedef struct NonNilableReferences {
+  NSObject *__nonnull __unsafe_unretained obj;
+} NonNilableReferences;

@@ -233,6 +233,7 @@ func testCompleteFunctionCall2() {
 func testCompleteStructMembers1() {
   FooStruct1#^CLANG_STRUCT_MEMBERS_1^#
 // CLANG_STRUCT_MEMBERS_1: Begin completions
+// CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct1#]{{$}}
 // CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal: ({#x: Int32#}, {#y: Double#})[#FooStruct1#]{{$}}
 // CLANG_STRUCT_MEMBERS_1-NEXT: End completions
 }

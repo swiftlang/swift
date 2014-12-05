@@ -18,6 +18,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -1116,11 +1117,78 @@ namespace {
       // Note: only occurs in templates.
       return nullptr;
     }
+    
+    /// \brief Create a default constructor that initializes a struct to zero.
+    ConstructorDecl *createDefaultConstructor(StructDecl *structDecl) {
+      auto &context = Impl.SwiftContext;
+      
+      // Create the 'self' declaration.
+      auto selfType = structDecl->getDeclaredTypeInContext();
+      auto selfMetatype = MetatypeType::get(selfType);
+      auto selfDecl = createSelfDecl(structDecl, false);
+      Pattern *selfPattern = createTypedNamedPattern(selfDecl);
+
+      // The default initializer takes no arguments.
+      auto paramPattern = TuplePattern::create(context, SourceLoc(), {},
+                                               SourceLoc());
+      auto emptyTy = TupleType::getEmpty(context);
+
+      // Create the constructor.
+      DeclName name(context, context.Id_init, {});
+      auto constructor =
+        new (context) ConstructorDecl(name, structDecl->getLoc(),
+                                      OTK_None, SourceLoc(),
+                                      selfPattern, paramPattern,
+                                      nullptr, structDecl);
+      
+      // Set the constructor's type.
+      auto fnTy = FunctionType::get(emptyTy, selfType);
+      auto allocFnTy = FunctionType::get(selfMetatype, fnTy);
+      auto initFnTy = FunctionType::get(selfType, fnTy);
+      constructor->setType(allocFnTy);
+      constructor->setInitializerType(initFnTy);
+      constructor->setAccessibility(Accessibility::Public);
+
+      // Use a builtin to produce a zero initializer, and assign it to self.
+      
+      // Construct the left-hand reference to self.
+      Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
+                                            /*Implicit=*/true);
+      
+      // Construct the right-hand call to Builtin.zeroInitializer.
+      auto zeroInitializerFunc = cast<FuncDecl>(getBuiltinValueDecl(context,
+                                     context.getIdentifier("zeroInitializer")));
+      auto zeroInitializerRef = new (context) DeclRefExpr(zeroInitializerFunc,
+                                                          SourceLoc(),
+                                                          /*implicit*/ true);
+      auto emptyTuple = TupleExpr::create(context, SourceLoc(), {}, {}, {},
+                                          SourceLoc(),
+                                          /*trailing closure*/ false,
+                                          /*implicit*/ true,
+                                          emptyTy);
+      auto call = new (context) CallExpr(zeroInitializerRef, emptyTuple,
+                                         /*implicit*/ true);
+      
+      auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
+                                             /*implicit*/ true);
+      
+      // Create the function body.
+      ASTNode bodyElts = assign;
+      auto body = BraceStmt::create(context, SourceLoc(), bodyElts, SourceLoc());
+      constructor->setBody(body);
+
+      // Add this as an external definition.
+      Impl.registerExternalDecl(constructor);
+
+      // We're done.
+      return constructor;
+    }
 
     /// \brief Create a constructor that initializes a struct from its members.
     ConstructorDecl *createValueConstructor(StructDecl *structDecl,
                                             ArrayRef<Decl *> members,
-                                            bool wantCtorParamNames) {
+                                            bool wantCtorParamNames,
+                                            bool wantBody) {
       auto &context = Impl.SwiftContext;
 
       // Create the 'self' declaration.
@@ -1177,33 +1245,35 @@ namespace {
       constructor->setInitializerType(initFnTy);
       constructor->setAccessibility(Accessibility::Public);
 
-      // Assign all of the member variables appropriately.
-      SmallVector<ASTNode, 4> stmts;
-      unsigned paramIdx = 0;
-      for (auto member : members) {
-        auto var = dyn_cast<VarDecl>(member);
-        if (!var || !var->hasStorage())
-          continue;
+      if (wantBody) {
+        // Assign all of the member variables appropriately.
+        SmallVector<ASTNode, 4> stmts;
+        unsigned paramIdx = 0;
+        for (auto member : members) {
+          auto var = dyn_cast<VarDecl>(member);
+          if (!var || !var->hasStorage())
+            continue;
 
-        // Construct left-hand side.
-        Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
-                                              /*Implicit=*/true);
-        lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc(),
-                                          /*Implicit=*/true);
+          // Construct left-hand side.
+          Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
+                                                /*Implicit=*/true);
+          lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc(),
+                                            /*Implicit=*/true);
 
-        // Construct right-hand side.
-        auto param = params[paramIdx++];
-        auto rhs = new (context) DeclRefExpr(param, SourceLoc(),
-                                             /*Implicit=*/true);
+          // Construct right-hand side.
+          auto param = params[paramIdx++];
+          auto rhs = new (context) DeclRefExpr(param, SourceLoc(),
+                                               /*Implicit=*/true);
 
-        // Add assignment.
-        stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
-                                                 /*Implicit=*/true));
+          // Add assignment.
+          stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
+                                                   /*Implicit=*/true));
+        }
+
+        // Create the function body.
+        auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc());
+        constructor->setBody(body);
       }
-
-      // Create the function body.
-      auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc());
-      constructor->setBody(body);
 
       // Add this as an external definition.
       Impl.registerExternalDecl(constructor);
@@ -1398,7 +1468,8 @@ namespace {
         // underlying type.
         Decl *varDecl = var;
         auto constructor = createValueConstructor(structDecl, varDecl,
-                                                  /*wantCtorParamNames=*/false);
+                                                  /*wantCtorParamNames=*/false,
+                                                  /*wantBody=*/true);
 
         // Set the members of the struct.
         structDecl->addMember(constructor);
@@ -1492,10 +1563,12 @@ namespace {
         Decl *varDecl = var;
         auto valueConstructor = createValueConstructor(
                                   structDecl, varDecl,
-                                  /*wantCtorParamNames=*/false);
+                                  /*wantCtorParamNames=*/false,
+                                  /*wantBody=*/ true);
         auto labeledValueConstructor = createValueConstructor(
                                                  structDecl, varDecl,
-                                                 /*wantCtorParamNames=*/true);
+                                                 /*wantCtorParamNames=*/true,
+                                                 /*wantBody=*/true);
 
         // Build a delayed RawOptionSet conformance for the type.
         DelayedProtocolDecl delayedProtocols[] = {
@@ -1581,6 +1654,10 @@ namespace {
       // yet.
       bool hasUnreferenceableStorage = false;
       
+      // Track whether this record contains fields that can't be zero-
+      // initialized.
+      bool hasZeroInitializableStorage = true;
+      
       if (decl->isUnion()) {
         if (Impl.SwiftContext.LangOpts.ImportUnions) {
           // Import the union, but don't make its storage accessible for now.
@@ -1664,9 +1741,22 @@ namespace {
 
           // Skip anonymous structs or unions; they'll be dealt with via the
           // IndirectFieldDecls.
-          if (auto field = dyn_cast<clang::FieldDecl>(nd))
+          if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
             if (field->isAnonymousStructOrUnion())
               continue;
+            // Non-nullable pointers can't be zero-initialized.
+            if (auto nullability = field->getType()
+                  ->getNullability(Impl.getClangASTContext())) {
+              if (*nullability == clang::NullabilityKind::NonNull)
+                hasZeroInitializableStorage = false;
+            }
+            
+            // TODO: If we had the notion of a closed enum with no private
+            // cases or resilience concerns, then complete NS_ENUMs with
+            // no case corresponding to zero would also not be zero-
+            // initializable.
+            
+          }
 
           auto member = Impl.importDecl(nd);
           if (!member || !isa<VarDecl>(member)) {
@@ -1674,8 +1764,25 @@ namespace {
             hasUnreferenceableStorage = true;
             continue;
           }
-
+          
           members.push_back(member);
+        }
+      }
+      
+      bool hasReferenceableFields = !members.empty();
+
+      if (hasZeroInitializableStorage) {
+        // Add constructors for the struct.
+        members.push_back(createDefaultConstructor(result));
+        if (hasReferenceableFields) {
+          // The default zero initializer suppresses the implicit value
+          // constructor that would normally be formed, so we have to add that
+          // explicitly as well. We leave the body implicit in order to match
+          // the behavior of the implicit constructor native structs receive.
+          auto valueCtor = createValueConstructor(result, members,
+                                                  /*want param names*/true,
+                                                  /*want body*/false);
+          members.push_back(valueCtor);
         }
       }
 

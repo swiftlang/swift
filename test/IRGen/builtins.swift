@@ -510,5 +510,26 @@ func assumeNonNegative_test2(x: Builtin.Word) -> Builtin.Word {
   return Builtin.assumeNonNegative_Word(return_word(x))
 }
 
+struct Empty {}
+struct Pair { var i: Int, b: Bool }
+
+// CHECK-LABEL: define hidden { i32, i1 } @_TF8builtins15zeroInitializerFT_TVS_5EmptyVS_4Pair_() {
+// CHECK:         ret { i32, i1 } zeroinitializer
+func zeroInitializer() -> (Empty, Pair) {
+  return (Builtin.zeroInitializer(), Builtin.zeroInitializer())
+}
+
+// CHECK-LABEL: define hidden { i32, i1 } @_TF8builtins20zeroInitializerTupleFT_TVS_5EmptyVS_4Pair_() {
+// CHECK:         ret { i32, i1 } zeroinitializer
+func zeroInitializerTuple() -> (Empty, Pair) {
+  return Builtin.zeroInitializer()
+}
+
+// CHECK-LABEL: define hidden void @_TF8builtins20zeroInitializerEmptyFT_T_() {
+// CHECK:         ret void
+func zeroInitializerEmpty() {
+  return Builtin.zeroInitializer()
+}
+
 // CHECK: ![[R]] = metadata !{i64 0, i64 9223372036854775807}
 

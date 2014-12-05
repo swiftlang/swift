@@ -748,6 +748,18 @@ static ValueDecl *getMarkDependenceOperation(ASTContext &ctx, Identifier name) {
                                    resultType, bodyResultType, paramList);
 }
 
+static ValueDecl *getZeroInitializerOperation(ASTContext &Context,
+                                             Identifier Id) {
+  // <T> () -> T
+  Type GenericTy;
+  Type ArchetypeTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
+
+  return getBuiltinGenericFunction(Id, {}, {}, GenericTy, ArchetypeTy,
+                                   ParamList);
+}
+
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   Type GenericTy;
@@ -1408,6 +1420,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CondUnreachable:
   case BuiltinValueKind::Unreachable:
     return getUnreachableOperation(Context, Id);
+      
+  case BuiltinValueKind::ZeroInitializer:
+    return getZeroInitializerOperation(Context, Id);
       
   case BuiltinValueKind::Once:
     return getOnceOperation(Context, Id);

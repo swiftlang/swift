@@ -246,3 +246,12 @@ func testFunctionPointersAsOpaquePointers() {
   useFunctionPointer2(anotherFP)
   anotherFP = fp // expected-error {{'(CInt, CLong, UnsafeMutablePointer<Void>)' is not identical to 'Int32'}}
 }
+
+func testStructDefaultInit() {
+  let a_s = AnonStructs()
+  let modrm = ModRM()
+  let union = AnonUnion()
+  let v4 = GLKVector4()
+
+  let nonNilable = NonNilableReferences() // expected-error{{missing argument}}
+}

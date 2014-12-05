@@ -44,15 +44,21 @@ struct FooRuncingOptions : RawOptionSetType {
 struct FooStruct1 {
   var x: Int32
   var y: Double
+  init()
+  init(x: Int32, y: Double)
 }
 struct FooStruct2 {
   var x: Int32
   var y: Double
+  init()
+  init(x: Int32, y: Double)
 }
 typealias FooStructTypedef1 = FooStruct2
 struct FooStructTypedef2 {
   var x: Int32
   var y: Double
+  init()
+  init(x: Int32, y: Double)
 }
 
 /// Aaa.  FooTypedef1.  Bbb.
@@ -180,6 +186,8 @@ func theLastDeclInFoo()
 func _internalTopLevelFunc()
 struct _InternalStruct {
   var x: Int32
+  init()
+  init(x: Int32)
 }
 extension FooClassBase {
   class func _internalMeth1() -> AnyObject!

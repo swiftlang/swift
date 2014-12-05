@@ -20,10 +20,6 @@ import Darwin
 public extension CGPoint {
   static var zeroPoint: CGPoint { get { return CGPoint(x: 0, y: 0) } }
 
-  init() {
-    self.init(x: 0.0, y: 0.0)
-  }
-
   init(x: Int, y: Int) {
     self.init(x: CGFloat(x), y: CGFloat(y))
   }
@@ -41,10 +37,6 @@ public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
 
 public extension CGSize {
   static var zeroSize: CGSize { return CGSize(width: 0, height: 0) }
-
-  init() {
-    self.init(width: 0.0, height: 0.0)
-  }
 
   init(width: Int, height: Int) {
     self.init(width: CGFloat(width), height: CGFloat(height))
@@ -85,10 +77,6 @@ public extension CGRect {
   }
   static var nullRect:     CGRect { get { return CGRectNull } }
   static var infiniteRect: CGRect { get { return CGRectInfinite } }
-
-  init() {
-    self.init(origin: CGPoint(), size: CGSize())
-  }
 
   init(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {
     self.init(origin: CGPoint(x: x, y: y), 

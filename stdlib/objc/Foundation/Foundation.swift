@@ -857,16 +857,6 @@ extension NSObject : CVarArgType {
 // Fast enumeration
 //===----------------------------------------------------------------------===//
 
-// Give NSFastEnumerationState a default initializer, for convenience.
-extension NSFastEnumerationState {
-  public init() {
-    state = 0
-    itemsPtr = .null()
-    mutationsPtr = .null()
-    extra = (0,0,0,0,0)
-  }
-}
-
 
 // NB: This is a class because fast enumeration passes around interior pointers
 // to the enumeration state, so the state cannot be moved in memory. We will

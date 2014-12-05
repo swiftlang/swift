@@ -318,6 +318,9 @@ BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 
 // FIXME: shufflevector
 
+/// zeroInitializer has type <T> () -> T
+BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
+
 /// once has type (Builtin.RawPointer, () -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 

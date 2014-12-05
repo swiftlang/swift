@@ -27,11 +27,15 @@
 // TAG_DECLS_AND_TYPEDEFS:      {{^}}struct FooStruct1 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct2 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}typealias FooStructTypedef1 = FooStruct2{{$}}
@@ -39,26 +43,36 @@
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStructTypedef2 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct3 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct4 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct5 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct6 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // NEGATIVE-NOT: typealias FooStructTypedef2
