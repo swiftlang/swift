@@ -193,7 +193,7 @@ import SwiftShims
 // Bridging `NSSet` to `Set` and vice versa
 // ----------------------------------------
 //
-// Bridging guarantees for `_Set<T>` are the same as for `Dictionary<T, ()>`.
+// Bridging guarantees for `Set<T>` are the same as for `Dictionary<T, ()>`.
 //
 
 /// This protocol is only used for compile-time checks that
@@ -261,7 +261,7 @@ internal struct _UnmanagedAnyObjectArray {
   }
 }
 
-//===--- APIs unique to _Set<T> -------------------------------------------===//
+//===--- APIs unique to Set<T> --------------------------------------------===//
 
 /// Header part of the native storage for `Set`.
 internal struct _SetBody {
@@ -285,10 +285,10 @@ internal struct _SetElement<T> {
 }
 
 /// A collection of unique `T` instances with no defined ordering.
-public struct _Set<T : Hashable> :
+public struct Set<T : Hashable> :
   Hashable, CollectionType, ArrayLiteralConvertible {
 
-  typealias _Self = _Set<T>
+  typealias _Self = Set<T>
   typealias _VariantStorage = _VariantSetStorage<T>
   typealias _NativeStorage = _NativeSetStorage<T>
   public typealias Element = T
@@ -441,13 +441,13 @@ public struct _Set<T : Hashable> :
 
   /// Create an empty `Set`.
   public init() {
-    self = _Set<T>(minimumCapacity: 0)
+    self = Set<T>(minimumCapacity: 0)
   }
 
   /// Create a `Set` from a finite sequence of items.
   public init<S: SequenceType where S.Generator.Element == T>(_ sequence: S) {
     self.init()
-    if let s = sequence as? _Set<T> {
+    if let s = sequence as? Set<T> {
       // If this sequence is actually a native `Set`, then we can quickly
       // adopt its native storage and let COW handle uniquing only
       // if necessary.
@@ -479,7 +479,7 @@ public struct _Set<T : Hashable> :
   public func isSubsetOf<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? _Set<T>) ?? _Set(sequence)
+    let other = (sequence as? Set<T>) ?? Set(sequence)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
@@ -489,7 +489,7 @@ public struct _Set<T : Hashable> :
   public func isStrictSubsetOf<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? _Set<T>) ?? _Set(sequence)
+    let other = (sequence as? Set<T>) ?? Set(sequence)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset && !isEqual
   }
@@ -498,7 +498,7 @@ public struct _Set<T : Hashable> :
   public func isSupersetOf<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? _Set<T>) ?? _Set(sequence)
+    let other = (sequence as? Set<T>) ?? Set(sequence)
     return other.isSubsetOf(self)
   }
 
@@ -507,7 +507,7 @@ public struct _Set<T : Hashable> :
   public func isStrictSupersetOf<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? _Set<T>) ?? _Set(sequence)
+    let other = (sequence as? Set<T>) ?? Set(sequence)
     return other.isStrictSubsetOf(self)
   }
 
@@ -515,7 +515,7 @@ public struct _Set<T : Hashable> :
   public func isDisjointWith<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) -> Bool {
-    let other = (sequence as? _Set<T>) ?? _Set(sequence)
+    let other = (sequence as? Set<T>) ?? Set(sequence)
     for member in self {
       if other.contains(member) {
         return false
@@ -527,7 +527,7 @@ public struct _Set<T : Hashable> :
   /// Return a new `Set` with items in both this set and a finite sequence.
   public func union<
     S: SequenceType where S.Generator.Element == T
-  >(sequence: S) -> _Set<T> {
+  >(sequence: S) -> Set<T> {
     var newSet = self
     newSet.unionInPlace(sequence)
     return newSet
@@ -552,7 +552,7 @@ public struct _Set<T : Hashable> :
   /// in a finite sequence.
   public func subtract<
     S: SequenceType where S.Generator.Element == T
-  >(sequence: S) -> _Set<T> {
+  >(sequence: S) -> Set<T> {
     var newSet = self
     newSet.subtractInPlace(sequence)
     return newSet
@@ -576,9 +576,9 @@ public struct _Set<T : Hashable> :
   /// Return a new set with elements common to this set and a finite sequence.
   public func intersect<
     S: SequenceType where S.Generator.Element == T
-  >(sequence: S) -> _Set<T> {
-    let other = (sequence as? _Set<T>) ?? _Set(sequence)
-    var newSet = _Set<T>()
+  >(sequence: S) -> Set<T> {
+    let other = (sequence as? Set<T>) ?? Set(sequence)
+    var newSet = Set<T>()
     for member in self {
       if other.contains(member) {
         newSet.insert(member)
@@ -611,7 +611,7 @@ public struct _Set<T : Hashable> :
   /// sequence but do not occur in both.
   public func exclusiveOr<
     S: SequenceType where S.Generator.Element == T
-  >(sequence: S) -> _Set<T> {
+  >(sequence: S) -> Set<T> {
     var newSet = self
     newSet.exclusiveOrInPlace(sequence)
     return newSet
@@ -623,7 +623,7 @@ public struct _Set<T : Hashable> :
   public mutating func exclusiveOrInPlace<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) {
-    var other = (sequence as? _Set<T>) ?? _Set(sequence)
+    var other = (sequence as? Set<T>) ?? Set(sequence)
     for member in other {
       if contains(member) {
         remove(member)
@@ -639,7 +639,7 @@ public struct _Set<T : Hashable> :
   }
 
   public var hashValue: Int {
-    // FIXME: <rdar://problem/18915294> Cache _Set<T> hashValue
+    // FIXME: <rdar://problem/18915294> Cache Set<T> hashValue
     var result: Int = _mixInt(0)
     for member in self {
        result ^= _mixInt(member.hashValue)
@@ -652,7 +652,7 @@ public struct _Set<T : Hashable> :
 /// a set and some sequence (which may itself be a `Set`).
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
-internal func _compareSets<T>(lhs: _Set<T>, rhs: _Set<T>) ->
+internal func _compareSets<T>(lhs: Set<T>, rhs: Set<T>) ->
   (isSubset: Bool, isEqual: Bool) {
   for member in lhs {
     if !rhs.contains(member) {
@@ -662,7 +662,7 @@ internal func _compareSets<T>(lhs: _Set<T>, rhs: _Set<T>) ->
   return (true, lhs.count == rhs.count)
 }
 
-public func == <T : Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
+public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
   switch (lhs._variantStorage, rhs._variantStorage) {
   case (.Native(let lhsNativeOwner), .Native(let rhsNativeOwner)):
     let lhsNative = lhsNativeOwner.nativeStorage
@@ -728,7 +728,7 @@ public func == <T : Hashable>(lhs: _Set<T>, rhs: _Set<T>) -> Bool {
   }
 }
 
-extension _Set: Printable, DebugPrintable {
+extension Set: Printable, DebugPrintable {
   internal func _makeDescription(#isDebug: Bool) -> String {
     if count == 0 {
       return "{}"
@@ -784,8 +784,8 @@ internal func _stdlib_NSSet_allObjects(nss: _NSSetType) ->
 ///
 /// Requires: `BaseValue` is a base class or base @objc
 /// protocol (such as `AnyObject`) of `DerivedValue`.
-public func _setUpCast<DerivedValue, BaseValue>(source: _Set<DerivedValue>) ->
-  _Set<BaseValue> {
+public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>) ->
+  Set<BaseValue> {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
@@ -803,11 +803,11 @@ public func _setUpCast<DerivedValue, BaseValue>(source: _Set<DerivedValue>) ->
 /// Precondition: `SwiftValue` is bridged to Objective-C
 /// and requires non-trivial bridging.
 public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
-source: _Set<SwiftValue>) -> _Set<ObjCValue> {
+source: Set<SwiftValue>) -> Set<ObjCValue> {
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
-  var result = _Set<ObjCValue>(minimumCapacity: source.count)
+  var result = Set<ObjCValue>(minimumCapacity: source.count)
   let valueBridgesDirectly =
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
     _isBridgedVerbatimToObjectiveC(ObjCValue.self)
@@ -833,20 +833,20 @@ source: _Set<SwiftValue>) -> _Set<ObjCValue> {
 ///
 /// Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 /// are reference types.
-public func _setDownCast<BaseValue, DerivedValue>(source: _Set<BaseValue>) ->
-  _Set<DerivedValue> {
+public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>) ->
+  Set<DerivedValue> {
 
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
   switch source._variantStorage {
   case _VariantSetStorage.Native(let nativeOwner):
-    return _Set(
+    return Set(
     _immutableCocoaSet:
     unsafeBitCast(nativeOwner, _NSSetType.self))
 
   case _VariantSetStorage.Cocoa(let cocoaStorage):
-    return _Set(
+    return Set(
     _immutableCocoaSet:
     unsafeBitCast(cocoaStorage, _NSSetType.self))
   }
@@ -860,11 +860,11 @@ public func _setDownCast<BaseValue, DerivedValue>(source: _Set<BaseValue>) ->
 /// Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 /// are reference types.
 public func _setDownCastConditional<BaseValue, DerivedValue>(
-  source: _Set<BaseValue>) -> _Set<DerivedValue>? {
+  source: Set<BaseValue>) -> Set<DerivedValue>? {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  var result = _Set<DerivedValue>(minimumCapacity: source.count)
+  var result = Set<DerivedValue>(minimumCapacity: source.count)
   for member in source {
     if let derivedMember = member as? DerivedValue {
       result.insert(derivedMember)
@@ -880,8 +880,8 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
 /// Precondition: at least one of `SwiftValue` is a bridged value
 /// type, and the corresponding `ObjCValue` is a reference type.
 public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
-  source: _Set<ObjCValue>) -> _Set<SwiftValue> {
-  let result: _Set<SwiftValue>? = _setBridgeFromObjectiveCConditional(source)
+  source: Set<ObjCValue>) -> Set<SwiftValue> {
+  let result: Set<SwiftValue>? = _setBridgeFromObjectiveCConditional(source)
   _precondition(result != nil, "This set cannot be bridged from Objective-C")
   return result!
 }
@@ -896,8 +896,8 @@ public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
 public func _setBridgeFromObjectiveCConditional<
   ObjCValue, SwiftValue
 >(
-  source: _Set<ObjCValue>
-) -> _Set<SwiftValue>? {
+  source: Set<ObjCValue>
+) -> Set<SwiftValue>? {
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
@@ -905,7 +905,7 @@ public func _setBridgeFromObjectiveCConditional<
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCValue.self)
 
-  var result = _Set<SwiftValue>(minimumCapacity: source.count)
+  var result = Set<SwiftValue>(minimumCapacity: source.count)
   for value in source {
     // Downcast the value.
     var resultValue: SwiftValue
@@ -1549,8 +1549,6 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 # Tuple items:
 # Self: Class name
 #
-# _Self: Class name prefixed with an underscore
-#
 # a_Self: Class name when using an indefinite article
 #
 # TypeParametersDecl: Generic parameters appearing in top-level declarations
@@ -1564,7 +1562,6 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 # AnySequenceType: The same as SequenceType but everything is an AnyObject.
 collections = [
   ('Set',
-   '_Set',
    'a Set',
    'T : Hashable',
    'T',
@@ -1573,7 +1570,6 @@ collections = [
    'AnyObject'),
 
   ('Dictionary',
-   '_Dictionary',
    'a Dictionary',
    'Key : Hashable, Value',
    'Key, Value',
@@ -1583,7 +1579,7 @@ collections = [
 ]
 }%
 
-% for (Self, _Self, a_Self, TypeParametersDecl, TypeParameters, AnyTypeParameters, SequenceType, AnySequenceType) in collections:
+% for (Self, a_Self, TypeParametersDecl, TypeParameters, AnyTypeParameters, SequenceType, AnySequenceType) in collections:
 
 /// An instance of this class has all `${Self}` data tail-allocated.  It is
 /// used as a `_HeapBuffer` storage.
@@ -1592,9 +1588,9 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
   // (without : Hashable) is used here - this storage must work
   // with non-Hashable types.
 
-  typealias Element = ${_Self}Element<${TypeParameters}>
-  typealias ${Self}HeapBuffer = _HeapBuffer<${_Self}Body, Element?>
-  typealias HeapBufferStorage = _HeapBufferStorage<${_Self}Body, Element?>
+  typealias Element = _${Self}Element<${TypeParameters}>
+  typealias ${Self}HeapBuffer = _HeapBuffer<_${Self}Body, Element?>
+  typealias HeapBufferStorage = _HeapBufferStorage<_${Self}Body, Element?>
 
   deinit {
     // FIXME: this cast is invalid.
@@ -1616,7 +1612,7 @@ internal struct _Native${Self}Storage<${TypeParametersDecl}> :
   _HashStorageType, Printable {
   internal typealias Owner = _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias StorageImpl = _Native${Self}StorageImpl<${TypeParameters}>
-  internal typealias Element = ${_Self}Element<${TypeParameters}>
+  internal typealias Element = _${Self}Element<${TypeParameters}>
   internal typealias SequenceElement = ${SequenceType}
 
 %if Self == 'Set': # Set needs these to keep signatures simple.
@@ -1627,7 +1623,7 @@ internal struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal let buffer: StorageImpl.${Self}HeapBuffer
 
   @transparent
-  internal var body: ${_Self}Body {
+  internal var body: _${Self}Body {
     get {
       return buffer.value
     }
@@ -1642,7 +1638,7 @@ internal struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal init(capacity: Int) {
-    let body = ${_Self}Body(capacity: capacity)
+    let body = _${Self}Body(capacity: capacity)
     buffer = StorageImpl.${Self}HeapBuffer(StorageImpl.self, body, capacity)
     for var i = 0; i < capacity; ++i {
       (elements + i).initialize(.None)
@@ -1910,7 +1906,7 @@ internal struct _Native${Self}Storage<${TypeParametersDecl}> :
 /// `${Self}<${AnyTypeParameters}>`, but `AnyObject` can not be a Key because
 /// it is not `Hashable`.
 internal struct _BridgedNative${Self}Storage {
-  internal typealias Element = ${_Self}Element<${AnyTypeParameters}>
+  internal typealias Element = _${Self}Element<${AnyTypeParameters}>
   internal typealias StorageImpl =
     _Native${Self}StorageImpl<${AnyTypeParameters}>
   internal typealias SequenceElement = ${AnySequenceType}
@@ -1922,7 +1918,7 @@ internal struct _BridgedNative${Self}Storage {
   }
 
   @transparent
-  internal var body: ${_Self}Body {
+  internal var body: _${Self}Body {
     get {
       return buffer.value
     }
@@ -2340,7 +2336,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   internal func _createBridgedNativeStorage(capacity: Int) ->
     BridgedNativeStorage {
-    let body = ${_Self}Body(capacity: capacity)
+    let body = _${Self}Body(capacity: capacity)
     let buffer = BridgedNativeStorage.StorageImpl.${Self}HeapBuffer(
       BridgedNativeStorage.StorageImpl.self, body, capacity)
     let elements = buffer.baseAddress
@@ -2362,10 +2358,10 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     for var i = 0; i < nativeStorage.capacity; ++i {
       if let nativeElement = nativeStorage[i] {
 %if Self == 'Set':
-        bridged[i] = ${_Self}Element<${AnyTypeParameters}>(
+        bridged[i] = _${Self}Element<${AnyTypeParameters}>(
           key: _bridgeToObjectiveCUnconditional(nativeElement.key))
 %elif Self == 'Dictionary':
-        bridged[i] = ${_Self}Element<${AnyTypeParameters}>(
+        bridged[i] = _${Self}Element<${AnyTypeParameters}>(
           key: _bridgeToObjectiveCUnconditional(nativeElement.key),
           value: _bridgeToObjectiveCUnconditional(nativeElement.value))
 %end
@@ -2583,7 +2579,7 @@ internal struct _Cocoa${Self}Storage {}
 
 internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
-  internal typealias _NativeStorageElement = ${_Self}Element<${TypeParameters}>
+  internal typealias _NativeStorageElement = _${Self}Element<${TypeParameters}>
   internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
   internal typealias NativeStorageOwner =
     _Native${Self}StorageOwner<${TypeParameters}>
@@ -3272,7 +3268,7 @@ internal func <(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
 internal struct _Cocoa${Self}Index {}
 #endif
 
-internal enum ${_Self}IndexRepresentation<${TypeParametersDecl}> {
+internal enum ${Self}IndexRepresentation<${TypeParametersDecl}> {
   typealias _Index = ${Self}Index<${TypeParameters}>
   typealias _NativeIndex = _Index._NativeIndex
   typealias _CocoaIndex = _Index._CocoaIndex
@@ -3284,7 +3280,7 @@ internal enum ${_Self}IndexRepresentation<${TypeParametersDecl}> {
 %{
 if Self == 'Set':
   SubscriptingWithIndexDoc = """\
-/// Used to access the members in an instance of `_Set<T>`."""
+/// Used to access the members in an instance of `Set<T>`."""
 elif Self == 'Dictionary':
   SubscriptingWithIndexDoc = """\
 /// Used to access the key-value pairs in an instance of
@@ -3319,7 +3315,7 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   internal typealias Value = ${TypeParameters}
 %end
 
-  internal var _value: ${_Self}IndexRepresentation<${TypeParameters}>
+  internal var _value: ${Self}IndexRepresentation<${TypeParameters}>
 
   internal static func _Native(index: _NativeIndex) -> ${Self}Index {
     return ${Self}Index(_value: ._Native(index))
@@ -3505,7 +3501,7 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
 final internal class _Cocoa${Self}Generator {}
 #endif
 
-internal enum ${_Self}GeneratorRepresentation<${TypeParametersDecl}> {
+internal enum ${Self}GeneratorRepresentation<${TypeParametersDecl}> {
   internal typealias _Generator = ${Self}Generator<${TypeParameters}>
   internal typealias _NativeIndex = _Generator._NativeIndex
   case _Native(start: _NativeIndex, end: _NativeIndex)
@@ -3531,7 +3527,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   internal typealias Value = ${TypeParameters}
 %end
 
-  internal var _state: ${_Self}GeneratorRepresentation<${TypeParameters}>
+  internal var _state: ${Self}GeneratorRepresentation<${TypeParameters}>
 
   internal static func _Native(
     #start: _NativeIndex, end: _NativeIndex
@@ -3600,64 +3596,54 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   }
 }
 
-internal struct ${_Self}MirrorPosition<${TypeParametersDecl}> {
-  // FIXME: Remove when un-underscoring _Set
-%if Self == 'Set':
-  internal typealias MirroredType = ${_Self}<${TypeParameters}>
-%elif Self == 'Dictionary':
+internal struct ${Self}MirrorPosition<${TypeParametersDecl}> {
   internal typealias MirroredType = ${Self}<${TypeParameters}>
-%end
 
   internal var _intPos: Int
-  internal var ${_Self}Pos: MirroredType.Index
+  internal var ${Self}Pos: MirroredType.Index
 
   internal init(_ m: MirroredType) {
     _intPos = 0
-    ${_Self}Pos = m.startIndex
+    ${Self}Pos = m.startIndex
   }
 
   internal mutating func successor() {
     _intPos = _intPos + 1
-    ${_Self}Pos = ${_Self}Pos.successor()
+    ${Self}Pos = ${Self}Pos.successor()
   }
 
   internal mutating func prec() {
     _intPos = _intPos - 1
-    ${_Self}Pos = ${_Self}Pos.predecessor()
+    ${Self}Pos = ${Self}Pos.predecessor()
   }
 }
 
 internal func ==<${TypeParametersDecl}> (
-  lhs: ${_Self}MirrorPosition<${TypeParameters}>, rhs : Int
+  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
 ) -> Bool {
   return lhs._intPos == rhs
 }
 
 internal func > <${TypeParametersDecl}> (
-  lhs: ${_Self}MirrorPosition<${TypeParameters}>, rhs : Int
+  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
 ) -> Bool {
   return lhs._intPos > rhs
 }
 
 internal func < <${TypeParametersDecl}> (
-  lhs: ${_Self}MirrorPosition<${TypeParameters}>, rhs : Int
+  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
 ) -> Bool {
   return lhs._intPos < rhs
 }
 
-internal class ${_Self}Mirror<${TypeParametersDecl}> : MirrorType {
-  // FIXME: Remove when un-underscoring Set.
-%if Self == 'Set':
-  typealias MirroredType = ${_Self}<${TypeParameters}>
-%elif Self == 'Dictionary':
+internal class ${Self}Mirror<${TypeParametersDecl}> : MirrorType {
   typealias MirroredType = ${Self}<${TypeParameters}>
-%end
   internal let _mirror : MirroredType
-  internal var _pos : ${_Self}MirrorPosition<${TypeParameters}>
+  internal var _pos : ${Self}MirrorPosition<${TypeParameters}>
 
   internal init(_ m : MirroredType) {
     _mirror = m
-    _pos = ${_Self}MirrorPosition(m)
+    _pos = ${Self}MirrorPosition(m)
   }
 
   internal var value: Any { return (_mirror as Any) }
@@ -3678,9 +3664,9 @@ internal class ${_Self}Mirror<${TypeParametersDecl}> : MirrorType {
       _pos.prec()
     }
 %if Self == 'Set':
-    return ("[\(_pos._intPos)]", reflect(_mirror[_pos.${_Self}Pos]))
+    return ("[\(_pos._intPos)]", reflect(_mirror[_pos.${Self}Pos]))
 %elif Self == 'Dictionary':
-    return ("[\(_pos._intPos)]", reflect(_mirror[_pos.${_Self}Pos]))
+    return ("[\(_pos._intPos)]", reflect(_mirror[_pos.${Self}Pos]))
 %end
   }
 
@@ -3707,15 +3693,10 @@ internal class ${_Self}Mirror<${TypeParametersDecl}> : MirrorType {
 %end
 }
 
-%if Self == 'Set':
-// FIXME: Remove after un-underscoring Set
-extension ${_Self} : Reflectable {
-%elif Self == 'Dictionary':
 extension ${Self} : Reflectable {
-%end
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
-    return ${_Self}Mirror(self)
+    return ${Self}Mirror(self)
   }
 }
 
@@ -3723,18 +3704,13 @@ extension ${Self} : Reflectable {
 ///
 /// Using a builder can be faster than inserting members into an empty
 /// `${Self}`.
-public struct ${_Self}Builder<${TypeParametersDecl}> {
+public struct _${Self}Builder<${TypeParametersDecl}> {
 %if Self == 'Set':
   typealias Key = ${TypeParameters}
   typealias Value = ${TypeParameters}
 %end
 
-  // FIXME: Remove when un-underscoring Set
-%if Self == 'Set':
-  internal var _result: ${_Self}<${TypeParameters}>
-%elif Self == 'Dictionary':
   internal var _result: ${Self}<${TypeParameters}>
-%end
   internal var _nativeStorage: _Native${Self}Storage<${TypeParameters}>
   internal let _requestedCount: Int
   internal var _actualCount: Int
@@ -3743,12 +3719,7 @@ public struct ${_Self}Builder<${TypeParametersDecl}> {
     let requiredCapacity =
       _Native${Self}Storage<${TypeParameters}>.getMinCapacity(
         count, _hashContainerDefaultMaxLoadFactorInverse)
-    // FIXME: Remove when un-underscoring Set
-%if Self == 'Set':
-    _result = ${_Self}<${TypeParameters}>(minimumCapacity: requiredCapacity)
-%elif Self == 'Dictionary':
     _result = ${Self}<${TypeParameters}>(minimumCapacity: requiredCapacity)
-%end
     _nativeStorage = _result._variantStorage.native
     _requestedCount = count
     _actualCount = 0
@@ -3764,12 +3735,7 @@ public struct ${_Self}Builder<${TypeParametersDecl}> {
     _actualCount++
   }
 
-  // FIXME: Remove when un-underscoring Set.
-%if Self == 'Set':
-  public mutating func take() -> ${_Self}<${TypeParameters}> {
-%elif Self == 'Dictionary':
   public mutating func take() -> ${Self}<${TypeParameters}> {
-%end
     _precondition(_actualCount >= 0,
       "can not take the result twice")
     _precondition(_actualCount == _requestedCount,
@@ -3787,12 +3753,7 @@ public struct ${_Self}Builder<${TypeParametersDecl}> {
 //===--- Bridging ---------------------------------------------------------===//
 
 #if _runtime(_ObjC)
-%if Self == 'Set':
-// FIXME: Remove after un-underscoring Set
-extension ${_Self} {
-%elif Self == 'Dictionary':
 extension ${Self} {
-%end
   public func _bridgeToObjectiveCImpl()
     -> _NS${Self}CoreType {
     switch _variantStorage {
@@ -3813,23 +3774,13 @@ extension ${Self} {
 
   public static func _bridgeFromObjectiveCAdoptingNativeStorage(
       s: AnyObject
-// FIXME: Remove when un-underscoring Set
-%if Self == 'Set':
-  ) -> ${_Self}<${TypeParameters}>? {
-%elif Self == 'Dictionary':
   ) -> ${Self}<${TypeParameters}>? {
-%end
     if let nativeOwner =
         s as AnyObject as? _Native${Self}StorageOwner<${TypeParameters}> {
       // If `NS${Self}` is actually native storage of `${Self}` with key
       // and value types that the requested ones match exactly, then just
       // re-wrap the native storage.
-// FIXME: Remove when un-underscoring Set
-%if Self == 'Set':
-      return ${_Self}<${TypeParameters}>(_nativeStorageOwner: nativeOwner)
-%elif Self == 'Dictionary':
       return ${Self}<${TypeParameters}>(_nativeStorageOwner: nativeOwner)
-%end
     }
     // FIXME: what if `s` is native storage, but for different key/value type?
     return .None

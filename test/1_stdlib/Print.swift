@@ -757,15 +757,15 @@ test_DictionaryPrinting()
 // CHECK: test_DictionaryPrinting done
 
 func test_SetPrinting() {
-  var sI = _Set<Int>()
+  var sI = Set<Int>()
   printedIs(sI, "{}")
   debugPrintedIs(sI, "{}")
 
-  sI = _Set<Int>([11, 22])
+  sI = Set<Int>([11, 22])
   printedIs(sI, "{11, 22}", expected2: "{22, 11}")
   debugPrintedIs(sI, "{11, 22}", expected2: "{22, 11}")
 
-  let sS = _Set<String>(["Hello", "world"])
+  let sS = Set<String>(["Hello", "world"])
   printedIs(sS, "{Hello, world}", expected2: "{world, Hello}")
   debugPrintedIs(sS, "{\"Hello\", \"world\"}", expected2: "{\"world\", \"Hello\"}")
 

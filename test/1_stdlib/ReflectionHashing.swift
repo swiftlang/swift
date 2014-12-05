@@ -71,7 +71,7 @@ Reflection.test("Dictionary") {
 }
 
 Reflection.test("Set") {
-  let s = _Set(1...5)
+  let s = Set(1...5)
 
   var output = ""
   dump(s, &output)
