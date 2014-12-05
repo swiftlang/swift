@@ -1506,10 +1506,12 @@ Only certain types of SIL value can carry value-dependence:
 
 - SIL address types
 - unmanaged pointer types:
+
   - ``@sil_unmanaged`` types
   - ``Builtin.RawPointer``
   - aggregates containing such a type, such as ``UnsafePointer``,
     possibly recursively
+
 - non-trivial types (but they can be independently managed)
 
 This rule means that casting a pointer to an integer type breaks
