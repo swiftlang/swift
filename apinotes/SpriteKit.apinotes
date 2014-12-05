@@ -632,6 +632,11 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: 'isEqualToNode:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: node
     MethodKind: Class
     NullabilityOfRet: N

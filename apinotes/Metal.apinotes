@@ -17,6 +17,10 @@ Classes:
     NullabilityOfRet: O
 - Name: MTLDepthStencilDescriptor
   Properties:
+  - Name: backFaceStencil
+    Nullability: U
+  - Name: frontFaceStencil
+    Nullability: U
   - Name: label
     Nullability: O
 - Name: MTLRenderPassAttachmentDescriptor
@@ -25,12 +29,42 @@ Classes:
     Nullability: O
   - Name: texture
     Nullability: O
+- Name: MTLRenderPassColorAttachmentDescriptorArray
+  Methods:
+  - Selector: 'objectAtIndexedSubscript:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: U
+  - Selector: 'setObject:atIndexedSubscript:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    NullabilityOfRet: S
 - Name: MTLRenderPassDescriptor
   Properties:
   - Name: colorAttachments
     Nullability: N
+  - Name: depthAttachment
+    Nullability: U
+  - Name: stencilAttachment
+    Nullability: U
   - Name: visibilityResultBuffer
     Nullability: O
+- Name: MTLRenderPipelineColorAttachmentDescriptorArray
+  Methods:
+  - Selector: 'objectAtIndexedSubscript:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: U
+  - Selector: 'setObject:atIndexedSubscript:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    NullabilityOfRet: S
 - Name: MTLRenderPipelineDescriptor
   Properties:
   - Name: colorAttachments
@@ -60,6 +94,32 @@ Classes:
     - S
     - S
     NullabilityOfRet: N
+- Name: MTLVertexAttributeDescriptorArray
+  Methods:
+  - Selector: 'objectAtIndexedSubscript:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: U
+  - Selector: 'setObject:atIndexedSubscript:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    NullabilityOfRet: S
+- Name: MTLVertexBufferLayoutDescriptorArray
+  Methods:
+  - Selector: 'objectAtIndexedSubscript:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: U
+  - Selector: 'setObject:atIndexedSubscript:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    NullabilityOfRet: S
 - Name: MTLVertexDescriptor
   Properties:
   - Name: attributes

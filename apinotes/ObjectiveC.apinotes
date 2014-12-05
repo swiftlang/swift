@@ -1,6 +1,16 @@
 ---
 Name: ObjectiveC
 Classes:
+- Name: List
+  Methods:
+  - Selector: init
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'isEqual:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
 - Name: NSObject
   Methods:
   - Selector: alloc
@@ -65,6 +75,16 @@ Classes:
   - Selector: superclass
     MethodKind: Class
     NullabilityOfRet: O
+- Name: Object
+  Methods:
+  - Selector: init
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'isEqual:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
 Protocols:
 - Name: NSObject
   Methods:

@@ -213,6 +213,8 @@ Classes:
     Nullability: O
   - Name: entityMigrationPolicyClassName
     Nullability: N
+  - Name: name
+    Nullability: U
   - Name: relationshipMappings
     Nullability: N
   - Name: sourceEntityName
@@ -980,6 +982,10 @@ Classes:
   Properties:
   - Name: configurationName
     Nullability: N
+  - Name: identifier
+    Nullability: U
+  - Name: metadata
+    Nullability: U
   - Name: options
     Nullability: O
   - Name: persistentStoreCoordinator
@@ -1131,6 +1137,8 @@ Classes:
   Properties:
   - Name: managedObjectModel
     Nullability: N
+  - Name: name
+    Nullability: U
   - Name: persistentStores
     Nullability: N
 - Name: NSPersistentStoreRequest

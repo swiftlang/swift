@@ -13,7 +13,7 @@ Classes:
   - Selector: 'attributedStringWithAttachment:'
     MethodKind: Class
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   - Selector: 'boundingRectWithSize:options:context:'
     MethodKind: Instance
@@ -26,7 +26,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    - U
+    - N
     - O
     NullabilityOfRet: O
   - Selector: 'drawWithRect:options:context:'
@@ -40,7 +40,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    - U
+    - N
     - O
     NullabilityOfRet: O
   - Selector: 'initWithData:options:documentAttributes:error:'
@@ -505,6 +505,9 @@ Classes:
   - Selector: sharedAccelerometer
     MethodKind: Class
     NullabilityOfRet: N
+  Properties:
+  - Name: delegate
+    Nullability: O
 - Name: UIAccessibilityCustomAction
   Methods:
   - Selector: 'initWithName:target:selector:'
@@ -1236,7 +1239,7 @@ Classes:
   - Selector: 'initWithCollectionViewLayout:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   Properties:
   - Name: collectionView
@@ -1429,6 +1432,12 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+- Name: UICollectionViewUpdateItem
+  Properties:
+  - Name: indexPathAfterUpdate
+    Nullability: O
+  - Name: indexPathBeforeUpdate
+    Nullability: O
 - Name: UICollisionBehavior
   Methods:
   - Selector: 'addBoundaryWithIdentifier:forPath:'
@@ -1526,8 +1535,8 @@ Classes:
   - Selector: 'initWithCGColor:'
     MethodKind: Instance
     Nullability:
-    - U
-    NullabilityOfRet: N
+    - N
+    NullabilityOfRet: O
   - Selector: 'initWithCIColor:'
     MethodKind: Instance
     Nullability:
@@ -1651,6 +1660,8 @@ Classes:
     - S
     NullabilityOfRet: S
   Properties:
+  - Name: calendar
+    Nullability: U
   - Name: date
     Nullability: N
   - Name: locale
@@ -2140,7 +2151,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithFontAttributes:'
     MethodKind: Instance
     Nullability:
@@ -2469,12 +2480,16 @@ Classes:
     Nullability: N
 - Name: UILabel
   Properties:
+  - Name: font
+    Nullability: U
   - Name: highlightedTextColor
     Nullability: O
   - Name: shadowColor
     Nullability: O
   - Name: text
     Nullability: O
+  - Name: textColor
+    Nullability: U
 - Name: UILexicon
   Properties:
   - Name: entries
@@ -2642,8 +2657,8 @@ Classes:
   - Selector: 'initWithNavigationBarClass:toolbarClass:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: N
   - Selector: 'initWithRootViewController:'
     MethodKind: Instance
@@ -2951,7 +2966,7 @@ Classes:
   - Selector: 'printerWithURL:'
     MethodKind: Class
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   Properties:
   - Name: displayLocation
@@ -3363,7 +3378,7 @@ Classes:
   - Selector: 'initWithItems:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   - Selector: 'insertSegmentWithImage:atIndex:animated:'
     MethodKind: Instance
@@ -3564,7 +3579,7 @@ Classes:
   - Selector: 'initWithIdentifier:source:destination:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - N
     - N
     NullabilityOfRet: U
@@ -3919,6 +3934,8 @@ Classes:
     - N
     NullabilityOfRet: N
   Properties:
+  - Name: backgroundColor
+    Nullability: U
   - Name: backgroundEffect
     Nullability: O
 - Name: UITextChecker
@@ -3972,6 +3989,8 @@ Classes:
     Nullability: O
   - Name: background
     Nullability: O
+  - Name: defaultTextAttributes
+    Nullability: U
   - Name: delegate
     Nullability: O
   - Name: disabledBackground
@@ -4070,6 +4089,8 @@ Classes:
     Nullability: O
   - Name: items
     Nullability: O
+  - Name: tintColor
+    Nullability: U
 - Name: UITouch
   Methods:
   - Selector: 'locationInView:'
@@ -4668,6 +4689,8 @@ Classes:
     Nullability: N
   - Name: transitioningDelegate
     Nullability: O
+  - Name: view
+    Nullability: U
 - Name: UIViewPrintFormatter
   Properties:
   - Name: view
@@ -4855,6 +4878,14 @@ Protocols:
     - S
     - S
     - S
+    NullabilityOfRet: S
+- Name: UIAccelerometerDelegate
+  Methods:
+  - Selector: 'accelerometer:didAccelerate:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
     NullabilityOfRet: S
 - Name: UIAccessibilityReadingContent
   Methods:
@@ -5269,6 +5300,12 @@ Protocols:
     NullabilityOfRet: S
 - Name: UICollectionViewDelegate
   Methods:
+  - Selector: 'collectionView:canFocusItemAtIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
   - Selector: 'collectionView:canPerformAction:forItemAtIndexPath:withSender:'
     MethodKind: Instance
     Nullability:
@@ -5298,6 +5335,12 @@ Protocols:
     - N
     - N
     NullabilityOfRet: S
+  - Selector: 'collectionView:didFocusItemAtIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
   - Selector: 'collectionView:didHighlightItemAtIndexPath:'
     MethodKind: Instance
     Nullability:
@@ -5309,6 +5352,12 @@ Protocols:
     Nullability:
     - N
     - N
+    NullabilityOfRet: S
+  - Selector: 'collectionView:didUnfocusItemAtIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
     NullabilityOfRet: S
   - Selector: 'collectionView:didUnhighlightItemAtIndexPath:'
     MethodKind: Instance
@@ -5322,6 +5371,13 @@ Protocols:
     - N
     - S
     - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'collectionView:shouldChangeFocusedItem:fromItemAtIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
     - U
     NullabilityOfRet: S
   - Selector: 'collectionView:shouldDeselectItemAtIndexPath:'
@@ -5518,11 +5574,23 @@ Protocols:
     NullabilityOfRet: N
 - Name: UIDocumentInteractionControllerDelegate
   Methods:
+  - Selector: 'documentInteractionController:canPerformAction:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: S
   - Selector: 'documentInteractionController:didEndSendingToApplication:'
     MethodKind: Instance
     Nullability:
     - N
     - N
+    NullabilityOfRet: S
+  - Selector: 'documentInteractionController:performAction:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
     NullabilityOfRet: S
   - Selector: 'documentInteractionController:willBeginSendingToApplication:'
     MethodKind: Instance
@@ -5667,6 +5735,13 @@ Protocols:
     NullabilityOfRet: U
 - Name: UIImagePickerControllerDelegate
   Methods:
+  - Selector: 'imagePickerController:didFinishPickingImage:editingInfo:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - U
+    NullabilityOfRet: S
   - Selector: 'imagePickerController:didFinishPickingMediaWithInfo:'
     MethodKind: Instance
     Nullability:
@@ -6517,6 +6592,18 @@ Protocols:
     - N
     - N
     NullabilityOfRet: S
+  - Selector: 'tableView:accessoryTypeForRowWithIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'tableView:canFocusRowAtIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
   - Selector: 'tableView:canPerformAction:forRowAtIndexPath:withSender:'
     MethodKind: Instance
     Nullability:
@@ -6558,6 +6645,12 @@ Protocols:
     - N
     - N
     NullabilityOfRet: S
+  - Selector: 'tableView:didFocusRowAtIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: S
   - Selector: 'tableView:didHighlightRowAtIndexPath:'
     MethodKind: Instance
     Nullability:
@@ -6569,6 +6662,12 @@ Protocols:
     Nullability:
     - N
     - N
+    NullabilityOfRet: S
+  - Selector: 'tableView:didUnfocusRowAtIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
     NullabilityOfRet: S
   - Selector: 'tableView:didUnhighlightRowAtIndexPath:'
     MethodKind: Instance
@@ -6636,6 +6735,13 @@ Protocols:
     - N
     - S
     - N
+    - U
+    NullabilityOfRet: S
+  - Selector: 'tableView:shouldChangeFocusedItem:fromRowAtIndexPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
     - U
     NullabilityOfRet: S
   - Selector: 'tableView:shouldHighlightRowAtIndexPath:'

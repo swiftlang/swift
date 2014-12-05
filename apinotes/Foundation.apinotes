@@ -476,6 +476,12 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: 'makeObjectsPerformSelector:withObject:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - O
+    NullabilityOfRet: S
   - Selector: 'objectAtIndex:'
     MethodKind: Instance
     Nullability:
@@ -2434,8 +2440,60 @@ Classes:
     - N
     NullabilityOfRet: N
   Properties:
+  - Name: AMSymbol
+    Nullability: U
+  - Name: calendar
+    Nullability: U
+  - Name: dateFormat
+    Nullability: U
   - Name: defaultDate
     Nullability: O
+  - Name: eraSymbols
+    Nullability: U
+  - Name: gregorianStartDate
+    Nullability: U
+  - Name: locale
+    Nullability: U
+  - Name: longEraSymbols
+    Nullability: U
+  - Name: monthSymbols
+    Nullability: U
+  - Name: PMSymbol
+    Nullability: U
+  - Name: quarterSymbols
+    Nullability: U
+  - Name: shortMonthSymbols
+    Nullability: U
+  - Name: shortQuarterSymbols
+    Nullability: U
+  - Name: shortStandaloneMonthSymbols
+    Nullability: U
+  - Name: shortStandaloneQuarterSymbols
+    Nullability: U
+  - Name: shortStandaloneWeekdaySymbols
+    Nullability: U
+  - Name: shortWeekdaySymbols
+    Nullability: U
+  - Name: standaloneMonthSymbols
+    Nullability: U
+  - Name: standaloneQuarterSymbols
+    Nullability: U
+  - Name: standaloneWeekdaySymbols
+    Nullability: U
+  - Name: timeZone
+    Nullability: U
+  - Name: twoDigitStartDate
+    Nullability: U
+  - Name: veryShortMonthSymbols
+    Nullability: U
+  - Name: veryShortStandaloneMonthSymbols
+    Nullability: U
+  - Name: veryShortStandaloneWeekdaySymbols
+    Nullability: U
+  - Name: veryShortWeekdaySymbols
+    Nullability: U
+  - Name: weekdaySymbols
+    Nullability: U
 - Name: NSDateIntervalFormatter
   Methods:
   - Selector: 'stringFromDate:toDate:'
@@ -4749,6 +4807,9 @@ Classes:
     - S
     - S
     NullabilityOfRet: N
+  Properties:
+  - Name: numberFormatter
+    Nullability: U
 - Name: NSLinguisticTagger
   Methods:
   - Selector: 'availableTagSchemesForLanguage:'
@@ -5107,6 +5168,9 @@ Classes:
     - S
     - S
     NullabilityOfRet: N
+  Properties:
+  - Name: numberFormatter
+    Nullability: U
 - Name: NSMessagePortNameServer
   Methods:
   - Selector: 'portForName:'
@@ -6354,10 +6418,16 @@ Classes:
     Nullability: N
   - Name: format
     Nullability: N
+  - Name: groupingSeparator
+    Nullability: U
   - Name: internationalCurrencySymbol
     Nullability: O
   - Name: locale
     Nullability: O
+  - Name: maximum
+    Nullability: U
+  - Name: minimum
+    Nullability: U
   - Name: minusSign
     Nullability: N
   - Name: multiplier
@@ -6382,6 +6452,8 @@ Classes:
     Nullability: N
   - Name: plusSign
     Nullability: N
+  - Name: positiveFormat
+    Nullability: U
   - Name: positiveInfinitySymbol
     Nullability: N
   - Name: positivePrefix
@@ -6701,6 +6773,8 @@ Classes:
     AvailabilityMsg: you may be able to use XPC instead
   - Name: className
     Nullability: N
+  - Name: objectSpecifier
+    Nullability: O
   - Name: toManyRelationshipKeys
     Nullability: N
   - Name: toOneRelationshipKeys
@@ -7763,6 +7837,15 @@ Classes:
   - Selector: mainRunLoop
     MethodKind: Class
     NullabilityOfRet: N
+  - Selector: 'performSelector:target:argument:order:modes:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    - O
+    - S
+    - N
+    NullabilityOfRet: S
   - Selector: 'removePort:forMode:'
     MethodKind: Instance
     Nullability:
@@ -7959,6 +8042,8 @@ Classes:
   Properties:
   - Name: appleEvent
     Nullability: O
+  - Name: arguments
+    Nullability: U
   - Name: commandDescription
     Nullability: N
   - Name: directParameter
@@ -8259,6 +8344,12 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
+    NullabilityOfRet: S
+  - Selector: 'makeObjectsPerformSelector:withObject:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - O
     NullabilityOfRet: S
   - Selector: 'member:'
     MethodKind: Instance
@@ -9279,6 +9370,8 @@ Classes:
     - N
     NullabilityOfRet: S
   Properties:
+  - Name: name
+    Nullability: U
   - Name: threadDictionary
     Nullability: N
 - Name: NSTimer
@@ -10741,6 +10834,11 @@ Classes:
   - Selector: 'initWithSuiteName:'
     MethodKind: Instance
     Nullability:
+    - O
+    NullabilityOfRet: O
+  - Selector: 'initWithUser:'
+    MethodKind: Instance
+    Nullability:
     - N
     NullabilityOfRet: O
   - Selector: 'integerForKey:'
@@ -10769,6 +10867,9 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: O
+  - Selector: persistentDomainNames
+    MethodKind: Instance
+    NullabilityOfRet: N
   - Selector: 'registerDefaults:'
     MethodKind: Instance
     Nullability:
@@ -11643,7 +11744,7 @@ Classes:
   - Selector: 'initWithData:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'initWithStream:'
@@ -12738,6 +12839,146 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
+    - N
+    NullabilityOfRet: S
+- Name: NSXMLParserDelegate
+  Methods:
+  - Selector: 'parser:didEndElement:namespaceURI:qualifiedName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:didEndMappingPrefix:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parser:didStartElement:namespaceURI:qualifiedName:attributes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - O
+    - O
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parser:didStartMappingPrefix:toURI:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parser:foundAttributeDeclarationWithName:forElement:type:defaultValue:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - N
+    - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:foundCDATA:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parser:foundCharacters:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:foundComment:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:foundElementDeclarationWithName:model:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parser:foundExternalEntityDeclarationWithName:publicID:systemID:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:foundIgnorableWhitespace:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parser:foundInternalEntityDeclarationWithName:value:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:foundNotationDeclarationWithName:publicID:systemID:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:foundProcessingInstructionWithTarget:data:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:foundUnparsedEntityDeclarationWithName:publicID:systemID:notationName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - O
+    - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'parser:parseErrorOccurred:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parser:resolveExternalEntityName:systemID:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - O
+    NullabilityOfRet: O
+  - Selector: 'parser:validationErrorOccurred:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parserDidEndDocument:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'parserDidStartDocument:'
+    MethodKind: Instance
+    Nullability:
     - N
     NullabilityOfRet: S
 - Name: NSXPCListenerDelegate
