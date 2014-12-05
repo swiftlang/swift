@@ -14,8 +14,9 @@
 // <rdar://problem/17550602> [unicode] Implement case folding
 extension String {
   /// A "table" for which ASCII characters need to be upper cased.
-  /// Each bit represents 2 ASCII characters. The bit is set iff the character
-  /// is lower case. It is offsetted down by 1.
+  /// To determine which bit corresponds to which ASCII character, subtract 1
+  /// from the ASCII value of that character and divide by 2. The bit is set iff
+  /// that character is a lower case character.
   internal var _asciiLowerCaseTable: UInt64 {
     @inline(__always)
     get {
@@ -23,7 +24,7 @@ extension String {
     }
   }
 
-  /// The same table for characters that are upper case.
+  /// The same table for upper case characters.
   internal var _asciiUpperCaseTable: UInt64 {
     @inline(__always)
     get {
