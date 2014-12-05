@@ -966,7 +966,8 @@ SILModule::constructSIL(Module *mod, SILOptions &options, SourceFile *sf,
   }
 
   // Emit external definitions used by this module.
-  for (auto def : mod->Ctx.ExternalDefinitions) {
+  for (size_t i = 0, e = mod->Ctx.LastCheckedExternalDefinition; i != e; ++i) {
+    auto def = mod->Ctx.ExternalDefinitions[i];
     sgm.emitExternalDefinition(def);
   }
 
