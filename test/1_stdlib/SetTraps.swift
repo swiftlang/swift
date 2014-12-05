@@ -10,6 +10,7 @@
 // RUN: %target-run %t/a.out RemoveInvalidIndex2 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out RemoveInvalidIndex3 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out RemoveInvalidIndex4 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out RemoveFirstFromEmpty 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // FIXME: <rdar://problem/18853078> Implement Set<T> up and downcasting
 // R/UN: %target-run %t/a.out BridgedKeyIsNotNSCopyable1 2>&1 | FileCheck %s -check-prefix=CHECK-UNRECOGNIZED-SELECTOR
@@ -114,6 +115,12 @@ if arg == "RemoveInvalidIndex4" {
   assert(!s.contains(10))
   println("OK")
   s.removeAtIndex(index)
+}
+
+if arg == "RemoveFirstFromEmpty" {
+  var s = Set<Int>()
+  println("OK")
+  s.removeFirst()
 }
 
 class TestObjCKeyTy : NSObject {
