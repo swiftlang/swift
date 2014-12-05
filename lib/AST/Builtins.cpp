@@ -428,6 +428,26 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, Output);
 }
 
+static const char * const GenericParamNames[] = {
+  "T",
+  "U",
+};
+
+static std::pair<ArchetypeType*, GenericTypeParamDecl*>
+createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
+  Module *M = ctx.TheBuiltinModule;
+  Identifier ident = ctx.getIdentifier(name);
+  ArchetypeType *archetype
+    = ArchetypeType::getNew(ctx, nullptr,
+                            static_cast<AssociatedTypeDecl *>(nullptr),
+                            ident, ArrayRef<Type>(), Type(), false);
+  auto genericParam =
+    new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
+                                   ident, SourceLoc(), 0, index);
+  genericParam->setArchetype(archetype);
+  return { archetype, genericParam };
+}
+
 /// Create a generic parameter list with a single generic parameter.
 ///
 /// \returns a tuple (interface type, body type, parameter list) that contains
@@ -436,24 +456,34 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
 /// an ArchetypeType*), and the generic parameter list.
 static std::tuple<Type, Type, GenericParamList*>
 getGenericParam(ASTContext &Context) {
-  Module *M = Context.TheBuiltinModule;
+  auto archetypeAndParam = createGenericParam(Context, GenericParamNames[0], 0);
+  ArchetypeType *archetypes[] = { archetypeAndParam.first };
+  auto param = archetypeAndParam.second;
+  auto paramList = GenericParamList::create(Context, SourceLoc(),
+                                            param, SourceLoc());
+  paramList->setAllArchetypes(Context.AllocateCopy(archetypes));
+  return std::make_tuple(param->getDeclaredType(), archetypes[0],
+                         paramList);
+}
 
-  Identifier GenericName = Context.getIdentifier("T");
-  ArchetypeType *Archetype
-    = ArchetypeType::getNew(Context, nullptr,
-                            static_cast<AssociatedTypeDecl *>(nullptr),
-                            GenericName,
-                            ArrayRef<Type>(), Type(), false);
-  auto GenericTyDecl =
-    new (Context) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
-                                       GenericName, SourceLoc(), 0, 0);
-  GenericTyDecl->setArchetype(Archetype);
-  auto ParamList = GenericParamList::create(Context, SourceLoc(), GenericTyDecl,
+/// Create a generic parameter list with multiple generic parameters.
+static GenericParamList *getGenericParams(ASTContext &ctx,
+                                          unsigned numParameters,
+                       SmallVectorImpl<ArchetypeType*> &archetypes,
+                       SmallVectorImpl<GenericTypeParamDecl*> &genericParams) {
+  assert(numParameters <= llvm::array_lengthof(GenericParamNames));
+  assert(archetypes.empty() && genericParams.empty());
+
+  for (unsigned i = 0; i != numParameters; ++i) {
+    auto archetypeAndParam = createGenericParam(ctx, GenericParamNames[i], i);
+    archetypes.push_back(archetypeAndParam.first);
+    genericParams.push_back(archetypeAndParam.second);
+  }
+
+  auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
-  ParamList->setAllArchetypes(
-    Context.AllocateCopy(ArrayRef<ArchetypeType *>(&Archetype, 1)));
-  return std::make_tuple(GenericTyDecl->getDeclaredType(), Archetype,
-                         ParamList);
+  paramList->setAllArchetypes(ctx.AllocateCopy(archetypes));
+  return paramList;
 }
 
 /// Create a function with type <T> T -> ().
@@ -682,30 +712,9 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &Context,
   // SILGen and IRGen check additional constraints during lowering.
   
   // Create the generic parameters.
-  Module *M = Context.TheBuiltinModule;
-
   SmallVector<ArchetypeType *, 2> Archetypes;
   SmallVector<GenericTypeParamDecl *, 2> GenericParams;
-  unsigned index = 0;
-  for (char const *name : {"T", "U"}) {
-    Identifier GenericName = Context.getIdentifier(name);
-    ArchetypeType *Archetype
-      = ArchetypeType::getNew(Context, nullptr,
-                              static_cast<AssociatedTypeDecl *>(nullptr),
-                              GenericName,
-                              ArrayRef<Type>(), Type(), false);
-    auto GenericTyDecl =
-      new (Context) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
-                                         GenericName, SourceLoc(), 0, index);
-    GenericTyDecl->setArchetype(Archetype);
-
-    Archetypes.push_back(Archetype);
-    GenericParams.push_back(GenericTyDecl);
-    ++index;
-  }
-  auto ParamList = GenericParamList::create(Context, SourceLoc(), GenericParams,
-                                            SourceLoc());
-  ParamList->setAllArchetypes(Context.AllocateCopy(Archetypes));
+  auto ParamList = getGenericParams(Context, 2, Archetypes, GenericParams);
   
   TupleTypeElt Params(GenericParams[0]->getDeclaredType());
   TupleTypeElt BodyArgs(Archetypes[0]);
@@ -713,6 +722,30 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &Context,
   return getBuiltinGenericFunction(Id, Params, BodyArgs,
                                    GenericParams[1]->getDeclaredType(),
                                    Archetypes[1], ParamList);
+}
+
+static ValueDecl *getMarkDependenceOperation(ASTContext &ctx, Identifier name) {
+  // <T,U> (T,U) -> T
+
+  // Create the generic parameters.
+  SmallVector<ArchetypeType *, 2> archetypes;
+  SmallVector<GenericTypeParamDecl *, 2> genericParams;
+  auto paramList = getGenericParams(ctx, 2, archetypes, genericParams);
+
+  TupleTypeElt paramTypes[] = {
+    genericParams[0]->getDeclaredType(),
+    genericParams[1]->getDeclaredType(),
+  };
+  TupleTypeElt bodyParamTypes[] = {
+    archetypes[0],
+    archetypes[1],
+  };
+
+  Type resultType = genericParams[0]->getDeclaredType();
+  Type bodyResultType = archetypes[0];
+
+  return getBuiltinGenericFunction(name, paramTypes, bodyParamTypes,
+                                   resultType, bodyResultType, paramList);
 }
 
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
@@ -1333,6 +1366,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocRaw:
     return getDeallocOperation(Context, Id);
+
+  case BuiltinValueKind::MarkDependence:
+    return getMarkDependenceOperation(Context, Id);
 
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::CastFromNativeObject:

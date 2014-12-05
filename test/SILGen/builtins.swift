@@ -5,6 +5,10 @@ import Swift
 
 protocol ClassProto : class { }
 
+struct Pointer {
+  var value: Builtin.RawPointer
+}
+
 // CHECK-LABEL: sil hidden @_TF8builtins3foo
 func foo(x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
   // CHECK: builtin "cmp_eq_Int1"
@@ -432,4 +436,12 @@ func castRefFromBridgeObject(bo: Builtin.BridgeObject) -> C {
 // CHECK:         release [[BO]]
 func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
   return Builtin.castBitPatternFromBridgeObject(bo)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins14markDependenceFTVS_7PointerPS_10ClassProto__S0_ : $@thin (Pointer, @owned ClassProto) -> Pointer {
+// CHECK:         [[T0:%.*]] = mark_dependence %0 : $Pointer on %1 : $ClassProto
+// CHECK-NEXT:    strong_release %1 : $ClassProto
+// CHECK-NEXT:    return [[T0]] : $Pointer
+func markDependence(v: Pointer, base: ClassProto) -> Pointer {
+  return Builtin.markDependence(v, base)
 }

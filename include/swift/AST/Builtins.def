@@ -180,6 +180,9 @@ BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 /// Init has type (T, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 
+/// MarkDependence has type (T, U) -> T
+BUILTIN_SIL_OPERATION(MarkDependence, "markDependence", Special)
+
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
 BUILTIN_SIL_OPERATION(CastToNativeObject, "castToNativeObject", Special)
 

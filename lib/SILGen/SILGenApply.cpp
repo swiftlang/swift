@@ -2776,6 +2776,19 @@ namespace {
                                                      wordType);
     return ManagedValue::forUnmanaged(result);
   }
+
+  static ManagedValue emitBuiltinMarkDependence(SILGenFunction &gen,
+                                                SILLocation loc,
+                                                ArrayRef<Substitution> subs,
+                                                ArrayRef<ManagedValue> args,
+                                                SGFContext C) {
+    assert(args.size() == 2 && "markDependence should have two value args");
+    assert(subs.size() == 2 && "markDependence should have two generic args");
+
+    SILValue result =
+      gen.B.createMarkDependence(loc, args[0].forward(gen), args[1].getValue());
+    return gen.emitManagedRValueWithCleanup(result);
+  }
   
   /// Specialized emitter for type traits.
   template<TypeTraitResult (TypeBase::*Trait)(),
