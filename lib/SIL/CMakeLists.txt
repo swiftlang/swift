@@ -11,7 +11,6 @@ add_swift_library(swiftSIL
   SILGlobalVariable.cpp
   SILInstruction.cpp
   SILLocation.cpp
-  SILMetadata.cpp
   SILModule.cpp
   SILPrinter.cpp
   SILSuccessor.cpp

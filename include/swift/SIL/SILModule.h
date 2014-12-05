@@ -26,7 +26,6 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
-#include "swift/SIL/SILMetadata.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
@@ -95,15 +94,6 @@ private:
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
   void *TypeListUniquing;
-
-  /// A folding set of all SILMetadatas.
-  llvm::FoldingSet<SILMetadata> Metadatas;
-
-  /// A map to associate SILInstruction with SILMetadata. 
-  llvm::DenseMap<const SILInstruction *, SILMetadata *> MetadataStore;
-
-  /// Temporary data structures for parsing.
-  llvm::DenseMap<unsigned, SILMetadata *> NumberedMetadata;
 
   /// The swift Module associated with this SILModule.
   Module *TheSwiftModule;
@@ -197,25 +187,6 @@ public:
 
   /// \brief Get a uniqued pointer to a SIL type list.
   SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
-
-  /// \brief Get a uniqued pointer to a SILMetadata.
-  SILMetadata *getSILMetadata(const llvm::FoldingSetNodeID &ID,
-                              unsigned numOps, size_t bytes,
-                              size_t alignment, SILMetadata::MDKind kind,
-                              bool &newlyCreated);
-
-  /// \brief Get associated Metadata for a given SILInstruction.
-  SILMetadata *getInstMetadata(SILMetadata::MDKind KindID,
-                               SILInstruction *Inst) const;
-  /// \brief Set Metadata for a given SILInstruction.
-  void setInstMetadata(SILMetadata::MDKind KindID, SILInstruction *Inst,
-                       SILMetadata *Node);
-
-  /// \brief For parsing, find a SILMetadata with given node ID.
-  SILMetadata *findDefinedMetadata(unsigned NodeID) const;
-
-  /// \brief For parsing, define a SILMetadata with given node ID.
-  void defineMetadata(unsigned NodeID, SILMetadata *node);
 
   /// \brief This converts Swift types to SILTypes.
   Lowering::TypeConverter Types;

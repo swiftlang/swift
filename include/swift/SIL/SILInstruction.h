@@ -25,7 +25,6 @@
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILLocation.h"
-#include "swift/SIL/SILMetadata.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILValue.h"
@@ -203,8 +202,6 @@ public:
   /// additional handling. It is important to know this information when
   /// you perform such optimizations like e.g. jump-threading.
   bool isTriviallyDuplicatable() const;
-
-  void setMetadata(SILMetadata::MDKind KindID, SILMetadata *Node);
 };
 
 /// A template base class for instructions that take a single SILValue operand

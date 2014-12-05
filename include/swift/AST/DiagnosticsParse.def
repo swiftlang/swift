@@ -523,14 +523,6 @@ ERROR(sil_witness_assoc_not_found, decl_parsing,none,
 ERROR(sil_witness_protocol_conformance_not_found, decl_parsing,none,
       "sil protocol conformance not found", ())
 
-// SIL Metadata
-ERROR(expected_sil_metadata_integer, decl_parsing,none,
-      "expected integer in a sil metadata", ())
-ERROR(expected_sil_metadata_string, decl_parsing,none,
-      "expected string literal in a sil metadata", ())
-ERROR(expected_tok_in_sil_metadata, decl_parsing,none,
-      "expected '%0' in sil metadata", (StringRef))
-
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
 //------------------------------------------------------------------------------
