@@ -356,9 +356,13 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
 
   llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
+
+  llvm::DenseMap<const SILMetadata *, unsigned> *MetadataMap;
+
 public:
-  SILPrinter(raw_ostream &OS, bool V = false) : OS(OS), Verbose(V),
-                                                LastBufferID(0) {
+  SILPrinter(raw_ostream &OS, bool V = false,
+             llvm::DenseMap<const SILMetadata *, unsigned> *m = nullptr) :
+    OS(OS), Verbose(V), LastBufferID(0), MetadataMap(m) {
   }
 
   ID getID(const SILBasicBlock *B);
@@ -430,6 +434,20 @@ public:
 
     // Print the value.
     visit(V);
+
+    // Print associated metadata if exists.
+    if (SILInstruction *I = dyn_cast<SILInstruction>(V)) {
+      if (MetadataMap) {
+        SILMetadata *N = I->getModule().getInstMetadata(
+          SILMetadata::MDKind::BranchKind, I);
+        if (N) {
+          auto iter = MetadataMap->find(N);
+          assert(iter != MetadataMap->end() &&
+                 "Node IDs for SILMetadatas should have been assigned");
+          OS << ", !prof !" << iter->second;
+        }
+      }
+    }
 
     // Print users, or id for valueless instructions.
     bool printedSlashes = false;
@@ -1379,7 +1397,9 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
 }
 
 /// Pretty-print the SILFunction to the designated stream.
-void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
+void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
+                        llvm::DenseMap<const SILMetadata *, unsigned>
+                          *MetadataMap) const {
   OS << "// " << demangleSymbolAsString(getName()) << '\n';
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
@@ -1422,7 +1442,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   
   if (!isExternalDeclaration()) {
     OS << " {\n";
-    SILPrinter(OS, Verbose).print(this);
+    SILPrinter(OS, Verbose, MetadataMap).print(this);
     OS << "}";
   }
   
@@ -1494,10 +1514,12 @@ static void printSILGlobals(llvm::raw_ostream &OS, bool Verbose,
 
 static void printSILFunctions(llvm::raw_ostream &OS, bool Verbose,
                               bool ShouldSort,
-                              const SILModule::FunctionListType &Functions) {
+                              const SILModule::FunctionListType &Functions,
+                              llvm::DenseMap<const SILMetadata *, unsigned>
+                                *MetadataMap) {
   if (!ShouldSort) {
     for (const SILFunction &f : Functions)
-      f.print(OS, Verbose);
+      f.print(OS, Verbose, MetadataMap);
     return;
   }
 
@@ -1511,7 +1533,7 @@ static void printSILFunctions(llvm::raw_ostream &OS, bool Verbose,
     }
   );
   for (const SILFunction *f : functions)
-    f->print(OS, Verbose);
+    f->print(OS, Verbose, MetadataMap);
 }
 
 static void printSILVTables(llvm::raw_ostream &OS, bool Verbose,
@@ -1605,8 +1627,41 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     }
   }
 
+  // Assign ID to each SIL metadata.
+  llvm::DenseMap<const SILMetadata *, unsigned> MetadataMap;
+  unsigned CurrentId = 0;
+  for (const SILFunction &F : getFunctionList())
+    for (auto &BB : F)
+      for (auto &I : BB) {
+        // Check if SILInstruction has metadata.
+        auto Iter = MetadataStore.find(&I);
+        if (Iter != MetadataStore.end()) {
+          SILMetadata *N = Iter->second;
+          auto MI = MetadataMap.find(N);
+          if (MI == MetadataMap.end()) {
+            MetadataMap[N] = CurrentId++;
+          }
+          // TODO: assign IDs for MDNodes that are referenced by N.
+        }
+      }
+  
+  // Print SIL metadata.
+  llvm::SmallVector<const SILMetadata *, 16> Nodes;
+  Nodes.resize(MetadataMap.size());
+  for (auto &entry : MetadataMap)
+    Nodes[entry.second] = entry.first;
+
+  for (unsigned i = 0, e = Nodes.size(); i != e; ++i) {
+    assert(Nodes[i]->getKind() == SILMetadata::MDKind::BranchKind);
+    auto *branchNode = cast<SILBranchNode>(Nodes[i]);
+    OS << "sil_metadata !" << i << " = {\"branch_weights\"";
+    for (auto w : branchNode->getWeights())
+      OS << ", " << w;
+    OS << "}\n";
+  }
+
   printSILGlobals(OS, Verbose, ShouldSort, getSILGlobalList());
-  printSILFunctions(OS, Verbose, ShouldSort, getFunctionList());
+  printSILFunctions(OS, Verbose, ShouldSort, getFunctionList(), &MetadataMap);
   printSILVTables(OS, Verbose, ShouldSort, getVTableList());
   printSILWitnessTables(OS, Verbose, ShouldSort, getWitnessTableList());
   

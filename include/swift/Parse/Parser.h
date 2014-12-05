@@ -786,6 +786,7 @@ public:
   bool parseSILVTable();
   bool parseSILGlobal();
   bool parseSILWitnessTable();
+  bool parseSILMetadata();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

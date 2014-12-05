@@ -255,6 +255,8 @@ namespace {
       GenericParamList *gp;
       return parseProtocolConformance(dummy, gp, builder, true);
     }
+
+    bool parseInstructionMetadata(SILInstruction *Inst);
   };
 } // end anonymous namespace.
 
@@ -3114,6 +3116,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   // Store the named value if we had a name.
   if (ResultNameLoc.isValid())
     setLocalValue(ResultVal, ResultName, ResultNameLoc);
+
+  if (auto *Inst = dyn_cast<SILInstruction>(ResultVal))
+    if (parseInstructionMetadata(Inst))
+      return true;
   return false;
 }
 
@@ -3223,6 +3229,108 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     break;
   }
   }
+  return false;
+}
+
+/// Parse the attachment of metadata to a SILInstruction.
+bool SILParser::parseInstructionMetadata(SILInstruction *Inst) {
+  if (!P.consumeIf(tok::comma))
+    return false;
+
+  // We currently allow a single attachment in the form of "!prof !id".
+  if (P.parseToken(tok::sil_exclamation, diag::expected_tok_in_sil_instr, "!"))
+    return true;
+
+  Identifier KindId;
+  SourceLoc KindLoc = P.Tok.getLoc();
+  if (P.parseIdentifier(KindId, KindLoc,
+                        diag::expected_tok_in_sil_instr, "kind"))
+    return true;
+  if (KindId.str() != "prof") {
+    P.diagnose(KindLoc, diag::expected_tok_in_sil_instr, "prof");
+    return true;
+  }
+
+  if (P.parseToken(tok::sil_exclamation, diag::expected_tok_in_sil_instr, "!"))
+    return true;
+
+  // Get Metadata Id.
+  unsigned NodeID = 0;
+  if (P.Tok.getKind() != tok::integer_literal ||
+      P.Tok.getText().getAsInteger(10, NodeID)) {
+    P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+    return true;
+  }
+  P.consumeToken(tok::integer_literal);
+
+  auto *MD = SILMod.findDefinedMetadata(NodeID);
+  assert(MD && "Metadata should be defined before usage");
+  Inst->setMetadata(SILMetadata::getMDKind(KindId.str()), MD);
+
+  return false;
+}
+
+static bool isMetadata(const Token &T) {
+  if (T.is(tok::exclaim_postfix) || T.is(tok::sil_exclamation))
+    return true;
+  if (T.isAnyOperator() && T.getText().startswith("!"))
+    return true;
+  return false;
+}
+
+/// Parse the definition of a branch_weight metadata.
+/// sil_metadata !ID = {"branch_weights", 3, 5}
+bool Parser::parseSILMetadata() {
+  Lexer::SILBodyRAII Tmp(*L);
+  consumeToken(tok::kw_sil_metadata);
+  if(!isMetadata(Tok))
+    return true;
+  consumeToken();
+
+  // Get Metadata Id.
+  unsigned NodeID = 0;
+  if (Tok.getKind() != tok::integer_literal ||
+      Tok.getText().getAsInteger(10, NodeID)) {
+    diagnose(Tok, diag::expected_sil_metadata_integer);
+    return true;
+  }
+  consumeToken(tok::integer_literal);
+
+  if (parseToken(tok::equal, diag::expected_tok_in_sil_metadata, "="))
+    return true;
+  if (parseToken(tok::l_brace, diag::expected_tok_in_sil_metadata, "{"))
+    return true;
+
+  if (Tok.getKind() != tok::string_literal) {
+    diagnose(Tok, diag::expected_sil_metadata_string);
+    return true;
+  }
+  // Drop the double quotes.
+  StringRef rawString = Tok.getText().drop_front().drop_back();
+  if (rawString != "branch_weights") {
+    diagnose(Tok, diag::expected_tok_in_sil_metadata, "branch_weights");
+    return true;
+  }
+  consumeToken(tok::string_literal);
+
+  // Parse the list of weights as integer_literal.
+  llvm::SmallVector<uint32_t, 4> weights;
+  while (consumeIf(tok::comma)) {
+    unsigned Weight = 0;
+    if (Tok.getKind() != tok::integer_literal ||
+        Tok.getText().getAsInteger(10, Weight)) {
+      diagnose(Tok, diag::expected_sil_metadata_integer);
+      return true;
+    }
+    consumeToken(tok::integer_literal);
+    weights.push_back(Weight);
+  }
+
+  if (parseToken(tok::r_brace, diag::expected_tok_in_sil_metadata, "}"))
+    return true;
+
+  SILBranchNode *node = SILBranchNode::get(*SIL->M, weights);
+  SIL->M->defineMetadata(NodeID, node);
   return false;
 }
 
