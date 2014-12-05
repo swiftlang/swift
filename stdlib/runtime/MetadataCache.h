@@ -63,8 +63,13 @@ public:
     return true;
   }
 
-  llvm::hash_code hash() {
-    return llvm::hash_combine_range(begin(), end());
+  unsigned hash() {
+    unsigned H = 0x56ba80d1 ^ length ;
+    for (unsigned i = 0; i < length; i++) {
+      H = (H >> 10) | (H << 22);
+      H ^= ((size_t)args[i]) ^ ((size_t)args[i] >> 32);
+    }
+    return H * 0x27d4eb2d;
   }
 
   const void * const *begin() const { return args; }
@@ -142,7 +147,7 @@ template <class Entry> class MetadataCache {
   };
 
   /// This collection maps hash codes to a list of entry pairs.
-  typedef ConcurrentMap<llvm::hash_code, EntryPair> MDMapTy;
+  typedef ConcurrentMap<unsigned, EntryPair> MDMapTy;
 
   /// This map hash codes of entry refs to a list of entry pairs.
   MDMapTy *Map;
@@ -177,7 +182,7 @@ public:
 #endif
 
     EntryRef<Entry> key = EntryRef<Entry>::forArguments(arguments,numArguments);
-    llvm::hash_code hash = key.hash();
+    unsigned hash = key.hash();
 
 #if SWIFT_DEBUG_RUNTIME
     printf("%s(%p): generated hash %llx\n",
