@@ -280,25 +280,48 @@ extension String {
   /// Construct an instance containing just the given `Character`.
   public init(_ c: Character) {
     switch c._representation {
-    case .Small(var _63bits):
+    case let .Small(_63bits):
       let value = Character._smallValue(_63bits)
       let smallUTF8 = Character._SmallUTF8(value)
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: smallUTF8)
-    case .Large(var value):
+    case let .Large(value):
       self = String(_StringCore(_StringBuffer(value)))
     }
   }
 }
 
+internal var _128asBuiltinInt63: Builtin.Int63 {
+  @inline(__always) get {
+    let _int128in64: Int64 = 128
+    return Builtin.truncOrBitCast_Int64_Int63(_int128in64.value)
+  }
+}
+
 public func ==(lhs: Character, rhs: Character) -> Bool {
-  // FIXME(performance): constructing two temporary strings is extremely
-  // wasteful and inefficient.
-  return String(lhs) == String(rhs)
+  switch (lhs._representation, rhs._representation) {
+  case let (.Small(lbits), .Small(rbits)) where
+    Bool(Builtin.cmp_ult_Int63(lbits, _128asBuiltinInt63))
+    && Bool(Builtin.cmp_ult_Int63(rbits, _128asBuiltinInt63)):
+    return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
+  default:
+    // FIXME(performance): constructing two temporary strings is extremely
+    // wasteful and inefficient.
+    return String(lhs) == String(rhs)
+  }
 }
 
 public func <(lhs: Character, rhs: Character) -> Bool {
-  // FIXME(performance): constructing two temporary strings is extremely
-  // wasteful and inefficient.
-  return String(lhs) < String(rhs)
+  switch (lhs._representation, rhs._representation) {
+  case let (.Small(lbits), .Small(rbits)) where
+    // Note: This is consistent with Foundation but unicode incorrect.
+    // See String._lessThanASCII.
+    Bool(Builtin.cmp_ult_Int63(lbits, _128asBuiltinInt63))
+    && Bool(Builtin.cmp_ult_Int63(rbits, _128asBuiltinInt63)):
+    return Bool(Builtin.cmp_ult_Int63(lbits, _128asBuiltinInt63))
+  default:
+    // FIXME(performance): constructing two temporary strings is extremely
+    // wasteful and inefficient.
+    return String(lhs) < String(rhs)
+  }
 }

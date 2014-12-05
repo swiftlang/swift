@@ -223,5 +223,28 @@ CharacterTests.test("RoundTripping/Random") {
   }
 }
 
+CharacterTests.test("forall x: ASCII . String(Character(x)) == String(x)") {
+  // For all ASCII chars, constructing a Character then a String should be the
+  // same as constructing a String directly.
+  let asciiDomain = Array(0..<128).map({ UnicodeScalar(Int($0)) })
+  expectEqualFunctionsForDomain(asciiDomain,
+    { String($0) },
+    { String(Character($0)) })
+}
+
+CharacterTests.test(
+  "forall x: (0..ASCII_MAX-1) . String(x) < String(y+1) == String(Character(x)) < String(Character(y+1))") {
+  // For all ASCII chars, constructing a Character then a String should ordered
+  // the same as constructing a String directly.
+  let asciiDomain = Array(0..<127)
+  let ascii0to126 = asciiDomain.map({ UnicodeScalar(Int($0)) })
+  let ascii1to127 = asciiDomain.map({ UnicodeScalar(Int($0 + 1)) })
+  expectEqualMethodsForDomain(
+    ascii0to126,
+    ascii1to127,
+    { x in { String(x) < String($0) } },
+    { x in { String(Character(x)) < String(Character($0)) } })
+}
+
 runAllTests()
 
