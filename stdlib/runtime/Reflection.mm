@@ -786,6 +786,9 @@ extern "C" const MirrorWitnessTable _TWPVSs12_ClassMirrorSs10MirrorTypeSs;
 
 extern "C" const FullMetadata<Metadata> _TMdVSs17_ClassSuperMirror;
 extern "C" const MirrorWitnessTable _TWPVSs17_ClassSuperMirrorSs10MirrorTypeSs;
+
+extern "C" const FullMetadata<Metadata> _TMdVSs15_MetatypeMirror;
+extern "C" const MirrorWitnessTable _TWPVSs15_MetatypeMirrorSs10MirrorTypeSs;
   
 #if SWIFT_OBJC_INTEROP
 // These type metadata objects are kept in swiftFoundation because they rely
@@ -931,14 +934,18 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     }
     SWIFT_FALLTHROUGH;
   }
+  
+  case MetadataKind::Metatype:
+  case MetadataKind::ExistentialMetatype: {
+    return std::make_tuple(T, &_TMdVSs15_MetatypeMirror,
+                           &_TWPVSs15_MetatypeMirrorSs10MirrorTypeSs);
+  }
       
   /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Enum:
   case MetadataKind::Function:
   case MetadataKind::Block:
   case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
     return std::make_tuple(
         T, &_TMdVSs13_OpaqueMirror, &_TWPVSs13_OpaqueMirrorSs10MirrorTypeSs);
       

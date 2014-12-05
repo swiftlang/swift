@@ -65,17 +65,17 @@ func testCFStringAnyObjectType() {
     = CFStringCreateWithCString(nil, "Swift", CFStringBuiltInEncodings.ASCII.rawValue)
 
   let cfStrType = cfStr.dynamicType
-  // CHECK: Metatype
+  // CHECK: [[STRING_CLASS:(NS|CF).*String]]
   println(cfStrType)
 
   // Convert to AnyObject.Type
   let anyObjectType: AnyObject.Type = cfStrType
-  // CHECK: ExistentialMetatype
+  // CHECK: [[STRING_CLASS]]
   println(anyObjectType)
 
   // Convert back to CFString.Type
   let cfStrType2 = anyObjectType as CFString.Type
-  // CHECK: Metatype
+  // CHECK: [[STRING_CLASS]]
   println(cfStrType2)
 
   // CHECK: done

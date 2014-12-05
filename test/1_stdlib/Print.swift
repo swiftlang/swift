@@ -685,14 +685,14 @@ func test_ThickMetatypePrintingImpl<T>(thickMetatype: T.Type, expected: String) 
 
 func test_gcMetatypePrinting() {
   let structMetatype = StructPrintable.self
-  printedIs(structMetatype, "(Metatype)")
-  printedIs([ structMetatype ], "[(Metatype)]")
-  test_ThickMetatypePrintingImpl(structMetatype, "(Metatype)")
+  printedIs(structMetatype, "a.StructPrintable")
+  printedIs([ structMetatype ], "[a.StructPrintable]")
+  test_ThickMetatypePrintingImpl(structMetatype, "a.StructPrintable")
 
   let classMetatype = ClassPrintable.self
-  printedIs(classMetatype, "(Metatype)")
-  printedIs([ classMetatype ], "[(Metatype)]")
-  test_ThickMetatypePrintingImpl(classMetatype, "(Metatype)")
+  printedIs(classMetatype, "a.ClassPrintable")
+  printedIs([ classMetatype ], "[a.ClassPrintable]")
+  test_ThickMetatypePrintingImpl(classMetatype, "a.ClassPrintable")
 
   println("test_gcMetatypePrinting done")
 }

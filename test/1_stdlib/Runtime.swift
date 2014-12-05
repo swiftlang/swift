@@ -958,6 +958,53 @@ Reflection.test("CustomMirrorIsInherited") {
   }
 }
 
+protocol SomeNativeProto {}
+extension Int: SomeNativeProto {}
+
+@objc protocol SomeObjCProto {}
+extension SomeClass: SomeObjCProto {}
+
+Reflection.test("MetatypeMirror") {
+  if true {
+    var output = ""
+    let concreteMetatype = Int.self
+    dump(concreteMetatype, &output)
+
+    let expectedInt = "- Swift.Int #0\n"
+    expectEqual(expectedInt, output)
+
+    let anyMetatype: Any.Type = Int.self
+    output = ""
+    dump(anyMetatype, &output)
+    expectEqual(expectedInt, output)
+
+    let nativeProtocolMetatype: SomeNativeProto.Type = Int.self
+    output = ""
+    dump(nativeProtocolMetatype, &output)
+    expectEqual(expectedInt, output)
+
+    expectEqual(reflect(concreteMetatype).objectIdentifier!,
+                reflect(anyMetatype).objectIdentifier!)
+    expectEqual(reflect(concreteMetatype).objectIdentifier!,
+                reflect(nativeProtocolMetatype).objectIdentifier!)
+
+
+    let concreteClassMetatype = SomeClass.self
+    let expectedSomeClass = "- a.SomeClass #0\n"
+    output = ""
+    dump(concreteClassMetatype, &output)
+    expectEqual(expectedSomeClass, output)
+
+    let objcProtocolMetatype: SomeObjCProto.Type = SomeClass.self
+    output = ""
+    dump(objcProtocolMetatype, &output)
+    expectEqual(expectedSomeClass, output)
+
+    expectEqual(reflect(concreteClassMetatype).objectIdentifier!,
+                reflect(objcProtocolMetatype).objectIdentifier!)
+  }
+}
+
 Reflection.test("TupleMirror") {
   if true {
     var output = ""

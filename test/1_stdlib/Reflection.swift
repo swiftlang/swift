@@ -28,19 +28,19 @@ struct Complex<T> {
 }
 // CHECK-LABEL: Complex:
 println("Complex:")
-// CHECK-NEXT:    Reflection.Complex
+// CHECK-NEXT:    Reflection.Complex<Swift.Double>
 // CHECK-NEXT:      real: 1.5
 // CHECK-NEXT:      imag: 0.75
 dump(Complex<Double>(real: 1.5, imag: 0.75))
-// CHECK-NEXT:    Reflection.Complex
+// CHECK-NEXT:    Reflection.Complex<Swift.Double>
 // CHECK-NEXT:      real: -1.5
 // CHECK-NEXT:      imag: -0.75
 dump(Complex<Double>(real: -1.5, imag: -0.75))
-// CHECK-NEXT:    Reflection.Complex
+// CHECK-NEXT:    Reflection.Complex<Swift.Int>
 // CHECK-NEXT:      real: 22
 // CHECK-NEXT:      imag: 44
 dump(Complex<Int>(real: 22, imag: 44))
-// CHECK-NEXT:    Reflection.Complex
+// CHECK-NEXT:    Reflection.Complex<Swift.String>
 // CHECK-NEXT:      real: is this the real life?
 // CHECK-NEXT:      imag: is it just fantasy?
 dump(Complex<String>(real: "is this the real life?", 
@@ -193,7 +193,7 @@ var justSomeFunction = { (x:Int)->Int in return x + 1 }
 // CHECK-NEXT: (Function)
 println(reflect(justSomeFunction).summary)
 
-// CHECK-NEXT: (Metatype)
+// CHECK-NEXT: Swift.String
 println(reflect(String.self).summary)
 
 // CHECK-NEXT: CollectionOfOne(Howdy Swift!)

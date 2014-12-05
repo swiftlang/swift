@@ -21,11 +21,11 @@ public protocol Reflectable {
   func getMirror() -> MirrorType
 }
 
-/// A unique identifier for a class instance. This can be used by reflection
-/// clients to recognize cycles in the object graph.
+/// A unique identifier for a class instance or metatype. This can be used by
+/// reflection clients to recognize cycles in the object graph.
 ///
-/// In Swift, only class instances have unique identities. There is no notion
-/// of identity for structs, enums, or tuples.
+/// In Swift, only class instances and metatypes have unique identities. There
+/// is no notion of identity for structs, enums, functions, or tuples.
 public struct ObjectIdentifier : Hashable, Comparable {
   let value: Builtin.RawPointer
 
@@ -48,8 +48,13 @@ public struct ObjectIdentifier : Hashable, Comparable {
     return Int(Builtin.ptrtoint_Word(value))
   }
 
-  /// Construct an instance that uniquely identifies `x`.
+  /// Construct an instance that uniquely identifies the class instance `x`.
   public init(_ x: AnyObject) {
+    self.value = unsafeBitCast(x, Builtin.RawPointer.self)
+  }
+
+  /// Construct an instance that uniquely identifies the metatype `x`.
+  public init(_ x: Any.Type) {
     self.value = unsafeBitCast(x, Builtin.RawPointer.self)
   }
 }
@@ -474,3 +479,27 @@ struct _ClassSuperMirror: MirrorType {
   var disposition: MirrorDisposition { return .Class }
 }
 
+struct _MetatypeMirror: MirrorType {
+  let data: _MagicMirrorData
+
+  var value: Any { return data.value }
+  var valueType: Any.Type { return data.valueType }
+
+  var objectIdentifier: ObjectIdentifier? {
+    return data._loadValue() as ObjectIdentifier
+  }
+
+  var count: Int {
+    return 0
+  }
+  subscript(i: Int) -> (String, MirrorType) {
+    _preconditionFailure("no children")
+  }
+  var summary: String {
+    return _typeName(data._loadValue() as Any.Type)
+  }
+  var quickLookObject: QuickLookObject? { return nil }
+
+  // Special disposition for types?
+  var disposition: MirrorDisposition { return .Aggregate }
+}

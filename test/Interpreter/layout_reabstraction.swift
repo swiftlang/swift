@@ -18,7 +18,7 @@ func printMetatypeConditional<T>(x: Any, _: T.Type) {
 var any: Any = S.self
 // CHECK: downcast in substituted context:
 println("downcast in substituted context:")
-// CHECK-NEXT: (Metatype)
+// CHECK-NEXT: main.S
 println(any as S.Type)
 // CHECK-NEXT: nope
 if let q = any as? Q.Type {
@@ -29,9 +29,9 @@ if let q = any as? Q.Type {
 
 // CHECK-NEXT: downcast in generic context:
 println("downcast in generic context:")
-// CHECK-NEXT: (Metatype)
+// CHECK-NEXT: main.S
 printMetatype(any, S.self)
-// CHECK-NEXT: (Metatype)
+// CHECK-NEXT: main.S
 printMetatypeConditional(any, S.self)
 // CHECK-NEXT: nope
 printMetatypeConditional(any, Q.self)
