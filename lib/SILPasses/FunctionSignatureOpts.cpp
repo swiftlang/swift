@@ -18,7 +18,6 @@
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILFunction.h"
@@ -570,9 +569,8 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
       Builder.createReleaseValue(Loc, AI->getArgument(ArgDesc.Index));
     }
 
-    // Erase the old apply and its callee.
-    recursivelyDeleteTriviallyDeadInstructions(AI, true,
-                                               [](SILInstruction *){});
+    // Erase the old apply.
+    AI->eraseFromParent();
 
     ++NumCallSitesOptimized;
   }
@@ -618,8 +616,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 static SILFunction *
 moveFunctionBodyToNewFunctionWithName(SILFunction *F,
                                       llvm::SmallString<64> &NewFName,
-                                      FunctionAnalyzer &Analyzer,
-                                      bool CallerSetIsComplete) {
+                                      FunctionAnalyzer &Analyzer) {
   // First we create an empty function (i.e. no BB) whose function signature has
   // had its arity modified.
   //
@@ -644,13 +641,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
     ArgOffset = ArgDesc.updateOptimizedBBArgs(Builder, NewFEntryBB, ArgOffset);
   }
 
-  // Then if we know the entire callset of the original function, don't turn the
-  // old function into a thunk. Instead just return early, leaving the function
-  // as an external reference. We will delete it after we rewrite all users.
-  if (CallerSetIsComplete)
-    return NewF;
-
-  // Otherwise generate the thunk body just in case.
+  // Then create the new thunk body since NewF has the right signature now.
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgDescs) {
     ThunkBody->createBBArg(ArgDesc.ParameterInfo.getSILType(),
@@ -668,11 +659,9 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 /// function returns true if we were successful in creating the new function and
 /// returns false otherwise.
 static bool
-optimizeFunctionSignature(RCIdentityAnalysis *RCIA,
-                          SILFunction *F,
+optimizeFunctionSignature(SILFunction *F,
                           CallGraphNode::CallerCallSiteList CallSites,
-                          bool CallerSetIsComplete,
-                          std::vector<SILFunction *> &DeadFunctions) {
+                          RCIdentityAnalysis *RCIA) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
 
@@ -711,8 +700,7 @@ optimizeFunctionSignature(RCIdentityAnalysis *RCIA,
 
   // Otherwise, move F over to NewF.
   SILFunction *NewF =
-    moveFunctionBodyToNewFunctionWithName(F, NewFName, Analyzer,
-                                          CallerSetIsComplete);
+    moveFunctionBodyToNewFunctionWithName(F, NewFName, Analyzer);
 
   // And remove all Callee releases that we found and made redundent via owned
   // to guaranteed conversion.
@@ -727,12 +715,6 @@ optimizeFunctionSignature(RCIdentityAnalysis *RCIA,
   // Rewrite all apply insts calling F to call NewF. Update each call site as
   // appropriate given the form of function signature optimization performed.
   rewriteApplyInstToCallNewFunction(Analyzer, NewF, CallSites);
-
-  // Now that we have rewritten all apply insts that referenced the old
-  // function, if the caller set was complete, delete the old function.
-  if (CallerSetIsComplete) {
-    DeadFunctions.push_back(F);
-  }
 
   return true;
 }
@@ -814,9 +796,6 @@ public:
     // those calls.
     bool Changed = false;
 
-    std::vector<SILFunction *> DeadFunctions;
-    DeadFunctions.reserve(128);
-
     for (auto &F : *M) {
       // Check the signature of F to make sure that it is a function that we can
       // specialize. These are conditions independent of the call graph.
@@ -841,21 +820,8 @@ public:
       if (CallSites.empty())
         continue;
 
-      // Check if we know the callgraph is complete with respect to this
-      // function. In such a case, we don't need to generate the thunk.
-      bool CallerSetIsComplete = FNode->isCallerSetComplete();
-
       // Otherwise, try to optimize the function signature of F.
-      Changed |= optimizeFunctionSignature(RCIA, &F, CallSites,
-                                           CallerSetIsComplete,
-                                           DeadFunctions);
-    }
-
-    while (!DeadFunctions.empty()) {
-      SILFunction *F = DeadFunctions.back();
-      if (!F->isZombie())
-        M->eraseFunction(F);
-      DeadFunctions.pop_back();
+      Changed |= optimizeFunctionSignature(&F, CallSites, RCIA);
     }
 
     // If we changed anything, invalidate the call graph.

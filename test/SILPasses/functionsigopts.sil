@@ -54,24 +54,6 @@ bb3:
   return %4 : $()
 }
 
-// CHECK-NOT: sil hidden [fragile] @private_dead_arg_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-sil private [fragile] @private_dead_arg_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
-  cond_br undef, bb1, bb2
-
-bb1:
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
-  %3 = apply %2(%1) : $@thin (Builtin.NativeObject) -> ()
-  %4 = tuple()
-  return %4 : $()
-}
-
 // CHECK-LABEL: sil [fragile] @dead_arg_callsite_1 : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTOS_dn_dead_arg_with_callsites : $@thin (Builtin.NativeObject) -> ()
@@ -84,10 +66,8 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 
   // This ensures that %0 is not dead in this function. We don't want to specialize this.
   apply %4(%0) : $@thin (Builtin.NativeObject) -> ()
-  %5 = function_ref @private_dead_arg_with_callsites : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> ()
-  %6 = apply %5(%0, %1) : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> ()
-  %7 = tuple()
-  return %7 : $()
+  %5 = tuple()
+  return %5 : $()
 }
 
 // This test makes sure we can look up an already specialized callee instead of regenerating one.
