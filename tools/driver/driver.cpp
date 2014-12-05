@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <memory>
+#include <stdlib.h>
 
 using namespace swift;
 using namespace swift::driver;
@@ -62,7 +63,7 @@ int main(int argc_, const char **argv_) {
     llvm::errs() << "error: couldn't get arguments: " << EC.message() << '\n';
     return 1;
   }
-  
+
   // Handle integrated tools.
   if (argv.size() > 1){
     StringRef FirstArg(argv[1]);
