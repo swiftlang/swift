@@ -153,12 +153,12 @@ ArchetypeToConcreteConvertC(t: e)
 // CHECK-NEXT: load
 // CHECK-NEXT: store
 // CHECK-NEXT: alloc_stack $D
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: unconditional_checked_cast_addr take_always
 // CHECK-NEXT: load
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: return
 ArchetypeToConcreteConvertD(t: c)
@@ -228,9 +228,11 @@ ConcreteToArchetypeConvertC(t: c, t2: b)
 // CHECK: bb0
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: store
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: unconditional_checked_cast_addr take_always
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: load
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return

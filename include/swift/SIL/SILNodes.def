@@ -198,7 +198,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(UnconditionalCheckedCastInst, ConversionInst, None)
     VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, None)
-  INST(UnconditionalCheckedCastAddrInst, SILInstruction, MayReadWrite)
+  INST(UnconditionalCheckedCastAddrInst, SILInstruction, MayHaveSideEffects)
 
   // Runtime failure
   // FIXME: Special MemBehavior for runtime failure?
@@ -216,7 +216,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     TERMINATOR(SwitchEnumAddrInst, TermInst, MayRead)
     TERMINATOR(DynamicMethodBranchInst, TermInst, None)
     TERMINATOR(CheckedCastBranchInst, TermInst, None)
-    TERMINATOR(CheckedCastAddrBranchInst, TermInst, MayReadWrite)
+    TERMINATOR(CheckedCastAddrBranchInst, TermInst, MayHaveSideEffects)
     VALUE_RANGE(TermInst, UnreachableInst, CheckedCastAddrBranchInst)
 
   VALUE_RANGE(SILInstruction, AllocStackInst, CheckedCastAddrBranchInst)

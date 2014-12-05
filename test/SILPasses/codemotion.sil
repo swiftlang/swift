@@ -1422,3 +1422,23 @@ bb3:
   %4 = tuple()
   return %4 : $()
 }
+
+class F {}
+class G {}
+
+// CHECK-LABEL: sil @cast_consumption
+sil @cast_consumption : $@thin (@owned F) -> () {
+bb0(%0 : $F):
+  %1 = alloc_stack $F
+// CHECK: store
+  store %0 to %1#1 : $*F
+// CHECK-NEXT: strong_retain
+  strong_retain %0 : $F
+// CHECK-NEXT: unconditional_checked_cast_addr
+  unconditional_checked_cast_addr take_always F in %1#1 : $*F to G in %1#1 : $*F
+// CHECK-NEXT: strong_release
+  strong_release %0 : $F
+  dealloc_stack %1#0 : $*@local_storage F
+  %2 = tuple ()
+  return %2 : $()
+}
