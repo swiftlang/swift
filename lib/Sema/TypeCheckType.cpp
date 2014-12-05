@@ -116,6 +116,7 @@ Type TypeChecker::getNSObjectType(DeclContext *dc) {
 
 Type 
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
+                                               bool inExpression,
                                                Type dynamicType,
                                                Type valueType) {
   // We can only bridge from class or Objective-C existential types.
@@ -127,7 +128,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
-  return getBridgedToObjC(dc, valueType);
+  return getBridgedToObjC(dc, inExpression, valueType);
 }
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
@@ -2268,7 +2269,8 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   return false;
 }
 
-Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
+Type TypeChecker::getBridgedToObjC(const DeclContext *dc, bool inExpression,
+                                   Type type) {
   if (type->isBridgeableObjectType())
     return type;
 
@@ -2279,11 +2281,9 @@ Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
     return nullptr;
 
   // Check whether the type conforms to _BridgedToObjectiveC.
-  // FIXME: We should be able to tell if this is being checked within a function
-  // body.
   ProtocolConformance *conformance = nullptr;
   if (!conformsToProtocol(type, bridgedProto, const_cast<DeclContext *>(dc),
-                          /*inExpression=*/false, &conformance))
+                          inExpression, &conformance))
     return nullptr;
 
   // If the type is generic, check whether its generic arguments are also
@@ -2293,7 +2293,7 @@ Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
       if (arg->hasTypeVariable())
         continue;
 
-      if (getBridgedToObjC(dc, arg).isNull())
+      if (getBridgedToObjC(dc, inExpression, arg).isNull())
         return nullptr;
     }
   }
@@ -2349,7 +2349,7 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
       if (boundGeneric->getDecl() == arrayDecl) {
         auto elementType = boundGeneric->getGenericArgs()[0];
-        return !getBridgedToObjC(DC, elementType).isNull();
+        return !getBridgedToObjC(DC, false, elementType).isNull();
       }
     }
   }
@@ -2360,12 +2360,12 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
       if (boundGeneric->getDecl() == dictDecl) {
         // The key type must be bridged to Objective-C.
         auto keyType = boundGeneric->getGenericArgs()[0];
-        if (getBridgedToObjC(DC, keyType).isNull())
+        if (getBridgedToObjC(DC, false, keyType).isNull())
           return false;
 
         // The value type must be bridged to Objective-C.
         auto valueType = boundGeneric->getGenericArgs()[1];
-        if (getBridgedToObjC(DC, valueType).isNull())
+        if (getBridgedToObjC(DC, false, valueType).isNull())
           return false;
 
         return true;

@@ -277,6 +277,7 @@ extension PrivateTy6 : PrivateProto3 {}
 // CHECK-DAG: !private "Sb"
 // CHECK-DAG: !private "Sd"
 // CHECK-DAG: !private "SS"
+// CHECK-DAG: !private "Su"
 // CHECK-DAG: !private "VSs10Dictionary"
 // CHECK-DAG: !private "V4main17OtherFileIntArray"
 // CHECK-DAG: !private "V4main18OtherFileOuterType"

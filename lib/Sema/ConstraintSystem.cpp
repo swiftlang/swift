@@ -261,7 +261,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   // If the default literal type is bridged to a class type, add the class type.
   if (auto proto = TC.Context.getProtocol(kind)) {
     if (auto defaultType = TC.getDefaultType(proto, DC)) {
-      if (auto bridgedClassType = TC.getBridgedToObjC(DC, defaultType)) {
+      if (auto bridgedClassType = TC.getBridgedToObjC(DC, true, defaultType)) {
         types.push_back(bridgedClassType);
       }
     }
