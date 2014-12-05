@@ -11,4 +11,18 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
 
   var ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}}
   var ao3_ok: AnyObject? = sc.property // okay
+
+  var ao4: AnyObject = sc.methodD()
+  if sc.methodD() == nil { } // expected-error{{cannot invoke}}
+
+  sc.methodE(sc)
+  sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
+
+  sc.methodF(sc, second: sc)
+  sc.methodF(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
+  sc.methodF(sc, second: osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
+
+  sc.methodG(sc, second: sc)
+  sc.methodG(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
+  sc.methodG(sc, second: osc) 
 }

@@ -30,6 +30,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/TypeVisitor.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -900,6 +901,39 @@ Type ClangImporter::Implementation::importPropertyType(
                     isFromSystemModule, optionality);
 }
 
+/// Get a bit vector indicating which arguments are non-null for a
+/// given function or method.
+static llvm::SmallBitVector getNonNullArgs(
+                              const clang::Decl *decl,
+                              ArrayRef<const clang::ParmVarDecl *> params) {
+  llvm::SmallBitVector result;
+  if (!decl)
+    return result;
+
+  for (const auto *nonnull : decl->specific_attrs<clang::NonNullAttr>()) {
+    if (!nonnull->args_size()) {
+      // Easy case: all pointer arguments are non-null.
+      if (result.empty())
+        result.resize(params.size(), true);
+      else
+        result.set(0, params.size());
+
+      return result;
+    }
+
+    // Mark each of the listed parameters as non-null.
+    if (result.empty())
+      result.resize(params.size(), false);
+
+    for (unsigned idx : nonnull->args()) {
+      if (idx < result.size())
+        result.set(idx);
+    }
+  }
+
+  return result;
+}
+
 Type ClangImporter::Implementation::importFunctionType(
        const clang::FunctionDecl *clangDecl,
        clang::QualType resultType,
@@ -926,9 +960,14 @@ Type ClangImporter::Implementation::importFunctionType(
     if (knownFnTmp->NullabilityAudited)
       knownFn = knownFnTmp;
 
-  OptionalTypeKind OptionalityOfReturn
-    = knownFn ? translateNullability(knownFn->getReturnTypeInfo())
-              : OTK_ImplicitlyUnwrappedOptional;
+  OptionalTypeKind OptionalityOfReturn;
+  if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
+    OptionalityOfReturn = OTK_None;
+  } else if (knownFn) {
+    OptionalityOfReturn = translateNullability(knownFn->getReturnTypeInfo());
+  } else {
+    OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
+  }
 
   // Import the result type.
   auto swiftResultTy = importType(resultType,
@@ -946,6 +985,7 @@ Type ClangImporter::Implementation::importFunctionType(
   SmallVector<TuplePatternElt, 4> argPatternElts;
   SmallVector<TuplePatternElt, 4> bodyPatternElts;
   unsigned index = 0;
+  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
   for (auto param : params) {
     auto paramTy = param->getType();
     if (paramTy->isVoidType()) {
@@ -954,9 +994,17 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Check nullability of the parameter.
-    OptionalTypeKind OptionalityOfParam
-      = knownFn ? translateNullability(knownFn->getParamTypeInfo(index))
-                : OTK_ImplicitlyUnwrappedOptional;
+    OptionalTypeKind OptionalityOfParam;
+    if (!nonNullArgs.empty() && nonNullArgs[index]) {
+      OptionalityOfParam = OTK_None;
+    } else if (param->hasAttr<clang::NonNullAttr>()) {
+      OptionalityOfParam = OTK_None;
+    } else if (knownFn) {
+      OptionalityOfParam = translateNullability(
+                             knownFn->getParamTypeInfo(index));
+    } else {
+      OptionalityOfParam = OTK_ImplicitlyUnwrappedOptional;
+    }
 
     // Import the parameter type into Swift.
     Type swiftParamTy = importType(paramTy, ImportTypeKind::Parameter,
@@ -1057,9 +1105,15 @@ Type ClangImporter::Implementation::importMethodType(
     }
   }
 
-  OptionalTypeKind OptionalityOfReturn
-    = knownMethod ? translateNullability(knownMethod->getReturnTypeInfo())
-                  : OTK_ImplicitlyUnwrappedOptional;
+  OptionalTypeKind OptionalityOfReturn;
+  if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
+    OptionalityOfReturn = OTK_None;
+  } else if (knownMethod) {
+    OptionalityOfReturn = translateNullability(
+                            knownMethod->getReturnTypeInfo());
+  } else {
+    OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
+  }
 
   // Import the result type.
   auto swiftResultTy = importType(resultType, resultKind,
@@ -1072,6 +1126,7 @@ Type ClangImporter::Implementation::importMethodType(
   SmallVector<TupleTypeElt, 4> swiftBodyParams;
   SmallVector<TuplePatternElt, 4> bodyPatternElts;
   auto argNames = methodName.getArgumentNames();
+  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
   unsigned index = 0;
   for (auto param : params) {
     auto paramTy = param->getType();
@@ -1082,9 +1137,15 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Import the parameter type into Swift.
     OptionalTypeKind optionalityOfParam = OTK_ImplicitlyUnwrappedOptional;
-    if (knownMethod)
+    if (!nonNullArgs.empty() && nonNullArgs[index]) {
+      optionalityOfParam = OTK_None;
+    } else if (param->hasAttr<clang::NonNullAttr>()) {
+      optionalityOfParam = OTK_None;
+    } else if (knownMethod) {
       optionalityOfParam =
         translateNullability(knownMethod->getParamTypeInfo(index));
+    }
+
     Type swiftParamTy;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {

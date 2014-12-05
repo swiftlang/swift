@@ -13,6 +13,10 @@ extern __nullable id global_id;
 - (nonnull nonnull_id)methodB:(nullable int (^)(int, int))block;
 - (nullable nonnull_id)methodC;
 @property (nullable) nonnull_id property;
+- (id)methodD __attribute__((returns_nonnull));
+- (void)methodE:(SomeClass *) __attribute__((nonnull)) obj;
+- (void)methodF:(SomeClass *)obj second:(SomeClass *)obj2 __attribute__((nonnull));
+- (void)methodG:(SomeClass *)obj second:(SomeClass *)obj2 __attribute__((nonnull(1)));
 @end
 
 #endif
