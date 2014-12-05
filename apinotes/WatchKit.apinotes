@@ -35,6 +35,10 @@ Classes:
     NullabilityOfRet: S
 - Name: WKInterfaceController
   Methods:
+  - Selector: 'awakeWithContext:'
+    MethodKind: Instance
+    Nullability:
+    - O
   - Selector: 'actionForUserActivity:context:'
     MethodKind: Instance
     Nullability:
