@@ -688,13 +688,12 @@ bb0(%0 : $T):
 sil hidden @protocolTypedParam : $@thin (@owned Foo) -> () {
 bb0(%0 : $Foo):
   debug_value %0 : $Foo
-  // CHECK: [[REF:%[a-zA-Z0-9]+]] = function_ref @protocolConstrained
+  // CHECK-NOT: function_ref @protocolConstrained
   %2 = function_ref @protocolConstrained : $@thin <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
   strong_retain %0 : $Foo
-  // FIXME: We currently do not transparently inline in cases where the
-  //        substitution list includes protocols, although we could in the case
-  //        where it is an @objc protocol.
-  // CHECK: apply [transparent] [[REF]]
+  // CHECK-NOT: apply [transparent]
+  // CHECK: [[METHOD:%[a-zA-Z0-9]+]] = witness_method [volatile] $Foo, #Foo.foo!1.foreign : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  // CHECK: apply [[METHOD]]<Foo>(%0) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   %4 = apply [transparent] %2<Foo>(%0) : $@thin <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
   strong_release %0 : $Foo
   %6 = tuple ()
