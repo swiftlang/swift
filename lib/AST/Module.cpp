@@ -1131,16 +1131,16 @@ Module::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
   return result ? *result : nullptr; \
 } \
 Kind##OperatorDecl * \
-SourceFile::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
+SourceFile::lookup##Kind##Operator(Identifier name, bool isNonPrivate, \
+                                   SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(*this, loc, name, true, \
                                           &SourceFile::Kind##Operators); \
-  /* FIXME: Track whether this is a private use or not. */ \
   if (!result.hasValue()) \
     return nullptr; \
   if (ReferencedNames) {\
     if (!result.getValue() || \
         result.getValue()->getDeclContext()->getModuleScopeContext() != this) {\
-      ReferencedNames->addTopLevelName(name, true); \
+      ReferencedNames->addTopLevelName(name, isNonPrivate); \
     } \
   } \
   if (!result.getValue()) { \

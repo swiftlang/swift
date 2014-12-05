@@ -4913,12 +4913,22 @@ public:
     SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
     if (FD->isUnaryOperator()) {
       if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
-        op = SF.lookupPrefixOperator(operatorName, FD->getLoc());
+        op = SF.lookupPrefixOperator(operatorName,
+                                     !FD->isPrivateContextForLookup(false),
+                                     FD->getLoc());
       } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
-        op = SF.lookupPostfixOperator(operatorName,FD->getLoc());
+        op = SF.lookupPostfixOperator(operatorName,
+                                      !FD->isPrivateContextForLookup(false),
+                                      FD->getLoc());
       } else {
-        auto prefixOp = SF.lookupPrefixOperator(operatorName, FD->getLoc());
-        auto postfixOp = SF.lookupPostfixOperator(operatorName, FD->getLoc());
+        auto prefixOp =
+            SF.lookupPrefixOperator(operatorName,
+                                    !FD->isPrivateContextForLookup(false),
+                                    FD->getLoc());
+        auto postfixOp =
+            SF.lookupPostfixOperator(operatorName,
+                                     !FD->isPrivateContextForLookup(false),
+                                     FD->getLoc());
 
         // If we found both prefix and postfix, or neither prefix nor postfix,
         // complain. We can't fix this situation.
@@ -4967,7 +4977,9 @@ public:
                     static_cast<bool>(postfixOp));
       }
     } else if (FD->isBinaryOperator()) {
-      op = SF.lookupInfixOperator(operatorName, FD->getLoc());
+      op = SF.lookupInfixOperator(operatorName,
+                                  !FD->isPrivateContextForLookup(false),
+                                  FD->getLoc());
     } else {
       TC.diagnose(FD, diag::invalid_arg_count_for_operator);
       return;

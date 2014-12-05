@@ -839,11 +839,14 @@ public:
   ///
   /// The file must be name-bound already. If the operator is not found, or if
   /// there is an ambiguity, returns null.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name,
+  ///
+  /// \param isNonPrivate If true, the lookup of this operator may affect
+  /// downstream files.
+  InfixOperatorDecl *lookupInfixOperator(Identifier name, bool isNonPrivate,
                                          SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name,
+  PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isNonPrivate,
                                            SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name,
+  PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isNonPrivate,
                                              SourceLoc diagLoc = {});
   /// @}
 

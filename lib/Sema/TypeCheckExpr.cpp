@@ -130,13 +130,17 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = DRE->getDecl()->getName();
-    if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, E->getLoc()))
+    bool isPrivate = DC->isPrivateContextForLookup(true);
+    if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, !isPrivate,
+                                                        E->getLoc()))
       return op->getInfixData();
 
   } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = OO->getDecls()[0]->getName();
-    if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, E->getLoc()))
+    bool isPrivate = DC->isPrivateContextForLookup(true);
+    if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, !isPrivate,
+                                                        E->getLoc()))
       return op->getInfixData();
   }
   

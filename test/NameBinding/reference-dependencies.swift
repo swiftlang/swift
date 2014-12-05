@@ -103,7 +103,7 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: !private "+"
   let _: UInt = reduce([1,2], 0, +)
   
-  // CHECK-DAG: - "-"
+  // CHECK-DAG: !private "-"
   let _: UInt = 3 - 2 - 1
 
   // CHECK-DAG: !private "AliasFromOtherFile"
