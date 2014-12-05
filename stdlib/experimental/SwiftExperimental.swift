@@ -21,7 +21,7 @@
 /// not matter right now.
 infix operator ○ { associativity left precedence 100 }
 
-/// Function composition.
+/// Compose functions.
 ///
 /// ::
 ///
