@@ -323,6 +323,8 @@ ModuleFile::readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData) {
                                              base + sizeof(uint32_t), base));
 }
 
+
+
 bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
   cursor.EnterSubBlock(INDEX_BLOCK_ID);
 
@@ -378,6 +380,11 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::OBJC_METHODS:
         ObjCMethods = readObjCMethodTable(scratch, blobData);
+        break;
+      case index_block::FORCE_DESERIALIZATION:
+        std::copy(scratch.begin(), scratch.end(),
+                  std::back_inserter(EagerDeserializationDecls));
+        
         break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
@@ -886,6 +893,13 @@ bool ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
 
   if (Bits.HasUnderlyingModule)
     (void)getModule(FileContext->getParentModule()->Name);
+
+  // Process decls we know we want to eagerly deserialize.
+  if (!EagerDeserializationDecls.empty()) {
+    for (DeclID DID : EagerDeserializationDecls)
+      getDecl(DID);
+    typeCheckExternalDefinitions(*FileContext);
+  }
 
   return getStatus() == ModuleStatus::Valid;
 }

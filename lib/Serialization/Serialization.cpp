@@ -337,6 +337,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, CLASS_MEMBERS);
   BLOCK_RECORD(index_block, OPERATOR_METHODS);
   BLOCK_RECORD(index_block, OBJC_METHODS);
+  BLOCK_RECORD(index_block, FORCE_DESERIALIZATION);
 
   BLOCK(SIL_BLOCK);
   BLOCK_RECORD(sil_block, SIL_FUNCTION);
@@ -1238,6 +1239,14 @@ void Serializer::writeCrossReference(const Decl *D) {
   using namespace decls_block;
 
   unsigned abbrCode;
+
+  // FIXME: If we're emitting a module that can be inlined into other modules,
+  // we currently need to eagerly deserialize any cross-referenced decls, in
+  // order to ensure that they're fully type-checked before SIL generation
+  // begins.
+  if (Options.SerializeAllSIL) {
+    EagerDeserializationDecls.push_back(DeclIDs[D].first);
+  }
 
   if (auto op = dyn_cast<OperatorDecl>(D)) {
     writeCrossReference(op->getModuleContext());
@@ -3112,6 +3121,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);
+    
+    index_block::ForceDeserializationTableLayout ForceDeserializationTable(Out);
+    SmallVector<uint64_t, 8> scratch;
+    ForceDeserializationTable.emit(scratch,
+                                   EagerDeserializationDecls);
   }
 }
 
@@ -3122,7 +3136,10 @@ void Serializer::writeToStream(raw_ostream &os) {
 
 template <size_t N>
 Serializer::Serializer(const unsigned char (&signature)[N],
-                       ModuleOrSourceFile DC) {
+                       ModuleOrSourceFile DC,
+                       const SerializationOptions &options)
+  : Options(options)
+{
   for (unsigned char byte : signature)
     Out.Emit(byte, 8);
 
@@ -3134,7 +3151,7 @@ Serializer::Serializer(const unsigned char (&signature)[N],
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod,
                                const SerializationOptions &options) {
-  Serializer S{MODULE_SIGNATURE, DC};
+  Serializer S{MODULE_SIGNATURE, DC, options};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeBlockInfoBlock();
@@ -3151,7 +3168,8 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
 }
 
 void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
-  Serializer S{MODULE_DOC_SIGNATURE, DC};
+  SerializationOptions DefaultOpts;
+  Serializer S{MODULE_DOC_SIGNATURE, DC, DefaultOpts};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();

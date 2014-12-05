@@ -49,6 +49,8 @@ class Serializer {
   const SourceFile *SF = nullptr;
 
 public:
+  const SerializationOptions &Options;
+
   /// Stores a declaration or a type to be written to the AST file.
   ///
   /// Convenience wrapper around a PointerUnion.
@@ -142,8 +144,8 @@ private:
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
 
-  /// The decls that adopt compiler-known protocols.
-  SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
+  /// Decls to be eagerly deserialized.
+  SmallVector<DeclID, 2> EagerDeserializationDecls;
 
   /// The last assigned DeclID for decls from this module.
   DeclID LastDeclID = 0;
@@ -264,7 +266,8 @@ private:
   void writeToStream(raw_ostream &os);
 
   template <size_t N>
-  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC);
+  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC,
+             const SerializationOptions &Options);
 
 public:
   /// Serialize a module to the given stream.

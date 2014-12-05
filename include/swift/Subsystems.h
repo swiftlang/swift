@@ -41,6 +41,7 @@ namespace swift {
   class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
+  class FileUnit;
   class GenericParamList;
   class IRGenOptions;
   class LangOptions;
@@ -155,7 +156,7 @@ namespace swift {
   void performWholeModuleTypeChecking(SourceFile &SF);
 
   /// Incrementally type-check only added external definitions.
-  void typeCheckExternalDefinitions(SourceFile &SF);
+  void typeCheckExternalDefinitions(FileUnit &FU);
 
   /// \brief Recursively validate the specified type.
   ///

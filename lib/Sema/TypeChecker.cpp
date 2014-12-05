@@ -440,9 +440,11 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   }
 }
 
-void swift::typeCheckExternalDefinitions(SourceFile &SF) {
-  assert(SF.ASTStage == SourceFile::TypeChecked);
-  auto &Ctx = SF.getASTContext();
+void swift::typeCheckExternalDefinitions(FileUnit &FU) {
+  if (auto SF = dyn_cast<SourceFile>(&FU)) {
+    assert(SF->ASTStage == SourceFile::TypeChecked);
+  }
+  auto &Ctx = FU.getASTContext();
   TypeChecker TC(Ctx);
   typeCheckFunctionsAndExternalDecls(TC);
 }
