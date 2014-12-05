@@ -16,6 +16,8 @@
 // CHECK-NEXT: "ExtraFloatLiteralConvertible"
 // CHECK-NEXT: "~~~"
 // CHECK-NEXT: "ThreeTildeType"
+// CHECK-NEXT: "overloadedOnProto"
+// CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
 // CHECK-NEXT: "Outer"
 // CHECK: "eof"
@@ -85,6 +87,9 @@ protocol ThreeTildeType {
 
 private struct ThreeTildeTypeImpl : ThreeTildeType {
 }
+
+func overloadedOnProto<T>(_: T) {}
+func overloadedOnProto<T: ThreeTildeType>(_: T) {}
 
 // CHECK-DAG: !private "~~~"
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
@@ -167,6 +172,9 @@ func lookUpManyTopLevelNames() {
   }
   
   for _: OtherFileEnumWrapper.Enum in EmptyGenerator<X>() {}
+  
+  // CHECK-DAG: !private "otherFileGetNonImpl"
+  overloadedOnProto(otherFileGetNonImpl())
 }
 
 struct Outer {
@@ -282,6 +290,7 @@ extension PrivateTy6 : PrivateProto3 {}
 // CHECK-DAG: !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
 // CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
+// CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
 // CHECK-DAG: !private "VSs14EmptyGenerator"
 // CHECK-DAG: !private "VSs17IndexingGenerator"
 // CHECK-DAG: - "O4main13OtherFileEnum"

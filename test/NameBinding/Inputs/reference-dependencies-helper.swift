@@ -60,6 +60,9 @@ struct OtherFileProtoImplementor2 : OtherFileProto2 {}
 func otherFileGetImpl2() -> OtherFileProtoImplementor2 {}
 func otherFileUseGeneric<T: OtherFileProto2>(_: T) {}
 
+struct OtherFileProtoNonImplementor {}
+func otherFileGetNonImpl() -> OtherFileProtoNonImplementor {}
+
 func topLevel1() -> Int { return 2 }
 func topLevel2() -> Int { return 2 }
 func topLevel3() -> Int { return 2 }

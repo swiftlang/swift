@@ -2513,7 +2513,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   }
 
   const DeclContext *topLevelContext = DC->getModuleScopeContext();
-  auto recordDependency = [=](ProtocolConformance *conformance) {
+  auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
     // Record that we depend on the type's conformance.
     auto *constSF = dyn_cast<SourceFile>(topLevelContext);
     if (!constSF)
@@ -2525,9 +2525,10 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       return;
 
     // We only care about intra-module dependencies.
-    if (SF->getParentModule() !=
-        conformance->getDeclContext()->getParentModule())
-      return;
+    if (conformance)
+      if (SF->getParentModule() !=
+          conformance->getDeclContext()->getParentModule())
+        return;
 
     tracker->addUsedNominal(nominal,
                             !DC->isPrivateContextForLookup(InExpression));
@@ -2550,6 +2551,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       if (ComplainLoc.isValid()) {
         diagnose(ComplainLoc, diag::type_does_not_conform, T,
                  Proto->getDeclaredType());
+      } else {
+        recordDependency();
       }
 
       return false;
@@ -2578,6 +2581,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       if (ComplainLoc.isValid()) {
         diagnose(ComplainLoc, diag::type_does_not_conform,
                  T, Proto->getDeclaredType());
+      } else {
+        recordDependency();
       }
       return false;
 
