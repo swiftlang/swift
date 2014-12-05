@@ -88,8 +88,17 @@ namespace {
     /// Witnesses that are currently being resolved.
     llvm::SmallPtrSet<ValueDecl *, 4> ResolvingWitnesses;
 
+    /// Caches the set of associated types that are referenced in each
+    /// requirement.
+    llvm::DenseMap<ValueDecl *, llvm::SmallVector<AssociatedTypeDecl *, 2>>
+      ReferencedAssociatedTypes;
+
     /// Whether we've already complained about problems with this conformance.
     bool AlreadyComplained = false;
+
+    /// Retrieve the associated types that are referenced by the given
+    /// requirement with a base of 'Self'.
+    ArrayRef<AssociatedTypeDecl *> getReferencedAssociatedTypes(ValueDecl *req);
 
     /// Record a (non-type) witness for the given requirement.
     void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
@@ -987,6 +996,37 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   };
 }
 
+ArrayRef<AssociatedTypeDecl *> 
+ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
+  // Check whether we've already cached this information.
+  auto known = ReferencedAssociatedTypes.find(req);
+  if (known != ReferencedAssociatedTypes.end())
+    return known->second;
+
+  // Collect the set of associated types rooted on Self in the
+  // signature.
+  auto &assocTypes = ReferencedAssociatedTypes[req];
+  llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
+  req->getInterfaceType().visit([&](Type type) {
+      if (auto dependentMember = type->getAs<DependentMemberType>()) {
+        if (auto genericParam 
+              = dependentMember->getBase()->getAs<GenericTypeParamType>()) {
+          if (genericParam->getDepth() == 0 && 
+              genericParam->getIndex() == 0) {
+            if (auto assocType = dependentMember->getAssocType()) {
+              if (assocType->getDeclContext() == Proto &&
+                  knownAssocTypes.insert(assocType).second) {
+                assocTypes.push_back(assocType);
+              }
+            }
+          }
+        }
+      }
+    });
+
+  return assocTypes;
+}
+
 void ConformanceChecker::recordWitness(ValueDecl *requirement,
                                        const RequirementMatch &match) {
   // If we already recorded this witness, don't do so again.
@@ -1853,14 +1893,13 @@ ConformanceChecker::resolveSingleTypeWitness(AssociatedTypeDecl *assocType) {
 
     // Determine whether this requirement refers to the associated
     // type we're resolving.
-    // FIXME: Cache this dependency information somewhere?
-    bool hasAssocType = requirement->getInterfaceType().findIf([&](Type type) {
-        if (auto dependentMember = type->getAs<DependentMemberType>()) {
-          return dependentMember->getAssocType() == assocType;
-        }
-
-        return false;
-      });
+    bool hasAssocType = false;
+    for (auto referencedAssocType : getReferencedAssociatedTypes(requirement)) {
+      if (referencedAssocType == assocType) {
+        hasAssocType = true;
+        break;
+      }
+    }
 
     // If the requirement doesn't refer to the associated type we're
     // resolving, ignore it.
@@ -1940,36 +1979,46 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // Try to resolve each of the associated types referenced within the
   // requirement's type to type witnesses via name lookup. Such
   // bindings can inform the choice of witness.
-  bool failed = requirement->getInterfaceType().findIf([&](Type type) -> bool {
-      if (auto dependentMember = type->getAs<DependentMemberType>()) {
-        auto assocType = dependentMember->getAssocType();
-        if (cast<ProtocolDecl>(assocType->getDeclContext()) == Proto) {
-          // If we don't already have a type witness and aren't in the
-          // process of trying to resolve it already...
-          if (!Conformance->hasTypeWitness(assocType) &&
-              ResolvingTypeWitnesses.count(assocType) == 0) {
-            switch (resolveTypeWitnessViaLookup(assocType)) {
-            case ResolveWitnessResult::Success:
-              break;
 
-            case ResolveWitnessResult::ExplicitFailed:
-              return true;
+  // Note that we copy the associated types vector because attempting to
+  // resolve type witnesses could invalidate the ArrayRef we get.
+  SmallVector<AssociatedTypeDecl *, 2> assocTypes;
+  {
+    auto refAssocTypes = getReferencedAssociatedTypes(requirement);
+    assocTypes.append(refAssocTypes.begin(), refAssocTypes.end());
+  }
 
-            case ResolveWitnessResult::Missing:
-              // Okay: this associated type can be deduced.
-              break;
-            }
-          }
+  bool failed = false;
+  for (auto assocType : assocTypes) {
+    // If we don't already have a type witness and aren't in the
+    // process of trying to resolve it already...
+    if (!Conformance->hasTypeWitness(assocType) &&
+        ResolvingTypeWitnesses.count(assocType) == 0) {
+      switch (resolveTypeWitnessViaLookup(assocType)) {
+      case ResolveWitnessResult::Success:
+        break;
 
-          // If the type witness is an error, just fail quietly.
-          if (Conformance->hasTypeWitness(assocType) &&
-              Conformance->getTypeWitness(assocType, nullptr).getReplacement()
-                ->is<ErrorType>())
-            return true;
-        }
+      case ResolveWitnessResult::ExplicitFailed:
+        failed = true;
+        break;
+
+      case ResolveWitnessResult::Missing:
+        // Okay: this associated type can be deduced.
+        break;
       }
-      return false;
-    });
+    }
+
+    if (failed)
+      break;
+
+    // If the type witness is an error, just fail quietly.
+    if (Conformance->hasTypeWitness(assocType) &&
+        Conformance->getTypeWitness(assocType, nullptr).getReplacement()
+          ->is<ErrorType>()) {
+      failed = true;
+      break;
+    }
+  }
 
   // If one of the associated types had an outright error, don't bother
   // trying to check this witness: we won't be able to meaningfully
