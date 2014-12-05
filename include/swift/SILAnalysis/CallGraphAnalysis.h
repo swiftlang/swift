@@ -25,6 +25,24 @@
 namespace swift {
   class CallGraphNode;
 
+inline bool canHaveIndirectUses(SILFunction *F) {
+  if (swift::isPossiblyUsedExternally(F->getLinkage(),
+                                      F->getModule().isWholeModule()))
+    return true;
+
+  // TODO: main is currently marked as internal so we explicitly check
+  // for functions with this name and keep them around.
+  if (F->getName() == SWIFT_ENTRY_POINT_FUNCTION)
+    return true;
+
+  // ObjC functions are called through the runtime and are therefore alive
+  // even if not referenced inside SIL.
+  if (canBeCalledIndirectly(F->getLoweredFunctionType()->getAbstractCC()))
+    return true;
+
+  return false;
+}
+
   class CallGraphEdge {
   public:
     typedef llvm::DenseSet<CallGraphNode *> CalleeSetType;
@@ -124,9 +142,9 @@ namespace swift {
   public:
     friend class CallGraph;
 
-    CallGraphNode(SILFunction *Function, unsigned Ordinal) : Function(Function),
-                                                             Ordinal(Ordinal),
-                                                      CallerSetComplete(false) {
+    CallGraphNode(SILFunction *Function, unsigned Ordinal)
+      : Function(Function), Ordinal(Ordinal),
+        CallerSetComplete(!canHaveIndirectUses(Function)) {
       assert(Function &&
              "Cannot build a call graph node with a null function pointer!");
     }
@@ -186,12 +204,9 @@ namespace swift {
     }
 
   private:
-    /// Mark a set of callers as known to be complete.
-    void markCallerSetComplete() {
-      assert(!isCallerSetComplete() &&
-             "The caller set should only be marked complete once!");
-
-      CallerSetComplete = true;
+    /// Mark a set of callers as known to not be complete.
+    void markCallerSetIncomplete() {
+      CallerSetComplete = false;
     }
 
     /// Add an edge representing a call site within this function.

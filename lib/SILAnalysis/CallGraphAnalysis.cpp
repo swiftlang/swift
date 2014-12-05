@@ -154,10 +154,29 @@ void CallGraph::addEdges(SILFunction *F) {
   auto *CallerNode = getCallGraphNode(F);
   assert(CallerNode && "Expected call graph node for function!");
 
-  for (auto &BB : *F)
-    for (auto &I : BB)
-      if (auto *AI = dyn_cast<ApplyInst>(&I))
+  for (auto &BB : *F) {
+    for (auto &I : BB) {
+      if (auto *AI = dyn_cast<ApplyInst>(&I)) {
         addEdgesForApply(AI, CallerNode);
+      }
+
+      if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
+        auto *CalleeFn = FRI->getReferencedFunction();
+        if (!CalleeFn->isPossiblyUsedExternally()) {
+          bool hasAllApplyUsers = std::none_of(FRI->use_begin(), FRI->use_end(),
+            [](const Operand *Op) {
+              return !isa<ApplyInst>(Op->getUser());
+            });
+
+          // If we have a non-apply user of this function, return false.
+          if (!hasAllApplyUsers) {
+            auto *CalleeNode = getCallGraphNode(CalleeFn);
+            CalleeNode->markCallerSetIncomplete();
+          }
+        }
+      }
+    }
+  }
 }
 
 static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,

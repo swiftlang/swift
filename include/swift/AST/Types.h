@@ -1800,6 +1800,20 @@ enum class AbstractCC : unsigned char {
   
   Last_AbstractCC = WitnessMethod,
 };
+
+/// Can this calling convention result in a function being called indirectly
+/// through the runtime.
+inline bool canBeCalledIndirectly(AbstractCC cc) {
+  switch (cc) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::C:
+    return false;
+  case AbstractCC::ObjCMethod:
+  case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
+    return true;
+  }
+}
   
 /// AnyFunctionType - A function type has a single input and result, but
 /// these types may be tuples, for example:
