@@ -23,7 +23,6 @@
 #include <vector>
 
 namespace swift {
-  class CallGraphNode;
 
 inline bool canHaveIndirectUses(SILFunction *F) {
   if (swift::isPossiblyUsedExternally(F->getLinkage(),
@@ -43,273 +42,275 @@ inline bool canHaveIndirectUses(SILFunction *F) {
   return false;
 }
 
-  class CallGraphEdge {
-  public:
-    typedef llvm::DenseSet<CallGraphNode *> CalleeSetType;
+class CallGraphNode;
 
-  private:
-    // The call site represented by this call graph edge.
-    ApplyInst *CallSite;
+class CallGraphEdge {
+public:
+  typedef llvm::DenseSet<CallGraphNode *> CalleeSetType;
 
-    // The set of functions potentially called from this call site. This
-    // might include functions that are not actually callable based on
-    // dynamic types. If the int bit is non-zero, the set is complete in
-    // the sense that no function outside the set could be called.
-    llvm::PointerIntPair<CalleeSetType *, 1> CalleeSet;
+private:
+  // The call site represented by this call graph edge.
+  ApplyInst *CallSite;
 
-  public:
-    /// Create a call graph edge for a call site where we will fill in
-    /// the set of potentially called functions later.
-    CallGraphEdge(ApplyInst *CallSite) : CallSite(CallSite),
-                                         CalleeSet(new CalleeSetType, 0) {
-      // TODO: We will probably have many call sites that can share a
-      //       callee set so we should optimize allocation and
-      //       deallocation of these accordingly.
-    }
+  // The set of functions potentially called from this call site. This
+  // might include functions that are not actually callable based on
+  // dynamic types. If the int bit is non-zero, the set is complete in
+  // the sense that no function outside the set could be called.
+  llvm::PointerIntPair<CalleeSetType *, 1> CalleeSet;
 
-    /// Create a call graph edge for a call site that is known to have
-    /// only a single callee.
-    CallGraphEdge(ApplyInst *CallSite, CallGraphNode *Node)
-      : CallSite(CallSite),
-        // FIXME: Do not allocate memory for the singleton callee case.
-        CalleeSet(new CalleeSetType, 0) {
-      addCallee(Node);
-      markCalleeSetComplete();
-    }
-
-    ~CallGraphEdge() {
-      delete CalleeSet.getPointer();
-    }
-
-    const ApplyInst *getCallSite() const {
-      return CallSite;
-    }
-
-    /// Return a callee set that is known to be complete.
-    const CalleeSetType &getCalleeSet() const {
-      assert(isCalleeSetComplete() && "Attempt to get an incomplete call set!");
-      return *CalleeSet.getPointer();
-    }
-
-    /// Return a callee set that is not known to be complete.
-    const CalleeSetType &getKnownCalleeSet() {
-      return *CalleeSet.getPointer();
-    }
-
-    /// Add the given function to the set of functions that we could
-    /// call from this call site.
-    void addCallee(CallGraphNode *Node) {
-      assert(!isCalleeSetComplete() &&
-             "Attempting to add another callee to a complete call set!");
-      CalleeSet.getPointer()->insert(Node);
-    }
-
-    /// Return whether the call set is known to be complete.
-    bool isCalleeSetComplete() const {
-      return CalleeSet.getInt();
-    }
-
-  private:
-    /// Mark the call set as being complete.
-    void markCalleeSetComplete() {
-      CalleeSet.setInt(1);
-    }
-  };
-
-  /// A helper method for use with ArrayRefView. Just returns the CallSite
-  /// ApplyInst of E.
-  inline ApplyInst *getEdgeApplyInst(CallGraphEdge * const &E) {
-    return const_cast<ApplyInst *>(E->getCallSite());
+public:
+  /// Create a call graph edge for a call site where we will fill in
+  /// the set of potentially called functions later.
+  CallGraphEdge(ApplyInst *CallSite) : CallSite(CallSite),
+                                       CalleeSet(new CalleeSetType, 0) {
+    // TODO: We will probably have many call sites that can share a
+    //       callee set so we should optimize allocation and
+    //       deallocation of these accordingly.
   }
 
-  class CallGraphNode {
-    /// The function represented by this call graph node.
-    SILFunction *Function;
+  /// Create a call graph edge for a call site that is known to have
+  /// only a single callee.
+  CallGraphEdge(ApplyInst *CallSite, CallGraphNode *Node)
+    : CallSite(CallSite),
+      // FIXME: Do not allocate memory for the singleton callee case.
+      CalleeSet(new CalleeSetType, 0) {
+    addCallee(Node);
+    markCalleeSetComplete();
+  }
 
-    /// The call graph node ordinal within the SILModule.
-    const unsigned Ordinal;
+  ~CallGraphEdge() {
+    delete CalleeSet.getPointer();
+  }
 
-    /// The known call sites that call into this function. The
-    /// caller's call graph node owns these.
-    llvm::SmallVector<CallGraphEdge *, 4> Callers;
+  const ApplyInst *getCallSite() const {
+    return CallSite;
+  }
 
-    /// The call sites within this function. This CallGraph node owns these.
-    llvm::SmallVector<CallGraphEdge *, 4> CallSites;
+  /// Return a callee set that is known to be complete.
+  const CalleeSetType &getCalleeSet() const {
+    assert(isCalleeSetComplete() && "Attempt to get an incomplete call set!");
+    return *CalleeSet.getPointer();
+  }
 
-    /// Do we know all the potential callers of this function?
-    bool CallerSetComplete;
+  /// Return a callee set that is not known to be complete.
+  const CalleeSetType &getKnownCalleeSet() {
+    return *CalleeSet.getPointer();
+  }
 
-  public:
-    friend class CallGraph;
+  /// Add the given function to the set of functions that we could
+  /// call from this call site.
+  void addCallee(CallGraphNode *Node) {
+    assert(!isCalleeSetComplete() &&
+           "Attempting to add another callee to a complete call set!");
+    CalleeSet.getPointer()->insert(Node);
+  }
 
-    CallGraphNode(SILFunction *Function, unsigned Ordinal)
-      : Function(Function), Ordinal(Ordinal),
-        CallerSetComplete(!canHaveIndirectUses(Function)) {
-      assert(Function &&
-             "Cannot build a call graph node with a null function pointer!");
-    }
+  /// Return whether the call set is known to be complete.
+  bool isCalleeSetComplete() const {
+    return CalleeSet.getInt();
+  }
 
-    ~CallGraphNode() {
-      for (auto *CallSite : getCallSites())
-        delete CallSite;
-    }
+private:
+  /// Mark the call set as being complete.
+  void markCalleeSetComplete() {
+    CalleeSet.setInt(1);
+  }
+};
 
-    SILFunction *getFunction() {
-      return Function;
-    }
+/// A helper method for use with ArrayRefView. Just returns the CallSite
+/// ApplyInst of E.
+inline ApplyInst *getEdgeApplyInst(CallGraphEdge * const &E) {
+  return const_cast<ApplyInst *>(E->getCallSite());
+}
 
-    /// Get the complete set of edges associated with call sites that can call
-    /// into this function.
-    const llvm::SmallVectorImpl<CallGraphEdge *> &getCallers() const {
-      assert(isCallerSetComplete() &&
-             "Attempt to get an incomplete caller set!");
-      return Callers;
-    }
+class CallGraphNode {
+  /// The function represented by this call graph node.
+  SILFunction *Function;
 
-    // An adaptor that is used to show all of the apply insts which call the
-    // SILFunction of this node.
-    using CallerCallSiteList = ArrayRefView<CallGraphEdge *, ApplyInst *,
-                                            getEdgeApplyInst>;
+  /// The call graph node ordinal within the SILModule.
+  const unsigned Ordinal;
 
-    /// Return the set of apply insts that can call into this function.
-    CallerCallSiteList getCallerCallSites() const {
-      return CallerCallSiteList(getCallers());
-    }
+  /// The known call sites that call into this function. The
+  /// caller's call graph node owns these.
+  llvm::SmallVector<CallGraphEdge *, 4> Callers;
 
-    /// Get the known set of call graph edges that represent calls into this
-    /// function.
-    llvm::SmallVectorImpl<CallGraphEdge *> &getKnownCallers() {
-      return Callers;
-    }
+  /// The call sites within this function. This CallGraph node owns these.
+  llvm::SmallVector<CallGraphEdge *, 4> CallSites;
 
-    /// Return the known set of apply insts that can call into this function.
-    CallerCallSiteList getKnownCallerCallSites() {
-      return CallerCallSiteList(getKnownCallers());
-    }
+  /// Do we know all the potential callers of this function?
+  bool CallerSetComplete;
 
-    /// Get the known set of call sites in this function.
-    llvm::SmallVectorImpl<CallGraphEdge *> &getCallSites() {
-      return CallSites;
-    }
+public:
+  friend class CallGraph;
 
-    /// Do we know that the set of call sites is complete - i.e. that
-    /// there is no other place that we can call from that can reach
-    /// this function?
-    bool isCallerSetComplete() const {
-      return CallerSetComplete;
-    }
+  CallGraphNode(SILFunction *Function, unsigned Ordinal)
+    : Function(Function), Ordinal(Ordinal),
+      CallerSetComplete(!canHaveIndirectUses(Function)) {
+    assert(Function &&
+           "Cannot build a call graph node with a null function pointer!");
+  }
 
-    unsigned getOrdinal() const {
-      return Ordinal;
-    }
+  ~CallGraphNode() {
+    for (auto *CallSite : getCallSites())
+      delete CallSite;
+  }
 
-  private:
-    /// Mark a set of callers as known to not be complete.
-    void markCallerSetIncomplete() {
-      CallerSetComplete = false;
-    }
+  SILFunction *getFunction() {
+    return Function;
+  }
 
-    /// Add an edge representing a call site within this function.
-    void addCallSite(CallGraphEdge *CallSite) {
-      CallSites.push_back(CallSite);
-    }
+  /// Get the complete set of edges associated with call sites that can call
+  /// into this function.
+  const llvm::SmallVectorImpl<CallGraphEdge *> &getCallers() const {
+    assert(isCallerSetComplete() &&
+           "Attempt to get an incomplete caller set!");
+    return Callers;
+  }
 
-    /// Add an edge representing a call site that calls into this function.
-    void addCaller(CallGraphEdge *CallerCallSite) {
-      Callers.push_back(CallerCallSite);
-    }
-  };
+  // An adaptor that is used to show all of the apply insts which call the
+  // SILFunction of this node.
+  using CallerCallSiteList = ArrayRefView<CallGraphEdge *, ApplyInst *,
+                                          getEdgeApplyInst>;
 
-  struct CallGraphSCC {
-    llvm::SmallVector<CallGraphNode *, 1> SCCNodes;
-  };
+  /// Return the set of apply insts that can call into this function.
+  CallerCallSiteList getCallerCallSites() const {
+    return CallerCallSiteList(getCallers());
+  }
 
-  class CallGraph {
-    llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
-    llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
-    llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
-    std::vector<SILFunction *> BottomUpFunctionOrder;
+  /// Get the known set of call graph edges that represent calls into this
+  /// function.
+  llvm::SmallVectorImpl<CallGraphEdge *> &getKnownCallers() {
+    return Callers;
+  }
 
-  public:
-    CallGraph(SILModule *M, bool completeModule);
+  /// Return the known set of apply insts that can call into this function.
+  CallerCallSiteList getKnownCallerCallSites() {
+    return CallerCallSiteList(getKnownCallers());
+  }
 
-    ~CallGraph() {
-      for (auto &MapEntry : FunctionToNodeMap)
-        delete MapEntry.second;
+  /// Get the known set of call sites in this function.
+  llvm::SmallVectorImpl<CallGraphEdge *> &getCallSites() {
+    return CallSites;
+  }
 
-      for (auto *SCC : BottomUpSCCOrder)
-        delete SCC;
-    }
+  /// Do we know that the set of call sites is complete - i.e. that
+  /// there is no other place that we can call from that can reach
+  /// this function?
+  bool isCallerSetComplete() const {
+    return CallerSetComplete;
+  }
 
-    llvm::SmallVectorImpl<CallGraphNode *> &getCallGraphRoots() {
-      return CallGraphRoots;
-    }
+  unsigned getOrdinal() const {
+    return Ordinal;
+  }
 
-    CallGraphNode *getCallGraphNode(SILFunction *F) {
-      auto Found = FunctionToNodeMap.find(F);
-      if (Found == FunctionToNodeMap.end())
-        return nullptr;
+private:
+  /// Mark a set of callers as known to not be complete.
+  void markCallerSetIncomplete() {
+    CallerSetComplete = false;
+  }
 
-      assert(Found->second && "Unexpected null call graph node in map!");
-      return Found->second;
-    }
+  /// Add an edge representing a call site within this function.
+  void addCallSite(CallGraphEdge *CallSite) {
+    CallSites.push_back(CallSite);
+  }
 
-    llvm::SmallVectorImpl<CallGraphSCC *> &getBottomUpSCCOrder() {
-      if (BottomUpSCCOrder.empty())
-        computeBottomUpSCCOrder();
+  /// Add an edge representing a call site that calls into this function.
+  void addCaller(CallGraphEdge *CallerCallSite) {
+    Callers.push_back(CallerCallSite);
+  }
+};
 
-      return BottomUpSCCOrder;
-    }
+struct CallGraphSCC {
+  llvm::SmallVector<CallGraphNode *, 1> SCCNodes;
+};
 
-    std::vector<SILFunction *> &getBottomUpFunctionOrder() {
-      if (BottomUpFunctionOrder.empty())
-        computeBottomUpFunctionOrder();
+class CallGraph {
+  llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
+  llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
+  llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
+  std::vector<SILFunction *> BottomUpFunctionOrder;
 
-      return BottomUpFunctionOrder;
-    }
+public:
+  CallGraph(SILModule *M, bool completeModule);
 
-  private:
-    void addCallGraphNode(SILFunction *F, unsigned Ordinal);
-    void addEdges(SILFunction *F);
-    void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
-    void computeBottomUpSCCOrder();
-    void computeBottomUpFunctionOrder();
-  };
+  ~CallGraph() {
+    for (auto &MapEntry : FunctionToNodeMap)
+      delete MapEntry.second;
 
-  /// The Call Graph Analysis provides information about the call graph.
-  class CallGraphAnalysis : public SILAnalysis {
-    SILModule *M;
-    std::vector<SILFunction *> BottomUpFunctionOrder;
-    CallGraph *CG;
+    for (auto *SCC : BottomUpSCCOrder)
+      delete SCC;
+  }
 
-  public:
-    virtual ~CallGraphAnalysis() {
+  llvm::SmallVectorImpl<CallGraphNode *> &getCallGraphRoots() {
+    return CallGraphRoots;
+  }
+
+  CallGraphNode *getCallGraphNode(SILFunction *F) {
+    auto Found = FunctionToNodeMap.find(F);
+    if (Found == FunctionToNodeMap.end())
+      return nullptr;
+
+    assert(Found->second && "Unexpected null call graph node in map!");
+    return Found->second;
+  }
+
+  llvm::SmallVectorImpl<CallGraphSCC *> &getBottomUpSCCOrder() {
+    if (BottomUpSCCOrder.empty())
+      computeBottomUpSCCOrder();
+
+    return BottomUpSCCOrder;
+  }
+
+  std::vector<SILFunction *> &getBottomUpFunctionOrder() {
+    if (BottomUpFunctionOrder.empty())
+      computeBottomUpFunctionOrder();
+
+    return BottomUpFunctionOrder;
+  }
+
+private:
+  void addCallGraphNode(SILFunction *F, unsigned Ordinal);
+  void addEdges(SILFunction *F);
+  void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
+  void computeBottomUpSCCOrder();
+  void computeBottomUpFunctionOrder();
+};
+
+/// The Call Graph Analysis provides information about the call graph.
+class CallGraphAnalysis : public SILAnalysis {
+  SILModule *M;
+  std::vector<SILFunction *> BottomUpFunctionOrder;
+  CallGraph *CG;
+
+public:
+  virtual ~CallGraphAnalysis() {
+    delete CG;
+  }
+  CallGraphAnalysis(SILModule *MM) : SILAnalysis(AnalysisKind::CallGraph),
+                                     M(MM), CG(nullptr) {}
+
+  static bool classof(const SILAnalysis *S) {
+    return S->getKind() == AnalysisKind::CallGraph;
+  }
+
+  CallGraph &getCallGraph() {
+    if (!CG)
+      CG = new CallGraph(M, false);
+
+    return *CG;
+  }
+
+  virtual void invalidate(InvalidationKind K) {
+    if (K >= InvalidationKind::CallGraph) {
+      BottomUpFunctionOrder.clear();
       delete CG;
+      CG = nullptr;
     }
-    CallGraphAnalysis(SILModule *MM) : SILAnalysis(AnalysisKind::CallGraph),
-                                       M(MM), CG(nullptr) {}
+  }
 
-    static bool classof(const SILAnalysis *S) {
-      return S->getKind() == AnalysisKind::CallGraph;
-    }
-
-    CallGraph &getCallGraph() {
-      if (!CG)
-        CG = new CallGraph(M, false);
-
-      return *CG;
-    }
-
-    virtual void invalidate(InvalidationKind K) {
-      if (K >= InvalidationKind::CallGraph) {
-        BottomUpFunctionOrder.clear();
-        delete CG;
-        CG = nullptr;
-      }
-    }
-
-    virtual void invalidate(SILFunction*, InvalidationKind K) { invalidate(K); }
-  };
+  virtual void invalidate(SILFunction*, InvalidationKind K) { invalidate(K); }
+};
 
 } // end namespace swift
 
