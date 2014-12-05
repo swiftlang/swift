@@ -29,6 +29,48 @@ llvm::cl::opt<std::string>
     SILPrintOnlyFun("sil-print-only-function", llvm::cl::init(""),
                     llvm::cl::desc("Only print out the sil for this function"));
 
+llvm::cl::opt<std::string>
+    SILPrintBefore("sil-print-before", llvm::cl::init(""), llvm::cl::desc(
+      "Print out the sil before passes which contain this string"));
+
+llvm::cl::opt<std::string>
+    SILPrintAfter("sil-print-after", llvm::cl::init(""), llvm::cl::desc(
+      "Print out the sil after passes which contain this string"));
+
+llvm::cl::opt<std::string>
+    SILPrintAround("sil-print-around", llvm::cl::init(""), llvm::cl::desc(
+      "Print out the sil before and after passes which contain this string"));
+
+static bool doPrintBefore(SILTransform *T, SILFunction *F) {
+  if (!SILPrintOnlyFun.empty() && (!F || F->getName() != SILPrintOnlyFun))
+    return false;
+
+  if (!SILPrintBefore.empty() &&
+      T->getName().find(SILPrintBefore) != StringRef::npos)
+    return true;
+
+  if (!SILPrintAround.empty() &&
+      T->getName().find(SILPrintAround) != StringRef::npos)
+    return true;
+
+  return false;
+}
+
+static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
+  if (!SILPrintOnlyFun.empty() && (!F || F->getName() != SILPrintOnlyFun))
+    return false;
+  
+  if (!SILPrintAfter.empty() &&
+      T->getName().find(SILPrintAfter) != StringRef::npos)
+    return true;
+
+  if (!SILPrintAround.empty() &&
+      T->getName().find(SILPrintAround) != StringRef::npos)
+    return true;
+
+  return Default;
+}
+
 bool SILPassManager::
 runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
@@ -47,6 +89,12 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
         llvm::dbgs() << "#" << NumPassesRun << " Pass: " << SFT->getName()
                      << ", Function: " << F.getName() << "\n";
 
+      if (doPrintBefore(SFT, &F)) {
+        llvm::dbgs() << "*** SIL function before " << SFT->getName() << " ("
+                    << NumOptimizationIterations << ") ***\n";
+        F.dump();
+      }
+      
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SFT->run();
 
@@ -63,17 +111,14 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       }
 
       // If this pass invalidated anything, print and verify.
-      if (CompleteFuncs->hasChanged()) {
-        if (Options.PrintAll) {
-          if (SILPrintOnlyFun.empty() || F.getName().str() == SILPrintOnlyFun) {
-            llvm::dbgs() << "*** SIL function after " << SFT->getName() << " ("
-                         << NumOptimizationIterations << ") ***\n";
-            F.dump();
-          }
-        }
-        if (Options.VerifyAll) {
-          F.verify();
-        }
+      if (doPrintAfter(SFT, &F,
+                       CompleteFuncs->hasChanged() && Options.PrintAll)) {
+        llvm::dbgs() << "*** SIL function after " << SFT->getName() << " ("
+                     << NumOptimizationIterations << ") ***\n";
+        F.dump();
+      }
+      if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
+        F.verify();
       }
     }
   }
@@ -129,6 +174,12 @@ void SILPassManager::runOneIteration() {
         llvm::dbgs() << "#" << NumPassesRun << " Pass: " << SMT->getName()
                      << " (module pass)\n";
 
+      if (doPrintBefore(SMT, nullptr)) {
+        llvm::dbgs() << "*** SIL module before " << SMT->getName() << " ("
+                     << NumOptimizationIterations << ") ***\n";
+        Mod->dump();
+      }
+    
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SMT->run();
       ++NumPassesRun;
@@ -145,15 +196,14 @@ void SILPassManager::runOneIteration() {
       }
 
       // If this pass invalidated anything, print and verify.
-      if (CompleteFuncs->hasChanged()) {
-        if (Options.PrintAll && SILPrintOnlyFun.empty()) {
-          llvm::dbgs() << "*** SIL module after " << SMT->getName() << " ("
-                       << NumOptimizationIterations << ") ***\n";
-          Mod->dump();
-        }
-        if (Options.VerifyAll) {
-          Mod->verify();
-        }
+      if (doPrintAfter(SMT, nullptr,
+                       CompleteFuncs->hasChanged() && Options.PrintAll)) {
+        llvm::dbgs() << "*** SIL module after " << SMT->getName() << " ("
+                     << NumOptimizationIterations << ") ***\n";
+        Mod->dump();
+      }
+      if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
+        Mod->verify();
       }
       
       continue;
