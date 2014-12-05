@@ -75,36 +75,31 @@ public func _stdlib_conformsToProtocol<SourceType, DestType>(
     value: SourceType, _: DestType.Type
 ) -> Bool
 
-@asmname("swift_stdlib_getTypeName")
-public func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
-
 @asmname("swift_stdlib_getDemangledTypeName")
-public func _stdlib_getDemangledTypeNameImpl(type: Any.Type, result: UnsafeMutablePointer<String>)
+public func _stdlib_getDemangledTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
+
+@asmname("swift_stdlib_getDemangledMetatypeName")
+public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, result: UnsafeMutablePointer<String>)
 
 /// Returns the demangled name of a metatype.
 public func _typeName(type: Any.Type) -> String {
   var stringPtr = UnsafeMutablePointer<String>.alloc(1)
-  _stdlib_getDemangledTypeNameImpl(type, stringPtr)
+  _stdlib_getDemangledMetatypeNameImpl(type, stringPtr)
   let result = stringPtr.move()
   stringPtr.dealloc(1)
   return result
 }
 
 /// Returns the mangled type name for the given value.
-public func _stdlib_getTypeName<T>(value: T) -> String {
+public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
   // FIXME: this code should be using _withUninitializedString, but it leaks
   // when called from here.
   // <rdar://problem/17892969> Closures in generic context leak their captures?
   var stringPtr = UnsafeMutablePointer<String>.alloc(1)
-  _stdlib_getTypeNameImpl(value, stringPtr)
+  _stdlib_getDemangledTypeNameImpl(value, stringPtr)
   let stringResult = stringPtr.move()
   stringPtr.dealloc(1)
   return stringResult
-}
-
-/// Returns the human-readable type name for the given value.
-public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
-  return _stdlib_demangleName(_stdlib_getTypeName(value))
 }
 
 @asmname("swift_stdlib_demangleName")

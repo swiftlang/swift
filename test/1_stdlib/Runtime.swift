@@ -577,31 +577,31 @@ enum SomeEnum {
   init() { self = .A }
 }
 
-Runtime.test("getTypeName") {
-  expectEqual("_TtC1a9SomeClass", _stdlib_getTypeName(SomeClass()))
-  expectEqual("_TtC1a13SomeObjCClass", _stdlib_getTypeName(SomeObjCClass()))
-  expectEqual("_TtC1a20SomeNSObjectSubclass", _stdlib_getTypeName(SomeNSObjectSubclass()))
-  expectEqual("NSObject", _stdlib_getTypeName(NSObject()))
-  expectEqual("_TtV1a10SomeStruct", _stdlib_getTypeName(SomeStruct()))
-  expectEqual("_TtO1a8SomeEnum", _stdlib_getTypeName(SomeEnum()))
+Runtime.test("getDemangledTypeName") {
+  expectEqual("a.SomeClass", _stdlib_getDemangledTypeName(SomeClass()))
+  expectEqual("a.SomeObjCClass", _stdlib_getDemangledTypeName(SomeObjCClass()))
+  expectEqual("a.SomeNSObjectSubclass", _stdlib_getDemangledTypeName(SomeNSObjectSubclass()))
+  expectEqual("NSObject", _stdlib_getDemangledTypeName(NSObject()))
+  expectEqual("a.SomeStruct", _stdlib_getDemangledTypeName(SomeStruct()))
+  expectEqual("a.SomeEnum", _stdlib_getDemangledTypeName(SomeEnum()))
 
   var a: Any = SomeClass()
-  expectEqual("_TtC1a9SomeClass", _stdlib_getTypeName(a))
+  expectEqual("a.SomeClass", _stdlib_getDemangledTypeName(a))
 
   a = SomeObjCClass()
-  expectEqual("_TtC1a13SomeObjCClass", _stdlib_getTypeName(a))
+  expectEqual("a.SomeObjCClass", _stdlib_getDemangledTypeName(a))
 
   a = SomeNSObjectSubclass()
-  expectEqual("_TtC1a20SomeNSObjectSubclass", _stdlib_getTypeName(a))
+  expectEqual("a.SomeNSObjectSubclass", _stdlib_getDemangledTypeName(a))
 
   a = NSObject()
-  expectEqual("NSObject", _stdlib_getTypeName(a))
+  expectEqual("NSObject", _stdlib_getDemangledTypeName(a))
 
   a = SomeStruct()
-  expectEqual("_TtV1a10SomeStruct", _stdlib_getTypeName(a))
+  expectEqual("a.SomeStruct", _stdlib_getDemangledTypeName(a))
 
   a = SomeEnum()
-  expectEqual("_TtO1a8SomeEnum", _stdlib_getTypeName(a))
+  expectEqual("a.SomeEnum", _stdlib_getDemangledTypeName(a))
 }
 
 Runtime.test("demangleName") {
@@ -1156,8 +1156,8 @@ Reflection.test("Unmanaged/not-nil") {
   dump(optionalURL, &output)
 
   let expected =
-    "▿ Swift.Unmanaged\n" +
-    "  ▿ Some: Swift.Unmanaged\n" +
+    "▿ Swift.Unmanaged<ObjectiveC.CFURL>\n" +
+    "  ▿ Some: Swift.Unmanaged<ObjectiveC.CFURL>\n" +
     "    - _value: http://llvm.org/ #0\n"
 
   expectEqual(expected, output)
