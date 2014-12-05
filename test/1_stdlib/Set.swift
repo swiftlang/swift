@@ -895,7 +895,7 @@ SetTestSuite.test("COW.Fast.AnyDoesNotReallocate") {
   var s = getCOWFastSet()
   var identity1 = unsafeBitCast(s, Word.self)
 
-  expectNotEmpty(s.any)
+  expectNotEmpty(s.any())
   expectEqual(identity1, unsafeBitCast(s, Word.self))
 }
 
@@ -911,7 +911,7 @@ SetTestSuite.test("COW.Slow.AnyDoesNotReallocate") {
   var s = getCOWSlowSet()
   var identity1 = unsafeBitCast(s, Word.self)
 
-  expectNotEmpty(s.any)
+  expectNotEmpty(s.any())
   expectEqual(identity1, unsafeBitCast(s, Word.self))
 }
 
@@ -2811,7 +2811,7 @@ SetTestSuite.test("removeAny") {
   expectTrue(s2.contains(any!))
   expectNotEqual(unsafeBitCast(s1, Word.self), unsafeBitCast(s2, Word.self))
   expectTrue(s1.isSubsetOf(s2))
-  expectEmpty(empty.any)
+  expectEmpty(empty.any())
 }
 
 SetTestSuite.test("remove(member)") {
@@ -2855,8 +2855,8 @@ SetTestSuite.test("any") {
   let s1 = _Set([1010, 2020, 3030])
   let emptySet = _Set<Int>()
 
-  expectTrue(s1.contains(s1.any!))
-  expectEmpty(emptySet.any)
+  expectTrue(s1.contains(s1.any()!))
+  expectEmpty(emptySet.any())
 }
 
 SetTestSuite.test("count") {
