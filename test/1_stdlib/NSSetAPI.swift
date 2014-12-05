@@ -17,7 +17,7 @@ NSSetAPI.test("initWithObjects") {
     switch ($0.description < $1.description, $0.description == $1.description) {
     case (true, _): return .LT
     case (_, true): return .EQ
-    case _: return .GT
+    default: return .GT
     }
   }
 }
