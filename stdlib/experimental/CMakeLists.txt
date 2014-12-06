@@ -7,6 +7,5 @@ add_swift_library(swiftSwiftExperimental INSTALL TARGET_LIBRARY
 
   SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
 
-  FRAMEWORK_DEPENDS Foundation
   DEPENDS swiftCore)
 
