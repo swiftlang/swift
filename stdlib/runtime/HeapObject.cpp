@@ -302,6 +302,26 @@ void swift::swift_weakRelease(HeapObject *object) {
   }
 }
 
+HeapObject *swift::swift_tryPin(HeapObject *object) {
+  if (!object) return nullptr;
+
+  // Try to set the flag.  If this succeeds, the caller will be
+  // responsible for clearing it.
+  if (object->refCount.tryIncrementAndPin()) {
+    return object;
+  }
+
+  // If setting the flag failed, it's because it was already set.
+  // Return nil so that the object will be deallocated later.
+  return nullptr;
+}
+
+void swift::swift_unpin(HeapObject *object) {
+  if (object && object->refCount.decrementAndUnpinShouldDeallocate()) {
+    _swift_release_dealloc(object);
+  }
+}
+
 HeapObject *swift::swift_tryRetain(HeapObject *object) {
   return _swift_tryRetain(object);
 }

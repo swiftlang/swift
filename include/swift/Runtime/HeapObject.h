@@ -163,6 +163,21 @@ extern "C" HeapObject *swift_tryRetain(HeapObject *object);
 
 /// Returns true if an object is in the process of being deallocated.
 extern "C" bool swift_isDeallocating(HeapObject *object);
+
+/// Attempts to atomically pin an object and increment its reference
+/// count.  Returns nil if the object was already pinned.
+///
+/// The standard protocol is that the caller is responsible for
+/// calling swift_unpin on the return value.
+///
+/// The object reference may be nil.
+extern "C" HeapObject *swift_tryPin(HeapObject *object);
+
+/// Given that an object is pinned, atomically unpin it and decrement
+/// the reference count.
+///
+/// The object reference may be nil.
+extern "C" void swift_unpin(HeapObject *object);
   
 /// Atomically decrements the retain count of an object.  If the
 /// retain count reaches zero, the object is destroyed as follows:

@@ -954,7 +954,7 @@ bool swift::_swift_isUniquelyReferenced_nonNull_native(
 ) {
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
-  return object->refCount.getCount() == 1;
+  return object->refCount.isUniquelyReferenced();
 }
 
 // Given a non-@objc object reference, return true iff the
@@ -1010,6 +1010,30 @@ bool swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
 #else
   return _swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object);
 #endif
+}
+
+/// Given a non-nil object reference, return true if the object is a
+/// native swift object and either its strong reference count is 1 or
+/// its pinned flag is set.
+bool swift::_swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
+                                                          const void *object) {
+  assert(object != nullptr);
+  return
+#if SWIFT_OBJC_INTEROP
+    swift::_swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
+#endif 
+    _swift_isUniquelyReferencedOrPinned_nonNull_native(
+                                                    (const HeapObject*)object);
+}
+
+/// Given a non-nil native swift object reference, return true if
+/// either the object has a strong reference count of 1 or its
+/// pinned flag is set.
+bool swift::_swift_isUniquelyReferencedOrPinned_nonNull_native(
+                                                    const HeapObject* object) {
+  assert(object != nullptr);
+  assert(!object->refCount.isDeallocating());
+  return object->refCount.isUniquelyReferencedOrPinned();
 }
 
 /// Returns class_getInstanceSize(c)

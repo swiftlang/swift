@@ -40,6 +40,10 @@ bool _swift_isUniquelyReferencedNonObjC_nonNull(const void *);
 bool _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   __swift_uintptr_t bits);
 
+/// Is this non-null pointer a reference to an object that uses Swift
+/// reference counting and is either uniquely referenced or pinned?
+bool _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(const void *);
+
 /// Is this native Swift pointer a non-null unique reference to
 /// an object?
 bool _swift_isUniquelyReferenced_native(const struct HeapObject *);
@@ -48,10 +52,15 @@ bool _swift_isUniquelyReferenced_native(const struct HeapObject *);
 /// an object?
 bool _swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
 
+/// Does this non-null native Swift pointer refer to an object that
+/// is either uniquely referenced or pinned?
+bool _swift_isUniquelyReferencedOrPinned_nonNull_native(
+                                                const struct HeapObject *);
+
 bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
 bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
 
-    __swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
+ __swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift
