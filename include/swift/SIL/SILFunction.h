@@ -154,6 +154,10 @@ public:
     return LoweredType;
   }
 
+  bool canBeDeleted() const {
+    return !getRefCount() && !isZombie();
+  }
+
   /// Return the number of entities referring to this function (other
   /// than the SILModule).
   unsigned getRefCount() const { return RefCount; }
