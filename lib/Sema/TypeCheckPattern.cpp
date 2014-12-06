@@ -948,6 +948,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::DictionaryDowncastBridged:
+    case CheckedCastKind::SetDowncast:
+    case CheckedCastKind::SetDowncastBridged:
       return coercePatternViaConditionalDowncast(
                *this, P, dc, type,
                subOptions|TR_FromNonInferredPattern);

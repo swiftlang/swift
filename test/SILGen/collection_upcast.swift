@@ -68,3 +68,18 @@ func testDictionaryUpcastBridged(dict: Dictionary<BridgedSwift, BridgedSwift>) {
   let anyObjectDict: Dictionary<NSObject, AnyObject> = dict  
 }
 
+// CHECK-LABEL: sil hidden @_TF17collection_upcast13testSetUpcast
+// CHECK-NEXT: bb0([[SET:%[0-9]+]] : $Set<BridgedObjC>):
+func testSetUpcast(dict: Set<BridgedObjC>) {
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs10_setUpCastUSs8Hashable_S___FGVSs3SetQ__GS0_Q0__ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK-NEXT: apply [[BRIDGE_FN]]<BridgedObjC, NSObject>([[SET]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  let anyObjectSet: Set<NSObject> = dict
+}
+
+// CHECK-LABEL: sil hidden @_TF17collection_upcast20testSetUpcastBridged
+// CHECK-NEXT: bb0(%0 : $Set<BridgedSwift>):
+func testSetUpcastBridged(dict: Set<BridgedSwift>) {
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs22_setBridgeToObjectiveCUSs8Hashable_S___FGVSs3SetQ__GS0_Q0__ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: apply [[BRIDGE_FN]]<BridgedSwift, NSObject>([[SET]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  let anyObjectSet: Set<NSObject> = dict  
+}

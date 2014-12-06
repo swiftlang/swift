@@ -80,6 +80,8 @@ public:
   Optional<SILDeclRef> NSArrayToArrayFn;
   Optional<SILDeclRef> DictionaryToNSDictionaryFn;
   Optional<SILDeclRef> NSDictionaryToDictionaryFn;
+  Optional<SILDeclRef> SetToNSSetFn;
+  Optional<SILDeclRef> NSSetToSetFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
 
@@ -257,6 +259,8 @@ public:
   SILDeclRef getNSArrayToArrayFn();
   SILDeclRef getDictionaryToNSDictionaryFn();
   SILDeclRef getNSDictionaryToDictionaryFn();
+  SILDeclRef getSetToNSSetFn();
+  SILDeclRef getNSSetToSetFn();
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
   

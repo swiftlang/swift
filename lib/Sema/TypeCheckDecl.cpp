@@ -3515,6 +3515,9 @@ static void checkBridgedFunctions(TypeChecker &TC) {
     checkObjCBridgingFunctions(TC, module, "NSDictionary",
                                "_convertNSDictionaryToDictionary",
                                "_convertDictionaryToNSDictionary");
+    checkObjCBridgingFunctions(TC, module, "NSSet",
+                               "_convertNSSetToSet",
+                               "_convertSetToNSSet");
   }
 }
 

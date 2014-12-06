@@ -2651,6 +2651,8 @@ namespace {
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         // Valid checks.
@@ -2676,7 +2678,9 @@ namespace {
       if (fromOptionals.size() != toOptionals.size() ||
           castKind == CheckedCastKind::ArrayDowncast ||
           castKind == CheckedCastKind::DictionaryDowncast ||
-          castKind == CheckedCastKind::DictionaryDowncastBridged) {
+          castKind == CheckedCastKind::DictionaryDowncastBridged ||
+          castKind == CheckedCastKind::SetDowncast ||
+          castKind == CheckedCastKind::SetDowncastBridged) {
         auto toOptType = OptionalType::get(toType);
         ConditionalCheckedCastExpr *cast
           = new (tc.Context) ConditionalCheckedCastExpr(
@@ -2884,6 +2888,8 @@ namespace {
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         break;
@@ -2961,6 +2967,8 @@ namespace {
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         expr->setCastKind(castKind);
@@ -4165,6 +4173,20 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       bool isBridged = !sourceKey->isBridgeableObjectType() ||
                        !sourceValue->isBridgeableObjectType();
+      return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             isBridged);
+    }
+
+    case ConversionRestrictionKind::SetUpcast: {
+      // Look through implicitly unwrapped optionals.
+      if (auto objTy
+            = cs.lookThroughImplicitlyUnwrappedOptionalType(expr->getType())) {
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        if (!expr) return nullptr;
+      }
+
+      bool isBridged = !cs.getBaseTypeForSetType(fromType.getPointer())
+                          ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
                                                              isBridged);
     }

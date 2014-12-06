@@ -2168,284 +2168,264 @@ SetTestSuite.test("SetToNSSetConversion") {
 // Set Casts
 //
 
-// FIXME: <rdar://problem/18853078> Implement Set<T> up and downcasting
+SetTestSuite.test("SetUpcastEntryPoint") {
+  var s = Set<TestObjCKeyTy>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
 
-//SetTestSuite.test("SetUpcastEntryPoint") {
-//  var s = Set<TestObjCKeyTy>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
+  var sAsAnyObject: Set<NSObject> = _setUpCast(s)
+
+  expectEqual(3, sAsAnyObject.count)
+  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(1010)))
+  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(2020)))
+  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(3030)))
+}
+
+SetTestSuite.test("SetUpcast") {
+  var s = Set<TestObjCKeyTy>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  var sAsAnyObject: Set<NSObject> = s
+
+  expectEqual(3, sAsAnyObject.count)
+  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(1010)))
+  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(2020)))
+  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(3030)))
+}
+
+SetTestSuite.test("SetUpcastBridgedEntryPoint") {
+  var s = Set<TestBridgedKeyTy>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestBridgedKeyTy(i))
+  }
+
+  if true {
+    var s: Set<NSObject> = _setBridgeToObjectiveC(s)
+
+    expectTrue(s.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s.contains(TestBridgedKeyTy(2020)))
+    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+  }
+
+  if true {
+    var s: Set<TestObjCKeyTy> = _setBridgeToObjectiveC(s)
+
+    expectEqual(3, s.count)
+    expectTrue(s.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s.contains(TestBridgedKeyTy(2020)))
+    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+  }
+}
+
+SetTestSuite.test("SetUpcastBridged") {
+  var s = Set<TestBridgedKeyTy>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestBridgedKeyTy(i))
+  }
+
+  if true {
+    var s: Set<NSObject> = s
+
+    expectEqual(3, s.count)
+    expectTrue(s.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s.contains(TestBridgedKeyTy(2020)))
+    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+  }
+
+  if true {
+    var s: Set<TestObjCKeyTy> = s
+
+    expectEqual(3, s.count)
+    expectTrue(s.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s.contains(TestBridgedKeyTy(2020)))
+    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+  }
+}
+
 //
-//  var sAsAnyObject: Set<NSObject> = _setUpCast(s)
+// Set downcasts
 //
-//  expectEqual(3, sAsAnyObject.count)
-//  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(1010)))
-//  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(2020)))
-//  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(3030)))
-//}
-//
-//SetTestSuite.test("SetUpcast") {
-//  var s = Set<TestObjCKeyTy>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  var sAsAnyObject: Set<NSObject> = s
-//
-//  expectEqual(3, sAsAnyObject.count)
-//  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(1010)))
-//  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(2020)))
-//  expectTrue(sAsAnyObject.contains(TestObjCKeyTy(3030)))
-//}
-//
-//SetTestSuite.test("SetUpcastBridgedEntryPoint") {
-//  var s = Set<TestBridgedKeyTy>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestBridgedKeyTy(i))
-//  }
-//
-//  if true {
-//    var s: Set<NSObject> = _setBridgeToObjectiveC(s)
-//
-//    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-//    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-//    expectTrue(s.contains(TestBridgedKeyTy(3030)))
-//  }
-//
-//  if true {
-//    var s: Set<TestBridgedKeyTy> = _setBridgeToObjectiveC(s)
-//
-//    expectEqual(3, s.count)
-//    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-//    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-//    expectTrue(s.contains(TestBridgedKeyTy(3030)))
-//  }
-//}
-//
-//SetTestSuite.test("SetUpcastBridged") {
-//  var s = Set<TestBridgedKeyTy>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestBridgedKeyTy(i))
-//  }
-//
-//  if true {
-//    var s: Set<NSObject> = s
-//
-//    expectEqual(3, s.count)
-//    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-//    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-//    expectTrue(s.contains(TestBridgedKeyTy(3030)))
-//  }
-//
-//  if true {
-//    var s: Set<TestBridgedKeyTy> = s
-//
-//    expectEqual(3, s.count)
-//    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-//    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-//    expectTrue(s.contains(TestBridgedKeyTy(3030)))
-//  }
-//}
-//
-////
-//// Set downcasts
-////
-//
-//SetTestSuite.test("SetDowncastEntryPoint") {
-//  var s = Set<NSObject>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  // Successful downcast.
-//  let dCC: Set<TestObjCKeyTy> = _setDownCast(s)
-//  expectEqual(3, dCC.count)
-//  expectTrue(dCC.contains(TestObjCKeyTy(1010)))
-//  expectTrue(dCC.contains(TestObjCKeyTy(2020)))
-//  expectTrue(dCC.contains(TestObjCKeyTy(3030)))
-//}
-//
-//SetTestSuite.test("SetDowncast") {
-//  var s = Set<NSObject>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  // Successful downcast.
-//  let dCC = s as Set<TestObjCKeyTy>
-//  expectEqual(3, dCC.count)
-//  expectTrue(dCC.contains(TestObjCKeyTy(1010)))
-//  expectTrue(dCC.contains(TestObjCKeyTy(2020)))
-//  expectTrue(dCC.contains(TestObjCKeyTy(3030)))
-//}
-//
-//SetTestSuite.test("SetDowncastConditionalEntryPoint") {
-//  var s = Set<NSObject>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  // Successful downcast.
-//  if let dCC: Set<TestObjCKeyTy> = _setDownCastConditional(s) {
-//    expectEqual(3, dCC.count)
-//    expectTrue(dCC.contains(TestObjCKeyTy(1010)))
-//    expectTrue(dCC.contains(TestObjCKeyTy(2020)))
-//    expectTrue(dCC.contains(TestObjCKeyTy(3030)))
-//  } else {
-//    expectTrue(false)
-//  }
-//
-//  // Unsuccessful downcast
-//  s.insert("Hello, world")
-//  if let dCC: Set<TestObjCKeyTy>
-//       = _setDownCastConditional(s) {
-//    expectTrue(false)
-//  }
-//}
-//
-//SetTestSuite.test("SetDowncastConditional") {
-//  var s = Set<NSObject>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  // Successful downcast.
-//  if let dCC = s as? Set<TestObjCKeyTy> {
-//    expectEqual(3, dCC.count)
-//    expectTrue(dCC.contains(TestObjCKeyTy(1010)))
-//    expectTrue(dCC.contains(TestObjCKeyTy(2020)))
-//    expectTrue(dCC.contains(TestObjCKeyTy(3030)))
-//  } else {
-//    expectTrue(false)
-//  }
-//
-//  // Unsuccessful downcast
-//  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
-//  if let dCC = s as? Set<TestObjCKeyTy> {
-//    expectTrue(false)
-//  }
-//}
-//
-//SetTestSuite.test("SetBridgeFromObjectiveCEntryPoint") {
-//  var s = Set<NSObject>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  // Successful downcast.
-//  let sCV: Set<TestObjCKeyTy> = _setBridgeFromObjectiveC(s)
-//  if true {
-//    expectEqual(3, dCV.count)
-//    expectTrue(dCV.contains(TestObjCKeyTy(1010)))
-//    expectTrue(dCV.contains(TestObjCKeyTy(2020)))
-//    expectTrue(dCV.contains(TestObjCKeyTy(3030)))
-//  }
-//}
-//
-//SetTestSuite.test("SetBridgeFromObjectiveC") {
-//  var s = Set<NSObject>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  // Successful downcast.
-//  let sCV = s as Set<TestObjCKeyTy>
-//  if true {
-//    expectEqual(3, dCV.count)
-//    expectTrue(dCV.contains(TestObjCKeyTy(1010)))
-//    expectTrue(dCV.contains(TestObjCKeyTy(2020)))
-//    expectTrue(dCV.contains(TestObjCKeyTy(3030)))
-//  }
-//
-//  // Successful downcast.
-//  let sVC = s as Set<TestBridgedKeyTy>
-//  if true {
-//    expectEqual(3, dVC.count)
-//    expectTrue(dVC.contains(TestBridgedKeyTy(1010)))
-//    expectTrue(dVC.contains(TestBridgedKeyTy(2020)))
-//    expectTrue(dVC.contains(TestBridgedKeyTy(3030)))
-//  }
-//}
-//
-//SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
-//  var s = Set<NSObject>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  // Successful downcast.
-//  if let sCV: Set<TestObjCKeyTy> = _setBridgeFromObjectiveCConditional(s) {
-//    expectEqual(3, dCV.count)
-//    expectTrue(dCV.contains(TestObjCKeyTy(1010)))
-//    expectTrue(dCV.contains(TestObjCKeyTy(2020)))
-//    expectTrue(dCV.contains(TestObjCKeyTy(3030)))
-//  } else {
-//    expectTrue(false)
-//  }
-//
-//  // Successful downcast.
-//  if let sVC: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveCConditional(s) {
-//    expectEqual(3, dVC.count)
-//    expectTrue(dVC.contains(TestBridgedKeyTy(1010)))
-//    expectTrue(dVC.contains(TestBridgedKeyTy(2020)))
-//    expectTrue(dVC.contains(TestBridgedKeyTy(3030)))
-//  } else {
-//    expectTrue(false)
-//  }
-//
-//  // Unsuccessful downcasts
-//  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
-//  if let sCV: Set<TestObjCKeyTy> = _setBridgeFromObjectiveCConditional(s) {
-//    expectTrue(false)
-//  }
-//  if let sVC: Set<TestBridgedKeyTy>
-//       = _setBridgeFromObjectiveCConditional(s) {
-//    expectTrue(false)
-//  }
-//  if let sVV: Set<TestBridgedKeyTy>
-//       = _setBridgeFromObjectiveCConditional(s) {
-//    expectTrue(false)
-//  }
-//}
-//
-//SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
-//  var s = Set<NSObject>(minimumCapacity: 32)
-//  for i in [1010, 2020, 3030] {
-//      s.insert(TestObjCKeyTy(i))
-//  }
-//
-//  // Successful downcast.
-//  if let dCm = s as? Set<TestObjCKeyTy>  {
-//    expectEqual(3, dCV.count)
-//    expectTrue(dCV.contains(TestObjCKeyTy(1010)))
-//    expectTrue(dCV.contains(TestObjCKeyTy(2020)))
-//    expectTrue(dCV.contains(TestObjCKeyTy(3030)))
-//  } else {
-//    expectTrue(false)
-//  }
-//
-//  // Successful downcast.
-//  if let sVC = s as? Set<TestBridgedKeyTy> {
-//    expectEqual(3, dVC.count)
-//    expectTrue(dVC.contains(TestBridgedKeyTy(1010)))
-//    expectTrue(dVC.contains(TestBridgedKeyTy(2020)))
-//    expectTrue(dVC.contains(TestBridgedKeyTy(3030)))
-//  } else {
-//    expectTrue(false)
-//  }
-//
-//  // Unsuccessful downcasts
-//  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
-//  if let dCm = s as? Set<TestObjCKeyTy> {
-//    expectTrue(false)
-//  }
-//  if let sVC = s as? Set<TestBridgedKeyTy> {
-//    expectTrue(false)
-//  }
-//  if let sVm = s as? Set<TestBridgedKeyTy> {
-//    expectTrue(false)
-//  }
-//}
+
+SetTestSuite.test("SetDowncastEntryPoint") {
+  var s = Set<NSObject>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  // Successful downcast.
+  let sCC: Set<TestObjCKeyTy> = _setDownCast(s)
+  expectEqual(3, sCC.count)
+  expectTrue(sCC.contains(TestObjCKeyTy(1010)))
+  expectTrue(sCC.contains(TestObjCKeyTy(2020)))
+  expectTrue(sCC.contains(TestObjCKeyTy(3030)))
+}
+
+SetTestSuite.test("SetDowncast") {
+  var s = Set<NSObject>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  // Successful downcast.
+  let sCC = s as Set<TestObjCKeyTy>
+  expectEqual(3, sCC.count)
+  expectTrue(sCC.contains(TestObjCKeyTy(1010)))
+  expectTrue(sCC.contains(TestObjCKeyTy(2020)))
+  expectTrue(sCC.contains(TestObjCKeyTy(3030)))
+}
+
+SetTestSuite.test("SetDowncastConditionalEntryPoint") {
+  var s = Set<NSObject>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  // Successful downcast.
+  if let sCC: Set<TestObjCKeyTy> = _setDownCastConditional(s) {
+    expectEqual(3, sCC.count)
+    expectTrue(sCC.contains(TestObjCKeyTy(1010)))
+    expectTrue(sCC.contains(TestObjCKeyTy(2020)))
+    expectTrue(sCC.contains(TestObjCKeyTy(3030)))
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcast
+  s.insert("Hello, world")
+  if let sCC: Set<TestObjCKeyTy>
+       = _setDownCastConditional(s) {
+    expectTrue(false)
+  }
+}
+
+SetTestSuite.test("SetDowncastConditional") {
+  var s = Set<NSObject>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  // Successful downcast.
+  if let sCC = s as? Set<TestObjCKeyTy> {
+    expectEqual(3, sCC.count)
+    expectTrue(sCC.contains(TestObjCKeyTy(1010)))
+    expectTrue(sCC.contains(TestObjCKeyTy(2020)))
+    expectTrue(sCC.contains(TestObjCKeyTy(3030)))
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcast
+  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
+  if let sCC = s as? Set<TestObjCKeyTy> {
+    expectTrue(false)
+  }
+}
+
+SetTestSuite.test("SetBridgeFromObjectiveCEntryPoint") {
+  var s = Set<NSObject>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  // Successful downcast.
+  let sCV: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)
+  if true {
+    expectEqual(3, sCV.count)
+    expectTrue(sCV.contains(TestBridgedKeyTy(1010)))
+    expectTrue(sCV.contains(TestBridgedKeyTy(2020)))
+    expectTrue(sCV.contains(TestBridgedKeyTy(3030)))
+  }
+}
+
+SetTestSuite.test("SetBridgeFromObjectiveC") {
+  var s = Set<NSObject>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  // Successful downcast.
+  let sCV = s as Set<TestObjCKeyTy>
+  if true {
+    expectEqual(3, sCV.count)
+    expectTrue(sCV.contains(TestObjCKeyTy(1010)))
+    expectTrue(sCV.contains(TestObjCKeyTy(2020)))
+    expectTrue(sCV.contains(TestObjCKeyTy(3030)))
+  }
+
+  // Successful downcast.
+  let sVC = s as Set<TestBridgedKeyTy>
+  if true {
+    expectEqual(3, sVC.count)
+    expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
+    expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
+    expectTrue(sVC.contains(TestBridgedKeyTy(3030)))
+  }
+}
+
+SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
+  var s = Set<NSObject>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  // Successful downcast.
+  if let sVC: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveCConditional(s) {
+    expectEqual(3, sVC.count)
+    expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
+    expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
+    expectTrue(sVC.contains(TestBridgedKeyTy(3030)))
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcasts
+  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
+  if let sVC: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveCConditional(s) {
+    expectTrue(false)
+  }
+}
+
+SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
+  var s = Set<NSObject>(minimumCapacity: 32)
+  for i in [1010, 2020, 3030] {
+      s.insert(TestObjCKeyTy(i))
+  }
+
+  // Successful downcast.
+  if let sCV = s as? Set<TestObjCKeyTy>  {
+    expectEqual(3, sCV.count)
+    expectTrue(sCV.contains(TestObjCKeyTy(1010)))
+    expectTrue(sCV.contains(TestObjCKeyTy(2020)))
+    expectTrue(sCV.contains(TestObjCKeyTy(3030)))
+  } else {
+    expectTrue(false)
+  }
+
+  // Successful downcast.
+  if let sVC = s as? Set<TestBridgedKeyTy> {
+    expectEqual(3, sVC.count)
+    expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
+    expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
+    expectTrue(sVC.contains(TestBridgedKeyTy(3030)))
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcasts
+  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
+  if let sCm = s as? Set<TestObjCKeyTy> {
+    expectTrue(false)
+  }
+  if let sVC = s as? Set<TestBridgedKeyTy> {
+    expectTrue(false)
+  }
+  if let sVm = s as? Set<TestBridgedKeyTy> {
+    expectTrue(false)
+  }
+}
 
 // Public API
 

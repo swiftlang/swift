@@ -65,6 +65,9 @@ namespace {
     /// The source type is 'NSDictionary'.
     NSDictionary,
 
+    /// The source type is 'NSSet'.
+    NSSet,
+
     /// The source type is 'NSUInteger'.
     NSUInteger,
 
@@ -94,6 +97,7 @@ namespace {
     case ImportHint::CFPointer:
     case ImportHint::NSArray:
     case ImportHint::NSDictionary:
+    case ImportHint::NSSet:
     case ImportHint::NSString:
     case ImportHint::ObjCPointer:
       return true;
@@ -598,6 +602,10 @@ namespace {
         return { importedType, ImportHint::NSDictionary };
       }
 
+      if (imported->hasName() && imported->getName().str() == "NSSet") {
+        return { importedType, ImportHint::NSSet };
+      }
+
       return { importedType, ImportHint::ObjCPointer };
     }
 
@@ -831,6 +839,15 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                      impl.getNSObjectType(),
                      impl.getNamedSwiftType(impl.getStdlibModule(),
                                             "AnyObject"));
+  }
+
+  // When NSSet* is the type of a function parameter or a function
+  // result type, map it to Set<NSObject>.
+  if (hint == ImportHint::NSSet && canBridgeTypes(importKind) &&
+      impl.tryLoadFoundationModule()) {
+    importedType = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
+                                                        "Set",
+                                                        impl.getNSObjectType());
   }
 
   // Wrap class, class protocol, function, and metatype types in an

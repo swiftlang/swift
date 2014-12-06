@@ -38,6 +38,17 @@ func dictDownCast<Ct: MyClass>(dict: [KeyClass:MyClass]) -> [KeyClass:Ct] {
   // CHECK: return	  
 }
 
+func setUpCast<Ct: KeyClass>(s: Set<Ct>) -> Set<KeyClass> {
+  // CHECK: apply %{{[0-9]*}}<Ct, KeyClass>(%{{[0-9]*}})
+  return s as Set<KeyClass>
+  // CHECK: return	  
+}
+
+func setDownCast<Ct : KeyClass>(s : Set<KeyClass>) -> Set<Ct> {
+  // CHECK: apply %{{[0-9]*}}<KeyClass, Ct>(%{{[0-9]*}})
+  return s as Set<Ct>
+  // CHECK: return	  
+}
 
 let arr: [MyClass] = [MyClass()]
 
@@ -48,3 +59,8 @@ let dict: [KeyClass:MyClass] = [KeyClass() : MyClass()]
 
 dictUpCast(dict)
 dictDownCast(dict)
+
+let s: Set<KeyClass> = Set()
+
+setUpCast(s)
+setDownCast(s)

@@ -1122,6 +1122,9 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
     fn = E->bridgesToObjC() ? ctx.getDictionaryBridgeToObjectiveC(nullptr)
                             : ctx.getDictionaryUpCast(nullptr);
+  } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
+    fn = E->bridgesToObjC() ? ctx.getSetBridgeToObjectiveC(nullptr)
+                            : ctx.getSetUpCast(nullptr);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
@@ -1182,6 +1185,14 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
            : (conditional 
                 ? ctx.getDictionaryDownCastConditional(nullptr)
                 : ctx.getDictionaryDownCast(nullptr));
+  } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
+    fn = bridgesFromObjC
+           ? (conditional 
+                ? ctx.getSetBridgeFromObjectiveCConditional(nullptr)
+                : ctx.getSetBridgeFromObjectiveC(nullptr))
+           : (conditional 
+                ? ctx.getSetDownCastConditional(nullptr)
+                : ctx.getSetDownCast(nullptr));
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
@@ -2007,9 +2018,12 @@ static RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
   // entry points.
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||
-      castKind == CheckedCastKind::DictionaryDowncastBridged) {
+      castKind == CheckedCastKind::DictionaryDowncastBridged ||
+      castKind == CheckedCastKind::SetDowncast ||
+      castKind == CheckedCastKind::SetDowncastBridged) {
     bool bridgesFromObjC
-      = (castKind == CheckedCastKind::DictionaryDowncastBridged);
+      = (castKind == CheckedCastKind::DictionaryDowncastBridged ||
+         castKind == CheckedCastKind::SetDowncastBridged);
     return emitCollectionDowncastExpr(SGF, operand, loc, targetType, C,
                                       /*conditional=*/false,
                                       bridgesFromObjC);
@@ -2087,9 +2101,12 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
   auto castKind = E->getCastKind();
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||
-      castKind == CheckedCastKind::DictionaryDowncastBridged) {
+      castKind == CheckedCastKind::DictionaryDowncastBridged ||
+      castKind == CheckedCastKind::SetDowncast ||
+      castKind == CheckedCastKind::SetDowncastBridged) {
     bool bridgesFromObjC
-      = (castKind == CheckedCastKind::DictionaryDowncastBridged);
+      = (castKind == CheckedCastKind::DictionaryDowncastBridged ||
+         castKind == CheckedCastKind::SetDowncastBridged);
     return emitCollectionDowncastExpr(SGF, E->getSubExpr(), SILLocation(E), 
                                       E->getCastTypeLoc().getType(), C,
                                       /*conditional=*/true,
@@ -2199,9 +2216,12 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   auto castKind = E->getCastKind();
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||
-      castKind == CheckedCastKind::DictionaryDowncastBridged) {
+      castKind == CheckedCastKind::DictionaryDowncastBridged ||
+      castKind == CheckedCastKind::SetDowncast ||
+      castKind == CheckedCastKind::SetDowncastBridged) {
     bool bridgesFromObjC
-      = (castKind == CheckedCastKind::DictionaryDowncastBridged);
+      = (castKind == CheckedCastKind::DictionaryDowncastBridged ||
+         castKind == CheckedCastKind::SetDowncastBridged);
     SILLocation loc(E);
     ManagedValue optValue = emitCollectionDowncastExpr(
                               SGF, E->getSubExpr(), loc,
@@ -5366,6 +5386,47 @@ static ManagedValue emitBridgeNSDictionaryToDictionary(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(dict);
 }
 
+static ManagedValue emitBridgeSetToNSSet(SILGenFunction &gen, SILLocation loc,
+                                         ManagedValue set) {
+  SILValue setToNSSetFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getSetToNSSetFn());
+
+  // Figure out the key and value types.
+  auto setTy = set.getType().getSwiftRValueType()->castTo<BoundGenericType>();
+  auto subs = setTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
+  auto substFnType
+    = setToNSSetFn.getType().substGenericArgs(gen.SGM.M, subs);
+  SILValue nsset = gen.B.createApply(loc, setToNSSetFn,
+                                     substFnType,
+                                     gen.SGM.getLoweredType(
+                                       gen.SGM.Types.getNSSetType()),
+                                     subs,
+                                     { set.forward(gen) });
+
+  return gen.emitManagedRValueWithCleanup(nsset);
+}
+
+static ManagedValue emitBridgeNSSetToSet(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ManagedValue nsset,
+                                         SILType nativeTy) {
+  SILValue nssetToSetFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSSetToSetFn());
+
+  auto setTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
+  auto subs = setTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
+  auto substFnType
+    = nssetToSetFn.getType().substGenericArgs(gen.SGM.M, subs);
+
+  SILValue set = gen.B.createApply(loc, nssetToSetFn,
+                                   substFnType,
+                                   nativeTy,
+                                   subs,
+                                   { nsset.forward(gen) });
+
+  return gen.emitManagedRValueWithCleanup(set);
+}
+
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
                                              SILLocation loc,
                                              ManagedValue swiftBool) {
@@ -5534,6 +5595,13 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
     }
   }
 
+  // Bridge Set to NSSet.
+  if (auto setDecl = gen.getASTContext().getSetDecl()) {
+    if (v.getType().getSwiftRValueType().getAnyNominal() == setDecl) {
+      return emitBridgeSetToNSSet(gen, loc, v);
+    }
+  }
+
   return v;
 }
 
@@ -5609,6 +5677,13 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
   if (auto dictDecl = gen.getASTContext().getDictionaryDecl()) {
     if (nativeTy.getSwiftRValueType()->getAnyNominal() == dictDecl) {
       return emitBridgeNSDictionaryToDictionary(gen, loc, v, nativeTy);
+    }
+  }
+
+  // Bridge NSSet to Set.
+  if (auto setDecl = gen.getASTContext().getSetDecl()) {
+    if (nativeTy.getSwiftRValueType()->getAnyNominal() == setDecl) {
+      return emitBridgeNSSetToSet(gen, loc, v, nativeTy);
     }
   }
   

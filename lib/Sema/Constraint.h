@@ -189,6 +189,8 @@ enum class ConversionRestrictionKind {
   /// Implicit upcast conversion of dictionary types, which includes
   /// bridging.
   DictionaryUpcast,
+  /// Implicit upcast conversion of set types, which includes bridging.
+  SetUpcast,
   /// Implicit bridging from a value type to an Objective-C class.
   BridgeToObjC,
   /// Implicit bridging from an Objective-C class to a value type.

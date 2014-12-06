@@ -1692,6 +1692,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::DictionaryUpcast);
+      } else if (isSetType(desugar1) && isSetType(desugar2)) {
+        conversionsOrFixes.push_back(
+          ConversionRestrictionKind::SetUpcast);
       }
     }
   }
@@ -2239,6 +2242,11 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
     return CheckedCastKind::DictionaryDowncast;
   }
 
+  // Set downcasts are handled specially.
+  if (cs->isSetType(fromType) && cs->isSetType(toType)) {
+    return CheckedCastKind::SetDowncast;
+  }
+
   // If we can bridge through an Objective-C class, do so.
   auto &tc = cs->getTypeChecker();
   if (tc.getDynamicBridgedThroughObjCClass(cs->DC, true, fromType, toType)) {
@@ -2371,6 +2379,29 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     case SolutionKind::Error:
       return SolutionKind::Error;
     }
+  }
+
+  case CheckedCastKind::SetDowncast:
+  case CheckedCastKind::SetDowncastBridged: {
+    auto fromBaseType = getBaseTypeForSetType(fromType.getPointer());
+    auto toBaseType = getBaseTypeForSetType(toType.getPointer());
+    // FIXME: Deal with from/to base types that haven't been solved
+    // down to type variables yet.
+
+    // Check whether we need to bridge through an Objective-C class.
+    if (auto classType = TC.getDynamicBridgedThroughObjCClass(DC, true,
+                                                              fromBaseType,
+                                                              toBaseType)) {
+      // The class we're bridging through must be a subtype of the type we're
+      // coming from.
+      addConstraint(ConstraintKind::Subtype, classType, fromBaseType,
+                    getConstraintLocator(locator));
+      return SolutionKind::Solved;
+    }
+
+    addConstraint(ConstraintKind::Subtype, toBaseType, fromBaseType,
+                  getConstraintLocator(locator));
+    return SolutionKind::Solved;
   }
       
   case CheckedCastKind::ValueCast: {
@@ -3421,6 +3452,19 @@ Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
   llvm_unreachable("attempted to extract a base type from a non-array type");
 }
 
+Type ConstraintSystem::getBaseTypeForSetType(TypeBase *type) {
+  type = type->lookThroughAllAnyOptionalTypes().getPointer();
+
+  if (auto bound = type->getAs<BoundGenericStructType>()) {
+    if (bound->getDecl() == getASTContext().getSetDecl()) {
+      return bound->getGenericArgs()[0];
+    }
+  }
+
+  type->dump();
+  llvm_unreachable("attempted to extract a base type from a non-set type");
+}
+
 Type ConstraintSystem::getTypeWhenUnavailable(Type declType) {
   if (!TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
     return declType;
@@ -3829,6 +3873,78 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     case SolutionKind::Error:
       return SolutionKind::Error;
     }
+  }
+
+  // T1 < T2 || T1 bridges to T2 ===> Set<T1> <c Set<T2>
+  case ConversionRestrictionKind::SetUpcast: {
+    auto t1 = type1->getDesugaredType();    
+    Type baseType1 = getBaseTypeForSetType(t1);
+
+    auto t2 = type2->getDesugaredType();
+    Type baseType2 = getBaseTypeForSetType(t2);
+
+    // Look through type variables in the first base type; we need to know
+    // their structure before we can decide whether this can be an upcast.
+    TypeVariableType *baseTypeVar1 = nullptr;
+    baseType1 = getFixedTypeRecursive(baseType1, baseTypeVar1, false, false);
+
+    if (baseTypeVar1) {
+      if (flags & TMF_GenerateConstraints) {
+        addConstraint(
+          Constraint::createRestricted(*this, getConstraintKind(matchKind),
+                                       restriction, type1, type2,
+                                       getConstraintLocator(locator)));
+        return SolutionKind::Solved;
+      }
+
+      return SolutionKind::Unsolved;
+    }
+
+    // If the first base type is a bridgeable object type, this can only be an
+    // upcast.
+    bool isUpcast = baseType1->isBridgeableObjectType();
+
+    if (isUpcast) {
+      increaseScore(SK_CollectionUpcastConversion);
+    } else {
+      // This might be a bridged upcast.
+      Type bridgedBaseType1 = TC.getBridgedToObjC(DC, true, baseType1);
+      if (!bridgedBaseType1) {
+        // FIXME: Record failure.
+        return SolutionKind::Error;
+      }
+
+      // Look through the destination base type. We need its structure to
+      // determine whether we'll be bridging or upcasting the base type.
+      TypeVariableType *baseTypeVar2 = nullptr;
+      baseType2 = getFixedTypeRecursive(baseType2, baseTypeVar2, false, false);
+      
+      // If the destination base type is a type variable, we can't simplify
+      // this now.
+      if (baseTypeVar2) {
+        if (flags & TMF_GenerateConstraints) {
+          addConstraint(
+            Constraint::createRestricted(*this, getConstraintKind(matchKind),
+                                         restriction, type1, type2,
+                                         getConstraintLocator(locator)));
+          return SolutionKind::Solved;
+        }
+        
+        return SolutionKind::Unsolved;
+      }
+
+      // This can be a bridging upcast.
+      if (baseType2->isBridgeableObjectType())
+        baseType1 = bridgedBaseType1;
+      increaseScore(SK_CollectionBridgedConversion);
+    }
+
+    addContextualScore();
+    assert(matchKind >= TypeMatchKind::Conversion);
+
+    // The source base type must be a subtype of the destination base type.
+    return matchTypes(baseType1, baseType2, TypeMatchKind::Subtype, subFlags,
+                      locator);
   }
 
   // T bridges to C and C < U ===> T <c U

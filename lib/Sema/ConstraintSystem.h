@@ -1691,6 +1691,9 @@ public:
   /// key and value types for the dictionary.
   Optional<std::pair<Type, Type>> isDictionaryType(Type type);
 
+  /// \brief Determine if the type in question is a Set<T>.
+  bool isSetType(Type t);
+
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
@@ -2176,6 +2179,11 @@ public:
   /// \param type The array type to inspect.
   /// \returns the base type of the array.
   Type getBaseTypeForArrayType(TypeBase *type);
+
+  /// Extract the base type from a set type.
+  /// \param type The set type to inspect.
+  /// \returns the base type of the set.
+  Type getBaseTypeForSetType(TypeBase *type);
   
   /// Returns the type to use when the passed-in declaration type is potentially
   /// unavailable.

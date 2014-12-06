@@ -2024,6 +2024,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
+  if (cs.isSetType(toType) && cs.isSetType(fromType)) {
+    auto toBaseType = cs.getBaseTypeForSetType(toType.getPointer());
+    auto fromBaseType = cs.getBaseTypeForSetType(fromType.getPointer());
+    if (toBaseType->isBridgeableObjectType() &&
+        fromBaseType->isBridgeableObjectType()) {
+      return CheckedCastKind::SetDowncast;
+    }
+    return CheckedCastKind::SetDowncastBridged;
+  }
+
   // If the destination type is a subtype of the source type, we have
   // a downcast.
   if (isSubtypeOf(toType, fromType, dc)) {

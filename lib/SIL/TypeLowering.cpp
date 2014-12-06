@@ -2244,6 +2244,13 @@ Type TypeConverter::getLoweredCBridgedType(Type t,
     }
   }
 
+  // Set bridging.
+  if (auto setDecl = Context.getSetDecl()) {
+    if (t->getAnyNominal() == setDecl) {
+      return getNSSetType();
+    }
+  }
+
   return t;
 }
 

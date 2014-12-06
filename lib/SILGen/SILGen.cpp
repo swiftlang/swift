@@ -206,6 +206,27 @@ SILDeclRef SILGenModule::getNSDictionaryToDictionaryFn() {
                        None /*FIXME: Dictionary<K, V>*/);
 }
 
+static SILType getNSSetTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(SGM.Types.getNSSetType());
+}
+
+SILDeclRef SILGenModule::getSetToNSSetFn() {
+  return getBridgingFn(SetToNSSetFn, *this,
+                       FOUNDATION_MODULE_NAME,
+                       "_convertSetToNSSet",
+                       { /* FIXME: Set<T> */},
+                       getNSSetTy(*this),
+                       /*FIXME: trustInputTypes=*/true);
+}
+
+SILDeclRef SILGenModule::getNSSetToSetFn() {
+  return getBridgingFn(NSSetToSetFn, *this,
+                       FOUNDATION_MODULE_NAME,
+                       "_convertNSSetToSet",
+                       { getNSSetTy(*this) },
+                       None /*FIXME: Set<T>*/);
+}
+
 #define STANDARD_GET_BRIDGING_FN(Module, FromTy, ToTy) \
   SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
     return getBridgingFn(FromTy##To##ToTy##Fn, *this, \

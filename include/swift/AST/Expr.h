@@ -82,6 +82,10 @@ enum class CheckedCastKind : unsigned {
   // A downcast from a dictionary type to another dictionary type that
   // requires bridging.
   DictionaryDowncastBridged,
+  // A downcast from a set type to another set type.
+  SetDowncast,
+  // A downcast from a set type to another set type that requires bridging.
+  SetDowncastBridged,
   /// A downcast from an object of class or Objective-C existential
   /// type to its bridged value type.
   BridgeFromObjectiveC,

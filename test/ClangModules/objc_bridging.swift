@@ -18,6 +18,10 @@ extension Dictionary {
   func onlyOnDictionary() { }
 }
 
+extension Set {
+  func onlyOnSet() { }
+}
+
 func foo() {
   var sf : (String!) -> String? = NSStringToNSString
   var s : String = NSArray().nsstringProperty.onlyOnString()
@@ -31,6 +35,9 @@ func foo() {
   var df: (Dictionary<NSObject, AnyObject>!) -> Dictionary<NSObject, AnyObject>!
     = dictToDict
   NSArray().dictProperty.onlyOnDictionary()
+
+  var setf : (Set<NSObject>!) -> Set<NSObject>! = setToSet
+  NSArray().setProperty.onlyOnSet()
 }
 
 func allocateMagic(zone: NSZone) -> UnsafeMutablePointer<Void> {

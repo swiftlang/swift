@@ -159,3 +159,47 @@ func testDictionaryDowncastBridgedKVConditional(dict: Dictionary<NSObject, AnyOb
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT]]) : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   return dict as? Dictionary<BridgedSwift, BridgedSwift>
 }
+
+// CHECK-LABEL: sil hidden @_TF19collection_downcast25testSetDowncastFromObject
+// CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+func testSetDowncastFromObject(obj: AnyObject) 
+       -> Set<BridgedObjC> {
+  // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Set<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Set<BridgedObjC>
+  return obj as Set<BridgedObjC>
+}
+
+// CHECK-LABEL: sil hidden @_TF19collection_downcast15testSetDowncast
+// CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
+func testSetDowncast(dict: Set<NSObject>) 
+       -> Set<BridgedObjC> {
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs12_setDownCastUSs8Hashable_S___FGVSs3SetQ__GS0_Q0__ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedObjC>([[SET]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  return dict as Set<BridgedObjC>
+}
+
+// CHECK-LABEL: sil hidden @_TF19collection_downcast26testSetDowncastConditional
+// CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
+func testSetDowncastConditional(dict: Set<NSObject>) 
+       -> Set<BridgedObjC>? {
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs23_setDownCastConditionalUSs8Hashable_S___FGVSs3SetQ__GSqGS0_Q0___ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
+  // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedObjC>([[SET]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
+  return dict as? Set<BridgedObjC>
+}
+
+// CHECK-LABEL: sil hidden @_TF19collection_downcast22testSetDowncastBridged
+// CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
+func testSetDowncastBridged(dict: Set<NSObject>) 
+       -> Set<BridgedSwift> {
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs24_setBridgeFromObjectiveCUSs8Hashable_S___FGVSs3SetQ__GS0_Q0__ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  return dict as Set<BridgedSwift>
+}
+
+// CHECK-LABEL: sil hidden @_TF19collection_downcast33testSetDowncastBridgedConditional
+// CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
+func testSetDowncastBridgedConditional(dict: Set<NSObject>) 
+       -> Set<BridgedSwift>? {
+  return dict as? Set<BridgedSwift>
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs35_setBridgeFromObjectiveCConditionalUSs8Hashable_S___FGVSs3SetQ__GSqGS0_Q0___ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
+  // CHECK: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
+}

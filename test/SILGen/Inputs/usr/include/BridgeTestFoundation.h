@@ -16,6 +16,9 @@
 @interface NSDictionary : NSObject
 @end
 
+@interface NSSet : NSObject
+@end
+
 @interface NSNumber : NSObject
 @end
 

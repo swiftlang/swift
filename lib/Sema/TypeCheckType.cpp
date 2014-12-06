@@ -2373,6 +2373,16 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     }
   }
 
+  // Set<T> is representable when T is bridged to Objective-C.
+  if (auto setDecl = Context.getSetDecl()) {
+    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
+      if (boundGeneric->getDecl() == setDecl) {
+        auto elementType = boundGeneric->getGenericArgs()[0];
+        return !getBridgedToObjC(DC, false, elementType).isNull();
+      }
+    }
+  }
+
   // Check to see if this is a bridged type.  Note that some bridged
   // types are representable, but their optional type is not.
   fillObjCRepresentableTypeCache(DC);

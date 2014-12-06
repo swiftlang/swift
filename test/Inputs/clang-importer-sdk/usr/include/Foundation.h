@@ -37,7 +37,7 @@ __attribute__((availability(macosx,introduced=10.10)))
 
 @end
 
-@class NSString, NSArray, NSDictionary, NSEnumerator;
+@class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
 
 /// Aaa.  NSArray.  Bbb.
 @interface NSArray : NSObject
@@ -48,6 +48,7 @@ __attribute__((availability(macosx,introduced=10.10)))
 @property BOOL boolProperty;
 @property NSArray *arrayProperty;
 @property NSDictionary *dictProperty;
+@property NSSet *setProperty;
 
 + (instancetype)arrayWithObjects:(const id[])objects count:(NSUInteger)count;
 - (void)makeObjectsPerformSelector:(SEL)aSelector;
@@ -88,6 +89,17 @@ __attribute__((availability(macosx,introduced=10.10)))
 
 @interface NSMutableDictionary (NSExtendedMutableDictionary)
 - (void)setObject:(id)obj forKeyedSubscript:(id <NSCopying>)key /*NS_AVAILABLE(10_8, 6_0)*/;
+@end
+
+@interface NSSet : NSObject
+- (instancetype)init;
+- (NSUInteger)count;
+- (id)anyObject;
+@end
+
+@interface NSMutableSet : NSSet
+- (void)addObject:(id)obj;
+- (void)removeObject:(id)obj;
 @end
 
 @interface NSNumber : NSObject
@@ -417,6 +429,7 @@ typedef NS_ENUM(NSInteger, NSByteCountFormatterCountStyle) {
 
 NSArray *arrayToArray(NSArray *arr);
 NSDictionary *dictToDict(NSDictionary *dict);
+NSSet *setToSet(NSSet *dict);
 
 @interface NSExtensionContext : NSObject
 - (void)openURL:(NSURL *)URL completionHandler:(void (^)(BOOL success))completionHandler;

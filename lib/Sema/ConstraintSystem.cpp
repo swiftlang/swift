@@ -699,6 +699,14 @@ Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
   return None;
 }
 
+bool ConstraintSystem::isSetType(Type type) {
+  if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
+    return boundStruct->getDecl() == TC.Context.getSetDecl();
+  }
+
+  return false;
+}
+
 Type ConstraintSystem::openBindingType(Type type, 
                                        ConstraintLocatorBuilder locator,
                                        DeclContext *dc) {
