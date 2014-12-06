@@ -27,17 +27,31 @@ namespace swift { extern "C" {
 #define bool _Bool
 #endif
 
+/// Is this pointer a non-null unique reference to an object
+/// that uses Swift reference counting?
 bool _swift_isUniquelyReferencedNonObjC(const void *);
+
+/// Is this non-null pointer a unique reference to an object
+/// that uses Swift reference counting?
 bool _swift_isUniquelyReferencedNonObjC_nonNull(const void *);
-bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
-bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
-bool _swift_isUniquelyReferenced_native_spareBits(__swift_uintptr_t bits);
+
+/// Is this non-null BridgeObject a unique reference to an object
+/// that uses Swift reference counting?
 bool _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   __swift_uintptr_t bits);
-bool
-_swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
+
+/// Is this native Swift pointer a non-null unique reference to
+/// an object?
 bool _swift_isUniquelyReferenced_native(const struct HeapObject *);
-__swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
+
+/// Is this non-null native Swift pointer a unique reference to
+/// an object?
+bool _swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
+
+bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
+bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
+
+    __swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

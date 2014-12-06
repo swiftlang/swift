@@ -988,24 +988,6 @@ bool swift::_swift_isUniquelyReferencedNonObjC(
     && _swift_isUniquelyReferencedNonObjC_nonNull(object);
 }
 
-/// Given the bits of a possibly-nil Native swift object reference, or of a
-/// word-sized Swift enum containing a Native swift object reference as
-/// a payload, return true iff the object's strong reference count is
-/// 1.
-bool swift::_swift_isUniquelyReferenced_native_spareBits(
-  __swift_uintptr_t bits
-) {
-  const auto object = reinterpret_cast<HeapObject*>(
-    bits & ~heap_object_abi::SwiftSpareBitsMask);
-
-  // Sometimes we have a NULL "owner" object, e.g. because the data
-  // being referenced (usually via UnsafeMutablePointer<T>) has infinite
-  // lifetime, or lifetime managed outside the Swift object system.
-  // In these cases we have to assume the data is shared among
-  // multiple references, and needs to be copied before modification.
-  return _swift_isUniquelyReferenced_native(object);
-}
-
 /// Return true if the given bits of a Builtin.BridgeObject refer to a
 /// native swift object whose strong reference count is 1.
 bool swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
