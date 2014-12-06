@@ -9,7 +9,7 @@ ExperimentalTestSuite.test("ComposeOperator/SmokeTest") {
   func incr(x: Int) -> Int { return x + 1 }
   func twice(x: Int) -> Int { return x * 2 }
 
-  expectEqual(7, (incr ○ twice)(3))
+  expectEqual(7, (incr ∘ twice)(3))
 }
 
 /*
@@ -24,7 +24,7 @@ ExperimentalTestSuite.test("ComposeOperator/Types") {
   func a(_: A) -> B { return B() }
   func b(_: B) -> C { return C() }
 
-  var result = b ○ a
+  var result = b ∘ a
   typealias Expected = A -> C
   expectType(Expected.self, &result)
 }
@@ -43,7 +43,7 @@ ExperimentalTestSuite.test("ComposeOperator/CountCalls") {
   func a(_: A) -> B { ++aCalled; return B() }
   func b(_: B) -> C { ++bCalled; return C() }
 
-  var result = b ○ a
+  var result = b ∘ a
   expectEqual(0, aCalled)
   expectEqual(0, bCalled)
   result(A())
@@ -63,7 +63,7 @@ func a(_: A) -> B { ++aCalled; return B() }
 func b(_: B) -> C { ++bCalled; return C() }
 
 ExperimentalTestSuite.test("ComposeOperator/CountCalls/Workaround") {
-  var result = b ○ a
+  var result = b ∘ a
   expectEqual(0, aCalled)
   expectEqual(0, bCalled)
   result(A())
