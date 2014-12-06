@@ -308,12 +308,21 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitClosureExpr(ClosureExpr *expr) {
+  Expr *visitCaptureListExpr(CaptureListExpr *expr) {
     for (auto c : expr->getCaptureList()) {
       if (doIt(c.Var) || doIt(c.Init))
         return nullptr;
     }
 
+    Expr *body = expr->getClosureBody();
+    if ((body = doIt(body)))
+      expr->setClosureBody(body);
+    else
+      return nullptr;
+    return expr;
+  }
+
+  Expr *visitClosureExpr(ClosureExpr *expr) {
     if (Pattern *Pat = doIt(expr->getParams()))
       expr->setParams(Pat);
     else

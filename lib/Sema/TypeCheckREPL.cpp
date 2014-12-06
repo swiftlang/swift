@@ -241,8 +241,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   unsigned discriminator = TLC.claimNextClosureDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(ArrayRef<CaptureListEntry>(),
-                                ParamPat, SourceLoc(), SourceLoc(), TypeLoc(),
+      new (Context) ClosureExpr(ParamPat, SourceLoc(), SourceLoc(), TypeLoc(),
                                 discriminator, newTopLevel);
 
   Type ParamTy = ParamPat->getType();

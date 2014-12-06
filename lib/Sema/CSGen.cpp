@@ -837,6 +837,12 @@ namespace {
       llvm_unreachable("Unhandled pattern kind");
     }
 
+    Type visitCaptureListExpr(CaptureListExpr *expr) {
+      // The type of the capture list is just the type of its closure.
+      expr->setType(expr->getClosureBody()->getType());
+      return expr->getType();
+    }
+
     Type visitClosureExpr(ClosureExpr *expr) {
       // Closure expressions always have function type. In cases where a
       // parameter or return type is omitted, a fresh type variable is used to

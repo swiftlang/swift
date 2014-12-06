@@ -195,6 +195,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::Dictionary:
           case ExprKind::Subscript:
           case ExprKind::TupleElement:
+          case ExprKind::CaptureList:
           case ExprKind::Closure:
           case ExprKind::AutoClosure:
           case ExprKind::Module:
@@ -395,15 +396,6 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
     unsigned InClosure = 0;
-
-    // Keep track of DeclRefExpr's we've emitted diagnostics for, so we don't
-    // emit the same error on both the property access and on the underlying
-    // self reference.
-    SmallVector<Expr*, 2> DiagnosedSelfs;
-
-    /// This is a set of expressions that have already been checked, so they
-    /// should not be re-recursed into.
-    SmallPtrSet<Expr*, 2> AlreadyCheckedSubexprs;
   public:
     explicit DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
 
@@ -415,43 +407,34 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // If we've already prechecked this subexpression, don't walk into it.
-      if (AlreadyCheckedSubexprs.erase(E))
-        return { false, E };
 
       // If this is an explicit closure expression - not an autoclosure - then
       // we keep track of the fact that recursive walks are within the closure.
-      if (auto *CE = dyn_cast<ClosureExpr>(E)) {
-        // We don't want to consider capture lists part of the closure itself
-        // (even though they are children of the ClosureExpr), so we precheck
-        // them before bumping the "InClosure" count.
-        for (const auto &Capture : CE->getCaptureList()) {
-          if (Capture.Init == nullptr || Capture.Init->getInit() == nullptr)
-            continue;
-
-          Capture.Init->walk(*this);
-          AlreadyCheckedSubexprs.insert(Capture.Init->getInit());
-        }
-
+      if (isa<ClosureExpr>(E))
         ++InClosure;
-      }
+
+      // If we aren't in a closure, no diagnostics will be produced.
+      if (!InClosure)
+        return { true, E };
 
       // If we see a property reference with an implicit base from within a
       // closure, then reject it as requiring an explicit "self." qualifier.  We
       // do this in explicit closures, not autoclosures, because otherwise the
       // transparence of autoclosures is lost.
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (InClosure && isImplicitSelfUse(MRE->getBase())) {
+        if (isImplicitSelfUse(MRE->getBase())) {
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
                       MRE->getMember().getDecl()->getName())
             .fixItInsert(MRE->getLoc(), "self.");
-          DiagnosedSelfs.push_back(MRE->getBase());
+          // Clear the "implicit" bit so we don't rediagnose this.
+          MRE->getBase()->setImplicit(false);
+          return { true, E };
         }
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (InClosure && isImplicitSelfUse(DSCE->getBase()) &&
+        if (isImplicitSelfUse(DSCE->getBase()) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
 
@@ -459,15 +442,18 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
                       diag::method_call_in_closure_without_explicit_self,
                       MethodExpr->getDecl()->getName())
             .fixItInsert(DSCE->getLoc(), "self.");
-          DiagnosedSelfs.push_back(DSCE->getBase());
+          // Clear the "implicit" bit so we don't rediagnose this.
+          DSCE->getBase()->setImplicit(false);
+          return { true, E };
         }
 
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (InClosure && isImplicitSelfUse(E)) {
+      if (isImplicitSelfUse(E)) {
         // Make sure this isn't a subexpression of something we've already
         // emitted a diagnostic for.
-        if (!std::count(DiagnosedSelfs.begin(), DiagnosedSelfs.end(), E))
-          TC.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
+        TC.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
+        // Clear the "implicit" bit so we don't rediagnose this.
+        E->setImplicit(false);
       }
 
       return { true, E };

@@ -145,8 +145,8 @@ class ExplicitSelfRequiredTest {
     // This should not produce an error, "x" isn't being captured by the closure.
     doStuff({ [myX = x] in 4 })
 
-    // This should produce an error, but crashes the compiler earlier.
-    // doStuff({ [myX = {x}] in method() })
+    // This should produce an error, since x is used within the inner closure.
+    doStuff({ [myX = {x}] in 4 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
 
     return 42
   }

@@ -1671,8 +1671,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(Context.AllocateCopy(captureList),
-                                            params, arrowLoc, inLoc,
+  auto *closure = new (Context) ClosureExpr(params, arrowLoc, inLoc,
                                             explicitResultType,
                                             discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.
@@ -1744,7 +1743,13 @@ ParserResult<Expr> Parser::parseExprClosure() {
                                      rightBrace),
                    hasSingleExpressionBody);
 
-  return makeParserResult(Status, closure);
+  // If the closure includes a capture list, create an AST node for it as well.
+  Expr *result = closure;
+  if (!captureList.empty())
+    result = new (Context) CaptureListExpr(Context.AllocateCopy(captureList),
+                                           closure);
+
+  return makeParserResult(Status, result);
 }
 
 ///   expr-anon-closure-argument:

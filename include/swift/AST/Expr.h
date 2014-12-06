@@ -2524,6 +2524,51 @@ public:
   }
 };
 
+
+/// Instances of this structure represent elements of the capture list that can
+/// optionally occur in a capture expression.
+struct CaptureListEntry {
+  VarDecl *Var;
+  PatternBindingDecl *Init;
+
+  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
+  : Var(Var), Init(Init) {
+  }
+};
+
+/// CaptureListExpr - This expression represents the capture list on an explicit
+/// closure.  Because the capture list is evaluated outside of the closure, this
+/// CaptureList wraps the ClosureExpr.  The dynamic semantics are that evaluates
+/// the variable bindings from the capture list, then evaluates the
+/// subexpression (the closure itself) and returns the result.
+class CaptureListExpr : public Expr {
+  ArrayRef<CaptureListEntry> captureList;
+  Expr *closureBody;
+public:
+  CaptureListExpr(ArrayRef<CaptureListEntry> captureList, Expr *closureBody)
+    : Expr(ExprKind::CaptureList, /*Implicit=*/false, Type()),
+      captureList(captureList), closureBody(closureBody) {
+  }
+
+  ArrayRef<CaptureListEntry> getCaptureList() { return captureList; }
+  Expr *getClosureBody() { return closureBody; }
+  const Expr *getClosureBody() const { return closureBody; }
+
+  void setClosureBody(Expr *body) { closureBody = body; }
+
+  /// This is a bit weird, but the capture list is lexically contained within
+  /// the closure, so the ClosureExpr has the full source range.
+  SourceRange getSourceRange() const {
+    return closureBody->getSourceRange();
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CaptureList;
+  }
+};
+
+
 /// \brief A base class for closure expressions.
 class AbstractClosureExpr : public Expr, public DeclContext {
   CaptureInfo Captures;
@@ -2598,17 +2643,6 @@ public:
   using Expr::dump;
 };
 
-/// Instances of this structure represent elements of the capture list that can
-/// optionally occur in a capture expression.
-struct CaptureListEntry {
-  VarDecl *Var;
-  PatternBindingDecl *Init;
-  
-  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
-    : Var(Var), Init(Init) {
-  }
-};
-  
 /// \brief An explicit unnamed function expression, which can optionally have
 /// named arguments.
 ///
@@ -2619,7 +2653,6 @@ struct CaptureListEntry {
 ///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
-  ArrayRef<CaptureListEntry> CaptureList;
 
   /// \brief The location of the '->' denoting an explicit return type,
   /// if present.
@@ -2636,14 +2669,12 @@ class ClosureExpr : public AbstractClosureExpr {
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
 public:
-  ClosureExpr(ArrayRef<CaptureListEntry> captureList,
-              Pattern *params, SourceLoc arrowLoc, SourceLoc inLoc,
+  ClosureExpr(Pattern *params, SourceLoc arrowLoc, SourceLoc inLoc,
               TypeLoc explicitResultType, unsigned discriminator,
               DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      CaptureList(captureList), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultType(explicitResultType),
+      ArrowLoc(arrowLoc), InLoc(inLoc), ExplicitResultType(explicitResultType),
       Body(nullptr) {
     setParams(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
@@ -2657,8 +2688,6 @@ public:
     Body.setPointer(S);
     Body.setInt(isSingleExpression);
   }
-  
-  ArrayRef<CaptureListEntry> getCaptureList() { return CaptureList; }
 
   /// \brief Determine whether the parameters of this closure are actually
   /// anonymous closure variables.
@@ -2730,6 +2759,7 @@ public:
     return E->getKind() == ExprKind::Closure;
   }
 };
+
 
 /// \brief This is a closure of the contained subexpression that is formed
 /// when an scalar expression is converted to @autoclosure function type.

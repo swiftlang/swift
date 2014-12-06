@@ -2513,6 +2513,13 @@ namespace {
       return expr;
     }
 
+    Expr *visitCaptureListExpr(CaptureListExpr *expr) {
+      // The type of the capture list is the type of the closure contained
+      // inside it.
+      expr->setType(expr->getClosureBody()->getType());
+      return expr;
+    }
+
     Expr *visitClosureExpr(ClosureExpr *expr) {
       llvm_unreachable("Handled by the walker directly");
     }

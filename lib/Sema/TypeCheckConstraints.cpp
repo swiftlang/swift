@@ -450,6 +450,18 @@ namespace {
     bool walkToClosureExprPre(ClosureExpr *expr);
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // For capture lists, we typecheck the decls they contain.
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        // Validate the capture list.
+        for (auto capture : captureList->getCaptureList()) {
+          TC.typeCheckDecl(capture.Init, true);
+          TC.typeCheckDecl(capture.Init, false);
+          TC.typeCheckDecl(capture.Var, true);
+          TC.typeCheckDecl(capture.Var, false);
+        }
+        return { true, expr };
+      }
+
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
       // we've determine the complete function type.
@@ -526,14 +538,6 @@ namespace {
 /// true for single-expression closures, where we want the body to be considered
 /// part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
-  // Validate the capture list.
-  for (auto capture : closure->getCaptureList()) {
-    TC.typeCheckDecl(capture.Init, true);
-    TC.typeCheckDecl(capture.Init, false);
-    TC.typeCheckDecl(capture.Var, true);
-    TC.typeCheckDecl(capture.Var, false);
-  }
-
   // Validate the parameters.
   TypeResolutionOptions options;
   options |= TR_AllowUnspecifiedTypes;

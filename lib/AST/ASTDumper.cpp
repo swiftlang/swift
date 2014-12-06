@@ -1269,7 +1269,10 @@ public:
   void visitTypeExpr(TypeExpr *E) {
     printCommon(E, "type_expr");
     OS << " typerepr='";
-    E->getTypeRepr()->print(OS);
+    if (E->getTypeRepr())
+      E->getTypeRepr()->print(OS);
+    else
+      OS << "<<NULL>>";
     OS << "')";
   }
 
@@ -1584,6 +1587,18 @@ public:
     OS << ')';
   }
 
+  void visitCaptureListExpr(CaptureListExpr *E) {
+    printCommon(E, "capture_list");
+    for (auto capture : E->getCaptureList()) {
+      Indent += 2;
+      printRec(capture.Var);
+      printRec(capture.Init);
+      Indent -= 2;
+    }
+    printRec(E->getClosureBody());
+    OS << ')';
+  }
+
   llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
     OS << " discriminator=" << E->getDiscriminator();
@@ -1599,16 +1614,6 @@ public:
     if (expr->hasSingleExpressionBody())
       OS << " single-expression";
     OS << '\n';
-
-
-    for (auto capture : expr->getCaptureList()) {
-      Indent += 2;
-      OS.indent(Indent) << "(capture '" << capture.Var->getName().str()
-                        << "'\n";
-      printRec(capture.Var);
-      printRec(capture.Init);
-      Indent -= 2;
-    }
 
     if (expr->hasSingleExpressionBody()) {
       printRec(expr->getSingleExpressionBody());

@@ -2351,19 +2351,18 @@ namespace {
     RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(NewDC);
-
-        // If this is a ClosureExpr, make sure to recontextualize any decls in
-        // the capture list as well.
-        if (auto *C = dyn_cast<ClosureExpr>(E)) {
-          for (auto &CLE : C->getCaptureList()) {
-            CLE.Var->setDeclContext(NewDC);
-            CLE.Init->setDeclContext(NewDC);
-          }
-        }
-
         return { false, E };
+      }
+      
+      if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
+        // Make sure to recontextualize any decls in the capture list as well.
+        for (auto &CLE : CLE->getCaptureList()) {
+          CLE.Var->setDeclContext(NewDC);
+          CLE.Init->setDeclContext(NewDC);
+        }
       }
 
       return { true, E };
