@@ -880,7 +880,7 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
   }
 
   // Check the availability of the type. Skip checking for SIL.
-  if (!(options & TR_SILType) &&
+  if (!(options & TR_SILType) && !(options & TR_AllowUnavailable) &&
       diagnoseAvailability(result.get<Type>(), IdType,
                            Components.back()->getIdLoc(), DC, *this)) {
     Type ty = ErrorType::get(Context);
@@ -1104,7 +1104,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
         if (base) {
           Optional<MetatypeRepresentation> storedRepr;
-          auto instanceTy = resolveType(base, options);
+          // The instance type is not a SIL type. We still want to allow
+          // unavailable references, though.
+          auto instanceOptions = options - TR_SILType | TR_AllowUnavailable;
+          auto instanceTy = resolveType(base, instanceOptions);
 
           // Check for @thin.
           if (attrs.has(TAK_thin)) {
@@ -1681,7 +1684,7 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
 Type TypeResolver::buildMetatypeType(MetatypeTypeRepr *repr,
                                      Type instanceType,
                                      Optional<MetatypeRepresentation> storedRepr) {
-  if (instanceType->isExistentialType()) {
+  if (instanceType->isAnyExistentialType()) {
     // TODO: diagnose invalid representations?
     return ExistentialMetatypeType::get(instanceType, storedRepr);
   } else {
@@ -1712,7 +1715,7 @@ Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
 Type TypeResolver::buildProtocolType(ProtocolTypeRepr *repr,
                                      Type instanceType,
                                      Optional<MetatypeRepresentation> storedRepr) {
-  if (!instanceType->isExistentialType()) {
+  if (!instanceType->isAnyExistentialType()) {
     TC.diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential);
     return ErrorType::get(TC.Context);
   }

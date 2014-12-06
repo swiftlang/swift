@@ -1216,6 +1216,31 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
+sil @meta_metatype : $@thin () -> @thick Beth.Type.Type {
+entry:
+  %m = metatype $@thick Beth.Type.Type
+  return %m : $@thick Beth.Type.Type
+}
+
+sil @concrete_meta_existential_metatype : $@thin () -> @thick P.Type.Protocol {
+entry:
+  %m = metatype $@thick P.Type.Protocol
+  return %m : $@thick P.Type.Protocol
+}
+
+sil @concrete_meta_existential_meta_existential_metatype
+  : $@thin () -> @thick P.Type.Type.Protocol {
+entry:
+  %m = metatype $@thick P.Type.Type.Protocol
+  return %m : $@thick P.Type.Type.Protocol
+}
+
+sil @function_metatype : $@thin () -> @thick (() -> ()).Type {
+entry:
+  %m = metatype $@thick (() -> ()).Type
+  return %m : $@thick (() -> ()).Type
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis

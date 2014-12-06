@@ -221,9 +221,12 @@ enum TypeResolutionFlags {
   /// This affects what sort of dependencies are recorded when resolving the
   /// type.
   TR_InExpression = 0x2000,
-
+  
   /// Whether this type resolution is guaranteed not to affect downstream files.
-  TR_KnownPrivateDependency = 0x4000
+  TR_KnownPrivateDependency = 0x4000,
+
+  /// Whether we should allow references to unavailable types.
+  TR_AllowUnavailable = 0x8000,
 };
 
 /// Option set describing how type resolution should work.
