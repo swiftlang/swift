@@ -54,7 +54,7 @@ extension String {
           _asciiUpperCaseTable >>
           UInt64(((value &- 1) & 0b0111_1111) >> 1)
         let add = (isUpper & 0x1) << 5
-        dest[i] = value + UInt8(add)
+        dest[i] = value &+ UInt8(truncatingBitPattern: add)
       }
       return String(_storage: buffer)
     }
@@ -76,7 +76,7 @@ extension String {
           _asciiLowerCaseTable >>
           UInt64(((value &- 1) & 0b0111_1111) >> 1)
         let add = (isLower & 0x1) << 5
-        dest[i] = value - UInt8(add)
+        dest[i] = value &- UInt8(truncatingBitPattern: add)
       }
       return String(_storage: buffer)
     }
