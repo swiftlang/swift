@@ -2942,7 +2942,7 @@ SetTestSuite.test("∩") {
 
   let identity1 = unsafeBitCast(s1, Word.self)
   expectEqual(Set([1010, 2020, 3030]),
-    Set([1010, 2020, 3030]).intersect(Set([1010, 2020, 3030])))
+    Set([1010, 2020, 3030]) ∩ Set([1010, 2020, 3030]))
   expectEqual(identity1, unsafeBitCast(s1, Word.self))
 
   expectEqual(s1, s1 ∩ s3)
