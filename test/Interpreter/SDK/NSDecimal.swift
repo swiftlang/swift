@@ -78,6 +78,9 @@ func +(x: NSDecimalResult, y: NSDecimalResult) -> NSDecimalResult {
   }
 }
 
+let zero = NSDecimalResult()
+println(zero) // CHECK: 0
+
 let two: NSDecimalResult = "1" + "1"
 println(two) // CHECK: 2
 
