@@ -37,11 +37,16 @@ import CoreFoundation
 
 // CHECK-LABEL: @interface BridgedTypes
 // CHECK-NEXT: - (NSDictionary * __nonnull)dictBridge:(NSDictionary * __nonnull)x;
+// CHECK-NEXT: - (NSSet * __nonnull)setBridge:(NSSet * __nonnull)x;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class BridgedTypes {
   func dictBridge(x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> { 
     return x 
+  }
+
+  func setBridge(x: Set<NSObject>) -> Set<NSObject> {
+    return x
   }
 }
 
@@ -100,6 +105,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testDictionaryBridging:(NSDictionary * __nonnull)a;
 // CHECK-NEXT: - (void)testDictionaryBridging2:(NSDictionary * __nonnull)a;
 // CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary * __nonnull)a;
+// CHECK-NEXT: - (void)testSetBridging:(NSSet * __nonnull)a;
 // CHECK-NEXT: - (IBAction)actionMethod:(id __nonnull)_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
@@ -142,6 +148,8 @@ class NotObjC {}
   func testDictionaryBridging(a: [NSObject : AnyObject]) {}
   func testDictionaryBridging2(a: [NSNumber : Methods]) {}
   func testDictionaryBridging3(a: [String : String]) {}
+
+  func testSetBridging(a: Set<NSObject>) {}
 
   @IBAction func actionMethod(_: AnyObject) {}
 }

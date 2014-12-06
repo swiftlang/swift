@@ -365,6 +365,7 @@ private:
       if (auto nominal = copyTy->getStructOrBoundGenericStruct()) {
         if (nominal == ctx.getArrayDecl() ||
             nominal == ctx.getDictionaryDecl() ||
+            nominal == ctx.getSetDecl() ||
             nominal == ctx.getStringDecl()) {
           os << ", copy";
         }
@@ -600,6 +601,12 @@ private:
     if (SD == ctx.getDictionaryDecl()) {
       // FIXME: IT'd be nice to put the element type here as well.
       os << "NSDictionary *";
+      printNullability(optionalKind);
+      return true;
+    }
+
+    if (SD == ctx.getSetDecl()) {
+      os << "NSSet *";
       printNullability(optionalKind);
       return true;
     }
