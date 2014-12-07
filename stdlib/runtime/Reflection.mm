@@ -690,8 +690,12 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
   
   id object = [*reinterpret_cast<const id *>(value) retain];
   swift_release(owner);
-  if ([object respondsToSelector:@selector(debugQuickLookObject)])
-    object = [object debugQuickLookObject];
+  if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
+    id quickLookObject = [object debugQuickLookObject];
+    [quickLookObject retain];
+    [object release];
+    object = quickLookObject;
+  }
   
   // NSNumbers quick-look as integers or doubles, depending on type.
   if ([object isKindOfClass:[NSNumber class]]) {
@@ -716,6 +720,7 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
       break;
     }
     
+    [object release];
     result.optional.isNone = false;
     return result;
   }
@@ -723,13 +728,13 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
   // Various other framework types are used for rich representations.
   
   /// Store an ObjC reference into an Any.
-  auto setAnyToObject = [](Any &any, id obj) {
+  auto initializeAnyWithTakeOfObject = [](Any &any, id obj) {
     any.Type = swift_getObjCClassMetadata(_swift_getClass((const void*) obj));
-    *reinterpret_cast<id *>(&any.Buffer) = [obj retain];
+    *reinterpret_cast<id *>(&any.Buffer) = obj;
   };
   
   if ([object isKindOfClass:NSClassFromString(@"NSAttributedString")]) {
-    setAnyToObject(result.payload.Any, object);
+    initializeAnyWithTakeOfObject(result.payload.Any, object);
     result.payload.Kind = QuickLookObject::Tag::AttributedString;
     result.optional.isNone = false;
     return result;
@@ -739,30 +744,32 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
       || [object isKindOfClass:NSClassFromString(@"UIImageView")]
       || [object isKindOfClass:NSClassFromString(@"CIImage")]
       || [object isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
-    setAnyToObject(result.payload.Any, object);
+    initializeAnyWithTakeOfObject(result.payload.Any, object);
     result.payload.Kind = QuickLookObject::Tag::Image;
     result.optional.isNone = false;
     return result;
   } else if ([object isKindOfClass:NSClassFromString(@"NSColor")]
              || [object isKindOfClass:NSClassFromString(@"UIColor")]) {
-    setAnyToObject(result.payload.Any, object);
+    initializeAnyWithTakeOfObject(result.payload.Any, object);
     result.payload.Kind = QuickLookObject::Tag::Color;
     result.optional.isNone = false;
     return result;
   } else if ([object isKindOfClass:NSClassFromString(@"NSBezierPath")]
              || [object isKindOfClass:NSClassFromString(@"UIBezierPath")]) {
-    setAnyToObject(result.payload.Any, object);
+    initializeAnyWithTakeOfObject(result.payload.Any, object);
     result.payload.Kind = QuickLookObject::Tag::BezierPath;
     result.optional.isNone = false;
     return result;
-  } else if ([object isKindOfClass:NSClassFromString(@"NSString")]) {
+  } else if ([object isKindOfClass:[NSString class]]) {
     result.payload.TextOrURL = String((NSString*)object);
+    [object release];
     result.payload.Kind = QuickLookObject::Tag::Text;
     result.optional.isNone = false;
     return result;
   }
   
   // Return none if we didn't get a suitable object.
+  [object release];
   result.optional.isNone = true;
   return result;
 }

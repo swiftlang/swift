@@ -435,5 +435,81 @@ println(reflect(CGSize(width: 30, height: 60)).summary)
 // CHECK-NEXT: (50.0, 60.0, 100.0, 150.0)
 println(reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
 
+// rdar://problem/18513769 -- Make sure that QuickLookObject lookup correctly
+// manages memory.
+
+@objc class CanaryBase {
+  deinit {
+    println("\(self.dynamicType) overboard")
+  }
+
+  required init() { }
+}
+
+var CanaryHandle = false
+
+class IsDebugQLO: CanaryBase, Printable {
+  @objc var description: String {
+    return "I'm a QLO"
+  }
+}
+
+class HasDebugQLO: CanaryBase {
+  @objc var debugQuickLookObject: AnyObject {
+    return IsDebugQLO()
+  }
+}
+
+class HasNumberQLO: CanaryBase {
+  @objc var debugQuickLookObject: AnyObject {
+    let number = NSNumber(integer: 97210)
+    return number
+  }
+}
+
+class HasAttributedQLO: CanaryBase {
+  @objc var debugQuickLookObject: AnyObject {
+    let str = NSAttributedString(string: "attributed string")
+    objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
+      objc_AssociationPolicy(OBJC_ASSOCIATION_RETAIN_NONATOMIC))
+    return str
+  }
+}
+
+class HasStringQLO: CanaryBase {
+  @objc var debugQuickLookObject: AnyObject {
+    let str = NSString(string: "plain string")
+    objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
+      objc_AssociationPolicy(OBJC_ASSOCIATION_RETAIN_NONATOMIC))
+    return str
+  }
+}
+
+func testQLO<T: CanaryBase>(type: T.Type) {
+  autoreleasepool {
+    _ = reflect(type()).quickLookObject
+  }
+}
+
+testQLO(IsDebugQLO.self)
+// CHECK-NEXT: IsDebugQLO overboard
+
+testQLO(HasDebugQLO.self)
+// CHECK-NEXT: HasDebugQLO overboard
+// CHECK-NEXT: IsDebugQLO overboard
+
+testQLO(HasNumberQLO.self)
+// CHECK-NEXT: HasNumberQLO overboard
+// TODO: tagged numbers are immortal, so we can't reliably check for
+//   cleanup here
+
+testQLO(HasAttributedQLO.self)
+// CHECK-NEXT: HasAttributedQLO overboard
+// CHECK-NEXT: CanaryBase overboard
+
+testQLO(HasStringQLO.self)
+// CHECK-NEXT: HasStringQLO overboard
+// CHECK-NEXT: CanaryBase overboard
+
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")
