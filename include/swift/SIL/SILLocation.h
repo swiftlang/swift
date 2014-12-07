@@ -183,7 +183,7 @@ private:
 
 public:
 
-  /// When an ASTNode gets implicitely converted into a SILLocation we
+  /// When an ASTNode gets implicitly converted into a SILLocation we
   /// construct a RegularLocation. Since RegularLocations represent the majority
   /// of locations, this greatly simplifies the user code.
   SILLocation(Stmt *S) : ASTNode(S), KindData(RegularKind) {}
