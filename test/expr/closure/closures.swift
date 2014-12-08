@@ -225,3 +225,14 @@ var closureWithObservedProperty: () -> () = {
 
 {}() // expected-error{{statement cannot begin with a closure expression}} expected-note{{explicitly discard the result of the closure by assigning to '_'}} expected-error{{unable to infer closure type in the current context}}
 
+
+
+// rdar://19179412 - Crash on invalid code.
+func rdar19179412() -> Int -> Int {
+  return { x in
+    class A {
+      let d : Int = 0
+    }
+  }
+}
+

@@ -406,6 +406,11 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
              DRE->getDecl()->getName().str() == "self";
     }
 
+    // Don't walk into nested decls.
+    bool walkToDeclPre(Decl *D) override {
+      return false;
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
 
       // If this is an explicit closure expression - not an autoclosure - then
@@ -427,9 +432,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
                       diag::property_use_in_closure_without_explicit_self,
                       MRE->getMember().getDecl()->getName())
             .fixItInsert(MRE->getLoc(), "self.");
-          // Clear the "implicit" bit so we don't rediagnose this.
-          MRE->getBase()->setImplicit(false);
-          return { true, E };
+          return { false, E };
         }
 
       // Handle method calls with a specific diagnostic + fixit.
@@ -437,24 +440,16 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
         if (isImplicitSelfUse(DSCE->getBase()) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
-
           TC.diagnose(DSCE->getLoc(),
                       diag::method_call_in_closure_without_explicit_self,
                       MethodExpr->getDecl()->getName())
             .fixItInsert(DSCE->getLoc(), "self.");
-          // Clear the "implicit" bit so we don't rediagnose this.
-          DSCE->getBase()->setImplicit(false);
-          return { true, E };
+          return { false, E };
         }
 
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (isImplicitSelfUse(E)) {
-        // Make sure this isn't a subexpression of something we've already
-        // emitted a diagnostic for.
+      if (isImplicitSelfUse(E))
         TC.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
-        // Clear the "implicit" bit so we don't rediagnose this.
-        E->setImplicit(false);
-      }
 
       return { true, E };
     }
