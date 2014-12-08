@@ -133,7 +133,11 @@ namespace swift {
   enum class TypeCheckingFlags : unsigned {
     /// Whether to delay checking that benefits from having the entire
     /// module parsed, e.g., Objective-C method override checking.
-    DelayWholeModuleChecking = 0x01
+    DelayWholeModuleChecking = 1 << 0,
+
+    /// If set, dumps wall time taken to check each function body to
+    /// llvm::errs().
+    DebugTimeFunctionBodies = 1 << 1
   };
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve

@@ -35,6 +35,8 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/Timer.h"
 
 using namespace swift;
 
@@ -115,6 +117,32 @@ namespace {
       // But we do want to walk into the initializers of local
       // variables.
       return isa<PatternBindingDecl>(D);
+    }
+  };
+
+  class FunctionBodyTimer {
+    PointerUnion<const AbstractFunctionDecl *,
+                 const AbstractClosureExpr *> Function;
+    llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
+
+  public:
+    FunctionBodyTimer(decltype(Function) Fn) : Function(Fn) {}
+    ~FunctionBodyTimer() {
+      llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
+
+      auto elapsed = endTime.getProcessTime() - StartTime.getProcessTime();
+      llvm::errs() << llvm::format("%0.1f", elapsed * 1000) << "ms\t";
+
+      if (auto *AFD = Function.dyn_cast<const AbstractFunctionDecl *>()) {
+        AFD->getLoc().print(llvm::errs(), AFD->getASTContext().SourceMgr);
+        llvm::errs() << "\t";
+        AFD->print(llvm::errs(), PrintOptions());
+      } else {
+        auto *ACE = Function.get<const AbstractClosureExpr *>();
+        ACE->getLoc().print(llvm::errs(), ACE->getASTContext().SourceMgr);
+        llvm::errs() << "\t(closure)";
+      }
+      llvm::errs() << "\n";
     }
   };
 }
@@ -836,6 +864,11 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (!AFD->getBody())
     return false;
+
+  Optional<FunctionBodyTimer> timer;
+  if (DebugTimeFunctionBodies)
+    timer.emplace(AFD);
+
   return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
 }
 
@@ -1048,6 +1081,11 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
 
 void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   BraceStmt *body = closure->getBody();
+
+  Optional<FunctionBodyTimer> timer;
+  if (DebugTimeFunctionBodies)
+    timer.emplace(closure);
+
   StmtChecker(*this, closure).typeCheckBody(body);
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());

@@ -140,14 +140,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
-
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
   Opts.DelayedFunctionBodyParsing |= Args.hasArg(OPT_delayed_function_body_parsing);
 
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
-
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+  Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
 
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))

@@ -382,6 +382,9 @@ void CompilerInstance::performSema() {
   if (PrimaryBufferID == NO_SUCH_BUFFER) {
     TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
   }
+  if (Invocation.getFrontendOptions().DebugTimeFunctionBodies) {
+    TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
+  }
 
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {

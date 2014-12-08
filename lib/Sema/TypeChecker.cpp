@@ -460,6 +460,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   auto &Ctx = SF.getASTContext();
   TypeChecker TC(Ctx);
   auto &DefinedFunctions = TC.definedFunctions;
+  if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
+    TC.enableDebugTimeFunctionBodies();
   
   // Lookup the swift module.  This ensures that we record all known protocols
   // in the AST.

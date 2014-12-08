@@ -337,6 +337,10 @@ private:
   /// The index of the next response metavariable to bind to a REPL result.
   unsigned NextResponseVariableIndex = 0;
 
+  /// If true, the time it takes to type-check each function will be dumped
+  /// to llvm::errs().
+  bool DebugTimeFunctionBodies = false;
+
   /// A helper to construct and typecheck call to super.init().
   ///
   /// \returns NULL if the constructed expression does not typecheck.
@@ -348,6 +352,11 @@ public:
   ~TypeChecker();
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
+
+  /// Dump the time it takes to type-check each function to llvm::errs().
+  void enableDebugTimeFunctionBodies() {
+    DebugTimeFunctionBodies = true;
+  }
   
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes &&...Args) {
