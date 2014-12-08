@@ -15,7 +15,7 @@ struct IsPrintable1 : Printable {
 }
 
 func accept_creates_Printable (_: () -> Printable) {}
-func accept_creates_FormattedPrintable (_: () -> FormattedPrintable) {} // expected-note 2{{in call to function 'accept_creates_FormattedPrintable'}}
+func accept_creates_FormattedPrintable (_: () -> FormattedPrintable) {}
 
 func fp_to_p(fp: FormattedPrintable) -> Printable { return fp; }
 func p_to_fp(p: Printable) -> FormattedPrintable { }
@@ -30,14 +30,14 @@ func protocolConformance(ac1: @autoclosure () -> Printable,
 
   f1 = f2 // okay
   f1 = f3 // okay
-  f2 = f1 // expected-error{{'Printable' does not conform to protocol 'FormattedPrintable'}}
+  f2 = f1 // expected-error{{cannot assign a value of type '(fp: FormattedPrintable) -> Printable' to a value of type '(p: Printable) -> FormattedPrintable'}}
 
   accept_creates_Printable(ac1)
   accept_creates_Printable(ac2)
   accept_creates_Printable(ip1)
-  accept_creates_FormattedPrintable(ac1) // expected-error{{type 'Printable' does not conform to protocol 'FormattedPrintable'}}
+  accept_creates_FormattedPrintable(ac1) // expected-error{{cannot invoke 'accept_creates_FormattedPrintable' with an argument list of type '@autoclosure () -> Printable'}} expected-note{{expected an argument list of type '() -> FormattedPrintable'}}
   accept_creates_FormattedPrintable(ac2)
-  accept_creates_FormattedPrintable(ip1) // expected-error{{type 'IsPrintable1' does not conform to protocol 'FormattedPrintable'}}
+  accept_creates_FormattedPrintable(ip1) // expected-error{{cannot invoke 'accept_creates_FormattedPrintable' with an argument list of type '@autoclosure () -> IsPrintable1'}} expected-note{{expected an argument list of type '() -> FormattedPrintable'}}
 }
 
 func p_gen_to_fp(_: () -> Printable) -> FormattedPrintable {}
@@ -49,5 +49,5 @@ func nonTrivialNested() {
   var f3 : (_ : () -> FormattedPrintable) -> Printable = fp_gen_to_p
 
   f1 = f2 // okay
-  f1 = f3 // expected-error{{'Printable' does not conform to protocol 'FormattedPrintable'}}
+  f1 = f3 // expected-error{{annot assign a value of type '(() -> FormattedPrintable) -> Printable' to a value of type '(() -> Printable) -> Printable'}}
 }

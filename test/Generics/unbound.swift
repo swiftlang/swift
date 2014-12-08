@@ -67,7 +67,7 @@ extension GS {
   }
 
   func h() {
-    var gs : GS<Int> = GS() // expected-error{{'T' is not identical to 'Int'}}
+    var gs : GS<Int> = GS() // expected-error{{cannot invoke initializer for type 'GS<T>' with no arguments}}
   }
 }
 

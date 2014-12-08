@@ -733,6 +733,10 @@ public:
   bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
                                   Type convertType = Type());
 
+  /// \brief "Nullify" an expression tree's type data, to make it suitable for
+  /// re-typecheck operations.
+  void eraseTypeData(Expr *&expr);
+
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
   ///
@@ -1212,6 +1216,24 @@ public:
 
   bool hasEnabledForbiddenTypecheckPrefix() const {
     return !Context.LangOpts.DebugForbidTypecheckPrefix.empty();
+  }
+};
+
+/// \brief RAII object that cleans up the given expression if not explicitly
+/// disabled.
+class CleanupIllFormedExpressionRAII {
+  constraints::ConstraintSystem &cs;
+  Expr **expr;
+  
+public:
+  CleanupIllFormedExpressionRAII(constraints::ConstraintSystem &cs, Expr *&expr)
+  : cs(cs), expr(&expr) { }
+  
+  ~CleanupIllFormedExpressionRAII();
+  
+  /// \brief Disable the cleanup of this expression; it doesn't need it.
+  void disable() {
+    expr = nullptr;
   }
 };
 

@@ -7,7 +7,7 @@ func modify(inout x: Int) {}
 
 if let x = foo() {
   use(x)
-  modify(&x) // expected-error{{not convertible to '@lvalue}}
+  modify(&x) // expected-error{{cannot assign to immutable value of type 'Int'}}
 }
 
 use(x) // expected-error{{unresolved identifier 'x'}}

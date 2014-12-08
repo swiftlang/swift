@@ -11,7 +11,7 @@ func test0(fridge: CCRefrigeratorRef) {
 
 func test1(power: Unmanaged<CCPowerSupplyRef>) {
   assertUnmanaged(power)
-  let fridge = CCRefrigeratorCreate(power) // expected-error {{'Unmanaged<CCPowerSupplyRef>' is not convertible to 'CCPowerSupply'}}
+  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot invoke 'CCRefrigeratorCreate' with an argument list of type 'Unmanaged<CCPowerSupplyRef>'}} expected-note{{expected an argument list of type 'CCPowerSupply!'}}
   assertUnmanaged(fridge)
 }
 
@@ -58,8 +58,8 @@ func test9() {
   let constFridge: CCRefrigerator = fridge
   CCRefrigeratorOpen(fridge)
   let item = CCRefrigeratorGet(fridge, 0).takeUnretainedValue()
-  CCRefrigeratorInsert(item, fridge) // expected-error {{'CCItem' is not convertible to 'CCMutableRefrigerator'}}
-  CCRefrigeratorInsert(constFridge, item) // expected-error {{'CCRefrigerator' is not convertible to 'CCMutableRefrigerator'}}
+  CCRefrigeratorInsert(item, fridge) // expected-error {{cannot invoke 'CCRefrigeratorInsert' with an argument list of type 'CCItem, CCMutableRefrigerator'}} expected-note {{expected an argument list of type 'CCMutableRefrigerator!, CCItem!'}}
+  CCRefrigeratorInsert(constFridge, item) // expected-error {{cannot invoke 'CCRefrigeratorInsert' with an argument list of type 'CCRefrigerator, CCItem'}} expected-note {{expected an argument list of type 'CCMutableRefrigerator!, CCItem!'}}
   CCRefrigeratorInsert(fridge, item)
   CCRefrigeratorClose(fridge)
 }

@@ -27,15 +27,15 @@ let r0: Range = 10..<100
 let r1: Range = UInt(10)..<100
 let r2: Range = 10...100
 let r3: Range = UInt(10)...100
-r0[0]       // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
-r1[UInt(0)] // expected-error {{could not find an overload for 'init' that accepts the supplied arguments}}
-r1[0]       // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
-r2[0]       // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
-r3[0]       // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
-r0[0..<4]   // expected-error {{'HalfOpenInterval<T>' is not convertible to 'Int'}}
-r1[0..<4]   // expected-error {{'HalfOpenInterval<T>' is not convertible to 'UInt'}}
-r2[0..<4]   // expected-error {{'HalfOpenInterval<T>' is not convertible to 'Int'}}
-r3[0..<4]   // expected-error {{'HalfOpenInterval<T>' is not convertible to 'UInt'}}
+r0[0]       // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Int'}}
+r1[UInt(0)] // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'UInt'}}
+r1[0]       // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Int'}}
+r2[0]       // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Int'}}
+r3[0]       // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Int'}}
+r0[0..<4]   // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
+r1[0..<4]   // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
+r2[0..<4]   // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
+r3[0..<4]   // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
 (10..<100)[0]           // expected-error {{HalfOpenInterval<T>' does not have a member named 'subscript'}}
-(UInt(10)...100)[0..<4] // expected-error {{ClosedInterval<T>' does not have a member named 'subscript'}}
+(UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type '(Range<UInt>)' with an index of type 'Range<Int>'}}
 

@@ -24,11 +24,11 @@ dictCC = dictDC
 dictCC = dictDD
 
 dictCD = dictDD
-dictCD = dictCC // expected-error{{'C' is not identical to 'D'}}
+dictCD = dictCC // expected-error{{cannot assign a value of type 'Dictionary<C, C>' to a value of type 'Dictionary<C, D>'}}
 
 
 dictDC = dictDD
-dictDC = dictCD // expected-error{{'C' is not identical to 'D'}}
+dictDC = dictCD // expected-error{{cannot assign a value of type 'Dictionary<C, D>' to a value of type 'Dictionary<D, C>'}}
 
-dictDD = dictCC // expected-error{{'C' is not identical to 'D'}}
+dictDD = dictCC // expected-error{{cannot assign a value of type 'Dictionary<C, C>' to a value of type 'Dictionary<D, D>'}}
 

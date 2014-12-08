@@ -40,7 +40,7 @@ i = j
 _ = (i, f)
 slice[7] = i
 
-slice[7] = f // expected-error{{'Y' is not convertible to 'X'}}
+slice[7] = f // expected-error{{cannot assign a value of type 'Y' to a value of type 'X'}}
 
 slice[7] = _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 

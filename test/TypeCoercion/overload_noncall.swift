@@ -16,7 +16,7 @@ func f2(g: (x: X) -> X) -> ((y: Y) -> Y) { }
 func test_conv() {
   var a1 : (x1 : X, x2 : X) -> X = f0;
   var a2 : (X, X) -> X = f0;
-  var a5 : (Y, X) -> X = f0; // expected-error{{Y' is not a subtype of 'X'}}
+  var a5 : (Y, X) -> X = f0; // expected-error{{could not find an overload for 'f0' that accepts the supplied arguments}}
   var a6 : (X) -> X = f1;
   var a7 : (X) -> (X) = f1;
   var a8 : (x2 : X) -> (X) = f1;
@@ -40,7 +40,7 @@ var xy : Y // expected-error {{invalid redeclaration of 'xy'}}
 func accept_X(inout x: X) { }
 func accept_XY(inout x: X) -> X { }
 func accept_XY(inout y: Y) -> Y { }
-func accept_Z(inout z: Z) -> Z { } // expected-note{{in initialization of parameter 'z'}}
+func accept_Z(inout z: Z) -> Z { }
 
 func test_inout() {
   var x : X;
@@ -52,8 +52,8 @@ func test_inout() {
   x = accept_XY(&xy);
 
   x = xy;
-  x = &xy; // expected-error{{'inout X' is not convertible to 'X'}}
-  accept_Z(&xy); // expected-error{{'X' is not identical to 'Z'}}
+  x = &xy; // expected-error{{cannot assign a value of type 'inout X' to a value of type 'X'}}
+  accept_Z(&xy); // expected-error{{cannot invoke 'accept_Z' with an argument list of type 'inout X'}} expected-note{{expected an argument list of type 'inout Z'}}
 }
 
 func lvalue_or_rvalue(inout x: X) -> X { }

@@ -35,7 +35,7 @@ func basictest() {
 
   var x4 : Bool = true
   var x5 : Bool =
-        4 // expected-error {{type 'Bool' does not conform to protocol 'IntegerLiteralConvertible'}}
+        4 // expected-error {{'Int' is not convertible to 'Bool'}}
 
   //var x6 : Float = 4+5
 
@@ -46,8 +46,8 @@ func basictest() {
   x8 = x8 + 1
   x8 + 1
   0 + x8
-  1.0 + x8 // expected-error{{cannot invoke '+' with an argument list of type '(FloatLiteralConvertible, @lvalue Int8)'}}
-  var x9 : Int16 = x8 + 1 // expected-error{{cannot invoke '+' with an argument list of type '(@lvalue Int8, IntegerLiteralConvertible)'}}
+  1.0 + x8 // expected-error{{binary operator '+' cannot be applied to an Double operand and a Int8 operand}} expected-note{{Overloads for '+' exist with these partially matching parameter lists:}}
+  var x9 : Int16 = x8 + 1 // expected-error{{binary operator '+' cannot be applied to an Int8 operand and a Int operand}} expected-note{{Overloads for '+' exist with these partially matching parameter lists:}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -62,7 +62,7 @@ func basictest() {
 
   // Brace expressions.
   // FIXME: Defaulting to () -> () for function expressions?
-  var brace3 = { // expected-error{{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
+  var brace3 = { // expected-error{{unable to infer closure type in the current context}}
     var brace2 = 42  // variable shadowing.
     brace2+7
   }
@@ -111,9 +111,7 @@ func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  // FIXME: below error should be {{'((), Int)' is not a subtype of 'Int'}} <rdar://problem/18742728>
-  // expected-error@+1 {{cannot invoke '+' with an argument of type '(($T2) -> ($T2) -> $T1) -> (($T2) -> $T1) -> $T1'}}
-  testfunc2({ $0 + 1 })
+  testfunc2({ $0 + 1 }) // expected-error{{cannot invoke 'testfunc2' with an argument list of type '(_) -> _'}} expected-note{{expected an argument list of type '((), Int) -> Int'}}
 
   enum union1 {
     case bar
@@ -248,7 +246,7 @@ func test_floating_point() {
 
 func test_nonassoc(x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{cannot invoke '==' with an argument list of type '($T4, Int)'}}
+  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{binary operator '==' cannot be applied to an Bool operand and a Int operand}} expected-note{{Overloads for '==' exist with these partially matching parameter lists:}}
 }
 
 // More realistic examples.
@@ -267,7 +265,7 @@ func fib(n: Int) -> Int {
 
 // FIXME: Should warn about integer constants being too large <rdar://problem/14070127>
 var
-   il_a: Bool = 4  // expected-error {{type 'Bool' does not conform to protocol 'IntegerLiteralConvertible'}}
+   il_a: Bool = 4  // expected-error {{'Int' is not convertible to 'Bool'}}
 var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
@@ -432,20 +430,20 @@ s.extend(["x"])
 // InOut arguments
 //===----------------------------------------------------------------------===//
 
-func takesInt(x: Int) {} // expected-note{{in initialization of parameter 'x'}}
+func takesInt(x: Int) {}
 func takesExplicitInt(inout x: Int) { }
 
 func testInOut(inout arg: Int) {
   var x: Int
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   takesExplicitInt(&x)
-  takesInt(&x) // expected-error{{'inout Int' is not convertible to 'Int'}}
+  takesInt(&x) // expected-error{{cannot invoke 'takesInt' with an argument list of type 'inout Int'}} expected-note{{expected an argument list of type 'Int'}}
   var y = &x // expected-error{{reference to 'Int' not used to initialize a inout parameter}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
   var z = &arg // expected-error{{reference to 'Int' not used to initialize a inout parameter}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
 
-  takesExplicitInt(5) // expected-error {{type 'inout Int' does not conform to protocol 'IntegerLiteralConvertible'}}
+  takesExplicitInt(5) // expected-error {{cannot invoke 'takesExplicitInt' with an argument list of type 'Int'}} expected-note{{expected an argument list of type 'inout Int'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -491,7 +489,7 @@ func conversionTest(inout a: Double, inout b: Int) {
 
   var pi_f1 = Float(pi_f)
   var pi_d1 = Double(pi_d)
-  var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot convert the expression's type 'SpecialPi' to type 'SpecialPi'}}
+  var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot invoke initializer for type 'SpecialPi' with an argument list of type 'SpecialPi'}}
 
   var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi'}}
   var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi'}}
@@ -503,7 +501,7 @@ func conversionTest(inout a: Double, inout b: Int) {
 
   var e = Empty(f)
   // FIXME: Need note pointing back to the initializer.
-  var e2 = Empty(d) // expected-error{{'Double' is not convertible to 'Float'}}
+  var e2 = Empty(d) // expected-error{{cannot invoke initializer for type 'Empty' with an argument list of type 'Double'}}
   var e3 = Empty(Float(d))
 }
 
@@ -513,7 +511,7 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{missing argument for parameter 'dependencies' in call}}
+ruleVar = Rule("a") // expected-error{{cannot assign to immutable value of type 'Rule'}} expected-error {{cannot invoke initializer for type 'Rule' with an argument list of type 'String'}}
 
 
 class C {
@@ -521,7 +519,7 @@ class C {
   init(other: C?) { x = other }
 }
 
-var c = C(3) // expected-error {{cannot convert the expression's type 'Double' to type 'IntegerLiteralConvertible'}}
+var c = C(3) // expected-error {{cannot invoke initializer for type 'C' with an argument list of type 'Int'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
@@ -533,7 +531,7 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
   --i8
 
   // FIXME: Weird diagnostic.
-  ++Int64(5) // expected-error{{could not find an overload for '++' that accepts the supplied arguments}}
+  ++Int64(5) // expected-error{{unary operator '++' cannot be applied to an operand of type 'Int64'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -591,7 +589,7 @@ func test() {
   var x = Foo()
 
   // rdar://15708430
-  (&x).method()  // expected-error {{'inout Foo' is not identical to 'Foo'}}
+  (&x).method()  // expected-error {{cannot invoke 'method' with no arguments}}
 }
 
 // Unused l-value
@@ -604,13 +602,13 @@ _ // expected-error{{'_' can only appear in a pattern or on the left side of an 
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{cannot convert the expression's type 'Array' to type 'ArrayLiteralConvertible'}}
+  var c = []  // expected-error {{type of expression is ambiguous without more context}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{cannot convert the expression's type 'Dictionary' to type 'DictionaryLiteralConvertible'}}
+  var c = [:]  // expected-error {{type of expression is ambiguous without more context}}
 }
 
 func invalidDictionaryLiteral() {
@@ -625,8 +623,8 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: #] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
 }
 
-[1].join([4]) // expected-error {{'Array<$T2>' does not conform to protocol 'IntegerLiteralConvertible'}}
-[1].join([[[4]]]) // expected-error {{type 'Array<$T6>' does not conform to protocol 'IntegerLiteralConvertible'}}
+[1].join([4]) // expected-error {{cannot invoke 'join' with an argument list of type '[Int]'}}
+[1].join([[[4]]]) // expected-error {{cannot invoke 'join' with an argument list of type '[Array<Array<Int>>]'}}
 
 //===----------------------------------------------------------------------===//
 // nil/.None comparisons
@@ -645,4 +643,3 @@ func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
 
   var y: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 }
-

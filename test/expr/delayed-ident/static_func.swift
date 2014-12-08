@@ -14,7 +14,7 @@ var x1: X1 = .create(5)
 x1 = .createGeneric(3.14159)
 
 // Non-matching data members
-x1 = .notAFactory(5) // expected-error{{'Int' is not convertible to 'X1'}}
+x1 = .notAFactory(5) // expected-error{{could not find member 'notAFactory'}}
 
 // Static methods returning unchecked-optional types
 x1 = .createMaybe(5)

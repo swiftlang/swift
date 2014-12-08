@@ -2,8 +2,8 @@
 
 var t = true
 var f = false
-println(t != nil) // expected-error{{could not find an overload for 'println' that accepts the supplied arguments}}
-println(f != nil) // expected-error{{could not find an overload for 'println' that accepts the supplied arguments}}
+println(t != nil) // expected-error{{binary operator '!=' cannot be applied to an Bool operand and a nil operand}}
+println(f != nil) // expected-error{{binary operator '!=' cannot be applied to an Bool operand and a nil operand}}
 
 class C : Equatable {}
 
@@ -12,7 +12,7 @@ func == (lhs: C, rhs: C) -> Bool {
 }
 
 func test(c: C) {
-  if c == nil {} // expected-error{{type 'C' does not conform to protocol 'NilLiteralConvertible'}}
+  if c == nil {} // expected-error{{binary operator '==' cannot be applied to an C operand and a nil operand}} expected-note{{Overloads for '==' exist with these partially matching parameter lists:}}
 }
 
 class D {}
@@ -21,6 +21,6 @@ var d = D()
 var dopt: D? = nil
 var diuopt: D! = nil
 
-d == nil // expected-error{{cannot invoke '==' with an argument list of type '(@lvalue D, NilLiteralConvertible)'}}
+d == nil // expected-error{{binary operator '==' cannot be applied to an D operand and a nil operand}}
 dopt == nil
 diuopt == nil

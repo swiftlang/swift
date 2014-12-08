@@ -792,7 +792,7 @@ namespace {
         // variable's type because it can easily escape the constraint
         // system and become a dangling type reference.
         if (forFunctionParam)
-          var->setType(ty);
+          var->overwriteType(ty);
         return ty;
       }
 

@@ -2578,10 +2578,13 @@ public:
   void visitTypeVariableType(TypeVariableType *T) {
     auto Base = T->getBaseBeingSubstituted();
     
-    if (T->getASTContext().LangOpts.DebugConstraintSolver ||
-        (T->isEqual(Base)) ||
-        T->isPrinting) {
+    if (T->getASTContext().LangOpts.DebugConstraintSolver) {
       Printer << "$T" << T->getID();
+      return;
+    }
+    
+    if (T->isEqual(Base) || T->isPrinting) {
+      Printer << "_";
       return;
     }
     

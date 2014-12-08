@@ -15,7 +15,7 @@ var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // FIXME: expected-error{{different number of elements}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int =
-   { // expected-error{{'Double' is not a subtype of 'Int'}}
+   { // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
        $0 + 1.0 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
@@ -25,14 +25,14 @@ var closure7 : Int =
 
 func funcdecl1(a: Int, y: Int) {}
 func funcdecl3() -> Int {}
-func funcdecl4(a: ((Int)->Int), b: Int) {} // expected-note{{in initialization of parameter 'a'}}
+func funcdecl4(a: ((Int)->Int), b: Int) {}
 
 func funcdecl5(a: Int, y: Int) {
   // Pass in a closure containing the call to funcdecl3.
-  funcdecl4({ funcdecl3() }, 12) // FIXME: expected-error{{'Int' is not a subtype of '()'}}
+  funcdecl4({ funcdecl3() }, 12) // expected-error{{cannot invoke 'funcdecl4' with an argument list of type '() -> _, Int'}} expected-note{{expected an argument list of type '((Int) -> Int), Int'}}
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
   func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
-  func6(fn: {($0) + $0})    // expected-error{{'UInt8' is not a subtype of 'Int'}}
+  func6(fn: {($0) + $0})    // expected-error{{cannot invoke 'func6' with an argument list of type '(_) -> _'}} expected-note{{expected an argument list of type '(Int, Int) -> Int'}}
 
 
   var testfunc : ((), Int) -> Int
@@ -60,16 +60,16 @@ func funcdecl5(a: Int, y: Int) {
   
   // Infer incompatible type.
   // FIXME: Need to relate diagnostic to return type
-  func6(fn: {a,b->Float in 4.0 })    // expected-error {{'Float' is not a subtype of 'Int'}}
+  func6(fn: {a,b->Float in 4.0 })    // expected-error {{cannot invoke 'func6' with an argument list of type '(_, _) -> Float'}} expected-note{{expected an argument list of type '(Int, Int) -> Int'}}
 
   // Pattern doesn't need to name arguments.
   func6(fn: { _,_ in 4 })
   
-  var fn = {} // FIXME: maybe? expected-error{{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
+  var fn = {} // FIXME: maybe? expected-error{{unable to infer closure type in the current context}}
   var fn2 = { 4 }
   
   
-  var c : Int = { a,b-> Int in a+b} // expected-error{{'(($T0, ($T0, $T1) -> Int) -> Int, (($T0, $T1) -> Int, $T1) -> Int) -> Int' is not convertible to 'Int'}}
+  var c : Int = { a,b-> Int in a+b} // expected-error{{'(_, _) -> Int' is not convertible to 'Int'}}
   
   
 }
@@ -106,7 +106,7 @@ assert(f0(1) == 1)
 
 
 var selfRef = { selfRef() } // expected-error {{variable used within its own initial value}}
-var nestedSelfRef = { // expected-error {{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
+var nestedSelfRef = { // expected-error {{unable to infer closure type in the current context}}
   var recursive = { nestedSelfRef() } // expected-error {{variable used within its own initial value}}
   recursive()
 }
@@ -223,5 +223,5 @@ var closureWithObservedProperty: () -> () = {
 
 ;
 
-{}() // expected-error{{statement cannot begin with a closure}} expected-note{{explicitly discard the result of the closure}}{{1-1=_ = }} expected-error{{type of expression is ambiguous without more context}}
+{}() // expected-error{{statement cannot begin with a closure expression}} expected-note{{explicitly discard the result of the closure by assigning to '_'}} expected-error{{unable to infer closure type in the current context}}
 

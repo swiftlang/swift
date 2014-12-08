@@ -7,9 +7,9 @@ import ObjectiveC
 protocol NonObjCProto {}
 typealias TwoObjCProtos = protocol<ObjCProto, ObjCProto2>
 
-func takesProtocol(x: Protocol) {} // expected-note{{}} expected-note{{}}
+func takesProtocol(x: Protocol) {}
 
 takesProtocol(ObjCProto.self)
 takesProtocol(ObjCProto2.self)
-takesProtocol(NonObjCProto.self) // expected-error{{'NonObjCProto.Protocol' is not convertible to 'Protocol'}}
-takesProtocol(TwoObjCProtos.self) // expected-error{{'TwoObjCProtos.Protocol' is not convertible to 'Protocol'}}
+takesProtocol(NonObjCProto.self) // expected-error{{cannot invoke 'takesProtocol' with an argument list of type 'NonObjCProto.Protocol'}} expected-note{{expected an argument list of type 'Protocol'}}
+takesProtocol(TwoObjCProtos.self) // expected-error{{cannot invoke 'takesProtocol' with an argument list of type 'TwoObjCProtos.Protocol'}} expected-note {{expected an argument list of type 'Protocol'}}

@@ -17,13 +17,13 @@ extension Double : P {
 }
 
 func f0(x: Int, 
-       y: Float) { } // expected-note{{in initialization of parameter 'y'}}
+       y: Float) { }
 
-func f1(_: (Int, Float) -> Int) { } // expected-note 2{{in call to function 'f1'}}
+func f1(_: (Int, Float) -> Int) { }
 
 func f2(_: (_: (Int) -> Int)) -> Int {}
 
-func f3(_: (_: (Int) -> Float) -> Int) {} // expected-note{{in call to function 'f3'}}
+func f3(_: (_: (Int) -> Float) -> Int) {}
 
 func f4(x: Int) -> Int { }
 
@@ -37,8 +37,8 @@ var d : Double
 // Check the various forms of diagnostics the type checker can emit.
 
 // Tuple size mismatch.
-f1( 
-   f4 // expected-error{{'(Int, Float)' is not a subtype of 'Int'}}
+f1(  // expected-error {{cannot invoke 'f1' with an argument list of type '(Int) -> Int'}}
+   f4 // expected-note {{expected an argument list of type '(Int, Float) -> Int'}}
    ) 
 
 // Tuple element unused.
@@ -51,17 +51,17 @@ f0(i, i, // expected-error{{extra argument in call}}
 // f5(f4)
 
 // Tuple element not convertible.
-f0(i,
-   d // expected-error{{'Double' is not convertible to 'Float'}}
+f0(i, // expected-error {{cannot invoke 'f0' with an argument list of type 'Int, Double'}} expected-note{{expected an argument list of type 'Int, Float'}}
+   d
    )
 
 // Function result not a subtype.
-f1(
-   f0 // expected-error{{'()' is not a subtype of 'Int'}}
+f1( // expected-error {{cannot invoke 'f1' with an argument list of type '(Int, Float) -> ()'}}
+   f0 // expected-note{{expected an argument list of type '(Int, Float) -> Int'}}
    )
 
-f3( 
-   f2 // expected-error{{'Float' is not a subtype of 'Int'}}
+f3( // expected-error {{cannot invoke 'f3' with an argument list of type '(((Int) -> Int)) -> Int'}}
+   f2 // expected-note{{expected an argument list of type '((Int) -> Float) -> Int'}}
    )
 
 // FIXME: Can't test same-type diagnostic yet.
@@ -80,13 +80,13 @@ infix operator **** {
   precedence 200
 }
 
-func ****(_: Int, _: String) { } // expected-note{{in initialization of parameter '_'}}
-i **** i // expected-error{{'Int' is not convertible to 'String'}}
+func ****(_: Int, _: String) { }
+i **** i // expected-error{{binary operator '****' cannot be applied to two Int operands}}
 
 infix operator ***~ {
   associativity left
   precedence 200
 }
 
-func ***~(Int, String) { } // expected-note{{in initialization of parameter '_'}}
-i ***~ i // expected-error{{'Int' is not convertible to 'String'}}
+func ***~(Int, String) { }
+i ***~ i // expected-error{{binary operator '***~' cannot be applied to two Int operands}}

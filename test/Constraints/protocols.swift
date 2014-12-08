@@ -13,10 +13,10 @@ extension Float32 : Barable {
 }
 
 func f0(_: Barable) {}
-func f1(x: protocol<Fooable, Barable>) {} // expected-note 2{{in initialization of parameter 'x'}}
+func f1(x: protocol<Fooable, Barable>) {}
 func f2(_: Float) {}
 
-func g(_: (protocol<Barable, Fooable>) -> ()) {} // expected-note{{in call to function 'g'}}
+func g(_: (protocol<Barable, Fooable>) -> ()) {}
 
 var i : Int
 var f : Float
@@ -31,8 +31,8 @@ f0(f)
 f0(b)
 f1(i)
 
-f1(f) // expected-error{{type 'Float' does not conform to protocol 'Fooable'}}
-f1(b) // expected-error{{type 'Barable' does not conform to protocol 'Fooable'}}
+f1(f) // expected-error{{cannot invoke 'f1' with an argument list of type 'Float'}} expected-note{{expected an argument list of type 'protocol<Barable, Fooable>'}}
+f1(b) // expected-error{{cannot invoke 'f1' with an argument list of type 'Barable'}} expected-note{{expected an argument list of type 'protocol<Barable, Fooable>'}}
 
 //===--------------------------------------------------------------------===//
 // Subtyping
@@ -40,7 +40,7 @@ f1(b) // expected-error{{type 'Barable' does not conform to protocol 'Fooable'}}
 g(f0)
 g(f1)
 
-g(f2) // expected-error{{'protocol<Barable, Fooable>' is not a subtype of 'Float'}}
+g(f2) // expected-error{{cannot invoke 'g' with an argument list of type '(Float) -> ()'}} expected-note{{expected an argument list of type '(protocol<Barable, Fooable>) -> ()'}}
 
 //===--------------------------------------------------------------------===//
 // Dynamic self

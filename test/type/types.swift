@@ -26,7 +26,7 @@ var d4 : @autoclosure () -> Int =
    d2 // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
 
 var e0 : [Int]
-e0[] // expected-error {{missing argument for parameter #1 in call}}
+e0[] // expected-error {{cannot subscript a value of type '[Int]' with an index of type '()'}}
 
 var f0 : [Float]
 var f1 : [(Int,Int)]

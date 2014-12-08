@@ -77,7 +77,7 @@ func arrayToNSArray() {
   nsa = [BridgedClass]()
   nsa = [OtherClass]()
   nsa = [BridgedStruct]()
-  nsa = [NotBridgedStruct]() // expected-error{{missing argument for parameter #1 in call}}
+  nsa = [NotBridgedStruct]() // expected-error{{cannot assign a value of type '[(NotBridgedStruct)]' to a value of type 'NSArray'}}
 }
 
 // NSArray -> Array
@@ -102,26 +102,26 @@ func dictionaryToNSDictionary() {
   nsd = [NSObject : BridgedClass]()
   nsd = [NSObject : OtherClass]()
   nsd = [NSObject : BridgedStruct]()
-  nsd = [NSObject : NotBridgedStruct]() // expected-error{{'[NSObject : NotBridgedStruct]' is not convertible to 'NSDictionary'}}
+  nsd = [NSObject : NotBridgedStruct]() // expected-error{{cannot assign a value of type '[NSObject : NotBridgedStruct]' to a value of type 'NSDictionary'}}
 
-  nsd = [NSObject : BridgedClass?]() // expected-error{{'[NSObject : BridgedClass?]' is not convertible to 'NSDictionary'}}
-  nsd = [NSObject : BridgedStruct?]()  // expected-error{{'[NSObject : BridgedStruct?]' is not convertible to 'NSDictionary'}}
+  nsd = [NSObject : BridgedClass?]() // expected-error{{cannot assign a value of type '[NSObject : BridgedClass?]' to a value of type 'NSDictionary'}}
+  nsd = [NSObject : BridgedStruct?]()  // expected-error{{cannot assign a value of type '[NSObject : BridgedStruct?]' to a value of type 'NSDictionary'}}
 
   nsd = [BridgedClass : AnyObject]()
   nsd = [OtherClass : AnyObject]()
   nsd = [BridgedStruct : AnyObject]()
-  nsd = [NotBridgedStruct : AnyObject]()  // expected-error{{'[NotBridgedStruct : AnyObject]' is not convertible to 'NSDictionary'}}
+  nsd = [NotBridgedStruct : AnyObject]()  // expected-error{{cannot assign a value of type '[NotBridgedStruct : AnyObject]' to a value of type 'NSDictionary'}}
 
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?
-  nsd = [BridgedStruct() : bcOpt] // expected-error{{cannot convert the expression's type '()' to type 'BridgedStruct'}}
+  nsd = [BridgedStruct() : bcOpt] // expected-error{{cannot assign a value of type '[BridgedStruct : BridgedClass?]' to a value of type 'NSDictionary'}}
 }
 
 // In this case, we should not implicitly convert Dictionary to NSDictionary.
 struct NotEquatable {}
 func notEquatableError(d: Dictionary<Int, NotEquatable>) -> Bool {
   // FIXME: Another awful diagnostic.
-  return d == d // expected-error{{cannot invoke '==' with an argument list of type '(Dictionary<Int, NotEquatable>, Dictionary<Int, NotEquatable>)'}}
+  return d == d // expected-error{{binary operator '==' cannot be applied to two Dictionary<Int, NotEquatable> operands}}
 }
 
 // NSString -> String
@@ -139,7 +139,7 @@ let d2: Double = 3.14159
 inferDouble2 = d2
 
 // rdar://problem/18269449
-var i1: Int = 1.5 * 3.5 // expected-error{{cannot invoke '*' with an argument list of type '(FloatLiteralConvertible, FloatLiteralConvertible)'}}
+var i1: Int = 1.5 * 3.5 // expected-error{{binary operator '*' cannot be applied to two Double operands}} expected-note{{Overloads for '*' exist with these partially matching parameter lists:}}
 
 // rdar://problem/18330319
 func rdar18330319(s: String, d: [String : AnyObject]) {

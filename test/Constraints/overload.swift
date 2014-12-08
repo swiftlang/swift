@@ -22,7 +22,7 @@ f0(1)
 f1(f0(1))
 f1(identity(1))
 
-f0(x) // expected-error{{cannot invoke 'f0' with an argument of type '@lvalue X'}}
+f0(x) // expected-error{{cannot find an overload for 'f0' that accepts an argument list of type 'X'}}
 
 f + 1
 f2(i)
@@ -79,8 +79,8 @@ struct X2d {
 // FIXME: Suppress the diagnostic for the call below, because the invalid
 // declaration would have matched.
 func f3(x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
-func f3(x: Float) -> Float { } // expected-note{{in initialization of parameter 'x'}}
-f3(i) // expected-error{{'Int' is not convertible to 'Float'}}
+func f3(x: Float) -> Float { }
+f3(i) // expected-error{{cannot find an overload for 'f3' that accepts an argument list of type 'Int'}}
 
 func f4(i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
 func f4(j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}

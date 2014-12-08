@@ -20,8 +20,8 @@ class D2 : B {
 }
 
 func useB(x: B) {}
-func useD1(x: D1) {} // expected-note 4{{in initialization of parameter 'x'}}
-func useD2(x: D2) {} // expected-note {{in initialization of parameter 'x'}}
+func useD1(x: D1) {}
+func useD2(x: D2) {}
 
 var a = true ? 1 : 0 // should infer Int
 var b : Double = true ? 1 : 0 // should infer Double
@@ -42,16 +42,16 @@ var h = true ? D1() : D1() // should infer D1
 var i = true ? D1() : D2() // should infer B
 
 useB(e)
-useD1(e) // expected-error{{}}
+useD1(e) // expected-error{{}} expected-note{{}}
 useB(f)
-useD1(f) // expected-error{{}}
+useD1(f) // expected-error{{}} expected-note{{}}
 useB(g)
-useD1(g) // expected-error{{}}
+useD1(g) // expected-error{{}} expected-note{{}}
 useB(h)
 useD1(h)
 useB(i)
-useD1(i) // expected-error{{}}
-useD2(i) // expected-error{{}}
+useD1(i) // expected-error{{}} expected-note{{}}
+useD2(i) // expected-error{{}} expected-note{{}}
 
 var x = MyLogicValue() ? 1 : 0
 var y = 22 ? 1 : 0 // expected-error{{}}

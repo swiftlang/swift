@@ -65,7 +65,7 @@ struct Y1 {
       return x // expected-error{{'X' is not convertible to 'Int'}}
     }
     set {
-      x = newValue // expected-error{{'Int' is not convertible to 'X'}}
+      x = newValue // expected-error{{cannot assign a value of type 'Int' to a value of type 'X'}}
     }
   }
 }
@@ -179,10 +179,10 @@ func test_subscript(inout x2: X2, i: Int, j: Int, inout value: Int, no: NoSubscr
   value = ovl[(i, j)]
   ovl[(i, j)] = value
 
-  value = ovl[(i, j, i)] // expected-error{{'(Int, Int, Int)' is not convertible to 'Int'}}
+  value = ovl[(i, j, i)] // expected-error{{cannot subscript a value of type 'OverloadedSubscript' with an index of type '(Int, Int, Int)'}}
 
   // FIXME: <rdar://problem/11510876> Implement overload resolution
-  ret[i] // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}
+  ret[i] // expected-error{{cannot subscript a value of type 'RetOverloadedSubscript' with an index of type 'Int'}}
 
   value = ret[i]
   ret[i] = value

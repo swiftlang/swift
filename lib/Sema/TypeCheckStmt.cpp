@@ -305,9 +305,11 @@ public:
                                        RS->isImplicit());
     }
 
-    if (TC.typeCheckExpression(E, DC, ResultTy, Type(), /*discardedExpr=*/false))
-      return 0;
+    auto failed = TC.typeCheckExpression(E, DC, ResultTy, Type(), false);
     RS->setResult(E);
+    
+    if (failed)
+      return 0;
 
     return RS;
   }

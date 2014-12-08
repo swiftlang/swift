@@ -224,7 +224,7 @@ class ThisDerived1 : ThisBase1 {
     self.baseProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseProp'}}
     self.baseFunc0() // expected-error {{missing argument}}
     self.baseFunc0(ThisBase1())()
-    self.baseFunc1(42) // expected-error {{type 'ThisBase1' does not conform to protocol 'IntegerLiteralConvertible'}}
+    self.baseFunc1(42) // expected-error {{cannot invoke 'baseFunc1' with an argument list of type 'Int'}}
     self.baseFunc1(ThisBase1())(42)
     self[0] = 42.0 // expected-error {{'ThisDerived1.Type' does not have a member named 'subscript'}}
     self.baseStaticVar = 42
@@ -250,7 +250,7 @@ class ThisDerived1 : ThisBase1 {
     self.derivedInstanceVar = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'derivedInstanceVar'}}
     self.derivedProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'derivedProp'}}
     self.derivedFunc0() // expected-error {{missing argument}}
-    self.derivedFunc0(ThisBase1())() // expected-error {{'ThisBase1' is not convertible to 'ThisDerived1'}}
+    self.derivedFunc0(ThisBase1())() // expected-error {{unable to infer closure type in the current context}}
     self.derivedFunc0(ThisDerived1())()
     self.derivedStaticVar = 42
     self.derivedStaticProp = 42
@@ -290,7 +290,7 @@ class ThisDerived1 : ThisBase1 {
     super.baseProp = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'baseProp'}}
     super.baseFunc0() // expected-error {{missing argument}}
     super.baseFunc0(ThisBase1())()
-    super.baseFunc1(42) // expected-error {{type 'ThisBase1' does not conform to protocol 'IntegerLiteralConvertible'}}
+    super.baseFunc1(42) // expected-error {{cannot invoke 'baseFunc1' with an argument list of type 'Int'}}
     super.baseFunc1(ThisBase1())(42)
     super[0] = 42.0 // expected-error {{'ThisBase1.Type' does not have a member named 'subscript'}}
     super.baseStaticVar = 42
@@ -456,7 +456,7 @@ struct DefaultArgumentFromExtension {
   func g(x: (DefaultArgumentFromExtension) -> () -> () = f) {
     var f = 42
     var x2 = x
-    x2 = f // expected-error{{not convertible}}
+    x2 = f // expected-error{{cannot assign a value of type 'Int' to a value of type '(DefaultArgumentFromExtension) -> () -> ()'}}
   }
   var x : (DefaultArgumentFromExtension) -> () -> () = f
 }

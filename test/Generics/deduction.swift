@@ -6,8 +6,8 @@
 
 func identity<T>(value: T) -> T { return value }
 
-func identity2<T>(value: T) -> T { return value }
-func identity2<T>(value: T) -> Int { return 0 }
+func identity2<T>(value: T) -> T { return value } // expected-note {{found this candidate}}
+func identity2<T>(value: T) -> Int { return 0 } // expected-note {{found this candidate}}
 
 struct X { }
 struct Y { }
@@ -24,8 +24,8 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
   // FIXME: Is this actually the behavior we want? It's strange that these
   // two have different behavior.
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{'Y' is not convertible to 'X'}}
-  xx = identity2(yy) // expected-error{{'Y' is not convertible to 'X'}}
+  xx = identity(yy) // expected-error{{cannot assign a value of type '(Y)' to a value of type 'X'}}
+  xx = identity2(yy) // expected-error{{ambiguous use of 'identity2'}}
 }
 
 // FIXME: Crummy diagnostic!
@@ -40,11 +40,11 @@ func useTwoIdentical(xi: Int, yi: Float) {
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
   
-  twoIdentical(x, y) // expected-error{{cannot invoke function with an argument list of type '(@lvalue Int, @lvalue Float)'}}
+  twoIdentical(x, y) // expected-error{{cannot invoke 'twoIdentical' with an argument list of type 'Int, Float'}} expected-note{{expected an argument list of type 'T, T'}}
 }
 
 func mySwap<T>(inout x: T,
-               inout y: T) {   // expected-note{{in initialization of parameter 'y'}}
+               inout y: T) {
   var tmp = x
   x = y
   y = tmp
@@ -57,7 +57,7 @@ func useSwap(xi: Int, yi: Float) {
   
   mySwap(x, x) // expected-error 2{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   
-  mySwap(&x, &y) // expected-error{{'Float' is not identical to 'Int'}}
+  mySwap(&x, &y) // expected-error{{cannot invoke 'mySwap' with an argument list of type 'inout Int, inout Float'}} expected-note{{expected an argument list of type 'inout T, inout T'}}
 }
 
 func takeTuples<T, U>(_: (T, U), _: (U, T)) {
@@ -66,7 +66,7 @@ func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 func useTuples(x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{cannot convert the expression's type '((Int, Float), (Int, Float))' to type 'Float'}}
+  takeTuples((x, y), (x, y)) // expected-error{{cannot invoke 'takeTuples' with an argument list of type '(Int, Float), (Int, Float)'}} expected-note {{expected an argument list of type '(T, U), (U, T)'}}
 
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
@@ -76,7 +76,7 @@ func acceptFunction<T, U>(f: (T) -> U, t: T, u: U) {}
 
 func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
-   acceptFunction(f, y, y) // expected-error{{cannot convert the expression's type '((Int) -> Float, Float, Float)' to type 'Float'}}
+   acceptFunction(f, y, y) // expected-error{{cannot invoke 'acceptFunction' with an argument list of type '(Int) -> Float, Float, Float'}} expected-note{{expected an argument list of type '(T) -> U, T, U'}}
 }
 
 func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note{{in call to function 'returnTuple'}}
@@ -85,7 +85,7 @@ func testReturnTuple(x: Int, y: Float) {
   returnTuple(x) // expected-error{{argument for generic parameter 'U' could not be inferred}}
   var rt1 : (Int, Float) = returnTuple(x)
   var rt2 : (Float, Float) = returnTuple(y)
-  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot convert the expression's type 'U' to type 'Float'}}
+  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot invoke 'returnTuple' with an argument list of type 'Float'}} expected-note{{expected an argument list of type 'T'}}
 }
 
 
@@ -202,7 +202,7 @@ extension Int : IsBefore {
 
 func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(x, y)
-  min2(a, b) // expected-error{{type 'Float' does not conform to protocol 'IsBefore'}}
+  min2(a, b) // expected-error{{cannot invoke 'min2' with an argument list of type 'Float, Float'}} expected-note {{expected an argument list of type 'T, T'}}
 }
 
 func rangeOfIsBefore<
@@ -212,7 +212,7 @@ func rangeOfIsBefore<
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{type 'Double' does not conform to protocol 'IsBefore'}}
+  rangeOfIsBefore(da.generate()) // expected-error{{cannot invoke 'rangeOfIsBefore' with an argument list of type 'IndexingGenerator<Array<Double>>'}} expected-note{{expected an argument list of type 'R'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -222,7 +222,7 @@ protocol Addable {
   func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
-  u + u // expected-error{{cannot invoke '+' with an argument list of type '(U, U)'}}
+  u + u // expected-error{{binary operator '+' cannot be applied to two U operands}}
   return x+y
 }
 
@@ -231,7 +231,7 @@ func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
 //===----------------------------------------------------------------------===//
 struct MyVector<T> { func size() -> Int {} }
 
-func getVectorSize<T>(v: MyVector<T>) -> Int { // expected-note{{in initialization of parameter 'v'}}
+func getVectorSize<T>(v: MyVector<T>) -> Int {
   return v.size()
 }
 
@@ -243,7 +243,7 @@ func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
   // FIXME: $T1 should not show up here!
-  getVectorSize(i) // expected-error{{'Int' is not convertible to 'MyVector<T>'}}
+  getVectorSize(i) // expected-error{{cannot invoke 'getVectorSize' with an argument list of type 'Int'}} expected-note {{expected an argument list of type 'MyVector<T>'}}
 
   var x : X, y : Y
   x = ovlVector(vi)

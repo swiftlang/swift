@@ -77,28 +77,28 @@ f2(&non_settable_x) // expected-error{{}}
 // - inout (generic)
 f1(&non_settable_x) // expected-error{{}}
 // - inout assignment
-non_settable_x += x // expected-error{{}}
+non_settable_x += x // expected-error{{}} expected-note{{Overloads for '+=' exist with these partially matching parameter lists:}}
 ++non_settable_x // expected-error{{}}
 
 // non-settable property is non-settable:
 z.non_settable_x = x // expected-error{{}}
 f2(&z.non_settable_x) // expected-error{{}}
 f1(&z.non_settable_x) // expected-error{{}}
-z.non_settable_x += x // expected-error{{}}
+z.non_settable_x += x // expected-error{{}} expected-note{{Overloads for '+=' exist with these partially matching parameter lists:}}
 ++z.non_settable_x // expected-error{{}}
 
 // non-settable subscript is non-settable:
 z[0] = 0.0 // expected-error{{}}
 f2(&z[0]) // expected-error{{}}
 f1(&z[0]) // expected-error{{}}
-z[0] += 0.0 // expected-error{{}}
+z[0] += 0.0 // expected-error{{}} expected-note{{Overloads for '+=' exist with these partially matching parameter lists:}}
 ++z[0] // expected-error{{}}
 
 // settable property of an rvalue value type is non-settable:
 fz().settable_x = x // expected-error{{}}
 f2(&fz().settable_x) // expected-error{{}}
 f1(&fz().settable_x) // expected-error{{}}
-fz().settable_x += x // expected-error{{}}
+fz().settable_x += x // expected-error{{}} expected-note{{Overloads for '+=' exist with these partially matching parameter lists:}}
 ++fz().settable_x // expected-error{{}}
 
 // settable property of an rvalue reference type IS SETTABLE:
@@ -112,7 +112,7 @@ fref().property += 0.0
 z.non_settable_x.property = 1.0 // expected-error{{}}
 f2(&z.non_settable_x.property) // expected-error{{}}
 f1(&z.non_settable_x.property) // expected-error{{}}
-z.non_settable_x.property += 1.0 // expected-error{{}}
+z.non_settable_x.property += 1.0 // expected-error{{}} expected-note{{Overloads for '+=' exist with these partially matching parameter lists:}}
 ++z.non_settable_x.property // expected-error{{}}
 
 // settable property of a non-settable reference type IS SETTABLE:
@@ -153,10 +153,10 @@ func testFooStruct() {
 }
 
 // Don't load from explicit lvalues.
-func takesInt(x: Int) {} // expected-note{{in initialization of parameter 'x'}}
+func takesInt(x: Int) {}
 func testInOut(inout arg: Int) {
   var x : Int
-  takesInt(&x) // expected-error{{'inout Int' is not convertible to 'Int'}}
+  takesInt(&x) // expected-error{{cannot invoke 'takesInt' with an argument list of type 'inout Int'}} expected-note{{expected an argument list of type 'Int'}}
 }
 
 // Don't infer inout types.
@@ -169,4 +169,4 @@ var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not material
 func takeArrayRef(inout x:Array<String>) { }
 
 // FIXME: Poor diagnostic.
-takeArrayRef(["asdf", "1234"]) // expected-error{{expression does not conform to type '$T3'}}
+takeArrayRef(["asdf", "1234"]) // expected-error{{cannot invoke 'takeArrayRef' with an argument list of type '[String]'}} expected-note{{expected an argument list of type 'inout Array<String>'}}

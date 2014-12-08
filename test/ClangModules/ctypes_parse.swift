@@ -244,7 +244,7 @@ func testFunctionPointersAsOpaquePointers() {
   > = getFunctionPointer2()
 
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{'(CInt, CLong, UnsafeMutablePointer<Void>)' is not identical to 'Int32'}}
+  anotherFP = fp // expected-error {{cannot assign a value of type 'fptr' to a value of type 'CFunctionPointer<(CInt, CLong, UnsafeMutablePointer<Void>) -> Void>'}}
 }
 
 func testStructDefaultInit() {

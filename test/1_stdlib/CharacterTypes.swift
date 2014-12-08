@@ -63,6 +63,6 @@ func testOverloads() {
 }
 
 func testAddCharacters(a: Character) {
-  a + a // expected-error {{cannot invoke '+' with an argument list of type '(Character, Character)'}}
+  a + a // expected-error {{binary operator '+' cannot be applied to two Character operands}}
 }
 

@@ -5,6 +5,6 @@
 
 class c {
     func b((Any, c))(a: (Any, AnyObject)) {
-        b(a) // expected-error {{type of expression is ambiguous without more context}}
+        b(a) // expected-error {{cannot invoke 'b' with an argument list of type '(Any, AnyObject)'}}
     }
 }

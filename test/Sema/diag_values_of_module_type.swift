@@ -90,7 +90,7 @@ func badTest1() {
 }
 func badTest2() {
   var x = 0
-  x = Swift // expected-error {{expected module member name after module name}} expected-error {{'module<Swift>' is not convertible to 'Int'}}
+  x = Swift // expected-error {{expected module member name after module name}} expected-error {{cannot assign a value of type 'module<Swift>' to a value of type 'Int'}}
 }
 func badTest3() {
   var x = Swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}

@@ -38,9 +38,9 @@ func funcdecl5(a: Int, y: Int) {
   (x) = y
 
   // FIXME: Can we provide nicer diagnostics for this case?
-  1 = x        // expected-error {{cannot convert the expression's type '()' to type 'Int'}}
+  1 = x        // expected-error {{cannot assign to a Int literal value}}
   (1) = x      // expected-error {{cannot assign to the result of this expression}}
-  (x:1).x = 1 // expected-error {{cannot convert the expression's type '()' to type 'IntegerLiteralConvertible'}}
+  (x:1).x = 1 // expected-error {{cannot assign to immutable value of type 'Int'}}
   var tup : (x:Int, y:Int)
   tup.x = 1
 

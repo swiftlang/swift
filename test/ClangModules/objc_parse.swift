@@ -43,7 +43,7 @@ func instanceMethods(b: B) {
   // Both class and instance methods exist.
   b.description
   b.instanceTakesObjectClassTakesFloat(b)
-  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{type 'Double' does not conform to protocol 'AnyObject'}}
+  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{cannot invoke 'instanceTakesObjectClassTakesFloat' with an argument list of type 'Double'}}
 
   // Instance methods with keyword components
   var obj = NSObject()
@@ -68,7 +68,7 @@ func classMethods(b: B, other: NSObject) {
   // Both class and instance methods exist.
   B.description()
   B.instanceTakesObjectClassTakesFloat(2.0)
-  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{cannot invoke 'instanceTakesObjectClassTakesFloat' with an argument of type 'NSObject'}}
+  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{cannot invoke 'instanceTakesObjectClassTakesFloat' with an argument list of type 'NSObject'}}
 
   // Call an instance method of NSObject.
   var c: AnyClass = B.myClass() // no-warning
@@ -168,7 +168,7 @@ func keyedSubscripting(b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()] // expected-warning {{constant 'value' inferred to have type 'AnyObject?', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}
 
-  dict[nil] = a // expected-error {{type 'NSCopying' does not conform to protocol 'NilLiteralConvertible'}}
+  dict[nil] = a // expected-error {{cannot assign a value of type 'A' to a value of type 'AnyObject?'}}
   let _ = dict[nil]  // expected-error {{type 'NSCopying' does not conform to protocol 'NilLiteralConvertible'}}
 }
 
@@ -189,7 +189,7 @@ func testProtocols(b: B, bp: BProto) {
   var c1 : Cat1Proto = b
   var bcat1 = b.getAsProtoWithCat()
   c1 = bcat1
-  bcat1 = c1 // expected-error{{type 'Cat1Proto' does not conform to protocol 'BProto'}}
+  bcat1 = c1 // expected-error{{cannot assign a value of type 'Cat1Proto' to a value of type 'protocol<BProto, Cat1Proto>!'}}
 }
 
 // Methods only defined in a protocol

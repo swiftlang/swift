@@ -8,7 +8,7 @@ func testCFToObjC(cfStr: CFString, cfMutableStr: CFMutableString) {
   nsStr = cfMutableStr
 
   var nsMutableStr: NSMutableString = cfMutableStr
-  nsMutableStr = cfStr // expected-error{{'NSString' is not a subtype of 'NSMutableString'}}
+  nsMutableStr = cfStr // expected-error{{cannot assign a value of type 'CFString' to a value of type 'NSMutableString'}}
 
   // sanity check
   nsStr = nsMutableStr
@@ -19,7 +19,7 @@ func testObjCToCF(nsStr: NSString, nsMutableStr: NSMutableString) {
   cfStr = nsMutableStr
 
   var cfMutableStr: CFMutableString = nsMutableStr
-  cfMutableStr = cfStr // expected-error{{'CFString' is not convertible to 'CFMutableString'}}
+  cfMutableStr = cfStr // expected-error{{cannot assign a value of type 'CFString' to a value of type 'CFMutableString'}}
 
   // sanity check
   cfStr = cfMutableStr
@@ -32,7 +32,7 @@ func testCFToNative(cfStr: CFString, cfMutableStr: CFMutableString) {
 
 func testNativeToCF(str: String) {
   var cfStr: CFString = str
-  var cfMutableStr: CFMutableString = str // expected-error{{'NSString' is not a subtype of 'NSMutableString'}}
+  var cfMutableStr: CFMutableString = str // expected-error{{'String' is not convertible to 'CFMutableString'}}
 }
 
 func testCFToAnyObject(cfStr: CFString, cfMutableStr: CFMutableString,

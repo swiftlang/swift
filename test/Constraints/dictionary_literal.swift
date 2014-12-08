@@ -18,7 +18,7 @@ func useDict<K, V>(d: Dictionary<K,V>) {}
 // Concrete dictionary literals.
 useDictStringInt([ "Hello" : 1 ])
 useDictStringInt([ "Hello" : 1, "World" : 2])
-useDictStringInt([ "Hello" : 1, "World" : 2.5]) // expected-error{{}}
+useDictStringInt([ "Hello" : 1, "World" : 2.5]) // expected-error{{}} expected-note{{expected an argument list of type 'DictStringInt'}}
 useDictStringInt([ 7 : 1, "World" : 2]) // expected-error{{}}
 
 // Generic dictionary literals.

@@ -5226,7 +5226,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
     // We didn't manage to diagnose anything well, so fall back to
     // diagnosing mining the system to construct a reasonable error message.
-    this->diagnoseFailureFromConstraints(expr);
+    this->diagnoseFailureForExpr(expr);
 
     return nullptr;
   }

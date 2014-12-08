@@ -25,8 +25,8 @@ func f0<T : A>(obji: T, ai: A, bi: B) {
   a = obj
 
   // Invalid assignments
-  obj = a // expected-error{{'A' is not convertible to 'T'}}
-  obj = b // expected-error{{'B' is not convertible to 'T'}}
+  obj = a // expected-error{{cannot assign a value of type 'A' to a value of type 'T'}}
+  obj = b // expected-error{{cannot assign a value of type 'B' to a value of type 'T'}}
 
   // Downcast that is actually a coercion
   a = (obj as? A)! // expected-error{{conditional downcast from 'T' to 'A' always succeeds}}
@@ -39,7 +39,7 @@ func f0<T : A>(obji: T, ai: A, bi: B) {
 func call_f0(a: A, b: B, other: Other) {
   f0(a, a, b)
   f0(b, a, b)
-  f0(other, a, b) // expected-error{{}}
+  f0(other, a, b) // expected-error{{}} expected-note{{}}
 }
 
 // Declaration errors

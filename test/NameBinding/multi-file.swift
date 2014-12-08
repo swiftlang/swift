@@ -9,7 +9,7 @@ struct SomeStruct {
 
 func test() {
   funcOrVar()
-  var a: Int = funcOrVar // expected-error{{cannot convert the expression's type '() -> ()' to type 'Int'}}
+  var a: Int = funcOrVar // expected-error{{'() -> ()' is not convertible to 'Int'}}
 
   var s = SomeStruct(value: 42) // use the local SomeStruct
   

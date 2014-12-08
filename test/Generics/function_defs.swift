@@ -17,7 +17,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> 
     return true;
   }
 
-  return t1.isEqual(u) // expected-error{{'U' is not convertible to 'T'}}
+  return t1.isEqual(u) // expected-error{{cannot invoke 'isEqual' with an argument list of type 'U'}}
 }
 
 protocol MethodLessComparable {
@@ -36,7 +36,7 @@ func min<T : MethodLessComparable>(x: T, y: T) -> T {
 func existential<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) {
   var eqComp : EqualComparable = t1 // expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
   eqComp = u
-  if t1.isEqual(eqComp) {} // expected-error{{'EqualComparable' is not convertible to 'T'}}
+  if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type 'EqualComparable'}}
   if eqComp.isEqual(t2) {} // expected-error{{'EqualComparable' does not have a member named 'isEqual'}}
 }
 
@@ -46,10 +46,10 @@ protocol OtherEqualComparable {
 
 func otherExistential<T : EqualComparable>(t1: T) {
   var otherEqComp : OtherEqualComparable = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
-  otherEqComp = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}}
+  otherEqComp = t1 // expected-error{{cannot assign a value of type 'T' to a value of type 'OtherEqualComparable'}}
 
   var otherEqComp2 : OtherEqualComparable // expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
-  otherEqComp2 = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}}
+  otherEqComp2 = t1 // expected-error{{cannot assign a value of type 'T' to a value of type 'OtherEqualComparable'}}
 
   var everyEq : protocol<EqualComparable, OtherEqualComparable> = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
 }
@@ -103,14 +103,14 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument of type '@lvalue Ovl.A'}}
+  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type 'Ovl.A'}}
   
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
   var f3f : (Float) -> Float = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
   var f3ovl_1 : (Ovl) -> Ovl = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
   var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3 // expected-error{{partial application of generic method is not allowed}}
-  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{'Ovl' is not a subtype of 'Int'}}
+  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{could not find an overload for 'f3' that accepts the supplied arguments}}
 
   // FIXME: Should not be inout. <rdar://problem/15821762>
   var f3i_unbound : (inout Ovl) -> (Int) -> Int = Ovl.f3       // expected-error{{partial application of generic method is not allowed}}
@@ -148,12 +148,12 @@ func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
 
   value = t[index]
   // FIXME: bogus error
-  t[index] = value // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}
+  t[index] = value // expected-error{{cannot assign a value of invariant archetype type 'T.Value' to another value of the same type}}
   element = t[17]
   // FIXME: bogus error
-  t[42] = element // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}
+  t[42] = element // expected-error{{cannot assign a value of invariant archetype type 'T.ElementType' to another value of the same type}}
 
-  t[value] = 17 // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}
+  t[value] = 17 // expected-error{{cannot subscript a value of type 'T' with an index of type 'T.Value'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -168,7 +168,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
 
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
-  T.isEqual(t, y: u) // expected-error{{'U' is not convertible to 'T'}}
+  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type 'T, U'}}
 }
 
 //===----------------------------------------------------------------------===//

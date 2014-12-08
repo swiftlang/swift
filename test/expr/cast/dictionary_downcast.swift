@@ -34,9 +34,9 @@ if let dictDC = dictCC as? Dictionary<D, C> { }
 if let dictDD = dictCC as? Dictionary<D, D> { }
 
 // Test dictionary downcasts to unrelated types.
-dictCC as Dictionary<D, U> // expected-error{{'C' is not identical to 'D'}}
-dictCC as Dictionary<U, D> // expected-error{{'C' is not identical to 'U'}}
-dictCC as Dictionary<U, U> // expected-error{{'C' is not identical to 'U'}}
+dictCC as Dictionary<D, U> // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<D, U>'}}
+dictCC as Dictionary<U, D> // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<U, D>'}}
+dictCC as Dictionary<U, U> // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<U, U>'}}
 
 // Test dictionary conditional downcasts to unrelated types
 if let dictDU = dictCC as? Dictionary<D, U> { } // expected-error{{'U' is not a subtype of 'C'}}

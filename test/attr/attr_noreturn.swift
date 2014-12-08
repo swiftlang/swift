@@ -109,7 +109,7 @@ struct MethodWithNoreturn {
 func print(_: Int) {}
 var maybeReturns: (Int) -> () = exit // no-error
 var neverReturns1 = exit
-neverReturns1 = print // expected-error {{could not find an overload for 'print' that accepts the supplied arguments}}
+neverReturns1 = print // expected-error {{cannot assign a value of type '(Int) -> ()' to a value of type '@noreturn (Int) -> ()'}}
 
 var neverReturns2: @noreturn MethodWithNoreturn -> @noreturn () -> () = MethodWithNoreturn.neverReturns
 

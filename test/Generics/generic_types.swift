@@ -194,18 +194,18 @@ func useNested(ii: Int, hni: HasNested<Int>,
   typealias HNI = HasNested<Int>
   var id = hni.f(1, u: 3.14159)
   id = (2, 3.14159)
-  hni.f(1.5, 3.14159) // expected-error{{cannot invoke function with an argument list of type '(FloatLiteralConvertible, FloatLiteralConvertible)'}}
+  hni.f(1.5, 3.14159) // expected-error{{cannot invoke 'f' with an argument list of type 'Double, Double'}}
 
   // Generic constructor of a generic struct
   HNI(1, 2.71828)
   // FIXME: Should report this error: {{cannot convert the expression's type 'HNI' to type 'Int'}}
-  HNI(1.5, 2.71828) // expected-error{{cannot convert the expression's type '(FloatLiteralConvertible, FloatLiteralConvertible)' to type 'FloatLiteralConvertible'}}
+  HNI(1.5, 2.71828) // expected-error{{cannot invoke initializer for type 'HNI' with an argument list of type 'Double, Double'}}
 
   // Generic function in a nested generic struct
   var ids = xis.g(1, u: "Hello", v: 3.14159)
   ids = (2, "world", 2.71828)
 
-  xis = xfs // expected-error{{'Float' is not identical to 'Int'}}
+  xis = xfs // expected-error{{cannot assign a value of type 'HasNested<Float>.InnerGeneric<String>' to a value of type 'HasNested<Int>.InnerGeneric<String>'}}
 }
 
 var dfail : Dictionary<Int> // expected-error{{generic type 'Dictionary' specialized with too few type parameters (got 1, but expected 2)}}

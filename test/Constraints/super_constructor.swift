@@ -16,7 +16,7 @@ class D : B {
   }
 
   init(e:Int) {
-    super.init('x') // expected-error{{'()' does not conform to protocol 'CharacterLiteralConvertible'}}
+    super.init('x') // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
   }
 
   init(f:Int) {

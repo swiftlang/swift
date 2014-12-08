@@ -78,12 +78,12 @@ func testUpcastBridge() {
   dictBO = dictBB
   dictOB = dictBB
 
-  dictBB = dictBO // expected-error{{'ObjC' is not identical to 'BridgedToObjC'}}
-  dictBB = dictOB // expected-error{{'ObjC' is not identical to 'BridgedToObjC'}}
+  dictBB = dictBO // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, ObjC>' to a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  dictBB = dictOB // expected-error{{cannot assign a value of type 'Dictionary<ObjC, BridgedToObjC>' to a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
 
-  dictDO = dictBB // expected-error{{'BridgedToObjC' is not identical to 'DerivesObjC'}}
-  dictOD = dictBB // expected-error{{'BridgedToObjC' is not identical to 'ObjC'}}
-  dictDD = dictBB // expected-error{{'BridgedToObjC' is not identical to 'DerivesObjC'}}
+  dictDO = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<DerivesObjC, ObjC>'}}
+  dictOD = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<ObjC, DerivesObjC>'}}
+  dictDD = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<DerivesObjC, DerivesObjC>'}}
 }
 
 func testDowncastBridge() {
@@ -112,7 +112,7 @@ func testDowncastBridge() {
   dictOB as Dictionary<BridgedToObjC, BridgedToObjC>
 
   // We don't do mixed down/upcasts.
-  dictDO as Dictionary<BridgedToObjC, BridgedToObjC> // expected-error{{'DerivesObjC' is not identical to 'BridgedToObjC'}}
+  dictDO as Dictionary<BridgedToObjC, BridgedToObjC> // expected-error{{'Dictionary<DerivesObjC, ObjC>' is not convertible to 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
 }
 
 func testConditionalDowncastBridge() {

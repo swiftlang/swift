@@ -68,19 +68,19 @@ postfix operator ^ {}
 postfix func ^ (x: God) -> TheDevil {}
 prefix func ^ (x: TheDevil) -> God {}
 
-func ^ (x: TheDevil, y: God) -> Man {} // expected-note 2{{in initialization of parameter 'x'}}
+func ^ (x: TheDevil, y: God) -> Man {}
 
 var _ : TheDevil = God()^
 var _ : God = ^TheDevil()
 var _ : Man = TheDevil() ^ God()
 var _ : Man = God()^ ^ ^TheDevil()
-var _ = God()^TheDevil() // expected-error{{'God' is not convertible to 'TheDevil'}}
+var _ = God()^TheDevil() // expected-error{{binary operator '^' cannot be applied to an God operand and a TheDevil operand}}
 
 postfix func ^ (x: Man) -> () -> God {
   return { return God() }
 }
 
-var _ : God = Man()^() // expected-error{{'Man' is not convertible to 'TheDevil'}}
+var _ : God = Man()^() // expected-error{{binary operator '^' cannot be applied to an Man operand and a () operand}}
 
 func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 

@@ -67,7 +67,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
   for (i, f) in gtr {
     sum = sum + i
     sumf = sumf + f
-    sum = sum + f  // expected-error{{'Int' is not convertible to 'Float'}}
+    sum = sum + f  // expected-error{{binary operator '+' cannot be applied to an Int operand and a Float operand}} expected-note{{Overloads for '+' exist with these partially matching parameter lists:}}
   }
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
@@ -124,7 +124,7 @@ func testForEachInference() {
   for d: Double in getOvlSeq() { }
 
   // Overloaded sequence not resolved contextually
-  for v in getOvlSeq() { } // expected-error{{cannot invoke 'getOvlSeq' with an argument list of type '()'}}
+  for v in getOvlSeq() { } // expected-error{{cannot invoke 'getOvlSeq' with no arguments}}
 
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }

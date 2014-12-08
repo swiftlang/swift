@@ -2,10 +2,10 @@
 // RUN: %S/../../utils/line-directive %t/main.swift -- %swift -verify -parse %t/main.swift
 
 func testUnaryMinusInUnsigned() {
-  var a: UInt8 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
-  var b: UInt16 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
-  var c: UInt32 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
-  var d: UInt64 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
+  var a: UInt8 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type '(Int)'}}
+  var b: UInt16 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type '(Int)'}}
+  var c: UInt32 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type '(Int)'}}
+  var d: UInt64 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type '(Int)'}}
 }
 
 // Int and UInt are not identical to any fixed-size integer type
@@ -34,44 +34,44 @@ func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   UInt16(truncatingBitPattern: UInt(0))
   UInt32(truncatingBitPattern: UInt(0))
   UInt64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: UInt(0))   // expected-error {{cannot invoke 'init' with an argument list of type}}
+  UInt(truncatingBitPattern: UInt(0))   // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type}}
 
   Int8(truncatingBitPattern: UInt(0))
   Int16(truncatingBitPattern: UInt(0))
   Int32(truncatingBitPattern: UInt(0))
   Int64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: UInt(0))   // expected-error {{cannot invoke 'init' with an argument list of type}}
+  Int(truncatingBitPattern: UInt(0))   // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type}}
 
   UInt8(truncatingBitPattern: Int(0))
   UInt16(truncatingBitPattern: Int(0))
   UInt32(truncatingBitPattern: Int(0))
   UInt64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  UInt(truncatingBitPattern: Int(0))   // expected-error {{cannot invoke 'init' with an argument list of type}}
+  UInt(truncatingBitPattern: Int(0))   // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type}}
 
   Int8(truncatingBitPattern: Int(0))
   Int16(truncatingBitPattern: Int(0))
   Int32(truncatingBitPattern: Int(0))
   Int64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
-  Int(truncatingBitPattern: Int(0))   // expected-error {{cannot invoke 'init' with an argument list of type}}
+  Int(truncatingBitPattern: Int(0))   // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type}}
 
-  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{cannot invoke 'init' with an argument list of type}}
-  UInt(truncatingBitPattern: UInt16(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
-  UInt(truncatingBitPattern: UInt32(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
+  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type}}
+  UInt(truncatingBitPattern: UInt16(0)) // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type}}
+  UInt(truncatingBitPattern: UInt32(0)) // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type}}
   UInt(truncatingBitPattern: UInt64(0))
 
-  Int(truncatingBitPattern: UInt8(0))  // expected-error {{cannot invoke 'init' with an argument list of type}}
-  Int(truncatingBitPattern: UInt16(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
-  Int(truncatingBitPattern: UInt32(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
+  Int(truncatingBitPattern: UInt8(0))  // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type}}
+  Int(truncatingBitPattern: UInt16(0)) // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type}}
+  Int(truncatingBitPattern: UInt32(0)) // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type}}
   Int(truncatingBitPattern: UInt64(0))
 
-  UInt(truncatingBitPattern: Int8(0))  // expected-error {{cannot invoke 'init' with an argument list of type}}
-  UInt(truncatingBitPattern: Int16(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
-  UInt(truncatingBitPattern: Int32(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
+  UInt(truncatingBitPattern: Int8(0))  // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type}}
+  UInt(truncatingBitPattern: Int16(0)) // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type}}
+  UInt(truncatingBitPattern: Int32(0)) // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type}}
   UInt(truncatingBitPattern: Int64(0))
 
-  Int(truncatingBitPattern: Int8(0))  // expected-error {{cannot invoke 'init' with an argument list of type}}
-  Int(truncatingBitPattern: Int16(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
-  Int(truncatingBitPattern: Int32(0)) // expected-error {{cannot invoke 'init' with an argument list of type}}
+  Int(truncatingBitPattern: Int8(0))  // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type}}
+  Int(truncatingBitPattern: Int16(0)) // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type}}
+  Int(truncatingBitPattern: Int32(0)) // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type}}
   Int(truncatingBitPattern: Int64(0))
 }
 
@@ -99,12 +99,12 @@ func testMixedSignArithmetic() {
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
-    Stride(1) - ${T}(0) // expected-error {{cannot invoke '-' with an argument list of type '($T}}
+    Stride(1) - ${T}(0) // expected-error {{binary operator '-' cannot be applied to an Stride operand and a}} expected-note {{Overloads for '-' exist with these partially matching parameter lists:}}
 
     // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{'Stride' is not identical to 'UInt8'}}
-    y -= ${T}(1)        // expected-error {{'Stride' is not identical to 'UInt8'}}
+    y += ${T}(1)        // expected-error {{binary operator '+=' cannot be applied to an Stride operand and a}} expected-note {{Overloads for '+=' exist with these partially matching parameter lists:}}
+    y -= ${T}(1)        // expected-error {{binary operator '-=' cannot be applied to an Stride operand and a}} expected-note {{Overloads for '-=' exist with these partially matching parameter lists:}}
   }
 % end
 }

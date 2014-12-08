@@ -51,7 +51,7 @@ func testEquality() {
 
   var x7 : (_ : protocol<P1, P3>) -> ()
   var x8 : (_ : protocol<P2>) -> ()
-  x7 = x8 // expected-error{{'protocol<P1, P3>' does not conform to protocol 'P2'}}
+  x7 = x8 // expected-error{{cannot assign a value of type '(P2) -> ()' to a value of type '(protocol<P1, P3>) -> ()'}}
 }
 
 // Name lookup into protocol-conformance types
@@ -105,7 +105,7 @@ func testConversion() {
 
   // Conversions among existential types.
   var x2 : protocol<SuperREPLPrintable, FooProtocol>
-  x2 = x // expected-error{{'protocol<FooProtocol, REPLPrintable>' does not conform to protocol 'SuperREPLPrintable'}}
+  x2 = x // expected-error{{cannot assign a value of type 'protocol<FooProtocol, REPLPrintable>' to a value of type 'protocol<FooProtocol, SuperREPLPrintable>'}}
   x = x2
 
   // Subtyping

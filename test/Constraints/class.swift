@@ -15,14 +15,14 @@ var d : D
 var ef : E<Float> 
 var fi : F<Int>
 
-func f0(b : B) {} // expected-note{{in initialization of parameter 'b'}}
+func f0(b : B) {}
 
 func ternary<T>(cond: Bool,
                 ifTrue: @autoclosure () -> T,
                 ifFalse: @autoclosure () -> T) -> T {}
 
 f0(c)
-f0(a) // expected-error{{'A' is not convertible to 'B'}}
+f0(a) // expected-error{{cannot invoke 'f0' with an argument list of type 'A'}} expected-note {{expected an argument list of type 'B'}}
 f0(ef)
 f0(fi)
 

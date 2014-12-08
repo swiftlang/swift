@@ -1008,6 +1008,8 @@ struct ResolvedOverloadSetListItem {
                      unsigned alignment
                        = alignof(ResolvedOverloadSetListItem));
 };
+  
+
 
 /// Identifies a specific conversion from
 struct SpecificConstraint {
@@ -1063,6 +1065,108 @@ public:
   }
 };
 
+/// If a constraint system fails to converge on a solution for a given
+/// expression, this class can produce a reasonable diagnostic for the failure
+/// by analyzing the remnants of the failed constraint system. (Specifically,
+/// left-over inactive, active and failed constraints.)
+/// This class does not tune its diagnostics for a specific expression kind,
+/// for that, you'll want to use an instance of the FailureDiagnosis class.
+class GeneralFailureDiagnosis {
+
+protected:
+  
+  Expr *expr = nullptr;
+  ConstraintSystem *CS = nullptr;
+  
+  // Specific constraint kinds used, in conjunction with the expression node,
+  // to determine the appropriate diagnostic.
+  Constraint *conversionConstraint = nullptr;
+  Constraint *overloadConstraint = nullptr;
+  Constraint *fallbackConstraint = nullptr;
+  Constraint *activeConformanceConstraint = nullptr;
+  Constraint *valueMemberConstraint = nullptr;
+  Constraint *argumentConstraint = nullptr;
+  Constraint *disjunctionConversionConstraint = nullptr;
+  Constraint *conformanceConstraint = nullptr;
+  Constraint *bridgeToObjCConstraint = nullptr;
+  
+public:
+  
+  GeneralFailureDiagnosis(Expr *expr, ConstraintSystem *CS);
+  /// Attempt to diagnose a failure without taking into account the specific
+  /// kind of expression that could not be type checked.
+  bool diagnoseGeneralFailure();
+  
+protected:
+  
+  /// Produce a diagnostic for a general member-lookup failure (irrespective of
+  /// the exact expression kind).
+  bool diagnoseGeneralValueMemberFailure();
+  
+  /// Produce a diagnostic for a general overload resolution failure
+  /// (irrespective of the exact expression kind).
+  bool diagnoseGeneralOverloadFailure();
+  
+  /// Produce a diagnostic for a general conversion failure (irrespective of the
+  /// exact expression kind).
+  bool diagnoseGeneralConversionFailure();
+  
+  // By default, diagnose all failures as "general" failures. To tailor a
+  // diagnostic for a specific expression kind, override the appropriate
+  // diagnosis method in the FailureDiagnosis class.
+#define EXPR(ID, PARENT) \
+  bool diagnoseFailureFor##ID##Expr() { \
+    return diagnoseGeneralFailure(); \
+  }
+#include "swift/AST/ExprNodes.def"
+};
+  
+/// When a specific constraint system failure cannot be ascertained, this class
+/// can be used to deduce the cause of the failure and produce a suitable
+/// diagnostic by examining the expression in question along with the remnants
+/// of the failed constraint system.
+class FailureDiagnosis : public GeneralFailureDiagnosis {
+
+public:
+  FailureDiagnosis(Expr *expr, ConstraintSystem *cs) :
+      GeneralFailureDiagnosis(expr, cs) {}
+  
+  /// Attempt to diagnose a specific failure from the info we've collected from
+  /// the failed constraint system.
+  bool diagnoseFailure();
+  
+private:
+  /// If the type check failure on the expression is a top-level one, obtain a
+  /// type or any sub expressions by potentially re-typechecking in a
+  /// context-free manner.
+  Type getTypeOfIndependentSubExpression(Expr *subExpr);
+  
+  /// Given a set of parameter lists from an overload group, and a list of
+  /// arguments, emit a diagnostic indicating any partially matching overloads.
+  void suggestPotentialOverloads(const StringRef functionName,
+                                 const SourceLoc &loc,
+                                 const SmallVectorImpl<Type> &paramLists,
+                                 const SmallVectorImpl<Type> &argTypes);
+  
+  /// Diagnose a specific kind of application expression.
+  bool diagnoseFailureForBinaryExpr();
+  bool diagnoseFailureForPrefixUnaryExpr();
+  bool diagnoseFailureForPostfixUnaryExpr();
+  bool diagnoseFailureForUnaryExpr();
+  bool diagnoseFailureForSubscriptExpr();
+  
+  /// Diagnose a failed function, method or initializer application expression.
+  bool diagnoseFailureForCallExpr();
+  
+  /// Diagnose a failed assignment expression, with special attention paid to
+  /// assignments to immutable values.
+  bool diagnoseFailureForAssignExpr();
+  
+  /// Diagnose the specific case of addressing an immutable value, or one
+  /// without a setter.
+  bool diagnoseFailureForInOutExpr();
+};
+
 /// An intrusive, doubly-linked list of constraints.
 typedef llvm::ilist<Constraint> ConstraintList;
 
@@ -1073,11 +1177,13 @@ enum class ConstraintSystemFlags {
 
 /// Options that affect the constraint system as a whole.
 typedef OptionSet<ConstraintSystemFlags> ConstraintSystemOptions;
+  
 
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
+  
 public:
   TypeChecker &TC;
   DeclContext *DC;
@@ -1085,9 +1191,13 @@ public:
   
   friend class Fix;
   friend class OverloadChoice;
+  friend class GeneralFailureDiagnosis;
+  friend class FailureDiagnosis;
+  
   class SolverScope;
 
 private:
+  
   Constraint *failedConstraint = nullptr;
   
   /// \brief Allocator used for all of the related constraint systems.
@@ -1545,7 +1655,7 @@ public:
   ///
   /// \return true if we were able to create a diagnostic from expr's
   /// constraints.
-  bool diagnoseFailureFromConstraints(Expr *expr);
+  bool diagnoseFailureForExpr(Expr *expr);
 
   /// \brief Add a newly-allocated constraint after attempting to simplify
   /// it.

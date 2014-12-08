@@ -296,8 +296,8 @@ func testSelectorStyleArguments1(var x: Int, var bar y: Int) {
 }
 
 func testSelectorStyleArguments2(let x: Int, let bar y: Int) {
-  ++x  // expected-error {{cannot invoke '++' with an argument of type 'Int'}}
-  ++y  // expected-error {{cannot invoke '++' with an argument of type 'Int'}}
+  ++x  // expected-error {{unary operator '++' cannot be applied to an operand of type 'Int'}}
+  ++y  // expected-error {{unary operator '++' cannot be applied to an operand of type 'Int'}}
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
@@ -321,7 +321,7 @@ class LetClassMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'a' in 'self'}}
     b = 42  // expected-error {{cannot assign to 'b' in 'self'}}
-    updateInt(&a)   // expected-error {{'Int' is not convertible to '@lvalue inout $T3'}}
+    updateInt(&a)   // expected-error {{cannot assign to immutable value of type 'Int'}}
   }
 }
 struct LetStructMembers {
@@ -337,7 +337,7 @@ struct LetStructMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'a' in 'self'}}
     b = 42  // expected-error {{cannot assign to 'b' in 'self'}}
-    updateInt(&a)   // expected-error {{'Int' is not convertible to '@lvalue inout $T3'}}
+    updateInt(&a)   // expected-error {{cannot assign to immutable value of type 'Int'}}
   }
 }
 

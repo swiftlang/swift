@@ -3,6 +3,6 @@
 import Foundation
 
 func useUnavailable() {
-  var a = NSSimpleCString() // expected-error {{'NSSimpleCString' is unavailable}} expected-error {{cannot convert the expression's type}}
-  var b = NSConstantString() // expected-error {{'NSConstantString' is unavailable}} expected-error {{cannot convert the expression's type}}
+  var a = NSSimpleCString() // expected-error {{'NSSimpleCString' is unavailable}}
+  var b = NSConstantString() // expected-error {{'NSConstantString' is unavailable}}
 }

@@ -16,30 +16,30 @@ var ca: Array<C> = [c1]
 var da: Array<D> = [d1]
 
 ca = da
-da = ca // expected-error{{C' is not identical to 'D'}}
+da = ca // expected-error{{cannot assign a value of type 'Array<C>' to a value of type 'Array<D>'}}
 
 var caa = [ca]
 var daa = [da]
 
-caa = daa // expected-error{{'D' is not identical to 'C'}}
+caa = daa // expected-error{{cannot assign a value of type '[Array<D>]' to a value of type '[Array<C>]'}}
 
 // Array slice type
 var cas: [C] = [c1]
 var das: [D] = [d1]
 
 cas = das
-das = cas // expected-error{{'C' is not identical to 'D'}}
+das = cas // expected-error{{cannot assign a value of type '[C]' to a value of type '[D]'}}
 
 // Slice<T>
 var cs = ca[0...0]
 var ds = da[0...0]
 
-cs = ds // expected-error{{'D' is not identical to 'C'}}
-ds = cs // expected-error{{'C' is not identical to 'D'}}
+cs = ds // expected-error{{cannot assign a value of type 'Slice<D>' to a value of type 'Slice<C>'}}
+ds = cs // expected-error{{cannot assign a value of type 'Slice<C>' to a value of type 'Slice<D>'}}
 
 // ContiguousArray<T>
 var cna: ContiguousArray<C> = [c1]
 var dna: ContiguousArray<D> = [d1]
 
-cna = dna // expected-error{{'D' is not identical to 'C'}}
-dna = cna // expected-error{{'C' is not identical to 'D'}}
+cna = dna // expected-error{{cannot assign a value of type 'ContiguousArray<D>' to a value of type 'ContiguousArray<C>'}}
+dna = cna // expected-error{{cannot assign a value of type 'ContiguousArray<C>' to a value of type 'ContiguousArray<D>'}}

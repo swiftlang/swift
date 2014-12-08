@@ -43,12 +43,12 @@ func useList<T>(l: List<T>) {}
 func useDict<K,V>(d: Dict<K,V>) {}
 
 useIntList([1,2,3])
-useIntList([1.0,2,3]) // expected-error{{}}
+useIntList([1.0,2,3]) // expected-error{{cannot invoke 'useIntList' with an argument list of type '[Double]'}} expected-note{{expected an argument list of type 'IntList'}}
 useDoubleList([1.0,2,3])
 useDoubleList([1.0,2.0,3.0])
 
 useIntDict(["Niners" => 31, "Ravens" => 34])
-useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{}}
+useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{cannot invoke 'useIntDict' with an argument list of type '[(String, Double)]'}} expected-note{{expected an argument list of type 'IntDict'}}
 useDoubleDict(["Niners" => 31, "Ravens" => 34.0])
 useDoubleDict(["Niners" => 31.0, "Ravens" => 34])
 useDoubleDict(["Niners" => 31.0, "Ravens" => 34.0])

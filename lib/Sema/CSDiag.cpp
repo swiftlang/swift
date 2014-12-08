@@ -646,7 +646,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   } else {
     cloc = failure.getLocator();
   }
-
+  
   SourceRange range1, range2;
 
   ConstraintLocator *targetLocator;
@@ -674,11 +674,19 @@ static bool diagnoseFailure(ConstraintSystem &cs,
       .highlight(range1).highlight(range2);
     break;
 
+  case Failure::TypesNotConvertible:
   case Failure::TypesNotEqual:
   case Failure::TypesNotSubtypes:
-  case Failure::TypesNotConvertible:
   case Failure::TypesNotConstructible:
-  case Failure::FunctionTypesMismatch:
+  case Failure::FunctionTypesMismatch: {
+    
+    // We can do a better job of diagnosing application argument conversion
+    // failures elsewhere.
+    if (isa<ApplyExpr>(expr) ||
+        isa<InOutExpr>(expr) ||
+        isa<AssignExpr>(expr))
+      return false;
+    
     tc.diagnose(loc, diag::invalid_relation,
                 failure.getKind() - Failure::TypesNotEqual,
                 failure.getFirstType(),
@@ -686,6 +694,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
       .highlight(range1).highlight(range2);
     if (targetLocator && !useExprLoc)
       noteTargetOfDiagnostic(cs, failure, targetLocator);
+    }
     break;
 
   case Failure::DoesNotHaveMember:
@@ -709,6 +718,14 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::DoesNotConformToProtocol:
     // FIXME: Probably want to do this within the actual solver, because at
     // this point it's too late to actually recover fully.
+      
+    // We can do a better job of diagnosing application argument conversion
+    // failures elsewhere.
+    if (isa<ApplyExpr>(expr) ||
+        isa<InOutExpr>(expr) ||
+        isa<AssignExpr>(expr))
+      return false;
+      
     tc.conformsToProtocol(failure.getFirstType(),
                           failure.getSecondType()->castTo<ProtocolType>()
                             ->getDecl(),
@@ -1115,30 +1132,175 @@ static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
                                type2->getLValueOrInOutObjectType());
 }
 
-bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
+/// Determine if a type resulting from a failed typecheck operation is fully-
+/// specialized, or if it still has type variable type arguments.
+/// (This diverges slightly from hasTypeVariable, in that certain tyvars,
+/// such as for nil literals, will be treated as specialized.)
+bool typeIsNotSpecialized(Type type) {
+  if (type.isNull())
+    return true;
   
-  // If we've been asked for more detailed type-check diagnostics, mine the
-  // system's active and inactive constraints for information on why we could
-  // not find a solution.
-  Constraint *conversionConstraint = nullptr;
-  Constraint *overloadConstraint = nullptr;
-  Constraint *fallbackConstraint = nullptr;
-  Constraint *activeConformanceConstraint = nullptr;
-  Constraint *valueMemberConstraint = nullptr;
-  Constraint *argumentConstraint = nullptr;
-  Constraint *disjunctionConversionConstraint = nullptr;
-  Constraint *conformanceConstraint = nullptr;
+  if (auto tv = type->getAs<TypeVariableType>()) {
     
-  if(!ActiveConstraints.empty()) {
+      // If it's a nil-literal conformance, there's no reason to re-specialize.
+      if (tv->getImpl().literalConformanceProto) {
+      
+        auto knownProtoKind =
+            tv->getImpl().literalConformanceProto->getKnownProtocolKind();
+        
+        if (knownProtoKind.hasValue() &&
+            (knownProtoKind.getValue() ==
+                KnownProtocolKind::NilLiteralConvertible)) {
+          return false;
+      }
+    }
+    
+    return true;
+  }
+  
+  // Desugar, if necessary.
+  if (auto sugaredTy = type->getAs<SyntaxSugarType>())
+    type = sugaredTy->getBaseType();
+  
+  // If it's generic, check the type arguments.
+  if (auto bgt = type->getAs<BoundGenericType>()) {
+    for (auto tyarg : bgt->getGenericArgs()) {
+      if (typeIsNotSpecialized(tyarg))
+        return true;
+    }
+    
+    return false;
+  }
+  
+  // If it's a tuple, check the members.
+  if (auto tupleTy = type->getAs<TupleType>()) {
+    for (auto elementTy : tupleTy->getElementTypes()) {
+      if (typeIsNotSpecialized((elementTy)))
+        return true;
+    }
+    
+    return false;
+  }
+  
+  // If it's an inout type, check the inner type.
+  if (auto inoutTy = type->getAs<InOutType>()) {
+    return typeIsNotSpecialized(inoutTy->getObjectType());
+  }
+  
+  // If it's a function, check the parameter and return types.
+  if (auto functionTy = type->getAs<AnyFunctionType>()) {
+    if (typeIsNotSpecialized(functionTy->getResult()) ||
+        typeIsNotSpecialized(functionTy->getInput()))
+      return true;
+    
+    return false;
+  }
+  
+  // Otherwise, broadly check for type variables.
+  return type->hasTypeVariable();
+}
+
+/// Obtain the colloquial description for a known protocol kind.
+std::string getDescriptionForKnownProtocolKind(KnownProtocolKind kind) {
+  switch (kind) {
+#define PROTOCOL(Id) \
+case KnownProtocolKind::Id: \
+return #Id;
+      
+#define LITERAL_CONVERTIBLE_PROTOCOL(Id, Description) \
+case KnownProtocolKind::Id: \
+return #Description;
+      
+#define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id) \
+case KnownProtocolKind::Id: \
+return #Id;
+      
+#include "swift/AST/KnownProtocols.def"
+  }
+  
+  llvm_unreachable("unrecognized known protocol kind");
+}
+
+/// Determine if the type is an error type, or its metatype.
+bool isErrorTypeKind(Type t) {
+  
+  if (auto mt = t->getAs<MetatypeType>())
+    t = mt->getInstanceType();
+  
+  return t->is<ErrorType>();
+}
+
+/// Obtain a "user friendly" type name. E.g., one that uses colloquial names
+/// for literal convertible protocols if necessary, and is devoid of type
+/// variables.
+std::string getUserFriendlyTypeName(Type t, bool unwrap = true) {
+  
+  assert(!t.isNull());
+  
+  // Unwrap any l-value types.
+  if (unwrap) {
+    if (auto lv = t->getAs<LValueType>()) {
+      t = lv->getObjectType();
+    }
+  }
+  
+  if (auto tv = t->getAs<TypeVariableType>()) {
+    if (tv->getImpl().literalConformanceProto) {
+      Optional<KnownProtocolKind> kind =
+          tv->getImpl().literalConformanceProto->getKnownProtocolKind();
+      
+      if (kind.hasValue()) {
+        return getDescriptionForKnownProtocolKind(kind.getValue());
+      }
+    }
+  }
+  
+  return t.getString();
+}
+
+/// Conveniently unwrap a paren expression, if necessary.
+Expr* unwrapParenExpr(Expr *e) {
+  if (auto parenExpr = dyn_cast<ParenExpr>(e))
+    return unwrapParenExpr(parenExpr->getSubExpr());
+  
+  return e;
+}
+
+/// Given a vector of types, obtain a stringified comma-separated list of their
+/// associated "user friendly" type names.
+std::string getTypeListString(SmallVectorImpl<Type> &types) {
+  
+  std::string typeList = "";
+  
+  if (types.size()) {
+    typeList += getUserFriendlyTypeName(types[0]);
+    
+    for (size_t i = 1; i < types.size(); i++)
+      typeList += ", " + getUserFriendlyTypeName(types[i]);
+  }
+  
+  return typeList;
+  
+}
+
+GeneralFailureDiagnosis::GeneralFailureDiagnosis(Expr *expr,
+                                                 ConstraintSystem *cs) :
+expr(expr), CS(cs) {
+  
+  assert(expr && CS);
+  
+  // Collect and categorize constraint information from the failed system.
+  
+  if(!CS->ActiveConstraints.empty()) {
     // If any active conformance constraints are in the system, we know that
     // any inactive constraints are in its service. Capture the constraint and
     // present this information to the user.
-    auto *constraint = &ActiveConstraints.front();
+    auto *constraint = &CS->ActiveConstraints.front();
     
     activeConformanceConstraint = getComponentConstraint(constraint);
   }
   
-  for (auto & constraintRef : InactiveConstraints) {
+  for (auto & constraintRef : CS->InactiveConstraints) {
     auto constraint = &constraintRef;
     
     // Capture the first non-disjunction constraint we find. We'll use this
@@ -1152,31 +1314,31 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     // Store off conversion constraints, favoring existing conversion
     // constraints.
     if ((!(activeConformanceConstraint ||
-        conformanceConstraint) || constraint->isFavored()) &&
+           conformanceConstraint) || constraint->isFavored()) &&
         constraint->getKind() == ConstraintKind::ConformsTo) {
       conformanceConstraint = constraint;
     }
     
     // Failed binding constraints point to a missing member.
     if ((!valueMemberConstraint || constraint->isFavored()) &&
-        (constraint->getKind() == ConstraintKind::ValueMember
-         || constraint->getKind() == ConstraintKind::UnresolvedValueMember)) {
-      valueMemberConstraint = constraint;
-    }
+        ((constraint->getKind() == ConstraintKind::ValueMember) ||
+         (constraint->getKind() == ConstraintKind::UnresolvedValueMember))) {
+          valueMemberConstraint = constraint;
+        }
     
     // A missed argument conversion can result in better error messages when
     // a user passes the wrong arguments to a function application.
     if ((!argumentConstraint || constraint->isFavored())) {
       argumentConstraint = getConstraintChoice(constraint,
-                                                ConstraintKind::
-                                                    ArgumentTupleConversion);
+                                               ConstraintKind::
+                                               ArgumentTupleConversion);
     }
     
     // Overload resolution failures are often nicely descriptive, so store
     // off the first one we find.
     if ((!overloadConstraint || constraint->isFavored())) {
       overloadConstraint = getConstraintChoice(constraint,
-                                                ConstraintKind::BindOverload);
+                                               ConstraintKind::BindOverload);
     }
     
     // Conversion constraints are also nicely descriptive, so we'll grab the
@@ -1185,27 +1347,33 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
         (constraint->getKind() == ConstraintKind::Conversion ||
          constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
           conversionConstraint = constraint;
+        }
+    
+    // Also check for bridging failures.
+    if ((!bridgeToObjCConstraint || constraint->isFavored()) &&
+        constraint->getKind() == ConstraintKind::BridgedToObjectiveC) {
+      bridgeToObjCConstraint = constraint;
     }
     
     // When all else fails, inspect a potential conjunction or disjunction for a
     // consituent conversion.
     if (!disjunctionConversionConstraint || constraint->isFavored()) {
-      disjunctionConversionConstraint = getConstraintChoice(constraint,
-                                                             ConstraintKind::
-                                                                Conversion,
-                                                             true);
+      disjunctionConversionConstraint =
+      getConstraintChoice(constraint, ConstraintKind::Conversion, true);
     }
   }
   
   // If no more descriptive constraint was found, use the fallback constraint.
   if (fallbackConstraint &&
-      !(conversionConstraint || overloadConstraint || argumentConstraint)) {
-    
-    if (fallbackConstraint->getKind() == ConstraintKind::ArgumentConversion)
-      argumentConstraint = fallbackConstraint;
-    else
-      conversionConstraint = fallbackConstraint;
-  }
+      !(conversionConstraint ||
+        overloadConstraint ||
+        argumentConstraint)) {
+        
+        if (fallbackConstraint->getKind() == ConstraintKind::ArgumentConversion)
+          argumentConstraint = fallbackConstraint;
+        else
+          conversionConstraint = fallbackConstraint;
+      }
   
   // If there's still no conversion to diagnose, use the disjunction conversion.
   if (!conversionConstraint) {
@@ -1214,36 +1382,29 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   
   // If there was already a conversion failure, use it.
   if (!conversionConstraint &&
-      this->failedConstraint &&
-      this->failedConstraint->getKind() != ConstraintKind::Disjunction) {
-    conversionConstraint = this->failedConstraint;
+      CS->failedConstraint &&
+      CS->failedConstraint->getKind() != ConstraintKind::Disjunction) {
+    conversionConstraint = CS->failedConstraint;
   }
+}
+
+bool GeneralFailureDiagnosis::diagnoseGeneralValueMemberFailure() {
   
   if (valueMemberConstraint) {
     auto memberName = valueMemberConstraint->getMember().getBaseName();
-    TC.diagnose(expr->getLoc(),
-                diag::could_not_find_member,
-                memberName)
+    CS->TC.diagnose(expr->getLoc(),
+                    diag::could_not_find_member,
+                    memberName)
     .highlight(expr->getSourceRange());
     
     return true;
   }
   
-  if (activeConformanceConstraint) {
-    std::pair<Type, Type> types = getBoundTypesFromConstraint(
-                                                  this,
-                                                  expr,
-                                                  activeConformanceConstraint);
-    
-    TC.diagnose(expr->getLoc(),
-                diag::does_not_conform_to_constraint,
-                types.first,
-                types.second)
-    .highlight(expr->getSourceRange());
-  
-    return true;
-  }
+  return false;
+}
 
+bool GeneralFailureDiagnosis::diagnoseGeneralOverloadFailure() {
+  
   // In the absense of a better conversion constraint failure, point out the
   // inability to find an appropriate overload.
   if (overloadConstraint) {
@@ -1253,50 +1414,57 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     
     if (!argType.isNull() &&
         !argType->getAs<TypeVariableType>() &&
-        dyn_cast<ApplyExpr>(expr)) {
+        isa<ApplyExpr>(expr)) {
       if (argType->getAs<TupleType>()) {
-        TC.diagnose(expr->getLoc(),
-                    diag::cannot_find_appropriate_overload_with_type_list,
-                    overloadName.str(), argType)
+        CS->TC.diagnose(expr->getLoc(),
+                        diag::cannot_find_appropriate_overload_with_type_list,
+                        overloadName.str(), argType)
         .highlight(expr->getSourceRange());
       } else {
-        TC.diagnose(expr->getLoc(),
-                    diag::cannot_find_appropriate_overload_with_type,
-                    overloadName.str(), argType)
+        CS->TC.diagnose(expr->getLoc(),
+                        diag::cannot_find_appropriate_overload_with_type,
+                        overloadName.str(),
+                        argType)
         .highlight(expr->getSourceRange());
       }
     } else {
-      TC.diagnose(expr->getLoc(),
-                  diag::cannot_find_appropriate_overload,
-                  overloadName.str())
+      CS->TC.diagnose(expr->getLoc(),
+                      diag::cannot_find_appropriate_overload,
+                      overloadName.str())
       .highlight(expr->getSourceRange());
     }
     return true;
   }
   
+  return false;
+}
+
+bool GeneralFailureDiagnosis::diagnoseGeneralConversionFailure() {
+  
   // Otherwise, if we have a conversion constraint, use that as the basis for
   // the diagnostic.
   if (conversionConstraint || argumentConstraint) {
     auto constraint = argumentConstraint ?
-                        argumentConstraint : conversionConstraint;
+    argumentConstraint :
+    conversionConstraint;
     
     if (conformanceConstraint) {
       if (conformanceConstraint->getTypeVariables().size() <
-              constraint->getTypeVariables().size()) {
+          constraint->getTypeVariables().size()) {
         constraint = conformanceConstraint;
       }
     }
     
     auto locator = constraint->getLocator();
     auto anchor = locator ? locator->getAnchor() : expr;
-    std::pair<Type, Type> types = getBoundTypesFromConstraint(this,
+    std::pair<Type, Type> types = getBoundTypesFromConstraint(CS,
                                                               expr,
                                                               constraint);
     
     if (argumentConstraint) {
-      TC.diagnose(expr->getLoc(),
-                  diag::could_not_convert_argument,
-                  types.first).
+      CS->TC.diagnose(expr->getLoc(),
+                      diag::could_not_convert_argument,
+                      types.first).
       highlight(anchor->getSourceRange());
     } else {
       
@@ -1304,20 +1472,572 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
       // variable and just print the conformance.
       if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
           types.first->getAs<TypeVariableType>()) {
-        TC.diagnose(anchor->getLoc(),
-                    diag::single_expression_conformance_failure,
-                    types.first)
+        CS->TC.diagnose(anchor->getLoc(),
+                        diag::single_expression_conformance_failure,
+                        types.first)
         .highlight(anchor->getSourceRange());
       } else {
-        TC.diagnose(anchor->getLoc(),
-                    diag::cannot_find_conversion,
-                    types.first, types.second)
-        .highlight(anchor->getSourceRange());
+        // If the second type is a type variable, the expression itself is
+        // ambiguous.
+        if (types.first->getAs<UnboundGenericType>() ||
+            types.second->getAs<TypeVariableType>()) {
+          if (isa<ClosureExpr>(expr)) {
+            CS->TC.diagnose(expr->getLoc(),
+                            diag::cannot_infer_closure_type);
+          } else {
+            CS->TC.diagnose(expr->getLoc(),
+                            diag::type_of_expression_is_ambiguous);
+          }
+        } else {
+          auto failureKind =
+          Failure::TypesNotConvertible - Failure::TypesNotEqual;
+          
+          CS->TC.diagnose(anchor->getLoc(),
+                          diag::invalid_relation,
+                          failureKind,
+                          types.first, types.second)
+          .highlight(anchor->getSourceRange());
+        }
       }
     }
     
     return true;
   }
+  
+  return false;
+}
+
+bool GeneralFailureDiagnosis::diagnoseGeneralFailure() {
+  
+  if (diagnoseGeneralValueMemberFailure() ||
+      diagnoseGeneralOverloadFailure() ||
+      diagnoseGeneralConversionFailure()) {
+    return true;
+  }
+  
+  return false;
+}
+
+Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
+  
+  if (!isa<ClosureExpr>(subExpr) &&
+      typeIsNotSpecialized(subExpr->getType())) {
+    CS->TC.eraseTypeData(subExpr);
+
+    CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(), false);
+  }
+  
+  assert(subExpr->getType());
+  
+  return subExpr->getType();
+}
+
+/// FIXME: Right now, a "matching" overload is one with a parameter whose type
+/// is identical to one of the argument types. We can obviously do something
+/// more sophisticated with this.
+void FailureDiagnosis::suggestPotentialOverloads(
+                               const StringRef functionName,
+                               const SourceLoc &loc,
+                               const SmallVectorImpl<Type> &paramLists,
+                               const SmallVectorImpl<Type> &argTypes) {
+  if (!argTypes.size()) {
+    return;
+  }
+  
+  std::string suggestionText = "";
+  std::map<std::string, bool> dupes;
+  auto iPL = 0;
+
+  for (auto paramList : paramLists) {
+    SmallVector<Type, 16> paramTypes;
+    
+    // Assemble the parameter type list.
+    if (auto parenType = dyn_cast<ParenType>(paramList.getPointer())) {
+      paramTypes.push_back(parenType->getUnderlyingType());
+    } else if (auto tupleType = paramList->getAs<TupleType>()) {
+      paramTypes.append(tupleType->getElementTypes().begin(),
+                        tupleType->getElementTypes().end());
+    }
+    
+    for (auto pt : paramTypes) {
+      for (auto at : argTypes) {
+        if (pt->isEqual(at)) {
+          auto typeListString = getTypeListString(paramTypes);
+          if (!dupes[typeListString]) {
+            dupes[typeListString] = true;
+            if (iPL)
+              suggestionText += ", ";
+            iPL++;
+            suggestionText += "(" + typeListString + ")";
+          }
+          break;
+        }
+      }
+    }
+  }
+  
+  if (!suggestionText.length())
+    return;
+  
+  CS->TC.diagnose(loc,
+                  diag::suggest_partial_overloads,
+                  functionName,
+                  suggestionText);
+}
+
+bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
+  assert(expr->getKind() == ExprKind::Binary);
+  
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  
+  auto binop = cast<BinaryExpr>(expr);
+  
+  auto argExpr = dyn_cast<TupleExpr>(binop->getArg());
+  auto argTuple = getTypeOfIndependentSubExpression(argExpr)->
+  getAs<TupleType>();
+  
+  // If the argument type is not a tuple, we've posted the diagnostic
+  // recursively.
+  if (!argTuple)
+    return true;
+  
+  std::string overloadName;
+  
+  SmallVector<Type, 16> paramLists;
+  SmallVector<Type, 2> argTypes;
+  
+  if (auto DRE = dyn_cast<DeclRefExpr>(binop->getFn())) {
+    overloadName = DRE->getDecl()->getNameStr();
+  } else if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(binop->getFn())) {
+    overloadName = ODRE->getDecls()[0]->getNameStr();
+    
+    for (auto DRE : ODRE->getDecls()) {
+      if (auto fnType = DRE->getType()->getAs<AnyFunctionType>()) {
+        paramLists.push_back(fnType->getInput());
+      }
+    }
+  } else if (overloadConstraint) {
+    overloadName = overloadConstraint->getOverloadChoice().
+    getDecl()->getName().str();
+  } else {
+    llvm_unreachable("unrecognized binop function kind");
+  }
+  
+  assert(!overloadName.empty());
+  
+  argTypes.push_back(argTuple->getElementType(0));
+  argTypes.push_back(argTuple->getElementType(1));
+  
+  auto argTyName1 = getUserFriendlyTypeName(argTypes[0]);
+  auto argTyName2 = getUserFriendlyTypeName(argTypes[1]);
+  
+  if (argTyName1.compare(argTyName2)) {
+    CS->TC.diagnose(argExpr->getElements()[0]->getLoc(),
+                    diag::cannot_apply_binop_to_args,
+                    overloadName,
+                    argTyName1,
+                    argTyName2);
+  } else {
+    CS->TC.diagnose(argExpr->getElements()[0]->getLoc(),
+                    diag::cannot_apply_binop_to_same_args,
+                    overloadName,
+                    argTyName1);
+  }
+  
+  if (paramLists.size())
+    suggestPotentialOverloads(overloadName,
+                              argExpr->getElements()[0]->getLoc(),
+                              paramLists,
+                              argTypes);
+  
+  return true;
+}
+  
+bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
+  assert(expr->getKind() == ExprKind::PostfixUnary ||
+         expr->getKind() == ExprKind::PrefixUnary);
+  
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  
+  auto applyExpr = cast<ApplyExpr>(expr);
+  auto argExpr = applyExpr->getArg();
+  auto argType = getTypeOfIndependentSubExpression(argExpr);
+  
+  // If the argument type is an error, we've posted the diagnostic
+  // recursively.
+  if (isErrorTypeKind(argType))
+    return true;
+  
+  auto argTyName = getUserFriendlyTypeName(argType);
+  
+  std::string overloadName;
+  
+  if (overloadConstraint) {
+    overloadName = overloadConstraint->getOverloadChoice().
+    getDecl()->getName().str();
+  } else if (auto declRefExpr = dyn_cast<DeclRefExpr>(applyExpr->getFn())) {
+    overloadName = declRefExpr->getDecl()->getNameStr();
+  } else if (auto overloadedDRE =
+             dyn_cast<OverloadedDeclRefExpr>(applyExpr->getFn())) {
+    overloadName = overloadedDRE->getDecls()[0]->getNameStr();
+  } else {
+    llvm_unreachable("unrecognized unop function kind");
+  }
+  
+  assert(!overloadName.empty());
+  
+  // FIXME: Note that we don't currently suggest a partially matching overload.
+  CS->TC.diagnose(argExpr->getLoc(),
+                  diag::cannot_apply_unop_to_arg,
+                  overloadName,
+                  argTyName);
+  
+  return true;
+}
+
+bool FailureDiagnosis::diagnoseFailureForPrefixUnaryExpr() {
+  return diagnoseFailureForUnaryExpr();
+}
+
+bool FailureDiagnosis::diagnoseFailureForPostfixUnaryExpr() {
+  return diagnoseFailureForUnaryExpr();
+}
+
+bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
+  assert(expr->getKind() == ExprKind::Subscript ||
+         expr->getKind() == ExprKind::PrefixUnary);
+  
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  
+  auto subscriptExpr = cast<SubscriptExpr>(expr);
+  auto indexExpr = subscriptExpr->getIndex();
+  auto baseExpr = subscriptExpr->getBase();
+  
+  auto indexType = getTypeOfIndependentSubExpression(indexExpr);
+  
+  // Extract the exact argument type from the argument tuple.
+  if (auto parenTy = dyn_cast<ParenType>(indexType.getPointer())) {
+    indexType = parenTy->getUnderlyingType();
+  }
+  
+  // An error has been posted elsewhere.
+  if (isErrorTypeKind(indexType))
+    return true;
+  
+  auto baseType = getTypeOfIndependentSubExpression(baseExpr);
+  
+  auto indexTypeName = getUserFriendlyTypeName(indexType);
+  auto baseTypeName = getUserFriendlyTypeName(baseType);
+  
+  assert(!(indexTypeName.empty() || baseTypeName.empty()));
+  
+  // FIXME: As with unary applications, we don't currently suggest a partially
+  // matching overload.
+  CS->TC.diagnose(indexExpr->getLoc(),
+                  diag::cannot_subscript_with_index,
+                  baseTypeName,
+                  indexTypeName);
+  
+  return true;
+}
+
+bool FailureDiagnosis::diagnoseFailureForCallExpr() {
+  assert(expr->getKind() == ExprKind::Call);
+  
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  
+  auto callExpr = cast<CallExpr>(expr);
+  auto fnExpr = callExpr->getFn();
+  auto argExpr = callExpr->getArg();
+  
+  // An error was posted elsewhere.
+  if (isErrorTypeKind(fnExpr->getType())) {
+    return true;
+  }
+  
+  std::string overloadName = "";
+  
+  bool isClosureInvocation = false;
+  bool isInvalidTrailingClosureTarget = false;
+  bool foundIntermediateError = false;
+  bool isInitializer = false;
+  bool isOverloadedFn = false;
+  
+  llvm::SmallVector<Type,16> paramLists;
+  llvm::SmallVector<Type, 16> argTypes;
+  
+  // Obtain the function's name, and collect any parameter lists for diffing
+  // purposes.
+  if (auto DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+    overloadName = DRE->getDecl()->getNameStr();
+    
+    if (auto fnType = DRE->getDecl()->getType()->getAs<AnyFunctionType>()) {
+      paramLists.push_back(fnType->getInput());
+    }
+    
+  } else if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
+    isOverloadedFn = true;
+    overloadName = ODRE->getDecls()[0]->getNameStr().str();
+    
+    // Collect the parameters for later use.
+    for (auto D : ODRE->getDecls()) {
+      if (auto fnType = D->getType()->getAs<AnyFunctionType>()) {
+        paramLists.push_back(fnType->getInput());
+      }
+    }
+    
+  } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
+    isInitializer = true;
+    
+    // It's always a metatype type, so use the instance type name.
+    auto instanceType = TE->getType()->getAs<MetatypeType>()->getInstanceType();
+    overloadName = instanceType->getString();
+  } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
+    overloadName = UDE->getName().str().str();
+  } else {
+    isClosureInvocation = true;
+    
+    auto unwrappedExpr = unwrapParenExpr(fnExpr);
+    isInvalidTrailingClosureTarget = !isa<ClosureExpr>(unwrappedExpr);
+  }
+  
+  // Build the argument type list.
+  if (auto parenExpr = dyn_cast<ParenExpr>(argExpr)) {
+    auto subType =
+        getTypeOfIndependentSubExpression((parenExpr->getSubExpr()));
+    
+    if (isErrorTypeKind(subType))
+      foundIntermediateError = true;
+    
+    argTypes.push_back(subType);
+  } else if (auto tupleExpr = dyn_cast<TupleExpr>(argExpr)) {
+    for (auto elExpr : tupleExpr->getElements()) {
+      auto elType = getTypeOfIndependentSubExpression(elExpr);
+      
+      if (isErrorTypeKind(elType))
+        foundIntermediateError = true;
+      
+      argTypes.push_back(elType);
+    }
+  }
+  
+  if (foundIntermediateError)
+    return true;
+  
+  if (argTypes.size()) {
+    
+    std::string argString = getTypeListString(argTypes);
+    
+    if (!isOverloadedFn) {
+      if (isClosureInvocation) {
+        
+        if (isInvalidTrailingClosureTarget) {
+          CS->TC.diagnose(fnExpr->getLoc(),
+                          diag::invalid_trailing_closure_target);
+        } else {
+          CS->TC.diagnose(fnExpr->getLoc(),
+                          diag::cannot_invoke_closure,
+                          argString);
+        }
+      } else {
+        CS->TC.diagnose(fnExpr->getLoc(),
+                        isInitializer ?
+                          diag::cannot_apply_initializer_to_args :
+                          diag::cannot_apply_function_to_args,
+                        overloadName,
+                        argString);
+      }
+    } else {
+      CS->TC.diagnose(fnExpr->getLoc(),
+                      isInitializer ?
+                        diag::cannot_find_appropriate_initializer_with_list :
+                        diag::cannot_find_appropriate_overload_with_list,
+                      overloadName,
+                      argString);
+    }
+  } else {
+    
+    if (isClosureInvocation) {
+      CS->TC.diagnose(fnExpr->getLoc(), diag::cannot_infer_closure_type);
+    } else {
+      CS->TC.diagnose(fnExpr->getLoc(),
+                      isInitializer ?
+                        diag::cannot_find_initializer_with_no_params :
+                        diag::cannot_find_overload_with_no_params,
+                      overloadName);
+    }
+  }
+  
+  // Did the user intend on invoking a different overload?
+  if (paramLists.size()) {
+    if(!isOverloadedFn) {
+      std::string paramString = "";
+      SmallVector<Type, 16> paramTypes;
+      
+      if (auto parenType = dyn_cast<ParenType>(paramLists[0].getPointer())) {
+        paramTypes.push_back(parenType->getUnderlyingType());
+      } else if (auto tupleType = paramLists[0]->getAs<TupleType>()) {
+        paramTypes.append(tupleType->getElementTypes().begin(),
+                          tupleType->getElementTypes().end());
+      }
+      
+      if (paramTypes.size()) {
+        paramString = getTypeListString(paramTypes);
+        
+        CS->TC.diagnose(argExpr->getLoc(),
+                        diag::expected_certain_args,
+                        paramString);
+      }
+    } else {
+      suggestPotentialOverloads(overloadName,
+                                fnExpr->getLoc(),
+                                paramLists,
+                                argTypes);
+    }
+  }
+  
+  return true;
+}
+
+bool FailureDiagnosis::diagnoseFailureForAssignExpr() {
+  assert(expr->getKind() == ExprKind::Assign);
+  
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  
+  auto assignExpr = cast<AssignExpr>(expr);
+  auto destExpr = assignExpr->getDest();
+  auto srcExpr = assignExpr->getSrc();
+  
+  auto destType = getTypeOfIndependentSubExpression(destExpr);
+  auto srcType = getTypeOfIndependentSubExpression(srcExpr);
+  
+  // If the source type is already an error type, we've likely already posted
+  // an error due to a contextual type conversion error.
+  if (isErrorTypeKind(srcType) || isErrorTypeKind(destType)) {
+    return true;
+  }
+  
+  auto destTypeName = getUserFriendlyTypeName(destType);
+  auto srcTypeName = getUserFriendlyTypeName(srcType);
+  
+  if (isa<LiteralExpr>(destExpr)) {
+    CS->TC.diagnose(destExpr->getLoc(),
+                    diag::cannot_assign_to_literal,
+                    destTypeName);
+  } else if (!srcTypeName.compare(destTypeName)) {
+    
+    if (destType->is<ArchetypeType>()) {
+      CS->TC.diagnose(srcExpr->getLoc(),
+                      diag::cannot_assign_invariant_self,
+                      srcTypeName);
+    } else {
+      
+      // If the types are the same, this might not be an assignability error -
+      // something else may have gone wrong. In that case, independently
+      // re-typecheck the source expression to see if there's a different
+      // failure.
+      CS->TC.eraseTypeData(srcExpr);
+      CS->TC.typeCheckExpression(srcExpr, CS->DC, Type(), Type(), false);
+      
+      if (srcExpr->getType()->getAs<ErrorType>())
+        return true;
+      
+      CS->TC.diagnose(destExpr->getLoc(),
+                      diag::cannot_assign_to_immutable_expr,
+                      destTypeName);
+    }
+  } else {
+    CS->TC.diagnose(srcExpr->getLoc(),
+                    diag::cannot_assign_values,
+                    srcTypeName,
+                    destTypeName);
+  }
+  
+  return true;
+}
+
+bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
+  assert(expr->getKind() == ExprKind::InOut);
+  
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  
+  auto inoutExpr = cast<InOutExpr>(expr);
+  auto addressedExpr = inoutExpr->getSubExpr();
+  
+  if (auto DRE = dyn_cast<DeclRefExpr>(addressedExpr)) {
+    if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      if (VD->hasAccessorFunctions() && !VD->getSetter()) {
+        CS->TC.diagnose(DRE->getLoc(),
+                        diag::assignment_get_only_property,
+                        VD->getName());
+        return true;
+      }
+      
+      if (VD->isLet()) {
+        CS->TC.diagnose(addressedExpr->getLoc(),
+                        diag::cannot_assign_to_immutable_expr,
+                        getUserFriendlyTypeName(addressedExpr->getType()));
+        return true;
+      }
+    }
+  } else if (isa<UnresolvedDotExpr>(addressedExpr)) {
+    // For now, keep the UDE distinct from the above to allow for potentially
+    // better diagnostics.
+    CS->TC.diagnose(addressedExpr->getLoc(),
+                    diag::cannot_assign_to_immutable_expr,
+                    getUserFriendlyTypeName(addressedExpr->getType()));
+    return true;
+  }
+  
+  return diagnoseGeneralFailure();
+}
+
+bool FailureDiagnosis::diagnoseFailure() {
+  assert(CS && expr);
+  
+  if (activeConformanceConstraint) {
+    std::pair<Type, Type> types =
+    getBoundTypesFromConstraint(CS,
+                                expr,
+                                activeConformanceConstraint);
+    
+    CS->TC.diagnose(expr->getLoc(),
+                         diag::does_not_conform_to_constraint,
+                         types.first,
+                         types.second)
+    .highlight(expr->getSourceRange());
+    
+    return true;
+  }
+  
+  // If a bridging conversion slips through, treat it as ambiguous.
+  if (bridgeToObjCConstraint) {
+    CS->TC.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous);
+    
+    return true;
+  }
+  
+  // Move on to expr-specific diagnostics.
+  switch(expr->getKind()) {
+      
+#define EXPR(ID, PARENT) \
+  case ExprKind::ID: return diagnoseFailureFor##ID##Expr();
+#include "swift/AST/ExprNodes.def"
+
+  }
+  
+  llvm_unreachable("unrecognized expr kind");
+}
+
+/// Given a specific expression and the remnants of the failed constraint
+/// system, produce a specific diagnostic.
+bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
+  
+  FailureDiagnosis diagnosis(expr, this);
+  
+  // Now, attempt to diagnose the failure from the info we've collected.
+  if (diagnosis.diagnoseFailure())
+    return true;
   
   // A DiscardAssignmentExpr is special in that it introduces a new type
   // variable but places no constraints upon it. Instead, it relies on the rhs
@@ -1355,20 +2075,6 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   return false;
 }
 
-/// Given an expression and a failure, determine if we should emit a diagnostic
-/// based on the recorded failure, or instead emit a diagnostic based on the
-/// system's failed constraints.
-static bool shouldDiagnoseFromConstraints(Expr * expr, Failure &failure) {
-  
-  // For applications and unresolved 'dot' expressions, we can produce a better
-  // diagnostic than 'cannot convert type' by mining the inactive constraints.
-  if (dyn_cast<ApplyExpr>(expr) ||
-      dyn_cast<UnresolvedDotExpr>(expr))
-    return failure.getKind() == Failure::FailureKind::TypesNotConvertible;
-  
-  return false;
-}
-
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
                                Expr *expr,
                                bool onlyFailures) {
@@ -1391,7 +2097,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
     // If we can't make sense of the existing constraints (or none exist), go
     // ahead and try the unavoidable failures again, but with locator
     // substitutions in place.
-    if (!this->diagnoseFailureFromConstraints(expr) &&
+    if (!this->diagnoseFailureForExpr(expr) &&
         !unavoidableFailures.empty()) {
       for (auto failure : unavoidableFailures) {
         if (diagnoseFailure(*this, *failure, expr, true))
@@ -1453,15 +2159,12 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
     // Fall through to produce diagnostics.
   }
 
-  if (failures.size()) {
+  if (failures.size() == 1) {
     auto &failure = unavoidableFailures.empty()? *failures.begin()
                                                : **unavoidableFailures.begin();
     
-    if (!unavoidableFailures.empty() ||
-        !shouldDiagnoseFromConstraints(expr, failure)) {
-      if (diagnoseFailure(*this, failure, expr, failures.size() > 1))
-        return true;
-    }
+    if (diagnoseFailure(*this, failure, expr, false))
+      return true;
   }
   
   if (getExpressionTooComplex()) {
@@ -1473,7 +2176,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
   
   // If all else fails, attempt to diagnose the failure by looking through the
   // system's constraints.
-  this->diagnoseFailureFromConstraints(expr);
+  this->diagnoseFailureForExpr(expr);
   
   return true;
 }

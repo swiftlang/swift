@@ -65,7 +65,8 @@ TypeBase *TypeVariableType::getBaseBeingSubstituted() {
   if (auto locator = impl.getLocator())
     if (auto anchor = locator->getAnchor())
       if (auto anchorType = anchor->getType())
-        if (!anchorType->getAs<TypeVariableType>())
+        if (!(anchorType->getAs<TypeVariableType>() ||
+              anchorType->getAs<AnyFunctionType>()))
           return anchorType.getPointer();
   
   if (auto proto = impl.literalConformanceProto) {
@@ -771,19 +772,16 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
                                         ConstraintSystem *cs, Expr *expr) {
   class CleanupIllFormedExpression : public ASTWalker {
     ASTContext &context;
-    ConstraintSystem *cs;
 
   public:
     CleanupIllFormedExpression(ASTContext &context, ConstraintSystem *cs)
-      : context(context), cs(cs) { }
+      : context(context) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         closure->getParams()->forEachVariable([&](VarDecl *VD) {
           if (VD->hasType()) {
             Type T = VD->getType();
-            if (cs)
-              T = cs->simplifyType(T);
             if (T->hasTypeVariable()) {
               T = ErrorType::get(context);
               VD->setInvalid();
@@ -803,8 +801,6 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
       Type type;
       if (expr->getType()) {
         type = expr->getType();
-        if (cs)
-          type = cs->simplifyType(type);
       }
 
       if (!type || type->hasTypeVariable())
@@ -831,28 +827,10 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
   return expr->walk(CleanupIllFormedExpression(context, cs));
 }
 
-namespace {
-  /// \brief RAII object that cleans up the given expression if not explicitly
-  /// disabled.
-  class CleanupIllFormedExpressionRAII {
-    ConstraintSystem &cs;
-    Expr **expr;
-
-  public:
-    CleanupIllFormedExpressionRAII(ConstraintSystem &cs, Expr *&expr)
-      : cs(cs), expr(&expr) { }
-
-    ~CleanupIllFormedExpressionRAII() {
-      if (expr) {
-        *expr = cleanupIllFormedExpression(cs.getASTContext(), &cs, *expr);
-      }
-    }
-
-    /// \brief Disable the cleanup of this expression; it doesn't need it.
-    void disable() {
-      expr = nullptr;
-    }
-  };
+CleanupIllFormedExpressionRAII::~CleanupIllFormedExpressionRAII() {
+  if (expr) {
+    *expr = cleanupIllFormedExpression(cs.getASTContext(), &cs, *expr);
+  }
 }
 
 /// Pre-check the expression, validating any types that occur in the
@@ -1025,6 +1003,24 @@ bool TypeChecker::typeCheckExpression(
   expr = result;
   cleanup.disable();
   return false;
+}
+
+/// Private class to "cleanse" an expression tree of types. This is done in the
+/// case of a typecheck failure, where we may want to re-typecheck partially-
+/// typechecked subexpressions in a context-free manner.
+class TypeNullifier : public ASTWalker {
+public:
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    expr->setType(nullptr);
+    
+    return { true, expr };
+  }
+};
+
+void TypeChecker::eraseTypeData(Expr *&expr) {
+  assert(expr);
+  
+  expr->walk(TypeNullifier());
 }
 
 bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,

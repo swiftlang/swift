@@ -235,7 +235,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL(Protocol) \
   case KnownProtocolKind::Protocol: llvm_unreachable("Not a literal protocol");
-#define LITERAL_CONVERTIBLE_PROTOCOL(Protocol)
+#define LITERAL_CONVERTIBLE_PROTOCOL(Protocol, Description)
 #include "swift/AST/KnownProtocols.def"
 
   case KnownProtocolKind::ArrayLiteralConvertible:     index = 0; break;
@@ -271,7 +271,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL(Protocol) \
   case KnownProtocolKind::Protocol: llvm_unreachable("Not a literal protocol");
-#define LITERAL_CONVERTIBLE_PROTOCOL(Protocol)
+#define LITERAL_CONVERTIBLE_PROTOCOL(Protocol, Description)
 #include "swift/AST/KnownProtocols.def"
 
   case KnownProtocolKind::ArrayLiteralConvertible:

@@ -24,13 +24,13 @@ infix func fn_binary(lhs: Int, rhs: Int) {}  // expected-error {{'infix' require
 func ++++(lhs: X, rhs: X) -> X {}
 func ++++(lhs: Y, rhs: Y) -> Y {} // okay
 
-func useInt(x: Int) {} // expected-note{{initialization of parameter}}
+func useInt(x: Int) {}
 func test() {
   var x : Int
   var y : Int = 42
   // Produce a diagnostic for using the result of an assignment as a value.
   // rdar://12961094
-  useInt(x = y)  // expected-error{{'()' is not convertible to 'Int'}}
+  useInt(x = y)  // expected-error{{cannot invoke 'useInt' with an argument list of type '()'}} expected-note{{expected an argument list of type 'Int'}}
 }
 
 prefix operator ~~ {}

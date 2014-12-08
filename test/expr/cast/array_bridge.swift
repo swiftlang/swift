@@ -33,12 +33,12 @@ var b: [B] = []
 
 a = b
 
-b = a // expected-error {{'A' is not identical to 'B'}}
+b = a // expected-error {{cannot assign a value of type '[A]' to a value of type '[B]'}}
 
 var aa: [[A]] = []
 var bb: [[B]] = []
 
-aa = bb // expected-error {{'B' is not identical to 'A'}}
+aa = bb // expected-error {{cannot assign a value of type '[[B]]' to a value of type '[[A]]'}}
 
 class C {
 }
@@ -76,7 +76,7 @@ var e: [E] = []
 var f: [F] = []
 
 e = f
-f = e // expected-error {{'E' is not identical to 'F'}}
+f = e // expected-error {{cannot assign a value of type '[E]' to a value of type '[F]'}}
 
 class G {
   var x = 0
@@ -139,4 +139,4 @@ var aoa: [AnyObject] = []
 var i: [I] = []
 
 aoa = i
-i = aoa // expected-error {{'AnyObject' is not identical to 'I'}}
+i = aoa // expected-error {{cannot assign a value of type '[AnyObject]' to a value of type '[I]'}}

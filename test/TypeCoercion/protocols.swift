@@ -45,9 +45,9 @@ func testPrintableCoercion(ip1: IsPrintable1,
   var p : MyPrintable = ip1 // okay
   p = ip1 // okay
   p = ip2 // okay
-  p = inp1 // expected-error{{'IsNotPrintable1' does not conform to protocol 'MyPrintable'}}
-  p = inp2 // expected-error{{'IsNotPrintable2' does not conform to protocol 'MyPrintable'}}
-  p = op // expected-error{{type 'OtherPrintable' does not conform to protocol 'MyPrintable'}}
+  p = inp1 // expected-error{{cannot assign a value of type 'IsNotPrintable1' to a value of type 'MyPrintable'}}
+  p = inp2 // expected-error{{cannot assign a value of type 'IsNotPrintable2' to a value of type 'MyPrintable'}}
+  p = op // expected-error{{cannot assign a value of type 'OtherPrintable' to a value of type 'MyPrintable'}}
 }
 
 func testTitledCoercion(ip1: IsPrintable1, book: Book, lackey: Lackey,
@@ -56,8 +56,8 @@ func testTitledCoercion(ip1: IsPrintable1, book: Book, lackey: Lackey,
   t = ip1
   t = book
   t = lackey
-  t = number // expected-error{{'Number' does not conform to protocol 'Titled'}}
-  t = ip2 // expected-error{{'IsPrintable2' does not conform to protocol 'Titled'}}
+  t = number // expected-error{{cannot assign a value of type 'Number' to a value of type 'Titled'}}
+  t = ip2 // expected-error{{cannot assign a value of type 'IsPrintable2' to a value of type 'Titled'}}
 }
 
 
@@ -88,11 +88,11 @@ func testFormattedPrintableCoercion(ip1: IsPrintable1,
                                     inout op: OtherPrintable,
                                     nfp1: NotFormattedPrintable1) {
   fp = ip1
-  fp = ip2 // expected-error{{'IsPrintable2' does not conform to protocol 'FormattedPrintable'}}
-  fp = nfp1 // expected-error{{'NotFormattedPrintable1' does not conform to protocol 'FormattedPrintable'}}
+  fp = ip2 // expected-error{{cannot assign a value of type 'IsPrintable2' to a value of type 'FormattedPrintable'}}
+  fp = nfp1 // expected-error{{cannot assign a value of type 'NotFormattedPrintable1' to a value of type 'FormattedPrintable'}}
   p = fp
-  op = fp // expected-error{{type 'FormattedPrintable' does not conform to protocol 'OtherPrintable'}}
-  fp = op // expected-error{{'OtherPrintable' does not conform to protocol 'FormattedPrintable'}}
+  op = fp // expected-error{{cannot assign a value of type 'FormattedPrintable' to a value of type 'OtherPrintable'}}
+  fp = op // expected-error{{cannot assign a value of type 'OtherPrintable' to a value of type 'FormattedPrintable'}}
 }
 
 protocol Document : Titled, MyPrintable {
@@ -107,18 +107,18 @@ func testMethodsAndVars(fp: FormattedPrintable, f: TestFormat, inout doc: Docume
 
 func testDocumentCoercion(inout doc: Document, ip1: IsPrintable1, l: Lackey) {
   doc = ip1
-  doc = l // expected-error{{'Lackey' does not conform to protocol 'Document'}}
+  doc = l // expected-error{{cannot assign a value of type 'Lackey' to a value of type 'Document'}}
 }
 
 // Check coercion of references.
-func refCoercion(inout p: MyPrintable) { } // expected-note 2{{in initialization of parameter 'p'}}
+func refCoercion(inout p: MyPrintable) { }
 var p : MyPrintable = IsPrintable1()
 var fp : FormattedPrintable = IsPrintable1()
 var ip1 : IsPrintable1
 
 refCoercion(&p)
-refCoercion(&fp) // expected-error{{'FormattedPrintable' is not identical to 'MyPrintable'}}
-refCoercion(&ip1) // expected-error{{'IsPrintable1' is not identical to 'MyPrintable'}}
+refCoercion(&fp) // expected-error{{cannot invoke 'refCoercion' with an argument list of type 'inout FormattedPrintable'}} expected-note{{expected an argument list of type 'inout MyPrintable'}}
+refCoercion(&ip1) // expected-error{{cannot invoke 'refCoercion' with an argument list of type 'inout IsPrintable1'}} expected-note{{expected an argument list of type 'inout MyPrintable'}}
 
 protocol IntSubscriptable {
   subscript(i: Int) -> Int { get }
@@ -144,8 +144,8 @@ func testIntSubscripting(inout i_s: IntSubscriptable,
   i_s[5] = 7 // expected-error{{cannot assign to the result of this expression}}
 
   i_s = iis
-  i_s = ids // expected-error{{'IsDoubleSubscriptable' does not conform to protocol 'IntSubscriptable'}}
-  i_s = iiss // expected-error{{'IsIntToStringSubscriptable' does not conform to protocol 'IntSubscriptable'}}
+  i_s = ids // expected-error{{cannot assign a value of type 'IsDoubleSubscriptable' to a value of type 'IntSubscriptable'}}
+  i_s = iiss // expected-error{{cannot assign a value of type 'IsIntToStringSubscriptable' to a value of type 'IntSubscriptable'}}
 }
 
 protocol MyREPLPrintable {

@@ -15,7 +15,7 @@ func f2xy(#x: Int, #y: Int) -> Int {}
 func f2ab(#a: Int, #b: Int) -> Int {}
 func f2yx(#y: Int, #x: Int) -> Int {}
 
-func f3(x: (x: Int, y: Int) -> ()) {} // expected-note{{in initialization of parameter 'x'}}
+func f3(x: (x: Int, y: Int) -> ()) {}
 func f3a(x: Int, y: Int) {}
 func f3b(_: Int) {}
 
@@ -35,10 +35,10 @@ f4(1, 2, 3)
 
 f2(f2xy)
 f2(f2ab)
-f2(f2yx) // expected-error{{cannot convert the expression's type '(y: Int, x: Int) -> Int' to type '((x: Int, y: Int) -> Int) -> ()'}}
+f2(f2yx) // expected-error{{cannot invoke 'f2' with an argument list of type '(y: Int, x: Int) -> Int'}} expected-note{{expected an argument list of type '(x: Int, y: Int) -> Int'}}
 
 f3(f3a)
-f3(f3b) // expected-error{{'(x: Int, y: Int)' is not a subtype of 'Int'}}
+f3(f3b) // expected-error{{cannot invoke 'f3' with an argument list of type '(Int) -> ()'}} expected-note{{expected an argument list of type '(x: Int, y: Int) -> ()'}}
 
 func getIntFloat() -> (int: Int, float: Float) {}
 var values = getIntFloat()

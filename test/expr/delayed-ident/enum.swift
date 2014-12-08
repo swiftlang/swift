@@ -21,4 +21,4 @@ var e2a: E2<Int> = .First
 e2a = .Second(5)
 var e2b: E2 = .Second(5)
 e2b = .First
-var e2c: E2 = .First // expected-error{{argument for generic parameter 'T' could not be inferred}}
+var e2c: E2 = .First // expected-error{{could not find member 'First'}}

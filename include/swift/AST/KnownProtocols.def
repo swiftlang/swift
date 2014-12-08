@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 
-/// \def PROTOCOL(Id)
+/// \def PROTOCOL(Id, Description)
 ///
 /// The enumerator value is \c KnownProtocolKind::Id. The protocol represented
 /// is simply named \p Id.
@@ -24,9 +24,9 @@
 #define PROTOCOL(Id)
 #endif
 
-/// \def LITERAL_CONVERTIBLE_PROTOCOL(Id)
+/// \def LITERAL_CONVERTIBLE_PROTOCOL(Id, Description)
 #ifndef LITERAL_CONVERTIBLE_PROTOCOL
-#define LITERAL_CONVERTIBLE_PROTOCOL(Id) PROTOCOL(Id)
+#define LITERAL_CONVERTIBLE_PROTOCOL(Id, Description) PROTOCOL(Id)
 #endif
 
 /// \def BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id)
@@ -49,17 +49,17 @@ PROTOCOL(Comparable)
 PROTOCOL(_ObjectiveCBridgeable)
 PROTOCOL(_DestructorSafeContainer)
 
-LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(BooleanLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(CharacterLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(DictionaryLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(ExtendedGraphemeClusterLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(FloatLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(IntegerLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(StringInterpolationConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(StringLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(NilLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(UnicodeScalarLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible, array)
+LITERAL_CONVERTIBLE_PROTOCOL(BooleanLiteralConvertible, boolean)
+LITERAL_CONVERTIBLE_PROTOCOL(CharacterLiteralConvertible, character)
+LITERAL_CONVERTIBLE_PROTOCOL(DictionaryLiteralConvertible, dictionary)
+LITERAL_CONVERTIBLE_PROTOCOL(ExtendedGraphemeClusterLiteralConvertible, character)
+LITERAL_CONVERTIBLE_PROTOCOL(FloatLiteralConvertible, floating-point)
+LITERAL_CONVERTIBLE_PROTOCOL(IntegerLiteralConvertible, integer)
+LITERAL_CONVERTIBLE_PROTOCOL(StringInterpolationConvertible, string)
+LITERAL_CONVERTIBLE_PROTOCOL(StringLiteralConvertible, string)
+LITERAL_CONVERTIBLE_PROTOCOL(NilLiteralConvertible, nil)
+LITERAL_CONVERTIBLE_PROTOCOL(UnicodeScalarLiteralConvertible, character)
 
 BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinBooleanLiteralConvertible)
 BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinCharacterLiteralConvertible)

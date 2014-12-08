@@ -5,7 +5,7 @@ protocol P {
   func generate() -> Int
 }
 func f<U: P>(rhs: U) -> X<U.A> { // expected-error {{use of undeclared type 'X'}}
-  let g = rhs.generate() // expected-error {{could not find member 'generate'}}
+  let g = rhs.generate() // expected-error {{cannot invoke 'generate' with no arguments}}
 }
 
 struct Zzz<T> {
