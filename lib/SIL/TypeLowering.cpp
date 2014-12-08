@@ -895,7 +895,6 @@ namespace {
     AddressOnlyTypeLowering(SILType type)
       : TypeLowering(type, IsNotTrivial, IsAddressOnly) {}
 
-  public:
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
@@ -946,9 +945,15 @@ namespace {
     }
   };
   
-  /// A class that acts as a stand-in for unimplemented types.
-  class UnimplementedTypeLowering : public AddressOnlyTypeLowering {
-    using AddressOnlyTypeLowering::AddressOnlyTypeLowering;
+  /// A class that acts as a stand-in for improperly recursive types.
+  class RecursiveErrorTypeLowering : public AddressOnlyTypeLowering {
+  public:
+    RecursiveErrorTypeLowering(SILType type)
+      : AddressOnlyTypeLowering(type) {}
+    
+    bool isValid() const override {
+      return false;
+    }
   };
 
   /// Build the appropriate TypeLowering subclass for the given type.
@@ -1161,7 +1166,7 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
                                          nomTy->getDeclaredTypeInContext());
     } else
       assert(false && "non-nominal types should not be recursive");
-    found->second = new (*this, k.isDependent()) UnimplementedTypeLowering(
+    found->second = new (*this, k.isDependent()) RecursiveErrorTypeLowering(
                                 SILType::getPrimitiveAddressType(k.SubstType));
   }
   return found->second;
@@ -1169,7 +1174,10 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
 
 void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
   auto &Types = k.isDependent() ? DependentTypes : IndependentTypes;
-  Types[k] = tl;
+  // TODO: Types[k] should always be null at this point, except that we
+  // rely on type lowering to discover recursive value types right now.
+  if (!Types[k])
+    Types[k] = tl;
 }
 
 #ifndef NDEBUG

@@ -155,6 +155,12 @@ public:
     return !isAddressOnly();
   }
   
+  /// True if the type was successfully lowered, false if there was an error
+  /// during type lowering.
+  virtual bool isValid() const {
+    return true;
+  }
+  
   /// isTrivial - Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {

@@ -1,4 +1,4 @@
-// RUN: %swift -emit-silgen -verify %s
+// RUN: %swift -emit-sil -verify %s
 
 struct SelfRecursiveStruct { // expected-error{{recursive value type}}
   let a: SelfRecursiveStruct
@@ -36,4 +36,13 @@ enum RecursiveByGenericSubstitutionEnum<T> {
 }
 struct RecursiveByGenericSubstitutionStruct { // expected-error{{recursive value type}}
   let a: RecursiveByGenericSubstitutionEnum<RecursiveByGenericSubstitutionStruct>
+}
+
+struct RecursiveWithLocal { // expected-error{{recursive value type 'RecursiveWithLocal' is not allowed}}
+  init(t: Local) { self.t = t }
+  struct Local {
+    init(s: RecursiveWithLocal) { self.s = s }
+    var s: RecursiveWithLocal
+  }
+  var t: Local
 }
