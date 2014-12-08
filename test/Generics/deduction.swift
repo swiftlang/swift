@@ -40,7 +40,7 @@ func useTwoIdentical(xi: Int, yi: Float) {
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
   
-  twoIdentical(x, y) // expected-error{{cannot invoke 'twoIdentical' with an argument list of type 'Int, Float'}} expected-note{{expected an argument list of type 'T, T'}}
+  twoIdentical(x, y) // expected-error{{cannot invoke 'twoIdentical' with an argument list of type '(Int, Float)'}} expected-note{{expected an argument list of type '(T, T)'}}
 }
 
 func mySwap<T>(inout x: T,
@@ -57,7 +57,7 @@ func useSwap(xi: Int, yi: Float) {
   
   mySwap(x, x) // expected-error 2{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   
-  mySwap(&x, &y) // expected-error{{cannot invoke 'mySwap' with an argument list of type 'inout Int, inout Float'}} expected-note{{expected an argument list of type 'inout T, inout T'}}
+  mySwap(&x, &y) // expected-error{{cannot invoke 'mySwap' with an argument list of type '(inout Int, inout Float)'}} expected-note{{expected an argument list of type '(inout T, inout T)'}}
 }
 
 func takeTuples<T, U>(_: (T, U), _: (U, T)) {
@@ -66,7 +66,7 @@ func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 func useTuples(x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{cannot invoke 'takeTuples' with an argument list of type '(Int, Float), (Int, Float)'}} expected-note {{expected an argument list of type '(T, U), (U, T)'}}
+  takeTuples((x, y), (x, y)) // expected-error{{cannot invoke 'takeTuples' with an argument list of type '((Int, Float), (Int, Float))'}} expected-note {{expected an argument list of type '((T, U), (U, T))'}}
 
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
@@ -76,7 +76,7 @@ func acceptFunction<T, U>(f: (T) -> U, t: T, u: U) {}
 
 func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
-   acceptFunction(f, y, y) // expected-error{{cannot invoke 'acceptFunction' with an argument list of type '(Int) -> Float, Float, Float'}} expected-note{{expected an argument list of type '(T) -> U, T, U'}}
+   acceptFunction(f, y, y) // expected-error{{cannot invoke 'acceptFunction' with an argument list of type '((Int) -> Float, Float, Float)'}} expected-note{{expected an argument list of type '((T) -> U, T, U)'}}
 }
 
 func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note{{in call to function 'returnTuple'}}
@@ -85,7 +85,7 @@ func testReturnTuple(x: Int, y: Float) {
   returnTuple(x) // expected-error{{argument for generic parameter 'U' could not be inferred}}
   var rt1 : (Int, Float) = returnTuple(x)
   var rt2 : (Float, Float) = returnTuple(y)
-  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot invoke 'returnTuple' with an argument list of type 'Float'}} expected-note{{expected an argument list of type 'T'}}
+  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Float)'}} expected-note{{expected an argument list of type '(T)'}}
 }
 
 
@@ -202,7 +202,7 @@ extension Int : IsBefore {
 
 func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(x, y)
-  min2(a, b) // expected-error{{cannot invoke 'min2' with an argument list of type 'Float, Float'}} expected-note {{expected an argument list of type 'T, T'}}
+  min2(a, b) // expected-error{{cannot invoke 'min2' with an argument list of type '(Float, Float)'}} expected-note {{expected an argument list of type '(T, T)'}}
 }
 
 func rangeOfIsBefore<
@@ -212,7 +212,7 @@ func rangeOfIsBefore<
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{cannot invoke 'rangeOfIsBefore' with an argument list of type 'IndexingGenerator<Array<Double>>'}} expected-note{{expected an argument list of type 'R'}}
+  rangeOfIsBefore(da.generate()) // expected-error{{cannot invoke 'rangeOfIsBefore' with an argument list of type '(IndexingGenerator<Array<Double>>)'}} expected-note{{expected an argument list of type '(R)'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -243,7 +243,7 @@ func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
   // FIXME: $T1 should not show up here!
-  getVectorSize(i) // expected-error{{cannot invoke 'getVectorSize' with an argument list of type 'Int'}} expected-note {{expected an argument list of type 'MyVector<T>'}}
+  getVectorSize(i) // expected-error{{cannot invoke 'getVectorSize' with an argument list of type '(Int)'}} expected-note {{expected an argument list of type '(MyVector<T>)'}}
 
   var x : X, y : Y
   x = ovlVector(vi)

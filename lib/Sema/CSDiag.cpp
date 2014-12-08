@@ -1559,19 +1559,23 @@ void FailureDiagnosis::suggestPotentialOverloads(
                         tupleType->getElementTypes().end());
     }
     
-    for (auto pt : paramTypes) {
-      for (auto at : argTypes) {
-        if (pt->isEqual(at)) {
-          auto typeListString = getTypeListString(paramTypes);
-          if (!dupes[typeListString]) {
-            dupes[typeListString] = true;
-            if (iPL)
-              suggestionText += ", ";
-            iPL++;
-            suggestionText += "(" + typeListString + ")";
-          }
-          break;
+    if (paramTypes.size() != argTypes.size())
+      continue;
+    
+    for (size_t i = 0; i < paramTypes.size(); i++) {
+      auto pt = paramTypes[i];
+      auto at = argTypes[i];
+    
+      if (pt->isEqual(at)) {
+        auto typeListString = getTypeListString(paramTypes);
+        if (!dupes[typeListString]) {
+          dupes[typeListString] = true;
+          if (iPL)
+            suggestionText += ", ";
+          iPL++;
+          suggestionText += "(" + typeListString + ")";
         }
+        break;
       }
     }
   }
@@ -1826,7 +1830,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   
   if (argTypes.size()) {
     
-    std::string argString = getTypeListString(argTypes);
+    std::string argString = "(" + getTypeListString(argTypes) + ")";
     
     if (!isOverloadedFn) {
       if (isClosureInvocation) {
@@ -1882,7 +1886,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
       }
       
       if (paramTypes.size()) {
-        paramString = getTypeListString(paramTypes);
+        paramString = "(" + getTypeListString(paramTypes) + ")";
         
         CS->TC.diagnose(argExpr->getLoc(),
                         diag::expected_certain_args,
@@ -1922,8 +1926,7 @@ bool FailureDiagnosis::diagnoseFailureForAssignExpr() {
   
   if (isa<LiteralExpr>(destExpr)) {
     CS->TC.diagnose(destExpr->getLoc(),
-                    diag::cannot_assign_to_literal,
-                    destTypeName);
+                    diag::cannot_assign_to_literal);
   } else if (!srcTypeName.compare(destTypeName)) {
     
     if (destType->is<ArchetypeType>()) {

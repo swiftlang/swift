@@ -31,8 +31,8 @@ f0(f)
 f0(b)
 f1(i)
 
-f1(f) // expected-error{{cannot invoke 'f1' with an argument list of type 'Float'}} expected-note{{expected an argument list of type 'protocol<Barable, Fooable>'}}
-f1(b) // expected-error{{cannot invoke 'f1' with an argument list of type 'Barable'}} expected-note{{expected an argument list of type 'protocol<Barable, Fooable>'}}
+f1(f) // expected-error{{cannot invoke 'f1' with an argument list of type '(Float)'}} expected-note{{expected an argument list of type '(protocol<Barable, Fooable>)'}}
+f1(b) // expected-error{{cannot invoke 'f1' with an argument list of type '(Barable)'}} expected-note{{expected an argument list of type '(protocol<Barable, Fooable>)'}}
 
 //===--------------------------------------------------------------------===//
 // Subtyping
@@ -40,7 +40,7 @@ f1(b) // expected-error{{cannot invoke 'f1' with an argument list of type 'Barab
 g(f0)
 g(f1)
 
-g(f2) // expected-error{{cannot invoke 'g' with an argument list of type '(Float) -> ()'}} expected-note{{expected an argument list of type '(protocol<Barable, Fooable>) -> ()'}}
+g(f2) // expected-error{{cannot invoke 'g' with an argument list of type '((Float) -> ())'}} expected-note{{expected an argument list of type '((protocol<Barable, Fooable>) -> ())'}}
 
 //===--------------------------------------------------------------------===//
 // Dynamic self

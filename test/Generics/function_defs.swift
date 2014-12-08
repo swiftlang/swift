@@ -17,7 +17,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> 
     return true;
   }
 
-  return t1.isEqual(u) // expected-error{{cannot invoke 'isEqual' with an argument list of type 'U'}}
+  return t1.isEqual(u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(U)'}}
 }
 
 protocol MethodLessComparable {
@@ -36,7 +36,7 @@ func min<T : MethodLessComparable>(x: T, y: T) -> T {
 func existential<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) {
   var eqComp : EqualComparable = t1 // expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
   eqComp = u
-  if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type 'EqualComparable'}}
+  if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type '(EqualComparable)'}}
   if eqComp.isEqual(t2) {} // expected-error{{'EqualComparable' does not have a member named 'isEqual'}}
 }
 
@@ -103,7 +103,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type 'Ovl.A'}}
+  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
   
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
@@ -168,7 +168,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
 
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
-  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type 'T, U'}}
+  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, U)'}}
 }
 
 //===----------------------------------------------------------------------===//

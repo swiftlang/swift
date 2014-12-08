@@ -53,7 +53,7 @@ func test_inout() {
 
   x = xy;
   x = &xy; // expected-error{{cannot assign a value of type 'inout X' to a value of type 'X'}}
-  accept_Z(&xy); // expected-error{{cannot invoke 'accept_Z' with an argument list of type 'inout X'}} expected-note{{expected an argument list of type 'inout Z'}}
+  accept_Z(&xy); // expected-error{{cannot invoke 'accept_Z' with an argument list of type '(inout X)'}} expected-note{{expected an argument list of type '(inout Z)'}}
 }
 
 func lvalue_or_rvalue(inout x: X) -> X { }

@@ -35,10 +35,10 @@ f4(1, 2, 3)
 
 f2(f2xy)
 f2(f2ab)
-f2(f2yx) // expected-error{{cannot invoke 'f2' with an argument list of type '(y: Int, x: Int) -> Int'}} expected-note{{expected an argument list of type '(x: Int, y: Int) -> Int'}}
+f2(f2yx) // expected-error{{cannot invoke 'f2' with an argument list of type '((y: Int, x: Int) -> Int)'}} expected-note{{expected an argument list of type '((x: Int, y: Int) -> Int)'}}
 
 f3(f3a)
-f3(f3b) // expected-error{{cannot invoke 'f3' with an argument list of type '(Int) -> ()'}} expected-note{{expected an argument list of type '(x: Int, y: Int) -> ()'}}
+f3(f3b) // expected-error{{cannot invoke 'f3' with an argument list of type '((Int) -> ())'}} expected-note{{expected an argument list of type '((x: Int, y: Int) -> ())'}}
 
 func getIntFloat() -> (int: Int, float: Float) {}
 var values = getIntFloat()

@@ -83,8 +83,8 @@ ERROR(cannot_convert_existential_to_metatype,sema,none,
       "accessing members of protocol type value %0 is unimplemented", (Type))
 
 ERROR(cannot_apply_binop_to_args,sema,none,
-      "binary operator '%0' cannot be applied to an %1 operand and "
-      "a %2 operand", (StringRef, StringRef, StringRef))
+      "binary operator '%0' cannot be applied operands of type '%1' and '%2'",
+      (StringRef, StringRef, StringRef))
 
 ERROR(cannot_apply_binop_to_same_args,sema,none,
       "binary operator '%0' cannot be applied to two %1 operands",
@@ -110,7 +110,7 @@ ERROR(cannot_assign_to_immutable_expr,sema,none,
       "cannot assign to immutable value of type '%0'", (StringRef))
 
 ERROR(cannot_assign_to_literal,sema,none,
-      "cannot assign to a %0 literal value", (StringRef))
+      "cannot assign to a literal value", ())
 
 ERROR(cannot_apply_function_to_args,sema,none,
       "cannot invoke '%0' with an argument list of type "
@@ -145,7 +145,7 @@ ERROR(cannot_infer_closure_type,sema,none,
       "unable to infer closure type in the current context", ())
 
 ERROR(invalid_trailing_closure_target,sema,none,
-      "invalid target for trailing closure", ())
+      "unexpected trailing closure", ())
 
 NOTE(suggest_partial_overloads,sema,none,
       "Overloads for '%0' exist with these partially matching parameter "

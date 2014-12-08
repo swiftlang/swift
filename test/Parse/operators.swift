@@ -74,13 +74,13 @@ var _ : TheDevil = God()^
 var _ : God = ^TheDevil()
 var _ : Man = TheDevil() ^ God()
 var _ : Man = God()^ ^ ^TheDevil()
-var _ = God()^TheDevil() // expected-error{{binary operator '^' cannot be applied to an God operand and a TheDevil operand}}
+var _ = God()^TheDevil() // expected-error{{binary operator '^' cannot be applied operands of type 'God' and 'TheDevil'}}
 
 postfix func ^ (x: Man) -> () -> God {
   return { return God() }
 }
 
-var _ : God = Man()^() // expected-error{{binary operator '^' cannot be applied to an Man operand and a () operand}}
+var _ : God = Man()^() // expected-error{{binary operator '^' cannot be applied operands of type 'Man' and '()'}}
 
 func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 

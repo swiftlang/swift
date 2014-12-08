@@ -22,7 +22,7 @@ func ternary<T>(cond: Bool,
                 ifFalse: @autoclosure () -> T) -> T {}
 
 f0(c)
-f0(a) // expected-error{{cannot invoke 'f0' with an argument list of type 'A'}} expected-note {{expected an argument list of type 'B'}}
+f0(a) // expected-error{{cannot invoke 'f0' with an argument list of type '(A)'}} expected-note {{expected an argument list of type '(B)'}}
 f0(ef)
 f0(fi)
 

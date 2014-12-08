@@ -20,4 +20,4 @@ func i<j : b, k : d where k.f == j> (n: k) {
 }
 func i<l : d where l.f == c> (n: l) {
 }
-i(e()) // expected-error {{cannot find an overload for 'i' that accepts an argument list of type 'e'}}
+i(e()) // expected-error {{cannot find an overload for 'i' that accepts an argument list of type '(e)'}}

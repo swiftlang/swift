@@ -4,16 +4,16 @@ import nullability;
 
 func testSomeClass(sc: SomeClass, osc: SomeClass?) {
   var ao1: AnyObject = sc.methodA(osc)
-  if sc.methodA(osc) == nil { } // expected-error{{binary operator '==' cannot be applied to an AnyObject operand and a nil operand}}
+  if sc.methodA(osc) == nil { } // expected-error{{binary operator '==' cannot be applied operands of type 'AnyObject' and 'nil'}}
 
   var ao2: AnyObject = sc.methodB(nil)
-  if sc.methodA(osc) == nil { } // expected-error{{binary operator '==' cannot be applied to an AnyObject operand and a nil operand}}
+  if sc.methodA(osc) == nil { } // expected-error{{binary operator '==' cannot be applied operands of type 'AnyObject' and 'nil'}}
 
   var ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}}
   var ao3_ok: AnyObject? = sc.property // okay
 
   var ao4: AnyObject = sc.methodD()
-  if sc.methodD() == nil { } // expected-error{{cannot invoke}}
+  if sc.methodD() == nil { } // expected-error{{binary operator '==' cannot be applied operands of type 'AnyObject' and 'nil'}}
 
   sc.methodE(sc)
   sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}

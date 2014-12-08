@@ -117,8 +117,8 @@ var fp : FormattedPrintable = IsPrintable1()
 var ip1 : IsPrintable1
 
 refCoercion(&p)
-refCoercion(&fp) // expected-error{{cannot invoke 'refCoercion' with an argument list of type 'inout FormattedPrintable'}} expected-note{{expected an argument list of type 'inout MyPrintable'}}
-refCoercion(&ip1) // expected-error{{cannot invoke 'refCoercion' with an argument list of type 'inout IsPrintable1'}} expected-note{{expected an argument list of type 'inout MyPrintable'}}
+refCoercion(&fp) // expected-error{{cannot invoke 'refCoercion' with an argument list of type '(inout FormattedPrintable)'}} expected-note{{expected an argument list of type '(inout MyPrintable)'}}
+refCoercion(&ip1) // expected-error{{cannot invoke 'refCoercion' with an argument list of type '(inout IsPrintable1)'}} expected-note{{expected an argument list of type '(inout MyPrintable)'}}
 
 protocol IntSubscriptable {
   subscript(i: Int) -> Int { get }

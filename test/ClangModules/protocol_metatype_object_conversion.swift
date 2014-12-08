@@ -11,5 +11,5 @@ func takesProtocol(x: Protocol) {}
 
 takesProtocol(ObjCProto.self)
 takesProtocol(ObjCProto2.self)
-takesProtocol(NonObjCProto.self) // expected-error{{cannot invoke 'takesProtocol' with an argument list of type 'NonObjCProto.Protocol'}} expected-note{{expected an argument list of type 'Protocol'}}
-takesProtocol(TwoObjCProtos.self) // expected-error{{cannot invoke 'takesProtocol' with an argument list of type 'TwoObjCProtos.Protocol'}} expected-note {{expected an argument list of type 'Protocol'}}
+takesProtocol(NonObjCProto.self) // expected-error{{cannot invoke 'takesProtocol' with an argument list of type '(NonObjCProto.Protocol)'}} expected-note{{expected an argument list of type '(Protocol)'}}
+takesProtocol(TwoObjCProtos.self) // expected-error{{cannot invoke 'takesProtocol' with an argument list of type '(TwoObjCProtos.Protocol)'}} expected-note {{expected an argument list of type '(Protocol)'}}

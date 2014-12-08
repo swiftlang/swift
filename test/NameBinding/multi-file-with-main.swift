@@ -2,6 +2,6 @@
 
 func testOperator() {
   // FIXME: Lousy error message.
-  let x: Int = 1 +++ "abc" // expected-error {{binary operator '+++' cannot be applied to an Int operand and a String operand}}
+  let x: Int = 1 +++ "abc" // expected-error {{binary operator '+++' cannot be applied operands of type 'Int' and 'String'}}
   println(x)
 }

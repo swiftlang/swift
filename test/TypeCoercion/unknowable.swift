@@ -43,6 +43,6 @@ func doWibble(_: CanWibble) {}
 
 func testWibble() {
   doWibble(1)
-  doWibble(3.14) // expected-error{{cannot invoke 'doWibble' with an argument list of type 'Double'}} expected-note{{expected an argument list of type 'CanWibble'}}
+  doWibble(3.14) // expected-error{{cannot invoke 'doWibble' with an argument list of type '(Double)'}} expected-note{{expected an argument list of type '(CanWibble)'}}
 }
 

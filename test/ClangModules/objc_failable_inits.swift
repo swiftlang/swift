@@ -5,7 +5,7 @@ import Foundation
 func testDictionary() {
   // -[NSDictionary init] returns non-nil.
   var dictNonOpt = NSDictionary()
-  if dictNonOpt == nil { } // expected-error{{binary operator '==' cannot be applied to an NSDictionary operand and a nil operand}}
+  if dictNonOpt == nil { } // expected-error{{binary operator '==' cannot be applied operands of type 'NSDictionary' and 'nil'}}
 }
 
 func testString() {

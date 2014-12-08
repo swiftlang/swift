@@ -30,11 +30,11 @@ ambiguousWithVar(true)   // no-warning
 var localVar : Bool
 localVar = false
 localVar = 42 // expected-error {{cannot assign a value of type 'Int' to a value of type 'Bool'}}
-localVar(42)  // expected-error {{cannot invoke 'localVar' with an argument list of type 'Int'}}
+localVar(42)  // expected-error {{cannot invoke 'localVar' with an argument list of type '(Int)'}}
 var _ : localVar // should still work
 
 var _ = scopedVar // no-warning
-scopedVar(42) // expected-error {{cannot invoke 'scopedVar' with an argument list of type 'Int'}}
+scopedVar(42) // expected-error {{cannot invoke 'scopedVar' with an argument list of type '(Int)'}}
 
 var _ : Bool = scopedFunction(true)
 var _ : Int  = scopedFunction(42)

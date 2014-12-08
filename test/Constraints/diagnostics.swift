@@ -37,8 +37,8 @@ var d : Double
 // Check the various forms of diagnostics the type checker can emit.
 
 // Tuple size mismatch.
-f1(  // expected-error {{cannot invoke 'f1' with an argument list of type '(Int) -> Int'}}
-   f4 // expected-note {{expected an argument list of type '(Int, Float) -> Int'}}
+f1(  // expected-error {{cannot invoke 'f1' with an argument list of type '((Int) -> Int)'}}
+   f4 // expected-note {{expected an argument list of type '((Int, Float) -> Int)'}}
    ) 
 
 // Tuple element unused.
@@ -51,17 +51,17 @@ f0(i, i, // expected-error{{extra argument in call}}
 // f5(f4)
 
 // Tuple element not convertible.
-f0(i, // expected-error {{cannot invoke 'f0' with an argument list of type 'Int, Double'}} expected-note{{expected an argument list of type 'Int, Float'}}
+f0(i, // expected-error {{cannot invoke 'f0' with an argument list of type '(Int, Double)'}} expected-note{{expected an argument list of type '(Int, Float)'}}
    d
    )
 
 // Function result not a subtype.
-f1( // expected-error {{cannot invoke 'f1' with an argument list of type '(Int, Float) -> ()'}}
-   f0 // expected-note{{expected an argument list of type '(Int, Float) -> Int'}}
+f1( // expected-error {{cannot invoke 'f1' with an argument list of type '((Int, Float) -> ())'}}
+   f0 // expected-note{{expected an argument list of type '((Int, Float) -> Int)'}}
    )
 
-f3( // expected-error {{cannot invoke 'f3' with an argument list of type '(((Int) -> Int)) -> Int'}}
-   f2 // expected-note{{expected an argument list of type '((Int) -> Float) -> Int'}}
+f3( // expected-error {{cannot invoke 'f3' with an argument list of type '((((Int) -> Int)) -> Int)'}}
+   f2 // expected-note{{expected an argument list of type '(((Int) -> Float) -> Int)'}}
    )
 
 // FIXME: Can't test same-type diagnostic yet.

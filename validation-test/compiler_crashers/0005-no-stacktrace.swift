@@ -5,6 +5,6 @@
 
 class c {
     func b((Any, c))(a: (Any, AnyObject)) {
-        b(a) // expected-error {{cannot invoke 'b' with an argument list of type '(Any, AnyObject)'}}
+        b(a) // expected-error {{cannot invoke 'b' with an argument list of type '((Any, AnyObject))'}}
     }
 }
