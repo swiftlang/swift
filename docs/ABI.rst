@@ -277,9 +277,9 @@ and witness tables for all of the required protocol conformances are included.
 The layout is as if declared in the following C struct::
 
   struct OpaqueExistentialContainer {
+    void *fixedSizeBuffer[3];
     Metadata *type;
     WitnessTable *witnessTables[NUM_WITNESS_TABLES];
-    void *fixedSizeBuffer[3];
   };
 
 Class Existential Containers
@@ -294,8 +294,8 @@ own type metadata, so the separate metadata record is not needed. The
 layout is thus as if declared in the following C struct::
 
   struct ClassExistentialContainer {
-    WitnessTable *witnessTables[NUM_WITNESS_TABLES];
     HeapObject *value;
+    WitnessTable *witnessTables[NUM_WITNESS_TABLES];
   };
 
 Note that if no witness tables are needed, such as for the "any class" type
