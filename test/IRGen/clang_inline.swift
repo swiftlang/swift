@@ -29,5 +29,19 @@ func testExtern() -> CInt {
   return wrappedGetInt()
 }
 
-// CHECK: define internal i32 @innerZero() #2 {
-// CHECK: declare i32 @getInt() #3
+// CHECK: define hidden i32 @_TF12clang_inline16testAlwaysInlineFT_VSs5Int32() [[SSP:#[0-9]+]] {
+// CHECK-NOT: @alwaysInlineNumber
+// CHECK:   ret i32 17
+// CHECK-NOT: @alwaysInlineNumber
+func testAlwaysInline() -> CInt {
+  return alwaysInlineNumber()
+}
+
+// CHECK-NOT: @alwaysInlineNumber
+// CHECK: define internal i32 @innerZero() [[INNER_ZERO_ATTR:#[0-9]+]] {
+// CHECK: declare i32 @getInt() [[GET_INT_ATTR:#[0-9]+]]
+// CHECK-NOT: @alwaysInlineNumber
+
+// CHECK: attributes [[SSP]] = { ssp }
+// CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp 
+// CHECK: attributes [[GET_INT_ATTR]] = {

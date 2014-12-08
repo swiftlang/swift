@@ -279,6 +279,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     PMBuilder.LoopVectorize = true;
   } else {
     PMBuilder.OptLevel = 0;
+    PMBuilder.Inliner = llvm::createAlwaysInlinerPass(/*insert lifetime*/false);
   }
 
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer

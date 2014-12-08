@@ -44,6 +44,10 @@ static inline int innerZero(void) { return 0; }
 static inline int zero(void) { return innerZero(); }
 static inline int wrappedZero(void) { return zero(); }
 
+static inline int alwaysInlineNumber(void) __attribute__((always_inline)) {
+  return 17;
+}
+
 extern int getInt(void);
 static inline int wrappedGetInt(void) { return getInt(); }
 
