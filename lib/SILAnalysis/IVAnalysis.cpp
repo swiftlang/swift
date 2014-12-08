@@ -18,9 +18,11 @@
 using namespace swift;
 using namespace swift::PatternMatch;
 
+#if !defined(NDEBUG)
 static bool inSCC(ValueBase *Value, IVInfo::SCCType &SCC) {
   return std::find(SCC.begin(), SCC.end(), Value) != SCC.end();
 }
+#endif
 
 // For now, we'll consider only the simplest induction variables:
 // - Exactly one element in the cycle must be a SILArgument.
