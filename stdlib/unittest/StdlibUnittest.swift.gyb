@@ -32,9 +32,11 @@ public struct SourceLoc {
 }
 
 public struct SourceLocStack {
-  let locs: _UnitTestArray<SourceLoc> = []
+  let locs: _UnitTestArray<SourceLoc>
 
-  public init() {}
+  public init() {
+    locs = []
+  }
 
   public init(_ loc: SourceLoc) {
     locs = [ loc ]

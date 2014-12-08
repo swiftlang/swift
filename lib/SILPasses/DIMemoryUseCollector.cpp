@@ -254,6 +254,26 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
                                    IsSelfOfNonDelegatingInitializer, Result);
 }
 
+/// If the specified value is a 'let' property in an initializer, return true.
+bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
+  // If we aren't representing 'self' in a non-delegating initializer, then we
+  // can't have 'let' properties.
+  if (!IsSelfOfNonDelegatingInitializer) return false;
+
+  auto *NTD = cast<NominalTypeDecl>(getType()->getAnyNominal());
+  for (auto *VD : NTD->getStoredProperties()) {
+    auto FieldType = VD->getType()->getCanonicalType();
+    unsigned NumFieldElements = getElementCountRec(FieldType, false);
+    if (Element < NumFieldElements)
+      return VD->isLet();
+    Element -= NumFieldElements;
+  }
+
+  // Otherwise, we miscounted elements?
+  assert(Element == 0 && "Element count problem");
+  return false;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                        DIMemoryUse Implementation

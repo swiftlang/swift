@@ -3723,36 +3723,26 @@ public:
       if (PBD->getPattern()->hasType() && !PBD->hasInit() &&
           PBD->hasStorage() && !PBD->getPattern()->getType()->is<ErrorType>()) {
 
-        // If we have a type-adjusting attribute, apply it now.
-        // Also record whether the pattern-binding is for a debugger variable.
-        bool isDebuggerVar = false;
+        // If we have a type-adjusting attribute (like ownership), apply it now.
         if (auto var = PBD->getSingleVar()) {
-          isDebuggerVar = var->isDebuggerVar();
-            
           if (auto *OA = var->getAttrs().getAttribute<OwnershipAttr>())
             TC.checkOwnershipAttr(var, OA);
         }
 
-        // Make sure we don't have a @NSManaged property.
-        bool hasNSManaged = false;
+        // Decide whether we should suppress default initialization.
+        bool suppressDefaultInit = false;
         PBD->getPattern()->forEachVariable([&](VarDecl *var) {
-          if (var->getAttrs().hasAttribute<NSManagedAttr>())
-            hasNSManaged = true;
+          // @NSManaged properties never get default initialized, nor do
+          // debugger variables and immutable properties.
+          if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
+              var->isDebuggerVar() ||
+              var->isLet())
+            suppressDefaultInit = true;
         });
 
-        if (!hasNSManaged && !isDebuggerVar) {
+        if (!suppressDefaultInit) {
           auto type = PBD->getPattern()->getType();
           if (auto defaultInit = buildDefaultInitializer(TC, type)) {
-            // If any of the default initialized values are immutable, then
-            // emit a diagnostic.  We don't do this for members of types, since
-            // the init members have write access to the let values.
-            if (!PBD->getDeclContext()->isTypeContext()) {
-              PBD->getPattern()->forEachVariable([&] (VarDecl *VD) {
-                if (VD->isLet())
-                  TC.diagnose(VD->getLoc(), diag::let_default_init);
-              });
-            }
-
             // If we got a default initializer, install it and re-type-check it
             // to make sure it is properly coerced to the pattern type.
             PBD->setInit(defaultInit, /*checked=*/false);

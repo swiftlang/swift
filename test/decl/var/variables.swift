@@ -69,3 +69,8 @@ class SomeClass {}
 weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
 
 let a = b ; let b = a // expected-error{{could not infer type for 'a'}} expected-error{{could not infer type for 'b'}}
+
+
+// <rdar://problem/17501765> Swift should warn about immutable default initialized values
+let uselessValue : String? // expected-error {{'let' declarations require an initializer expression}}
+

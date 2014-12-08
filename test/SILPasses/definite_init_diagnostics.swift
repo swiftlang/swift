@@ -695,7 +695,7 @@ class rdar18414728Base {
     if let p1 = prop { // expected-error {{use of 'self' in property access 'prop' before all stored properties are initialized}}
       aaaaa = p1
     }
-    aaaaa = "foo"
+    aaaaa = "foo"  // expected-error {{immutable property 'self.aaaaa' may only be initialized once}}
   }
 
   init(a : ()) {
@@ -726,7 +726,7 @@ class rdar18414728Derived : rdar18414728Base {
     if let p1 = prop2 {  // expected-error {{use of 'self' in property access 'prop2' before super.init initializes self}}
       aaaaa2 = p1
     }
-    aaaaa2 = "foo"
+    aaaaa2 = "foo"    // expected-error {{immutable property 'self.aaaaa2' may only be initialized once}}
     super.init()
   }
 
@@ -744,7 +744,7 @@ class rdar18414728Derived : rdar18414728Base {
 
   override init(c : ()) {
     super.init()        // expected-error {{property 'self.aaaaa2' not initialized at super.init call}}
-    aaaaa2 = "foo"
+    aaaaa2 = "foo"      // expected-error {{immutable property 'self.aaaaa2' may only be initialized once}}
     method2()
   }
 
@@ -816,4 +816,50 @@ struct rdar17207456Struct {
     self.init()
   }
 }
+
+
+// <rdar://problem/19035287> let properties should only be initializable, not reassignable
+struct LetProperties {
+  let (u, v) : (Int, Int)
+  let x = 42    // expected-note{{initial value already provided in 'let' declaration}}
+  let y : Int
+  let z : Int?  // expected-note{{'self.z' not initialized}}
+
+  // Let properties can be initialized naturally exactly once along any given
+  // path through an initializer.
+  init(cond : Bool) {
+    if cond {
+      (u,v) = (4,2)
+      y = 71
+    } else {
+      y = 13
+      v = 2
+      u = v+1
+    }
+    z = nil
+  }
+
+  // Multiple initializations are an error.
+  init(a : Int) {
+    x = a   // expected-error {{immutable property 'self.x' may only be initialized once}}
+    y = a
+    y = a   // expected-error {{immutable property 'self.y' may only be initialized once}}
+
+    u = a
+    v = a
+    u = a   // expected-error {{immutable property 'self.u' may only be initialized once}}
+    v = a   // expected-error {{immutable property 'self.v' may only be initialized once}}
+
+  }  // expected-error {{return from initializer without initializing all stored properties}}
+
+  // inout uses of let properties are an error.
+  init() {
+    u = 1; v = 13; y = 1 ; z = u
+
+    var variable = 42
+    swap(&u, &variable)  // expected-error {{immutable property 'self.u' may not be passed to an inout argument}}
+  }
+}
+
+
 

@@ -6,6 +6,8 @@ struct SelfRecursiveStruct { // expected-error{{recursive value type}}
 
 struct OptionallyRecursiveStruct { // expected-error{{recursive value type}}
   let a: OptionallyRecursiveStruct?
+
+  init() { a = OptionallyRecursiveStruct() }
 }
 
 struct IndirectlyRecursiveStruct1 { // expected-error{{recursive value type}}

@@ -155,6 +155,9 @@ public:
   /// be determined, return it.  Otherwise, return null.
   ValueDecl *getPathStringToElement(unsigned Element,
                                     std::string &Result) const;
+
+  /// If the specified value is a 'let' property in an initializer, return true.
+  bool isElementLetProperty(unsigned Element) const;
 };
 
 

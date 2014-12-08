@@ -41,7 +41,7 @@ public final class LifetimeTracked : ForwardIndexType, Printable {
     return trackedCount
   }
   
-  public let value: Int = 0
+  public let value: Int
   public var serialNumber: Int = 0
 }
 

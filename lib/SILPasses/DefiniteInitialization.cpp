@@ -370,6 +370,8 @@ namespace {
     bool isInitializedAtUse(const DIMemoryUse &Use, bool *SuperInitDone = 0);
 
     void handleStoreUse(unsigned UseID);
+    void handleInOutUse(const DIMemoryUse &Use);
+
     void handleLoadUseFailure(const DIMemoryUse &InstInfo,
                               bool IsSuperInitComplete);
     void handleSuperInitUse(const DIMemoryUse &InstInfo);
@@ -649,8 +651,7 @@ void LifetimeChecker::doIt() {
     }
 
     case DIUseKind::InOutUse:
-      if (!isInitializedAtUse(Use))
-        diagnoseInitError(Use, diag::variable_inout_before_initialized);
+      handleInOutUse(Use);
       break;
 
     case DIUseKind::Escape:
@@ -726,16 +727,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   auto Liveness = getLivenessAtInst(InstInfo.Inst, InstInfo.FirstElement,
                                     InstInfo.NumElements);
 
-  // If this is a partial store into a struct and the whole struct hasn't been
-  // initialized, diagnose this as an error.
-  if (InstInfo.Kind == DIUseKind::PartialStore &&
-      Liveness.get(InstInfo.FirstElement) != DIKind::Yes) {
-    assert(InstInfo.NumElements == 1 && "partial stores are intra-element");
-    diagnoseInitError(InstInfo, diag::struct_not_fully_initialized);
-    return;
-  }
-
-  // Check to see if the store is either fully uninitialized or fully
+  // Check to see if the stored location is either fully uninitialized or fully
   // initialized.
   bool isFullyInitialized = true;
   bool isFullyUninitialized = true;
@@ -746,6 +738,38 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       isFullyInitialized = false;
     if (DI != DIKind::No)
       isFullyUninitialized = false;
+  }
+
+  // If this is a partial store into a struct and the whole struct hasn't been
+  // initialized, diagnose this as an error.
+  if (InstInfo.Kind == DIUseKind::PartialStore && !isFullyInitialized) {
+    assert(InstInfo.NumElements == 1 && "partial stores are intra-element");
+    diagnoseInitError(InstInfo, diag::struct_not_fully_initialized);
+    return;
+  }
+
+  // If this is a store to a 'let' property in an initializer, then we only
+  // allow the assignment if the property was completely uninitialized.
+  // Overwrites are not permitted.
+  if (TheMemory.IsSelfOfNonDelegatingInitializer &&
+      (InstInfo.Kind == DIUseKind::PartialStore || !isFullyUninitialized)) {
+
+    for (unsigned i = InstInfo.FirstElement, e = i+InstInfo.NumElements;
+         i != e; ++i) {
+      if (Liveness.get(i) == DIKind::No || !TheMemory.isElementLetProperty(i))
+        continue;
+
+      std::string PropertyName = "self";
+      auto *VD = TheMemory.getPathStringToElement(i, PropertyName);
+      diagnose(Module, InstInfo.Inst->getLoc(),
+               diag::immutable_property_already_initialized, PropertyName);
+      if (auto *Var = dyn_cast<VarDecl>(VD))
+        if (auto *InitPat = Var->getParentPattern())
+          if (InitPat->hasInit())
+            diagnose(Module, SILLocation(VD),
+                     diag::initial_value_provided_in_let_decl);
+      return;
+    }
   }
 
   // If this is an initialization or a normal assignment, upgrade the store to
@@ -777,6 +801,33 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // itself is tagged properly.
   updateInstructionForInitState(InstInfo);
 }
+
+void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
+  // inout uses are generally straight-forward: the memory must be initialized
+  // before the "address" is passed as an l-value.
+  if (!isInitializedAtUse(Use)) {
+    diagnoseInitError(Use, diag::variable_inout_before_initialized);
+    return;
+  }
+
+  // One additional check: 'let' properties may never be passed inout, because
+  // they are only allowed to have their initial value set, not a subsequent
+  // overwrite.
+  if (TheMemory.IsSelfOfNonDelegatingInitializer) {
+    for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
+         i != e; ++i) {
+      if (!TheMemory.isElementLetProperty(i))
+        continue;
+
+      std::string PropertyName = "self";
+      (void)TheMemory.getPathStringToElement(i, PropertyName);
+      diagnose(Module, Use.Inst->getLoc(),
+               diag::immutable_property_passed_inout, PropertyName);
+      return;
+    }
+  }
+}
+
 
 /// handleLoadUseFailure - Check and diagnose various failures when a load use
 /// is not fully initialized.

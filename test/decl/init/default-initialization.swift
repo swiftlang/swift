@@ -104,6 +104,3 @@ class MultipleInitDerived : MultipleInitBase {
   override init() { } // expected-error{{super.init isn't called before returning from initializer}}
 }
 
-// <rdar://problem/17501765> Swift should warn about immutable default initialized values
-let uselessValue : String?  // expected-warning {{immutable value is default initialized and can never be changed}}
-
