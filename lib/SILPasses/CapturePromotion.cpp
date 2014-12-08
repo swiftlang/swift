@@ -19,6 +19,8 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SILPasses/Transforms.h"
 
+#include <tuple>
+
 using namespace swift;
 
 typedef llvm::SmallSet<unsigned, 4> IndicesSet;
@@ -453,35 +455,35 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
   SILCloner<ClosureCloner>::visitLoadInst(Inst);
 }
 
+static std::pair<SILArgument *, SILArgument *> getBoxAndAddrFromIndex(
+                                                               SILFunction *F,
+                                                               unsigned Index) {
+  assert(F->isDefinition() && "Expected definition not external declaration!");
+  auto &Entry = F->front();
+  auto *Box = Entry.getBBArg(Index);
+  auto *Addr = Entry.getBBArg(Index + 1);
+
+  return std::make_pair(Box, Addr);
+}
+
+static SILFunction *getFunctionDefinition(SILValue FunctionValue) {
+  auto *FRI = dyn_cast<FunctionRefInst>(FunctionValue);
+  if (!FRI)
+    return nullptr;
+
+  auto *Fn = FRI->getReferencedFunction();
+  if (!Fn->isDefinition())
+    return nullptr;
+
+  return Fn;
+}
+
 /// \brief Given a partial_apply instruction and the argument index into its
 /// callee's argument list of a box argument (which is followed by an argument
 /// for the address of the box's contents), return true if the closure is known
 /// not to mutate the captured variable.
 static bool
-isNonmutatingCapture(PartialApplyInst *PAI, unsigned Index) {
-  // Return false if the callee is not a function with accessible contents.
-  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  if (!FRI)
-    return false;
-  assert(PAI->getCallee().getResultNumber() == 0);
-  SILFunction *Orig = FRI->getReferencedFunction();
-  if (Orig->empty())
-    return false;
-
-  // Obtain the arguments for the box and the address of its contents.
-  SILBasicBlock *OrigEntryBB = Orig->begin();
-  assert(Index + 1 < OrigEntryBB->bbarg_size() &&
-         "Too few arguments to entry block of capturing closure");
-  SILArgument *BoxArg = OrigEntryBB->getBBArgs()[Index];
-  SILArgument *AddrArg = OrigEntryBB->getBBArgs()[Index + 1];
-
-  // For now, return false is the address argument is an address-only type,
-  // since we currently assume loadable types only.
-  // TODO: handle address-only types
-  SILModule &M = PAI->getModule();
-  if (AddrArg->getType().isAddressOnly(M))
-    return false;
-
+isNonmutatingCapture(SILArgument *BoxArg, SILArgument *AddrArg) {
   // Conservatively do not allow any use of the box argument other than a
   // strong_release, since this is the pattern expected from SILGen.
   for (auto *O : BoxArg->getUses())
@@ -608,10 +610,25 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // index so is not stored separately);
       unsigned Index = OpNo - 2 + closureType->getParameters().size();
 
+      auto *Fn = getFunctionDefinition(PAI->getCallee());
+      if (!Fn)
+        return false;
+
+      SILArgument *BoxArg;
+      SILArgument *AddrArg;
+      std::tie(BoxArg, AddrArg) = getBoxAndAddrFromIndex(Fn, Index);
+
+      // For now, return false is the address argument is an address-only type,
+      // since we currently assume loadable types only.
+      // TODO: handle address-only types
+      SILModule &M = PAI->getModule();
+      if (AddrArg->getType().isAddressOnly(M))
+        return false;
+
       // Verify that this closure is known not to mutate the captured value; if
       // it does, then conservatively refuse to promote any captures of this
       // value.
-      if (!isNonmutatingCapture(PAI, Index))
+      if (!isNonmutatingCapture(BoxArg, AddrArg))
         return false;
 
       // Record the index and continue.
