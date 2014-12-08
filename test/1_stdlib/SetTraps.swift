@@ -3,9 +3,6 @@
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
 // RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out
 //
-// RUN: %target-run %t/a.out DuplicateKeys1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out DuplicateKeys2 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out DuplicateKeys3 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out RemoveInvalidIndex1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out RemoveInvalidIndex2 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out RemoveInvalidIndex3 2>&1 | FileCheck %s -check-prefix=CHECK
@@ -70,21 +67,6 @@ if true {
   // Sanity checks.  This code should not trap.
   var s = Set<BridgedVerbatimRefTy>()
   var nss: NSSet = s
-}
-
-if arg == "DuplicateKeys1" {
-  println("OK")
-  let s: Set<Int> = [10, 20, 30, 10]
-}
-
-if arg == "DuplicateKeys2" {
-  println("OK")
-  let s: Set<Int> = [10, 20, 30, 10]
-}
-
-if arg == "DuplicateKeys3" {
-  println("OK")
-  var s: Set<Int> = [10, 10]
 }
 
 if arg == "RemoveInvalidIndex1" {

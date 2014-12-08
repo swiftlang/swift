@@ -1882,11 +1882,16 @@ internal struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 %if Self == 'Set':
 
+    var count = 0
     for key in elements {
       var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
-        _precondition(!found, "${Self} literal contains duplicate keys")
+      if found {
+        continue
+      }
       nativeStorage[i.offset] = Element(key: key)
+      ++count
     }
+    nativeStorage.count = count
 
 %elif Self == 'Dictionary':
 
@@ -1895,10 +1900,10 @@ internal struct _Native${Self}Storage<${TypeParametersDecl}> :
       _precondition(!found, "${Self} literal contains duplicate keys")
       nativeStorage[i.offset] = Element(key: key, value: value)
     }
+    nativeStorage.count = elements.count
 
 %end
 
-    nativeStorage.count = elements.count
     return nativeStorage
   }
 }

@@ -2422,20 +2422,31 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
 // Public API
 
 SetTestSuite.test("init(SequenceType:)") {
-    let s1 = Set([1010, 2020, 3030])
-    var s2 = Set<Int>()
-    s2.insert(1010)
-    s2.insert(2020)
-    s2.insert(3030)
-    expectEqual(s1, s2)
+  let s1 = Set([1010, 2020, 3030])
+  var s2 = Set<Int>()
+  s2.insert(1010)
+  s2.insert(2020)
+  s2.insert(3030)
+  expectEqual(s1, s2)
 
-    // Test the uniquing capabilities of a set
-    let s3 = Set([
-      1010, 1010, 1010, 1010, 1010, 1010,
-      1010, 1010, 1010, 1010, 1010, 1010,
-      2020, 2020, 2020, 3030, 3030, 3030
-    ])
-    expectEqual(s1, s3)
+  // Test the uniquing capabilities of a set
+  let s3 = Set([
+    1010, 1010, 1010, 1010, 1010, 1010,
+    1010, 1010, 1010, 1010, 1010, 1010,
+    2020, 2020, 2020, 3030, 3030, 3030
+  ])
+  expectEqual(s1, s3)
+}
+
+SetTestSuite.test("init(arrayLiteral:)") {
+  let s1: Set<Int> = [1010, 2020, 3030, 1010, 2020, 3030]
+  let s2 = Set([1010, 2020, 3030])
+  var s3 = Set<Int>()
+  s3.insert(1010)
+  s3.insert(2020)
+  s3.insert(3030)
+  expectEqual(s1, s2)
+  expectEqual(s2, s3)
 }
 
 SetTestSuite.test("isSubsetOf.Set.Set") {
