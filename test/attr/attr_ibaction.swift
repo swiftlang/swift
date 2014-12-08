@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %target-build-swift -parse %s -Xfrontend -verify
 
 @IBAction // expected-error {{'IBAction' may only be used on 'func' declarations}}
 var iboutlet_global: Int
@@ -96,7 +96,6 @@ protocol CP2 : class { }
   // Other bad cases
   @IBAction func action30(_: S) {} // expected-error{{argument to 'IBAction' method cannot have non-object type}}
   @IBAction func action31(_: E) {} // expected-error{{argument to 'IBAction' method cannot have non-object type}}
-  @IBAction func action32(_: Int) {}  // expected-error{{argument to 'IBAction' method cannot have non-object type}}
 
   init() { }
 }

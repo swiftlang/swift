@@ -637,6 +637,21 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   auto Arguments = FD->getBodyParamPatterns()[1];
   auto ArgTuple = dyn_cast<TuplePattern>(Arguments);
 
+  auto checkSingleArgument = [this](const Pattern *argPattern) -> bool {
+    // One argument. May be a scalar on iOS (because of WatchKit).
+    if (isiOS(TC)) {
+      // Do a rough check to allow any ObjC-representable struct or enum type
+      // on iOS.
+      Type ty = argPattern->getType();
+      if (auto nominal = ty->getAnyNominal())
+        if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+          if (nominal->classifyAsOptionalType() == OTK_None)
+            if (TC.isTriviallyRepresentableInObjC(cast<FuncDecl>(D), ty))
+              return false;
+    }
+    return checkObjectOrOptionalObjectType(TC, D, argPattern);
+  };
+
   bool iOSOnlyUsedOnOSX = false;
   bool Valid = true;
   if (ArgTuple) {
@@ -650,8 +665,8 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
       }
       break;
     case 1:
-      // One argument.
-      if (checkObjectOrOptionalObjectType(TC, D, fields[0].getPattern()))
+      // One argument, see above.
+      if (checkSingleArgument(fields[0].getPattern()))
         Valid = false;
       break;
     case 2:
@@ -674,7 +689,7 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     }
   } else {
     // One argument without a name.
-    if (checkObjectOrOptionalObjectType(TC, D, Arguments))
+    if (checkSingleArgument(Arguments))
       Valid = false;
   }
 
