@@ -75,12 +75,12 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   assert(Importer && "No clang module loader!");
   auto &ClangContext = Importer->getClangASTContext();
 
-  auto *CGO = new clang::CodeGenOptions;
-  CGO->OptimizationLevel = Opts.Optimize ? 3 : 0;
-  CGO->DisableFPElim = Opts.DisableFPElim;
+  auto &CGO = Importer->getClangCodeGenOpts();
+  CGO.OptimizationLevel = Opts.Optimize ? 3 : 0;
+  CGO.DisableFPElim = Opts.DisableFPElim;
   auto &TO = ClangContext.getTargetInfo().getTargetOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, *CGO, TO,
+                                                ModuleName, CGO, TO,
                                                 LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
 

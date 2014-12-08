@@ -1,7 +1,4 @@
 // RUN: %target-run-simple-swift | FileCheck %s
-// FIXME: fails on iOS
-// FIXME: fails in JIT mode
-// REQUIRES: OS=macosx
 
 import GLKit
 

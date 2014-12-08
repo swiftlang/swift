@@ -559,6 +559,10 @@ public:
   clang::Preprocessor &getClangPreprocessor() const {
     return Instance->getPreprocessor();
   }
+  
+  clang::CodeGenOptions &getClangCodeGenOpts() const {
+    return Instance->getCodeGenOpts();
+  }
 
   /// Imports the given header contents into the Clang context.
   void importHeader(Module *adapter, StringRef headerName, SourceLoc diagLoc,

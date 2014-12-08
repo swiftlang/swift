@@ -2603,6 +2603,10 @@ clang::Sema &ClangImporter::getClangSema() const {
   return Impl.getClangSema();
 }
 
+clang::CodeGenOptions &ClangImporter::getClangCodeGenOpts() const {
+  return Impl.getClangCodeGenOpts();
+}
+
 std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash();
 }

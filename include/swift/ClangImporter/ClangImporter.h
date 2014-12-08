@@ -24,6 +24,7 @@ namespace llvm {
 
 namespace clang {
   class ASTContext;
+  class CodeGenOptions;
   class Decl;
   class MacroInfo;
   class Module;
@@ -183,6 +184,8 @@ public:
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const;
+  clang::CodeGenOptions &getClangCodeGenOpts() const;
+
   std::string getClangModuleHash() const;
 
   /// If we already imported a given decl, return the corresponding Swift decl.
