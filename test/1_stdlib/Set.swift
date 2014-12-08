@@ -118,20 +118,6 @@ func equalsUnordered(lhs: Set<Int>, rhs: Set<Int>) -> Bool {
   }
 }
 
-func equalsUnorderedPairs(lhs: [(Int, Int)], rhs: [(Int, Int)]) -> Bool {
-  let compareRight = { (a: (Int, Int), b: (Int, Int)) -> Bool in
-    return a.1 < b.1
-  }
-  let compareLeft = { (a: (Int, Int), b: (Int, Int)) -> Bool in
-    return a.0 < b.0
-  }
-  return equal(
-    sorted(sorted(lhs, compareRight), compareLeft),
-    sorted(sorted(rhs, compareRight), compareLeft)) {
-      $0.0 == $1.0 && $0.1 == $1.1
-  }
-}
-
 /// Get an NSSet of TestObjCKeyTy values
 func getAsNSSet(_ members: [Int] = [1010, 2020, 3030]) -> NSSet {
   let nsArray = NSMutableArray()
@@ -2929,7 +2915,7 @@ SetTestSuite.test("intersect") {
 
   let identity1 = unsafeBitCast(s1, Word.self)
   expectEqual(Set([1010, 2020, 3030]),
-    Set([1010, 2020, 3030]).intersect(Set([1010, 2020, 3030])))
+    Set([1010, 2020, 3030]).intersect(Set([1010, 2020, 3030])) as Set<Int>)
   expectEqual(identity1, unsafeBitCast(s1, Word.self))
 
   expectEqual(s1, s1.intersect(s3))
@@ -2948,7 +2934,7 @@ SetTestSuite.test("∩") {
 
   let identity1 = unsafeBitCast(s1, Word.self)
   expectEqual(Set([1010, 2020, 3030]),
-    Set([1010, 2020, 3030]) ∩ Set([1010, 2020, 3030]))
+    Set([1010, 2020, 3030]) ∩ Set([1010, 2020, 3030]) as Set<Int>)
   expectEqual(identity1, unsafeBitCast(s1, Word.self))
 
   expectEqual(s1, s1 ∩ s3)
@@ -3261,9 +3247,10 @@ SetTestSuite.test("Hashable") {
   let s2 = Set([2020])
   checkHashable(s1 == s2, s1, s2)
 
-  let ss1 = Set([Set([1010]), Set([2020]), Set([3030])])
-  let ss11 = Set([Set([2020]), Set([3030]), Set([2020])])
-  let ss2 = Set([Set([9090])])
+  // Explicit types help the type checker quite a bit.
+  let ss1 = Set([Set([1010] as [Int]), Set([2020] as [Int]), Set([3030] as [Int])])
+  let ss11 = Set([Set([2020] as [Int]), Set([3030] as [Int]), Set([2020] as [Int])])
+  let ss2 = Set([Set([9090] as [Int])])
   checkHashable(ss1 == ss11, ss1, ss11)
   checkHashable(ss1 == ss2, ss1, ss2)
 }
@@ -3275,16 +3262,16 @@ SetTestSuite.test("Operator.Precedence") {
   let s4 = Set([8080, 9090, 100100])
 
   // intersection higher precedence than union
-  expectEqual(s1 ∪ (s2 ∩ s3) ∪ s4, s1 ∪ s2 ∩ s3 ∪ s4)
+  expectEqual(s1 ∪ (s2 ∩ s3) ∪ s4, s1 ∪ s2 ∩ s3 ∪ s4 as Set<Int>)
 
   // intersection higher precedence than complement
-  expectEqual(s1 ∖ (s2 ∩ s3) ∖ s4, s1 ∖ s2 ∩ s3 ∖ s4)
+  expectEqual(s1 ∖ (s2 ∩ s3) ∖ s4, s1 ∖ s2 ∩ s3 ∖ s4 as Set<Int>)
 
   // intersection higher precedence than exclusive-or
-  expectEqual(s1 ⨁ (s2 ∩ s3) ⨁ s4, s1 ⨁ s2 ∩ s3 ⨁ s4)
+  expectEqual(s1 ⨁ (s2 ∩ s3) ⨁ s4, s1 ⨁ s2 ∩ s3 ⨁ s4 as Set<Int>)
 
   // union/complement/exclusive-or same precedence
-  expectEqual((((s1 ∪ s3) ∖ s2) ⨁ s4), s1 ∪ s3 ∖ s2 ⨁ s4)
+  expectEqual((((s1 ∪ s3) ∖ s2) ⨁ s4), s1 ∪ s3 ∖ s2 ⨁ s4 as Set<Int>)
 
   // ∪= should happen last.
   var s5 = Set([1010, 2020, 3030])

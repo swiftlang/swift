@@ -48,7 +48,8 @@ func equalsUnordered<T : Comparable>(
     return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
   }
   return equal(sorted(lhs, comparePair), sorted(rhs, comparePair)) {
-    $0.0 == $1.0 && $0.1 == $1.1
+    (lhs: (T, T), rhs: (T, T)) -> Bool in
+    lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
 }
 
