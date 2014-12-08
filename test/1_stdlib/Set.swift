@@ -2261,6 +2261,8 @@ SetTestSuite.test("SetDowncastEntryPoint") {
   expectTrue(sCC.contains(TestObjCKeyTy(1010)))
   expectTrue(sCC.contains(TestObjCKeyTy(2020)))
   expectTrue(sCC.contains(TestObjCKeyTy(3030)))
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("SetDowncast") {
@@ -2275,6 +2277,8 @@ SetTestSuite.test("SetDowncast") {
   expectTrue(sCC.contains(TestObjCKeyTy(1010)))
   expectTrue(sCC.contains(TestObjCKeyTy(2020)))
   expectTrue(sCC.contains(TestObjCKeyTy(3030)))
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("SetDowncastConditionalEntryPoint") {
@@ -2363,6 +2367,8 @@ SetTestSuite.test("SetBridgeFromObjectiveC") {
     expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
     expectTrue(sVC.contains(TestBridgedKeyTy(3030)))
   }
+
+  expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
 SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
