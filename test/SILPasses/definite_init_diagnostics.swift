@@ -821,6 +821,7 @@ struct rdar17207456Struct {
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
   let (u, v) : (Int, Int)
+  let w : (Int, Int)
   let x = 42    // expected-note{{initial value already provided in 'let' declaration}}
   let y : Int
   let z : Int?  // expected-note{{'self.z' not initialized}}
@@ -829,13 +830,16 @@ struct LetProperties {
   // path through an initializer.
   init(cond : Bool) {
     if cond {
+      w.0 = 4
       (u,v) = (4,2)
       y = 71
     } else {
       y = 13
       v = 2
       u = v+1
+      w.0 = 7
     }
+    w.1 = 19
     z = nil
   }
 
@@ -850,11 +854,17 @@ struct LetProperties {
     u = a   // expected-error {{immutable property 'self.u' may only be initialized once}}
     v = a   // expected-error {{immutable property 'self.v' may only be initialized once}}
 
+    w.0 = a
+    w.1 = a
+
+    w.0 = a  // expected-error {{immutable property 'self.w.0' may only be initialized once}}
+    w.1 = a  // expected-error {{immutable property 'self.w.1' may only be initialized once}}
+
   }  // expected-error {{return from initializer without initializing all stored properties}}
 
   // inout uses of let properties are an error.
   init() {
-    u = 1; v = 13; y = 1 ; z = u
+    u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
     var variable = 42
     swap(&u, &variable)  // expected-error {{immutable property 'self.u' may not be passed to an inout argument}}
