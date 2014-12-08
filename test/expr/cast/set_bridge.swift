@@ -55,10 +55,10 @@ func testUpcastBridge() {
   setO = setB
 
   // Upcast object to bridged type
-  setB = setO // expected-error{{'ObjC' is not identical to 'BridgedToObjC'}}
+  setB = setO // expected-error{{cannot assign a value of type 'Set<ObjC>' to a value of type 'Set<BridgedToObjC>'}}
 
   // Failed upcast
-  setD = setB // expected-error{{'BridgedToObjC' is not identical to 'DerivesObjC'}}
+  setD = setB // expected-error{{cannot assign a value of type 'Set<BridgedToObjC>' to a value of type 'Set<DerivesObjC>'}}
 }
 
 func testForcedDowncastBridge() {
@@ -69,11 +69,11 @@ func testForcedDowncastBridge() {
 
   setR as Set<BridgedToObjC>
   setO as Set<BridgedToObjC>
-  setD as Set<BridgedToObjC> // expected-error {{'DerivesObjC' is not identical to 'BridgedToObjC'}}
+  setD as Set<BridgedToObjC> // expected-error {{'Set<DerivesObjC>' is not convertible to 'Set<BridgedToObjC>'}}
 
   setB as Set<Root>
   setB as Set<ObjC>
-  setB as Set<DerivesObjC> // expected-error {{'BridgedToObjC' is not identical to 'DerivesObjC'}}
+  setB as Set<DerivesObjC> // expected-error {{'Set<BridgedToObjC>' is not convertible to 'Set<DerivesObjC>'}}
 }
 
 func testConditionalDowncastBridge() {
