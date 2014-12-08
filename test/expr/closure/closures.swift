@@ -227,7 +227,7 @@ var closureWithObservedProperty: () -> () = {
 
 
 
-// rdar://19179412 - Crash on invalid code.
+// rdar://19179412 - Crash on valid code.
 func rdar19179412() -> Int -> Int {
   return { x in
     class A {
