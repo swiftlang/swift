@@ -1509,13 +1509,9 @@ bool GeneralFailureDiagnosis::diagnoseGeneralConversionFailure() {
 
 bool GeneralFailureDiagnosis::diagnoseGeneralFailure() {
   
-  if (diagnoseGeneralValueMemberFailure() ||
-      diagnoseGeneralOverloadFailure() ||
-      diagnoseGeneralConversionFailure()) {
-    return true;
-  }
-  
-  return false;
+  return diagnoseGeneralValueMemberFailure() ||
+         diagnoseGeneralOverloadFailure() ||
+         diagnoseGeneralConversionFailure();
 }
 
 Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
@@ -1546,7 +1542,6 @@ void FailureDiagnosis::suggestPotentialOverloads(
   
   std::string suggestionText = "";
   std::map<std::string, bool> dupes;
-  auto iPL = 0;
 
   for (auto paramList : paramLists) {
     SmallVector<Type, 16> paramTypes;
@@ -1570,9 +1565,8 @@ void FailureDiagnosis::suggestPotentialOverloads(
         auto typeListString = getTypeListString(paramTypes);
         if (!dupes[typeListString]) {
           dupes[typeListString] = true;
-          if (iPL)
+          if (suggestionText.length())
             suggestionText += ", ";
-          iPL++;
           suggestionText += "(" + typeListString + ")";
         }
         break;
