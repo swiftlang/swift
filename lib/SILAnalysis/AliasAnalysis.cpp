@@ -238,6 +238,11 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
   // pointer, figure out if the indices of the GEPs tell us anything about the
   // derived pointers.
   if (Projection::isAddrProjection(V2)) {
+    assert(!Projection::isAddrProjection(O1) &&
+           "underlying object may not be a projection");
+    assert(!Projection::isAddrProjection(O2) &&
+           "underlying object may not be a projection");
+
     // Do the base pointers alias?
     AliasAnalysis::AliasResult BaseAlias = AA.alias(O1, O2);
 

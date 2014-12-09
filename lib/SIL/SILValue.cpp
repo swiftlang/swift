@@ -154,6 +154,7 @@ SILValue SILValue::stripAddressProjections() {
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
       V = cast<SILInstruction>(V.getDef())->getOperand(0);
       continue;
     default:
