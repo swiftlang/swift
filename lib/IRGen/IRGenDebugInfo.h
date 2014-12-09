@@ -62,7 +62,8 @@ typedef struct {
   Location LocForLinetable, Loc;
 } FullLocation;
 
-typedef llvm::DenseMap<const llvm::MDString *, llvm::WeakVH> WeakDIRefMap;
+typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
+        TrackingDIRefMap;
 
 enum IndirectionKind : bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
@@ -79,11 +80,11 @@ class IRGenDebugInfo {
   IRGenModule &IGM;
 
   // Various caches.
-  llvm::DenseMap<SILDebugScope *, llvm::WeakVH> ScopeCache;
-  llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
-  llvm::DenseMap<TypeBase *, llvm::WeakVH> DITypeCache;
-  std::map<std::string, llvm::WeakVH> DIModuleCache;
-  WeakDIRefMap DIRefMap;
+  llvm::DenseMap<SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
+  llvm::DenseMap<const char *, llvm::TrackingMDNodeRef> DIFileCache;
+  llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
+  std::map<std::string, llvm::TrackingMDNodeRef> DIModuleCache;
+  TrackingDIRefMap DIRefMap;
 
   llvm::SmallString<256> MainFilename;
   llvm::BumpPtrAllocator DebugInfoNames;
@@ -91,7 +92,7 @@ class IRGenDebugInfo {
   llvm::DICompileUnit TheCU;       /// The current compilation unit.
   llvm::DIFile MainFile;           /// The main file.
   llvm::DIModule MainModule;       /// The current module.
-  llvm::DIScope EntryPointFn;      /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  llvm::MDNode *EntryPointFn;      /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
   llvm::MDNode *InternalType;      /// Catch-all type for upaque internal types.
 
@@ -242,7 +243,7 @@ private:
   llvm::DITypeArray createParameterTypes(CanSILFunctionType FnTy,
                                      DeclContext *DeclCtx);
   llvm::DITypeArray createParameterTypes(SILType SILTy, DeclContext *DeclCtx);
-  void createParameterType(llvm::SmallVectorImpl<llvm::Value *> &Parameters,
+  void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType CanTy, DeclContext *DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags,

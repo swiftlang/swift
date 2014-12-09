@@ -460,7 +460,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     break;
   }
   case LibraryKind::Framework:
-    llvm::Value *args[] = {
+    llvm::Metadata *args[] = {
       llvm::MDString::get(ctx, "-framework"),
       llvm::MDString::get(ctx, linkLib.getName())
     };
@@ -506,10 +506,10 @@ void IRGenModule::emitAutolinkInfo() {
   static const char * const LinkerOptionsFlagName = "Linker Options";
 
   // Remove duplicates.
-  llvm::SmallPtrSet<llvm::Value*, 4> knownAutolinkEntries;
+  llvm::SmallPtrSet<llvm::Metadata*, 4> knownAutolinkEntries;
   AutolinkEntries.erase(std::remove_if(AutolinkEntries.begin(),
                                        AutolinkEntries.end(),
-                                       [&](llvm::Value *entry) -> bool {
+                                       [&](llvm::Metadata *entry) -> bool {
                                          return !knownAutolinkEntries.insert(
                                                    entry).second;
                                        }),

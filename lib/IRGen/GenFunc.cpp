@@ -1481,10 +1481,11 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       if (I->getParent() == IGF.Builder.GetInsertBlock()) {
         llvm::LLVMContext &ctx = IGF.IGM.Module.getContext();
         llvm::IntegerType *intType = dyn_cast<llvm::IntegerType>(v->getType());
-        llvm::Value *rangeElems[] = {
-          llvm::ConstantInt::get(intType, 0),
-          llvm::ConstantInt::get(intType,
-                             APInt::getSignedMaxValue(intType->getBitWidth()))
+        llvm::Metadata *rangeElems[] = {
+          llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(intType, 0)),
+          llvm::ConstantAsMetadata::get(
+              llvm::ConstantInt::get(intType,
+                  APInt::getSignedMaxValue(intType->getBitWidth())))
         };
         llvm::MDNode *range = llvm::MDNode::get(ctx, rangeElems);
         I->setMetadata(llvm::LLVMContext::MD_range, range);

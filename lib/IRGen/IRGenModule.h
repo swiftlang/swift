@@ -40,6 +40,7 @@ namespace llvm {
   class GlobalVariable;
   class IntegerType;
   class LLVMContext;
+  class Metadata;
   class Module;
   class PointerType;
   class StructType;
@@ -323,7 +324,7 @@ private:
   ///
   /// This is typed using llvm::Value instead of llvm::MDNode because it
   /// needs to be used to produce another MDNode during finalization.
-  SmallVector<llvm::Value *, 32> AutolinkEntries;
+  SmallVector<llvm::Metadata *, 32> AutolinkEntries;
 
   /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakVH, 4> ObjCClasses;

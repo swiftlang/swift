@@ -135,7 +135,7 @@ llvm::Value *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
                             "clang.arc.retainAutoreleasedReturnValueMarker");
     assert(metadata->getNumOperands() <= 1);
     if (metadata->getNumOperands() == 0) {
-      llvm::Value *string = llvm::MDString::get(LLVMContext, asmString);
+      auto *string = llvm::MDString::get(LLVMContext, asmString);
       metadata->addOperand(llvm::MDNode::get(LLVMContext, string));
     }
 

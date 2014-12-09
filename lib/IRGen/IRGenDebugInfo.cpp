@@ -93,10 +93,10 @@ static void mangleIdent(llvm::raw_string_ostream &OS, StringRef Id) {
   return;
 }
 
-/// Resolve a DITypeRef using our WeakVH-based map.
+/// Resolve a DITypeRef using our TrackingMDNodeRef-based map.
 static llvm::DIType resolve(const llvm::DITypeRef TyRef,
-                            const WeakDIRefMap &Map) {
-  llvm::Value *Val = TyRef;
+                            const TrackingDIRefMap &Map) {
+  llvm::Metadata *Val = TyRef;
   if (!Val)
     return llvm::DIType();
 
@@ -109,8 +109,7 @@ static llvm::DIType resolve(const llvm::DITypeRef TyRef,
   // Find the corresponding MDNode.
   auto I = Map.find(cast<llvm::MDString>(Val));
   assert(I != Map.end() && "Identifier not in the type map?");
-  llvm::Value *value = I->second;
-  llvm::DIType DITy(cast<llvm::MDNode>(value));
+  llvm::DIType DITy(cast<llvm::MDNode>(I->second));
   assert(DITy.Verify() && "MDNode in DITypeIdentifierMap should be a DIType.");
   return DITy;
 
@@ -118,7 +117,7 @@ static llvm::DIType resolve(const llvm::DITypeRef TyRef,
 
 /// Return the size reported by a type.
 static unsigned getSizeInBits(llvm::DIType Ty,
-                              const WeakDIRefMap &Map) {
+                              const TrackingDIRefMap &Map) {
   // Follow derived types until we reach a type that
   // reports back a size.
   while (Ty.isDerivedType() && !Ty.getSizeInBits()) {
@@ -130,7 +129,7 @@ static unsigned getSizeInBits(llvm::DIType Ty,
 
 /// Return the size reported by the variable's type.
 static unsigned getSizeInBits(const llvm::DIVariable Var,
-                              const WeakDIRefMap &Map) {
+                              const TrackingDIRefMap &Map) {
   llvm::DIType Ty = resolve(Var.getType(), Map);
   return getSizeInBits(Ty, Map);
 }
@@ -146,6 +145,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
     M(M),
     DBuilder(M),
     IGM(IGM),
+    EntryPointFn(nullptr),
     MetadataTypeDecl(nullptr),
     InternalType(nullptr),
     LastDebugLoc({}),
@@ -194,7 +194,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   if (IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
     IsLibrary = false;
-    EntryPointFn = DBuilder.createForwardDecl(
+    EntryPointFn = DBuilder.createReplaceableForwardDecl(
         llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
         MainFile, MainFile, 0);
   }
@@ -470,7 +470,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     llvm::DIDescriptor SP = emitFunction(*DS->SILFn, Fn);
 
     // Cache it.
-    ScopeCache[DS] = llvm::WeakVH(SP);
+    ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
     return SP;
   }
 
@@ -485,7 +485,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
       DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col);
 
   // Cache it.
-  ScopeCache[DS] = llvm::WeakVH(DScope);
+  ScopeCache[DS] = llvm::TrackingMDNodeRef(DScope);
 
   return DScope;
 }
@@ -512,7 +512,7 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
 
   if (CachedFile != DIFileCache.end()) {
     // Verify that the information still exists.
-    if (llvm::Value *V = CachedFile->second)
+    if (llvm::Metadata *V = CachedFile->second)
       return llvm::DIFile(cast<llvm::MDNode>(V));
   }
 
@@ -527,7 +527,7 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   llvm::DIFile F = DBuilder.createFile(File, BumpAllocatedString(Path));
 
   // Cache it.
-  DIFileCache[Filename] = llvm::WeakVH(F);
+  DIFileCache[Filename] = llvm::TrackingMDNodeRef(F);
   return F;
 }
 
@@ -606,7 +606,7 @@ llvm::DIScope IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   case DeclContextKind::ExtensionDecl:
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::TopLevelCodeDecl:
-    return EntryPointFn;
+    return llvm::DIScope(EntryPointFn);
   case DeclContextKind::Module: {
     auto File = getOrCreateFile(getFilenameFromDC(DC));
     return getOrCreateModule(TheCU, cast<Module>(DC)->getName().str(), File);
@@ -619,7 +619,7 @@ llvm::DIScope IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
         cast<NominalTypeDecl>(DC)->getDeclaredType().getPointer());
     if (CachedType != DITypeCache.end()) {
       // Verify that the information still exists.
-      if (llvm::Value *Val = CachedType->second) {
+      if (llvm::Metadata *Val = CachedType->second) {
         auto DITy = llvm::DIType(cast<llvm::MDNode>(Val));
         if (DITy.Verify())
           return DITy;
@@ -644,7 +644,7 @@ llvm::DIScope IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
 
 /// Create a single parameter type and push it.
 void IRGenDebugInfo::createParameterType(
-    llvm::SmallVectorImpl<llvm::Value *> &Parameters, SILType type,
+    llvm::SmallVectorImpl<llvm::Metadata *> &Parameters, SILType type,
     DeclContext *DeclCtx) {
   // FIXME: This use of getSwiftType() is extremely suspect.
   DebugTypeInfo DbgTy(type.getSwiftType(), IGM.getTypeInfo(type), DeclCtx);
@@ -662,7 +662,7 @@ llvm::DITypeArray IRGenDebugInfo::createParameterTypes(SILType SILTy,
 /// Create the array of function parameters for a function type.
 llvm::DITypeArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                                    DeclContext *DeclCtx) {
-  SmallVector<llvm::Value *, 16> Parameters;
+  SmallVector<llvm::Metadata *, 16> Parameters;
 
   GenericContextScope Scope(IGM, FnTy->getGenericSignature());
 
@@ -768,13 +768,19 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
       ScopeLine, Flags, IsOptimized, Fn, TemplateParameters, Decl);
 
   // RAUW the entry point function forward declaration with the real thing.
-  if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION)
-    EntryPointFn->replaceAllUsesWith(SP);
+  if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
+    assert(isa<llvm::MDNodeFwdDecl>(EntryPointFn) &&
+           "more than one entry point function");
+    auto tmp = cast<llvm::MDNodeFwdDecl>(EntryPointFn);
+    tmp->replaceAllUsesWith(SP);
+    llvm::MDNode::deleteTemporary(tmp);
+    EntryPointFn = SP;
+  }
 
   if (!DS)
     return llvm::DIDescriptor();
 
-  ScopeCache[DS] = llvm::WeakVH(SP);
+  ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
   return SP;
 }
 
@@ -852,11 +858,11 @@ llvm::DIModule IRGenDebugInfo::getOrCreateModule(llvm::DIScope Parent,
 
   if (CachedM != DIModuleCache.end())
     // Verify that the information still exists.
-    if (llvm::Value *Val = CachedM->second)
+    if (llvm::Metadata *Val = CachedM->second)
       return llvm::DIModule(cast<llvm::MDNode>(Val));
 
   auto M = DBuilder.createModule(Parent, Name, File, 1);
-  DIModuleCache[Name] = llvm::WeakVH(M);
+  DIModuleCache[Name] = llvm::TrackingMDNodeRef(M);
   return M;
 }
 
@@ -889,7 +895,8 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
   return MetadataTypeDecl;
 }
 
-void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
+void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
+                                      llvm::Value *Metadata,
                                       StringRef Name) {
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
@@ -968,11 +975,11 @@ static uint64_t getSizeFromExplosionValue(const clang::TargetInfo &TI,
 /// A generator that recursively returns the size of each element of a
 /// composite type.
 class ElementSizes {
-  const WeakDIRefMap &DIRefMap;
+  const TrackingDIRefMap &DIRefMap;
   SmallVector<const llvm::MDNode *, 12> Stack;
 
 public:
-  ElementSizes(const llvm::MDNode *DITy, const WeakDIRefMap &DIRefMap)
+  ElementSizes(const llvm::MDNode *DITy, const TrackingDIRefMap &DIRefMap)
       : DIRefMap(DIRefMap), Stack(1, DITy) {}
 
   struct SizeAlign {
@@ -1210,7 +1217,7 @@ llvm::DIDerivedType IRGenDebugInfo::createMemberType(
 llvm::DIArray IRGenDebugInfo::getTupleElements(
     TupleType *TupleTy, llvm::DIDescriptor Scope, llvm::DIFile File,
     unsigned Flags, DeclContext *DeclContext, unsigned &SizeInBits) {
-  SmallVector<llvm::Value *, 16> Elements;
+  SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (auto ElemTy : TupleTy->getElementTypes()) {
     DebugTypeInfo DbgTy(ElemTy, IGM.getTypeInfoForUnlowered(ElemTy),
@@ -1228,7 +1235,7 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
                                                llvm::DIFile File,
                                                unsigned Flags,
                                                unsigned &SizeInBits) {
-  SmallVector<llvm::Value *, 16> Elements;
+  SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (VarDecl *VD : D->getStoredProperties()) {
     auto memberTy =
@@ -1253,9 +1260,9 @@ llvm::DICompositeType IRGenDebugInfo::createStructType(
   StringRef Name = Decl->getName().str();
 
   // Forward declare this first because types may be recursive.
-  auto FwdDecl = DBuilder.createForwardDecl(
+  auto FwdDecl = DBuilder.createReplaceableForwardDecl(
       llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
-      llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
+        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
 
 #ifndef NDEBUG
   if (UniqueID.empty())
@@ -1265,15 +1272,16 @@ llvm::DICompositeType IRGenDebugInfo::createStructType(
            "UID is not a mangled name");
 #endif
 
-  llvm::WeakVH VH(FwdDecl);
-  DITypeCache[DbgTy.getType()] = VH;
-  DIRefMap[llvm::MDString::get(IGM.getLLVMContext(), UniqueID)] = VH;
+  auto TH = llvm::TrackingMDNodeRef(FwdDecl);
+  DITypeCache[DbgTy.getType()] = TH;
+  DIRefMap[llvm::MDString::get(IGM.getLLVMContext(), UniqueID)] = TH;
   auto Members = getStructMembers(Decl, BaseTy, Scope, File, Flags, SizeInBits);
   auto DITy = DBuilder.createStructType(
       Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
       Members, RuntimeLang, llvm::DIType(), UniqueID);
 
-  FwdDecl->replaceAllUsesWith(DITy);
+  cast<llvm::MDNodeFwdDecl>(FwdDecl.get())->replaceAllUsesWith(DITy);
+  llvm::MDNode::deleteTemporary(FwdDecl);
   return DITy;
 }
 
@@ -1282,7 +1290,7 @@ llvm::DIArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
                                               llvm::DIDescriptor Scope,
                                               llvm::DIFile File,
                                               unsigned Flags) {
-  SmallVector<llvm::Value *, 16> Elements;
+  SmallVector<llvm::Metadata *, 16> Elements;
   for (auto *ElemDecl : D->getAllElements()) {
     // FIXME <rdar://problem/14845818> Support enums.
     // Swift Enums can be both like DWARF enums and DWARF unions.
@@ -1325,20 +1333,22 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
 
   // FIXME: Is DW_TAG_union_type the right thing here?
   // Consider using a DW_TAG_variant_type instead.
-  auto FwdDecl = DBuilder.createForwardDecl(
+  auto FwdDecl =
+    DBuilder.createReplaceableForwardDecl(
       llvm::dwarf::DW_TAG_union_type, MangledName, Scope, File, Line,
-      llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
+        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
 
-  llvm::WeakVH VH(FwdDecl);
-  DITypeCache[DbgTy.getType()] = VH;
-  DIRefMap[llvm::MDString::get(IGM.getLLVMContext(), MangledName)] = VH;
+  auto TH = llvm::TrackingMDNodeRef(FwdDecl);
+  DITypeCache[DbgTy.getType()] = TH;
+  DIRefMap[llvm::MDString::get(IGM.getLLVMContext(), MangledName)] = TH;
 
   auto DITy = DBuilder.createUnionType(
       Scope, MangledName, File, Line, SizeInBits, AlignInBits, Flags,
       getEnumElements(DbgTy, Decl, Scope, File, Flags),
       llvm::dwarf::DW_LANG_Swift);
 
-  FwdDecl->replaceAllUsesWith(DITy);
+  cast<llvm::MDNodeFwdDecl>(FwdDecl.get())->replaceAllUsesWith(DITy);
+  llvm::MDNode::deleteTemporary(FwdDecl);
   return DITy;
 }
 
@@ -1385,7 +1395,7 @@ llvm::DIType IRGenDebugInfo::createPointerSizedStruct(
   unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
   unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
   auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign);
-  llvm::Value *Elements[] = {
+  llvm::Metadata *Elements[] = {
     DBuilder.createMemberType(Scope, "pointer", File, 0,
                               PtrSize, PtrAlign, 0, Flags, PtrTy)
   };
@@ -1638,7 +1648,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         DerivedFrom, llvm::DIArray(), llvm::dwarf::DW_LANG_Swift,
         llvm::DIType(), MangledName);
     // Emit the protocols the archetypes conform to.
-    SmallVector<llvm::Value *, 4> Protocols;
+    SmallVector<llvm::Metadata *, 4> Protocols;
     for (auto *ProtocolDecl : Archetype->getConformsTo()) {
       auto PTy = IGM.SILMod->Types.getLoweredType(ProtocolDecl->getType())
                      .getSwiftRValueType();
@@ -1841,7 +1851,7 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
   auto CachedType = DITypeCache.find(DbgTy.getType());
   if (CachedType != DITypeCache.end()) {
     // Verify that the information still exists.
-    if (llvm::Value *Val = CachedType->second) {
+    if (llvm::Metadata *Val = CachedType->second) {
       auto DITy = llvm::DIType(cast<llvm::MDNode>(Val));
       if (DITy.Verify())
         return DITy;
@@ -1856,7 +1866,7 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
   if (canMangle(DbgTy.getType())) {
     MangledName = getMangledName(DbgTy);
     UID = llvm::MDString::get(IGM.getLLVMContext(), MangledName);
-    if (llvm::Value *CachedTy = DIRefMap.lookup(UID)) {
+    if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID)) {
       auto DITy = llvm::DIType(cast<llvm::MDNode>(CachedTy));
       if (DITy.Verify())
         return DITy;
@@ -1879,7 +1889,7 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
   if (DITy.isCompositeType()) {
 #ifndef NDEBUG
     // Sanity check.
-    if (llvm::Value *V = DIRefMap.lookup(UID)) {
+    if (llvm::Metadata *V = DIRefMap.lookup(UID)) {
       llvm::DIType CachedTy(cast<llvm::MDNode>(V));
       if (CachedTy.Verify())
         assert(CachedTy == DITy && "conflicting types for one UID");
@@ -1888,11 +1898,11 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
       assert(UID->getString() == MangledName &&
              "Unique identifier is different from mangled name ");
 #endif
-    DIRefMap[UID] = llvm::WeakVH(DITy);
+    DIRefMap[UID] = llvm::TrackingMDNodeRef(DITy);
   }
 
   // Store it in the cache.
-  DITypeCache[DbgTy.getType()] = llvm::WeakVH(DITy);
+  DITypeCache[DbgTy.getType()] = llvm::TrackingMDNodeRef(DITy);
 
   return DITy;
 }
